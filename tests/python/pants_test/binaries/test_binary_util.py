@@ -10,7 +10,7 @@ import re
 
 import mock
 
-from pants.binaries.binary_util import BinaryUtil
+from pants.binaries.binary_util import BinaryUtilPrivate
 from pants.net.http.fetcher import Fetcher
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
@@ -49,16 +49,16 @@ class BinaryUtilTest(BaseTest):
 
   @classmethod
   def _fake_url(cls, binaries, base, binary_key):
-    binary_util = BinaryUtil([], 0, '/tmp')
+    binary_util = BinaryUtilPrivate([], 0, '/tmp')
     supportdir, version, name = binaries[binary_key]
     binary = binary_util._select_binary_base_path(supportdir, version, binary_key)
     return '{base}/{binary}'.format(base=base, binary=binary)
 
   def test_timeout(self):
     fetcher = mock.create_autospec(Fetcher, spec_set=True)
-    binary_util = BinaryUtil(baseurls=['http://binaries.example.com'],
-                             timeout_secs=42,
-                             bootstrapdir='/tmp')
+    binary_util = BinaryUtilPrivate(baseurls=['http://binaries.example.com'],
+                                    timeout_secs=42,
+                                    bootstrapdir='/tmp')
     self.assertFalse(fetcher.download.called)
 
     with binary_util._select_binary_stream('a-binary', 'a-binary/v1.2/a-binary', fetcher=fetcher):
@@ -69,7 +69,7 @@ class BinaryUtilTest(BaseTest):
 
   def test_nobases(self):
     """Tests exception handling if build support urls are improperly specified."""
-    binary_util = BinaryUtil(baseurls=[], timeout_secs=30, bootstrapdir='/tmp')
+    binary_util = BinaryUtilPrivate(baseurls=[], timeout_secs=30, bootstrapdir='/tmp')
     with self.assertRaises(binary_util.NoBaseUrlsError):
       binary_path = binary_util._select_binary_base_path(supportdir='bin/protobuf',
                                                          version='2.4.1',
@@ -81,7 +81,7 @@ class BinaryUtilTest(BaseTest):
     """Tests to make sure existing base urls function as expected."""
 
     with temporary_dir() as invalid_local_files, temporary_dir() as valid_local_files:
-      binary_util = BinaryUtil(
+      binary_util = BinaryUtilPrivate(
         baseurls=[
           'BLATANTLY INVALID URL',
           'https://dl.bintray.com/pantsbuild/bin/reasonably-invalid-url',
@@ -110,7 +110,7 @@ class BinaryUtilTest(BaseTest):
     """
     fake_base, fake_url = self._fake_base, self._fake_url
     bases = [fake_base('apple'), fake_base('orange'), fake_base('banana')]
-    binary_util = BinaryUtil(bases, 30, '/tmp')
+    binary_util = BinaryUtilPrivate(bases, 30, '/tmp')
 
     binaries = {t[2]: t for t in (('bin/protobuf', '2.4.1', 'protoc'),
                                   ('bin/ivy', '4.3.7', 'ivy'),
@@ -138,7 +138,7 @@ class BinaryUtilTest(BaseTest):
     self.assertEqual(0, len(unseen))  # Make sure we've seen all the SEENs.
 
   def test_select_binary_base_path_linux(self):
-    binary_util = BinaryUtil([], 0, '/tmp')
+    binary_util = BinaryUtilPrivate([], 0, '/tmp')
 
     def uname_func():
       return "linux", "dontcare1", "dontcare2", "dontcare3", "amd64"
@@ -148,7 +148,7 @@ class BinaryUtilTest(BaseTest):
                                                            uname_func=uname_func))
 
   def test_select_binary_base_path_darwin(self):
-    binary_util = BinaryUtil([], 0, '/tmp')
+    binary_util = BinaryUtilPrivate([], 0, '/tmp')
 
     def uname_func():
       return "darwin", "dontcare1", "14.9", "dontcare2", "dontcare3",
@@ -158,30 +158,30 @@ class BinaryUtilTest(BaseTest):
                                                            uname_func=uname_func))
 
   def test_select_binary_base_path_missing_os(self):
-    binary_util = BinaryUtil([], 0, '/tmp')
+    binary_util = BinaryUtilPrivate([], 0, '/tmp')
 
     def uname_func():
       return "vms", "dontcare1", "999.9", "dontcare2", "VAX9"
 
-    with self.assertRaisesRegexp(BinaryUtil.MissingMachineInfo,
+    with self.assertRaisesRegexp(BinaryUtilPrivate.MissingMachineInfo,
                                  r'Pants has no binaries for vms'):
       binary_util._select_binary_base_path("supportdir", "version", "name", uname_func=uname_func)
 
   def test_select_binary_base_path_missing_version(self):
-    binary_util = BinaryUtil([], 0, '/tmp')
+    binary_util = BinaryUtilPrivate([], 0, '/tmp')
 
     def uname_func():
       return "darwin", "dontcare1", "999.9", "dontcare2", "x86_64"
 
     os_id = ('darwin', '999')
-    with self.assertRaisesRegexp(BinaryUtil.MissingMachineInfo,
+    with self.assertRaisesRegexp(BinaryUtilPrivate.MissingMachineInfo,
                                  r'myname.*Update --binaries-path-by-id to find binaries for '
                                  r'{}'.format(re.escape(repr(os_id)))):
       binary_util._select_binary_base_path("supportdir", "myversion", "myname", uname_func=uname_func)
 
   def test_select_binary_base_path_override(self):
-    binary_util = BinaryUtil([], 0, '/tmp',
-                             {('darwin', '100'): ['skynet', '42']})
+    binary_util = BinaryUtilPrivate([], 0, '/tmp',
+                                    {('darwin', '100'): ['skynet', '42']})
 
     def uname_func():
       return "darwin", "dontcare1", "100.99", "dontcare2", "t1000"

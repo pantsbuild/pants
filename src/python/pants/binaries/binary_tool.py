@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from pants.binaries.binary_util import BinaryUtil
+from pants.binaries.binary_util import BinaryUtilPrivate
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
 
@@ -46,7 +46,7 @@ class BinaryToolBase(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
+    return super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtilPrivate.Factory,)
 
   @classmethod
   def register_options(cls, register):
@@ -105,7 +105,7 @@ class BinaryToolBase(Subsystem):
 
   @memoized_property
   def _binary_util(self):
-    return BinaryUtil.Factory.create()
+    return BinaryUtilPrivate.Factory.create()
 
   @classmethod
   def get_support_dir(cls):

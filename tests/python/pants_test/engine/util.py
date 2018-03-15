@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import re
 
-from pants.binaries.binary_util import BinaryUtil
+from pants.binaries.binary_util import BinaryUtilPrivate
 from pants.engine.addressable import SubclassesOf, addressable_list
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
@@ -20,7 +20,7 @@ from pants_test.subsystem.subsystem_util import init_subsystem
 
 def init_native():
   """Initialize and return a `Native` instance."""
-  init_subsystem(BinaryUtil.Factory)
+  init_subsystem(BinaryUtilPrivate.Factory)
   opts = create_options_for_optionables([])
   return Native.create(opts.for_global_scope())
 

@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.deprecated import deprecated
-from pants.binaries.binary_util import BinaryUtil
+from pants.binaries.binary_util import BinaryUtilPrivate
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -25,7 +25,8 @@ class ThriftBinary(object):
 
     @classmethod
     def subsystem_dependencies(cls):
-      return super(ThriftBinary.Factory, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
+      return (super(ThriftBinary.Factory, cls).subsystem_dependencies() +
+              (BinaryUtilPrivate.Factory,))
 
     @classmethod
     def register_options(cls, register):
@@ -48,7 +49,7 @@ class ThriftBinary(object):
       """
       # NB: create is an instance method to allow the user to choose global or scoped.
       # Its not unreasonable to imagine python and jvm stacks using different versions.
-      binary_util = BinaryUtil.Factory.create()
+      binary_util = BinaryUtilPrivate.Factory.create()
       options = self.get_options()
       return ThriftBinary(binary_util, options.supportdir, options.version)
 

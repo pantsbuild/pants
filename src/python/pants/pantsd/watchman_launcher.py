@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from pants.binaries.binary_util import BinaryUtil
+from pants.binaries.binary_util import BinaryUtilPrivate
 from pants.pantsd.watchman import Watchman
 from pants.util.memo import testable_memoized_property
 
@@ -20,7 +20,7 @@ class WatchmanLauncher(object):
     """
     :param Options bootstrap_options: The bootstrap options bag.
     """
-    binary_util = BinaryUtil(
+    binary_util = BinaryUtilPrivate(
       bootstrap_options.binaries_baseurls,
       bootstrap_options.binaries_fetch_timeout_secs,
       bootstrap_options.pants_bootstrapdir,

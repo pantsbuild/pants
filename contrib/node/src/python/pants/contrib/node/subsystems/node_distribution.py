@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import filecmp
 import logging
 import os
 import shutil
@@ -12,9 +13,7 @@ from collections import namedtuple
 
 from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
-from pants.base.hash_utils import hash_file
 from pants.binaries.binary_tool import NativeTool
-from pants.binaries.binary_util import BinaryUtil
 from pants.option.custom_types import dir_option, file_option
 from pants.util.dirutil import safe_mkdir, safe_rmtree
 from pants.util.memo import memoized_method, memoized_property
@@ -269,6 +268,8 @@ class NodeDistribution(NativeTool):
     shutil.copytree(self.eslint_setupdir, bootstrapped_support_path)
     return True
 
+  _eslint_required_files = ['yarn.lock', 'package.json']
+
   def eslint_supportdir(self, task_workdir):
     """ Returns the path where the ESLint is bootstrapped.
     
@@ -285,18 +286,21 @@ class NodeDistribution(NativeTool):
     # clean up the directory so that Pants can install a pre-defined eslint version later on.
     # Otherwise, if there is no configurations changes, rely on the cache.
     # If there is a config change detected, use the new configuration.
-    configured = False
     if self.eslint_setupdir:
-      configured = self._binary_util.is_bin_valid(self.eslint_setupdir,
-                                           [BinaryUtil.BinaryFileSpec('package.json'),
-                                            BinaryUtil.BinaryFileSpec('yarn.lock')])
+      configured = all(os.path.exists(os.path.join(self.eslint_setupdir, f))
+                       for f in self._eslint_required_files)
+    else:
+      configured = False
     if not configured:
       safe_mkdir(bootstrapped_support_path, clean=True)
     else:
-      binary_file_specs = [
-        BinaryUtil.BinaryFileSpec(f, hash_file(os.path.join(self.eslint_setupdir, f)))
-        for f in ['yarn.lock', 'package.json']]
-      installed = self._binary_util.is_bin_valid(bootstrapped_support_path, binary_file_specs)
+      try:
+        installed = all(filecmp.cmp(
+          os.path.join(self.eslint_setupdir, f), os.path.join(bootstrapped_support_path, f))
+        for f in self._eslint_required_files)
+      except OSError:
+        installed = False
+
       if not installed:
         self._configure_eslinter(bootstrapped_support_path)
     return bootstrapped_support_path, configured
