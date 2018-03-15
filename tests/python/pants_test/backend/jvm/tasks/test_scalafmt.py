@@ -5,68 +5,142 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+import os
+from textwrap import dedent
+
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.targets.junit_tests import JUnitTests
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
+from pants.base.exceptions import TaskError
+from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.resources import Resources
+from pants.source.source_root import SourceRootConfig
+from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
-TEST_DIR = 'testprojects/src/scala/org/pantsbuild/testproject'
+class ScalaFmtTestBase(NailgunTaskTestBase):
+  @property
+  def alias_groups(self):
+    return super(ScalaFmtTestBase, self).alias_groups.merge(
+      BuildFileAliases(targets={'java_tests': JUnitTests,
+                                'junit_tests': JUnitTests,
+                                'scala_library': ScalaLibrary}))
+
+  def setUp(self):
+    super(ScalaFmtTestBase, self).setUp()
+
+    init_subsystem(ScalaPlatform)
+    init_subsystem(SourceRootConfig)
+
+    self.configuration = self.create_file(
+      relpath='build-support/scalafmt/config',
+      contents=dedent("""
+      align.arrowEnumeratorGenerator = true
+      align.openParenCallSite = false
+      align.openParenDefnSite = false
+      assumeStandardLibraryStripMargin = false
+      binPack.parentConstructors = false
+      continuationIndent.callSite = 4
+      continuationIndent.defnSite = 4
+      maxColumn = 100
+      newlines.sometimesBeforeColonInMethodReturnType = true
+      spaces.afterTripleEquals = true
+      spaces.inImportCurlyBraces = false
+      """)
+    )
+
+    self.test_file_contents = dedent(
+      b"""
+      package org.pantsbuild.badscalastyle
+
+      /**
+       * These comments are formatted incorrectly
+       * and the parameter list is too long for one line
+       */
+      case class ScalaStyle(one: String,two: String,three: String,four: String,
+          five: String,six: String,seven: String,eight: String,  nine: String)
+
+      class Person(name: String,age: Int,astrologicalSign: String,
+          shoeSize: Int,
+          favoriteColor: java.awt.Color) {
+        def getAge:Int={return age}
+        def sum(longvariablename: List[String]): Int = {
+          longvariablename.map(_.toInt).foldLeft(0)(_ + _)
+        }
+      }
+      """
+    )
+    self.test_file = self.create_file(
+      relpath='src/scala/org/pantsbuild/badscalastyle/BadScalaStyle.scala',
+      contents=self.test_file_contents
+    )
+    self.library = self.make_target(spec='src/scala/org/pantsbuild/badscalastyle',
+                                    sources=['BadScalaStyle.scala'],
+                                    target_type=ScalaLibrary)
+    self.as_resources = self.make_target(spec='src/scala/org/pantsbuild/badscalastyle:as_resources',
+                                         target_type=Resources,
+                                         sources=['BadScalaStyle.scala'],
+                                         description='Depends on the same sources as the target '
+                                                     'above, but as resources.')
 
 
-class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
+class ScalaFmtCheckFormatTest(ScalaFmtTestBase):
+
+  @classmethod
+  def task_type(cls):
+    return ScalaFmtCheckFormat
+
   def test_scalafmt_fail_default_config(self):
-    target = '{}/badscalastyle'.format(TEST_DIR)
-    # test should fail because of style error.
-    failing_test = self.run_pants(['lint', target],
-      {'lint.scalafmt':{'skip':'False'}})
-    self.assert_failure(failing_test)
+    self.set_options(skip=False)
+    context = self.context(target_roots=self.library)
+    with self.assertRaises(TaskError):
+      self.execute(context)
 
   def test_scalafmt_fail(self):
-    target = '{}/badscalastyle'.format(TEST_DIR)
-    # test should fail because of style error.
-    failing_test = self.run_pants(['lint', target],
-      {'lint.scalafmt':{'skip':'False',
-      'configuration':'%(pants_supportdir)s/scalafmt/config'}})
-    self.assert_failure(failing_test)
+    self.set_options(skip=False, configuration=self.configuration)
+    context = self.context(target_roots=self.library)
+    with self.assertRaises(TaskError):
+      self.execute(context)
 
   def test_scalafmt_disabled(self):
-    target = '{}/badscalastyle'.format(TEST_DIR)
-    # test should pass because of scalafmt disabled.
-    failing_test = self.run_pants(['lint', target],
-      {'lint.scalafmt': {'skip':'True'}})
-    self.assert_success(failing_test)
-
-  def test_scalafmt_format_default_config(self):
-    self.format_file_and_verify_fmt({'skip':'False'})
-
-  def test_scalafmt_format(self):
-    self.format_file_and_verify_fmt({'skip':'False',
-      'configuration':'%(pants_supportdir)s/scalafmt/config'})
-
-  def format_file_and_verify_fmt(self, options):
-    # take a snapshot of the file which we can write out
-    # after the test finishes executing.
-    test_file_name = '{}/badscalastyle/BadScalaStyle.scala'.format(TEST_DIR)
-    with open(test_file_name, 'r') as f:
-      contents = f.read()
-
-    try:
-      # format an incorrectly formatted file.
-      target = '{}/badscalastyle'.format(TEST_DIR)
-      fmt_result = self.run_pants(['fmt', target], {'fmt.scalafmt':options})
-      self.assert_success(fmt_result)
-
-      # verify that the lint check passes.
-      test_fmt = self.run_pants(['lint', target], {'lint.scalafmt':options})
-      self.assert_success(test_fmt)
-    finally:
-      # restore the file to its original state.
-      f = open(test_file_name, 'w')
-      f.write(contents)
-      f.close()
+    self.set_options(skip=True)
+    self.execute(self.context(target_roots=self.library))
 
   def test_scalafmt_ignore_resources(self):
-    target = '{}/badscalastyle:as_resources'.format(TEST_DIR)
-    # test should succeed because the target is not in `target-types`.
-    run = self.run_pants(['lint', target],
-      {'lint.scalafmt':{'skip':'False',
-      'configuration':'%(pants_supportdir)s/scalafmt/config'}})
-    self.assert_success(run)
+    self.set_options(skip=False, configuration=self.configuration)
+    context = self.context(target_roots=self.as_resources)
+    self.execute(context)
+
+
+class ScalaFmtFormatTest(ScalaFmtTestBase):
+
+  @classmethod
+  def task_type(cls):
+    return ScalaFmtFormat
+
+  def test_scalafmt_format_default_config(self):
+    self.format_file_and_verify_fmt(skip=False)
+
+  def test_scalafmt_format(self):
+    self.format_file_and_verify_fmt(skip=False, configuration=self.configuration)
+
+  def format_file_and_verify_fmt(self, **options):
+    self.set_options(**options)
+
+    lint_options_scope = 'sfcf'
+    check_fmt_task_type = self.synthesize_task_subtype(ScalaFmtCheckFormat, lint_options_scope)
+    self.set_options_for_scope(lint_options_scope, **options)
+
+    # format an incorrectly formatted file.
+    context = self.context(for_task_types=[check_fmt_task_type], target_roots=self.library)
+    self.execute(context)
+
+    with open(self.test_file, 'rb') as fp:
+      self.assertNotEqual(self.test_file_contents, fp.read())
+
+    # verify that the lint check passes.
+    check_fmt_workdir = os.path.join(self.pants_workdir, check_fmt_task_type.stable_name())
+    check_fmt_task = check_fmt_task_type(context, check_fmt_workdir)
+    check_fmt_task.execute()
