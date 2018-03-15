@@ -8,9 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import re
 from collections import OrderedDict
 
-from pathspec import PathSpec
-from pathspec.patterns.gitwildmatch import GitWildMatchPattern
-
 from pants.build_graph.address import BuildFileAddress
 from pants.engine.objects import Serializable
 from pants.util.memo import memoized_property
@@ -184,8 +181,8 @@ class AddressMapper(object):
     :param list exclude_target_regexps: A list of regular expressions for excluding targets.
     """
     self.parser = parser
-    self.build_patterns = build_patterns or (b'BUILD', b'BUILD.*')
-    self.build_ignore_patterns = PathSpec.from_lines(GitWildMatchPattern, build_ignore_patterns or [])
+    self.build_patterns = tuple(build_patterns or [b'BUILD', b'BUILD.*'])
+    self.build_ignore_patterns = tuple(build_ignore_patterns or [])
     self._exclude_target_regexps = exclude_target_regexps or []
     self.exclude_patterns = [re.compile(pattern) for pattern in self._exclude_target_regexps]
     self.subproject_roots = subproject_roots or []

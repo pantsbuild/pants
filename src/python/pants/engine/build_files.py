@@ -60,8 +60,10 @@ def build_files(files_content):
 
 @rule(BuildFileGlobs, [Select(AddressMapper), Select(Dir)])
 def buildfile_path_globs_for_dir(address_mapper, directory):
-  patterns = address_mapper.build_patterns
-  return BuildFileGlobs(PathGlobs.create(directory.path, include=patterns, exclude=()))
+  patterns = tuple(join(directory.path, p) for p in address_mapper.build_patterns)
+  return BuildFileGlobs(PathGlobs.create('',
+                                         include=patterns,
+                                         exclude=address_mapper.build_ignore_patterns))
 
 
 @rule(AddressFamily, [Select(AddressMapper), Select(Dir), Select(BuildFiles)])
@@ -75,10 +77,7 @@ def parse_address_family(address_mapper, path, build_files):
     raise ResolveError('Directory "{}" does not contain build files.'.format(path))
   address_maps = []
   paths = (f.path for f in files_content)
-  ignored_paths = set(address_mapper.build_ignore_patterns.match_files(paths))
   for filecontent_product in files_content:
-    if filecontent_product.path in ignored_paths:
-      continue
     address_maps.append(AddressMap.parse(filecontent_product.path,
                                          filecontent_product.content,
                                          address_mapper.parser))
@@ -308,17 +307,12 @@ def addresses_from_address_families(address_mapper, address_families, specs):
 def filter_build_dirs(address_mapper, snapshot):
   """Given a Snapshot matching a build pattern, return parent directories as BuildDirs."""
   dirnames = set(dirname(f.stat.path) for f in snapshot.files)
-  ignored_dirnames = address_mapper.build_ignore_patterns.match_files('{}/'.format(dirname) for dirname in dirnames)
-  ignored_dirnames = set(d.rstrip('/') for d in ignored_dirnames)
-  return BuildDirs(tuple(Dir(d) for d in dirnames if d not in ignored_dirnames))
+  return BuildDirs(tuple(Dir(d) for d in dirnames))
 
 
 @rule(PathGlobs, [Select(AddressMapper), Select(Specs)])
 def spec_to_globs(address_mapper, specs):
   """Given a Spec object, return a PathGlobs object for the build files that it matches.
-
-  TODO: We should apply address_mapper.build_ignore_patterns here to ignore paths earlier
-  than we would in `parse_address_family`.
   """
   patterns = set()
   for spec in specs.dependencies:
@@ -334,7 +328,7 @@ def spec_to_globs(address_mapper, specs):
                       for f in _recursive_dirname(spec.directory))
     else:
       raise ValueError('Unrecognized Spec type: {}'.format(spec))
-  return PathGlobs.create('', include=patterns, exclude=[])
+  return PathGlobs.create('', include=patterns, exclude=address_mapper.build_ignore_patterns)
 
 
 def _recursive_dirname(f):

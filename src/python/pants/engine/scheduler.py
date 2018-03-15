@@ -20,8 +20,8 @@ from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcess
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
-from pants.engine.selectors import (Select, SelectDependencies, SelectProjection,
-                                    SelectVariant, constraint_for)
+from pants.engine.selectors import (Select, SelectDependencies, SelectProjection, SelectVariant,
+                                    constraint_for)
 from pants.engine.struct import HasProducts, Variants
 from pants.util.contextutil import temporary_file_path
 from pants.util.objects import datatype
