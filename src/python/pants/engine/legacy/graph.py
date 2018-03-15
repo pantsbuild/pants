@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+from collections import deque
 from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
@@ -24,7 +25,7 @@ from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.mapper import ResolveError
 from pants.engine.rules import TaskRule, rule
-from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectTransitive
+from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import datatype
@@ -313,21 +314,54 @@ class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependen
     return hash(self.address)
 
 
+class TransitiveHydratedTarget(datatype('TransitiveHydratedTarget', ['root', 'dependencies'])):
+  """A recursive structure wrapping a HydratedTarget root and TransitiveHydratedTarget deps."""
+
+
 class TransitiveHydratedTargets(Collection.of(HydratedTarget)):
-  """A transitive set of HydratedTarget objects."""
+  """A transitive set of HydratedTarget objects, flattened and de-duped."""
 
 
 class HydratedTargets(Collection.of(HydratedTarget)):
   """An intransitive set of HydratedTarget objects."""
 
 
-@rule(TransitiveHydratedTargets, [SelectTransitive(HydratedTarget,
-                                                   BuildFileAddresses,
-                                                   field_types=(Address,),
-                                                   field='addresses')])
-def transitive_hydrated_targets(targets):
-  """Recursively requests HydratedTarget instances, which will result in an eager, transitive graph walk."""
-  return TransitiveHydratedTargets(targets)
+@rule(TransitiveHydratedTargets, [SelectDependencies(TransitiveHydratedTarget,
+                                                     BuildFileAddresses,
+                                                     field_types=(Address,),
+                                                     field='addresses')])
+def transitive_hydrated_targets(transitive_hydrated_targets):
+  """Kicks off recursion on expansion of TransitiveHydratedTarget objects.
+
+  The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk
+  and flatten here. The engine memoizes the computation of TransitiveHydratedTarget, so
+  when multiple TransitiveHydratedTargets objects are being constructed for multiple
+  roots, their structure will be shared.
+
+  TODO: Further work would be to create exactly one `Collection.of(Spec)` root that also
+  dedupes.
+  """
+  result = []
+  visited = set()
+  to_visit = deque(transitive_hydrated_targets)
+
+  while to_visit:
+    tht = to_visit.popleft()
+    if tht.root in visited:
+      continue
+    visited.add(tht.root)
+    result.append(tht.root)
+    to_visit.extend(tht.dependencies)
+
+  return TransitiveHydratedTargets(result)
+
+@rule(TransitiveHydratedTarget, [Select(HydratedTarget),
+                                 SelectDependencies(TransitiveHydratedTarget,
+                                                    HydratedTarget,
+                                                    field_types=(Address,),
+                                                    field='addresses')])
+def transitive_hydrated_target(root, dependencies):
+  return TransitiveHydratedTarget(root, dependencies)
 
 
 @rule(HydratedTargets, [SelectDependencies(HydratedTarget,
@@ -408,6 +442,7 @@ def create_legacy_graph_tasks(symbol_table):
   symbol_table_constraint = symbol_table.constraint()
   return [
     transitive_hydrated_targets,
+    transitive_hydrated_target,
     hydrated_targets,
     TaskRule(
       HydratedTarget,
