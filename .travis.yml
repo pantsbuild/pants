@@ -3,8 +3,7 @@ env:
     - PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.ini"
     - ANDROID_SDK_INSTALL_LOCATION="${HOME}/opt/android-sdk-install"
     - ANDROID_HOME="$ANDROID_SDK_INSTALL_LOCATION/android-sdk-linux"
-    # Show the 3 slowest tests per py.test invocation
-    - PYTEST_PASSTHRU_ARGS="--duration=3"
+    - PYTEST_PASSTHRU_ARGS="-v --duration=3"
 
 before_cache:
   # Ensure permissions to do the below removals, which happen with or without caching enabled.
