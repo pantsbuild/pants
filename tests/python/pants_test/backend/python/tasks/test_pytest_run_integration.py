@@ -20,9 +20,10 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
   def test_pytest_run_timeout_succeeds(self):
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
-                                '--test-pytest-options=-k within_timeout',
                                 '--timeout-default=2',
-                                'testprojects/tests/python/pants/timeout:exceeds_timeout'])
+                                'testprojects/tests/python/pants/timeout:exceeds_timeout',
+                                '--',
+                                '-kwithin_timeout'])
     self.assert_success(pants_run)
 
   def test_pytest_run_conftest_succeeds(self):
@@ -35,11 +36,12 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     start = time.time()
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
-                                '--test-pytest-coverage=auto',
-                                '--test-pytest-options=-k exceeds_timeout',
-                                '--test-pytest-timeout-default=1',
-                                '--cache-test-pytest-ignore',
-                                'testprojects/tests/python/pants/timeout:exceeds_timeout'])
+                                '--coverage=auto',
+                                '--timeout-default=1',
+                                '--cache-ignore',
+                                'testprojects/tests/python/pants/timeout:exceeds_timeout',
+                                '--',
+                                '-kexceeds_timeout'])
     end = time.time()
     self.assert_failure(pants_run)
 
@@ -56,10 +58,10 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     start = time.time()
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
-                                '--test-pytest-timeout-terminate-wait=2',
-                                '--test-pytest-timeout-default=1',
-                                '--test-pytest-coverage=auto',
-                                '--cache-test-pytest-ignore',
+                                '--timeout-terminate-wait=2',
+                                '--timeout-default=1',
+                                '--coverage=auto',
+                                '--cache-ignore',
                                 'testprojects/tests/python/pants/timeout:ignores_terminate'])
     end = time.time()
     self.assert_failure(pants_run)
@@ -81,7 +83,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir(cleanup=False) as coverage_dir:
       pants_run = self.run_pants(['clean-all',
                                   'test.pytest',
-                                  '--test-pytest-coverage=pants',
+                                  '--coverage=pants',
                                   '--test-pytest-coverage-output-dir={}'.format(coverage_dir),
                                   'testprojects/tests/python/pants/constants_only'])
       self.assert_success(pants_run)

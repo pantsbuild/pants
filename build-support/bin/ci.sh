@@ -185,7 +185,7 @@ if [[ "${skip_internal_backends:-false}" == "false" ]]; then
   start_travis_section "BackendTests" "Running internal backend python tests"
   (
     ./pants.pex ${PANTS_ARGS[@]} test.pytest \
-    pants-plugins/tests/python::
+    pants-plugins/tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Internal backend python test failure"
   end_travis_section
 fi
@@ -198,7 +198,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   (
     ./pants.pex --tag='-integration' ${PANTS_ARGS[@]} test.pytest --chroot \
       --test-pytest-test-shard=${python_unit_shard} \
-      tests/python::
+      tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Core python test failure"
   end_travis_section
 fi
@@ -212,7 +212,7 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
     ./pants.pex ${PANTS_ARGS[@]} --exclude-target-regexp='.*/testprojects/.*' \
     --build-ignore=$SKIP_ANDROID_PATTERN test.pytest \
     --test-pytest-test-shard=${python_contrib_shard} \
-    contrib:: \
+    contrib:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Contrib python test failure"
   end_travis_section
 fi
@@ -237,7 +237,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   (
     ./pants.pex ${PANTS_ARGS[@]} --tag='+integration' test.pytest \
       --test-pytest-test-shard=${python_intg_shard} \
-      tests/python::
+      tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Pants Integration test failure"
   end_travis_section
 fi

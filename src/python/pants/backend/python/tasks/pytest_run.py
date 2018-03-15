@@ -35,7 +35,6 @@ from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
 from pants.util.process_handler import SubprocessProcessHandler
-from pants.util.strutil import safe_shlex_split
 from pants.util.xml_parser import XmlParser
 
 
@@ -111,7 +110,12 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
                   "it's best to use an absolute path to make it easy to find the subprocess "
                   "profiles later.")
 
-    register('--options', type=list, fingerprint=True, help='Pass these options to pytest.')
+    register('--options', type=list, fingerprint=True,
+             removal_version='1.7.0.dev0',
+             removal_hint='You can supply py.test options using the generic pass through the args '
+                          'facility. At the end of the pants command line, add `-- <py.test pass'
+                          'through args>`.',
+             help='Pass these options to pytest.')
 
     register('--coverage', fingerprint=True,
              help='Emit coverage information for specified packages or directories (absolute or '
@@ -676,8 +680,10 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         args.extend(['-s'])
       if self.get_options().colors:
         args.extend(['--color', 'yes'])
-      for options in self.get_options().options + self.get_passthru_args():
-        args.extend(safe_shlex_split(options))
+
+      args.extend(self.get_options().options)
+      args.extend(self.get_passthru_args())
+
       args.extend(test_args)
       args.extend(sources_map.keys())
 
