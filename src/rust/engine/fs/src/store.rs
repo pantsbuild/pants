@@ -2578,7 +2578,7 @@ mod tests {
   }
 
   fn list_dir(path: &Path) -> Vec<String> {
-    std::fs::read_dir(path)
+    let mut v: Vec<_> = std::fs::read_dir(path)
       .expect("Listing dir")
       .map(|entry| {
         entry
@@ -2587,7 +2587,9 @@ mod tests {
           .to_string_lossy()
           .to_string()
       })
-      .collect()
+      .collect();
+    v.sort();
+    v
   }
 
   fn file_contents(path: &Path) -> Bytes {
