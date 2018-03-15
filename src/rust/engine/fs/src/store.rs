@@ -496,7 +496,7 @@ mod local {
           Err(NotFound) => {}
           Err(err) => {
             return Err(format!(
-              "Error reading from store when determining type of fingerprint {}: {:?}",
+              "Error reading from store when determining type of fingerprint {}: {}",
               fingerprint, err
             ))
           }
@@ -505,13 +505,13 @@ mod local {
       let (env, file_database, _) = self.inner.file_dbs.get(fingerprint);
       let txn = env
         .begin_ro_txn()
-        .map_err(|err| format!("Failed to begin read transaction: {:?}", err))?;
+        .map_err(|err| format!("Failed to begin read transaction: {}", err))?;
       match txn.get(file_database, &fingerprint.as_ref()) {
         Ok(_) => return Ok(Some(EntryType::File)),
         Err(NotFound) => {}
         Err(err) => {
           return Err(format!(
-            "Error reading from store when determining type of fingerprint {}: {:?}",
+            "Error reading from store when determining type of fingerprint {}: {}",
             fingerprint, err
           ))
         }
@@ -529,7 +529,7 @@ mod local {
         env
           .begin_rw_txn()
           .and_then(|mut txn| self.lease(&lease_database, &digest.0, until, &mut txn))
-          .map_err(|err| format!("Error leasing digest {:?}: {:?}", digest, err))?;
+          .map_err(|err| format!("Error leasing digest {:?}: {}", digest, err))?;
       }
       Ok(())
     }
@@ -605,7 +605,7 @@ mod local {
               used_bytes -= aged_fingerprint.size_bytes;
               txn.commit()
             })
-            .map_err(|err| format!("Error garbage collecting: {:?}", err))?;
+            .map_err(|err| format!("Error garbage collecting: {}", err))?;
         }
       }
       Ok(used_bytes)
@@ -625,10 +625,10 @@ mod local {
       for &(ref env, ref database, ref lease_database) in database.all_lmdbs().iter() {
         let txn = env
           .begin_ro_txn()
-          .map_err(|err| format!("Error beginning transaction to garbage collect: {:?}", err))?;
+          .map_err(|err| format!("Error beginning transaction to garbage collect: {}", err))?;
         let mut cursor = txn
           .open_ro_cursor(*database)
-          .map_err(|err| format!("Failed to open lmdb read cursor: {:?}", err))?;
+          .map_err(|err| format!("Failed to open lmdb read cursor: {}", err))?;
         for (key, bytes) in cursor.iter() {
           *used_bytes = *used_bytes + bytes.len();
 
@@ -704,7 +704,7 @@ mod local {
             Ok(()) => Ok(fingerprint),
             Err(KeyExist) => Ok(fingerprint),
             Err(err) => Err(format!(
-              "Error storing fingerprint {}: {:?}",
+              "Error storing fingerprint {}: {}",
               fingerprint, err
             )),
           }
@@ -730,12 +730,12 @@ mod local {
           let (env, db, _) = dbs.get(&fingerprint);
           let ro_txn = env
             .begin_ro_txn()
-            .map_err(|err| format!("Failed to begin read transaction: {:?}", err));
+            .map_err(|err| format!("Failed to begin read transaction: {}", err));
           ro_txn.and_then(|txn| match txn.get(db, &fingerprint) {
             Ok(bytes) => Ok(Some(f(Bytes::from(bytes)))),
             Err(NotFound) => Ok(None),
             Err(err) => Err(format!(
-              "Error loading fingerprint {}: {:?}",
+              "Error loading fingerprint {}: {}",
               fingerprint, err,
             )),
           })
@@ -807,14 +807,14 @@ mod local {
             .set_max_dbs(2)
             .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES / 16)
             .open(&dir)
-            .map_err(|e| format!("Error making env for store at {:?}: {:?} for ", dir, e))?;
+            .map_err(|e| format!("Error making env for store at {:?}: {}", dir, e))?;
 
         debug!("Making ShardedLmdb content database for {:?}", dir);
         let content_database = env
           .create_db(Some("content"), DatabaseFlags::empty())
           .map_err(|e| {
             format!(
-              "Error creating/opening content database at {:?}: {:?}",
+              "Error creating/opening content database at {:?}: {}",
               dir, e
             )
           })?;
@@ -824,7 +824,7 @@ mod local {
           .create_db(Some("leases"), DatabaseFlags::empty())
           .map_err(|e| {
             format!(
-              "Error creating/opening content database at {:?}: {:?}",
+              "Error creating/opening content database at {:?}: {}",
               dir, e
             )
           })?;
