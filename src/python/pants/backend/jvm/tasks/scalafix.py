@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractproperty
 
-from pants.backend.jvm.tasks.scala_rewrite_base import ScalaRewriteBase
+from pants.backend.jvm.tasks.rewrite_base import RewriteBase
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
@@ -15,11 +15,10 @@ from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.lint_task_mixin import LintTaskMixin
 
 
-class ScalaFix(ScalaRewriteBase):
+class ScalaFix(RewriteBase):
   """Executes the scalafix tool."""
 
   _SCALAFIX_MAIN = 'scalafix.cli.Cli'
-  _SCALA_SOURCE_EXTENSION = '.scala'
 
   @classmethod
   def register_options(cls, register):
@@ -38,6 +37,14 @@ class ScalaFix(ScalaRewriteBase):
                           classpath=[
                             JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.11.11', rev='0.5.2'),
                           ])
+
+  @classmethod
+  def target_types(cls):
+    return ['scala_library', 'junit_tests', 'java_tests']
+
+  @classmethod
+  def source_extension(cls):
+    return '.scala'
 
   @classmethod
   def prepare(cls, options, round_manager):
