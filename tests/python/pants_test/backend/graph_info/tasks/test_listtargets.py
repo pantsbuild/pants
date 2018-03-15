@@ -14,7 +14,6 @@ from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.scala_artifact import ScalaArtifact
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
@@ -30,8 +29,9 @@ class BaseListTargetsTest(ConsoleTaskTestBase):
 class ListTargetsTestEmpty(BaseListTargetsTest):
 
   def test_list_all_empty(self):
-    with self.assertRaises(TaskError):
-      self.assertEqual('', self.execute_task())
+    # NB: Also renders a warning to stderr, which is challenging to detect here but confirmed in:
+    #   tests/python/pants_test/engine/legacy/test_list_integration.py
+    self.assertEqual('', self.execute_task())
 
 
 class ListTargetsTest(BaseListTargetsTest):
