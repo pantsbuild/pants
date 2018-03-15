@@ -3,6 +3,30 @@
 
 This document describes releases leading up to the ``1.5.x`` ``stable`` series.
 
+1.5.0rc1 (03/14/2018)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Render a warning rather than failing `list` when no targets are matched (#5598)
+  `PR #5598 <https://github.com/pantsbuild/pants/pull/5598>`_
+
+* [pantsd] Repair stale sources invalidation case. (#5589)
+  `PR #5589 <https://github.com/pantsbuild/pants/pull/5589>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Further --changed optimization (#5579)
+  `PR #5579 <https://github.com/pantsbuild/pants/pull/5579>`_
+
+* [pantsd] Don't compute TargetRoots twice. (#5595)
+  `PR #5595 <https://github.com/pantsbuild/pants/pull/5595>`_
+
+* [coursier] use same artifact cache override as ivy (#5586)
+  `PR #5586 <https://github.com/pantsbuild/pants/pull/5586>`_
+
 1.5.0rc0 (03/07/2018)
 ---------------------
 
