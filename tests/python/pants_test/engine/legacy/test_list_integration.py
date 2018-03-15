@@ -21,8 +21,8 @@ class ListIntegrationTest(PantsRunIntegrationTest):
     self.assertGreater(len(pants_run.stdout_data.strip().split()), 1)
 
   def test_list_none(self):
-    pants_run = self.do_command('list', success=False)
-    self.assertIn('Please specify one or more explicit target', pants_run.stdout_data)
+    pants_run = self.do_command('list', success=True)
+    self.assertIn('WARNING: No targets were matched in', pants_run.stderr_data)
 
   def test_list_invalid_dir(self):
     pants_run = self.do_command('list', 'abcde::', success=False)

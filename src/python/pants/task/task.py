@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import sys
 from abc import abstractmethod
 from contextlib import contextmanager
 from hashlib import sha1
@@ -648,15 +649,13 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                       .format(', '.join([repr(t) for t in target_roots])))
     return target_roots[0]
 
-  def determine_target_roots(self, goal_name, predicate=None):
+  def determine_target_roots(self, goal_name):
     """Helper for tasks that scan for default target roots.
 
     :param string goal_name: The goal name to use for any warning emissions.
-    :param callable predicate: The predicate to pass to `context.scan().targets(predicate=X)`.
     """
     if not self.context.target_roots:
-      raise TaskError('Please specify one or more explicit target '
-                      'specs (e.g. `./pants {0} ::`).'.format(goal_name))
+      print('WARNING: No targets were matched in goal `{}`.'.format(goal_name), file=sys.stderr)
 
     # For the v2 path, e.g. `./pants list` is a functional no-op. This matches the v2 mode behavior
     # of e.g. `./pants --changed-parent=HEAD list` (w/ no changes) returning an empty result.
