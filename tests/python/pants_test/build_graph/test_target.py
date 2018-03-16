@@ -152,13 +152,6 @@ class TargetTest(BaseTest):
                                             key_arg='resources')
     self.assertEqual(resources.filespec, {'globs': []})
 
-  def test_implicit_sources_disabled(self):
-    options = {Target.Arguments.options_scope: {'implicit_sources': False}}
-    init_subsystem(Target.Arguments, options)
-    target = self.make_target(':a', ImplicitSourcesTestingTarget)
-    sources = target.create_sources_field(sources=None, sources_rel_path='src/foo/bar')
-    self.assertEqual(sources.filespec, {'globs': []})
-
   def test_create_sources_field_with_string_fails(self):
     target = self.make_target(':a-target', Target)
 

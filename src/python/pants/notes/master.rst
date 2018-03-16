@@ -4,6 +4,104 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.6.0.dev0 (03/17/2018)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add google-java-format fmt/lint support (#5596)
+  `PR #5596 <https://github.com/pantsbuild/pants/pull/5596>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate BinaryUtil as public API. (#5601)
+  `PR #5601 <https://github.com/pantsbuild/pants/pull/5601>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix `PytestRun` passthru arg handling. (#5594)
+  `PR #5594 <https://github.com/pantsbuild/pants/pull/5594>`_
+
+* [pantsd] Repair stale sources invalidation case. (#5589)
+  `PR #5589 <https://github.com/pantsbuild/pants/pull/5589>`_
+
+* [coursier/m2-coords] update coursier json parsing; use maven's coords (#5475)
+  `PR #5475 <https://github.com/pantsbuild/pants/pull/5475>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Prepare 1.5.0rc1 (#5603)
+  `PR #5603 <https://github.com/pantsbuild/pants/pull/5603>`_
+
+* Use readable errno descriptions for lmdb errors (#5604)
+  `PR #5604 <https://github.com/pantsbuild/pants/pull/5604>`_
+
+* Convert scalafmt test to a unit test. (#5599)
+  `PR #5599 <https://github.com/pantsbuild/pants/pull/5599>`_
+
+* Materialized files have the executable bit set correctly (#5593)
+  `PR #5593 <https://github.com/pantsbuild/pants/pull/5593>`_
+
+* Render a warning rather than failing `list` when no targets are matched (#5598)
+  `PR #5598 <https://github.com/pantsbuild/pants/pull/5598>`_
+
+* New BinaryTool subsystems for node and yarnpkg. (#5584)
+  `PR #5584 <https://github.com/pantsbuild/pants/pull/5584>`_
+
+* Further --changed optimization (#5579)
+  `PR #5579 <https://github.com/pantsbuild/pants/pull/5579>`_
+
+* Yet more rustfmt (#5597)
+  `PR #5597 <https://github.com/pantsbuild/pants/pull/5597>`_
+  `PR #5592 <https://github.com/pantsbuild/pants/pull/5592>`_
+
+* [pantsd] Don't compute TargetRoots twice. (#5595)
+  `PR #5595 <https://github.com/pantsbuild/pants/pull/5595>`_
+
+* Use pre-compiled rustfmt instead of compiling it ourselves (#5592)
+  `PR #5592 <https://github.com/pantsbuild/pants/pull/5592>`_
+
+* [coursier] use same artifact cache override as ivy (#5586)
+  `PR #5586 <https://github.com/pantsbuild/pants/pull/5586>`_
+
+* Log when we try to upload files (#5591)
+  `PR #5591 <https://github.com/pantsbuild/pants/pull/5591>`_
+
+* Revert "Port BaseTest to v2 engine" (#5590)
+  `PR #5590 <https://github.com/pantsbuild/pants/pull/5590>`_
+
+* Update buildozer to 0.6.0-80c7f0d45d7e40fa1f7362852697d4a03df557b3 (#5581)
+  `PR #5581 <https://github.com/pantsbuild/pants/pull/5581>`_
+
+* Rust logging uses Python logging levels (#5528)
+  `PR #5528 <https://github.com/pantsbuild/pants/pull/5528>`_
+
+* Port BaseTest to v2 engine (#4867)
+  `PR #4867 <https://github.com/pantsbuild/pants/pull/4867>`_
+
+* Prepare 1.4.0! (#5583)
+  `PR #5583 <https://github.com/pantsbuild/pants/pull/5583>`_
+
+* Uniform handling of subsystem discovery (#5575)
+  `PR #5575 <https://github.com/pantsbuild/pants/pull/5575>`_
+
+* Send an empty WriteRequest for an empty file (#5578)
+  `PR #5578 <https://github.com/pantsbuild/pants/pull/5578>`_
+
+* Don't force fsync on every lmdb write transaction
+
+* Shard lmdb by top 4 bits of fingerprint
+
+* Revert "Revert a bunch of remoting PRs (#5543)"
+  `PR #5543 <https://github.com/pantsbuild/pants/pull/5543>`_
+
+* release.sh -q builds single-platform pexes locally (#5563)
+  `PR #5563 <https://github.com/pantsbuild/pants/pull/5563>`_
+
 1.5.0rc0 (03/07/2018)
 ---------------------
 

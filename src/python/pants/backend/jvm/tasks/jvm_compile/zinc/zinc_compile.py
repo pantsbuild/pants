@@ -118,7 +118,7 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def implementation_version(cls):
-    return super(BaseZincCompile, cls).implementation_version() + [('BaseZincCompile', 6)]
+    return super(BaseZincCompile, cls).implementation_version() + [('BaseZincCompile', 7)]
 
   @classmethod
   def compiler_plugin_types(cls):
@@ -177,13 +177,9 @@ class BaseZincCompile(JvmCompile):
                   'This is unset by default, because it is generally a good precaution to cache '
                   'only clean/cold builds.')
 
-    Zinc.register_options_for(cls, register,
-                              removal_version='1.6.0.dev0',
-                              removal_hint='Zinc tools should be registered via the `zinc` scope.')
-
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BaseZincCompile, cls).subsystem_dependencies() + (Zinc,)
+    return super(BaseZincCompile, cls).subsystem_dependencies() + (Zinc.Factory,)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -205,26 +201,8 @@ class BaseZincCompile(JvmCompile):
     return self.get_options().incremental_caching
 
   @memoized_property
-  def _zinc_tools(self):
-    """Get the instance of the JvmToolMixin to use for zinc.
-
-    TODO: Remove and use Zinc.global_instance() directly once the old tool location is removed
-    in `1.6.0.dev0`.
-    """
-    # If any tools were explicitly specified on self, use them... else, use the Zinc subsystem.
-    explicit_keys = set(self.get_options().get_explicit_keys())
-    explicit_on_self = explicit_keys & set(['zinc', 'compiler-bridge', 'compiler-interface'])
-    return self if explicit_on_self else Zinc.global_instance()
-
-  def _zinc_tool_classpath(self, toolname):
-    return self._zinc_tools.tool_classpath_from_products(self.context.products,
-                                                         toolname,
-                                                         scope=self.options_scope)
-
-  def _zinc_tool_jar(self, toolname):
-    return self._zinc_tools.tool_jar_from_products(self.context.products,
-                                                   toolname,
-                                                   scope=self.options_scope)
+  def _zinc(self):
+    return Zinc.Factory.global_instance().create(self.context.products)
 
   def __init__(self, *args, **kwargs):
     super(BaseZincCompile, self).__init__(*args, **kwargs)
@@ -280,9 +258,8 @@ class BaseZincCompile(JvmCompile):
     than compiling it.
     """
     hasher = sha1()
-    for tool in ['zinc', 'compiler-interface', 'compiler-bridge']:
-      hasher.update(os.path.relpath(self._zinc_tool_jar(tool),
-                                    self.get_options().pants_workdir))
+    for jar_path in self._zinc.zinc + [self._zinc.compiler_interface, self._zinc.compiler_bridge]:
+      hasher.update(os.path.relpath(jar_path, self.get_options().pants_workdir))
     key = hasher.hexdigest()[:12]
     return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
 
@@ -305,8 +282,8 @@ class BaseZincCompile(JvmCompile):
     if log_file:
       zinc_args.extend(['-capture-log', log_file])
 
-    zinc_args.extend(['-compiler-interface', self._zinc_tool_jar('compiler-interface')])
-    zinc_args.extend(['-compiler-bridge', self._zinc_tool_jar('compiler-bridge')])
+    zinc_args.extend(['-compiler-interface', self._zinc.compiler_interface])
+    zinc_args.extend(['-compiler-bridge', self._zinc.compiler_bridge])
     zinc_args.extend(['-zinc-cache-dir', self._zinc_cache_dir])
     zinc_args.extend(['-scala-path', ':'.join(self.scalac_classpath())])
 
@@ -363,7 +340,7 @@ class BaseZincCompile(JvmCompile):
         fp.write(arg)
         fp.write(b'\n')
 
-    if self.runjava(classpath=self._zinc_tool_classpath('zinc'),
+    if self.runjava(classpath=self._zinc.zinc,
                     main=Zinc.ZINC_COMPILE_MAIN,
                     jvm_options=jvm_options,
                     args=zinc_args,

@@ -158,7 +158,8 @@ class JvmToolMixin(object):
     """Needed only for test isolation."""
     JvmToolMixin._jvm_tools = []
 
-  def tool_jar_from_products(self, products, key, scope):
+  @classmethod
+  def tool_jar_from_products(cls, products, key, scope):
     """Get the jar for the tool previously registered under key in the given scope.
 
     :param products: The products of the current pants run.
@@ -170,11 +171,11 @@ class JvmToolMixin(object):
     :raises: `JvmToolMixin.InvalidToolClasspath` when the tool classpath is not composed of exactly
              one jar.
     """
-    classpath = self.tool_classpath_from_products(products, key, scope)
+    classpath = cls.tool_classpath_from_products(products, key, scope)
     if len(classpath) != 1:
       params = dict(tool=key, scope=scope, count=len(classpath), classpath='\n\t'.join(classpath))
-      raise self.InvalidToolClasspath('Expected tool {tool} in scope {scope} to resolve to one '
-                                      'jar, instead found {count}:\n\t{classpath}'.format(**params))
+      raise cls.InvalidToolClasspath('Expected tool {tool} in scope {scope} to resolve to one '
+                                     'jar, instead found {count}:\n\t{classpath}'.format(**params))
     return classpath[0]
 
   @staticmethod

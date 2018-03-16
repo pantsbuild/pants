@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.deprecated import deprecated_conditional
 from pants.base.payload import Payload
 from pants.build_graph.target import Target
 
@@ -19,7 +18,6 @@ class GoThriftLibrary(Target):
   def __init__(self,
                address=None,
                payload=None,
-               import_path=None,
                sources=None,
                **kwargs):
     """
@@ -28,11 +26,6 @@ class GoThriftLibrary(Target):
                    are relative to the BUILD file's directory.
     :param import_path: Deprecated: unused.
     """
-    deprecated_conditional(lambda: import_path is not None,
-                           removal_version='1.6.0.dev0',
-                           entity_description='import_path',
-                           hint_message='Remove this unused `{}` parameter'.format(self.alias()))
-
     payload = payload or Payload()
     payload.add_field('sources',
                       self.create_sources_field(sources, address.spec_path, key_arg='sources'))
