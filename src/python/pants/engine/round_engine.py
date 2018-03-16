@@ -190,24 +190,27 @@ class RoundEngine(Engine):
     for goal_dependency in goal_dependencies:
       self._visit_goal(goal_dependency, context, goal_info_by_goal, target_roots_replacement)
 
-  def _prepare(self, context, goals):
-    if len(goals) == 0:
-      raise TaskError('No goals to prepare')
-
+  def sort_goals(self, context, goals):
     goal_info_by_goal = OrderedDict()
     target_roots_replacement = self.TargetRootsReplacement()
     for goal in reversed(OrderedSet(goals)):
       self._visit_goal(goal, context, goal_info_by_goal, target_roots_replacement)
     target_roots_replacement.apply(context)
 
-    for goal_info in reversed(list(self._topological_sort(goal_info_by_goal))):
+    return list(reversed(list(self._topological_sort(goal_info_by_goal))))
+
+  def _prepare(self, context, goal_infos):
+    if len(goal_infos) == 0:
+      raise TaskError('No goals to prepare')
+    for goal_info in goal_infos:
       yield GoalExecutor(context, goal_info.goal, goal_info.tasktypes_by_name)
 
   def attempt(self, context, goals):
     """
     :API: public
     """
-    goal_executors = list(self._prepare(context, goals))
+    sorted_goal_infos = self.sort_goals(context, goals)
+    goal_executors = list(self._prepare(context, sorted_goal_infos))
     execution_goals = ' -> '.join(e.goal.name for e in goal_executors)
     context.log.info('Executing tasks in goals: {goals}'.format(goals=execution_goals))
 

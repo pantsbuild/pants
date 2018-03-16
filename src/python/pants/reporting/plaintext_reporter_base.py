@@ -19,6 +19,10 @@ class PlainTextReporterBase(Reporter):
       )
       ret += b'\nSelf Timings\n============\n{}\n'.format(
         self._format_aggregated_timings(self.run_tracker.self_timings))
+
+      ret += b'\nCritical Path Timings\n=====================\n{}\n'.format(
+        self._format_aggregated_timings(self.run_tracker.get_critical_path_timings())
+      )
     if settings.cache_stats:
       ret += b'\nCache Stats\n===========\n{}\n'.format(
         self._format_artifact_cache_stats(self.run_tracker.artifact_cache_stats))

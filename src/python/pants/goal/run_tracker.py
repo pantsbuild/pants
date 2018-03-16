@@ -86,6 +86,7 @@ class RunTracker(Subsystem):
     super(RunTracker, self).__init__(*args, **kwargs)
     self._run_timestamp = time.time()
     self._cmd_line = ' '.join(['pants'] + sys.argv[1:])
+    self._sorted_goal_infos = tuple()
 
     # Initialized in `initialize()`.
     self.run_info_dir = None
@@ -139,6 +140,9 @@ class RunTracker(Subsystem):
     #   }
     # }
     self._target_to_data = {}
+
+  def set_sorted_goal_infos(self, sorted_goal_infos):
+    self._sorted_goal_infos = sorted_goal_infos
 
   def register_thread(self, parent_workunit):
     """Register the parent workunit for all work in the calling thread.
@@ -349,6 +353,7 @@ class RunTracker(Subsystem):
       'run_info': run_information,
       'cumulative_timings': self.cumulative_timings.get_all(),
       'self_timings': self.self_timings.get_all(),
+      'critical_path_timings': self.get_critical_path_timings().get_all(),
       'artifact_cache_stats': self.artifact_cache_stats.get_all(),
       'pantsd_stats': self.pantsd_stats.get_all(),
       'outcomes': self.outcomes
@@ -427,6 +432,30 @@ class RunTracker(Subsystem):
       self.cumulative_timings.add_timing(path, duration, is_tool)
       self.self_timings.add_timing(path, self_time, is_tool)
       self.outcomes[path] = workunit.outcome_string(workunit.outcome())
+
+  def get_critical_path_timings(self):
+    """
+    Get the cumulative timings of each goal and all of the goals it (transitively) depended on.
+    """
+    transitive_dependencies = dict()
+    for goal_info in self._sorted_goal_infos:
+      deps = transitive_dependencies.setdefault(goal_info.goal.name, set())
+      for dep in goal_info.goal_dependencies:
+        deps.add(dep.name)
+        deps.update(transitive_dependencies.get(dep.name))
+
+    raw_timings = dict()
+    for entry in self.cumulative_timings.get_all():
+      raw_timings[entry["label"]] = entry["timing"]
+
+    timings = AggregatedTimings()
+    for goal, deps in transitive_dependencies.items():
+      label = "main:{}".format(goal)
+      timings.add_timing(label, raw_timings.get(label, 0.0))
+      for dep in deps:
+        dep_label = "main:{}".format(dep)
+        timings.add_timing(label, raw_timings.get(dep_label, 0.0))
+    return timings
 
   def get_background_root_workunit(self):
     if self._background_root_workunit is None:

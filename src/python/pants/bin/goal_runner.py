@@ -250,6 +250,10 @@ class GoalRunner(object):
       return 1
 
     engine = RoundEngine()
+
+    sorted_goal_infos = engine.sort_goals(self._context, self._goals)
+    RunTracker.global_instance().set_sorted_goal_infos(sorted_goal_infos)
+
     result = engine.execute(self._context, self._goals)
 
     if self._context.invalidation_report:
