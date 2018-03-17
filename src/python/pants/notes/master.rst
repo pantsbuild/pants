@@ -34,6 +34,9 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Robustify `SetupPyIntegrationTest`. #5610
+  `PR #5610 <https://github.com/pantsbuild/pants/pull/5610>`_
+
 * Prepare 1.5.0rc1 (#5603)
   `PR #5603 <https://github.com/pantsbuild/pants/pull/5603>`_
 
