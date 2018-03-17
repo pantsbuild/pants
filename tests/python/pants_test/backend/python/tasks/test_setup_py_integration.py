@@ -8,10 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import re
 import tarfile
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.backend.python.pants_requirement_integration_test_base import \
+  PantsRequirementIntegrationTestBase
 
 
-class SetupPyIntegrationTest(PantsRunIntegrationTest):
+class SetupPyIntegrationTest(PantsRequirementIntegrationTestBase):
 
   def assert_sdist(self, pants_run, key, files):
     sdist_path = 'dist/{}-0.0.1.tar.gz'.format(key)
@@ -142,19 +143,19 @@ class SetupPyIntegrationTest(PantsRunIntegrationTest):
 
     self.maxDiff = None
 
-    command = [
-      'setup-py',
-      'testprojects/pants-plugins/src/python/test_pants_plugin',
-    ]
-    pants_run = self.run_pants(command=command)
-    self.assert_success(pants_run)
+    with self.create_unstable_pants_distribution() as repo:
+      command = ['--python-repos-repos={}'.format(repo),
+                 'setup-py',
+                 'testprojects/pants-plugins/src/python/test_pants_plugin']
+      pants_run = self.run_pants(command=command)
+      self.assert_success(pants_run)
 
-    self.assert_sdist(pants_run, 'test_pants_plugin', [
-      'test_pants_plugin/',
-      'test_pants_plugin/__init__.py',
-      'test_pants_plugin/pants_infra_tests.py',
-      'test_pants_plugin/register.py',
-      'test_pants_plugin/subsystems/',
-      'test_pants_plugin/subsystems/__init__.py',
-      'test_pants_plugin/subsystems/pants_test_infra.py',
-    ])
+      self.assert_sdist(pants_run, 'test_pants_plugin', [
+        'test_pants_plugin/',
+        'test_pants_plugin/__init__.py',
+        'test_pants_plugin/pants_infra_tests.py',
+        'test_pants_plugin/register.py',
+        'test_pants_plugin/subsystems/',
+        'test_pants_plugin/subsystems/__init__.py',
+        'test_pants_plugin/subsystems/pants_test_infra.py',
+      ])
