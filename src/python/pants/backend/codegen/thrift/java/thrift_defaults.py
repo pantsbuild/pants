@@ -15,7 +15,7 @@ class ThriftDefaults(Subsystem):
 
   # TODO: These exist to support alternate compilers (specifically scrooge), but this should
   # probably be a scrooge-specific subsystem, tied to a scrooge_thrift_library target type.
-  # These options (e.g., rpc_style, language) are relevant to scrooge but may have no meaning
+  # These options (e.g., language) are relevant to scrooge but may have no meaning
   # in some other compiler (they certainly don't in the apache thrift compiler).
   @classmethod
   def register_options(cls, register):
@@ -23,10 +23,6 @@ class ThriftDefaults(Subsystem):
              help='The default compiler to use for java_thrift_library targets.')
     register('--language', type=str, advanced=True, default='java',
              help='The default language to generate for java_thrift_library targets.')
-    register('--rpc-style', type=str, advanced=True, default='sync',
-             removal_version='1.6.0.dev0',
-             removal_hint='Use --compiler-args instead of --rpc-style.',
-             help='The default rpc-style to generate for java_thrift_library targets.')
     register('--default-java-namespace', type=str, advanced=True, default=None,
              help='The default Java namespace to generate for java_thrift_library targets.')
     register('--namespace-map', type=dict, advanced=True, default={},
@@ -38,7 +34,6 @@ class ThriftDefaults(Subsystem):
     super(ThriftDefaults, self).__init__(*args, **kwargs)
     self._default_compiler = self.get_options().compiler
     self._default_language = self.get_options().language
-    self._default_rpc_style = self.get_options().rpc_style
     self._default_default_java_namespace = self.get_options().default_java_namespace
     self._default_namespace_map = self.get_options().namespace_map
     self._default_compiler_args = self.get_options().compiler_args
@@ -98,24 +93,17 @@ class ThriftDefaults(Subsystem):
     self._check_target(target)
     return target.default_java_namespace or self._default_default_java_namespace
 
-  def rpc_style(self, target):
-    """Returns the style of RPC stub to generate.
-
-    :param target: The target to extract the RPC stub style from.
-    :type target: :class:`pants.backend.codegen.thrift.java.java_thrift_library.JavaThriftLibrary`
-    :returns: The RPC stub style to generate.
-    :rtype: string
-    """
-    self._check_target(target)
-    return target.rpc_style or self._default_rpc_style
-
   def _check_target(self, target):
     if not isinstance(target, JavaThriftLibrary):
       raise ValueError('Can only determine defaults for JavaThriftLibrary targets, '
                        'given {} of type {}'.format(target, type(target)))
 
   def _tuple(self):
-    return self._default_compiler, self._default_language, self._default_rpc_style
+    return (self._default_compiler,
+            self._default_language,
+            tuple(sorted(self._default_namespace_map.items())),
+            tuple(self._default_compiler_args),  # N.B.: Assume compiler arg order can matter.
+            self._default_default_java_namespace)
 
   def __hash__(self):
     return hash(self._tuple())

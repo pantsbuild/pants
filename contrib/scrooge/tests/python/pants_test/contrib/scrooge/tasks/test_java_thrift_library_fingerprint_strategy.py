@@ -17,7 +17,6 @@ class JavaThriftLibraryFingerprintStrategyTest(BaseTest):
 
   options1 = {'compiler': 'scrooge',
               'language': 'java',
-              'rpc_style': 'async',
               'compiler_args': []}
 
   def create_strategy(self, option_values):
@@ -29,25 +28,17 @@ class JavaThriftLibraryFingerprintStrategyTest(BaseTest):
   def test_fp_diffs_due_to_option(self):
     option_values = {'compiler': 'scrooge',
                      'language': 'java',
-                     'rpc_style': 'finagle'}
+                     'compiler_args': ['--foo']}
 
-    a = self.make_target(':a', target_type=JavaThriftLibrary, dependencies=[])
+    a = self.make_target(':a', target_type=JavaThriftLibrary)
 
     fp1 = self.create_strategy(self.options1).compute_fingerprint(a)
     fp2 = self.create_strategy(option_values).compute_fingerprint(a)
     self.assertNotEquals(fp1, fp2)
 
-  def test_fp_diffs_due_to_target_change(self):
-    a = self.make_target(':a', target_type=JavaThriftLibrary, rpc_style='sync', dependencies=[])
-    b = self.make_target(':b', target_type=JavaThriftLibrary, rpc_style='finagle', dependencies=[])
-
-    fp1 = self.create_strategy(self.options1).compute_fingerprint(a)
-    fp2 = self.create_strategy(self.options1).compute_fingerprint(b)
-    self.assertNotEquals(fp1, fp2)
-
   def test_fp_diffs_due_to_compiler_args_change(self):
-    a = self.make_target(':a', target_type=JavaThriftLibrary, compiler_args=['--foo'], dependencies=[])
-    b = self.make_target(':b', target_type=JavaThriftLibrary, compiler_args=['--bar'], dependencies=[])
+    a = self.make_target(':a', target_type=JavaThriftLibrary, compiler_args=['--foo'])
+    b = self.make_target(':b', target_type=JavaThriftLibrary, compiler_args=['--bar'])
 
     fp1 = self.create_strategy(self.options1).compute_fingerprint(a)
     fp2 = self.create_strategy(self.options1).compute_fingerprint(b)
@@ -60,7 +51,7 @@ class JavaThriftLibraryFingerprintStrategyTest(BaseTest):
 
     option_values = {'compiler': 'scrooge',
                      'language': 'java',
-                     'rpc_style': 'finagle'}
+                     'compiler_args': ['--baz']}
     self.assertNotEqual(self.create_strategy(self.options1), self.create_strategy(option_values))
     self.assertNotEqual(hash(self.create_strategy(self.options1)),
                         hash(self.create_strategy(option_values)))

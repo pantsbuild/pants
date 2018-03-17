@@ -187,12 +187,6 @@ class BootstrapOptionsTest(unittest.TestCase):
         self.assertEquals('2', opts_double_config.for_scope('compile.apt').worker_count)
         self.assertEquals('red', opts_double_config.for_scope('fruit').apple)
 
-  def test_create_bootstrapped_multiple_config_override(self):
-    def create_options_bootstrapper(*config_paths):
-      return OptionsBootstrapper(args=['--config-override={}'.format(cp) for cp in config_paths])
-
-    self.do_test_create_bootstrapped_multiple_config(create_options_bootstrapper)
-
   def test_create_bootstrapped_multiple_pants_config_files(self):
     def create_options_bootstrapper(*config_paths):
       return OptionsBootstrapper(args=['--pants-config-files={}'.format(cp) for cp in config_paths])

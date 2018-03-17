@@ -9,7 +9,6 @@ from pants.core_tasks.bash_completion import BashCompletion
 from pants.core_tasks.clean import Clean
 from pants.core_tasks.deferred_sources_mapper import DeferredSourcesMapper
 from pants.core_tasks.explain_options_task import ExplainOptionsTask
-from pants.core_tasks.invalidate import Invalidate
 from pants.core_tasks.list_goals import ListGoals
 from pants.core_tasks.noop import NoopCompile, NoopTest
 from pants.core_tasks.pantsd_kill import PantsDaemonKill
@@ -55,7 +54,6 @@ def register_goals():
   # Register tasks.
 
   # Cleaning.
-  task(name='invalidate', action=Invalidate).install()
   task(name='clean-all', action=Clean).install('clean-all')
 
   # Pantsd.

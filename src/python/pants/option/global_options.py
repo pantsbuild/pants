@@ -21,11 +21,6 @@ from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
   options_scope = GLOBAL_SCOPE
   options_scope_category = ScopeInfo.GLOBAL
-  options_subsumed_scopes = [
-    ('binaries', '1.6.0.dev0'),
-    ('pantsd', '1.6.0.dev0'),
-    ('watchman', '1.6.0.dev0')
-  ]
 
   @classmethod
   def register_bootstrap_options(cls, register):
@@ -111,10 +106,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              default=[get_default_pants_config_file()], help='Paths to Pants config files.')
     # TODO: Deprecate the --pantsrc/--pantsrc-files options?  This would require being able
     # to set extra config file locations in an initial bootstrap config file.
-    register('--config-override', advanced=True, type=list, metavar='<path>',
-             removal_version='1.6.0.dev0',
-             removal_hint='Use --pants-config-files=<second config file path> instead.',
-             help='A second config file, to override pants.ini.')
     register('--pantsrc', advanced=True, type=bool, default=True,
              help='Use pantsrc files.')
     register('--pantsrc-files', advanced=True, type=list, metavar='<path>', daemon=False,
@@ -156,15 +147,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
     # These facilitate configuring the native engine.
-    register('--native-engine-version', advanced=True, default='DEPRECATED',
-             removal_version='1.6.0.dev0',
-             removal_hint='Unused, the native engine is now embedded in the pantsbuild.pants wheel',
-             help='Native engine version.')
-    register('--native-engine-supportdir', advanced=True, default='DEPRECATED',
-             removal_version='1.6.0.dev0',
-             removal_hint='Unused, the native engine is now embedded in the pantsbuild.pants wheel',
-             help='Find native engine binaries under this dir. Used as part of the path to '
-                  'lookup the binary with --binary-util-baseurls and --pants-bootstrapdir.')
     register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option, daemon=False,
              help='A directory to write execution and rule graphs to as `dot` files. The contents '
                   'of the directory will be overwritten if any filenames collide.')

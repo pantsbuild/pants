@@ -12,15 +12,9 @@ import xml.etree.ElementTree as ET
 from contextlib import contextmanager
 from unittest import skipIf
 
-from parameterized import parameterized
-
 from pants.base.build_environment import get_buildroot
 from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-
-
-OUTPUT_MODES = [('legacy_layout', ['--legacy-report-layout'], True),
-                ('nominal_layout', ['--no-legacy-report-layout'], False)]
 
 
 class JunitRunIntegrationTest(PantsRunIntegrationTest):
@@ -44,12 +38,11 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
                                 'testprojects/tests/java/org/pantsbuild/testproject/matcher'])
     self.assert_success(pants_run)
 
-  def report_file_path(self, results, relpath, legacy=False):
-    return os.path.join(results.workdir if legacy else os.path.join(get_buildroot(), 'dist'),
-                        relpath)
+  def report_file_path(self, relpath):
+    return os.path.join(get_buildroot(), 'dist', relpath)
 
   @contextmanager
-  def coverage(self, processor, xml_path, html_path, tests=(), args=(), legacy=False):
+  def coverage(self, processor, xml_path, html_path, tests=(), args=()):
     def cucumber_test(test):
       return '--test=org.pantsbuild.testproject.unicode.cucumber.CucumberTest#{}'.format(test)
 
@@ -60,10 +53,10 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
                              '--test-junit-coverage']) as results:
       self.assert_success(results)
 
-      coverage_xml = self.report_file_path(results, xml_path, legacy)
+      coverage_xml = self.report_file_path(xml_path)
       self.assertTrue(os.path.isfile(coverage_xml))
 
-      coverage_html = self.report_file_path(results, html_path, legacy)
+      coverage_html = self.report_file_path(html_path)
       self.assertTrue(os.path.isfile(coverage_html))
 
       def read_utf8(path):
@@ -72,15 +65,14 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
 
       yield ET.parse(coverage_xml).getroot(), read_utf8(coverage_html)
 
-  def do_test_junit_run_with_coverage_succeeds_cobertura(self, tests=(), args=(), legacy=False):
+  def do_test_junit_run_with_coverage_succeeds_cobertura(self, tests=(), args=()):
     html_path = ('test/junit/coverage/reports/html/'
                  'org.pantsbuild.testproject.unicode.cucumber.CucumberAnnotatedExample.html')
     with self.coverage(processor='cobertura',
                        xml_path='test/junit/coverage/reports/xml/coverage.xml',
                        html_path=html_path,
                        tests=tests,
-                       args=args,
-                       legacy=legacy) as (xml_report, html_report_string):
+                       args=args) as (xml_report, html_report_string):
 
       # Validate 100% coverage; ie a line coverage rate of 1.
       self.assertEqual('coverage', xml_report.tag)
@@ -91,30 +83,23 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
       self.assertIn('String pleasantry2()', html_report_string)
       self.assertIn('String pleasantry3()', html_report_string)
 
-  @parameterized.expand(OUTPUT_MODES)
-  def test_junit_run_with_coverage_succeeds_cobertura(self, unused_test_name, extra_args, legacy):
-    self.do_test_junit_run_with_coverage_succeeds_cobertura(args=extra_args, legacy=legacy)
+  def test_junit_run_with_coverage_succeeds_cobertura(self):
+    self.do_test_junit_run_with_coverage_succeeds_cobertura()
 
-  @parameterized.expand(OUTPUT_MODES)
-  def test_junit_run_with_coverage_succeeds_cobertura_merged(self,
-                                                             unused_test_name,
-                                                             extra_args,
-                                                             legacy):
+  def test_junit_run_with_coverage_succeeds_cobertura_merged(self):
     self.do_test_junit_run_with_coverage_succeeds_cobertura(tests=['testUnicodeClass1',
                                                                    'testUnicodeClass2',
                                                                    'testUnicodeClass3'],
-                                                            args=['--batch-size=2'] + extra_args,
-                                                            legacy=legacy)
+                                                            args=['--batch-size=2'])
 
-  def do_test_junit_run_with_coverage_succeeds_jacoco(self, tests=(), args=(), legacy=False):
+  def do_test_junit_run_with_coverage_succeeds_jacoco(self, tests=(), args=()):
     html_path = ('test/junit/coverage/reports/html/'
                  'org.pantsbuild.testproject.unicode.cucumber/CucumberAnnotatedExample.html')
     with self.coverage(processor='jacoco',
                        xml_path='test/junit/coverage/reports/xml',
                        html_path=html_path,
                        tests=tests,
-                       args=args,
-                       legacy=legacy) as (xml_report, html_report_string):
+                       args=args) as (xml_report, html_report_string):
 
       # Validate 100% coverage; ie: 0 missed instructions.
       self.assertEqual('report', xml_report.tag)
@@ -130,20 +115,14 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
       self.assertIn('class="el_method">pleasantry2()</a>', html_report_string)
       self.assertIn('class="el_method">pleasantry3()</a>', html_report_string)
 
-  @parameterized.expand(OUTPUT_MODES)
-  def test_junit_run_with_coverage_succeeds_jacoco(self, unused_test_name, extra_args, legacy):
-    self.do_test_junit_run_with_coverage_succeeds_jacoco(args=extra_args, legacy=legacy)
+  def test_junit_run_with_coverage_succeeds_jacoco(self):
+    self.do_test_junit_run_with_coverage_succeeds_jacoco()
 
-  @parameterized.expand(OUTPUT_MODES)
-  def test_junit_run_with_coverage_succeeds_jacoco_merged(self,
-                                                          unused_test_name,
-                                                          extra_args,
-                                                          legacy):
+  def test_junit_run_with_coverage_succeeds_jacoco_merged(self):
     self.do_test_junit_run_with_coverage_succeeds_jacoco(tests=['testUnicodeClass1',
                                                                 'testUnicodeClass2',
                                                                 'testUnicodeClass3'],
-                                                         args=['--batch-size=2'] + extra_args,
-                                                         legacy=legacy)
+                                                         args=['--batch-size=2'])
 
   def test_junit_run_against_invalid_class_fails(self):
     pants_run = self.run_pants(['clean-all',
@@ -199,7 +178,7 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
                              synthetic_jar_target]).stdout_data
     self.assertIn('Synthetic jar run is not detected', output)
 
-  def do_test_junit_run_with_html_report(self, tests=(), args=(), legacy=False):
+  def do_test_junit_run_with_html_report(self, tests=(), args=()):
     def html_report_test(test):
       return '--test=org.pantsbuild.testproject.htmlreport.HtmlReportTest#{}'.format(test)
 
@@ -208,7 +187,7 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
                             ['testprojects/tests/java/org/pantsbuild/testproject/htmlreport::',
                              '--test-junit-html-report']) as results:
       self.assert_failure(results)
-      report_html = self.report_file_path(results, 'test/junit/reports/junit-report.html', legacy)
+      report_html = self.report_file_path('test/junit/reports/junit-report.html')
       self.assertTrue(os.path.isfile(report_html))
       with codecs.open(report_html, 'r', encoding='utf8') as src:
         html = src.read()
@@ -217,15 +196,12 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
         self.assertIn('testErrors', html)
         self.assertIn('testSkipped', html)
 
-  @parameterized.expand(OUTPUT_MODES)
-  def test_junit_run_with_html_report(self, unused_test_name, extra_args, legacy):
-    self.do_test_junit_run_with_html_report(args=extra_args, legacy=legacy)
+  def test_junit_run_with_html_report(self):
+    self.do_test_junit_run_with_html_report()
 
-  @parameterized.expand(OUTPUT_MODES)
-  def test_junit_run_with_html_report_merged(self, unused_test_name, extra_args, legacy):
+  def test_junit_run_with_html_report_merged(self):
     self.do_test_junit_run_with_html_report(tests=['testPasses',
                                                    'testFails',
                                                    'testErrors',
                                                    'testSkipped'],
-                                            args=['--batch-size=3'] + extra_args,
-                                            legacy=legacy)
+                                            args=['--batch-size=3'])

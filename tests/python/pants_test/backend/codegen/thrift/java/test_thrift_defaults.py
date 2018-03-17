@@ -37,10 +37,6 @@ class TestThriftDefaults(BaseTest):
     with self.invalid_fixtures() as (thrift_defaults, target):
       thrift_defaults.language(target)
 
-  def test_rpc_style_invalid(self):
-    with self.invalid_fixtures() as (thrift_defaults, target):
-      thrift_defaults.rpc_style(target)
-
   def create_thrift_library(self, **kwargs):
     return self.make_target(spec='java_thift_library_{}'.format(uuid.uuid4()),
                             target_type=JavaThriftLibrary,
@@ -57,9 +53,3 @@ class TestThriftDefaults(BaseTest):
     self.assertEqual('java', thrift_defaults.language(self.create_thrift_library()))
     self.assertEqual('scala',
                      thrift_defaults.language(self.create_thrift_library(language='scala')))
-
-  def test_rpc_style(self):
-    thrift_defaults = self.create_thrift_defaults(rpc_style='thrift')
-    self.assertEqual('thrift', thrift_defaults.rpc_style(self.create_thrift_library()))
-    self.assertEqual('finagle',
-                     thrift_defaults.rpc_style(self.create_thrift_library(rpc_style='finagle')))

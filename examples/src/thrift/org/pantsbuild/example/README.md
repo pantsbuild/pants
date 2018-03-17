@@ -80,7 +80,7 @@ Use Apache Thrift compiler (the default):
     java_thrift_library(  # Yes, a "java" library to generate Scala
       compiler='scrooge', # default compiler does not gen Scala; Scrooge does
       language='scala',
-      # maybe set an rpc_style
+      # maybe set compiler_args
     )
 
 **Android**

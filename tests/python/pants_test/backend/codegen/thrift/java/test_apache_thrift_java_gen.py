@@ -79,11 +79,3 @@ class ApacheThriftJavaGenTest(TaskTestBase):
                          language='not-a-lang')
     with self.assertRaises(TargetDefinitionException):
       self.generate_single_thrift_target(a)
-
-    b = self.make_target(spec='src/thrift/com/foo:b',
-                         target_type=JavaThriftLibrary,
-                         sources=['one.thrift'],
-                         compiler='thrift',
-                         rpc_style='not-a-style')
-    with self.assertRaises(TargetDefinitionException):
-      self.generate_single_thrift_target(b)

@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 
 
@@ -25,7 +24,6 @@ class JavaThriftLibrary(JvmTarget):
   def __init__(self,
                compiler=None,
                language=None,
-               rpc_style=None,
                namespace_map=None,
                thrift_linter_strict=None,
                default_java_namespace=None,
@@ -39,8 +37,6 @@ class JavaThriftLibrary(JvmTarget):
       the global options under ``--thrift-default-compiler``.
     :param language: The language used to generate the output files. The default is defined in
       the global options under ``--thrift-default-language``.
-    :param rpc_style: An optional rpc style to generate service stubs with. The default is defined
-      in the global options under ``--thrift-default-rpc-style``.
     :param namespace_map: An optional dictionary of namespaces to remap {old: new}
     :param thrift_linter_strict: If True, fail if thrift linter produces any warnings.
     :param default_java_namespace: The namespace used for Java generated code when a Java
@@ -61,21 +57,6 @@ class JavaThriftLibrary(JvmTarget):
     self._compiler = check_value_for_arg('compiler', compiler, self._COMPILERS)
     self._language = language
 
-    deprecated_conditional(
-      lambda: rpc_style is not None,
-      '1.6.0.dev0',
-      'rpc_style', 
-      '''
-      Deprecated property rpc_style used for {target}, use compiler_args instead.
-      e.g. [ \'--finagle\'] for \'finagle\'
-      and [\'--finagle\', \'--ostrich\'] for \'ostrich\'. 
-      If both rpc_style and compiler_args are set then only compiler_args is used
-      and rpc_style is discarded.
-      '''.format(target=self.address.spec)
-    )
-
-    self._rpc_style = rpc_style
-
     self.namespace_map = namespace_map
     self.thrift_linter_strict = thrift_linter_strict
     self._default_java_namespace = default_java_namespace
@@ -89,10 +70,6 @@ class JavaThriftLibrary(JvmTarget):
   @property
   def language(self):
     return self._language
-
-  @property
-  def rpc_style(self):
-    return self._rpc_style
 
   @property
   def compiler_args(self):

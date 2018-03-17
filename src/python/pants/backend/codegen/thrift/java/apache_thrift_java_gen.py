@@ -24,7 +24,6 @@ class ApacheThriftJavaGen(ApacheThriftGenBase):
   thrift_generator = 'java'
 
   _COMPILER = 'thrift'
-  _RPC_STYLE = 'sync'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -52,10 +51,6 @@ class ApacheThriftJavaGen(ApacheThriftGenBase):
       raise TargetDefinitionException(
           target,
           'Compiler {} supports only language={}.'.format(self._COMPILER, self.thrift_generator))
-    if self._thrift_defaults.rpc_style(target) != self._RPC_STYLE:
-      raise TargetDefinitionException(
-          target,
-          'Compiler {} supports only rpc_style={}.'.format(self._COMPILER, self._RPC_STYLE))
 
   def execute_codegen(self, target, target_workdir):
     self._validate(target)

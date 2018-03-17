@@ -118,12 +118,6 @@ class Target(AbstractTarget):
                help='Map of target name to a list of keyword arguments that should be ignored if a '
                     'target receives them unexpectedly. Typically used to allow usage of arguments '
                     'in BUILD files that are not yet available in the current version of pants.')
-      register('--implicit-sources', advanced=True, default=True, type=bool,
-               removal_version='1.6.0.dev0',
-               removal_hint='Implicit sources are now the default.',
-               help='If True, Pants will infer the value of the sources argument for certain '
-                    'target types, if they do not have explicit sources specified. '
-                    'See http://www.pantsbuild.org/build_files.html#target-definitions')
 
     @classmethod
     def check(cls, target, kwargs):
@@ -869,9 +863,7 @@ class Target(AbstractTarget):
       # Note that the check for supports_default_sources() precedes the subsystem check.
       # This is so that tests don't need to set up the subsystem when creating targets that
       # legitimately do not require sources.
-      if ((key_arg is None or key_arg == 'sources') and
-          self.supports_default_sources() and
-          self.Arguments.global_instance().get_options().implicit_sources):
+      if (key_arg is None or key_arg == 'sources') and self.supports_default_sources():
         sources = self.default_sources(sources_rel_path)
       else:
         sources = FilesetWithSpec.empty(sources_rel_path)

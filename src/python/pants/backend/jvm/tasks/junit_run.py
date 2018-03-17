@@ -28,7 +28,6 @@ from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.reports.junit_html_report import JUnitHtmlReport, NoJunitHtmlReport
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.files import Files
@@ -185,8 +184,11 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='If true, generate an html summary report of tests that were run.')
     register('--open', type=bool,
              help='Attempt to open the html summary report in a browser (implies --html-report)')
-    register('--legacy-report-layout', type=bool, default=True, advanced=True,
-             help='Links JUnit and coverage reports to the legacy location.')
+    register('--legacy-report-layout', type=bool, default=False, advanced=True,
+             help='Used to link JUnit and coverage reports to the legacy location; now does '
+                  'nothing.',
+             removal_version='1.8.0.dev0',
+             removal_hint='This option is no longer used and can be safely removed.')
 
     # TODO(jtrobec): Remove direct register when coverage steps are moved to their own subsystem.
     CodeCoverage.register_junit_options(register, cls.register_jvm_tool)
@@ -238,7 +240,6 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     self._failure_summary = options.failure_summary
     self._open = options.open
     self._html_report = self._open or options.html_report
-    self._legacy_report_layout = options.legacy_report_layout
 
   @memoized_method
   def _args(self, fail_fast, output_dir):
@@ -646,22 +647,6 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       with OwnerPrintingInterProcessFileLock(os.path.join(dist_dir, lock_file)):
         self._link_current_reports(report_dir=output_dir, link_dir=dist_dir,
                                    preserve=preserve)
-
-      if self._legacy_report_layout:
-        deprecated_conditional(predicate=lambda: True,
-                               entity_description='[test.junit] legacy_report_layout',
-                               stacklevel=3,
-                               removal_version='1.6.0.dev0',
-                               hint_message='Reports are now linked into {} by default; so scripts '
-                                            'and CI jobs should be pointed there and the option '
-                                            'configured to False in pants.ini until such time as '
-                                            'the option is removed.'.format(dist_dir))
-        # NB: Deposit of the "current" test output in the root workdir (.pants.d/test/junit) is a
-        # defacto public API and so we implement that behavior here to maintain backwards
-        # compatibility for non-pants report file consumers.
-        with OwnerPrintingInterProcessFileLock(os.path.join(self.workdir, lock_file)):
-          self._link_current_reports(report_dir=output_dir, link_dir=self.workdir,
-                                     preserve=preserve)
 
   def _link_current_reports(self, report_dir, link_dir, preserve):
     # Kill everything not preserved.

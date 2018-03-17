@@ -10,18 +10,8 @@ from hashlib import sha1
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.deprecated import deprecated
 from pants.base.hash_utils import stable_json_hash
 from pants.util.meta import AbstractClass
-
-
-@deprecated(removal_version='1.6.0.dev0',
-            hint_message='Use pants.base.hash_utils.stable_json_hash instead.')
-def stable_json_sha1(obj):
-  """
-  :API: public
-  """
-  return stable_json_hash(obj)
 
 
 def combine_hashes(hashes):
