@@ -17,7 +17,6 @@ from pants.engine.build_files import Specs, UnhydratedStruct, create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
                                  DuplicateNameError, UnaddressableObjectError)
-from pants.engine.nodes import Throw
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import TaskRule
 from pants.engine.selectors import SelectDependencies

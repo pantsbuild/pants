@@ -102,8 +102,7 @@ class GraphTargetScanFailureTests(GraphTestBase):
       with self.graph_helper() as graph_helper:
         self.create_graph_from_specs(graph_helper, ['build-support/bin::'])
 
-    self.assertIn('Path "build-support/bin" contains no BUILD files',
-                  str(cm.exception))
+    self.assertIn('does not match any targets.', str(cm.exception))
 
   def test_inject_bad_dir(self):
     with self.assertRaises(AddressLookupError) as cm:

@@ -16,7 +16,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import (AddressableDescriptor, BuildFileAddresses, Collection,
-                                      Exactly, TypeConstraintError)
+                                      TypeConstraintError)
 from pants.engine.fs import FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
@@ -76,7 +76,6 @@ def parse_address_family(address_mapper, path, build_files):
   if not files_content:
     raise ResolveError('Directory "{}" does not contain build files.'.format(path))
   address_maps = []
-  paths = (f.path for f in files_content)
   for filecontent_product in files_content:
     address_maps.append(AddressMap.parse(filecontent_product.path,
                                          filecontent_product.content,

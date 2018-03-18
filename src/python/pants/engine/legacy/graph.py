@@ -319,19 +319,18 @@ def transitive_hydrated_targets(transitive_hydrated_targets):
   when multiple TransitiveHydratedTargets objects are being constructed for multiple
   roots, their structure will be shared.
   """
-  result = []
-  visited = set()
+  closure = set()
   to_visit = deque(transitive_hydrated_targets)
 
   while to_visit:
     tht = to_visit.popleft()
-    if tht.root in visited:
+    if tht.root in closure:
       continue
-    visited.add(tht.root)
-    result.append(tht.root)
+    closure.add(tht.root)
     to_visit.extend(tht.dependencies)
 
-  return TransitiveHydratedTargets(tuple(tht.root for tht in transitive_hydrated_targets), result)
+  return TransitiveHydratedTargets(tuple(tht.root for tht in transitive_hydrated_targets), closure)
+
 
 @rule(TransitiveHydratedTarget, [Select(HydratedTarget),
                                  SelectDependencies(TransitiveHydratedTarget,
