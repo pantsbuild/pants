@@ -2,13 +2,12 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::error::Error;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
 use futures::future::{self, Future};
-use ordermap::OrderMap;
 use tempdir::TempDir;
 
 use boxfuture::{Boxable, BoxFuture};
@@ -511,166 +510,6 @@ impl SelectDependencies {
   }
 }
 
-///
-/// A node that selects for the dep_product type, then recursively selects for the product type of
-/// the result. Both the product and the dep_product must have the same "field" and the types of
-/// products in that field must match the field type.
-///
-/// A node that recursively selects the dependencies of requested type and merge them.
-///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectTransitive {
-  pub subject: Key,
-  pub variants: Variants,
-  pub selector: selectors::SelectTransitive,
-  dep_product_entries: rule_graph::Entries,
-  product_entries: rule_graph::Entries,
-}
-
-impl SelectTransitive {
-  fn new(
-    selector: selectors::SelectTransitive,
-    subject: Key,
-    variants: Variants,
-    edges: &rule_graph::RuleEdges,
-  ) -> SelectTransitive {
-    let dep_p_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
-      Selector::SelectTransitive(selector.clone()),
-      selectors::Select::without_variant(
-        selector.clone().dep_product,
-      ),
-    ));
-    let p_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedMultipleNestedSelect(
-      Selector::SelectTransitive(selector.clone()),
-      selector.field_types.clone(),
-      selectors::Select::without_variant(
-        selector.clone().product,
-      ),
-    ));
-
-    SelectTransitive {
-      subject: subject,
-      variants: variants,
-      selector: selector.clone(),
-      dep_product_entries: dep_p_entries,
-      product_entries: p_entries,
-    }
-  }
-
-  ///
-  /// Process single subject.
-  ///
-  /// Return tuple of:
-  /// (processed subject_key, product output, dependencies to be processed in future iterations).
-  ///
-  fn expand_transitive(
-    &self,
-    context: &Context,
-    subject_key: Key,
-  ) -> NodeFuture<(Key, Value, Vec<Value>)> {
-    let field_name = self.selector.field.to_owned();
-    Select {
-      selector: selectors::Select::without_variant(self.selector.product),
-      subject: subject_key,
-      variants: self.variants.clone(),
-      // NB: We're filtering out all of the entries for field types other than
-      //     subject_key's since none of them will match.
-      entries: self
-        .product_entries
-        .clone()
-        .into_iter()
-        .filter(|e| e.matches_subject_type(subject_key.type_id().clone()))
-        .collect(),
-    }.run(context.clone())
-      .map(move |product| {
-        let deps = externs::project_multi(&product, &field_name);
-        (subject_key, product, deps)
-      })
-      .to_boxed()
-  }
-}
-
-///
-/// Track states when processing `SelectTransitive` iteratively.
-///
-#[derive(Debug)]
-struct TransitiveExpansion {
-  // Subjects to be processed.
-  todo: HashSet<Key>,
-
-  // Mapping from processed subject `Key` to its product.
-  // Products will be collected at the end of iterations.
-  outputs: OrderMap<Key, Value>,
-}
-
-impl SelectTransitive {
-  fn run(self, context: Context) -> NodeFuture<Value> {
-    // Select the product holding the dependency list.
-    Select {
-      selector: selectors::Select::without_variant(self.selector.dep_product),
-      subject: self.subject.clone(),
-      variants: self.variants.clone(),
-      entries: self.dep_product_entries.clone(),
-    }.run(context.clone())
-      .then(move |dep_product_res| {
-        match dep_product_res {
-          Ok(dep_product) => {
-            let subject_keys = externs::project_multi(&dep_product, &self.selector.field)
-              .into_iter()
-              .map(|subject| externs::key_for(subject))
-              .collect();
-
-            let init = TransitiveExpansion {
-              todo: subject_keys,
-              outputs: OrderMap::default(),
-            };
-
-            future::loop_fn(init, move |mut expansion| {
-              let round = future::join_all({
-                expansion
-                  .todo
-                  .drain()
-                  .map(|subject_key| self.expand_transitive(&context, subject_key))
-                  .collect::<Vec<_>>()
-              });
-
-              round.map(move |finished_items| {
-                let mut todo_candidates = Vec::new();
-                for (subject_key, product, more_deps) in finished_items.into_iter() {
-                  expansion.outputs.insert(subject_key, product);
-                  todo_candidates.extend(more_deps);
-                }
-
-                // NB enclose with {} to limit the borrowing scope.
-                {
-                  let outputs = &expansion.outputs;
-                  expansion.todo.extend(
-                    todo_candidates
-                      .into_iter()
-                      .map(|dep| externs::key_for(dep))
-                      .filter(|dep_key| !outputs.contains_key(dep_key))
-                      .collect::<Vec<_>>(),
-                  );
-                }
-
-                if expansion.todo.is_empty() {
-                  future::Loop::Break(expansion)
-                } else {
-                  future::Loop::Continue(expansion)
-                }
-              })
-            }).map(|expansion| {
-              externs::store_list(expansion.outputs.values().collect::<Vec<_>>(), false)
-            })
-              .to_boxed()
-          }
-          Err(failure) => err(failure),
-        }
-      })
-      .to_boxed()
-  }
-}
-
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectProjection {
   subject: Key,
@@ -735,7 +574,7 @@ impl SelectProjection {
               selector: selectors::Select::without_variant(self.selector.product),
               subject: externs::key_for(projected_subject),
               variants: self.variants.clone(),
-              // NB: Unlike SelectDependencies and SelectTransitive, we don't need to filter by
+              // NB: Unlike SelectDependencies , we don't need to filter by
               // subject here, because there is only one projected type.
               entries: self.projected_entries.clone(),
             }.run(context.clone())
@@ -1100,10 +939,6 @@ impl Task {
         SelectDependencies::new(s, self.subject.clone(), self.variants.clone(), edges)
           .run(context.clone())
       }
-      Selector::SelectTransitive(s) => {
-        SelectTransitive::new(s, self.subject.clone(), self.variants.clone(), edges)
-          .run(context.clone())
-      }
       Selector::SelectProjection(s) => {
         SelectProjection::new(s, self.subject.clone(), self.variants.clone(), edges)
           .run(context.clone())
@@ -1177,7 +1012,7 @@ impl NodeKey {
       &NodeKey::Task(ref s) => {
         format!(
           "Task({}, {}, {})",
-          externs::key_to_str(&s.task.func.0),
+          externs::project_str(&externs::val_for(&s.task.func.0), "__name__"),
           keystr(&s.subject),
           typstr(&s.product)
         )

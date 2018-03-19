@@ -356,24 +356,6 @@ pub extern "C" fn tasks_add_select_dependencies(
 }
 
 #[no_mangle]
-pub extern "C" fn tasks_add_select_transitive(
-  tasks_ptr: *mut Tasks,
-  product: TypeConstraint,
-  dep_product: TypeConstraint,
-  field: Buffer,
-  field_types: TypeIdBuffer,
-) {
-  with_tasks(tasks_ptr, |tasks| {
-    tasks.add_select_transitive(
-      product,
-      dep_product,
-      field.to_string().expect("field to be a string"),
-      field_types.to_vec(),
-    );
-  })
-}
-
-#[no_mangle]
 pub extern "C" fn tasks_add_select_projection(
   tasks_ptr: *mut Tasks,
   product: TypeConstraint,

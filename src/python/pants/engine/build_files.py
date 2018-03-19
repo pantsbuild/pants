@@ -12,23 +12,19 @@ import six
 
 from pants.base.project_tree import Dir
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
-                              SingleAddress)
+                              SingleAddress, Spec)
 from pants.build_graph.address import Address, BuildFileAddress
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import (AddressableDescriptor, BuildFileAddresses, Collection,
-                                      Exactly, TypeConstraintError)
+                                      TypeConstraintError)
 from pants.engine.fs import FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.engine.struct import Struct
+from pants.util.dirutil import fast_relpath_optional
 from pants.util.objects import datatype
-
-
-_SPECS_CONSTRAINT = Exactly(SingleAddress,
-                            SiblingAddresses,
-                            DescendantAddresses,
-                            AscendantAddresses)
 
 
 class ResolvedTypeMismatchError(ResolveError):
@@ -52,6 +48,10 @@ class BuildFileGlobs(datatype('BuildFilesGlobs', ['path_globs'])):
   """A wrapper around PathGlobs that are known to match a build file pattern."""
 
 
+class Specs(Collection.of(Spec)):
+  """A collection of Spec subclasses."""
+
+
 @rule(BuildFiles,
       [SelectProjection(FilesContent, PathGlobs, 'path_globs', BuildFileGlobs)])
 def build_files(files_content):
@@ -60,8 +60,10 @@ def build_files(files_content):
 
 @rule(BuildFileGlobs, [Select(AddressMapper), Select(Dir)])
 def buildfile_path_globs_for_dir(address_mapper, directory):
-  patterns = address_mapper.build_patterns
-  return BuildFileGlobs(PathGlobs.create(directory.path, include=patterns, exclude=()))
+  patterns = tuple(join(directory.path, p) for p in address_mapper.build_patterns)
+  return BuildFileGlobs(PathGlobs.create('',
+                                         include=patterns,
+                                         exclude=address_mapper.build_ignore_patterns))
 
 
 @rule(AddressFamily, [Select(AddressMapper), Select(Dir), Select(BuildFiles)])
@@ -74,11 +76,7 @@ def parse_address_family(address_mapper, path, build_files):
   if not files_content:
     raise ResolveError('Directory "{}" does not contain build files.'.format(path))
   address_maps = []
-  paths = (f.path for f in files_content)
-  ignored_paths = set(address_mapper.build_ignore_patterns.match_files(paths))
   for filecontent_product in files_content:
-    if filecontent_product.path in ignored_paths:
-      continue
     address_maps.append(AddressMap.parse(filecontent_product.path,
                                          filecontent_product.content,
                                          address_mapper.parser))
@@ -232,18 +230,24 @@ def _hydrate(item_type, spec_path, **kwargs):
 @rule(BuildFileAddresses,
       [Select(AddressMapper),
        SelectDependencies(AddressFamily, BuildDirs, field_types=(Dir,)),
-       Select(_SPECS_CONSTRAINT)])
-def addresses_from_address_families(address_mapper, address_families, spec):
-  """Given a list of AddressFamilies and a Spec, return matching Addresses.
+       Select(Specs)])
+def addresses_from_address_families(address_mapper, address_families, specs):
+  """Given a list of AddressFamilies matching a list of Specs, return matching Addresses.
 
-  Raises a ResolveError if:
+  Raises a AddressLookupError if:
      - there were no matching AddressFamilies, or
      - the Spec matches no addresses for SingleAddresses.
   """
 
-  def raise_if_empty_address_families():
-    if not address_families:
-      raise ResolveError('Path "{}" contains no BUILD files.'.format(spec.directory))
+  # NB: `@memoized` does not work on local functions.
+  def by_directory():
+    if by_directory.cached is None:
+      by_directory.cached = {af.namespace: af for af in address_families}
+    return by_directory.cached
+  by_directory.cached = None
+
+  def raise_empty_address_family(spec):
+    raise ResolveError('Path "{}" contains no BUILD files.'.format(spec.directory))
 
   def exclude_address(address):
     if address_mapper.exclude_patterns:
@@ -251,24 +255,49 @@ def addresses_from_address_families(address_mapper, address_families, spec):
       return any(p.search(address_str) is not None for p in address_mapper.exclude_patterns)
     return False
 
-  def all_included_addresses():
-    return (a
-            for af in address_families
-            for a in af.addressables.keys()
-            if not exclude_address(a))
+  addresses = []
+  included = set()
+  def include(address_families, predicate=None):
+    matched = False
+    for af in address_families:
+      for a in af.addressables.keys():
+        if a in included:
+          continue
+        if not exclude_address(a) and (predicate is None or predicate(a)):
+          matched = True
+          addresses.append(a)
+          included.add(a)
+    return matched
 
-  if type(spec) in (DescendantAddresses, SiblingAddresses):
-    raise_if_empty_address_families()
-    addresses = tuple(all_included_addresses())
-  elif type(spec) is SingleAddress:
-    raise_if_empty_address_families()
-    addresses = tuple(a for a in all_included_addresses() if a.target_name == spec.name)
-    if not addresses and len(address_families) == 1:
-      _raise_did_you_mean(address_families[0], spec.name)
-  elif type(spec) is AscendantAddresses:
-    addresses = tuple(all_included_addresses())
-  else:
-    raise ValueError('Unrecognized Spec type: {}'.format(spec))
+  for spec in specs.dependencies:
+    if type(spec) is DescendantAddresses:
+      matched = include(
+        af
+        for af in address_families
+        if fast_relpath_optional(af.namespace, spec.directory) is not None
+      )
+      if not matched:
+        raise AddressLookupError(
+          'Spec {} does not match any targets.'.format(spec))
+    elif type(spec) is SiblingAddresses:
+      address_family = by_directory().get(spec.directory)
+      if not address_family:
+        raise_empty_address_family(spec)
+      include([address_family])
+    elif type(spec) is SingleAddress:
+      address_family = by_directory().get(spec.directory)
+      if not address_family:
+        raise_empty_address_family(spec)
+      if not include([address_family], predicate=lambda a: a.target_name == spec.name):
+        _raise_did_you_mean(address_family, spec.name)
+    elif type(spec) is AscendantAddresses:
+      include(
+        af
+        for af in address_families
+        if fast_relpath_optional(spec.directory, af.namespace) is not None
+      )
+    else:
+      raise ValueError('Unrecognized Spec type: {}'.format(spec))
 
   return BuildFileAddresses(addresses)
 
@@ -277,30 +306,28 @@ def addresses_from_address_families(address_mapper, address_families, spec):
 def filter_build_dirs(address_mapper, snapshot):
   """Given a Snapshot matching a build pattern, return parent directories as BuildDirs."""
   dirnames = set(dirname(f.stat.path) for f in snapshot.files)
-  ignored_dirnames = address_mapper.build_ignore_patterns.match_files('{}/'.format(dirname) for dirname in dirnames)
-  ignored_dirnames = set(d.rstrip('/') for d in ignored_dirnames)
-  return BuildDirs(tuple(Dir(d) for d in dirnames if d not in ignored_dirnames))
+  return BuildDirs(tuple(Dir(d) for d in dirnames))
 
 
-@rule(PathGlobs, [Select(AddressMapper), Select(_SPECS_CONSTRAINT)])
-def spec_to_globs(address_mapper, spec):
-  """Given a Spec object, return a PathGlobs object for the build files that it matches."""
-  if type(spec) is DescendantAddresses:
-    directory = spec.directory
-    patterns = [join('**', pattern) for pattern in address_mapper.build_patterns]
-  elif type(spec) in (SiblingAddresses, SingleAddress):
-    directory = spec.directory
-    patterns = address_mapper.build_patterns
-  elif type(spec) is AscendantAddresses:
-    directory = ''
-    patterns = [
-      join(f, pattern)
-      for pattern in address_mapper.build_patterns
-      for f in _recursive_dirname(spec.directory)
-    ]
-  else:
-    raise ValueError('Unrecognized Spec type: {}'.format(spec))
-  return PathGlobs.create(directory, include=patterns, exclude=[])
+@rule(PathGlobs, [Select(AddressMapper), Select(Specs)])
+def spec_to_globs(address_mapper, specs):
+  """Given a Spec object, return a PathGlobs object for the build files that it matches.
+  """
+  patterns = set()
+  for spec in specs.dependencies:
+    if type(spec) is DescendantAddresses:
+      patterns.update(join(spec.directory, '**', pattern)
+                      for pattern in address_mapper.build_patterns)
+    elif type(spec) in (SiblingAddresses, SingleAddress):
+      patterns.update(join(spec.directory, pattern)
+                      for pattern in address_mapper.build_patterns)
+    elif type(spec) is AscendantAddresses:
+      patterns.update(join(f, pattern)
+                      for pattern in address_mapper.build_patterns
+                      for f in _recursive_dirname(spec.directory))
+    else:
+      raise ValueError('Unrecognized Spec type: {}'.format(spec))
+  return PathGlobs.create('', include=patterns, exclude=address_mapper.build_ignore_patterns)
 
 
 def _recursive_dirname(f):
@@ -370,8 +397,5 @@ def create_graph_rules(address_mapper, symbol_table):
     RootRule(Address),
     RootRule(BuildFileAddress),
     RootRule(BuildFileAddresses),
-    RootRule(AscendantAddresses),
-    RootRule(DescendantAddresses),
-    RootRule(SiblingAddresses),
-    RootRule(SingleAddress),
+    RootRule(Specs),
   ]

@@ -10,9 +10,10 @@ import os
 
 from pants.base.build_file import BuildFile
 from pants.base.specs import DescendantAddresses, SiblingAddresses
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import BuildFilesCollection
+from pants.engine.build_files import BuildFilesCollection, Specs
 from pants.engine.mapper import ResolveError
 from pants.engine.nodes import Throw
 from pants.util.dirutil import fast_relpath
@@ -32,16 +33,12 @@ class LegacyAddressMapper(AddressMapper):
     self._build_root = build_root
 
   def scan_build_files(self, base_path):
-    request = self._scheduler.execution_request([BuildFilesCollection], [(DescendantAddresses(base_path))])
-
-    result = self._scheduler.execute(request)
-    if result.error:
-      raise result.error
+    specs = (DescendantAddresses(base_path),)
+    build_files_collection, = self._scheduler.product_request(BuildFilesCollection, [Specs(specs)])
 
     build_files_set = set()
-    for _, state in result.root_products:
-      for build_files in state.value.dependencies:
-        build_files_set.update(f.path for f in build_files.files_content.dependencies)
+    for build_files in build_files_collection.dependencies:
+      build_files_set.update(f.path for f in build_files.files_content.dependencies)
 
     return build_files_set
 
@@ -68,30 +65,34 @@ class LegacyAddressMapper(AddressMapper):
   def scan_specs(self, specs, fail_fast=True):
     return self._internal_scan_specs(specs, fail_fast=fail_fast, missing_is_fatal=True)
 
+  def _specs_string(self, specs):
+    return ', '.join(s.to_spec_string() for s in specs)
+
   def _internal_scan_specs(self, specs, fail_fast=True, missing_is_fatal=True):
-    request = self._scheduler.execution_request([BuildFileAddresses], specs)
+    # TODO: This should really use `product_request`, but on the other hand, we need to
+    # deprecate the entire `AddressMapper` interface anyway. See #4769.
+    request = self._scheduler.execution_request([BuildFileAddresses], [Specs(tuple(specs))])
     result = self._scheduler.execute(request)
     if result.error:
       raise self.BuildFileScanError(str(result.error))
+    (_, state), = result.root_products
 
-    addresses = set()
-    for (spec, _), state in result.root_products:
-      if isinstance(state, Throw):
-        if isinstance(state.exc, ResolveError):
-          if missing_is_fatal:
-            raise self.BuildFileScanError(
-              'Spec `{}` does not match any targets.\n{}'.format(spec.to_spec_string(), str(state.exc)))
-          else:
-            # NB: ignore Throws containing ResolveErrors because they are due to missing targets / files
-            continue
+    if isinstance(state, Throw):
+      if isinstance(state.exc, (AddressLookupError, ResolveError)):
+        if missing_is_fatal:
+          raise self.BuildFileScanError(
+            'Spec `{}` does not match any targets.\n{}'.format(
+              self._specs_string(specs), str(state.exc)))
         else:
-          raise self.BuildFileScanError(str(state.exc))
-      elif missing_is_fatal and not state.value.dependencies:
-        raise self.BuildFileScanError(
-          'Spec `{}` does not match any targets.'.format(spec.to_spec_string()))
+          # NB: ignore Throws containing ResolveErrors because they are due to missing targets / files
+          return set()
+      else:
+        raise self.BuildFileScanError(str(state.exc))
+    elif missing_is_fatal and not state.value.dependencies:
+      raise self.BuildFileScanError(
+        'Spec `{}` does not match any targets.'.format(self._specs_string(specs)))
 
-      addresses.update(state.value.dependencies)
-    return addresses
+    return set(state.value.dependencies)
 
   def scan_addresses(self, root=None):
     if root:

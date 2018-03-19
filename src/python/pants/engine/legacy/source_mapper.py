@@ -12,6 +12,7 @@ import six
 from pants.base.specs import AscendantAddresses, SingleAddress
 from pants.build_graph.address import parse_spec
 from pants.build_graph.source_mapper import SourceMapper
+from pants.engine.build_files import Specs
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import HydratedTargets
 from pants.source.filespec import any_matches_filespec
@@ -79,14 +80,14 @@ class EngineSourceMapper(SourceMapper):
     """Bulk, iterable form of `target_addresses_for_source`."""
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
     sources_set = set(sources)
-    subjects = [AscendantAddresses(directory=d) for d in self._unique_dirs_for_sources(sources_set)]
+    specs = tuple(AscendantAddresses(directory=d) for d in self._unique_dirs_for_sources(sources_set))
 
     # Uniqify all transitive hydrated targets.
     hydrated_target_to_address = {}
-    for hydrated_targets in self._scheduler.product_request(HydratedTargets, subjects):
-      for hydrated_target in hydrated_targets.dependencies:
-        if hydrated_target not in hydrated_target_to_address:
-          hydrated_target_to_address[hydrated_target] = hydrated_target.adaptor.address
+    hydrated_targets, = self._scheduler.product_request(HydratedTargets, [Specs(specs)])
+    for hydrated_target in hydrated_targets.dependencies:
+      if hydrated_target not in hydrated_target_to_address:
+        hydrated_target_to_address[hydrated_target] = hydrated_target.adaptor.address
 
     for hydrated_target, legacy_address in six.iteritems(hydrated_target_to_address):
       # Handle BUILD files.

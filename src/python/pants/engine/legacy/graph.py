@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+from collections import deque
 from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
@@ -20,11 +21,11 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses, Collection
+from pants.engine.build_files import Specs
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
-from pants.engine.mapper import ResolveError
 from pants.engine.rules import TaskRule, rule
-from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectTransitive
+from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import datatype
@@ -56,9 +57,6 @@ class LegacyBuildGraph(BuildGraph):
   This implementation is backed by a Scheduler that is able to resolve TransitiveHydratedTargets.
   """
 
-  class InvalidCommandLineSpecError(AddressLookupError):
-    """Raised when command line spec is not a valid directory"""
-
   @classmethod
   def create(cls, scheduler, symbol_table):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class."""
@@ -79,7 +77,7 @@ class LegacyBuildGraph(BuildGraph):
     """Returns a new BuildGraph instance of the same type and with the same __init__ params."""
     return LegacyBuildGraph(self._scheduler, self._target_types)
 
-  def _index(self, roots):
+  def _index(self, hydrated_targets):
     """Index from the given roots into the storage provided by the base class.
 
     This is an additive operation: any existing connections involving these nodes are preserved.
@@ -88,14 +86,12 @@ class LegacyBuildGraph(BuildGraph):
     new_targets = list()
 
     # Index the ProductGraph.
-    for product in roots:
-      # We have a successful TransitiveHydratedTargets value (for a particular input Spec).
-      for hydrated_target in product.dependencies:
-        target_adaptor = hydrated_target.adaptor
-        address = target_adaptor.address
-        all_addresses.add(address)
-        if address not in self._target_by_address:
-          new_targets.append(self._index_target(target_adaptor))
+    for hydrated_target in hydrated_targets:
+      target_adaptor = hydrated_target.adaptor
+      address = target_adaptor.address
+      all_addresses.add(address)
+      if address not in self._target_by_address:
+        new_targets.append(self._index_target(target_adaptor))
 
     # Once the declared dependencies of all targets are indexed, inject their
     # additional "traversable_(dependency_)?specs".
@@ -208,12 +204,8 @@ class LegacyBuildGraph(BuildGraph):
     addresses = set(addresses) - set(self._target_by_address.keys())
     if not addresses:
       return
-    matched = set(self._inject_specs([SingleAddress(a.spec_path, a.target_name) for a in addresses]))
-    missing = addresses - matched
-    if missing:
-      # TODO: When SingleAddress resolution converted from projection of a directory
-      # and name to a match for PathGlobs, we lost our useful AddressLookupError formatting.
-      raise AddressLookupError('Addresses were not matched: {}'.format(missing))
+    for _ in self._inject_specs([SingleAddress(a.spec_path, a.target_name) for a in addresses]):
+      pass
 
   def inject_roots_closure(self, target_roots, fail_fast=None):
     if type(target_roots) is ChangedTargetRoots:
@@ -239,9 +231,6 @@ class LegacyBuildGraph(BuildGraph):
   def _resolve_context(self):
     try:
       yield
-    except ResolveError as e:
-      # NB: ResolveError means that a target was not found, which is a common user facing error.
-      raise AddressLookupError(str(e))
     except Exception as e:
       raise AddressLookupError(
         'Build graph construction failed: {} {}'.format(type(e).__name__, str(e))
@@ -250,16 +239,15 @@ class LegacyBuildGraph(BuildGraph):
   def _inject_addresses(self, subjects):
     """Injects targets into the graph for each of the given `Address` objects, and then yields them.
 
-    TODO: See #4533 about unifying "collection of literal Addresses" with the `Spec` types, which
-    would avoid the need for the independent `_inject_addresses` and `_inject_specs` codepaths.
+    TODO: See #5606 about undoing the split between `_inject_addresses` and `_inject_specs`.
     """
     logger.debug('Injecting addresses to %s: %s', self, subjects)
     with self._resolve_context():
       addresses = tuple(subjects)
-      hydrated_targets = self._scheduler.product_request(TransitiveHydratedTargets,
-                                                         [BuildFileAddresses(addresses)])
+      thts, = self._scheduler.product_request(TransitiveHydratedTargets,
+                                              [BuildFileAddresses(addresses)])
 
-    self._index(hydrated_targets)
+    self._index(thts.closure)
 
     yielded_addresses = set()
     for address in subjects:
@@ -274,20 +262,14 @@ class LegacyBuildGraph(BuildGraph):
     """
     logger.debug('Injecting specs to %s: %s', self, subjects)
     with self._resolve_context():
-      product_results = self._scheduler.products_request([TransitiveHydratedTargets, BuildFileAddresses],
-                                                         subjects)
+      specs = tuple(subjects)
+      thts, = self._scheduler.product_request(TransitiveHydratedTargets,
+                                              [Specs(specs)])
 
-    self._index(product_results[TransitiveHydratedTargets])
+    self._index(thts.closure)
 
-    yielded_addresses = set()
-    for subject, product in zip(subjects, product_results[BuildFileAddresses]):
-      if not product.dependencies:
-        raise self.InvalidCommandLineSpecError(
-          'Spec {} does not match any targets.'.format(subject))
-      for address in product.dependencies:
-        if address not in yielded_addresses:
-          yielded_addresses.add(address)
-          yield address
+    for hydrated_target in thts.roots:
+      yield hydrated_target.address
 
 
 class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependencies'])):
@@ -313,21 +295,50 @@ class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependen
     return hash(self.address)
 
 
-class TransitiveHydratedTargets(Collection.of(HydratedTarget)):
-  """A transitive set of HydratedTarget objects."""
+class TransitiveHydratedTarget(datatype('TransitiveHydratedTarget', ['root', 'dependencies'])):
+  """A recursive structure wrapping a HydratedTarget root and TransitiveHydratedTarget deps."""
+
+
+class TransitiveHydratedTargets(datatype('TransitiveHydratedTargets', ['roots', 'closure'])):
+  """A set of HydratedTarget roots, and their transitive, flattened, de-duped closure."""
 
 
 class HydratedTargets(Collection.of(HydratedTarget)):
   """An intransitive set of HydratedTarget objects."""
 
 
-@rule(TransitiveHydratedTargets, [SelectTransitive(HydratedTarget,
-                                                   BuildFileAddresses,
-                                                   field_types=(Address,),
-                                                   field='addresses')])
-def transitive_hydrated_targets(targets):
-  """Recursively requests HydratedTarget instances, which will result in an eager, transitive graph walk."""
-  return TransitiveHydratedTargets(targets)
+@rule(TransitiveHydratedTargets, [SelectDependencies(TransitiveHydratedTarget,
+                                                     BuildFileAddresses,
+                                                     field_types=(Address,),
+                                                     field='addresses')])
+def transitive_hydrated_targets(transitive_hydrated_targets):
+  """Kicks off recursion on expansion of TransitiveHydratedTarget objects.
+
+  The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk
+  and flatten here. The engine memoizes the computation of TransitiveHydratedTarget, so
+  when multiple TransitiveHydratedTargets objects are being constructed for multiple
+  roots, their structure will be shared.
+  """
+  closure = set()
+  to_visit = deque(transitive_hydrated_targets)
+
+  while to_visit:
+    tht = to_visit.popleft()
+    if tht.root in closure:
+      continue
+    closure.add(tht.root)
+    to_visit.extend(tht.dependencies)
+
+  return TransitiveHydratedTargets(tuple(tht.root for tht in transitive_hydrated_targets), closure)
+
+
+@rule(TransitiveHydratedTarget, [Select(HydratedTarget),
+                                 SelectDependencies(TransitiveHydratedTarget,
+                                                    HydratedTarget,
+                                                    field_types=(Address,),
+                                                    field='addresses')])
+def transitive_hydrated_target(root, dependencies):
+  return TransitiveHydratedTarget(root, dependencies)
 
 
 @rule(HydratedTargets, [SelectDependencies(HydratedTarget,
@@ -408,6 +419,7 @@ def create_legacy_graph_tasks(symbol_table):
   symbol_table_constraint = symbol_table.constraint()
   return [
     transitive_hydrated_targets,
+    transitive_hydrated_target,
     hydrated_targets,
     TaskRule(
       HydratedTarget,
