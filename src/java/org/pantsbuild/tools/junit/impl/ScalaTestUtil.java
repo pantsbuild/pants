@@ -6,6 +6,12 @@ public final class ScalaTestUtil {
   private ScalaTestUtil() {}
 
   /**
+   * org.scalatest.Suite.class, loaded with runtime reflection to avoid the
+   * scalatest dependency.
+   */
+  private static Class<?> suiteClass = null;
+
+  /**
    * Returns a scalatest junit runner using reflection in the classloader of the test.
    * @param clazz the test class
    *
@@ -31,7 +37,9 @@ public final class ScalaTestUtil {
    */
   public static boolean isScalaTestTest(Class<?> clazz) {
     try {
-      Class suiteClass = Class.forName("org.scalatest.Suite", true, clazz.getClassLoader());
+      if (suiteClass == null) {
+        suiteClass = Class.forName("org.scalatest.Suite", true, clazz.getClassLoader());
+      }
       return suiteClass.isAssignableFrom(clazz);
     } catch (ClassNotFoundException e) {
       return false;
