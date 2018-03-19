@@ -450,10 +450,10 @@ class RunTracker(Subsystem):
 
     timings = AggregatedTimings()
     for goal, deps in transitive_dependencies.items():
-      label = "main:{}".format(goal)
+      label = "{}:{}".format(RunTracker.DEFAULT_ROOT_NAME, goal)
       timings.add_timing(label, raw_timings.get(label, 0.0))
       for dep in deps:
-        dep_label = "main:{}".format(dep)
+        dep_label = "{}:{}".format(RunTracker.DEFAULT_ROOT_NAME, dep)
         timings.add_timing(label, raw_timings.get(dep_label, 0.0))
     return timings
 
