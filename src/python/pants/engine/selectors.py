@@ -127,26 +127,6 @@ class SelectDependencies(datatype('Dependencies', ['product', 'dep_product', 'fi
                                      field_types_portion)
 
 
-class SelectTransitive(datatype('Transitive', ['product', 'dep_product', 'field', 'field_types']),
-                       Selector):
-  """A variation of `SelectDependencies` that is used to recursively request a product.
-
-  One use case is to eagerly walk the entire graph.
-
-  It first selects for dep_product then recursively requests products with the `product` type, expanding each by its
-  `field`.
-
-  Requires that both the dep_product and product have the same field `field` that contains the same `field_types`.
-  """
-
-  DEFAULT_FIELD = 'dependencies'
-
-  optional = False
-
-  def __new__(cls, product, dep_product, field=DEFAULT_FIELD, field_types=tuple()):
-    return super(SelectTransitive, cls).__new__(cls, product, dep_product, field, field_types)
-
-
 class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'field', 'input_product']), Selector):
   """Selects a field of the given Subject to produce a Subject, Product dependency from.
 

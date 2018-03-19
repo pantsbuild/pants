@@ -70,6 +70,8 @@ python_library(
     ':struct',
     'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:objects',
   ]
 )
 
@@ -77,7 +79,6 @@ python_library(
   name='mapper',
   sources=['mapper.py'],
   dependencies=[
-    '3rdparty/python:pathspec',
     ':objects',
     ':parser',
     'src/python/pants/build_graph',

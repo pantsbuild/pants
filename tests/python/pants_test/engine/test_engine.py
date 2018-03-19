@@ -122,7 +122,7 @@ class EngineTraceTest(unittest.TestCase, SchedulerTestBase):
     self.assert_equal_with_printing(dedent('''
       Received unexpected Throw state(s):
       Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
-        Computing Task(<function nested_raise at 0xEEEEEEEEE>, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
+        Computing Task(nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
           Throw(An exception for B)
             Traceback (most recent call last):
               File LOCATION-INFO, in call
@@ -152,8 +152,8 @@ class EngineTraceTest(unittest.TestCase, SchedulerTestBase):
     self.assert_equal_with_printing(dedent('''
       Received unexpected Throw state(s):
       Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
-        Computing Task(<class 'pants_test.engine.test_engine.A'>, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
-          Computing Task(<function nested_raise at 0xEEEEEEEEE>, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =C)
+        Computing Task(A, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
+          Computing Task(nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =C)
             Throw(An exception for B)
               Traceback (most recent call last):
                 File LOCATION-INFO, in call

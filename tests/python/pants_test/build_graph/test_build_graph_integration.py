@@ -18,7 +18,7 @@ class BuildGraphIntegrationTest(PantsRunIntegrationTest):
       with self.file_renamed(os.path.join(prefix, 'cycle2'), 'TEST_BUILD', 'BUILD'):
         pants_run = self.run_pants(['compile', os.path.join(prefix, 'cycle1')])
         self.assert_failure(pants_run)
-        self.assertIn('Cycle detected', pants_run.stderr_data)
+        self.assertIn('cycle', pants_run.stderr_data)
 
   def test_banned_module_import(self):
     self.banned_import('testprojects/src/python/build_file_imports_module')

@@ -93,7 +93,7 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
     def for_scope(self, scope):
       # TODO(John Sirois): Some users pass in A dict of scope -> _FakeOptionValues instead of a
       # dict of scope -> (dict of option name -> value).  Clean up these usages and kill this
-      # accomodation.
+      # accommodation.
       options_for_this_scope = options.get(scope) or {}
       if isinstance(options_for_this_scope, _FakeOptionValues):
         options_for_this_scope = options_for_this_scope.option_values

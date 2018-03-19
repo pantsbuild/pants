@@ -151,6 +151,7 @@ python_tests(
     ':scheduler_test_base',
     ':util',
     'src/python/pants/build_graph',
+    'src/python/pants/engine:build_files',
     'src/python/pants/engine:mapper',
     'src/python/pants/engine:struct',
     'src/python/pants/util:dirutil',
@@ -191,6 +192,7 @@ python_tests(
   coverage=['pants.engine.nodes', 'pants.engine.scheduler'],
   dependencies=[
     ':util',
+    'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
     'src/python/pants/engine:scheduler',
     'tests/python/pants_test/engine/examples:planners',

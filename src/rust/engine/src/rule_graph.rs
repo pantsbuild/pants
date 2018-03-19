@@ -8,7 +8,7 @@ use std::io;
 
 use core::{Function, Key, TypeConstraint, TypeId, Value, ANY_TYPE};
 use externs;
-use selectors::{Select, SelectDependencies, SelectTransitive, Selector};
+use selectors::{Select, SelectDependencies, Selector};
 use tasks::{Task, Tasks};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -358,12 +358,6 @@ impl<'t> GraphMaker<'t> {
                 ref dep_product,
                 ref field_types,
                 ..
-              })
-              | &Selector::SelectTransitive(SelectTransitive {
-                ref product,
-                ref dep_product,
-                ref field_types,
-                ..
               }) => {
                 let initial_selector = *dep_product;
                 let initial_rules_or_literals = rhs_for_select(
@@ -683,22 +677,6 @@ pub fn selector_str(selector: &Selector) -> String {
     &Selector::SelectDependencies(ref s) => format!(
       "{}({}, {}, {}field_types=({},))",
       "SelectDependencies",
-      type_constraint_str(s.product),
-      type_constraint_str(s.dep_product),
-      if s.field == "dependencies" {
-        "".to_string()
-      } else {
-        format!("'{}', ", s.field)
-      },
-      s.field_types
-        .iter()
-        .map(|&f| type_str(f))
-        .collect::<Vec<String>>()
-        .join(", ")
-    ),
-    &Selector::SelectTransitive(ref s) => format!(
-      "{}({}, {}, {}field_types=({},))",
-      "SelectTransitive",
       type_constraint_str(s.product),
       type_constraint_str(s.dep_product),
       if s.field == "dependencies" {

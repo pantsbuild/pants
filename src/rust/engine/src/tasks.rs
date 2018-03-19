@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, FNV};
 use externs;
-use selectors::{Select, SelectDependencies, SelectProjection, SelectTransitive, Selector};
+use selectors::{Select, SelectDependencies, SelectProjection, Selector};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
@@ -114,21 +114,6 @@ impl Tasks {
     field_types: Vec<TypeId>,
   ) {
     self.clause(Selector::SelectDependencies(SelectDependencies {
-      product: product,
-      dep_product: dep_product,
-      field: field,
-      field_types: field_types,
-    }));
-  }
-
-  pub fn add_select_transitive(
-    &mut self,
-    product: TypeConstraint,
-    dep_product: TypeConstraint,
-    field: Field,
-    field_types: Vec<TypeId>,
-  ) {
-    self.clause(Selector::SelectTransitive(SelectTransitive {
       product: product,
       dep_product: dep_product,
       field: field,
