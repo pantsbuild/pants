@@ -9,10 +9,10 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.register import build_file_aliases
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_environment import pants_version
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class PantsRequirementTest(BaseTest):
+class PantsRequirementTest(TestBase):
   @property
   def alias_groups(self):
     # NB: We use aliases and BUILD files to test proper registration of the pants_requirement macro.

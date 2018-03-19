@@ -14,31 +14,27 @@ from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
 
-from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.deprecated import deprecated_module
 from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.target_roots import LiteralTargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
-from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.build_graph.target import Target
+from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.scope import GLOBAL_SCOPE
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin
-from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
+from pants.util.dirutil import (recursive_dirname, relative_symlink, safe_mkdir, safe_open,
+                                safe_rmtree)
 from pants_test.base.context_utils import create_context_from_options
+from pants_test.engine.util import init_native
 from pants_test.option.util.fakes import create_options_for_optionables
-
-
-deprecated_module('1.7.0.dev0', 'Use pants_test.test_base instead')
 
 
 class TestGenerator(object):
@@ -48,7 +44,7 @@ class TestGenerator(object):
   def generate_tests(cls):
     """Generate tests for a given class.
 
-    This should be called against the composing class in it's defining module, e.g.
+    This should be called against the composing class in its defining module, e.g.
 
       class ThingTest(TestGenerator):
         ...
@@ -73,11 +69,10 @@ class TestGenerator(object):
     setattr(cls, method_name, method)
 
 
-class BaseTest(unittest.TestCase):
+class TestBase(unittest.TestCase):
   """A baseclass useful for tests requiring a temporary buildroot.
 
   :API: public
-
   """
 
   def build_path(self, relpath):
@@ -99,6 +94,7 @@ class BaseTest(unittest.TestCase):
     """
     path = os.path.join(self.build_root, relpath)
     safe_mkdir(path)
+    self._invalidate_for(relpath)
     return path
 
   def create_workdir_dir(self, relpath):
@@ -110,7 +106,32 @@ class BaseTest(unittest.TestCase):
     """
     path = os.path.join(self.pants_workdir, relpath)
     safe_mkdir(path)
+    self._invalidate_for(relpath)
     return path
+
+  def _invalidate_for(self, *relpaths):
+    """Invalidates all files from the relpath, recursively up to the root.
+
+    Many python operations implicitly create parent directories, so we assume that touching a
+    file located below directories that do not currently exist will result in their creation.
+    """
+    if self._graph_helper is None:
+      return
+    files = {f for relpath in relpaths for f in recursive_dirname(relpath)}
+    self._graph_helper.scheduler.invalidate_files(files)
+
+  def create_link(self, relsrc, reldst):
+    """Creates a symlink within the buildroot.
+
+    :API: public
+
+    relsrc: A relative path for the source of the link.
+    reldst: A relative path for the destination of the link.
+    """
+    src = os.path.join(self.build_root, relsrc)
+    dst = os.path.join(self.build_root, reldst)
+    relative_symlink(src, dst)
+    self._invalidate_for(reldst)
 
   def create_file(self, relpath, contents='', mode='wb'):
     """Writes to a file under the buildroot.
@@ -124,7 +145,19 @@ class BaseTest(unittest.TestCase):
     path = os.path.join(self.build_root, relpath)
     with safe_open(path, mode=mode) as fp:
       fp.write(contents)
+    self._invalidate_for(relpath)
     return path
+
+  def create_files(self, path, files):
+    """Writes to a file under the buildroot with contents same as file name.
+
+    :API: public
+
+     path:  The relative path to the file from the build root.
+     files: List of file names.
+    """
+    for f in files:
+      self.create_file(os.path.join(path, f), contents=f)
 
   def create_workdir_file(self, relpath, contents='', mode='wb'):
     """Writes to a file under the work directory.
@@ -149,7 +182,6 @@ class BaseTest(unittest.TestCase):
     target:  A string containing the target definition as it would appear in a BUILD file.
     """
     self.create_file(self.build_path(relpath), target, mode='a')
-    return BuildFile(self.address_mapper._project_tree, relpath=self.build_path(relpath))
 
   def make_target(self,
                   spec='',
@@ -207,6 +239,13 @@ class BaseTest(unittest.TestCase):
     return BuildFileAliases(targets={'target': Target})
 
   @property
+  def pants_ignore_patterns(self):
+    """
+    :API: public
+    """
+    return None
+
+  @property
   def build_ignore_patterns(self):
     """
     :API: public
@@ -217,7 +256,7 @@ class BaseTest(unittest.TestCase):
     """
     :API: public
     """
-    super(BaseTest, self).setUp()
+    super(TestBase, self).setUp()
     # Avoid resetting the Runtracker here, as that is specific to fork'd process cleanup.
     clean_global_runtime_state(reset_subsystem=True)
 
@@ -231,7 +270,7 @@ class BaseTest(unittest.TestCase):
     safe_mkdir(self.pants_workdir)
 
     self.options = defaultdict(dict)  # scope -> key-value mapping.
-    self.options[GLOBAL_SCOPE] = {
+    self.options[''] = {
       'pants_workdir': self.pants_workdir,
       'pants_supportdir': os.path.join(self.build_root, 'build-support'),
       'pants_distdir': os.path.join(self.build_root, 'dist'),
@@ -251,7 +290,10 @@ class BaseTest(unittest.TestCase):
     self._build_configuration.register_aliases(self.alias_groups)
     self.build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
     self.project_tree = FileSystemProjectTree(self.build_root)
-    self.reset_build_graph()
+
+    self._graph_helper = None
+    self._build_graph = None
+    self._address_mapper = None
 
   def buildroot_files(self, relpath=None):
     """Returns the set of all files under the test build root.
@@ -268,18 +310,50 @@ class BaseTest(unittest.TestCase):
           yield os.path.relpath(os.path.join(root, f), self.build_root)
     return set(scan())
 
-  def reset_build_graph(self):
+  def _initialize_engine(self):
+    self._graph_helper = EngineInitializer.setup_legacy_graph(
+        self.pants_ignore_patterns,
+        self.pants_workdir,
+        build_file_imports_behavior='allow',
+        native=init_native(),
+        build_file_aliases=self.alias_groups,
+        build_ignore_patterns=self.build_ignore_patterns,
+      )
+
+    self._build_graph, self._address_mapper = self._graph_helper.create_build_graph(
+        LiteralTargetRoots([]),
+        self.build_root,
+      )
+
+  @property
+  def address_mapper(self):
+    if self._address_mapper is None:
+      self._initialize_engine()
+    return self._address_mapper
+
+  @property
+  def build_graph(self):
+    if self._build_graph is None:
+      self._initialize_engine()
+    return self._build_graph
+
+  def reset_build_graph(self, reset_build_files=False, delete_build_files=False):
     """Start over with a fresh build graph with no targets in it."""
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, self.project_tree,
-                                                 build_ignore_patterns=self.build_ignore_patterns)
-    self.build_graph = MutableBuildGraph(address_mapper=self.address_mapper)
+    if delete_build_files or reset_build_files:
+      files = [f for f in self.buildroot_files() if os.path.basename(f) == 'BUILD']
+      if delete_build_files:
+        for f in files:
+          os.remove(os.path.join(self.build_root, f))
+      self._invalidate_for(*files)
+    if self._build_graph is not None:
+      self._build_graph = self._build_graph.clone_new()
 
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
 
   def context(self, for_task_types=None, for_subsystems=None, options=None,
               target_roots=None, console_outstream=None, workspace=None,
-              scheduler=None, **kwargs):
+              **kwargs):
     """
     :API: public
 
@@ -333,16 +407,14 @@ class BaseTest(unittest.TestCase):
                                           build_file_parser=self.build_file_parser,
                                           address_mapper=self.address_mapper,
                                           console_outstream=console_outstream,
-                                          workspace=workspace,
-                                          scheduler=scheduler)
+                                          workspace=workspace)
     return context
 
   def tearDown(self):
     """
     :API: public
     """
-    super(BaseTest, self).tearDown()
-    BuildFile.clear_cache()
+    super(TestBase, self).tearDown()
     Subsystem.reset()
 
   def target(self, spec):
@@ -375,17 +447,6 @@ class BaseTest(unittest.TestCase):
       self.build_graph.inject_address_closure(address)
     targets = [self.build_graph.get_target(address) for address in addresses]
     return targets
-
-  def create_files(self, path, files):
-    """Writes to a file under the buildroot with contents same as file name.
-
-    :API: public
-
-     path:  The relative path to the file from the build root.
-     files: List of file names.
-    """
-    for f in files:
-      self.create_file(os.path.join(path, f), contents=f)
 
   def create_library(self, path, target_type, name, sources=None, **kwargs):
     """Creates a library target of given type at the BUILD file at path with sources

@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.base.exceptions import TargetDefinitionException
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class TestPythonBinary(BaseTest):
+class TestPythonBinary(TestBase):
   def setUp(self):
     super(TestPythonBinary, self).setUp()
     # Force creation of SourceRootConfig global instance. PythonBinary uses source roots

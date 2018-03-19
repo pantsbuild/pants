@@ -16,8 +16,8 @@ from setproctitle import setproctitle as set_process_title
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonExiter, DaemonPantsRunner
-from pants.bin.engine_initializer import EngineInitializer
 from pants.engine.native import Native
+from pants.init.engine_initializer import EngineInitializer
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.logging.setup import setup_logging
 from pants.option.arg_splitter import GLOBAL_SCOPE

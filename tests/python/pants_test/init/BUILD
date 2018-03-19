@@ -22,7 +22,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:objects',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
     'tests/python/pants_test/subsystem:subsystem_utils'
   ],
   coverage = ['pants.init'],

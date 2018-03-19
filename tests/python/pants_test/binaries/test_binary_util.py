@@ -15,7 +15,7 @@ from pants.binaries.binary_util import (BinaryRequest, BinaryToolFetcher, Binary
 from pants.net.http.fetcher import Fetcher
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ class ExternalUrlGenerator(BinaryToolUrlGenerator):
 
 
 # TODO(cosmicexplorer): test requests with an archiver!
-class BinaryUtilTest(BaseTest):
+class BinaryUtilTest(TestBase):
   """Tests binary_util's binaries_baseurls handling."""
 
   class MapFetcher(object):

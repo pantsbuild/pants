@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.parser_hierarchy import InvalidScopeError, all_enclosing_scopes, enclosing_scope
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class TestEnclosingScopeTraversal(BaseTest):
+class TestEnclosingScopeTraversal(TestBase):
   def test_enclosing_scope(self):
     """The enclosing scope of any non-nested scope should be the global scope,
     and the enclosing scope of a nested scope should be the scope without its

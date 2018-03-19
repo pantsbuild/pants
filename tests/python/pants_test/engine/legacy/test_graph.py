@@ -12,11 +12,11 @@ from contextlib import contextmanager
 
 import mock
 
-from pants.bin.engine_initializer import EngineInitializer
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
+from pants.init.engine_initializer import EngineInitializer
 from pants.init.options_initializer import OptionsInitializer
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -102,7 +102,7 @@ class GraphTargetScanFailureTests(GraphTestBase):
       with self.graph_helper() as graph_helper:
         self.create_graph_from_specs(graph_helper, ['no-such-path:'])
 
-    self.assertIn('Path "no-such-path" contains no BUILD files',
+    self.assertIn('Path "no-such-path" does not contain any BUILD files',
                   str(cm.exception))
 
   def test_with_existing_directory_with_no_build_files_fails(self):
@@ -123,7 +123,7 @@ class GraphTargetScanFailureTests(GraphTestBase):
 
         graph.inject_address_closure(Address('build-support/bin', 'wat'))
 
-    self.assertIn('Path "build-support/bin" contains no BUILD files',
+    self.assertIn('Path "build-support/bin" does not contain any BUILD files',
                   str(cm.exception))
 
 

@@ -10,6 +10,7 @@ from abc import abstractproperty
 
 from six import string_types
 
+from pants.base.deprecated import deprecated_conditional
 from pants.engine.addressable import addressable_list
 from pants.engine.fs import PathGlobs
 from pants.engine.objects import Locatable
@@ -126,12 +127,6 @@ class JunitTestsAdaptor(TargetAdaptor):
 class BundlesField(datatype(['address', 'bundles', 'filespecs_list', 'path_globs_list']), Field):
   """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
 
-  def __eq__(self, other):
-    return type(self) == type(other) and self.address == other.address
-
-  def __ne__(self, other):
-    return not (self == other)
-
   def __hash__(self):
     return hash(self.address)
 
@@ -244,6 +239,10 @@ class GoTargetAdaptor(TargetAdaptor):
     # N.B. Go targets glob on `*` due to the way resources and .c companion files are handled.
     return ('*',)
 
+  @property
+  def default_sources_exclude_globs(self):
+    return ('BUILD', 'BUILD.*')
+
 
 class BaseGlobs(Locatable, AbstractClass):
   """An adaptor class to allow BUILD file parsing from ContextAwareObjectFactories."""
@@ -296,11 +295,12 @@ class BaseGlobs(Locatable, AbstractClass):
 
     # `follow_links=True` is the default behavior for wrapped globs, so we pop the old kwarg
     # and warn here to bridge the gap from v1->v2 BUILD files.
-    follow_links = kwargs.pop('follow_links', None)
-    if follow_links is not None:
-      logger.warn(
-        'Ignoring `follow_links={}` kwarg on glob. Default behavior is to follow all links.'
-        .format(follow_links)
+    if kwargs.pop('follow_links', None) is not None:
+      deprecated_conditional(
+        lambda: True,
+        '1.6.0.dev0',
+        'Ignoring `follow_links` kwarg on glob in `{}`. Default behavior is to follow all links.'
+          .format(self._spec_path)
       )
 
     if kwargs:
@@ -309,7 +309,11 @@ class BaseGlobs(Locatable, AbstractClass):
   @property
   def filespecs(self):
     """Return a filespecs dict representing both globs and excludes."""
-    return {'globs': self._file_globs, 'exclude': self._exclude_filespecs}
+    filespecs = {'globs': self._file_globs}
+    exclude_filespecs = self._exclude_filespecs
+    if exclude_filespecs:
+      filespecs['exclude'] = exclude_filespecs
+    return filespecs
 
   @property
   def _exclude_filespecs(self):

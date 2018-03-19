@@ -25,7 +25,7 @@ class PythonEvalTest(PythonTaskTestBase):
     self._create_graph(broken_b_library=True)
 
   def _create_graph(self, broken_b_library):
-    self.reset_build_graph()
+    self.reset_build_graph(delete_build_files=True)
 
     self.a_library = self.create_python_library('src/python/a', 'a', {'a.py': dedent("""
     import inspect

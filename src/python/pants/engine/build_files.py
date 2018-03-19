@@ -23,7 +23,7 @@ from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
-from pants.util.dirutil import fast_relpath_optional
+from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.objects import TypeConstraintError, datatype
 
 
@@ -50,7 +50,7 @@ def parse_address_family(address_mapper, directory):
   files_content = yield Get(FilesContent, DirectoryDigest, snapshot.directory_digest)
 
   if not files_content:
-    raise ResolveError('Directory "{}" does not contain build files.'.format(directory.path))
+    raise ResolveError('Directory "{}" does not contain any BUILD files.'.format(directory.path))
   address_maps = []
   for filecontent_product in files_content.dependencies:
     address_maps.append(AddressMap.parse(filecontent_product.path,
@@ -224,7 +224,7 @@ def addresses_from_address_families(address_mapper, specs):
   by_directory.cached = None
 
   def raise_empty_address_family(spec):
-    raise ResolveError('Path "{}" contains no BUILD files.'.format(spec.directory))
+    raise ResolveError('Path "{}" does not contain any BUILD files.'.format(spec.directory))
 
   def exclude_address(address):
     if address_mapper.exclude_patterns:
@@ -291,25 +291,10 @@ def _spec_to_globs(address_mapper, specs):
     elif type(spec) is AscendantAddresses:
       patterns.update(join(f, pattern)
                       for pattern in address_mapper.build_patterns
-                      for f in _recursive_dirname(spec.directory))
+                      for f in recursive_dirname(spec.directory))
     else:
       raise ValueError('Unrecognized Spec type: {}'.format(spec))
   return PathGlobs.create('', include=patterns, exclude=address_mapper.build_ignore_patterns)
-
-
-def _recursive_dirname(f):
-  """Given a relative path like 'a/b/c/d', yield all ascending path components like:
-
-        'a/b/c/d'
-        'a/b/c'
-        'a/b'
-        'a'
-        ''
-  """
-  while f:
-    yield f
-    f = dirname(f)
-  yield ''
 
 
 def create_graph_rules(address_mapper, symbol_table):

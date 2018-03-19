@@ -87,7 +87,7 @@ class FileDepsTest(ConsoleTaskTestBase):
                       ]
                     )
                   """),
-                  sources=['src/thrift/storage/data_types.thrift'])
+                  sources=['data_types.thrift'])
 
     create_target(path='src/java/lib',
                   definition=dedent("""

@@ -11,11 +11,11 @@ from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependenc
                                                                     PinnedJarArtifactSet)
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.subsystem.subsystem import Subsystem
-from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
+from pants_test.test_base import TestBase
 
 
-class JarDependencyManagementTest(BaseTest):
+class JarDependencyManagementTest(TestBase):
 
   _coord_any = M2Coordinate('foobar', 'foobar')
   _coord_one = M2Coordinate('foobar', 'foobar', '1.1')

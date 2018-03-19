@@ -17,7 +17,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coverage.cobertura import Cobertura
 from pants.backend.jvm.tasks.coverage.manager import CodeCoverageSettings
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 class attrdict(dict):
@@ -46,7 +46,7 @@ class MockSystemCalls(object):
     self.safe_makedir_calls.append(dir)
 
 
-class TestCobertura(BaseTest):
+class TestCobertura(TestBase):
   def get_settings(self, options, syscalls):
     return CodeCoverageSettings(
       options,

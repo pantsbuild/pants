@@ -9,6 +9,6 @@ python_tests(
     'src/python/pants/backend/docgen/targets',
     'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
