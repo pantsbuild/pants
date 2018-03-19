@@ -442,10 +442,9 @@ class TestBase(unittest.TestCase):
     """
 
     spec = CmdLineSpecParser(self.build_root).parse_spec(spec)
-    addresses = list(self.address_mapper.scan_specs([spec]))
-    for address in addresses:
-      self.build_graph.inject_address_closure(address)
-    targets = [self.build_graph.get_target(address) for address in addresses]
+    targets = []
+    for address in self.build_graph.inject_specs_closure([spec]):
+      targets.append(self.build_graph.get_target(address))
     return targets
 
   def create_library(self, path, target_type, name, sources=None, **kwargs):
