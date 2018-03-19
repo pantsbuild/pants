@@ -76,8 +76,8 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     self.assertIn("FAILURE: Timeout of 1 seconds reached.", pants_run.stdout_data)
 
     # Ensure that the warning about killing triggered.
-    self.assertIn("WARN] Timed out test did not terminate gracefully after 2 seconds, "
-                  "killing...", pants_run.stderr_data)
+    self.assertIn("WARN] Timed out test(s) did not terminate gracefully after 2 seconds, "
+                  "killing...:", pants_run.stderr_data)
 
   def test_pytest_explicit_coverage(self):
     with temporary_dir(cleanup=False) as coverage_dir:

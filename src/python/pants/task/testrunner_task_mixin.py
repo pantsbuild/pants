@@ -269,8 +269,8 @@ class TestRunnerTaskMixin(object):
             # is executed by the Timer below.
             import logging
             logger = logging.getLogger(__name__)
-            logger.warn('Timed out test did not terminate gracefully after {} seconds, killing...'
-                        .format(wait_time))
+            logger.warn('Timed out test(s) did not terminate gracefully after {} seconds, killing...:\n  {}'
+                        .format(wait_time, args))
             process_handler.kill()
 
         timer = Timer(wait_time, kill_if_not_terminated)
