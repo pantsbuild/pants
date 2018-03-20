@@ -22,7 +22,8 @@ class AggregatedTimings(object):
     self._timings_by_path = defaultdict(float)
     self._tool_labels = set()
     self._path = path
-    safe_mkdir_for(self._path)
+    if path:
+      safe_mkdir_for(self._path)
 
   def add_timing(self, label, secs, is_tool=False):
     """Aggregate timings by label.

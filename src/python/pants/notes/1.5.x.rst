@@ -3,6 +3,19 @@
 
 This document describes releases leading up to the ``1.5.x`` ``stable`` series.
 
+1.5.0 (03/19/2018)
+------------------
+
+The ``1.5.0`` stable release, with no additional changes since the ``rc1`` release.
+
+A quick summary of the changes since the ``1.4.x`` branch:
+
+* V1 engine removed.
+* A new Thrift binary tool subsystem.
+* Redesign JavaScript Style Checker to use ESLint directly
+* Old python pipeline removed.
+* Enable workdir-max-build-entries by default.
+
 1.5.0rc1 (03/14/2018)
 ---------------------
 

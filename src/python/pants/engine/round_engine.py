@@ -133,7 +133,7 @@ class RoundEngine(Engine):
       if self._target_roots is not None:
         context._replace_targets(self._target_roots)
 
-  def _visit_goal(self, goal, context, goal_info_by_goal, target_roots_replacement):
+  def _visit_goal(self, goal, context, goal_info_by_goal):
     if goal in goal_info_by_goal:
       return
 
@@ -144,11 +144,6 @@ class RoundEngine(Engine):
       task_type = goal.task_type_by_name(task_name)
       tasktypes_by_name[task_name] = task_type
       visited_task_types.add(task_type)
-
-      alternate_target_roots = task_type.get_alternate_target_roots(context.options,
-                                                                    context.address_mapper,
-                                                                    context.build_graph)
-      target_roots_replacement.propose_alternates(task_type, alternate_target_roots)
 
       round_manager = RoundManager(context)
       task_type.invoke_prepare(context.options, round_manager)
@@ -188,26 +183,38 @@ class RoundEngine(Engine):
     goal_info_by_goal[goal] = goal_info
 
     for goal_dependency in goal_dependencies:
-      self._visit_goal(goal_dependency, context, goal_info_by_goal, target_roots_replacement)
+      self._visit_goal(goal_dependency, context, goal_info_by_goal)
 
-  def _prepare(self, context, goals):
-    if len(goals) == 0:
-      raise TaskError('No goals to prepare')
-
-    goal_info_by_goal = OrderedDict()
+  def _propose_alternative_target_roots(self, context, sorted_goal_infos):
     target_roots_replacement = self.TargetRootsReplacement()
-    for goal in reversed(OrderedSet(goals)):
-      self._visit_goal(goal, context, goal_info_by_goal, target_roots_replacement)
+    for goal_info in sorted_goal_infos:
+      for task_type in goal_info.tasktypes_by_name.values():
+        alternate_target_roots = task_type.get_alternate_target_roots(context.options,
+          context.address_mapper,
+          context.build_graph)
+        target_roots_replacement.propose_alternates(task_type, alternate_target_roots)
     target_roots_replacement.apply(context)
 
-    for goal_info in reversed(list(self._topological_sort(goal_info_by_goal))):
+  def sort_goals(self, context, goals):
+    goal_info_by_goal = OrderedDict()
+    for goal in reversed(OrderedSet(goals)):
+      self._visit_goal(goal, context, goal_info_by_goal)
+
+    return list(reversed(list(self._topological_sort(goal_info_by_goal))))
+
+  def _prepare(self, context, goal_infos):
+    if len(goal_infos) == 0:
+      raise TaskError('No goals to prepare')
+    for goal_info in goal_infos:
       yield GoalExecutor(context, goal_info.goal, goal_info.tasktypes_by_name)
 
   def attempt(self, context, goals):
     """
     :API: public
     """
-    goal_executors = list(self._prepare(context, goals))
+    sorted_goal_infos = self.sort_goals(context, goals)
+    self._propose_alternative_target_roots(context, sorted_goal_infos)
+    goal_executors = list(self._prepare(context, sorted_goal_infos))
     execution_goals = ' -> '.join(e.goal.name for e in goal_executors)
     context.log.info('Executing tasks in goals: {goals}'.format(goals=execution_goals))
 
