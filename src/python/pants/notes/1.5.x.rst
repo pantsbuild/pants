@@ -11,7 +11,6 @@ Refactoring, Improvements, and Tooling
 
 * [coursier/m2-coords] update coursier json parsing; use maven's coords (#5475)
   `PR #5475 <https://github.com/pantsbuild/pants/pull/5475>`_
->`_ttps://github.com/coursier/coursier/pull/782
 
 * Batch execution of address Specs and remove SelectTransitive (#5605)
   `PR #5605 <https://github.com/pantsbuild/pants/pull/5605>`_
