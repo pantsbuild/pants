@@ -9,7 +9,7 @@ public final class ScalaTestUtil {
    * org.scalatest.Suite.class, loaded with runtime reflection to avoid the
    * scalatest dependency.
    */
-  private static final Class<?> suiteClass;
+  private static Class<?> suiteClass;
   static {
     try {
       suiteClass = Class.forName("org.scalatest.Suite");
