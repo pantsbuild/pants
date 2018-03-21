@@ -14,8 +14,7 @@ from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_requirements,
-                                                       is_local_python_dist)
+from pants.backend.python.tasks.pex_build_util import dump_requirement_libs, dump_requirements
 from pants.base.hash_utils import hash_all
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
@@ -34,12 +33,6 @@ class ResolveRequirementsTaskBase(Task):
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
     round_manager.optional_product(PythonRequirementLibrary)  # For local dists.
-
-  @staticmethod
-  def tgt_closure_has_native_sources():
-    local_dist_tgts = self.context.targets(is_local_python_dist)
-    if local_dist_tgts:
-      return any(tgt.has_native_sources for tgt in local_dist_tgts)
 
   def resolve_requirements(self, interpreter, req_libs):
     """Requirements resolution for PEX files.
@@ -60,7 +53,7 @@ class ResolveRequirementsTaskBase(Task):
 
       # We need to ensure that we are resolving for only the current platform if we are
       # including local python dist targets that have native extensions.
-      maybe_platforms = ['current'] if self.tgt_closure_has_native_sources else None
+      maybe_platforms = ['current'] if self.tgt_closure_has_native_sources() else None
 
       path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity), target_set_id))
       # Note that we check for the existence of the directory, instead of for invalid_vts,

@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
 
+from pants.backend.python.tasks.pex_build_util import is_local_python_dist
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
@@ -650,6 +651,11 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     # For the v2 path, e.g. `./pants list` is a functional no-op. This matches the v2 mode behavior
     # of e.g. `./pants --changed-parent=HEAD list` (w/ no changes) returning an empty result.
     return self.context.target_roots
+
+  def tgt_closure_has_native_sources(self):
+    """Determine if any target in the current target closure has native (c or cpp) sources."""
+    local_dist_tgts = self.context.targets(is_local_python_dist)
+    return any(tgt.has_native_sources for tgt in local_dist_tgts)
 
 
 class Task(TaskBase):

@@ -90,3 +90,25 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     # Cleanup
     os.remove(pex1)
     os.remove(pex2)
+
+  def test_pants_resolves_local_dists_for_current_platform_only(self):
+    # Test that pants will override pants.ini platforms config when building
+    # or running a target that depends on native (c or cpp) sources.
+    pants_ini_config = {'python-setup': {'platforms': ['current', 'linux-x86_64']}}
+
+    # Clean all to rebuild requirements pex.
+    command=['clean-all', 'run', '{}:main'.format(self.fasthello_project)]
+    pants_run = self.run_pants(command=command, config=pants_ini_config)
+    self.assert_success(pants_run)
+
+    command=['binary', '{}:main'.format(self.fasthello_project)]
+    pants_run = self.run_pants(command=command, config=pants_ini_config)
+    self.assert_success(pants_run)
+    # Check that the pex was built.
+    pex = os.path.join(get_buildroot(), 'dist', 'main.pex')
+    self.assertTrue(os.path.isfile(pex))
+    # Check that the pex runs.
+    output = subprocess.check_output(pex)
+    self.assertIn('Super hello', output)
+    # Cleanup
+    os.remove(pex)
