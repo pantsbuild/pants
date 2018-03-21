@@ -14,7 +14,8 @@ from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.pex_build_util import dump_requirement_libs, dump_requirements
+from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_requirements,
+                                                       is_local_python_dist)
 from pants.base.hash_utils import hash_all
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
@@ -34,6 +35,12 @@ class ResolveRequirementsTaskBase(Task):
     round_manager.require_data(PythonInterpreter)
     round_manager.optional_product(PythonRequirementLibrary)  # For local dists.
 
+  @staticmethod
+  def tgt_closure_has_native_sources():
+    local_dist_tgts = self.context.targets(is_local_python_dist)
+    if local_dist_tgts:
+      return any(tgt.has_native_sources for tgt in local_dist_tgts)
+
   def resolve_requirements(self, interpreter, req_libs):
     """Requirements resolution for PEX files.
 
@@ -51,13 +58,17 @@ class ResolveRequirementsTaskBase(Task):
       else:
         target_set_id = 'no_targets'
 
+      # We need to ensure that we are resolving for only the current platform if we are
+      # including local python dist targets that have native extensions.
+      maybe_platforms = ['current'] if self.tgt_closure_has_native_sources else None
+
       path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity), target_set_id))
       # Note that we check for the existence of the directory, instead of for invalid_vts,
       # to cover the empty case.
       if not os.path.isdir(path):
         with safe_concurrent_creation(path) as safe_path:
           builder = PEXBuilder(path=safe_path, interpreter=interpreter, copy=True)
-          dump_requirement_libs(builder, interpreter, req_libs, self.context.log)
+          dump_requirement_libs(builder, interpreter, req_libs, self.context.log, platforms=maybe_platforms)
           builder.freeze()
     return PEX(path, interpreter=interpreter)
 
