@@ -3,6 +3,7 @@
 
 python_library(
   dependencies=[
+    'src/python/pants/backend/native/subsystems/platform_specific/linux',
     'src/python/pants/binaries:binary_util',
     'src/python/pants/binaries:execution_environment_mixin',
     'src/python/pants/subsystem',
