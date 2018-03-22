@@ -56,6 +56,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * An alternative to {@link JUnitCore} with stream capture and junit-report xml output capabilities.
  */
 public class ConsoleRunnerImpl {
+
   /** Should be set to false for unit testing via {@link #setCallSystemExitOnFinish} */
   private static boolean callSystemExitOnFinish = true;
   /** Intended to be used in unit testing this class */
