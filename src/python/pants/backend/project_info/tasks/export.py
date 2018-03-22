@@ -33,6 +33,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency_utils import M2Coordinate
@@ -127,6 +128,12 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
     return PythonInterpreterCache(PythonSetup.global_instance(),
                                   PythonRepos.global_instance(),
                                   logger=self.context.log.debug)
+
+  def check_artifact_cache_for(self, invalidation_check):
+    # Export is an output dependent on the entire target set, and is not divisible
+    # by target. So we can only cache it keyed by the entire target set.
+    global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+    return [global_vts]
 
   def resolve_jars(self, targets):
     # TODO: Why is this computed directly here instead of taking from the actual product
