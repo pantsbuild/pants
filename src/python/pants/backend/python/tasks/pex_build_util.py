@@ -46,6 +46,10 @@ def has_python_requirements(tgt):
   return isinstance(tgt, PythonRequirementLibrary)
 
 
+def is_python_binary(tgt):
+  return isinstance(tgt, PythonBinary)
+
+
 def _create_source_dumper(builder, tgt):
   if type(tgt) == Files:
     # Loose `Files` as opposed to `Resources` or `PythonTarget`s have no (implied) package structure

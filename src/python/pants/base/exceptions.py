@@ -59,3 +59,7 @@ class BuildConfigurationError(Exception):
 
 class BackendConfigurationError(BuildConfigurationError):
   """Indicates a plugin backend with a missing or malformed register module."""
+
+
+class IncompatiblePlatformsError(Exception):
+  """Indicates that target platforms are incompatible with a target that contains native code."""

@@ -17,7 +17,7 @@ from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, du
                                                        has_python_requirements, has_python_sources,
                                                        has_resources, is_python_target)
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
+from pants.base.exceptions import IncompatiblePlatformsError, TaskError
 from pants.build_graph.target_scopes import Scopes
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
@@ -130,8 +130,14 @@ class PythonBinaryCreate(Task):
         dump_sources(builder, tgt, self.context.log)
       # We need to ensure that we are resolving for only the current platform if we are
       # including local python dist targets that have native extensions.
-      platforms = ['current'] if self.tgt_closure_has_native_sources() else binary_tgt.platforms
-      dump_requirement_libs(builder, interpreter, req_tgts, self.context.log, platforms)
+      if self.tgt_closure_has_native_sources():
+        platforms = self.tgt_closure_platforms()
+        if set(platforms) != set(['current']):
+          raise IncompatiblePlatformsError('The target set contains one or more targets that depend on '
+            'native code. Please ensure that the platform arguments in all relevant '
+            'targets are compatible with the current platform. Found platforms: {}'
+            .format(str(platforms)))
+      dump_requirement_libs(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
 
       # Build the .pex file.
       pex_path = os.path.join(results_dir, '{}.pex'.format(binary_tgt.name))

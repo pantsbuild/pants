@@ -12,7 +12,8 @@ from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
 
-from pants.backend.python.tasks.pex_build_util import is_local_python_dist
+from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.tasks.pex_build_util import is_local_python_dist, is_python_binary
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
@@ -656,6 +657,17 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """Determine if any target in the current target closure has native (c or cpp) sources."""
     local_dist_tgts = self.context.targets(is_local_python_dist)
     return any(tgt.has_native_sources for tgt in local_dist_tgts)
+
+  def tgt_closure_platforms(self):
+    """Returns a list of all platform constraints in the target set of the current context."""
+    platforms = []
+    for tgt in self.context.targets(is_python_binary):
+      if tgt.platforms:
+        platforms += tgt.platforms
+    if not platforms:
+      # If no targets specify platforms, inherit the default platforms.
+      platforms = PythonSetup.global_instance().platforms
+    return platforms
 
 
 class Task(TaskBase):
