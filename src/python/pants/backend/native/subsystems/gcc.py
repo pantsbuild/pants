@@ -5,10 +5,16 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.binaries.binary_tool import NativeTool
+from pants.binaries.execution_environment_mixin import ExecutionPathEnvironment
 
 
-class LLVM(NativeTool):
-  options_scope = 'llvm'
-  default_version = '5.0.1'
+class GCC(NativeTool, ExecutionPathEnvironment):
+  options_scope = 'gcc'
+  default_version = '7.3.0'
   archive_type = 'tgz'
+
+  def get_additional_paths(self):
+    return [os.path.join(self.select(), 'bin')]
