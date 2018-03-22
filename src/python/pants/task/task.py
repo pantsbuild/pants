@@ -664,10 +664,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     for tgt in self.context.targets(is_python_binary):
       if tgt.platforms:
         platforms += tgt.platforms
-    if not platforms:
-      # If no targets specify platforms, inherit the default platforms.
-      platforms = PythonSetup.global_instance().platforms
-    return platforms
+    # If no targets specify platforms, inherit the default platforms.
+    return list(set(platforms)) or PythonSetup.global_instance().platforms
 
 
 class Task(TaskBase):

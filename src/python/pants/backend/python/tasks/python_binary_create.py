@@ -132,7 +132,7 @@ class PythonBinaryCreate(Task):
       # including local python dist targets that have native extensions.
       if self.tgt_closure_has_native_sources():
         platforms = self.tgt_closure_platforms()
-        if set(platforms) != set(['current']):
+        if platforms != ['current']:
           raise IncompatiblePlatformsError('The target set contains one or more targets that depend on '
             'native code. Please ensure that the platform arguments in all relevant '
             'targets are compatible with the current platform. Found platforms: {}'
