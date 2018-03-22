@@ -731,18 +731,19 @@ public class ConsoleRunnerImpl {
 
       @Option(name = "-parallel-threads",
           usage = "Number of threads to execute tests in parallel. Must be positive, "
-                  + "or 0 to set automatically.")
-      public void setParallelThreads(int parThreads) {
-        if (parThreads < 0) {
+              + "or 0 to set automatically.")
+      public void setParallelThreads(int parallelThreads) {
+        if (parallelThreads >= 0) {
+          this.parallelThreads = parallelThreads;
+          if (parallelThreads == 0) {
+            int availableProcessors = Runtime.getRuntime().availableProcessors();
+            this.parallelThreads = availableProcessors;
+            System.err.printf("Auto-detected %d processors, using -parallel-threads=%d\n",
+                availableProcessors, this.parallelThreads);
+          }
+        } else {
           throw new InvalidCmdLineArgumentException(
-              "-parallel-threads", parThreads, "-parallel-threads cannot be negative");
-        }
-        this.parallelThreads = parThreads;
-        if (parThreads == 0) {
-          int availableProcessors = Runtime.getRuntime().availableProcessors();
-          this.parallelThreads = availableProcessors;
-          System.err.printf("Auto-detected %d processors, using -parallel-threads=%d\n",
-              availableProcessors, this.parallelThreads);
+              "-parallel-threads", parallelThreads, "-parallel-threads cannot be negative");
         }
       }
 
