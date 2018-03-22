@@ -14,8 +14,7 @@ from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_requirements,
-                                                       is_python_binary)
+from pants.backend.python.tasks.pex_build_util import dump_requirement_libs, dump_requirements
 from pants.base.exceptions import IncompatiblePlatformsError
 from pants.base.hash_utils import hash_all
 from pants.invalidation.cache_manager import VersionedTargetSet
