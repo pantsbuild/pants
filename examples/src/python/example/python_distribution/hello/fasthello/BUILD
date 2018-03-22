@@ -19,5 +19,6 @@ python_binary(
   source='main.py',
   dependencies=[
     ':fasthello',
-  ]
+  ],
+  platforms=['current']
 )

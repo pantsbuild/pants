@@ -17,7 +17,8 @@ python_binary(
   source='main.py',
   dependencies=[
     ':fasthello',
-  ]
+  ],
+  platforms=['current']
 )
 
 python_binary(
@@ -26,7 +27,8 @@ python_binary(
   dependencies=[
     ':fasthello',
     ':pycountry'
-  ]
+  ],
+  platforms=['current']
 )
 
 python_requirement_library(
