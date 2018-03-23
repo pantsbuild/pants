@@ -16,7 +16,6 @@ from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.pantsd.pants_daemon import PantsDaemon
 from pants.util.collections import combined_dict
-from pants.util.memo import memoized_property
 
 
 logger = logging.getLogger(__name__)
@@ -52,10 +51,6 @@ class RemotePantsRunner(object):
     self._stdin = stdin or sys.stdin
     self._stdout = stdout or sys.stdout
     self._stderr = stderr or sys.stderr
-
-  @memoized_property
-  def pantsd(self):
-    return PantsDaemon.Factory.create(bootstrap_options=self._bootstrap_options)
 
   @contextmanager
   def _trapped_signals(self, client):
@@ -113,9 +108,12 @@ class RemotePantsRunner(object):
     # Exit.
     self._exiter.exit(result)
 
+  def _maybe_launch_pantsd(self):
+    return PantsDaemon.Factory.maybe_launch(bootstrap_options=self._bootstrap_options)
+
   def run(self, args=None):
     self._setup_logging()
-    port = self.pantsd.maybe_launch()
+    port = self._maybe_launch_pantsd()
 
     logger.debug('connecting to pailgun on port {}'.format(port))
     try:

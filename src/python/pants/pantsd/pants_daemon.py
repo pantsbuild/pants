@@ -76,34 +76,57 @@ class PantsDaemon(FingerprintedProcessManager):
 
   class Factory(object):
     @classmethod
-    def create(cls, bootstrap_options=None):
+    def maybe_launch(cls, bootstrap_options=None):
+      """Creates and launches a daemon instance if one does not already exist.
+
+      :param Options bootstrap_options: The bootstrap options, if available.
+      """
+      stub_pantsd = cls.create(bootstrap_options, full_init=False)
+      with stub_pantsd.process_lock:
+        if stub_pantsd.needs_restart(stub_pantsd.options_fingerprint):
+          # Once we determine we actually need to launch, recreate with full initialization.
+          pantsd = cls.create(bootstrap_options)
+          return pantsd.launch()
+        else:
+          return stub_pantsd.read_named_socket('pailgun', int)
+
+    @classmethod
+    def create(cls, bootstrap_options=None, full_init=True):
       """
       :param Options bootstrap_options: The bootstrap options, if available.
+      :param bool full_init: Whether or not to fully initialize the engine.
       """
       bootstrap_options = bootstrap_options or cls._parse_bootstrap_options()
       bootstrap_options_values = bootstrap_options.for_global_scope()
 
-      build_root = get_buildroot()
-      native = Native.create(bootstrap_options_values)
-      # TODO: https://github.com/pantsbuild/pants/issues/3479
-      watchman = WatchmanLauncher.create(bootstrap_options_values).watchman
-      legacy_graph_helper = cls._setup_legacy_graph_helper(native, bootstrap_options_values)
-      services, port_map = cls._setup_services(
-        build_root,
-        bootstrap_options_values,
-        legacy_graph_helper,
-        watchman
-      )
+      native = None
+      build_root = None
+      watchman = None
+      services = None
+      port_map = None
+
+      if full_init:
+        build_root = get_buildroot()
+        native = Native.create(bootstrap_options_values)
+        # TODO: https://github.com/pantsbuild/pants/issues/3479
+        watchman = WatchmanLauncher.create(bootstrap_options_values).watchman
+        legacy_graph_helper = cls._setup_legacy_graph_helper(native, bootstrap_options_values)
+        services, port_map = cls._setup_services(
+          build_root,
+          bootstrap_options_values,
+          legacy_graph_helper,
+          watchman
+        )
 
       return PantsDaemon(
-        native,
-        build_root,
-        bootstrap_options_values.pants_workdir,
-        bootstrap_options_values.level.upper(),
-        services,
-        port_map,
-        bootstrap_options_values.pants_subprocessdir,
-        bootstrap_options
+        native=native,
+        build_root=build_root,
+        work_dir=bootstrap_options_values.pants_workdir,
+        log_level=bootstrap_options_values.level.upper(),
+        services=services,
+        socket_map=port_map,
+        metadata_base_dir=bootstrap_options_values.pants_subprocessdir,
+        bootstrap_options=bootstrap_options
       )
 
     @staticmethod
@@ -337,29 +360,36 @@ class PantsDaemon(FingerprintedProcessManager):
     # TODO: Improve error handling on launch failures.
     os.spawnve(os.P_NOWAIT, sys.executable, cmd, env=exec_env)
 
-  def maybe_launch(self):
-    """Launches pantsd (if not already running) in a subprocess.
+  def needs_launch(self):
+    """Determines if pantsd needs to be launched.
+
+    N.B. This should always be called under care of `self.process_lock`.
+
+    :returns: True if the daemon needs launching, False otherwise.
+    :rtype: bool
+    """
+    new_fingerprint = self.options_fingerprint
+    self._logger.debug('pantsd: is_alive={} new_fingerprint={} current_fingerprint={}'
+                       .format(self.is_alive(), new_fingerprint, self.fingerprint))
+    return self.needs_restart(new_fingerprint)
+
+  def launch(self):
+    """Launches pantsd in a subprocess.
+
+    N.B. This should always be called under care of `self.process_lock`.
 
     :returns: The port that pantsd is listening on.
     :rtype: int
     """
+    self.terminate(include_watchman=False)
     self.watchman_launcher.maybe_launch()
-    self._logger.debug('acquiring lock: {}'.format(self.process_lock))
-    with self.process_lock:
-      new_fingerprint = self.options_fingerprint
-      self._logger.debug('pantsd: is_alive={} new_fingerprint={} current_fingerprint={}'
-                         .format(self.is_alive(), new_fingerprint, self.fingerprint))
-      if self.needs_restart(new_fingerprint):
-        self.terminate(include_watchman=False)
-        self._logger.debug('launching pantsd')
-        self.daemon_spawn()
-        # Wait up to 60 seconds for pantsd to write its pidfile.
-        self.await_pid(60)
-      listening_port = self.read_named_socket('pailgun', int)
-      pantsd_pid = self.pid
-    self._logger.debug('released lock: {}'.format(self.process_lock))
+    self._logger.debug('launching pantsd')
+    self.daemon_spawn()
+    # Wait up to 60 seconds for pantsd to write its pidfile.
+    self.await_pid(60)
+    listening_port = self.read_named_socket('pailgun', int)
     self._logger.debug('pantsd is running at pid {}, pailgun port is {}'
-                       .format(pantsd_pid, listening_port))
+                       .format(self.pid, listening_port))
     return listening_port
 
   def terminate(self, include_watchman=True):
