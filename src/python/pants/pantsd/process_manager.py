@@ -257,7 +257,7 @@ class ProcessManager(ProcessMetadataManager):
     return self._process_name
 
   @memoized_property
-  def process_lock(self):
+  def lifecycle_lock(self):
     """An identity-keyed inter-process lock for safeguarding lifecycle and other operations."""
     safe_mkdir(self._metadata_base_dir)
     return OwnerPrintingInterProcessFileLock(

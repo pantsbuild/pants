@@ -80,9 +80,11 @@ class PantsDaemon(FingerprintedProcessManager):
       """Creates and launches a daemon instance if one does not already exist.
 
       :param Options bootstrap_options: The bootstrap options, if available.
+      :returns: The pailgun port number of the running pantsd instance.
+      :rtype: int
       """
       stub_pantsd = cls.create(bootstrap_options, full_init=False)
-      with stub_pantsd.process_lock:
+      with stub_pantsd.lifecycle_lock:
         if stub_pantsd.needs_restart(stub_pantsd.options_fingerprint):
           # Once we determine we actually need to launch, recreate with full initialization.
           pantsd = cls.create(bootstrap_options)
@@ -99,17 +101,16 @@ class PantsDaemon(FingerprintedProcessManager):
       bootstrap_options = bootstrap_options or cls._parse_bootstrap_options()
       bootstrap_options_values = bootstrap_options.for_global_scope()
 
+      # TODO: https://github.com/pantsbuild/pants/issues/3479
+      watchman = WatchmanLauncher.create(bootstrap_options_values).watchman
       native = None
       build_root = None
-      watchman = None
       services = None
       port_map = None
 
       if full_init:
         build_root = get_buildroot()
         native = Native.create(bootstrap_options_values)
-        # TODO: https://github.com/pantsbuild/pants/issues/3479
-        watchman = WatchmanLauncher.create(bootstrap_options_values).watchman
         legacy_graph_helper = cls._setup_legacy_graph_helper(native, bootstrap_options_values)
         services, port_map = cls._setup_services(
           build_root,
@@ -363,7 +364,7 @@ class PantsDaemon(FingerprintedProcessManager):
   def needs_launch(self):
     """Determines if pantsd needs to be launched.
 
-    N.B. This should always be called under care of `self.process_lock`.
+    N.B. This should always be called under care of `self.lifecycle_lock`.
 
     :returns: True if the daemon needs launching, False otherwise.
     :rtype: bool
@@ -376,7 +377,7 @@ class PantsDaemon(FingerprintedProcessManager):
   def launch(self):
     """Launches pantsd in a subprocess.
 
-    N.B. This should always be called under care of `self.process_lock`.
+    N.B. This should always be called under care of `self.lifecycle_lock`.
 
     :returns: The port that pantsd is listening on.
     :rtype: int
@@ -394,9 +395,10 @@ class PantsDaemon(FingerprintedProcessManager):
 
   def terminate(self, include_watchman=True):
     """Terminates pantsd and watchman."""
-    super(PantsDaemon, self).terminate()
-    if include_watchman:
-      self.watchman_launcher.terminate()
+    with self.lifecycle_lock:
+      super(PantsDaemon, self).terminate()
+      if include_watchman:
+        self.watchman_launcher.terminate()
 
 
 def launch():
