@@ -4,6 +4,40 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+
+1.6.0.dev1 (03/25/2018)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+* Record critical path timings of goals (#5609)
+  `PR #5609 <https://github.com/pantsbuild/pants/pull/5609>`_
+
+API Changes
+~~~~~~~~~~~
+* Disable google java format by default (#5623)
+  `PR #5623 <https://github.com/pantsbuild/pants/pull/5623>`_
+
+Bugfixes
+~~~~~~~~
+* [export] use same artifact cache override with VersionedTargetSet (#5620)
+  `PR #5620 <https://github.com/pantsbuild/pants/pull/5620>`_
+
+* Memoize org.scalatest.Suite class loading (#5614)
+  `PR #5614 <https://github.com/pantsbuild/pants/pull/5614>`_
+
+* Batch execution of address Specs and remove SelectTransitive (#5605)
+  `PR #5605 <https://github.com/pantsbuild/pants/pull/5605>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Bump coursier version to 1.1.0.cf365ea27a710d5f09db1f0a6feee129aa1fc417 (#5625)
+  `PR #5625 <https://github.com/pantsbuild/pants/pull/5625>`_
+
+* Drop a golang dep that no longer appears to be used transitively... and yet somehow still seems to be failing. (#5619)
+  `PR #5619 <https://github.com/pantsbuild/pants/pull/5619>`_
+
+
 1.6.0.dev0 (03/17/2018)
 -----------------------
 
