@@ -2,6 +2,8 @@ use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::ops::Deref;
+use std::thread::sleep;
+use std::time::Duration;
 use std::sync::{Arc, Mutex};
 
 use bazel_protos;
@@ -12,7 +14,8 @@ use protobuf;
 pub struct MockExecution {
   name: String,
   execute_request: bazel_protos::remote_execution::ExecuteRequest,
-  operation_responses: Arc<Mutex<VecDeque<bazel_protos::operations::Operation>>>,
+  operation_responses:
+    Arc<Mutex<VecDeque<(bazel_protos::operations::Operation, Option<Duration>)>>>,
 }
 
 impl MockExecution {
@@ -27,7 +30,7 @@ impl MockExecution {
   pub fn new(
     name: String,
     execute_request: bazel_protos::remote_execution::ExecuteRequest,
-    operation_responses: Vec<bazel_protos::operations::Operation>,
+    operation_responses: Vec<(bazel_protos::operations::Operation, Option<Duration>)>,
   ) -> MockExecution {
     MockExecution {
       name: name,
@@ -162,13 +165,16 @@ impl MockResponder {
       .unwrap()
       .pop_front()
     {
-      Some(op) => {
+      Some((op, duration)) => {
+        if let Some(d) = duration {
+          sleep(d);
+        }
         sink.success(op.clone());
       }
       None => {
         sink.fail(grpcio::RpcStatus::new(
           grpcio::RpcStatusCode::InvalidArgument,
-          Some("Did not expect this request".to_string()),
+          Some("Did not expect further requests from client.".to_string()),
         ));
       }
     }

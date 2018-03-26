@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
@@ -89,10 +90,11 @@ impl CommandRunner {
           // TODO: Use some better looping-frequency strategy than a tight-loop:
           // https://github.com/pantsbuild/pants/issues/5503
 
-          // TODO: Add a timeout of some kind.
-          // https://github.com/pantsbuild/pants/issues/5504
-
           .and_then(move |(execute_request, operation)| {
+            let start_time = SystemTime::now();
+            // TODO the timeout should be injected rather than local to here.
+            let timeout: Duration = Duration::new(4, 0);
+
             future::loop_fn(operation, move |operation| {
               match extract_execute_response(operation) {
                 Ok(value) => {
@@ -129,8 +131,24 @@ impl CommandRunner {
                   );
                   match grpc_result {
                     Ok(operation) => {
-                      future::ok(future::Loop::Continue(operation)).to_boxed()
-                          as BoxFuture<_, _>
+                      match start_time.elapsed() {
+                        Ok(elapsed) => {
+                          if elapsed > timeout {
+                          // TODO: note what timed out. Options might include
+                          // the op name, exec digest and a friendly name like zinc-compile
+                            future::err(
+                              format!(
+                                "Exceeded time out of {:?} with {:?}",
+                                timeout,
+                                elapsed)).to_boxed() as BoxFuture<_, _>
+                          } else {
+                            future::ok(future::Loop::Continue(operation)).to_boxed()
+                          }
+                        },
+                        Err(err) => future::err(
+                            format!("Something weird happened with time {:?}", err)
+                          ).to_boxed() as BoxFuture<_, _>,
+                      }
                     },
                     Err(err) => future::err(err).to_boxed() as BoxFuture<_, _>,
                   }
@@ -449,6 +467,28 @@ mod tests {
   }
 
   #[test]
+  fn timeout_after_sufficiently_delayed_getoperations() {
+    let execute_request = echo_foo_request();
+
+    let mock_server = {
+      let op_name = "gimme-foo".to_string();
+
+      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
+        op_name.clone(),
+        super::make_execute_request(&execute_request).unwrap().1,
+        vec![
+          make_incomplete_operation(&op_name),
+          make_delayed_incomplete_operation(&op_name, Duration::new(5, 0)),
+        ],
+      ))
+    };
+
+    let error_msg = run_command_remote(&mock_server.address(), execute_request)
+      .expect_err("Timeout did not cause failure.");
+    assert_contains(&error_msg, "Exceeded time out");
+  }
+
+  #[test]
   fn bad_result_bytes() {
     let execute_request = echo_foo_request();
 
@@ -475,7 +515,7 @@ mod tests {
               response_wrapper.set_value(vec![0x00, 0x00, 0x00]);
               response_wrapper
             });
-            op
+            (op, None)
           },
         ],
       ))
@@ -505,7 +545,7 @@ mod tests {
               error.set_message("Something went wrong".to_string());
               error
             });
-            op
+            (op, None)
           },
         ],
       ))
@@ -538,7 +578,7 @@ mod tests {
               error.set_message("Something went wrong".to_string());
               error
             });
-            op
+            (op, None)
           },
         ],
       ))
@@ -564,7 +604,7 @@ mod tests {
             let mut op = bazel_protos::operations::Operation::new();
             op.set_name(op_name.to_string());
             op.set_done(true);
-            op
+            (op, None)
           },
         ],
       ))
@@ -591,7 +631,7 @@ mod tests {
             let mut op = bazel_protos::operations::Operation::new();
             op.set_name(op_name.to_string());
             op.set_done(true);
-            op
+            (op, None)
           },
         ],
       ))
@@ -799,7 +839,7 @@ mod tests {
       },
     ];
 
-    let operation = make_precondition_failure_operation(missing);
+    let (operation, _duration) = make_precondition_failure_operation(missing);
 
     assert_eq!(
       extract_execute_response(operation),
@@ -824,7 +864,7 @@ mod tests {
       },
     ];
 
-    let operation = make_precondition_failure_operation(missing);
+    let (operation, _duration) = make_precondition_failure_operation(missing);
 
     match extract_execute_response(operation) {
       Err(ExecutionError::Fatal(err)) => assert_contains(&err, "monkeys"),
@@ -842,7 +882,7 @@ mod tests {
       },
     ];
 
-    let operation = make_precondition_failure_operation(missing);
+    let (operation, _duration) = make_precondition_failure_operation(missing);
 
     match extract_execute_response(operation) {
       Err(ExecutionError::Fatal(err)) => assert_contains(&err, "OUT_OF_CAPACITY"),
@@ -854,7 +894,7 @@ mod tests {
   fn extract_execute_response_missing_without_list() {
     let missing = vec![];
 
-    let operation = make_precondition_failure_operation(missing);
+    let (operation, _duration) = make_precondition_failure_operation(missing);
 
     match extract_execute_response(operation) {
       Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_lowercase(), "precondition"),
@@ -916,11 +956,23 @@ mod tests {
     }
   }
 
-  fn make_incomplete_operation(operation_name: &str) -> bazel_protos::operations::Operation {
+  fn make_incomplete_operation(
+    operation_name: &str,
+  ) -> (bazel_protos::operations::Operation, Option<Duration>) {
     let mut op = bazel_protos::operations::Operation::new();
     op.set_name(operation_name.to_string());
     op.set_done(false);
-    op
+    (op, None)
+  }
+
+  fn make_delayed_incomplete_operation(
+    operation_name: &str,
+    delay: Duration,
+  ) -> (bazel_protos::operations::Operation, Option<Duration>) {
+    let mut op = bazel_protos::operations::Operation::new();
+    op.set_name(operation_name.to_string());
+    op.set_done(false);
+    (op, Some(delay))
   }
 
   fn make_successful_operation(
@@ -928,7 +980,7 @@ mod tests {
     stdout: &str,
     stderr: &str,
     exit_code: i32,
-  ) -> bazel_protos::operations::Operation {
+  ) -> (bazel_protos::operations::Operation, Option<Duration>) {
     let mut op = bazel_protos::operations::Operation::new();
     op.set_name(operation_name.to_string());
     op.set_done(true);
@@ -951,12 +1003,12 @@ mod tests {
       response_wrapper.set_value(response_proto_bytes);
       response_wrapper
     });
-    op
+    (op, None)
   }
 
   fn make_precondition_failure_operation(
     violations: Vec<bazel_protos::error_details::PreconditionFailure_Violation>,
-  ) -> bazel_protos::operations::Operation {
+  ) -> (bazel_protos::operations::Operation, Option<Duration>) {
     let mut operation = bazel_protos::operations::Operation::new();
     operation.set_name("cat".to_owned());
     operation.set_done(true);
@@ -976,7 +1028,7 @@ mod tests {
       });
       response
     }));
-    operation
+    (operation, None)
   }
 
   fn run_command_remote(
