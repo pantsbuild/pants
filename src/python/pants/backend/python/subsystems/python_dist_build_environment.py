@@ -25,13 +25,11 @@ class PythonDistBuildEnvironment(Subsystem, ExecutionEnvironmentMixin):
 
   def modify_environment(self, env):
     env = self._native_toolchain.modify_environment(env)
-    # If we're going to be wrapping setup.py-based projects, we really should be
-    # doing it through a subclass of a distutils UnixCCompiler (in Lib/distutils
-    # in the CPython source) instead of hoping setup.py knows what to do. The
-    # default UnixCCompiler from distutils will build a 32/64-bit "fat binary"
-    # unless you use their undocumented ARCHFLAGS env var, and there may be more
-    # dragons later on.
-    env['CC'] = 'gcc'
-    env['CXX'] = 'g++'
-    env['ARCHFLAGS'] = '-arch x86_64'
+    # FIXME: If we're going to be wrapping setup.py-based projects, we really
+    # should be doing it through a subclass of a distutils UnixCCompiler (in
+    # Lib/distutils in the CPython source) instead of hoping setup.py knows what
+    # to do. For example, the default UnixCCompiler from distutils will build a
+    # 32/64-bit "fat binary" on osx unless you set ARCHFLAGS='-arch x86_64',
+    # which is totally undocumented. We could probably expose this pretty easily
+    # as an import to the setup.py.
     return env
