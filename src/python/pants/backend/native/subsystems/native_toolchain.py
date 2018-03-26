@@ -22,9 +22,13 @@ class NativeToolchain(Subsystem, ExecutionEnvironmentMixin):
 
   PLATFORM_SPECIFIC_TOOLCHAINS = {
     # TODO(cosmicexplorer): 'darwin' should have everything here, but there's no
-    # open-source linker for OSX...yet.
-    'darwin': [GCC, Clang],
-    'linux': [GCC, Binutils, Clang],
+    # open-source linker for OSX.
+    'darwin': [],
+    # TODO(cosmicexplorer): we can package clang for linux too, but we need to
+    # merge all these tools under a single prefix (shared bin/, lib/, etc). for
+    # now we can separately add gcc and binutils's bin/ dirs to separate
+    # components of the PATH, but this isn't a working solution.
+    'linux': [GCC, Binutils],
   }
 
   @classmethod
