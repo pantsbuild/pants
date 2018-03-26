@@ -384,45 +384,6 @@ function get_pgp_keyid() {
   git config --get user.signingkey
 }
 
-function check_pypi() {
-  if [[ ! -r ~/.pypirc ]]
-  then
-    msg=$(cat << EOM
-You must create a ~/.pypirc file with your pypi credentials:
-cat << EOF > ~/.pypirc && chmod 600 ~/.pypirc
-[server-login]
-username: <fill me in>
-password: <fill me in>
-EOF
-
-More information is here: https://wiki.python.org/moin/EnhancedPyPI
-EOM
-)
-    die "${msg}"
-  fi
-  "${PY}" << EOF || die
-from __future__ import print_function
-
-import os
-import sys
-from ConfigParser import ConfigParser
-
-config = ConfigParser()
-config.read(os.path.expanduser('~/.pypirc'))
-
-def check_option(section, option):
-  if config.has_option(section, option):
-    return config.get(section, option)
-  print('Your ~/.pypirc must define a {} option in the {} section'.format(option, section))
-
-username = check_option('server-login', 'username')
-if not (username or check_option('server-login', 'password')):
-  sys.exit(1)
-else:
-  print(username)
-EOF
-}
-
 function tag_release() {
   release_version="${PANTS_STABLE_VERSION}" && \
   tag_name="release_${release_version}" && \
@@ -442,102 +403,12 @@ function publish_docs_if_master() {
   fi
 }
 
-function list_packages() {
-  echo "Releases the following source distributions to PyPi."
-  version="${PANTS_STABLE_VERSION}"
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
-  do
-    echo "  $(pkg_name $PACKAGE)-${version}"
-  done
-}
-
-function package_exists() {
-  package_name="$1"
-
-  curl --fail --head https://pypi.python.org/pypi/${package_name} &>/dev/null
-}
-
-function get_owners() {
-  package_name="$1"
-
-  latest_package_path=$(
-    curl -s https://pypi.python.org/pypi/${package_name} | \
-        grep -oE  "/pypi/${package_name}/[0-9]+\.[0-9]+\.[0-9]+([-.]?(rc|dev)[0-9]+)?" | head -n1
-  )
-  curl -s "https://pypi.python.org${latest_package_path}" | \
-    grep -A1 "Owner" | tail -1 | \
-    cut -d'>' -f2 | cut -d'<' -f1 | \
-    tr ',' ' ' | sed -E -e "s|[[:space:]]+| |g"
-}
-
-function list_owners() {
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
-  do
-    package_name=$(pkg_name $PACKAGE)
-    if package_exists ${package_name}
-    then
-      echo "Owners of ${package_name}:"
-      owners=($(get_owners ${package_name}))
-      for owner in "${owners[@]}"
-      do
-        echo "  ${owner}"
-      done
-    else
-      echo "The ${package_name} package is new!  There are no owners yet."
-    fi
-    echo
-  done
-}
-
-function check_owner() {
-  username=$(echo "$1" | tr '[:upper:]' '[:lower:]')
-  package_name="$2"
-
-  for owner in $(get_owners ${package_name})
-  do
-    # NB: A case-insensitive comparison is done since pypi is case-insensitive wrt usernames.
-    owner=$(echo "${owner}" | tr '[:upper:]' '[:lower:]')
-    if [[ "${username}" == "${owner}" ]]
-    then
-      return 0
-    fi
-  done
-  return 1
-}
-
 function check_owners() {
-  username="$(check_pypi)"
+  python "${ROOT}/build-support/bin/release.py" check_my_ownership
+}
 
-  total=${#RELEASE_PACKAGES[@]}
-  banner "Checking package ownership for pypi user ${username} of ${total} packages"
-  dont_own=()
-  index=0
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
-  do
-    index=$((index+1))
-    package_name="$(pkg_name $PACKAGE)"
-    banner "[${index}/${total}] checking that ${username} owns ${package_name}"
-    if package_exists ${package_name}
-    then
-      if ! check_owner "${username}" "${package_name}"
-      then
-        dont_own+=("${package_name}")
-      fi
-    else
-      echo "The ${package_name} package is new!  There are no owners yet."
-    fi
-  done
-
-  if (( ${#dont_own[@]} > 0 ))
-  then
-    msg=$(cat << EOM
-Your pypi account ${username} needs to be added as an owner for the
-following packages:
-$(echo "${dont_own[@]}" | tr ' ' '\n' | sed -E "s|^|  |")
-EOM
-)
-    die "${msg}"
-  fi
+function check_package_ownership() {
+  python "${ROOT}/build-support/bin/release.py" check_package_ownership
 }
 
 function reversion_whls() {
@@ -813,8 +684,8 @@ while getopts "hdntcloepqw" opt; do
     d) debug="true" ;;
     n) dry_run="true" ;;
     t) test_release="true" ;;
-    l) list_packages ; exit $? ;;
-    o) list_owners ; exit $? ;;
+    l) python "${ROOT}/build-support/bin/release.py list_packages" ; exit $? ;;
+    o) python "${ROOT}/build-support/bin/release.py list_owners" ; exit $? ;;
     e) fetch_and_check_prebuilt_wheels ; exit $? ;;
     p) build_pex fetch ; exit $? ;;
     q) build_pex build ; exit $? ;;
