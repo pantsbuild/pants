@@ -407,6 +407,10 @@ function check_owners() {
   run_local_pants -q run src/python/pants/releases:packages -- check-my-ownership
 }
 
+function check_package_ownership() {
+  run_local_pants -q run src/python/pants/releases:packages -- check-package-ownership
+}
+
 function reversion_whls() {
   # Reversions all whls from an input directory to an output directory.
   # Adds one pants-specific glob to match the `VERSION` file in `pantsbuild.pants`.
@@ -701,12 +705,14 @@ elif [[ "${dry_run}" == "true" ]]; then
   banner "Performing a dry run release" && \
   (
     dry_run_install && \
+    check_package_ownership && \
     banner "Dry run release succeeded"
   ) || die "Dry run release failed."
 elif [[ "${test_release}" == "true" ]]; then
   banner "Installing and testing the latest released packages" && \
   (
     install_and_test_packages "${PANTS_STABLE_VERSION}" && \
+    check_package_ownership && \
     banner "Successfully installed and tested the latest released packages"
   ) || die "Failed to install and test the latest released packages."
 else
@@ -714,6 +720,6 @@ else
   (
     check_origin && check_clean_branch && check_pgp && check_owners && \
       publish_packages && tag_release && publish_docs_if_master && \
-      banner "Successfully released packages to PyPi"
+      banner "Successfully released packages to PyPi" && check_package_ownership
   ) || die "Failed to release packages to PyPi."
 fi

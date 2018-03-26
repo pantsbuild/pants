@@ -136,5 +136,7 @@ elif sys.argv[1:] == ["list-owners"]:
 elif sys.argv[1:] == ["check-my-ownership"]:
   me = get_pypi_config('server-login', 'username')
   check_ownership(set([me]))
+elif sys.argv[1:] == ["check-package-ownership"]:
+  check_ownership(expected_package_owners)
 else:
   raise Exception("Didn't recognise arguments {}".format(sys.argv[1:]))
