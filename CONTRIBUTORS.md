@@ -58,6 +58,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Gary M. Josack
 + Harley Cooper
 + Hwasung Lee
++ Ian Tabolt
 + Igor Morozov
 + Ikai Lan
 + Itay Donanhirsh
