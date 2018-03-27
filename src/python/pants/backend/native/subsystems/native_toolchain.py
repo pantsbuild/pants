@@ -5,15 +5,35 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from contextlib import contextmanager
+import os
 
 from pants.backend.native.subsystems.gcc import GCC
 from pants.backend.native.subsystems.platform_specific.darwin.xcode_cli_tools import XCodeCLITools
 from pants.backend.native.subsystems.platform_specific.linux.binutils import Binutils
 from pants.binaries.binary_tool import ExecutablePathProvider
 from pants.subsystem.subsystem import Subsystem
+from pants.util.contextutil import environment_as, get_modified_path, temporary_dir
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.osutil import get_os_name, normalize_os_name
+from pants.util.process_handler import subprocess
+
+
+_HELLO_WORLD_C = """
+#include "stdio.h"
+
+int main() {
+  printf("%s\\n", "hello, world!");
+}
+"""
+
+
+_HELLO_WORLD_CPP = """
+#include <iostream>
+
+int main() {
+  std::cout << "hello, world!" << std::endl;
+}
+"""
 
 
 class NativeToolchain(Subsystem, ExecutablePathProvider):
@@ -59,7 +79,11 @@ class NativeToolchain(Subsystem, ExecutablePathProvider):
     'linux': [Binutils],
   }
 
-  class UnsupportedPlatformError(Exception): pass
+  class UnsupportedPlatformError(Exception):
+    """???"""
+
+  class NativeToolchainConfigurationError(Exception):
+    """???"""
 
   @classmethod
   @memoized_method
@@ -91,11 +115,44 @@ class NativeToolchain(Subsystem, ExecutablePathProvider):
     cur_platform_subsystems = self._get_platform_specific_subsystems()
     return [sub.scoped_instance(self) for sub in cur_platform_subsystems]
 
+  def _sanity_test(self, path_entries):
+    """Try to compile and run a hello world program. Test all supported native
+    languages."""
+
+    # TODO: show output here if the command fails!
+    isolated_toolchain_path = ':'.join(path_entries)
+    with environment_as(PATH=isolated_toolchain_path):
+      with temporary_dir() as tmpdir:
+
+        hello_c_path = os.path.join(tmpdir, 'hello.c')
+        with open(hello_c_path, 'w') as hello_c:
+          hello_c.write(_HELLO_WORLD_C)
+
+        subprocess.check_call(['cc', 'hello.c', '-o', 'hello_c'],
+                              cwd=tmpdir)
+        c_output = subprocess.check_output(['./hello_c'],
+                                           cwd=tmpdir)
+        if c_output != 'hello, world!\n':
+          raise self.NativeToolchainConfigurationError("C sanity test failure!")
+
+        hello_cpp_path = os.path.join(tmpdir, 'hello.cpp')
+        with open(hello_cpp_path, 'w') as hello_cpp:
+          hello_cpp.write(_HELLO_WORLD_CPP)
+
+        subprocess.check_call(['c++', 'hello.cpp', '-o', 'hello_cpp'],
+                              cwd=tmpdir)
+        cpp_output = subprocess.check_output(['./hello_cpp'],
+                                             cwd=tmpdir)
+        if cpp_output != 'hello, world!\n':
+          raise self.NativeToolchainConfigurationError("C++ sanity test failure!")
+
   def path_entries(self):
     """Note how it adds these in order, and how we can't necessarily expect /bin
     and /usr/bin to be on the user's PATH when they invoke Pants!"""
-    entries = []
+    combined_path_entries = []
     for subsystem in self._subsystem_instances:
-      entries.extend(subsystem.path_entries())
+      combined_path_entries.extend(subsystem.path_entries())
 
-    return entries
+    self._sanity_test(combined_path_entries)
+
+    return combined_path_entries

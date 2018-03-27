@@ -7,7 +7,9 @@ python_library(
     'src/python/pants/binaries:binary_util',
     'src/python/pants/binaries:execution_environment_mixin',
     'src/python/pants/subsystem',
+    'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:osutil',
+    'src/python/pants/util:process_handler',
   ],
 )
