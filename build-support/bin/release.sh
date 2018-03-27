@@ -404,11 +404,7 @@ function publish_docs_if_master() {
 }
 
 function check_owners() {
-  python "${ROOT}/build-support/bin/release.py" check_my_ownership
-}
-
-function check_package_ownership() {
-  python "${ROOT}/build-support/bin/release.py" check_package_ownership
+  run_local_pants -q run src/python/pants/releases:packages -- check-my-ownership
 }
 
 function reversion_whls() {
@@ -684,8 +680,8 @@ while getopts "hdntcloepqw" opt; do
     d) debug="true" ;;
     n) dry_run="true" ;;
     t) test_release="true" ;;
-    l) python "${ROOT}/build-support/bin/release.py list_packages" ; exit $? ;;
-    o) python "${ROOT}/build-support/bin/release.py list_owners" ; exit $? ;;
+    l) run_local_pants -q run src/python/pants/releases:packages -- list ; exit $? ;;
+    o) run_local_pants -q run src/python/pants/releases:packages -- list-owners ; exit $? ;;
     e) fetch_and_check_prebuilt_wheels ; exit $? ;;
     p) build_pex fetch ; exit $? ;;
     q) build_pex build ; exit $? ;;

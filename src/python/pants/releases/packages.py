@@ -1,11 +1,16 @@
-from __future__ import print_function
+# coding=utf-8
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import json
 import os
-import subprocess
 import sys
 import urllib2
 from ConfigParser import ConfigParser
+from pants.util.process_handler import subprocess
 
 
 COLOR_BLUE = "\x1b[34m"
@@ -47,6 +52,7 @@ class Package(object):
     f = urllib2.urlopen(url)
     return_next_line = False
     for line in f.readlines():
+      line = line.decode("utf-8")
       if return_next_line:
         owners = line.strip().replace("<span>", "").replace("</span>", "").split(", ")
         return set(owner.lower() for owner in owners)
@@ -114,9 +120,9 @@ def check_ownership(users):
     sys.exit(1)
 
 
-if sys.argv[1:] == ["list_packages"]:
+if sys.argv[1:] == ["list"]:
   print('\n'.join(package.name for package in sorted(all_packages())))
-elif sys.argv[1:] == ["list_owners"]:
+elif sys.argv[1:] == ["list-owners"]:
   for package in sorted(all_packages()):
     if not package.exists():
       print("The {} package is new!  There are no owners yet.".format(package.name), file=sys.stderr)
@@ -124,7 +130,7 @@ elif sys.argv[1:] == ["list_owners"]:
     print("Owners of {}:".format(package.name))
     for owner in sorted(package.owners()):
       print("{}".format(owner))
-elif sys.argv[1:] == ["check_my_ownership"]:
+elif sys.argv[1:] == ["check-my-ownership"]:
   me = get_pypi_config('server-login', 'username')
   check_ownership(set([me]))
 else:
