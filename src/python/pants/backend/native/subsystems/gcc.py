@@ -7,14 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.binaries.binary_tool import NativeTool
-from pants.binaries.execution_environment_mixin import ExecutionPathEnvironment
+from pants.binaries.binary_tool import NativeTool, ExecutablePathProvider
 
 
-class GCC(NativeTool, ExecutionPathEnvironment):
+class GCC(NativeTool, ExecutablePathProvider):
   options_scope = 'gcc'
   default_version = '7.3.0'
   archive_type = 'tgz'
 
-  def get_additional_paths(self):
+  def path_entries(self):
     return [os.path.join(self.select(), 'bin')]

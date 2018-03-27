@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
+from abc import abstractmethod
+
 from pants.binaries.binary_util import BinaryUtilPrivate
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
@@ -139,3 +141,10 @@ class Script(BinaryToolBase):
   :API: public
   """
   platform_dependent = False
+
+
+class ExecutablePathProvider(object):
+  """???"""
+
+  @abstractmethod
+  def path_entries(self): pass

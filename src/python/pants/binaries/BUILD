@@ -30,11 +30,3 @@ python_library(
     'src/python/pants/util:memo',
   ],
 )
-
-python_library(
-  name='execution_environment_mixin',
-  sources=['execution_environment_mixin.py'],
-  dependencies=[
-    'src/python/pants/util:contextutil',
-  ],
-)

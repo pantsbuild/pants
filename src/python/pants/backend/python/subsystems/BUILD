@@ -4,7 +4,6 @@
 python_library(
   dependencies = [
     '3rdparty/python:setuptools',
-    'src/python/pants/binaries:execution_environment_mixin',
     'src/python/pants/backend/native',
     'src/python/pants/option',
     'src/python/pants/subsystem',

@@ -7,14 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.binaries.binary_tool import NativeTool
-from pants.binaries.execution_environment_mixin import ExecutionPathEnvironment
+from pants.binaries.binary_tool import NativeTool, ExecutablePathProvider
 
 
-class Binutils(NativeTool, ExecutionPathEnvironment):
+class Binutils(NativeTool, ExecutablePathProvider):
   options_scope = 'binutils'
   default_version = '2.30'
   archive_type = 'tgz'
 
-  def get_additional_paths(self):
+  def path_entries(self):
     return [os.path.join(self.select(), 'bin')]

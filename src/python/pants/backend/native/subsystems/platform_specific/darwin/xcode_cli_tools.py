@@ -5,15 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
+from pants.binaries.binary_tool import ExecutablePathProvider
+from pants.subsystem.subsystem import Subsystem
 
-from pants.binaries.binary_tool import NativeTool, ExecutablePathProvider
 
+class XCodeCLITools(Subsystem, ExecutablePathProvider):
 
-class Clang(NativeTool, ExecutablePathProvider):
-  options_scope = 'clang'
-  default_version = '6.0.0'
-  archive_type = 'tgz'
+  options_scope = 'xcode-cli-tools'
 
   def path_entries(self):
-    return [os.path.join(self.select(), 'bin')]
+    raise Exception("???")

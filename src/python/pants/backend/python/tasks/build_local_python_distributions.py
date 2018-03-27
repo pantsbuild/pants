@@ -12,8 +12,8 @@ from contextlib import contextmanager
 
 from pex.interpreter import PythonInterpreter
 
+from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems.python_dist_build_environment import PythonDistBuildEnvironment
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.pex_build_util import is_local_python_dist
 from pants.backend.python.tasks.setup_py import SetupPyRunner
@@ -22,7 +22,7 @@ from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.build_graph.address import Address
 from pants.task.task import Task
-from pants.util.contextutil import environment_as
+from pants.util.contextutil import environment_as, get_modified_path
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 
@@ -49,14 +49,21 @@ class BuildLocalPythonDistributions(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BuildLocalPythonDistributions, cls).subsystem_dependencies() + (PythonDistBuildEnvironment.scoped(cls),)
+    return super(BuildLocalPythonDistributions, cls).subsystem_dependencies() + (NativeToolchain.scoped(cls),)
 
   # TODO: seriously consider subclassing UnixCCompiler as well as the build_ext
   # command from distutils to control the compiler and linker invocations
   # transparently instead of hoping distutils does the right thing.
+  # FIXME: If we're going to be wrapping setup.py-based projects, we really
+  # should be doing it through a subclass of a distutils UnixCCompiler (in
+  # Lib/distutils in the CPython source) instead of hoping setup.py knows what
+  # to do. For example, the default UnixCCompiler from distutils will build a
+  # 32/64-bit "fat binary" on osx unless you set ARCHFLAGS='-arch x86_64',
+  # which is totally undocumented. We could probably expose this pretty easily
+  # as an import to the setup.py.
   @memoized_property
-  def _python_dist_build_environment(self):
-    return PythonDistBuildEnvironment.scoped_instance(self)
+  def _native_toolchain_instance(self):
+    return NativeToolchain.scoped_instance(self)
 
   @property
   def cache_target_dirs(self):
@@ -104,9 +111,11 @@ class BuildLocalPythonDistributions(Task):
 
   def _create_dist(self, dist_tgt, dist_target_dir, interpreter):
     """Create a .whl file for the specified python_distribution target."""
-    self.context.log.debug("dist_target_dir: '{}'".format(dist_target_dir))
     self._copy_sources(dist_tgt, dist_target_dir)
-    with self._python_dist_build_environment.execution_environment():
+
+    native_toolchain_path_entries = self._native_toolchain_instance.path_entries()
+    path_with_native_toolchain = get_modified_path(os.environ, native_toolchain_path_entries, prepend=True)
+    with environment_as(PATH=path_with_native_toolchain):
       # Build a whl using SetupPyRunner and return its absolute path.
       setup_runner = SetupPyRunner(dist_target_dir, 'bdist_wheel', interpreter=interpreter)
       setup_runner.run()

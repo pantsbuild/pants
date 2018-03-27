@@ -27,6 +27,23 @@ class InvalidZipPath(ValueError):
   """Indicates a bad zip file path."""
 
 
+def get_modified_path(env, new_entries, path_var='PATH', delimiter=':', prepend=False):
+  prev_path = env.get(path_var, None)
+  if prev_path is None:
+    path_dirs = list()
+  else:
+    path_dirs = list(prev_path.split(delimiter))
+
+  new_entries_list = list(new_entries)
+
+  if prepend:
+    path_dirs = new_entries_list + path_dirs
+  else:
+    path_dirs += new_entries_list
+
+  return delimiter.join(path_dirs)
+
+
 @contextmanager
 def environment_as(**kwargs):
   """Update the environment to the supplied values, for example:
