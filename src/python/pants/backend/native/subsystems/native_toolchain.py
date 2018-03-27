@@ -74,7 +74,9 @@ class NativeToolchain(Subsystem, ExecutablePathProvider):
         "Pants doesn't support building native code on this platform "
         "(uname: '{}').".format(os_name))
 
-    all_subsystems_for_toolchain = cls._CROSS_PLATFORM_SUBSYSTEMS + subsystems_for_host
+    # NB: path entries for platform-specific subsystems currently take
+    # precedence over cross-platform ones -- this could be made configurable.
+    all_subsystems_for_toolchain = subsystems_for_host + cls._CROSS_PLATFORM_SUBSYSTEMS
 
     return all_subsystems_for_toolchain
 

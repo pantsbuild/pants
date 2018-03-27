@@ -114,7 +114,8 @@ class BuildLocalPythonDistributions(Task):
     self._copy_sources(dist_tgt, dist_target_dir)
 
     native_toolchain_path_entries = self._native_toolchain_instance.path_entries()
-    path_with_native_toolchain = get_modified_path(os.environ, native_toolchain_path_entries, prepend=True)
+    path_with_native_toolchain = get_modified_path(
+      os.environ, native_toolchain_path_entries, prepend=True)
     with environment_as(PATH=path_with_native_toolchain):
       # Build a whl using SetupPyRunner and return its absolute path.
       setup_runner = SetupPyRunner(dist_target_dir, 'bdist_wheel', interpreter=interpreter)
