@@ -96,7 +96,11 @@ class PantsDaemon(FingerprintedProcessManager):
     def create(cls, bootstrap_options=None, full_init=True):
       """
       :param Options bootstrap_options: The bootstrap options, if available.
-      :param bool full_init: Whether or not to fully initialize the engine.
+      :param bool full_init: Whether or not to fully initialize an engine et al for the purposes
+                             of spawning a new daemon. `full_init=False` is intended primarily
+                             for lightweight lifecycle checks (since there is a ~1s overhead to
+                             initialize the engine). See the impl of `maybe_launch` for an example
+                             of the intended usage.
       """
       bootstrap_options = bootstrap_options or cls._parse_bootstrap_options()
       bootstrap_options_values = bootstrap_options.for_global_scope()
