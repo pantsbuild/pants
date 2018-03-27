@@ -30,10 +30,13 @@ class XCodeCLITools(Subsystem, ExecutablePathProvider):
     for filename in self._REQUIRED_TOOLS:
       executable_path = os.path.join(self._INSTALL_LOCATION, filename)
       if not is_executable(executable_path):
-        raise self.XCodeToolsUnavailable("The XCode CLI tools don't seem to exist!")
+        raise self.XCodeToolsUnavailable(
+          "'{}' is not an executable file, but it is required to build "
+          "native code on this platform. Have you installed the XCode "
+          "command line developer tools?"
+          .format(executable_path))
 
   @memoized_method
   def path_entries(self):
     self._check_executables_exist()
-
     return [self._INSTALL_LOCATION]
