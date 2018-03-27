@@ -16,12 +16,6 @@ RUN yum install -y \
   libffi \
   libffi-devel \
   openssl-devel
-# LLVM release tarballs are xz-compressed.
-RUN yum install -y xz
-# GCC requires these to compile.
-RUN yum install -y \
-  m4 \
-  wget
 
 # By default, execute in an environment with python27 enabled.
 ENTRYPOINT ["/usr/bin/scl", "enable", "python27", "devtoolset-7",  "--"]
