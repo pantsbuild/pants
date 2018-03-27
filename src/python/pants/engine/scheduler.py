@@ -191,10 +191,9 @@ class WrappedNativeScheduler(object):
 
   def _register_task(self, output_constraint, rule):
     """Register the given TaskRule with the native scheduler."""
-    input_selects = rule.input_selectors
     func = rule.func
     self._native.lib.tasks_task_begin(self._tasks, Function(self._to_key(func)), output_constraint)
-    for selector in input_selects:
+    for selector in rule.input_selectors:
       selector_type = type(selector)
       product_constraint = self._to_constraint(selector.product)
       if selector_type is Select:
@@ -218,6 +217,10 @@ class WrappedNativeScheduler(object):
                                                      self._to_constraint(selector.input_product))
       else:
         raise ValueError('Unrecognized Selector type: {}'.format(selector))
+    for get in rule.input_gets:
+      self._native.lib.tasks_add_get(self._tasks,
+                                     self._to_constraint(get.product),
+                                     TypeId(self._to_id(get.subject)))
     self._native.lib.tasks_task_end(self._tasks)
 
   def visualize_graph_to_file(self, execution_request, filename):

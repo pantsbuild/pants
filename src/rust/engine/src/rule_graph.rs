@@ -8,7 +8,7 @@ use std::io;
 
 use core::{Function, Key, TypeConstraint, TypeId, Value, ANY_TYPE};
 use externs;
-use selectors::{Select, SelectDependencies, Selector};
+use selectors::{Get, Select, SelectDependencies, Selector};
 use tasks::{Task, Tasks};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -49,7 +49,11 @@ impl Entry {
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct RootEntry {
   subject_type: TypeId,
+  // TODO: A RootEntry can only have one declared `Selector`, and no declared `Get`s, but these
+  // are shaped as Vecs to temporarily minimize the re-shuffling in `_construct_graph`. Remove in
+  // a future commit.
   clause: Vec<Selector>,
+  gets: Vec<Get>,
 }
 
 impl From<RootEntry> for Entry {
@@ -146,6 +150,8 @@ impl Entry {
 ///
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub enum SelectKey {
+  // A Get for a particular product/subject pair.
+  JustGet(Get),
   // A bare select with no projection.
   JustSelect(Select),
   // The initial select of a multi-select operator, eg SelectDependencies.
@@ -323,10 +329,18 @@ impl<'t> GraphMaker<'t> {
       let mut was_unfulfillable = false;
       match entry {
         Entry::InnerEntry(InnerEntry {
-          rule: Task { ref clause, .. },
+          rule: Task {
+            ref clause,
+            ref gets,
+            ..
+          },
           ..
         })
-        | Entry::Root(RootEntry { ref clause, .. }) => {
+        | Entry::Root(RootEntry {
+          ref clause,
+          ref gets,
+          ..
+        }) => {
           for selector in clause {
             match selector {
               &Selector::Select(ref select) => {
@@ -503,6 +517,39 @@ impl<'t> GraphMaker<'t> {
               }
             }
           }
+          for get in gets {
+            match get {
+              &Get {
+                ref subject,
+                ref product,
+              } => {
+                let rules_or_literals_for_selector = rhs(&self.tasks, subject.clone(), product);
+                if rules_or_literals_for_selector.is_empty() {
+                  mark_unfulfillable(
+                    &mut unfulfillable_rules,
+                    &entry,
+                    subject.clone(),
+                    format!(
+                      "no rule was available to compute {} for {}",
+                      type_constraint_str(product.clone()),
+                      type_str(subject.clone())
+                    ),
+                  );
+                  was_unfulfillable = true;
+                  continue;
+                }
+                add_rules_to_graph(
+                  &mut rules_to_traverse,
+                  &mut rule_dependency_edges,
+                  &mut unfulfillable_rules,
+                  &mut root_rule_dependency_edges,
+                  &entry,
+                  SelectKey::JustGet(get.clone()),
+                  rules_or_literals_for_selector,
+                );
+              }
+            }
+          }
         }
         _ => panic!(
           "Entry type that cannot dependencies was not filtered out {:?}",
@@ -611,6 +658,7 @@ impl<'t> GraphMaker<'t> {
             variant_key: None,
           }),
         ],
+        gets: vec![],
       })
   }
 }
@@ -638,6 +686,7 @@ pub struct RuleGraph {
   unfulfillable_rules: UnfulfillableRuleMap,
 }
 
+// TODO: Take by reference.
 fn type_constraint_str(type_constraint: TypeConstraint) -> String {
   let str_val = externs::call_method(&to_val(type_constraint), "graph_str", &[])
     .expect("string from calling repr");
@@ -761,6 +810,7 @@ impl RuleGraph {
     let root = RootEntry {
       subject_type: subject_type,
       clause: vec![selector],
+      gets: vec![],
     };
     self.root_dependencies.get(&root).map(|e| e.clone())
   }
@@ -852,7 +902,6 @@ impl RuleGraph {
       })
   }
 
-  // TODO instead of this, make own fmt thing that accepts externs
   pub fn visualize(&self, f: &mut io::Write) -> io::Result<()> {
     if self.root_dependencies.is_empty() && self.rule_dependency_edges.is_empty() {
       write!(f, "digraph {{\n")?;
@@ -1029,13 +1078,17 @@ fn update_edges_based_on_unfulfillable_entry<K>(
 }
 
 fn rhs_for_select(tasks: &Tasks, subject_type: TypeId, select: &Select) -> Entries {
-  if externs::satisfied_by_type(&select.product, &subject_type) {
+  rhs(tasks, subject_type, &select.product)
+}
+
+fn rhs(tasks: &Tasks, subject_type: TypeId, product_type: &TypeConstraint) -> Entries {
+  if externs::satisfied_by_type(product_type, &subject_type) {
     // NB a matching subject is always picked first
     vec![Entry::new_subject_is_product(subject_type)]
-  } else if let Some(&(ref key, _)) = tasks.gen_singleton(&select.product) {
-    vec![Entry::new_singleton(key.clone(), select.product.clone())]
+  } else if let Some(&(ref key, _)) = tasks.gen_singleton(product_type) {
+    vec![Entry::new_singleton(key.clone(), product_type.clone())]
   } else {
-    match tasks.gen_tasks(&select.product) {
+    match tasks.gen_tasks(product_type) {
       Some(ref matching_tasks) => matching_tasks
         .iter()
         .map(|t| Entry::new_inner(subject_type, t))

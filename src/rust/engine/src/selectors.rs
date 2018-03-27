@@ -4,6 +4,12 @@
 use core::{Field, TypeConstraint, TypeId};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Get {
+  pub product: TypeConstraint,
+  pub subject: TypeId,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
   pub product: TypeConstraint,
   pub variant_key: Option<String>,

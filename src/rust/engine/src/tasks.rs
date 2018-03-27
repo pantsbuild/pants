@@ -5,12 +5,13 @@ use std::collections::{HashMap, HashSet};
 
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, FNV};
 use externs;
-use selectors::{Select, SelectDependencies, SelectProjection, Selector};
+use selectors::{Get, Select, SelectDependencies, SelectProjection, Selector};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
   pub product: TypeConstraint,
   pub clause: Vec<Selector>,
+  pub gets: Vec<Get>,
   pub func: Function,
   pub cacheable: bool,
 }
@@ -95,8 +96,21 @@ impl Tasks {
       cacheable: true,
       product: product,
       clause: Vec::new(),
+      gets: Vec::new(),
       func: func,
     });
+  }
+
+  pub fn add_get(&mut self, product: TypeConstraint, subject: TypeId) {
+    self
+      .preparing
+      .as_mut()
+      .expect("Must `begin()` a task creation before adding gets!")
+      .gets
+      .push(Get {
+        product: product,
+        subject: subject,
+      });
   }
 
   pub fn add_select(&mut self, product: TypeConstraint, variant_key: Option<String>) {
@@ -163,6 +177,7 @@ impl Tasks {
       tasks,
     );
     task.clause.shrink_to_fit();
+    task.gets.shrink_to_fit();
     tasks.push(task);
   }
 }

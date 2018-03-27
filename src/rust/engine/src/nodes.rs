@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use futures::future::{self, Future};
 use tempdir::TempDir;
@@ -121,6 +122,21 @@ impl Select {
       subject: subject,
       variants: variants,
       entries: edges.entries_for(&select_key),
+    }
+  }
+
+  pub fn new_with_entries(
+    product: TypeConstraint,
+    subject: Key,
+    variants: Variants,
+    entries: rule_graph::Entries,
+  ) -> Select {
+    let selector = selectors::Select::without_variant(product);
+    Select {
+      selector: selector,
+      subject: subject,
+      variants: variants,
+      entries: entries,
     }
   }
 
@@ -356,7 +372,7 @@ impl Select {
             product: self.product().clone(),
             variants: self.variants.clone(),
             task: task,
-            entry: entry.clone(),
+            entry: Arc::new(entry.clone()),
           })
         })
         .collect::<Vec<NodeFuture<Value>>>()
@@ -883,7 +899,7 @@ pub struct Task {
   product: TypeConstraint,
   variants: Variants,
   task: tasks::Task,
-  entry: rule_graph::Entry,
+  entry: Arc<rule_graph::Entry>,
 }
 
 impl Task {
@@ -909,30 +925,27 @@ impl Task {
     }
   }
 
-  ///
-  /// TODO: Merge with `get` once all edges are statically declared.
-  ///
-  fn gen_get(context: &Context, gets: Vec<externs::Get>) -> NodeFuture<Vec<Value>> {
+  fn gen_get(
+    context: &Context,
+    entry: Arc<rule_graph::Entry>,
+    gets: Vec<externs::Get>,
+  ) -> NodeFuture<Vec<Value>> {
     let get_futures = gets
       .into_iter()
       .map(|get| {
-        let externs::Get(constraint, subject) = get;
-        let selector = selectors::Select::without_variant(constraint.clone());
-        let edges_res = context
+        let externs::Get(product, subject) = get;
+        let entries = context
           .core
           .rule_graph
-          .find_root_edges(*subject.type_id(), selectors::Selector::Select(selector))
-          .ok_or_else(|| {
-            throw(&format!(
-              "No rules were available to compute {} for {}",
-              externs::key_to_str(&constraint.0),
-              externs::key_to_str(&subject)
-            ))
-          });
-        let context = context.clone();
-        future::result(edges_res).and_then(move |edges| {
-          Select::new(constraint, subject, Default::default(), &edges).run(context.clone())
-        })
+          .edges_for_inner(&entry)
+          .expect("edges for task exist.")
+          .entries_for(&rule_graph::SelectKey::JustGet(selectors::Get {
+            product: product,
+            subject: subject.type_id().clone(),
+          }));
+        Select::new_with_entries(product, subject, Default::default(), entries)
+          .run(context.clone())
+          .map_err(|e| was_required(e))
       })
       .collect::<Vec<_>>();
     future::join_all(get_futures).to_boxed()
@@ -942,15 +955,20 @@ impl Task {
   /// Given a python generator Value, loop to request the generator's dependencies until
   /// it completes with a result Value.
   ///
-  fn generate(context: Context, generator: Value) -> NodeFuture<Value> {
+  fn generate(
+    context: Context,
+    entry: Arc<rule_graph::Entry>,
+    generator: Value,
+  ) -> NodeFuture<Value> {
     future::loop_fn(externs::eval("None").unwrap(), move |input| {
       let context = context.clone();
+      let entry = entry.clone();
       future::result(externs::generator_send(&generator, &input)).and_then(move |response| {
         match response {
-          externs::GeneratorResponse::Get(get) => Self::gen_get(&context, vec![get])
+          externs::GeneratorResponse::Get(get) => Self::gen_get(&context, entry, vec![get])
             .map(|vs| future::Loop::Continue(vs.into_iter().next().unwrap()))
             .to_boxed() as BoxFuture<_, _>,
-          externs::GeneratorResponse::GetMulti(gets) => Self::gen_get(&context, gets)
+          externs::GeneratorResponse::GetMulti(gets) => Self::gen_get(&context, entry, gets)
             .map(|vs| future::Loop::Continue(externs::store_list(vs.iter().collect(), false)))
             .to_boxed() as BoxFuture<_, _>,
           externs::GeneratorResponse::Break(val) => {
@@ -976,6 +994,7 @@ impl Node for Task {
     );
 
     let func = self.task.func.clone();
+    let entry = self.entry.clone();
     deps
       .then(move |deps_result| match deps_result {
         Ok(deps) => externs::call(&externs::val_for(&func.0), &deps),
@@ -984,7 +1003,7 @@ impl Node for Task {
       .then(move |task_result| match task_result {
         Ok(val) => {
           if externs::satisfied_by(&context.core.types.generator, &val) {
-            Self::generate(context, val)
+            Self::generate(context, entry, val)
           } else {
             ok(val)
           }

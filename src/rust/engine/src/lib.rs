@@ -329,6 +329,13 @@ pub extern "C" fn tasks_task_begin(
 }
 
 #[no_mangle]
+pub extern "C" fn tasks_add_get(tasks_ptr: *mut Tasks, product: TypeConstraint, subject: TypeId) {
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.add_get(product, subject);
+  })
+}
+
+#[no_mangle]
 pub extern "C" fn tasks_add_select(tasks_ptr: *mut Tasks, product: TypeConstraint) {
   with_tasks(tasks_ptr, |tasks| {
     tasks.add_select(product, None);

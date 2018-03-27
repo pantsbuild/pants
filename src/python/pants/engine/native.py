@@ -168,6 +168,7 @@ Value externs_val_for(Key);
 
 Tasks* tasks_create(void);
 void tasks_task_begin(Tasks*, Function, TypeConstraint);
+void tasks_add_get(Tasks*, TypeConstraint, TypeId);
 void tasks_add_select(Tasks*, TypeConstraint);
 void tasks_add_select_variant(Tasks*, TypeConstraint, Buffer);
 void tasks_add_select_dependencies(Tasks*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);

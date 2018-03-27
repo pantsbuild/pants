@@ -106,10 +106,10 @@ class SourceRoots(datatype('SourceRoots', ['srcroots'])):
   """Placeholder for the SourceRoot subsystem."""
 
 
+@printing_func
 @rule(Address,
       [Select(JVMPackageName),
        SelectDependencies(AddressFamily, Snapshot, field='dir_stats', field_types=(Dir,))])
-@printing_func
 def select_package_address(jvm_package_name, address_families):
   """Return the Address from the given AddressFamilies which provides the given package."""
   addresses = [address for address_family in address_families
@@ -123,8 +123,8 @@ def select_package_address(jvm_package_name, address_families):
   return addresses[0].to_address()
 
 
-@rule(PathGlobs, [Select(JVMPackageName), Select(SourceRoots)])
 @printing_func
+@rule(PathGlobs, [Select(JVMPackageName), Select(SourceRoots)])
 def calculate_package_search_path(jvm_package_name, source_roots):
   """Return PathGlobs to match directories where the given JVMPackageName might exist."""
   rel_package_dir = jvm_package_name.name.replace('.', os_sep)
@@ -132,9 +132,9 @@ def calculate_package_search_path(jvm_package_name, source_roots):
   return PathGlobs.create('', include=specs)
 
 
+@printing_func
 @rule(ImportedJVMPackages,
       [SelectProjection(FilesContent, PathGlobs, 'path_globs', ScalaInferredDepsSources)])
-@printing_func
 def extract_scala_imports(source_files_content):
   """A toy example of dependency inference. Would usually be a compiler plugin."""
   packages = set()
@@ -147,10 +147,10 @@ def extract_scala_imports(source_files_content):
   return ImportedJVMPackages([JVMPackageName(p) for p in packages])
 
 
+@printing_func
 @rule(ScalaSources,
       [Select(ScalaInferredDepsSources),
        SelectDependencies(Address, ImportedJVMPackages, field_types=(JVMPackageName,))])
-@printing_func
 def reify_scala_sources(sources, dependency_addresses):
   """Given a ScalaInferredDepsSources object and its inferred dependencies, create ScalaSources."""
   kwargs = sources._asdict()
@@ -214,8 +214,8 @@ class ManagedJar(Struct):
     super(ManagedJar, self).__init__(org=org, name=name, **kwargs)
 
 
-@rule(Jar, [Select(ManagedJar), SelectVariant(ManagedResolve, 'resolve')])
 @printing_func
+@rule(Jar, [Select(ManagedJar), SelectVariant(ManagedResolve, 'resolve')])
 def select_rev(managed_jar, managed_resolve):
   (org, name) = (managed_jar.org, managed_jar.name)
   rev = managed_resolve.revs.get('{}#{}'.format(org, name), None)
@@ -224,14 +224,14 @@ def select_rev(managed_jar, managed_resolve):
   return Jar(org=managed_jar.org, name=managed_jar.name, rev=rev)
 
 
-@rule(Classpath, [Select(Jar)])
 @printing_func
+@rule(Classpath, [Select(Jar)])
 def ivy_resolve(jars):
   return Classpath(creator='ivy_resolve')
 
 
-@rule(Classpath, [Select(ResourceSources)])
 @printing_func
+@rule(Classpath, [Select(ResourceSources)])
 def isolate_resources(resources):
   """Copies resources into a private directory, and provides them as a Classpath entry."""
   return Classpath(creator='isolate_resources')
@@ -287,8 +287,8 @@ class BuildPropertiesConfiguration(Struct):
   pass
 
 
-@rule(Classpath, [Select(BuildPropertiesConfiguration)])
 @printing_func
+@rule(Classpath, [Select(BuildPropertiesConfiguration)])
 def write_name_file(name):
   """Write a file containing the name of this target in the CWD."""
   return Classpath(creator='write_name_file')
@@ -339,18 +339,18 @@ def gen_scrooge_thrift(sources, config, scrooge_classpath):
     return ScalaSources(files=['Fake.scala'], dependencies=config.dependencies)
 
 
+@printing_func
 @rule(Classpath,
       [Select(JavaSources),
        SelectDependencies(Classpath, JavaSources, field_types=(Address, Jar))])
-@printing_func
 def javac(sources, classpath):
   return Classpath(creator='javac')
 
 
+@printing_func
 @rule(Classpath,
       [Select(ScalaSources),
        SelectDependencies(Classpath, ScalaSources, field_types=(Address, Jar))])
-@printing_func
 def scalac(sources, classpath):
   return Classpath(creator='scalac')
 
