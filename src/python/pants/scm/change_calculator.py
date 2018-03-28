@@ -149,10 +149,10 @@ class EngineChangeCalculator(ChangeCalculator):
     # targets do not show up as changed roots, we use the `TransitiveHydratedTargets` product.
     #   see https://github.com/pantsbuild/pants/issues/382
     specs = (DescendantAddresses(''),)
-    adaptor_iter = (t
+    adaptor_iter = (t.adaptor
                     for targets in self._scheduler.product_request(TransitiveHydratedTargets,
                                                                    [Specs(specs)])
-                    for t in targets.dependencies)
+                    for t in targets.roots)
     graph = _DependentGraph.from_iterable(target_types_from_symbol_table(self._symbol_table),
                                           adaptor_iter)
 
