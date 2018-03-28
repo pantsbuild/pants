@@ -332,6 +332,13 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       self.assert_success(pants_run)
       self.assertEqual(pants_run.stdout_data.strip(), 'src/python/sources:text')
 
+  def test_changed_with_deleted_target_transitive(self):
+    with create_isolated_git_repo() as worktree:
+      safe_delete(os.path.join(worktree, 'src/resources/org/pantsbuild/resourceonly/BUILD'))
+      pants_run = self.run_pants(['list', '--changed-parent=HEAD', '--changed-include-dependees=transitive'])
+      self.assert_failure(pants_run)
+      self.assertIn('src/resources/org/pantsbuild/resourceonly', pants_run.stderr_data)
+
   def test_changed_in_directory_without_build_file(self):
     with create_isolated_git_repo() as worktree:
       create_file_in(worktree, 'new-project/README.txt', 'This is important.')
