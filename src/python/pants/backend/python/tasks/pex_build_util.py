@@ -85,7 +85,7 @@ def build_for_current_platform_only_check(tgts):
   Performs a check of whether the current target closure has native sources and if so, ensures that
   Pants is only targeting the current platform.
 
-  :context_tgts_func function: The target filtering function of the current task context.
+  :param tgts: a list of :class:`Target` objects.
   :return: a boolean value indicating whether the current target closure has native sources.
   """
   if tgt_closure_has_native_sources(filter(is_local_python_dist, tgts)):
