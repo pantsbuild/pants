@@ -64,4 +64,4 @@ class PythonDistribution(Target):
 
   @property
   def has_native_sources(self):
-    return any(src.endswith(('.c', '.cpp', '.cc')) for src in self.sources_relative_to_target_base())
+    return self.has_sources(extension=('.c', '.cpp', '.cc'))

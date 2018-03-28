@@ -653,20 +653,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     # of e.g. `./pants --changed-parent=HEAD list` (w/ no changes) returning an empty result.
     return self.context.target_roots
 
-  def tgt_closure_has_native_sources(self):
-    """Determine if any target in the current target closure has native (c or cpp) sources."""
-    local_dist_tgts = self.context.targets(is_local_python_dist)
-    return any(tgt.has_native_sources for tgt in local_dist_tgts)
-
-  def tgt_closure_platforms(self):
-    """Returns a list of all platform constraints in the target set of the current context."""
-    platforms = []
-    for tgt in self.context.targets(is_python_binary):
-      if tgt.platforms:
-        platforms += tgt.platforms
-    # If no targets specify platforms, inherit the default platforms.
-    return list(set(platforms)) or PythonSetup.global_instance().platforms
-
 
 class Task(TaskBase):
   """An executable task.
