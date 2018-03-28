@@ -12,8 +12,6 @@ from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
 
-from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.backend.python.tasks.pex_build_util import is_local_python_dist, is_python_binary
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files

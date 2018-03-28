@@ -51,8 +51,8 @@ def is_python_binary(tgt):
 
 
 def tgt_closure_has_native_sources(tgts):
-    """Determine if any target in the current target closure has native (c or cpp) sources."""
-    return any(tgt.has_native_sources for tgt in tgts)
+  """Determine if any target in the current target closure has native (c or cpp) sources."""
+  return any(tgt.has_native_sources for tgt in tgts)
 
 
 def tgt_closure_platforms(tgts):
@@ -80,7 +80,7 @@ def tgt_closure_platforms(tgts):
   return tgts_by_platforms
 
 
-def build_for_current_platform_only_check(context_tgts_func):
+def build_for_current_platform_only_check(tgts):
   """
   Performs a check of whether the current target closure has native sources and if so, ensures that
   Pants is only targeting the current platform.
@@ -88,8 +88,8 @@ def build_for_current_platform_only_check(context_tgts_func):
   :context_tgts_func function: The target filtering function of the current task context.
   :return: a boolean value indicating whether the current target closure has native sources.
   """
-  if tgt_closure_has_native_sources(context_tgts_func(is_local_python_dist)):
-    platforms = tgt_closure_platforms(context_tgts_func(is_python_binary))
+  if tgt_closure_has_native_sources(filter(is_local_python_dist, tgts)):
+    platforms = tgt_closure_platforms(filter(is_python_binary, tgts))
     if len(platforms.keys()) > 1 or not 'current' in platforms.keys():
       raise IncompatiblePlatformsError('The target set contains one or more targets that depend on '
         'native code. Please ensure that the platform arguments in all relevant targets and build '

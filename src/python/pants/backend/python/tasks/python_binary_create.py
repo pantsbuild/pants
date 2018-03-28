@@ -129,9 +129,10 @@ class PythonBinaryCreate(Task):
       # Dump everything into the builder's chroot.
       for tgt in source_tgts:
         dump_sources(builder, tgt, self.context.log)
+        import pdb;pdb.set_trace()
       # We need to ensure that we are resolving for only the current platform if we are
       # including local python dist targets that have native extensions.
-      build_for_current_platform_only_check(self.context.targets)
+      build_for_current_platform_only_check(self.context.targets())
       dump_requirement_libs(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
 
       # Build the .pex file.
