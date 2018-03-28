@@ -13,8 +13,8 @@ from collections import defaultdict
 from pants.base.build_environment import get_scm
 from pants.base.specs import DescendantAddresses
 from pants.build_graph.address import Address
-from pants.engine.build_files import HydratedStructs, Specs
-from pants.engine.legacy.graph import target_types_from_symbol_table
+from pants.engine.build_files import Specs
+from pants.engine.legacy.graph import TransitiveHydratedTargets, target_types_from_symbol_table
 from pants.engine.legacy.source_mapper import EngineSourceMapper
 from pants.goal.workspace import ScmWorkspace
 from pants.util.meta import AbstractClass
@@ -144,14 +144,15 @@ class EngineChangeCalculator(ChangeCalculator):
     if changed_request.include_dependees not in ('direct', 'transitive'):
       return
 
-    # For dependee finding, we need to parse all build files to collect all structs. But we
-    # don't need to fully hydrate targets (ie, expand their source globs), and so we use
-    # the `HydratedStructs` product. See #4535 for more info.
+    # TODO: For dependee finding, we technically only need to parse all build files to collect target
+    # dependencies. But in order to fully validate the graph and account for the fact that deleted
+    # targets do not show up as changed roots, we use the `TransitiveHydratedTargets` product.
+    #   see https://github.com/pantsbuild/pants/issues/382
     specs = (DescendantAddresses(''),)
-    adaptor_iter = (t
-                    for targets in self._scheduler.product_request(HydratedStructs,
+    adaptor_iter = (t.adaptor
+                    for targets in self._scheduler.product_request(TransitiveHydratedTargets,
                                                                    [Specs(specs)])
-                    for t in targets.dependencies)
+                    for t in targets.roots)
     graph = _DependentGraph.from_iterable(target_types_from_symbol_table(self._symbol_table),
                                           adaptor_iter)
 
