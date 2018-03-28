@@ -37,6 +37,22 @@ python_tests(
 )
 
 python_tests(
+  name = 'changed_integration',
+  sources = ['test_changed_integration.py'],
+  dependencies = [
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:process_handler',
+    'tests/python/pants_test/testutils:git_util',
+    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+  timeout = 600,
+)
+
+python_tests(
   name = 'dependees_integration',
   sources = ['test_dependees_integration.py'],
   dependencies = [
