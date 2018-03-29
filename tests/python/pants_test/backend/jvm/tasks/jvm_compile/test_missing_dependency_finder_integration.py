@@ -23,6 +23,20 @@ class MissingDependencyFinderIntegrationTest(PantsRunIntegrationTest):
     self.assertTrue(re.search('please add the following to the dependencies of.*'
                               '\'3rdparty:guava\',', run.stdout_data,
                               re.DOTALL))
+    self.assertFalse(re.search("buildozer", run.stdout_data, re.DOTALL))
+
+  def test_missing_deps_found_buildozer(self):
+    target = 'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist:missingjardepswhitelist'
+    run = self.run_pants([
+      'compile',
+      target,
+      '--compile-zinc-suggest-missing-deps',
+      '--compile-zinc-buildozer=path/to/buildozer',
+    ])
+    self.assert_failure(run)
+    self.assertTrue(re.search("path/to/buildozer 'add dependencies 3rdparty:guava' " + target,
+                              run.stdout_data,
+                              re.DOTALL))
 
   def test_missing_deps_not_found(self):
     target = 'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target'
