@@ -20,6 +20,7 @@ COLOR_RESET = "\x1b[0m"
 def banner(message):
   print("{}[=== {} ===]{}".format(COLOR_BLUE, message, COLOR_RESET))
 
+
 class Package(object):
   def __init__(self, name):
     self.name = name
@@ -47,7 +48,6 @@ class Package(object):
     return j["info"]["version"]
 
   def owners(self):
-    latest_version = self.latest_version()
     url = "https://pypi.python.org/pypi/{}/{}".format(self.name, self.latest_version())
     f = urllib2.urlopen(url)
     return_next_line = False
@@ -76,12 +76,15 @@ expected_package_owners = set([
   "wisechengyi",
 ])
 
+
 def contrib_packages():
   output = subprocess.check_output(('bash', '-c', 'source contrib/release_packages.sh ; for pkg in "${CONTRIB_PACKAGES[@]}"; do echo "${!pkg}"; done'))
   return set(Package(name) for name in output.strip().split('\n'))
 
+
 def all_packages():
   return core_packages.union(contrib_packages())
+
 
 def get_pypi_config(section, option):
   config = ConfigParser()
