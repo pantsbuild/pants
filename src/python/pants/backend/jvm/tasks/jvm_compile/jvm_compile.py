@@ -188,6 +188,10 @@ class JvmCompile(NailgunTaskBase):
              help='Suggest missing dependencies on a best-effort basis from target\'s transitive'
                   'deps for compilation failures that are due to class not found.')
     
+    register('--buildozer',
+             help='Path to buildozer for suggest-missing-deps command lines. '
+                  'If absent, no command line will be suggested to fix missing deps.')
+
     register('--missing-deps-not-found-msg', advanced=True, type=str,
              help='The message to print when pants can\'t find any suggestions for targets '
                   'containing the classes not found during compilation. This should '
@@ -803,6 +807,17 @@ class JvmCompile(NailgunTaskBase):
           'please add the following to the dependencies of ({}):\n  {}\n'
             .format(target.address.spec, '\n  '.join(sorted(list(formatted_suggested_deps))))
         )
+
+        path_to_buildozer = self.get_options().buildozer
+        if path_to_buildozer:
+          suggestion_msg += ("\nYou can do this by running {buildozer} "
+                             "'add dependencies {deps}' {target}".format(
+                                 buildozer=path_to_buildozer,
+                                 deps=" ".join(sorted(suggested_deps)),
+                                 target=target.address.spec
+                             )
+                            )
+
         self.context.log.info(suggestion_msg)
 
       if no_suggestions:
