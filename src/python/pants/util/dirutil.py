@@ -475,5 +475,5 @@ def rm_rf(name):
 
 
 def is_executable(path):
-  """???"""
+  """Returns whether a path names an existing executable file."""
   return os.path.isfile(path) and os.access(path, os.X_OK)

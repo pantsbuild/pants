@@ -109,18 +109,16 @@ class BuildLocalPythonDistributions(Task):
                                   src_relative_to_target_base)
       shutil.copyfile(abs_src_path, src_rel_to_results_dir)
 
+  # TODO(cosmicexplorer): don't invoke the native toolchain unless the current
+  # dist_tgt.has_native_sources? Would need some way to check whether the
+  # toolchain is invoked in an integration test.
   @contextmanager
   def _setup_py_invocation_environment(self, dist_tgt):
-    if not dist_tgt.has_native_sources:
+    native_toolchain = self._native_toolchain_instance()
+    native_toolchain_path_entries = native_toolchain.path_entries()
+    isolated_native_toolchain_path = get_joined_path(native_toolchain_path_entries)
+    with environment_as(PATH=isolated_native_toolchain_path):
       yield
-    else:
-      # NB: lazily instantiate the native toolchain only when native extensions
-      # need to be built!
-      native_toolchain = self._native_toolchain_instance()
-      native_toolchain_path_entries = native_toolchain.path_entries()
-      isolated_native_toolchain_path = get_joined_path(native_toolchain_path_entries)
-      with environment_as(PATH=isolated_native_toolchain_path):
-        yield
 
   def _create_dist(self, dist_tgt, dist_target_dir, interpreter):
     """Create a .whl file for the specified python_distribution target."""

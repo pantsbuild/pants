@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from abc import abstractmethod
-
 from pants.binaries.binary_util import BinaryUtilPrivate
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
@@ -144,7 +142,11 @@ class Script(BinaryToolBase):
 
 
 class ExecutablePathProvider(object):
-  """???"""
+  """Mixin for subsystems which provide directories containing executables.
 
-  @abstractmethod
-  def path_entries(self): pass
+  This is useful to abstract over different sources of executables (BinaryTool
+  archives or the host filesystem), or for aggregating multiple such subsystems.
+  """
+
+  def path_entries(self):
+    return []

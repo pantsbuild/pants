@@ -14,7 +14,7 @@ from pants.backend.native.subsystems.platform_specific.linux.binutils import Bin
 from pants.binaries.binary_tool import ExecutablePathProvider
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.memo import memoized_method
 from pants.util.osutil import get_os_name, normalize_os_name
 from pants.util.process_handler import subprocess
 
@@ -63,14 +63,15 @@ class NativeToolchain(Subsystem, ExecutablePathProvider):
   }
 
   class UnsupportedPlatformError(Exception):
-    """???"""
+    """Thrown if the native toolchain is invoked on an unrecognized platform.
 
-  class NativeToolchainConfigurationError(Exception):
-    """???"""
+    Note that the native toolchain should work on all of Pants's supported
+    platforms."""
 
   @classmethod
   @memoized_method
   def _get_platform_specific_subsystems(cls):
+    """Return the subsystems used by the native toolchain for this platform."""
     os_name = get_os_name()
     normed_os_name = normalize_os_name(os_name)
 
@@ -93,16 +94,19 @@ class NativeToolchain(Subsystem, ExecutablePathProvider):
     cur_platform_subsystems = cls._get_platform_specific_subsystems()
     return prev + tuple(sub.scoped(cls) for sub in cur_platform_subsystems)
 
-  @memoized_property
+  @memoized_method
   def _subsystem_instances(self):
     cur_platform_subsystems = self._get_platform_specific_subsystems()
     return [sub.scoped_instance(self) for sub in cur_platform_subsystems]
 
+  # TODO(cosmicexplorer): We should run a very small test suite verifying the
+  # toolchain can compile and link native code before returning, especially
+  # since we don't provide the tools on OSX. This should only be run once, so if
+  # we don't want to make this a task like SelectInterpreter, we should probably
+  # invoke the v2 engine (we can accept a context argument if so).
   def path_entries(self):
-    """Note how it adds these in order, and how we can't necessarily expect /bin
-    and /usr/bin to be on the user's PATH when they invoke Pants!"""
     combined_path_entries = []
-    for subsystem in self._subsystem_instances:
+    for subsystem in self._subsystem_instances():
       combined_path_entries.extend(subsystem.path_entries())
 
     return combined_path_entries

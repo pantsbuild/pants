@@ -32,7 +32,7 @@ class TestNativeToolchain(BaseTest):
       with environment_as(PATH=isolated_toolchain_path):
         return subprocess.check_output(cmd, cwd=cwd, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
-      raise NativeToolchain.NativeToolchainConfigurationError(
+      raise Exception(
         "Command failed while invoking the native toolchain "
         "with code '{code}', cwd='{}', cmd='{cmd}'. Combined stdout and stderr:\n{out}"
         .format(code=e.returncode, cwd=cwd, cmd=' '.join(cmd), out=e.output),
