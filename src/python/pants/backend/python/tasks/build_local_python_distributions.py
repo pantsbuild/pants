@@ -24,7 +24,7 @@ from pants.build_graph.address import Address
 from pants.task.task import Task
 from pants.util.contextutil import environment_as, get_modified_path
 from pants.util.dirutil import safe_mkdir
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method
 
 
 class BuildLocalPythonDistributions(Task):
@@ -61,7 +61,7 @@ class BuildLocalPythonDistributions(Task):
   # 32/64-bit "fat binary" on osx unless you set ARCHFLAGS='-arch x86_64',
   # which is totally undocumented. We could probably expose this pretty easily
   # as an import to the setup.py.
-  @memoized_property
+  @memoized_method
   def _native_toolchain_instance(self):
     return NativeToolchain.scoped_instance(self)
 
@@ -109,14 +109,25 @@ class BuildLocalPythonDistributions(Task):
                                   src_relative_to_target_base)
       shutil.copyfile(abs_src_path, src_rel_to_results_dir)
 
+  @contextmanager
+  def _setup_py_invocation_environment(self, dist_tgt):
+    if not dist_tgt.has_native_sources:
+      yield
+    else:
+      # NB: lazily instantiate the native toolchain only when native extensions
+      # need to be built!
+      native_toolchain = self._native_toolchain_instance()
+      native_toolchain_path_entries = native_toolchain.path_entries()
+      path_with_native_toolchain = get_modified_path(
+        os.environ, native_toolchain_path_entries, prepend=True)
+      with environment_as(PATH=path_with_native_toolchain):
+        yield
+
   def _create_dist(self, dist_tgt, dist_target_dir, interpreter):
     """Create a .whl file for the specified python_distribution target."""
     self._copy_sources(dist_tgt, dist_target_dir)
 
-    native_toolchain_path_entries = self._native_toolchain_instance.path_entries()
-    path_with_native_toolchain = get_modified_path(
-      os.environ, native_toolchain_path_entries, prepend=True)
-    with environment_as(PATH=path_with_native_toolchain):
+    with self._setup_py_invocation_environment(dist_tgt):
       # Build a whl using SetupPyRunner and return its absolute path.
       setup_runner = SetupPyRunner(dist_target_dir, 'bdist_wheel', interpreter=interpreter)
       setup_runner.run()
