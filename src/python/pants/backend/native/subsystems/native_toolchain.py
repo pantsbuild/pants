@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import logging
 import os
 
 from pants.backend.native.subsystems.clang import Clang
@@ -18,27 +17,6 @@ from pants.util.contextutil import environment_as, get_modified_path, temporary_
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.osutil import get_os_name, normalize_os_name
 from pants.util.process_handler import subprocess
-
-
-logger = logging.getLogger(__name__)
-
-
-_HELLO_WORLD_C = """
-#include "stdio.h"
-
-int main() {
-  printf("%s\\n", "hello, world!");
-}
-"""
-
-
-_HELLO_WORLD_CPP = """
-#include <iostream>
-
-int main() {
-  std::cout << "hello, world!" << std::endl;
-}
-"""
 
 
 class NativeToolchain(Subsystem, ExecutablePathProvider):
@@ -72,7 +50,7 @@ class NativeToolchain(Subsystem, ExecutablePathProvider):
   # order to work (add issue link here!!). For now we can separately add gcc and
   # binutils's bin/ dirs to separate components of the PATH, but this isn't a
   # working solution.
-  _CROSS_PLATFORM_SUBSYSTEMS = [GCC, Clang]
+  _CROSS_PLATFORM_SUBSYSTEMS = [Clang, GCC]
 
   # This is a map of {<platform> -> [<subsystem_cls>, ...]}; the key is the
   # normalized OS name, and the value is a list of subsystem class objects that
@@ -120,56 +98,11 @@ class NativeToolchain(Subsystem, ExecutablePathProvider):
     cur_platform_subsystems = self._get_platform_specific_subsystems()
     return [sub.scoped_instance(self) for sub in cur_platform_subsystems]
 
-  def _invoke_capturing_output(self, cmd, cwd):
-    logger.debug("invoking in cwd='{}', cmd='{}'".format(cwd, cmd))
-    try:
-      return subprocess.check_output(cmd, cwd=cwd, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-      raise NativeToolchainConfigurationError(
-        "Command failed while configuring the native toolchain "
-        "with code '{}', cwd='{}', cmd='{}'. Combined stdout and stderr:\n{}"
-        .format(e.returncode, cwd, ' '.join(cmd), e.output),
-        e)
-
-  def _sanity_test(self, path_entries):
-    """Try to compile and run a hello world program. Test all supported native
-    languages."""
-
-    logger.debug("invoking native toolchain sanity test with path_entries='{}'"
-                 .format(path_entries))
-
-    # TODO: show output here if the command fails!
-    isolated_toolchain_path = ':'.join(path_entries)
-    with environment_as(PATH=isolated_toolchain_path):
-      with temporary_dir() as tmpdir:
-
-        hello_c_path = os.path.join(tmpdir, 'hello.c')
-        with open(hello_c_path, 'w') as hello_c:
-          hello_c.write(_HELLO_WORLD_C)
-
-        self._invoke_capturing_output(['cc', 'hello.c', '-o', 'hello_c'],
-                                      cwd=tmpdir)
-        c_output = self._invoke_capturing_output(['./hello_c'], cwd=tmpdir)
-        if c_output != 'hello, world!\n':
-          raise self.NativeToolchainConfigurationError("C sanity test failure!")
-
-        hello_cpp_path = os.path.join(tmpdir, 'hello.cpp')
-        with open(hello_cpp_path, 'w') as hello_cpp:
-          hello_cpp.write(_HELLO_WORLD_CPP)
-
-        self._invoke_capturing_output(['c++', 'hello.cpp', '-o', 'hello_cpp'],
-                                      cwd=tmpdir)
-        cpp_output = self._invoke_capturing_output(['./hello_cpp'], cwd=tmpdir)
-        if cpp_output != 'hello, world!\n':
-          raise self.NativeToolchainConfigurationError("C++ sanity test failure!")
-
   def path_entries(self):
     """Note how it adds these in order, and how we can't necessarily expect /bin
     and /usr/bin to be on the user's PATH when they invoke Pants!"""
     combined_path_entries = []
     for subsystem in self._subsystem_instances:
       combined_path_entries.extend(subsystem.path_entries())
-
-    self._sanity_test(combined_path_entries)
 
     return combined_path_entries
