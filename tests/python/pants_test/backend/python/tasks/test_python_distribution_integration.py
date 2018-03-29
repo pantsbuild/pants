@@ -108,7 +108,10 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     # Test that pants will override pants.ini platforms config when building
     # or running a target that depends on native (c or cpp) sources.
     pex = os.path.join(get_buildroot(), 'dist', 'main.pex')
-    pants_ini_config = {'python-setup': {'platforms': ['current', 'macosx-10.13-intel', 'linux-x86_64']}}
+    # TODO(cosmicexplorer): what is this testing? should we be testing that it
+    # overrides the config or something as well as just success? should we test
+    # it in an osx environment?
+    pants_ini_config = {'python-setup': {'platforms': ['current', 'macosx-10.8-intel', 'linux-x86_64']}}
     try:
       # Clean all to rebuild requirements pex.
       command=['clean-all', 'run', '{}:main'.format(self.fasthello_project)]

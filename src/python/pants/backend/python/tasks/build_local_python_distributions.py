@@ -22,7 +22,7 @@ from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.build_graph.address import Address
 from pants.task.task import Task
-from pants.util.contextutil import environment_as, get_modified_path
+from pants.util.contextutil import environment_as, get_joined_path
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_method
 
@@ -118,9 +118,8 @@ class BuildLocalPythonDistributions(Task):
       # need to be built!
       native_toolchain = self._native_toolchain_instance()
       native_toolchain_path_entries = native_toolchain.path_entries()
-      path_with_native_toolchain = get_modified_path(
-        os.environ, native_toolchain_path_entries, prepend=True)
-      with environment_as(PATH=path_with_native_toolchain):
+      isolated_native_toolchain_path = get_joined_path(native_toolchain_path_entries)
+      with environment_as(PATH=isolated_native_toolchain_path):
         yield
 
   def _create_dist(self, dist_tgt, dist_target_dir, interpreter):

@@ -27,7 +27,10 @@ class InvalidZipPath(ValueError):
   """Indicates a bad zip file path."""
 
 
-def get_modified_path(env, new_entries, path_var='PATH', delimiter=':', prepend=False):
+def get_joined_path(new_entries, env=None, path_var='PATH', delimiter=':', prepend=False):
+  if env is None:
+    env = {}
+
   prev_path = env.get(path_var, None)
   if prev_path is None:
     path_dirs = list()

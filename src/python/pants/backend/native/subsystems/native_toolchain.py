@@ -13,7 +13,7 @@ from pants.backend.native.subsystems.platform_specific.darwin.xcode_cli_tools im
 from pants.backend.native.subsystems.platform_specific.linux.binutils import Binutils
 from pants.binaries.binary_tool import ExecutablePathProvider
 from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import environment_as, get_modified_path, temporary_dir
+from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.osutil import get_os_name, normalize_os_name
 from pants.util.process_handler import subprocess
