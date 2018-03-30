@@ -17,6 +17,9 @@ pants_version: 1.0.0
 plugins: [
     'pantsbuild.pants.contrib.go==%(pants_version)s',
   ]
+
+[go-distribution]
+version: 1.10
 ```
 
 On your next run of `./pants` the plugin will be installed and you'll find these new goals:
