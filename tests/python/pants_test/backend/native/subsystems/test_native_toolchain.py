@@ -12,10 +12,8 @@ from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
-# TODO(cosmicexplorer): ensure this runs on both OSX and Linux in Travis.
-# TODO(cosmicexplorer): most of this should probably be done (in a cached way)
-# at runtime when we set up the native toolchain -- fail early if we can't
-# compile/link something basic.
+# TODO(cosmicexplorer): can we have some form of this run in an OSX shard on
+# Travis?
 class TestNativeToolchain(BaseTest):
 
   def setUp(self):

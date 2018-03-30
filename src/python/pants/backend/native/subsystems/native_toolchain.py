@@ -45,11 +45,6 @@ class NativeToolchain(Subsystem, ExecutablePathProvider):
 
   # This is a list of subsystems which implement `ExecutablePathProvider` and
   # can be provided for all supported platforms.
-  # TODO(cosmicexplorer): We should be adding Clang to this list, but we need to
-  # merge all these tools under a single prefix (shared bin/, lib/, etc) in
-  # order to work (add issue link here!!). For now we can separately add gcc and
-  # binutils's bin/ dirs to separate components of the PATH, but this isn't a
-  # working solution.
   _CROSS_PLATFORM_SUBSYSTEMS = [Clang, GCC]
 
   # This is a map of {<platform> -> [<subsystem_cls>, ...]}; the key is the
@@ -99,11 +94,9 @@ class NativeToolchain(Subsystem, ExecutablePathProvider):
     cur_platform_subsystems = self._get_platform_specific_subsystems()
     return [sub.scoped_instance(self) for sub in cur_platform_subsystems]
 
-  # TODO(cosmicexplorer): We should run a very small test suite verifying the
-  # toolchain can compile and link native code before returning, especially
-  # since we don't provide the tools on OSX. This should only be run once, so if
-  # we don't want to make this a task like SelectInterpreter, we should probably
-  # invoke the v2 engine (we can accept a context argument if so).
+  # TODO(cosmicexplorer): We might want to run a very small test suite verifying
+  # the toolchain can compile and link native code before returning, especially
+  # since we don't provide the tools on OSX.
   def path_entries(self):
     combined_path_entries = []
     for subsystem in self._subsystem_instances():

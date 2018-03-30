@@ -51,16 +51,6 @@ class BuildLocalPythonDistributions(Task):
   def subsystem_dependencies(cls):
     return super(BuildLocalPythonDistributions, cls).subsystem_dependencies() + (NativeToolchain.scoped(cls),)
 
-  # TODO: seriously consider subclassing UnixCCompiler as well as the build_ext
-  # command from distutils to control the compiler and linker invocations
-  # transparently instead of hoping distutils does the right thing.
-  # FIXME: If we're going to be wrapping setup.py-based projects, we really
-  # should be doing it through a subclass of a distutils UnixCCompiler (in
-  # Lib/distutils in the CPython source) instead of hoping setup.py knows what
-  # to do. For example, the default UnixCCompiler from distutils will build a
-  # 32/64-bit "fat binary" on osx unless you set ARCHFLAGS='-arch x86_64',
-  # which is totally undocumented. We could probably expose this pretty easily
-  # as an import to the setup.py.
   @memoized_method
   def _native_toolchain_instance(self):
     return NativeToolchain.scoped_instance(self)
