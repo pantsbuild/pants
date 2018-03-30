@@ -10,6 +10,7 @@ import inspect
 import logging
 from abc import abstractproperty
 from collections import OrderedDict
+from types import TypeType
 
 from twitter.common.collections import OrderedSet
 
@@ -30,20 +31,7 @@ class _RuleVisitor(ast.NodeVisitor):
   def visit_Call(self, node):
     if not isinstance(node.func, ast.Name) or node.func.id != Get.__name__:
       return
-
-    # TODO: Validation.
-    if len(node.args) == 2:
-      product_type, subject_constructor = node.args
-      if not isinstance(product_type, ast.Name) or not isinstance(subject_constructor, ast.Call):
-        raise Exception('TODO: Implement validation of Get shapes.')
-      self.gets.append((product_type.id, subject_constructor.func.id))
-    elif len(node.args) == 3:
-      product_type, subject_type, _ = node.args
-      if not isinstance(product_type, ast.Name) or not isinstance(subject_type, ast.Name):
-        raise Exception('TODO: Implement validation of Get shapes.')
-      self.gets.append((product_type.id, subject_type.id))
-    else:
-      raise Exception('Invalid {}: {}'.format(Get.__name__, node.args))
+    self.gets.append(Get.extract_constraints(node))
 
 
 def rule(output_type, input_selectors):
@@ -62,15 +50,19 @@ def rule(output_type, input_selectors):
     caller_frame = inspect.stack()[1][0]
     module_ast = ast.parse(inspect.getsource(func))
 
-    def resolve(name):
-      return caller_frame.f_globals.get(name) or caller_frame.f_builtins.get(name)
+    def resolve_type(name):
+      resolved = caller_frame.f_globals.get(name) or caller_frame.f_builtins.get(name)
+      if not isinstance(resolved, (TypeType, Exactly)):
+        raise ValueError('Expected either a `type` constructor or TypeConstraint instance; '
+                         'got: {}'.format(name))
+      return resolved
 
     gets = []
     for node in ast.iter_child_nodes(module_ast):
       if isinstance(node, ast.FunctionDef) and node.name == func.__name__:
         rule_visitor = _RuleVisitor()
         rule_visitor.visit(node)
-        gets.extend(Get(resolve(p), resolve(s)) for p, s in rule_visitor.gets)
+        gets.extend(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
 
     func._rule = TaskRule(output_type, input_selectors, func, input_gets=gets)
     return func
