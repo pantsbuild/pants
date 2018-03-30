@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.binaries.binary_tool import NativeTool, ExecutablePathProvider
+from pants.binaries.binary_tool import ExecutablePathProvider, NativeTool
 
 
 class Clang(NativeTool, ExecutablePathProvider):
