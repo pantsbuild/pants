@@ -265,6 +265,7 @@ class GoalRunner(object):
     should_kill_nailguns = self._kill_nailguns
 
     try:
+      self._context.set_target_count_in_runtracker()
       result = self._execute_engine()
       self._context.set_resulting_graph_size_in_runtracker()
       if result:

@@ -12,9 +12,13 @@ class PantsDaemonStats(object):
   def __init__(self):
     self.preceding_graph_size = None
     self.resulting_graph_size = None
+    self.target_root_size = 0
 
   def set_preceding_graph_size(self, size):
     self.preceding_graph_size = size
+
+  def set_target_root_size(self, size):
+    self.target_root_size = size
 
   def set_resulting_graph_size(self, size):
     self.resulting_graph_size = size
@@ -22,5 +26,6 @@ class PantsDaemonStats(object):
   def get_all(self):
     return {
       'preceding_graph_size': self.preceding_graph_size,
+      'target_root_size': self.target_root_size,
       'resulting_graph_size': self.resulting_graph_size,
     }

@@ -155,6 +155,14 @@ class Context(object):
     ident = Target.identify(self.targets())
     return 'Context(id:{}, targets:{})'.format(ident, self.targets())
 
+  def set_target_count_in_runtracker(self):
+    """Sets the affected target count in the run tracker's daemon stats object."""
+    # N.B. `self._target_roots` is always an expanded list of `Target` objects as
+    # provided by `GoalRunner`.
+    target_count = len(self._target_roots)
+    self.run_tracker.pantsd_stats.set_target_root_size(target_count)
+    return target_count
+
   def set_resulting_graph_size_in_runtracker(self):
     """Sets the resulting graph size in the run tracker's daemon stats object."""
     node_count = self._scheduler.graph_len()
