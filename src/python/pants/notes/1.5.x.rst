@@ -3,6 +3,15 @@
 
 This document describes releases leading up to the ``1.5.x`` ``stable`` series.
 
+1.5.1rc1 (03/31/2018)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fail for deleted-but-depended-on targets in changed (#5636)
+  `PR #5636 <https://github.com/pantsbuild/pants/pull/5636>`_
+
 1.5.1rc0 (03/20/2018)
 ---------------------
 
