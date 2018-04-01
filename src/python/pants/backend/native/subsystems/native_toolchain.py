@@ -36,9 +36,9 @@ class NativeToolchain(Subsystem, ExecutablePathProvider):
 
   So when this subsystem is consumed, Pants will download and unpack archives
   (if necessary) which together provide an appropriate "native toolchain" for
-  the host platform. On OSX, Pants will find and provide path entries for the
-  XCode command-line tools, or error out with installation instructions if the
-  XCode tools could not be found.
+  the host platform. On OSX, Pants will also find and provide path entries for
+  the XCode command-line tools, or error out with installation instructions if
+  the XCode tools could not be found.
   """
 
   options_scope = 'native-toolchain'
