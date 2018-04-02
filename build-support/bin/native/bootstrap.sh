@@ -93,6 +93,7 @@ function ensure_native_build_prerequisites() {
   # We sincerely hope that no one ever runs `rustup override set` in a subdirectory of the working directory.
   "${CARGO_HOME}/bin/rustup" override set "${RUST_TOOLCHAIN}" >&2
   "${CARGO_HOME}/bin/rustup" component add rustfmt-preview >&2
+  "${CARGO_HOME}/bin/rustup" component add rust-src>&2
 
   # Sometimes fetching a large git repo dependency can take more than 10 minutes.
   # This times out on travis, because nothing is printed to stdout/stderr in that time.
