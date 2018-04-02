@@ -5,18 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
 from pants.backend.native.subsystems.clang import Clang
 from pants.backend.native.subsystems.gcc import GCC
 from pants.backend.native.subsystems.platform_specific.darwin.xcode_cli_tools import XCodeCLITools
 from pants.backend.native.subsystems.platform_specific.linux.binutils import Binutils
 from pants.binaries.binary_tool import ExecutablePathProvider
 from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.memo import memoized_method
 from pants.util.osutil import get_os_name, normalize_os_name
-from pants.util.process_handler import subprocess
 
 
 class NativeToolchain(Subsystem, ExecutablePathProvider):
