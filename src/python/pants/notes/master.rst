@@ -4,6 +4,38 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.6.0.dev2 (04/01/2018)
+-----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Resolve for current platform only if resolving a local python dist with native extensions (#5618)
+  `PR #5618 <https://github.com/pantsbuild/pants/pull/5618>`_
+
+* Fail for deleted-but-depended-on targets in changed (#5636)
+  `PR #5636 <https://github.com/pantsbuild/pants/pull/5636>`_
+
+* Restore and modernize `--changed` tests (#5635)
+  `PR #5635 <https://github.com/pantsbuild/pants/pull/5635>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* missing-deps-suggest outputs buildozer commands if path to buildozer is set (#5638)
+  `PR #5638 <https://github.com/pantsbuild/pants/pull/5638>`_
+
+* Rewrite package listing and ownership parts of release.sh in python (#5629)
+  `PR #5629 <https://github.com/pantsbuild/pants/pull/5629>`_
+
+* Add dependency on six (#5633)
+  `PR #5633 <https://github.com/pantsbuild/pants/pull/5633>`_
+
+* [pantsd] Don't initialize a scheduler for pantsd lifecycle checks. (#5624)
+  `PR #5624 <https://github.com/pantsbuild/pants/pull/5624>`_
+
+* Make build_dictionary.html easier to read (#5631)
+  `PR #5631 <https://github.com/pantsbuild/pants/pull/5631>`_
 
 1.6.0.dev1 (03/25/2018)
 -----------------------
