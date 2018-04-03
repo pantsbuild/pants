@@ -32,7 +32,7 @@ class TestNativeToolchain(BaseTest):
     except subprocess.CalledProcessError as e:
       raise Exception(
         "Command failed while invoking the native toolchain "
-        "with code '{code}', cwd='{}', cmd='{cmd}'. Combined stdout and stderr:\n{out}"
+        "with code '{code}', cwd='{cwd}', cmd='{cmd}'. Combined stdout and stderr:\n{out}"
         .format(code=e.returncode, cwd=cwd, cmd=' '.join(cmd), out=e.output),
         e)
 
