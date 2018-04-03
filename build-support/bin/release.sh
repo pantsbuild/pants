@@ -17,8 +17,9 @@ function run_local_pants() {
 
 # NB: Pants core does not have the ability to change its own version, so we compute the
 # suffix here and mutate the VERSION_FILE to affect the current version.
+readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
+readonly PANTS_STABLE_VERSION="$(cat "${VERSION_FILE}")"
 readonly HEAD_SHA=$(git rev-parse --verify HEAD)
-readonly PANTS_STABLE_VERSION="$(cat "${ROOT}/src/python/pants/VERSION")"
 readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+${HEAD_SHA:0:8}"
 
 readonly DEPLOY_DIR="${ROOT}/dist/deploy"
@@ -29,8 +30,6 @@ readonly DEPLOY_3RDPARTY_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_3RDPARTY_WHEELS_PATH}
 readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
 readonly DEPLOY_PANTS_SDIST_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_SDIST_PATH}"
 
-readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
-
 # A space-separated list of pants packages to include in any pexes that are built: by default,
 # only pants core is included.
 : ${PANTS_PEX_PACKAGES:="pantsbuild.pants"}
@@ -40,9 +39,9 @@ source ${ROOT}/contrib/release_packages.sh
 source "${ROOT}/build-support/bin/native/bootstrap.sh"
 
 function find_pkg() {
-  local readonly pkg_name=$1
-  local readonly version=$2
-  local readonly search_dir=$3
+  local -r pkg_name=$1
+  local -r version=$2
+  local -r search_dir=$3
   find "${search_dir}" -type f -name "${pkg_name}-${version}-*.whl"
 }
 
@@ -322,7 +321,9 @@ function dry_run_install() {
 
 ALLOWED_ORIGIN_URLS=(
   git@github.com:pantsbuild/pants.git
+  git@github.com:pantsbuild/pants
   https://github.com/pantsbuild/pants.git
+  https://github.com/pantsbuild/pants
 )
 
 function check_origin() {
@@ -447,7 +448,7 @@ EOF
 }
 
 function fetch_prebuilt_wheels() {
-  local readonly to_dir="$1"
+  local -r to_dir="$1"
 
   banner "Fetching prebuilt wheels for ${PANTS_UNSTABLE_VERSION}"
   (
@@ -531,7 +532,7 @@ function adjust_wheel_platform() {
 }
 
 function activate_twine() {
-  local readonly venv_dir="${ROOT}/build-support/twine-deps.venv"
+  local -r venv_dir="${ROOT}/build-support/twine-deps.venv"
 
   rm -rf "${venv_dir}"
   "${ROOT}/build-support/virtualenv" "${venv_dir}"
