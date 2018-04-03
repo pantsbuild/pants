@@ -265,10 +265,8 @@ class GoalRunner(object):
     should_kill_nailguns = self._kill_nailguns
 
     try:
-      self._context.set_target_root_count_in_runtracker()
-      result = self._execute_engine()
-      self._context.set_affected_target_count_in_runtracker()
-      self._context.set_resulting_graph_size_in_runtracker()
+      with self._context.executing():
+        result = self._execute_engine()
       if result:
         self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
     except KeyboardInterrupt:
