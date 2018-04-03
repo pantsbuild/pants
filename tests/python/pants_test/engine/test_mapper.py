@@ -10,10 +10,10 @@ import unittest
 from contextlib import contextmanager
 from textwrap import dedent
 
-from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
+from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress, Specs
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import Specs, UnhydratedStruct, create_graph_rules
+from pants.engine.build_files import UnhydratedStruct, create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
                                  DuplicateNameError, UnaddressableObjectError)

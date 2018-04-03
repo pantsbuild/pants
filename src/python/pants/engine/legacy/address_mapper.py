@@ -9,11 +9,11 @@ import logging
 import os
 
 from pants.base.build_file import BuildFile
-from pants.base.specs import DescendantAddresses, SiblingAddresses
+from pants.base.specs import DescendantAddresses, SiblingAddresses, Specs
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import BuildFilesCollection, Specs
+from pants.engine.build_files import BuildFilesCollection
 from pants.engine.mapper import ResolveError
 from pants.engine.nodes import Throw
 from pants.util.dirutil import fast_relpath

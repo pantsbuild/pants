@@ -11,9 +11,8 @@ from abc import abstractmethod
 from collections import defaultdict
 
 from pants.base.build_environment import get_scm
-from pants.base.specs import DescendantAddresses
+from pants.base.specs import DescendantAddresses, Specs
 from pants.build_graph.address import Address
-from pants.engine.build_files import Specs
 from pants.engine.legacy.graph import TransitiveHydratedTargets, target_types_from_symbol_table
 from pants.engine.legacy.source_mapper import EngineSourceMapper
 from pants.goal.workspace import ScmWorkspace

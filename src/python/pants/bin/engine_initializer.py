@@ -10,8 +10,9 @@ from collections import namedtuple
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.specs import Specs
 from pants.base.target_roots import ChangedTargetRoots, LiteralTargetRoots
-from pants.engine.build_files import BuildFileAddresses, Specs, create_graph_rules
+from pants.engine.build_files import BuildFileAddresses, create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper

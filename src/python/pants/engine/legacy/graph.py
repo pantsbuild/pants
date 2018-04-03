@@ -14,14 +14,13 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
-from pants.base.specs import SingleAddress
+from pants.base.specs import SingleAddress, Specs
 from pants.base.target_roots import ChangedTargetRoots, LiteralTargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import Specs
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.rules import TaskRule, rule

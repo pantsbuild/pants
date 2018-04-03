@@ -12,7 +12,7 @@ import six
 
 from pants.base.project_tree import Dir
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
-                              SingleAddress, Spec)
+                              SingleAddress, Spec, Specs)
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import AddressableDescriptor, BuildFileAddresses, TypeConstraintError
@@ -45,10 +45,6 @@ class BuildFiles(datatype('BuildFiles', ['files_content'])):
 
 class BuildFileGlobs(datatype('BuildFilesGlobs', ['path_globs'])):
   """A wrapper around PathGlobs that are known to match a build file pattern."""
-
-
-class Specs(Collection.of(Spec)):
-  """A collection of Spec subclasses."""
 
 
 @rule(BuildFiles,

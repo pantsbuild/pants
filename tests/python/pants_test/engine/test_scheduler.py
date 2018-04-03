@@ -10,9 +10,9 @@ import unittest
 from textwrap import dedent
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
+from pants.base.specs import Specs
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import Specs
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RootRule, TaskRule
 from pants.engine.selectors import Select, SelectVariant
