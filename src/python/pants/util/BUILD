@@ -83,6 +83,9 @@ python_library(
 python_library(
   name = 'objects',
   sources = ['objects.py'],
+  dependencies = [
+    ':memo',
+  ],
 )
 
 python_library(
