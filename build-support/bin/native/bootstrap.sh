@@ -83,7 +83,7 @@ function ensure_native_build_prerequisites() {
   then
     log "A pants owned rustup installation could not be found, installing via the instructions at" \
         "https://www.rustup.rs ..."
-    local readonly rustup=$(mktemp -t pants.rustup.XXXXXX)
+    local -r rustup=$(mktemp -t pants.rustup.XXXXXX)
     curl https://sh.rustup.rs -sSf > ${rustup}
     sh ${rustup} -y --no-modify-path --default-toolchain "${RUST_TOOLCHAIN}" 1>&2
     rm -f ${rustup}
@@ -93,7 +93,7 @@ function ensure_native_build_prerequisites() {
   # We sincerely hope that no one ever runs `rustup override set` in a subdirectory of the working directory.
   "${CARGO_HOME}/bin/rustup" override set "${RUST_TOOLCHAIN}" >&2
   "${CARGO_HOME}/bin/rustup" component add rustfmt-preview >&2
-  "${CARGO_HOME}/bin/rustup" component add rust-src>&2
+  "${CARGO_HOME}/bin/rustup" component add rust-src >&2
 
   # Sometimes fetching a large git repo dependency can take more than 10 minutes.
   # This times out on travis, because nothing is printed to stdout/stderr in that time.
@@ -112,8 +112,8 @@ function ensure_native_build_prerequisites() {
   "${CARGO_HOME}/bin/cargo" ensure-installed --package=grpcio-compiler --version=0.2.0 >&2
 
   local download_binary="${REPO_ROOT}/build-support/bin/download_binary.sh"
-  local readonly cmakeroot="$("${download_binary}" "binaries.pantsbuild.org" "cmake" "3.9.5" "cmake.tar.gz")" || die "Failed to fetch cmake"
-  local readonly goroot="$("${download_binary}" "binaries.pantsbuild.org" "go" "1.7.3" "go.tar.gz")/go" || die "Failed to fetch go"
+  local -r cmakeroot="$("${download_binary}" "binaries.pantsbuild.org" "cmake" "3.9.5" "cmake.tar.gz")" || die "Failed to fetch cmake"
+  local -r goroot="$("${download_binary}" "binaries.pantsbuild.org" "go" "1.7.3" "go.tar.gz")/go" || die "Failed to fetch go"
 
   export GOROOT="${goroot}"
   export EXTRA_PATH_FOR_CARGO="${cmakeroot}/bin:${goroot}/bin"
@@ -128,7 +128,7 @@ function run_cargo() {
     _ensure_cffi_sources || die
   fi
 
-  local readonly cargo="${CARGO_HOME}/bin/cargo"
+  local -r cargo="${CARGO_HOME}/bin/cargo"
   # We change to the ${REPO_ROOT} because if we're not in a subdirectory of it, .cargo/config isn't picked up.
   (cd "${REPO_ROOT}" && PATH="${EXTRA_PATH_FOR_CARGO}:${PATH}" "${cargo}" "$@")
 }
@@ -160,10 +160,12 @@ function _build_native_code() {
 function bootstrap_native_code() {
   # Bootstraps the native code only if needed.
   local native_engine_version="$(calculate_current_hash)"
+  local engine_version_header="engine_version: ${native_engine_version}"
   local target_binary="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
-  if [ ! -f "${target_binary}" ]
+  local target_binary_metadata="${target_binary}.metadata"
+  if [[ ! -f "${target_binary}" || ! -f "${target_binary_metadata}" ]]
   then
-    local readonly native_binary="$(_build_native_code)"
+    local -r native_binary="$(_build_native_code)"
 
     # If bootstrapping the native engine fails, don't attempt to run pants
     # afterwards.
@@ -174,10 +176,27 @@ function bootstrap_native_code() {
 
     # Pick up Cargo.lock changes if any caused by the `cargo build`.
     native_engine_version="$(calculate_current_hash)"
+    engine_version_header="engine_version: ${native_engine_version}"
     target_binary="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
+    target_binary_metadata="${target_binary}.metadata"
 
     mkdir -p "$(dirname ${target_binary})"
     cp "${native_binary}" "${target_binary}"
+
+    local -r metadata_file=$(mktemp -t pants.native_engine.metadata.XXXXXX)
+    echo "${engine_version_header}" > "${metadata_file}"
+    echo "repo_version: $(git describe --dirty)" >> "${metadata_file}"
+    mv "${metadata_file}" "${target_binary_metadata}"
   fi
-  cp -p "${target_binary}" "${NATIVE_ENGINE_RESOURCE}"
+
+  # Establishes the native engine wheel resource only if needed.
+  # NB: The header manipulation code here must be coordinated with header stripping code in
+  #     the Native.binary method in src/python/pants/engine/native.py.
+  if [[
+    ! -f "${NATIVE_ENGINE_RESOURCE}" ||
+    "$(head -1 "${NATIVE_ENGINE_RESOURCE}")" != "${engine_version_header}"
+  ]]
+  then
+    cat "${target_binary_metadata}" "${target_binary}" > "${NATIVE_ENGINE_RESOURCE}"
+  fi
 }
