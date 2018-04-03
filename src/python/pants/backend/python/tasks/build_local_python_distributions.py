@@ -106,10 +106,9 @@ class BuildLocalPythonDistributions(Task):
   def _setup_py_invocation_environment(self, dist_tgt):
     native_toolchain = self._native_toolchain_instance()
     native_toolchain_path_entries = native_toolchain.path_entries()
-    isolated_native_toolchain_path = get_joined_path(native_toolchain_path_entries)
-    with environment_as(PATH=isolated_native_toolchain_path,
-                        CC='clang',
-                        CXX='clang++'):
+    isolated_native_toolchain_path = get_joined_path(
+      native_toolchain_path_entries, os.environ.copy())
+    with environment_as(PATH=isolated_native_toolchain_path):
       yield
 
   def _create_dist(self, dist_tgt, dist_target_dir, interpreter):

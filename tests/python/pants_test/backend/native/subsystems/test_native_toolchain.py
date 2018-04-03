@@ -25,7 +25,7 @@ class TestNativeToolchain(BaseTest):
       cwd = self.build_root
 
     toolchain_dirs = self.toolchain.path_entries()
-    isolated_toolchain_path = get_joined_path(toolchain_dirs)
+    isolated_toolchain_path = get_joined_path(toolchain_dirs, os.environ.copy())
     try:
       with environment_as(PATH=isolated_toolchain_path):
         return subprocess.check_output(cmd, cwd=cwd, stderr=subprocess.STDOUT)
