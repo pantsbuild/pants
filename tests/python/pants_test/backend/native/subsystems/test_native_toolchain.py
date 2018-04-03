@@ -45,8 +45,12 @@ int main() {
 }
 """)
 
-    self._invoke_capturing_output(['cc', 'hello.c', '-o', 'hello_c'])
-    c_output = self._invoke_capturing_output(['./hello_c'])
+    self._invoke_capturing_output(['clang', 'hello.c', '-o', 'hello_clang'])
+    c_output = self._invoke_capturing_output(['./hello_clang'])
+    self.assertEqual(c_output, 'hello, world!\n')
+
+    self._invoke_capturing_output(['gcc', 'hello.c', '-o', 'hello_gcc'])
+    c_output = self._invoke_capturing_output(['./hello_gcc'])
     self.assertEqual(c_output, 'hello, world!\n')
 
   def test_hello_cpp(self):
@@ -58,6 +62,10 @@ int main() {
 }
 """)
 
-    self._invoke_capturing_output(['c++', 'hello.cpp', '-o', 'hello_cpp'])
-    cpp_output = self._invoke_capturing_output(['./hello_cpp'])
+    self._invoke_capturing_output(['clang++', 'hello.cpp', '-o', 'hello_clang++'])
+    cpp_output = self._invoke_capturing_output(['./hello_clang++'])
+    self.assertEqual(cpp_output, 'hello, world!\n')
+
+    self._invoke_capturing_output(['g++', 'hello.cpp', '-o', 'hello_g++'])
+    cpp_output = self._invoke_capturing_output(['./hello_g++'])
     self.assertEqual(cpp_output, 'hello, world!\n')
