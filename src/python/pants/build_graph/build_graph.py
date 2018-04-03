@@ -125,6 +125,11 @@ class BuildGraph(AbstractClass):
   def __len__(self):
     return len(self._target_by_address)
 
+  def target_file_count(self):
+    """Returns a count of source files owned by all Targets in the BuildGraph."""
+    # TODO: Move this file counting into the `ProductGraph`.
+    return sum(t.sources_count() for t in self.targets())
+
   @abstractmethod
   def clone_new(self):
     """Returns a new BuildGraph instance of the same type and with the same __init__ params."""

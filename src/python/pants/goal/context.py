@@ -161,6 +161,7 @@ class Context(object):
     self._set_target_root_count_in_runtracker()
     yield
     self._set_affected_target_count_in_runtracker()
+    self._set_affected_target_files_count_in_runtracker()
     self._set_resulting_graph_size_in_runtracker()
 
   def _set_target_root_count_in_runtracker(self):
@@ -176,6 +177,13 @@ class Context(object):
     target_count = len(self.build_graph)
     self.run_tracker.pantsd_stats.set_affected_targets_size(target_count)
     return target_count
+
+  def _set_affected_target_files_count_in_runtracker(self):
+    """Sets the realized target file count in the run tracker's daemon stats object."""
+    # TODO: Move this file counting into the `ProductGraph`.
+    target_file_count = self.build_graph.target_file_count()
+    self.run_tracker.pantsd_stats.set_affected_targets_file_count(target_file_count)
+    return target_file_count
 
   def _set_resulting_graph_size_in_runtracker(self):
     """Sets the resulting graph size in the run tracker's daemon stats object."""
