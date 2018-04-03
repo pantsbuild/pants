@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -18,7 +18,7 @@ from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.base.target_roots import LiteralTargetRoots
+from pants.base.target_roots import TargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -115,10 +115,10 @@ class TestBase(unittest.TestCase):
     Many python operations implicitly create parent directories, so we assume that touching a
     file located below directories that do not currently exist will result in their creation.
     """
-    if self._graph_helper is None:
+    if self._scheduler is None:
       return
     files = {f for relpath in relpaths for f in recursive_dirname(relpath)}
-    self._graph_helper.scheduler.invalidate_files(files)
+    self._scheduler.invalidate_files(files)
 
   def create_link(self, relsrc, reldst):
     """Creates a symlink within the buildroot.
@@ -288,12 +288,10 @@ class TestBase(unittest.TestCase):
 
     self._build_configuration = BuildConfiguration()
     self._build_configuration.register_aliases(self.alias_groups)
-    self.build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
+    self._build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
     self.project_tree = FileSystemProjectTree(self.build_root)
 
-    self._graph_helper = None
-    self._build_graph = None
-    self._address_mapper = None
+    self._reset_engine()
 
   def buildroot_files(self, relpath=None):
     """Returns the set of all files under the test build root.
@@ -310,18 +308,30 @@ class TestBase(unittest.TestCase):
           yield os.path.relpath(os.path.join(root, f), self.build_root)
     return set(scan())
 
+  def _reset_engine(self):
+    scheduler = getattr(self, '_scheduler', None)
+    if scheduler is not None:
+      # Eagerly free file handles, threads, connections, etc, held by the scheduler. In theory,
+      # dropping the scheduler is equivalent, but it's easy for references to the scheduler to leak.
+      scheduler.pre_fork()
+
+    self._scheduler = None
+    self._build_graph = None
+    self._address_mapper = None
+
   def _initialize_engine(self):
-    self._graph_helper = EngineInitializer.setup_legacy_graph(
+    graph_helper = EngineInitializer.setup_legacy_graph(
         self.pants_ignore_patterns,
         self.pants_workdir,
         build_file_imports_behavior='allow',
         native=init_native(),
         build_file_aliases=self.alias_groups,
         build_ignore_patterns=self.build_ignore_patterns,
-      )
+      ).new_session()
 
-    self._build_graph, self._address_mapper = self._graph_helper.create_build_graph(
-        LiteralTargetRoots([]),
+    self._scheduler = graph_helper.scheduler_session
+    self._build_graph, self._address_mapper = graph_helper.create_build_graph(
+        TargetRoots([]),
         self.build_root,
       )
 
@@ -404,7 +414,7 @@ class TestBase(unittest.TestCase):
     context = create_context_from_options(fake_options,
                                           target_roots=target_roots,
                                           build_graph=self.build_graph,
-                                          build_file_parser=self.build_file_parser,
+                                          build_file_parser=self._build_file_parser,
                                           address_mapper=self.address_mapper,
                                           console_outstream=console_outstream,
                                           workspace=workspace)
@@ -416,6 +426,7 @@ class TestBase(unittest.TestCase):
     """
     super(TestBase, self).tearDown()
     Subsystem.reset()
+    self._reset_engine()
 
   def target(self, spec):
     """Resolves the given target address to a Target object.
