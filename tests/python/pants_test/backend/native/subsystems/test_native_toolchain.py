@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.util.contextutil import environment_as, get_joined_path
 from pants.util.process_handler import subprocess
