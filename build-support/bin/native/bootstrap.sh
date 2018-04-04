@@ -194,7 +194,7 @@ function bootstrap_native_code() {
   #     the Native.binary method in src/python/pants/engine/native.py.
   if [[
     ! -f "${NATIVE_ENGINE_RESOURCE}" ||
-    "$(head -1 "${NATIVE_ENGINE_RESOURCE}")" != "${engine_version_header}"
+    "$(head -1 "${NATIVE_ENGINE_RESOURCE}" | tr '\0' '\n')" != "${engine_version_header}"
   ]]
   then
     cat "${target_binary_metadata}" "${target_binary}" > "${NATIVE_ENGINE_RESOURCE}"
