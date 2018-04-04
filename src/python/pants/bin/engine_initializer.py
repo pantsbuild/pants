@@ -10,8 +10,8 @@ from collections import namedtuple
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.base.target_roots import ChangedTargetRoots, LiteralTargetRoots
-from pants.engine.build_files import BuildFileAddresses, Specs, create_graph_rules
+from pants.base.specs import Specs
+from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
@@ -81,12 +81,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
     :param TargetRoots target_roots: The targets root of the request.
     """
     logger.debug('warming target_roots for: %r', target_roots)
-    if type(target_roots) is ChangedTargetRoots:
-      subjects = [BuildFileAddresses(target_roots.addresses)]
-    elif type(target_roots) is LiteralTargetRoots:
-      subjects = [Specs(tuple(target_roots.specs))]
-    else:
-      raise ValueError('Unexpected TargetRoots type: `{}`.'.format(target_roots))
+    subjects = [Specs(tuple(target_roots.specs))]
     request = self.scheduler.execution_request([TransitiveHydratedTargets], subjects)
     result = self.scheduler.execute(request)
     if result.error:

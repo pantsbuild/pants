@@ -14,21 +14,19 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
-from pants.base.specs import SingleAddress
-from pants.base.target_roots import ChangedTargetRoots, LiteralTargetRoots
+from pants.base.specs import SingleAddress, Specs
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
-from pants.engine.addressable import BuildFileAddresses, Collection
-from pants.engine.build_files import Specs
+from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.rules import TaskRule, rule
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
-from pants.util.objects import datatype
+from pants.util.objects import Collection, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -208,14 +206,8 @@ class LegacyBuildGraph(BuildGraph):
       pass
 
   def inject_roots_closure(self, target_roots, fail_fast=None):
-    if type(target_roots) is ChangedTargetRoots:
-      for address in self._inject_addresses(target_roots.addresses):
-        yield address
-    elif type(target_roots) is LiteralTargetRoots:
-      for address in self._inject_specs(target_roots.specs):
-        yield address
-    else:
-      raise ValueError('Unrecognized TargetRoots type: `{}`.'.format(target_roots))
+    for address in self._inject_specs(target_roots.specs):
+      yield address
 
   def inject_specs_closure(self, specs, fail_fast=None):
     # Request loading of these specs.

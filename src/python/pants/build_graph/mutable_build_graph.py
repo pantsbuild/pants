@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import traceback
 
-from pants.base.target_roots import ChangedTargetRoots, LiteralTargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
@@ -101,17 +100,10 @@ class MutableBuildGraph(BuildGraph):
                                        .format(message=e, spec=target_address.spec))
 
   def inject_roots_closure(self, target_roots, fail_fast=None):
-    if type(target_roots) is ChangedTargetRoots:
-      for address in target_roots.addresses:
-        self.inject_address_closure(address)
-        yield address
-    elif type(target_roots) is LiteralTargetRoots:
-      for address in self._address_mapper.scan_specs(target_roots.specs,
-                                                     fail_fast=fail_fast):
-        self.inject_address_closure(address)
-        yield address
-    else:
-      raise ValueError('Unrecognized TargetRoots type: `{}`.'.format(target_roots))
+    for address in self._address_mapper.scan_specs(target_roots.specs,
+                                                    fail_fast=fail_fast):
+      self.inject_address_closure(address)
+      yield address
 
   def inject_specs_closure(self, specs, fail_fast=None):
     for address in self._address_mapper.scan_specs(specs,
