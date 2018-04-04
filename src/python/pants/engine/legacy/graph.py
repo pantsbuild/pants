@@ -15,7 +15,6 @@ from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.base.specs import SingleAddress, Specs
-from pants.base.target_roots import ChangedTargetRoots, LiteralTargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
@@ -207,14 +206,8 @@ class LegacyBuildGraph(BuildGraph):
       pass
 
   def inject_roots_closure(self, target_roots, fail_fast=None):
-    if type(target_roots) is ChangedTargetRoots:
-      for address in self._inject_addresses(target_roots.addresses):
-        yield address
-    elif type(target_roots) is LiteralTargetRoots:
-      for address in self._inject_specs(target_roots.specs):
-        yield address
-    else:
-      raise ValueError('Unrecognized TargetRoots type: `{}`.'.format(target_roots))
+    for address in self._inject_specs(target_roots.specs):
+      yield address
 
   def inject_specs_closure(self, specs, fail_fast=None):
     # Request loading of these specs.

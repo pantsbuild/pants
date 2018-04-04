@@ -12,7 +12,7 @@ import six
 
 from pants.base.project_tree import Dir
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
-                              SingleAddress, Spec, Specs)
+                              SingleAddress, Specs)
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import AddressableDescriptor, BuildFileAddresses, TypeConstraintError

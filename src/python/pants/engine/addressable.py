@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import collections
 import inspect
-import sys
 from abc import abstractmethod
 from functools import update_wrapper
 
@@ -15,9 +14,8 @@ import six
 
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Resolvable, Serializable
-from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
-from pants.util.objects import Collection, datatype
+from pants.util.objects import Collection
 
 
 Addresses = Collection.of(Address)

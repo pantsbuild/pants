@@ -12,17 +12,5 @@ class InvalidSpecConstraint(Exception):
   """Raised when invalid constraints are given via target specs and arguments like --changed*."""
 
 
-class TargetRoots(object):
+class TargetRoots(datatype('TargetRoots', ['specs'])):
   """Determines the target roots for a given pants run."""
-
-
-class ChangedTargetRoots(datatype('ChangedTargetRoots', ['addresses']), TargetRoots):
-  """Target roots that have been altered by `--changed` functionality.
-
-  Contains a list of `Address`es rather than `Spec`s, because all inputs have already been
-  resolved, and are known to exist.
-  """
-
-
-class LiteralTargetRoots(datatype('LiteralTargetRoots', ['specs']), TargetRoots):
-  """User defined target roots, as pants.base.specs.Spec objects."""
