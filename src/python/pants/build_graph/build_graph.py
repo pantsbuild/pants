@@ -51,7 +51,6 @@ class BuildGraph(AbstractClass):
       super(BuildGraph.ManualSyntheticTargetError, self).__init__(
           'Found a manually-defined target at synthetic address {}'.format(addr.spec))
 
-
   class NoDepPredicateWalk(object):
     """This is a utility class to aid in graph traversals that don't have predicates on dependency edges."""
 
@@ -80,7 +79,6 @@ class BuildGraph(AbstractClass):
     def dep_predicate(self, target, dep, level):
       return True
 
-
   class DepthAgnosticWalk(NoDepPredicateWalk):
     """This is a utility class to aid in graph traversals that don't care about the depth."""
 
@@ -90,7 +88,6 @@ class BuildGraph(AbstractClass):
 
     def dep_predicate(self, target, dep, level):
       return self._dep_predicate(target, dep)
-
 
   class DepthAwareWalk(NoDepPredicateWalk):
     """This is a utility class to aid in graph traversals that care about the depth."""
@@ -124,6 +121,14 @@ class BuildGraph(AbstractClass):
 
   def __init__(self):
     self.reset()
+
+  def __len__(self):
+    return len(self._target_by_address)
+
+  def target_file_count(self):
+    """Returns a count of source files owned by all Targets in the BuildGraph."""
+    # TODO: Move this file counting into the `ProductGraph`.
+    return sum(t.sources_count() for t in self.targets())
 
   @abstractmethod
   def clone_new(self):

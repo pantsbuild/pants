@@ -265,10 +265,10 @@ class GoalRunner(object):
     should_kill_nailguns = self._kill_nailguns
 
     try:
-      result = self._execute_engine()
-      self._context.set_resulting_graph_size_in_runtracker()
-      if result:
-        self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
+      with self._context.executing():
+        result = self._execute_engine()
+        if result:
+          self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
     except KeyboardInterrupt:
       self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
       # On ctrl-c we always kill nailguns, otherwise they might keep running
