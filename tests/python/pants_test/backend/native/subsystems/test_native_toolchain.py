@@ -27,9 +27,12 @@ class TestNativeToolchain(BaseTest):
       cwd = self.build_root
 
     toolchain_dirs = self.toolchain.path_entries()
-    isolated_toolchain_path = get_joined_path(toolchain_dirs, os.environ.copy())
+    # FIXME(cosmicexplorer): if we're not sure which binaries are being called,
+    # this isn't much of a test.
+    prepended_toolchain_path = get_joined_path(
+      toolchain_dirs, os.environ.copy(), prepend=True)
     try:
-      with environment_as(PATH=isolated_toolchain_path):
+      with environment_as(PATH=prepended_toolchain_path):
         return subprocess.check_output(cmd, cwd=cwd, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
       raise Exception(
