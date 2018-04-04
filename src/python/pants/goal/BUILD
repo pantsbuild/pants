@@ -58,6 +58,7 @@ python_library(
   dependencies = [
     ':error',
     'src/python/pants/option',
+    'src/python/pants/util:memo',
   ],
 )
 
