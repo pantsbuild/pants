@@ -65,3 +65,10 @@ class GoTarget(Target):
     :returns: An import path that can be used to import this package in a `.go` file.
     :rtype: string
     """
+
+  def __init__(self, build_flags=None, **kwargs):
+    """
+    :param string build_flags: Build flags to pass to Go compiler.
+    """
+    super(GoTarget, self).__init__(**kwargs)
+    self.build_flags = build_flags

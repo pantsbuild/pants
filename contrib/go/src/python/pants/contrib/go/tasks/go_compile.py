@@ -60,9 +60,25 @@ class GoCompile(GoWorkspaceTask):
           lib_binary_map[vt.target] = os.path.join(gopath, 'pkg', self.goos_goarch,
                                                    vt.target.import_path + '.a')
 
+  @classmethod
+  def _split_build_flags(cls, build_flags):
+    """Visible for testing"""
+    return safe_shlex_split(build_flags)
+
   def _go_install(self, target, gopath):
-    build_flags = re.sub(r'^"|"$', '', self.get_options().build_flags)
-    args = safe_shlex_split(build_flags) + [target.import_path]
+    """Create and execute a `go install` command.
+
+    Build flags can be defined as globals (in `pants.ini`), as arguments to a Target, and
+    via the command-line. Build flags are merged with order: global < target < command-line
+    """
+    is_flagged = self.get_options().is_flagged('build_flags')
+    # If self.get_options().build_flags returns a quoted string, remove the outer quotes.
+    bfo = re.sub(r'^"|"$', '', self.get_options().build_flags)
+    global_build_flags, ephemeral_build_flags = ('', bfo) if is_flagged else (bfo, '')
+    binary_build_flags = target.build_flags if target.build_flags else ''
+    joined_build_flags = ' '.join([global_build_flags, binary_build_flags, ephemeral_build_flags])
+    build_flags = self._split_build_flags(joined_build_flags)
+    args = build_flags + [target.import_path]
     result, go_cmd = self.go_dist.execute_go_cmd(
       'install', gopath=gopath, args=args,
       workunit_factory=self.context.new_workunit,
@@ -82,9 +98,10 @@ class GoCompile(GoWorkspaceTask):
                                              library.
 
     Required links to binary dependencies under gopath's "pkg/" dir are either created if
-    non-existent, or refreshed if the link is older than the underlying binary. Any pre-existing
-    links within gopath's "pkg/" dir that do not correspond to a transitive dependency of target
-    are deleted.
+    non-existent, refreshed if the link is older than the underlying binary, or replaced with a
+    link if a file is present (e.g.: build flags triggered recompilation of linked sources).
+    Any pre-existing links within gopath's "pkg/" dir that do not correspond to a transitive
+    dependency of target are deleted.
     """
     required_links = set()
     for dep in target.closure():
@@ -95,7 +112,7 @@ class GoCompile(GoWorkspaceTask):
       lib_binary = lib_binary_map[dep]
       lib_binary_link = os.path.join(gopath, os.path.relpath(lib_binary, self.get_gopath(dep)))
       safe_mkdir(os.path.dirname(lib_binary_link))
-      if os.path.islink(lib_binary_link):
+      if os.path.islink(lib_binary_link) or os.path.isfile(lib_binary_link):
         if os.stat(lib_binary).st_mtime > os.lstat(lib_binary_link).st_mtime:
           # The binary under the link was updated after the link was created. Refresh
           # the link so the mtime (modification time) of the link is greater than the
