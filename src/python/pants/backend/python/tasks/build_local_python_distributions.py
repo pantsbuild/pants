@@ -99,23 +99,29 @@ class BuildLocalPythonDistributions(Task):
                                   src_relative_to_target_base)
       shutil.copyfile(abs_src_path, src_rel_to_results_dir)
 
-  # TODO(cosmicexplorer): don't invoke the native toolchain unless the current
-  # dist_tgt.has_native_sources? Would need some way to check whether the
-  # toolchain is invoked in an integration test.
+  # FIXME(cosmicexplorer): We should be isolating the path to just our provided
+  # toolchain, but this causes errors in Travis because distutils looks for
+  # "x86_64-linux-gnu-gcc" when linking native extensions. We almost definitely
+  # will need to introduce a subclass of UnixCCompiler and expose it to the
+  # setup.py to be able to invoke our toolchain on hosts that already have a
+  # compiler installed. Right now we just put our tools at the end of the PATH.
   @contextmanager
-  def _setup_py_invocation_environment(self, dist_tgt):
+  def _setup_py_invocation_environment(self):
     native_toolchain = self._native_toolchain_instance()
     native_toolchain_path_entries = native_toolchain.path_entries()
-    prepended_native_toolchain_path = get_joined_path(
-      native_toolchain_path_entries, os.environ.copy(), prepend=True)
-    with environment_as(PATH=prepended_native_toolchain_path):
+    appended_native_toolchain_path = get_joined_path(
+      native_toolchain_path_entries, os.environ.copy())
+    with environment_as(PATH=appended_native_toolchain_path):
       yield
 
   def _create_dist(self, dist_tgt, dist_target_dir, interpreter):
     """Create a .whl file for the specified python_distribution target."""
     self._copy_sources(dist_tgt, dist_target_dir)
 
-    with self._setup_py_invocation_environment(dist_tgt):
+    # TODO(cosmicexplorer): don't invoke the native toolchain unless the current
+    # dist_tgt.has_native_sources? Would need some way to check whether the
+    # toolchain is invoked in an integration test.
+    with self._setup_py_invocation_environment():
       # Build a whl using SetupPyRunner and return its absolute path.
       setup_runner = SetupPyRunner(dist_target_dir, 'bdist_wheel', interpreter=interpreter)
       setup_runner.run()
