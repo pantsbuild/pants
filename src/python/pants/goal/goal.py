@@ -7,6 +7,30 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.goal.error import GoalError
 from pants.option.optionable import Optionable
+from pants.util.memo import memoized
+
+
+@memoized
+def _create_stable_task_type(superclass, options_scope):
+  """Creates a singleton (via `memoized`) subclass instance for the given superclass and scope.
+
+  Currently we need to support registering the same task type multiple times in different
+  scopes. However we still want to have each task class know the options scope it was
+  registered in. So we create a synthetic subclass here.
+
+  TODO(benjy): Revisit this when we revisit the task lifecycle. We probably want to have
+  a task *instance* know its scope, but this means converting option registration from
+  a class method to an instance method, and instantiating the task much sooner in the
+  lifecycle.
+  """
+  subclass_name = b'{0}_{1}'.format(superclass.__name__,
+                                    options_scope.replace('.', '_').replace('-', '_'))
+  return type(subclass_name, (superclass,), {
+    b'__doc__': superclass.__doc__,
+    b'__module__': superclass.__module__,
+    b'options_scope': options_scope,
+    b'_stable_name': superclass.stable_name()
+  })
 
 
 class Goal(object):
@@ -169,22 +193,7 @@ class _Goal(object):
     Optionable.validate_scope_name_component(task_name)
     options_scope = Goal.scope(self.name, task_name)
 
-    # Currently we need to support registering the same task type multiple times in different
-    # scopes. However we still want to have each task class know the options scope it was
-    # registered in. So we create a synthetic subclass here.
-    # TODO(benjy): Revisit this when we revisit the task lifecycle. We probably want to have
-    # a task *instance* know its scope, but this means converting option registration from
-    # a class method to an instance method, and instantiating the task much sooner in the
-    # lifecycle.
-    superclass = task_registrar.task_type
-    subclass_name = b'{0}_{1}'.format(superclass.__name__,
-                                      options_scope.replace('.', '_').replace('-', '_'))
-    task_type = type(subclass_name, (superclass,), {
-      b'__doc__': superclass.__doc__,
-      b'__module__': superclass.__module__,
-      b'options_scope': options_scope,
-      b'_stable_name': superclass.stable_name()
-    })
+    task_type = _create_stable_task_type(task_registrar.task_type, options_scope)
 
     if first:
       otn.insert(0, task_name)
