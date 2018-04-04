@@ -49,9 +49,6 @@ class FilesetWithSpec(AbstractClass):
     self.filespec = filespec
     self._validate_globs_in_filespec(filespec, rel_root)
 
-  def __len__(self):
-    return len(self.files)
-
   def _validate_globs_in_filespec(self, filespec, rel_root):
     for glob in filespec['globs']:
       if not glob.startswith(rel_root):

@@ -549,7 +549,7 @@ class Target(AbstractTarget):
 
   def sources_count(self):
     """Returns the count of source files owned by the target."""
-    return len(self._sources_field.sources)
+    return len(self._sources_field.sources.files)
 
   @property
   def derived_from(self):
