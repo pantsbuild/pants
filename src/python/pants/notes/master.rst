@@ -13,12 +13,6 @@ Bugfixes
 * Memoize stable task creation (#5654)
   `PR #5654 <https://github.com/pantsbuild/pants/pull/5654>`_
 
-* Add dependency on six (#5633)
-  `PR #5633 <https://github.com/pantsbuild/pants/pull/5633>`_
-
-* Restore and modernize `--changed` tests (#5635)
-  `PR #5635 <https://github.com/pantsbuild/pants/pull/5635>`_
-
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -39,27 +33,6 @@ Refactoring, Improvements, and Tooling
 
 * Include rust stdlib sources in bootstrap. (#5645)
   `PR #5645 <https://github.com/pantsbuild/pants/pull/5645>`_
-
-* Document howto set go version (#5641)
-  `PR #5641 <https://github.com/pantsbuild/pants/pull/5641>`_
-
-* missing-deps-suggest outputs buildozer commands if path to buildozer is set (#5638)
-  `PR #5638 <https://github.com/pantsbuild/pants/pull/5638>`_
-
-* Rewrite package listing and ownership parts of release.sh in python (#5629)
-  `PR #5629 <https://github.com/pantsbuild/pants/pull/5629>`_
-
-* Resolve for current platform only if resolving a local python dist with native extensions (#5618)
-  `PR #5618 <https://github.com/pantsbuild/pants/pull/5618>`_
-
-* Fail for deleted-but-depended-on targets in changed (#5636)
-  `PR #5636 <https://github.com/pantsbuild/pants/pull/5636>`_
-
-* [pantsd] Don't initialize a scheduler for pantsd lifecycle checks. (#5624)
-  `PR #5624 <https://github.com/pantsbuild/pants/pull/5624>`_
-
-* Make build_dictionary.html easier to read (#5631)
-  `PR #5631 <https://github.com/pantsbuild/pants/pull/5631>`_
 
 1.6.0.dev2 (04/01/2018)
 -----------------------
