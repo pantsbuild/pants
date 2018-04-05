@@ -4,6 +4,36 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.6.0rc0 (04/04/2018)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Memoize stable task creation (#5654)
+  `PR #5654 <https://github.com/pantsbuild/pants/pull/5654>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Merge TargetRoots subclasses (#5648)
+  `PR #5648 <https://github.com/pantsbuild/pants/pull/5648>`_
+
+* Handle `native_engine.so` resources without headers. (#5653)
+  `PR #5653 <https://github.com/pantsbuild/pants/pull/5653>`_
+
+* Per-run metrics for target roots, transitive target counts. (#5651)
+  `PR #5651 <https://github.com/pantsbuild/pants/pull/5651>`_
+
+* Release script cleanups. (#5650)
+  `PR #5650 <https://github.com/pantsbuild/pants/pull/5650>`_
+
+* Only create native engine resource when needed. (#5649)
+  `PR #5649 <https://github.com/pantsbuild/pants/pull/5649>`_
+
+* Include rust stdlib sources in bootstrap. (#5645)
+  `PR #5645 <https://github.com/pantsbuild/pants/pull/5645>`_
+
 1.6.0.dev2 (04/01/2018)
 -----------------------
 
