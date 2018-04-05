@@ -71,6 +71,7 @@ expected_package_owners = set([
   "illicitonion",
   "ity",
   "john.sirois",
+  "kwlzn",
   "mateor",
   "stuhood",
   "wisechengyi",
@@ -101,7 +102,7 @@ def check_ownership(users):
   users = set(user.lower() for user in users)
   non_expected_users = users.difference(expected_package_owners)
   if non_expected_users:
-    raise ValueError('{} are not expected releasers. You may want to get added, as per https://www.pantsbuild.org/release.html#owners and then add yourself to expected_package_owners in file build-support/bin/release.py'.format(", ".join(non_expected_users)))
+    raise ValueError('{} are not expected releasers. You may want to get added, as per https://www.pantsbuild.org/release.html#owners and then add yourself to expected_package_owners in file src/python/pants/releases/packages.py'.format(", ".join(non_expected_users)))
 
   unowned = dict()
 
