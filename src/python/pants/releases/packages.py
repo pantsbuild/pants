@@ -66,17 +66,6 @@ core_packages = set([
   Package("pantsbuild.pants.testinfra"),
 ])
 
-expected_package_owners = set([
-  "benjyw",
-  "illicitonion",
-  "ity",
-  "john.sirois",
-  "kwlzn",
-  "mateor",
-  "stuhood",
-  "wisechengyi",
-])
-
 
 def contrib_packages():
   output = subprocess.check_output(('bash', '-c', 'source contrib/release_packages.sh ; for pkg in "${CONTRIB_PACKAGES[@]}"; do echo "${!pkg}"; done'))
@@ -100,10 +89,6 @@ def check_ownership(users):
   packages = sorted(all_packages())
   banner("Checking package ownership for {} packages".format(len(packages)))
   users = set(user.lower() for user in users)
-  non_expected_users = users.difference(expected_package_owners)
-  if non_expected_users:
-    raise ValueError('{} are not expected releasers. You may want to get added, as per https://www.pantsbuild.org/release.html#owners and then add yourself to expected_package_owners in file src/python/pants/releases/packages.py'.format(", ".join(non_expected_users)))
-
   unowned = dict()
 
   def check_ownership(i, package):
