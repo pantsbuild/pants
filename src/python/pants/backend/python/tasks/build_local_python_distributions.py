@@ -12,8 +12,9 @@ import shutil
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.python_requirement import PythonRequirement
+from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.pex_build_util import is_local_python_dist
+#from pants.backend.python.tasks.pex_build_util import is_local_python_dist
 from pants.backend.python.tasks.setup_py import SetupPyRunner
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
@@ -43,8 +44,12 @@ class BuildLocalPythonDistributions(Task):
   def cache_target_dirs(self):
     return True
 
+  @staticmethod
+  def filter_target(tgt):
+    return type(tgt) == PythonDistribution
+
   def execute(self):
-    dist_targets = self.context.targets(is_local_python_dist)
+    dist_targets = self.context.targets(self.filter_target)
     build_graph = self.context.build_graph
 
     if dist_targets:
