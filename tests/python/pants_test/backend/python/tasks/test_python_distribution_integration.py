@@ -19,6 +19,10 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
   fasthello_tests = 'examples/tests/python/example/python_distribution/hello/test_fasthello'
   fasthello_install_requires = 'testprojects/src/python/python_distribution/fasthello_with_install_requires'
 
+  def _assert_native_greeting(self, output):
+    self.assertIn('Hello from C!', output)
+    self.assertIn('Hello from C++!', output)
+
   def test_pants_binary(self):
     pex = os.path.join(get_buildroot(), 'dist', 'main.pex')
     try:
@@ -29,7 +33,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(os.path.isfile(pex))
       # Check that the pex runs.
       output = subprocess.check_output(pex)
-      self.assertIn('Super hello', output)
+      self._assert_native_greeting(output)
     finally:
       if os.path.exists(pex):
         os.remove(pex)
@@ -39,7 +43,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
     # Check that text was properly printed to stdout.
-    self.assertIn('Super hello', pants_run.stdout_data)
+    self._assert_native_greeting(pants_run.stdout_data)
 
   def test_pants_test(self):
     command=['test', '{}:fasthello'.format(self.fasthello_tests)]
@@ -87,7 +91,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(os.path.isfile(pex2))
       # Check that the pex 1 runs.
       output = subprocess.check_output(pex1)
-      self.assertIn('Super hello', output)
+      self._assert_native_greeting(output)
       # Check that the pex 2 fails due to no python_dists leaked into it.
       try:
         output = subprocess.check_output(pex2)
@@ -118,7 +122,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(os.path.isfile(pex))
       # Check that the pex runs.
       output = subprocess.check_output(pex)
-      self.assertIn('Super hello', output)
+      self._assert_native_greeting(output)
     finally:
       if os.path.exists(pex):
         # Cleanup

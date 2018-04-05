@@ -10,4 +10,4 @@ from hello_package import hello
 
 
 if __name__ == '__main__':
-  hello.hello()
+  print(hello.hello())

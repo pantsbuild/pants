@@ -472,3 +472,8 @@ def rm_rf(name):
     elif e.errno != errno.ENOENT:
       # Pass on 'No such file or directory', otherwise re-raise OSError to surface perm issues etc.
       raise
+
+
+def is_executable(path):
+  """Returns whether a path names an existing executable file."""
+  return os.path.isfile(path) and os.access(path, os.X_OK)

@@ -11,4 +11,7 @@ from hello_package import hello
 
 # Example of writing a test that depends on a python_dist target.
 def test_fasthello():
-  assert hello.hello() == "Super hello"
+  assert hello.hello() == '\n'.join([
+    'Hello from C!',
+    'Hello from C++!',
+  ])
