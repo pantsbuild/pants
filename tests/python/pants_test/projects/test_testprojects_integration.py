@@ -94,7 +94,9 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
 
     simply_skip = [
       # Already tested at pants_test.backend.jvm.targets.test_jar_dependency_integration.JarDependencyIntegrationTest
-      'testprojects/3rdparty/org/pantsbuild/testprojects:testprojects'
+      'testprojects/3rdparty/org/pantsbuild/testprojects:testprojects',
+      # Already tested in 'PantsRequirementIntegrationTest' and 'SetupPyIntegrationTest'.
+      'testprojects/pants-plugins/*',
     ]
 
     targets_to_exclude = (known_failing_targets + negative_test_targets + need_java_8 +
