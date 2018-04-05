@@ -5,10 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.binaries.binary_tool import NativeTool
+import os
+
+from pants.binaries.binary_tool import ExecutablePathProvider, NativeTool
 
 
-class LLVM(NativeTool):
-  options_scope = 'llvm'
-  default_version = '5.0.1'
+class Clang(NativeTool, ExecutablePathProvider):
+  options_scope = 'clang'
+  default_version = '6.0.0'
   archive_type = 'tgz'
+
+  def path_entries(self):
+    return [os.path.join(self.select(), 'bin')]
