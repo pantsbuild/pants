@@ -54,17 +54,17 @@ class Get(datatype('Get', ['product', 'subject'])):
     if len(call_node.args) == 2:
       product_type, subject_constructor = call_node.args
       if not isinstance(product_type, ast.Name) or not isinstance(subject_constructor, ast.Call):
-        raise Exception('Two arg form of {} expected (product_type, subject_type(subject)), but '
+        raise ValueError('Two arg form of {} expected (product_type, subject_type(subject)), but '
                         'got: ({})'.format(Get.__name__, render_args()))
       return (product_type.id, subject_constructor.func.id)
     elif len(call_node.args) == 3:
       product_type, subject_type, _ = call_node.args
       if not isinstance(product_type, ast.Name) or not isinstance(subject_type, ast.Name):
-        raise Exception('Three arg form of {} expected (product_type, subject_type, subject), but '
+        raise ValueError('Three arg form of {} expected (product_type, subject_type, subject), but '
                         'got: ({})'.format(Get.__name__, render_args()))
       return (product_type.id, subject_type.id)
     else:
-      raise Exception('Invalid {}; expected either two or three args, but '
+      raise ValueError('Invalid {}; expected either two or three args, but '
                       'got: ({})'.format(Get.__name__, render_args()))
 
   def __new__(cls, *args):
