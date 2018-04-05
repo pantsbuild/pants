@@ -44,6 +44,24 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  */
 class AntJunitXmlReportListener extends RunListener {
 
+  // NB: Cache the localhost name as a workaround for an issue where localhost resolution on OSX
+  // may take seconds.
+  // See: https://bugs.openjdk.java.net/browse/JDK-8170910
+  private static String localHostName = null;
+
+  private static String getLocalHostName() {
+    if (localHostName == null) {
+      String hostName;
+      try {
+        hostName = InetAddress.getLocalHost().getHostName();
+      } catch (UnknownHostException e) {
+        hostName = "localhost";
+      }
+      localHostName = hostName;
+    }
+    return localHostName;
+  }
+
   /**
    * A JAXB bean describing a test case exception.  These may indicate either an assertion failure
    * or an uncaught test exception.
@@ -235,11 +253,7 @@ class AntJunitXmlReportListener extends RunListener {
     TestSuite(Description test) {
       name = test.getClassName();
       testClass = test.getTestClass();
-      try {
-        hostname = InetAddress.getLocalHost().getHostName();
-      } catch (UnknownHostException e) {
-        hostname = "localhost";
-      }
+      hostname = getLocalHostName();
     }
 
     public int getErrors() {
