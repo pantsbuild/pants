@@ -45,7 +45,7 @@ class BuildLocalPythonDistributions(Task):
 
   @staticmethod
   def filter_target(tgt):
-    return type(tgt) == PythonDistribution
+    return type(tgt) is PythonDistribution
 
   def execute(self):
     dist_targets = self.context.targets(self.filter_target)
