@@ -2,6 +2,7 @@
 # To re-generate run: `pants buildgen.go --materialize --remote`
 
 go_binary(
+  #build_flags='-tags "netgo"',
   dependencies=[
     'contrib/go/examples/3rdparty/go/github.com/gorilla/mux',
     'contrib/go/examples/3rdparty/go/golang.org/x/net:http2',

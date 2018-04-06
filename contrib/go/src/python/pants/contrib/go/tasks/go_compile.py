@@ -78,7 +78,7 @@ class GoCompile(GoWorkspaceTask):
 
   @classmethod
   def _get_build_flags(cls, target, build_flags_from_option, is_flagged):
-    """Merge build flags with  global < target < command-line order
+    """Merge build flags with global < target < command-line order
 
     Build flags can be defined as globals (in `pants.ini`), as arguments to a Target, and
     via the command-line.
@@ -117,10 +117,9 @@ class GoCompile(GoWorkspaceTask):
                                              library.
 
     Required links to binary dependencies under gopath's "pkg/" dir are either created if
-    non-existent, refreshed if the link is older than the underlying binary, or replaced with a
-    link if a file is present (e.g.: build flags triggered recompilation of linked sources).
-    Any pre-existing links within gopath's "pkg/" dir that do not correspond to a transitive
-    dependency of target are deleted.
+    non-existent, or refreshed if the link is older than the underlying binary. Any pre-existing
+    links within gopath's "pkg/" dir that do not correspond to a transitive dependency of target
+    are deleted.
     """
     required_links = set()
     for dep in target.closure():
@@ -131,7 +130,7 @@ class GoCompile(GoWorkspaceTask):
       lib_binary = lib_binary_map[dep]
       lib_binary_link = os.path.join(gopath, os.path.relpath(lib_binary, self.get_gopath(dep)))
       safe_mkdir(os.path.dirname(lib_binary_link))
-      if os.path.islink(lib_binary_link) or os.path.isfile(lib_binary_link):
+      if os.path.islink(lib_binary_link):
         if os.stat(lib_binary).st_mtime > os.lstat(lib_binary_link).st_mtime:
           # The binary under the link was updated after the link was created. Refresh
           # the link so the mtime (modification time) of the link is greater than the
