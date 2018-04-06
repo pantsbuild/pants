@@ -74,18 +74,6 @@ pub fn store_i32(val: i32) -> Value {
   with_externs(|e| (e.store_i32)(e.context, val))
 }
 
-pub fn project(value: &Value, field: &str, type_id: &TypeId) -> Value {
-  with_externs(|e| {
-    (e.project)(
-      e.context,
-      value,
-      field.as_ptr(),
-      field.len() as u64,
-      type_id,
-    )
-  })
-}
-
 pub fn project_ignoring_type(value: &Value, field: &str) -> Value {
   with_externs(|e| (e.project_ignoring_type)(e.context, value, field.as_ptr(), field.len() as u64))
 }
@@ -103,13 +91,7 @@ pub fn project_multi_strs(item: &Value, field: &str) -> Vec<String> {
 
 pub fn project_str(value: &Value, field: &str) -> String {
   let name_val = with_externs(|e| {
-    (e.project)(
-      e.context,
-      value,
-      field.as_ptr(),
-      field.len() as u64,
-      &e.py_str_type,
-    )
+    (e.project_ignoring_type)(e.context, value, field.as_ptr(), field.len() as u64)
   });
   val_to_str(&name_val)
 }
@@ -248,7 +230,6 @@ pub struct Externs {
   pub store_list: StoreListExtern,
   pub store_bytes: StoreBytesExtern,
   pub store_i32: StoreI32Extern,
-  pub project: ProjectExtern,
   pub project_ignoring_type: ProjectIgnoringTypeExtern,
   pub project_multi: ProjectMultiExtern,
   pub type_to_str: TypeToStrExtern,
@@ -286,14 +267,6 @@ pub type StoreListExtern =
 pub type StoreBytesExtern = extern "C" fn(*const ExternContext, *const u8, u64) -> Value;
 
 pub type StoreI32Extern = extern "C" fn(*const ExternContext, i32) -> Value;
-
-pub type ProjectExtern = extern "C" fn(
-  *const ExternContext,
-  *const Value,
-  field_name_ptr: *const u8,
-  field_name_len: u64,
-  *const TypeId,
-) -> Value;
 
 #[repr(C)]
 #[derive(Debug)]

@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectVariant
+from pants.engine.selectors import Select, SelectDependencies, SelectVariant
 
 
 class AClass(object):
@@ -30,10 +30,6 @@ class SelectorsTest(unittest.TestCase):
                      SelectDependencies(AClass, AClass, field='some_field', field_types=(AClass,)))
     self.assert_repr("SelectDependencies(AClass, AClass)",
                      SelectDependencies(AClass, AClass))
-
-  def test_projection_repr(self):
-    self.assert_repr("SelectProjection(AClass, AClass, u'field', AClass)",
-                     SelectProjection(AClass, AClass, 'field', AClass))
 
   def assert_repr(self, expected, selector):
     self.assertEqual(expected, repr(selector))

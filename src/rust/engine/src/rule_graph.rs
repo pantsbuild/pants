@@ -445,76 +445,6 @@ impl<'t> GraphMaker<'t> {
                   rules_for_dependencies,
                 );
               }
-              &Selector::SelectProjection(ref select) => {
-                let initial_selector = select.input_product;
-                let initial_rules_or_literals = rhs_for_select(
-                  &self.tasks,
-                  entry.subject_type(),
-                  &Select {
-                    product: initial_selector,
-                    variant_key: None,
-                  },
-                );
-                if initial_rules_or_literals.is_empty() {
-                  mark_unfulfillable(
-                    &mut unfulfillable_rules,
-                    &entry,
-                    entry.subject_type(),
-                    format!(
-                      "no matches for {} when resolving {}",
-                      selector_str(&Selector::Select(Select::without_variant(initial_selector))),
-                      selector_str(selector)
-                    ),
-                  );
-                  was_unfulfillable = true;
-                  continue;
-                }
-
-                let projected_rules_or_literals = rhs_for_select(
-                  &self.tasks,
-                  select.projected_subject,
-                  &Select::without_variant(select.product),
-                );
-                if projected_rules_or_literals.is_empty() {
-                  mark_unfulfillable(
-                    &mut unfulfillable_rules,
-                    &entry,
-                    select.projected_subject,
-                    format!(
-                      "no matches for {} when resolving {}",
-                      selector_str(&Selector::Select(Select::without_variant(select.product))),
-                      selector_str(selector)
-                    ),
-                  );
-                  was_unfulfillable = true;
-                  continue;
-                }
-                add_rules_to_graph(
-                  &mut rules_to_traverse,
-                  &mut rule_dependency_edges,
-                  &mut unfulfillable_rules,
-                  &mut root_rule_dependency_edges,
-                  &entry,
-                  SelectKey::NestedSelect(
-                    selector.clone(),
-                    Select::without_variant(initial_selector),
-                  ),
-                  initial_rules_or_literals,
-                );
-                add_rules_to_graph(
-                  &mut rules_to_traverse,
-                  &mut rule_dependency_edges,
-                  &mut unfulfillable_rules,
-                  &mut root_rule_dependency_edges,
-                  &entry,
-                  SelectKey::ProjectedNestedSelect(
-                    selector.clone(),
-                    select.projected_subject,
-                    Select::without_variant(select.product),
-                  ),
-                  projected_rules_or_literals,
-                );
-              }
             }
           }
           for get in gets {
@@ -739,14 +669,15 @@ pub fn selector_str(selector: &Selector) -> String {
         .collect::<Vec<String>>()
         .join(", ")
     ),
-    &Selector::SelectProjection(ref s) => format!(
-      "SelectProjection({}, {}, '{}', {})",
-      type_constraint_str(s.product),
-      type_str(s.projected_subject),
-      s.field,
-      type_constraint_str(s.input_product),
-    ),
   }
+}
+
+fn get_str(get: &Get) -> String {
+  format!(
+    "Get({}, {})",
+    type_constraint_str(get.product),
+    type_str(get.subject.clone())
+  )
 }
 
 fn entry_str(entry: &Entry) -> String {
@@ -789,13 +720,27 @@ fn task_display(task: &Task) -> String {
     .map(|c| selector_str(c))
     .collect::<Vec<_>>()
     .join(", ");
-  if task.clause.len() <= 1 {
-    clause_portion = format!("({},)", clause_portion)
+  clause_portion = if task.clause.len() <= 1 {
+    format!("({},)", clause_portion)
   } else {
-    clause_portion = format!("({})", clause_portion)
-  }
+    format!("({})", clause_portion)
+  };
+  let mut get_portion = task
+    .gets
+    .iter()
+    .map(|g| get_str(g))
+    .collect::<Vec<_>>()
+    .join(", ");
+  get_portion = if task.gets.len() > 0 {
+    format!("[{}], ", get_portion)
+  } else {
+    "".to_string()
+  };
   let function_name = function_str(&&task.func);
-  format!("({}, {}, {})", product, clause_portion, function_name).to_string()
+  format!(
+    "({}, {}, {}{})",
+    product, clause_portion, get_portion, function_name
+  ).to_string()
 }
 
 impl RuleGraph {

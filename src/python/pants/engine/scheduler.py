@@ -21,8 +21,7 @@ from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcess
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
-from pants.engine.selectors import (Select, SelectDependencies, SelectProjection, SelectVariant,
-                                    constraint_for)
+from pants.engine.selectors import Select, SelectDependencies, SelectVariant, constraint_for
 from pants.engine.struct import HasProducts, Variants
 from pants.util.contextutil import temporary_file_path
 from pants.util.objects import datatype
@@ -209,12 +208,6 @@ class WrappedNativeScheduler(object):
                                                        self._to_constraint(selector.dep_product),
                                                        self._to_utf8_buf(selector.field),
                                                        self._to_ids_buf(selector.field_types))
-      elif selector_type is SelectProjection:
-        self._native.lib.tasks_add_select_projection(self._tasks,
-                                                     self._to_constraint(selector.product),
-                                                     TypeId(self._to_id(selector.projected_subject)),
-                                                     self._to_utf8_buf(selector.field),
-                                                     self._to_constraint(selector.input_product))
       else:
         raise ValueError('Unrecognized Selector type: {}'.format(selector))
     for get in rule.input_gets:

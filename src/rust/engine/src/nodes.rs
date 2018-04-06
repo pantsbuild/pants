@@ -536,86 +536,6 @@ impl SelectDependencies {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectProjection {
-  subject: Key,
-  variants: Variants,
-  selector: selectors::SelectProjection,
-  input_product_entries: rule_graph::Entries,
-  projected_entries: rule_graph::Entries,
-}
-
-impl SelectProjection {
-  fn new(
-    selector: selectors::SelectProjection,
-    subject: Key,
-    variants: Variants,
-    edges: &rule_graph::RuleEdges,
-  ) -> SelectProjection {
-    let dep_p_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
-      Selector::SelectProjection(selector.clone()),
-      selectors::Select::without_variant(selector.clone().input_product),
-    ));
-    let p_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedNestedSelect(
-      Selector::SelectProjection(selector.clone()),
-      selector.projected_subject.clone(),
-      selectors::Select::without_variant(selector.clone().product),
-    ));
-    SelectProjection {
-      subject: subject,
-      variants: variants,
-      selector: selector.clone(),
-      input_product_entries: dep_p_entries,
-      projected_entries: p_entries,
-    }
-  }
-}
-
-impl SelectProjection {
-  fn run(self, context: Context) -> NodeFuture<Value> {
-    // Request the product we need to compute the subject.
-    Select {
-      selector: selectors::Select {
-        product: self.selector.input_product,
-        variant_key: None,
-      },
-      subject: self.subject.clone(),
-      variants: self.variants.clone(),
-      entries: self.input_product_entries.clone(),
-    }.run(context.clone())
-      .then(move |dep_product_res| {
-        match dep_product_res {
-          Ok(dep_product) => {
-            // And then project the relevant field.
-            let projected_subject = externs::project(
-              &dep_product,
-              &self.selector.field,
-              &self.selector.projected_subject,
-            );
-            Select {
-              selector: selectors::Select::without_variant(self.selector.product),
-              subject: externs::key_for(projected_subject),
-              variants: self.variants.clone(),
-              // NB: Unlike SelectDependencies , we don't need to filter by
-              // subject here, because there is only one projected type.
-              entries: self.projected_entries.clone(),
-            }.run(context.clone())
-              .then(move |output_res| {
-                // If the output product is available, return it.
-                match output_res {
-                  Ok(output) => Ok(output),
-                  Err(failure) => Err(was_required(failure)),
-                }
-              })
-              .to_boxed()
-          }
-          Err(failure) => err(failure),
-        }
-      })
-      .to_boxed()
-  }
-}
-
 ///
 /// A Node that represents executing a process.
 ///
@@ -916,10 +836,6 @@ impl Task {
       }
       Selector::SelectDependencies(s) => {
         SelectDependencies::new(s, self.subject.clone(), self.variants.clone(), edges)
-          .run(context.clone())
-      }
-      Selector::SelectProjection(s) => {
-        SelectProjection::new(s, self.subject.clone(), self.variants.clone(), edges)
           .run(context.clone())
       }
     }

@@ -43,10 +43,10 @@ use context::Core;
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern,
               DropHandlesExtern, EqualsExtern, EvalExtern, ExternContext, Externs,
-              GeneratorSendExtern, IdentifyExtern, LogExtern, ProjectExtern,
-              ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult, SatisfiedByExtern,
-              SatisfiedByTypeExtern, StoreBytesExtern, StoreI32Extern, StoreListExtern,
-              TypeIdBuffer, TypeToStrExtern, ValToStrExtern};
+              GeneratorSendExtern, IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern,
+              ProjectMultiExtern, PyResult, SatisfiedByExtern, SatisfiedByTypeExtern,
+              StoreBytesExtern, StoreI32Extern, StoreListExtern, TypeIdBuffer, TypeToStrExtern,
+              ValToStrExtern};
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler};
 use tasks::Tasks;
@@ -137,7 +137,6 @@ pub extern "C" fn externs_set(
   store_list: StoreListExtern,
   store_bytes: StoreBytesExtern,
   store_i32: StoreI32Extern,
-  project: ProjectExtern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
@@ -161,7 +160,6 @@ pub extern "C" fn externs_set(
     store_list,
     store_bytes,
     store_i32,
-    project,
     project_ignoring_type,
     project_multi,
     create_exception,
@@ -370,24 +368,6 @@ pub extern "C" fn tasks_add_select_dependencies(
       dep_product,
       field.to_string().expect("field to be a string"),
       field_types.to_vec(),
-    );
-  })
-}
-
-#[no_mangle]
-pub extern "C" fn tasks_add_select_projection(
-  tasks_ptr: *mut Tasks,
-  product: TypeConstraint,
-  projected_subject: TypeId,
-  field: Buffer,
-  input_product: TypeConstraint,
-) {
-  with_tasks(tasks_ptr, |tasks| {
-    tasks.add_select_projection(
-      product,
-      projected_subject,
-      field.to_string().expect("field to be a string"),
-      input_product,
     );
   })
 }

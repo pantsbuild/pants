@@ -174,36 +174,3 @@ class SelectDependencies(datatype('Dependencies', ['product', 'dep_product', 'fi
                                      type_or_constraint_repr(self.dep_product),
                                      field_name_portion,
                                      field_types_portion)
-
-
-class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'field', 'input_product']), Selector):
-  """Selects a field of the given Subject to produce a Subject, Product dependency from.
-
-  Projecting an input allows for deduplication in the graph, where multiple Subjects
-  resolve to a single backing Subject instead.
-
-  For convenience, if a single field is requested and it is of the requested type, the field value
-  is projected directly rather than attempting to use it to construct the projected type.
-  """
-  optional = False
-
-  def __new__(cls, product, projected_subject, field, input_product):
-    if not isinstance(field, six.string_types):
-      raise ValueError('Expected `field` to be a string, but was: {!r}'.format(field))
-    return super(SelectProjection, cls).__new__(cls, product, projected_subject, field, input_product)
-
-  @property
-  def input_product_selector(self):
-    return Select(self.input_product)
-
-  @property
-  def projected_product_selector(self):
-    return Select(self.product)
-
-  def __repr__(self):
-    return '{}({}, {}, {}, {})'.format(type(self).__name__,
-                                       type_or_constraint_repr(self.product),
-                                       self.projected_subject.__name__,
-                                       repr(self.field),
-                                       getattr(
-                                         self.input_product, '__name__', repr(self.input_product)))
