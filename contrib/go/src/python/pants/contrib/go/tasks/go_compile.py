@@ -5,8 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import os
-import re
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
@@ -42,12 +42,10 @@ class GoCompile(GoWorkspaceTask):
     return ['exec_binary', 'deployable_archives']
 
   def execute(self):
-    build_flags_from_option = self.get_options().build_flags
-    build_flags_is_flagged = self.get_options().is_flagged('build_flags')
-    fingerprint_strategy = GoBinaryFingerprintStrategy(build_flags_from_option,
-                                                       build_flags_is_flagged,
-                                                       self._get_build_flags)
-
+    get_build_flags_func = functools.partial(self._get_build_flags,
+                                             self.get_options().build_flags,
+                                             self.get_options().is_flagged('build_flags'))
+    fingerprint_strategy = GoBinaryFingerprintStrategy(get_build_flags_func)
     self.context.products.safe_create_data('exec_binary', lambda: {})
     with self.invalidated(self.context.targets(self.is_go),
                           invalidate_dependents=True,
@@ -64,9 +62,7 @@ class GoCompile(GoWorkspaceTask):
         if not vt.valid:
           self.ensure_workspace(vt.target)
           self._sync_binary_dep_links(vt.target, gopath, lib_binary_map)
-          build_flags = self._get_build_flags(vt.target,
-                                              build_flags_from_option,
-                                              build_flags_is_flagged)
+          build_flags = get_build_flags_func(vt.target)
           self._go_install(vt.target, gopath, build_flags)
         if self.is_binary(vt.target):
           subdir, extension = self._get_cross_compiling_subdir_and_extension(gopath)
@@ -79,7 +75,7 @@ class GoCompile(GoWorkspaceTask):
 
   @classmethod
   @memoized_method
-  def _get_build_flags(cls, target, build_flags_from_option, is_flagged):
+  def _get_build_flags(cls, build_flags_from_option, is_flagged, target):
     """Merge build flags with global < target < command-line order
 
     Build flags can be defined as globals (in `pants.ini`), as arguments to a Target, and
@@ -87,7 +83,11 @@ class GoCompile(GoWorkspaceTask):
     """
     # If self.get_options().build_flags returns a quoted string, remove the outer quotes,
     # which happens for flags passed from the command-line.
-    bfo = re.sub(r'^["\']|["\']$', '', build_flags_from_option)
+    if (build_flags_from_option.startswith('\'') and build_flags_from_option.endswith('\'')) or \
+        (build_flags_from_option.startswith('"') and build_flags_from_option.endswith('"')):
+      bfo = build_flags_from_option[1:-1]
+    else:
+      bfo = build_flags_from_option
     global_build_flags, ephemeral_build_flags = ('', bfo) if is_flagged else (bfo, '')
     target_build_flags = target.build_flags if getattr(target, 'build_flags', None) else ''
     joined_build_flags = ' '.join([global_build_flags, target_build_flags, ephemeral_build_flags])

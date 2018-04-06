@@ -18,15 +18,11 @@ class GoBinaryFingerprintStrategy(FingerprintStrategy):
   which impact the output binary.
   """
 
-  def __init__(self, build_flags_from_option, is_flagged, get_build_flags):
+  def __init__(self, get_build_flags_func):
     """
-    :param string build_flags_from_option: Runtime value of GoCompile build_flags option.
-    :param bool is_flagged: If build_flags was set via the command-line flag.
-    :param func get_build_flags: Function that merges build_flags from the various sources.
+    :param func get_build_flags_func: Partial function that merges build_flags
     """
-    self._build_flags_from_option = build_flags_from_option
-    self._is_flagged = is_flagged
-    self._get_build_flags = get_build_flags
+    self._get_build_flags_func = get_build_flags_func
 
   def compute_fingerprint(self, target):
     fp = target.payload.fingerprint()
@@ -35,15 +31,12 @@ class GoBinaryFingerprintStrategy(FingerprintStrategy):
 
     hasher = hashlib.sha1()
     hasher.update(fp)
-    hasher.update(str(self._get_build_flags(target,
-                                            self._build_flags_from_option,
-                                            self._is_flagged)))
+    hasher.update(str(self._get_build_flags_func(target)))
     return hasher.hexdigest()
 
   def __hash__(self):
-    return hash((type(self), self._build_flags_from_option, self._is_flagged))
+    return hash((type(self), self._get_build_flags_func))
 
   def __eq__(self, other):
     return type(self) == type(other) and \
-           self._build_flags_from_option == other._build_flags_from_option and \
-           self._is_flagged == other._is_flagged
+        self._get_build_flags_func.args == other._get_build_flags_func.args
