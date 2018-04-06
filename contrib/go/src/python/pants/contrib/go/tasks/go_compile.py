@@ -11,6 +11,7 @@ import re
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
+from pants.util.memo import memoized_method
 from pants.util.strutil import safe_shlex_split
 
 from pants.contrib.go.targets.go_target import GoTarget
@@ -77,6 +78,7 @@ class GoCompile(GoWorkspaceTask):
                                                    vt.target.import_path + '.a')
 
   @classmethod
+  @memoized_method
   def _get_build_flags(cls, target, build_flags_from_option, is_flagged):
     """Merge build flags with global < target < command-line order
 
