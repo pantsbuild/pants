@@ -178,7 +178,7 @@ class RuleIndex(datatype('RuleIndex', ['rules', 'roots'])):
       # TODO: The heterogenity here has some confusing implications here:
       # see https://github.com/pantsbuild/pants/issues/4005
       for kind in rule.output_constraint.types:
-        # NB Ensure that interior types from SelectDependencies / SelectProjections work by
+        # NB Ensure that interior types from SelectDependencies work by
         # indexing on the list of types in the constraint.
         add_task(kind, rule)
       add_task(rule.output_constraint, rule)

@@ -112,7 +112,6 @@ typedef _Bool               (*extern_ptr_satisfied_by_type)(ExternContext*, Valu
 typedef Value               (*extern_ptr_store_list)(ExternContext*, Value**, uint64_t, _Bool);
 typedef Value               (*extern_ptr_store_bytes)(ExternContext*, uint8_t*, uint64_t);
 typedef Value               (*extern_ptr_store_i32)(ExternContext*, int32_t);
-typedef Value               (*extern_ptr_project)(ExternContext*, Value*, uint8_t*, uint64_t, TypeId*);
 typedef ValueBuffer         (*extern_ptr_project_multi)(ExternContext*, Value*, uint8_t*, uint64_t);
 typedef Value               (*extern_ptr_project_ignoring_type)(ExternContext*, Value*, uint8_t*, uint64_t);
 typedef Value               (*extern_ptr_create_exception)(ExternContext*, uint8_t*, uint64_t);
@@ -157,7 +156,6 @@ void externs_set(ExternContext*,
                  extern_ptr_store_list,
                  extern_ptr_store_bytes,
                  extern_ptr_store_i32,
-                 extern_ptr_project,
                  extern_ptr_project_ignoring_type,
                  extern_ptr_project_multi,
                  extern_ptr_create_exception,
@@ -172,7 +170,6 @@ void tasks_add_get(Tasks*, TypeConstraint, TypeId);
 void tasks_add_select(Tasks*, TypeConstraint);
 void tasks_add_select_variant(Tasks*, TypeConstraint, Buffer);
 void tasks_add_select_dependencies(Tasks*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);
-void tasks_add_select_projection(Tasks*, TypeConstraint, TypeId, Buffer, TypeConstraint);
 void tasks_task_end(Tasks*);
 void tasks_singleton_add(Tasks*, Value, TypeConstraint);
 void tasks_destroy(Tasks*);
@@ -252,7 +249,6 @@ extern "Python" {
   Value               extern_store_list(ExternContext*, Value**, uint64_t, _Bool);
   Value               extern_store_bytes(ExternContext*, uint8_t*, uint64_t);
   Value               extern_store_i32(ExternContext*, int32_t);
-  Value               extern_project(ExternContext*, Value*, uint8_t*, uint64_t, TypeId*);
   Value               extern_project_ignoring_type(ExternContext*, Value*, uint8_t*, uint64_t);
   ValueBuffer         extern_project_multi(ExternContext*, Value*, uint8_t*, uint64_t);
   Value               extern_create_exception(ExternContext*, uint8_t*, uint64_t);
@@ -430,20 +426,6 @@ def _initialize_externs(ffi):
     """Given a context and int32_t, return a new Value to represent the int32_t."""
     c = ffi.from_handle(context_handle)
     return c.to_value(i32)
-
-  @ffi.def_extern()
-  def extern_project(context_handle, val, field_str_ptr, field_str_len, type_id):
-    """Given a Value for `obj`, a field name, and a type, project the field as a new Value."""
-    c = ffi.from_handle(context_handle)
-    obj = c.from_value(val)
-    field_name = to_py_str(field_str_ptr, field_str_len)
-    typ = c.from_id(type_id.id_)
-
-    projected = getattr(obj, field_name)
-    if type(projected) is not typ:
-      projected = typ(projected)
-
-    return c.to_value(projected)
 
   @ffi.def_extern()
   def extern_project_ignoring_type(context_handle, val, field_str_ptr, field_str_len):
@@ -697,7 +679,6 @@ class Native(object):
                            self.ffi_lib.extern_store_list,
                            self.ffi_lib.extern_store_bytes,
                            self.ffi_lib.extern_store_i32,
-                           self.ffi_lib.extern_project,
                            self.ffi_lib.extern_project_ignoring_type,
                            self.ffi_lib.extern_project_multi,
                            self.ffi_lib.extern_create_exception,

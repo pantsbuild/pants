@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, FNV};
 use externs;
-use selectors::{Get, Select, SelectDependencies, SelectProjection, Selector};
+use selectors::{Get, Select, SelectDependencies, Selector};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
@@ -132,21 +132,6 @@ impl Tasks {
       dep_product: dep_product,
       field: field,
       field_types: field_types,
-    }));
-  }
-
-  pub fn add_select_projection(
-    &mut self,
-    product: TypeConstraint,
-    projected_subject: TypeId,
-    field: Field,
-    input_product: TypeConstraint,
-  ) {
-    self.clause(Selector::SelectProjection(SelectProjection {
-      product: product,
-      projected_subject: projected_subject,
-      field: field,
-      input_product: input_product,
     }));
   }
 

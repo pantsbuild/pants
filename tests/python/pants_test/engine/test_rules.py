@@ -14,7 +14,7 @@ from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import RootRule, RuleIndex, SingletonRule, TaskRule
 from pants.engine.scheduler import WrappedNativeScheduler
-from pants.engine.selectors import Select, SelectDependencies, SelectProjection
+from pants.engine.selectors import Get, Select, SelectDependencies
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.planners import Goal
 from pants_test.engine.util import (TargetTable, assert_equal_with_printing,
@@ -213,43 +213,7 @@ class RulesetValidatorTest(unittest.TestCase):
                       """).strip(),
         str(cm.exception))
 
-  def test_initial_select_projection_failure(self):
-    rules = _suba_root_rules + [
-      TaskRule(Exactly(A), [SelectProjection(B, D, 'some', C)], noop),
-    ]
-    validator = self.create_validator({}, rules)
-
-    with self.assertRaises(ValueError) as cm:
-      validator.assert_ruleset_valid()
-
-    self.assert_equal_with_printing(dedent("""
-                      Rules with errors: 1
-                        (A, (SelectProjection(B, D, 'some', C),), noop):
-                          no matches for Select(C) when resolving SelectProjection(B, D, 'some', C) with subject types: SubA
-                      """).strip(),
-                                    str(cm.exception))
-
-  def test_secondary_select_projection_failure(self):
-    rules = _suba_root_rules + [
-      TaskRule(Exactly(A), [SelectProjection(B, D, 'some', C)], noop),
-      TaskRule(C, [], noop)
-    ]
-
-    validator = self.create_validator({}, rules)
-
-    with self.assertRaises(ValueError) as cm:
-      validator.assert_ruleset_valid()
-
-    self.assert_equal_with_printing(dedent("""
-                     Rules with errors: 1
-                       (A, (SelectProjection(B, D, 'some', C),), noop):
-                         no matches for Select(B) when resolving SelectProjection(B, D, 'some', C) with subject types: D
-                     """).strip(),
-                                    str(cm.exception))
-
   assert_equal_with_printing = assert_equal_with_printing
-# TODO should it raise if a particular root type can't get to a particular rule? Leaning towards
-# no because it may be that there are some subgraphs particular to a particular root subject.
 
 
 class RuleGraphMakerTest(unittest.TestCase):
@@ -672,9 +636,9 @@ class RuleGraphMakerTest(unittest.TestCase):
                      }""").strip(),
       subgraph)
 
-  def test_select_projection_simple(self):
+  def test_get_simple(self):
     rules = [
-      TaskRule(Exactly(A), [SelectProjection(B, D, 'some', SubA)], noop),
+      TaskRule(Exactly(A), [], noop, [Get(B, D)]),
       TaskRule(B, [Select(D)], noop),
     ]
 
@@ -685,9 +649,9 @@ class RuleGraphMakerTest(unittest.TestCase):
                        // root subject types: SubA
                        // root entries
                          "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, (SelectProjection(B, D, 'some', SubA),), noop) of SubA"}
+                         "Select(A) for SubA" -> {"(A, (,), [Get(B, D)], noop) of SubA"}
                        // internal entries
-                         "(A, (SelectProjection(B, D, 'some', SubA),), noop) of SubA" -> {"SubjectIsProduct(SubA)" "(B, (Select(D),), noop) of D"}
+                         "(A, (,), [Get(B, D)], noop) of SubA" -> {"(B, (Select(D),), noop) of D"}
                          "(B, (Select(D),), noop) of D" -> {"SubjectIsProduct(D)"}
                      }""").strip(),
                                     subgraph)
