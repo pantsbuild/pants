@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import ast
 from abc import abstractproperty
 
 import six
@@ -32,11 +33,59 @@ def constraint_for(type_or_constraint):
     raise TypeError("Expected a type or constraint: got: {}".format(type_or_constraint))
 
 
+class Get(datatype('Get', ['product', 'subject'])):
+  """Experimental synchronous generator API.
+
+  May be called equivalently as either:
+    # verbose form: Get(product_type, subject_type, subject)
+    # shorthand form: Get(product_type, subject_type(subject))
+  """
+
+  @staticmethod
+  def extract_constraints(call_node):
+    """Parses a `Get(..)` call in one of its two legal forms to return its type constraints.
+
+    :param call_node: An `ast.Call` node representing a call to `Get(..)`.
+    :return: A tuple of product type id and subject type id.
+    """
+    def render_args():
+      return ', '.join(a.id for a in call_node.args)
+
+    if len(call_node.args) == 2:
+      product_type, subject_constructor = call_node.args
+      if not isinstance(product_type, ast.Name) or not isinstance(subject_constructor, ast.Call):
+        raise ValueError('Two arg form of {} expected (product_type, subject_type(subject)), but '
+                        'got: ({})'.format(Get.__name__, render_args()))
+      return (product_type.id, subject_constructor.func.id)
+    elif len(call_node.args) == 3:
+      product_type, subject_type, _ = call_node.args
+      if not isinstance(product_type, ast.Name) or not isinstance(subject_type, ast.Name):
+        raise ValueError('Three arg form of {} expected (product_type, subject_type, subject), but '
+                        'got: ({})'.format(Get.__name__, render_args()))
+      return (product_type.id, subject_type.id)
+    else:
+      raise ValueError('Invalid {}; expected either two or three args, but '
+                      'got: ({})'.format(Get.__name__, render_args()))
+
+  def __new__(cls, *args):
+    if len(args) == 2:
+      product, subject = args
+    elif len(args) == 3:
+      product, subject_type, subject = args
+      if type(subject) is not subject_type:
+        raise TypeError('Declared type did not match actual type for {}({}).'.format(
+          Get.__name__, ', '.join(str(a) for a in args)))
+    else:
+      raise Exception('Expected either two or three arguments to {}; got {}.'.format(
+        Get.__name__, args))
+    return super(Get, cls).__new__(cls, product, subject)
+
+
 class Selector(AbstractClass):
-  # The type constraint for the product type for this selector.
 
   @property
   def type_constraint(self):
+    """The type constraint for the product type for this selector."""
     return constraint_for(self.product)
 
   @abstractproperty

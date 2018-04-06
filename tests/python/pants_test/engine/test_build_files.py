@@ -9,32 +9,28 @@ import os
 import unittest
 
 from pants.build_graph.address import Address
-from pants.engine.addressable import (Exactly, SubclassesOf, addressable, addressable_dict,
-                                      addressable_list)
-from pants.engine.build_files import ResolvedTypeMismatchError, create_graph_rules
-from pants.engine.fs import create_fs_rules
+from pants.engine.addressable import Exactly, addressable, addressable_dict
+from pants.engine.build_files import (ResolvedTypeMismatchError, create_graph_rules,
+                                      parse_address_family)
+from pants.engine.fs import Dir, FileContent, FilesContent, PathGlobs, create_fs_rules
 from pants.engine.mapper import AddressMapper, ResolveError
 from pants.engine.nodes import Return, Throw
 from pants.engine.parser import SymbolTable
-from pants.engine.struct import HasProducts, Struct, StructWithDeps
+from pants.engine.struct import Struct, StructWithDeps
 from pants_test.engine.examples.parsers import (JsonParser, PythonAssignmentsParser,
                                                 PythonCallbacksParser)
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
+from pants_test.engine.util import Target, run_rule
 
 
-class Target(Struct, HasProducts):
-
-  def __init__(self, name=None, configurations=None, **kwargs):
-    super(Target, self).__init__(name=name, **kwargs)
-    self.configurations = configurations
-
-  @property
-  def products(self):
-    return self.configurations
-
-  @addressable_list(SubclassesOf(Struct))
-  def configurations(self):
-    pass
+class ParseAddressFamilyTest(unittest.TestCase):
+  def test_empty(self):
+    """Test that parsing an empty BUILD file results in an empty AddressFamily."""
+    address_mapper = AddressMapper(JsonParser(TestTable()))
+    af = run_rule(parse_address_family, address_mapper, Dir('/dev/null'), {
+        (FilesContent, PathGlobs): lambda _: FilesContent([FileContent('/dev/null/BUILD', '')])
+      })
+    self.assertEquals(len(af.objects_by_name), 0)
 
 
 class ApacheThriftConfiguration(StructWithDeps):

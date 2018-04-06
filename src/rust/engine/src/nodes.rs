@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use futures::future::{self, Future};
 use tempdir::TempDir;
@@ -121,6 +122,21 @@ impl Select {
       subject: subject,
       variants: variants,
       entries: edges.entries_for(&select_key),
+    }
+  }
+
+  pub fn new_with_entries(
+    product: TypeConstraint,
+    subject: Key,
+    variants: Variants,
+    entries: rule_graph::Entries,
+  ) -> Select {
+    let selector = selectors::Select::without_variant(product);
+    Select {
+      selector: selector,
+      subject: subject,
+      variants: variants,
+      entries: entries,
     }
   }
 
@@ -356,7 +372,7 @@ impl Select {
             product: self.product().clone(),
             variants: self.variants.clone(),
             task: task,
-            entry: entry.clone(),
+            entry: Arc::new(entry.clone()),
           })
         })
         .collect::<Vec<NodeFuture<Value>>>()
@@ -883,7 +899,7 @@ pub struct Task {
   product: TypeConstraint,
   variants: Variants,
   task: tasks::Task,
-  entry: rule_graph::Entry,
+  entry: Arc<rule_graph::Entry>,
 }
 
 impl Task {
@@ -908,6 +924,60 @@ impl Task {
       }
     }
   }
+
+  fn gen_get(
+    context: &Context,
+    entry: Arc<rule_graph::Entry>,
+    gets: Vec<externs::Get>,
+  ) -> NodeFuture<Vec<Value>> {
+    let get_futures = gets
+      .into_iter()
+      .map(|get| {
+        let externs::Get(product, subject) = get;
+        let entries = context
+          .core
+          .rule_graph
+          .edges_for_inner(&entry)
+          .expect("edges for task exist.")
+          .entries_for(&rule_graph::SelectKey::JustGet(selectors::Get {
+            product: product,
+            subject: subject.type_id().clone(),
+          }));
+        Select::new_with_entries(product, subject, Default::default(), entries)
+          .run(context.clone())
+          .map_err(|e| was_required(e))
+      })
+      .collect::<Vec<_>>();
+    future::join_all(get_futures).to_boxed()
+  }
+
+  ///
+  /// Given a python generator Value, loop to request the generator's dependencies until
+  /// it completes with a result Value.
+  ///
+  fn generate(
+    context: Context,
+    entry: Arc<rule_graph::Entry>,
+    generator: Value,
+  ) -> NodeFuture<Value> {
+    future::loop_fn(externs::eval("None").unwrap(), move |input| {
+      let context = context.clone();
+      let entry = entry.clone();
+      future::result(externs::generator_send(&generator, &input)).and_then(move |response| {
+        match response {
+          externs::GeneratorResponse::Get(get) => Self::gen_get(&context, entry, vec![get])
+            .map(|vs| future::Loop::Continue(vs.into_iter().next().unwrap()))
+            .to_boxed() as BoxFuture<_, _>,
+          externs::GeneratorResponse::GetMulti(gets) => Self::gen_get(&context, entry, gets)
+            .map(|vs| future::Loop::Continue(externs::store_list(vs.iter().collect(), false)))
+            .to_boxed() as BoxFuture<_, _>,
+          externs::GeneratorResponse::Break(val) => {
+            future::ok(future::Loop::Break(val)).to_boxed() as BoxFuture<_, _>
+          }
+        }
+      })
+    }).to_boxed()
+  }
 }
 
 impl Node for Task {
@@ -923,11 +993,22 @@ impl Node for Task {
         .collect::<Vec<_>>(),
     );
 
-    let task = self.task.clone();
+    let func = self.task.func.clone();
+    let entry = self.entry.clone();
     deps
       .then(move |deps_result| match deps_result {
-        Ok(deps) => externs::call(&externs::val_for(&task.func.0), &deps),
-        Err(err) => Err(err),
+        Ok(deps) => externs::call(&externs::val_for(&func.0), &deps),
+        Err(failure) => Err(failure),
+      })
+      .then(move |task_result| match task_result {
+        Ok(val) => {
+          if externs::satisfied_by(&context.core.types.generator, &val) {
+            Self::generate(context, entry, val)
+          } else {
+            ok(val)
+          }
+        }
+        Err(failure) => err(failure),
       })
       .to_boxed()
   }

@@ -146,6 +146,33 @@ pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
   with_externs(|e| (e.call)(e.context, func, args.as_ptr(), args.len() as u64)).into()
 }
 
+pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {
+  let response = with_externs(|e| (e.generator_send)(e.context, generator, arg));
+  match response.res_type {
+    PyGeneratorResponseType::Break => Ok(GeneratorResponse::Break(response.values.unwrap_one())),
+    PyGeneratorResponseType::Throw => Err(PyResult::failure_from(response.values.unwrap_one())),
+    PyGeneratorResponseType::Get => {
+      let mut interns = INTERNS.write().unwrap();
+      let constraint = TypeConstraint(interns.insert(response.constraints.unwrap_one()));
+      Ok(GeneratorResponse::Get(Get(
+        constraint,
+        interns.insert(response.values.unwrap_one()),
+      )))
+    }
+    PyGeneratorResponseType::GetMulti => {
+      let mut interns = INTERNS.write().unwrap();
+      let continues = response
+        .constraints
+        .to_vec()
+        .into_iter()
+        .zip(response.values.to_vec().into_iter())
+        .map(|(c, v)| Get(TypeConstraint(interns.insert(c)), interns.insert(v)))
+        .collect();
+      Ok(GeneratorResponse::GetMulti(continues))
+    }
+  }
+}
+
 ///
 /// NB: Panics on failure. Only recommended for use with built-in functions, such as
 /// those configured in types::Types.
@@ -206,83 +233,34 @@ where
 pub type ExternContext = raw::c_void;
 
 pub struct Externs {
-  context: *const ExternContext,
-  log: LogExtern,
-  log_level: u8,
-  call: CallExtern,
-  eval: EvalExtern,
-  identify: IdentifyExtern,
-  equals: EqualsExtern,
-  clone_val: CloneValExtern,
-  drop_handles: DropHandlesExtern,
-  satisfied_by: SatisfiedByExtern,
-  satisfied_by_type: SatisfiedByTypeExtern,
-  store_list: StoreListExtern,
-  store_bytes: StoreBytesExtern,
-  store_i32: StoreI32Extern,
-  project: ProjectExtern,
-  project_ignoring_type: ProjectIgnoringTypeExtern,
-  project_multi: ProjectMultiExtern,
-  type_to_str: TypeToStrExtern,
-  val_to_str: ValToStrExtern,
-  create_exception: CreateExceptionExtern,
+  pub context: *const ExternContext,
+  pub log_level: u8,
+  pub log: LogExtern,
+  pub call: CallExtern,
+  pub generator_send: GeneratorSendExtern,
+  pub eval: EvalExtern,
+  pub identify: IdentifyExtern,
+  pub equals: EqualsExtern,
+  pub clone_val: CloneValExtern,
+  pub drop_handles: DropHandlesExtern,
+  pub satisfied_by: SatisfiedByExtern,
+  pub satisfied_by_type: SatisfiedByTypeExtern,
+  pub store_list: StoreListExtern,
+  pub store_bytes: StoreBytesExtern,
+  pub store_i32: StoreI32Extern,
+  pub project: ProjectExtern,
+  pub project_ignoring_type: ProjectIgnoringTypeExtern,
+  pub project_multi: ProjectMultiExtern,
+  pub type_to_str: TypeToStrExtern,
+  pub val_to_str: ValToStrExtern,
+  pub create_exception: CreateExceptionExtern,
   // TODO: This type is also declared on `types::Types`.
-  py_str_type: TypeId,
+  pub py_str_type: TypeId,
 }
 
 // The pointer to the context is safe for sharing between threads.
 unsafe impl Sync for Externs {}
 unsafe impl Send for Externs {}
-
-impl Externs {
-  pub fn new(
-    ext_context: *const ExternContext,
-    log: LogExtern,
-    log_level: u8,
-    call: CallExtern,
-    eval: EvalExtern,
-    identify: IdentifyExtern,
-    equals: EqualsExtern,
-    clone_val: CloneValExtern,
-    drop_handles: DropHandlesExtern,
-    type_to_str: TypeToStrExtern,
-    val_to_str: ValToStrExtern,
-    satisfied_by: SatisfiedByExtern,
-    satisfied_by_type: SatisfiedByTypeExtern,
-    store_list: StoreListExtern,
-    store_bytes: StoreBytesExtern,
-    store_i32: StoreI32Extern,
-    project: ProjectExtern,
-    project_ignoring_type: ProjectIgnoringTypeExtern,
-    project_multi: ProjectMultiExtern,
-    create_exception: CreateExceptionExtern,
-    py_str_type: TypeId,
-  ) -> Externs {
-    Externs {
-      context: ext_context,
-      log: log,
-      log_level: log_level,
-      call: call,
-      eval: eval,
-      identify: identify,
-      equals: equals,
-      clone_val: clone_val,
-      drop_handles: drop_handles,
-      satisfied_by: satisfied_by,
-      satisfied_by_type: satisfied_by_type,
-      store_list: store_list,
-      store_bytes: store_bytes,
-      store_i32: store_i32,
-      project: project,
-      project_ignoring_type: project_ignoring_type,
-      project_multi: project_multi,
-      type_to_str: type_to_str,
-      val_to_str: val_to_str,
-      create_exception: create_exception,
-      py_str_type: py_str_type,
-    }
-  }
-}
 
 pub type LogExtern = extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
 
@@ -324,11 +302,17 @@ pub struct PyResult {
   value: Value,
 }
 
+impl PyResult {
+  fn failure_from(v: Value) -> Failure {
+    let traceback = project_str(&v, "_formatted_exc");
+    Failure::Throw(v, traceback)
+  }
+}
+
 impl From<PyResult> for Result<Value, Failure> {
   fn from(result: PyResult) -> Self {
     if result.is_throw {
-      let traceback = project_str(&result.value, "_formatted_exc");
-      Err(Failure::Throw(result.value, traceback))
+      Err(PyResult::failure_from(result.value))
     } else {
       Ok(result.value)
     }
@@ -350,6 +334,32 @@ impl From<Result<(), String>> for PyResult {
   }
 }
 
+// Only constructed from the python side.
+#[allow(dead_code)]
+#[repr(u8)]
+pub enum PyGeneratorResponseType {
+  Break = 0,
+  Throw = 1,
+  Get = 2,
+  GetMulti = 3,
+}
+
+#[repr(C)]
+pub struct PyGeneratorResponse {
+  res_type: PyGeneratorResponseType,
+  values: ValueBuffer,
+  constraints: ValueBuffer,
+}
+
+#[derive(Debug)]
+pub struct Get(pub TypeConstraint, pub Key);
+
+pub enum GeneratorResponse {
+  Break(Value),
+  Get(Get),
+  GetMulti(Vec<Get>),
+}
+
 // The result of an `identify` call, including the __hash__ of a Value and its TypeId.
 #[repr(C)]
 pub struct Ident {
@@ -358,7 +368,13 @@ pub struct Ident {
   pub type_id: TypeId,
 }
 
-// Points to an array containing a series of values allocated by Python.
+///
+/// Points to an array containing a series of values allocated by Python.
+///
+/// TODO: An interesting optimization might be possible where we avoid actually
+/// allocating the values array for values_len == 1, and instead store the Value in
+/// the `handle_` field.
+///
 #[repr(C)]
 pub struct ValueBuffer {
   values_ptr: *mut Value,
@@ -373,6 +389,20 @@ impl ValueBuffer {
       self.values_ptr,
       self.values_len as usize,
       |value_vec| unsafe { value_vec.iter().map(|v| v.clone_without_handle()).collect() },
+    )
+  }
+
+  /// Asserts that the ValueBuffer contains one value, and returns it.
+  pub fn unwrap_one(&self) -> Value {
+    assert!(
+      self.values_len == 1,
+      "ValueBuffer contained more than one value: {}",
+      self.values_len
+    );
+    with_vec(
+      self.values_ptr,
+      self.values_len as usize,
+      |value_vec| unsafe { value_vec.iter().next().unwrap().clone_without_handle() },
     )
   }
 }
@@ -466,6 +496,9 @@ pub type CreateExceptionExtern =
 
 pub type CallExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Value, u64) -> PyResult;
+
+pub type GeneratorSendExtern =
+  extern "C" fn(*const ExternContext, *const Value, *const Value) -> PyGeneratorResponse;
 
 pub type EvalExtern =
   extern "C" fn(*const ExternContext, python_ptr: *const u8, python_len: u64) -> PyResult;

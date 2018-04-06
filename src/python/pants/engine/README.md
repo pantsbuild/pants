@@ -1,10 +1,163 @@
-# The New Engine
+# The (New) Engine
 
-## Scheduling
+## API
 
-In the current RoundEngine, work is scheduled and then later performed via the `Task` interface. In
-the new engine execution occurs via simple functions, with inputs selected via an input
-selection clause made up of `Selector` objects (described later).
+The end user API for the engine is based on the registration of `@rule`s, which are functions
+or coroutines with statically declared inputs and outputs. A Pants (plugin) developer can write
+and install additional `@rule`s to extend the functionality of Pants.
+
+The set of installed `@rule`s is statically checked as a closed world: this compilation step occurs
+on startup, and identifies all unreachable or unsatisfiable rules before execution begins. This
+allows most composition errors to be detected immediately, and also provides for easy introspection
+of the build. To inspect the set of rules that are installed and which product types can be
+computed, you can pass the `--native-engine-visualize-to=$dir` flag, which will write out a graph
+of reachable `@rule`s.
+
+Once the engine is instantiated with a valid set of `@rule`s, a caller can synchronously request
+computation of any of the product types provided by those `@rule`s by calling:
+
+```python
+# Request a ThingINeed (a `Product`) for the thing_i_have (a `Subject`).
+thing_i_need, = scheduler.product_request(ThingINeed, [thing_i_have])
+```
+
+The engine then takes care of concurrently executing all dependencies of the matched `@rule`s to
+produce the requested value.
+
+### Products and Subjects
+
+The engine executes your `@rule`s in order to (recursively) compute a `Product` of the requested
+type for a given `Subject`. This recursive type search leads to a very loosely coupled (and yet
+still statically checked) form of dependency injection.
+
+When an `@rule` runs, it runs for a particular `Subject` value, which is part of the unique
+identity for that instance of the `@rule`. An `@rule` can request dependencies for different
+`Subject` values as it runs (see the section on `Get` requests below). Because the subject for
+an `@rule` is chosen by callers, a `Subject` can be of any (hashable) type that a user might want
+to compute a product for.
+
+The return value of an `@rule` for a particular `Subject` is known as a `Product`. At some level,
+you can think of (`subject_value`, `product_type`) as a "key" that uniquely identifies a particular
+Product value and `@rule` execution.
+
+#### Example
+
+As a very simple example, you might register the following `@rule` that can compute a `String`
+Product given a single `Int` input.
+
+```python
+@rule(StringType, [Select(IntType)])
+def int_to_str(an_int):
+  return '{}'.format(an_int)
+```
+
+The first argument to the `@rule` decorator is the Product (ie, return) type for the `@rule`. The
+second argument is a list of `Selectors` that declare the types of the input arguments to the
+`@rule`. In this case, because the Product type is `StringType` and there is one `Selector`
+(`Select(IntType)`), this `@rule` represents a conversion from `IntType` to `StrType`, with no
+other inputs.
+
+When the engine statically checks whether it can use this `@rule` to create a string for a
+Subject, it will first see whether there are any ways to get an IntType for that Subject. If
+the subject is already of `type(subject) == IntType`, then the `@rule` will be satisfiable without
+any other dependencies. On the other hand, if the type _doesn't_ match, the engine doesn't give up:
+it will next look for any other registered `@rule`s that can compute an IntType Product for the
+Subject (and so on, recursively.)
+
+In practical use, using basic types like `StringType` or `IntType` does not provide enough
+information to disambiguate between various types of data: So declaring small `datatype`
+definitions to provide a unique and descriptive type is strongly recommended:
+
+```python
+class FormattedInt(datatype('FormattedInt', ['content'])): pass
+
+@rule(FormattedInt, [Select(IntType)])
+def int_to_str(an_int):
+  return FormattedInt('{}'.format(an_int))
+```
+
+### Selectors and Gets
+
+As demonstrated above, the `Selector` classes select `@rule` inputs in the context of a particular
+`Subject` (and its `Variants`: discussed below). But it is frequently necessary to "change" the
+subject and request products for subjects other than the one that the `@rule` is running for.
+
+In cases where this is necessary, `@rule`s may be written as coroutines (ie, using the python
+`yield` statement) that yield "`Get` requests" that request products for other subjects. Just like
+`@rule` parameter Selectors, `Get` requests instantiated in the body of an `@rule` are statically
+checked to be satisfiable in the set of installed `@rule`s.
+
+#### Example
+
+For example, you could declare an `@rule` that requests FileContent for each entry in a Files list,
+and then concatentates that content into a (typed) string:
+
+```python
+@rule(ConcattedFiles, [Select(Files)])
+def concat(files):
+  file_content_list = yield [Get(FileContent, File(f)) for f in files]
+  yield ConcattedFiles(''.join(fc.content for fc in file_content_list))
+```
+
+This `@rule` declares that: "for any Subject for which we can compute `Files`, we can also compute
+`ConcattedFiles`". Each yielded `Get` request results in FileContent for a different File Subject
+from the Files list.
+
+### Variants
+
+Certain `@rule`s will also need parameters provided by their dependents in order to tailor their output
+Products to their consumers.  For example, a javac `@rule` might need to know the version of the java
+platform for a given dependent binary target (say Java 9), or an ivy `@rule` might need to identify a
+globally consistent ivy resolve for a test target.  To allow for this the engine introduces the
+concept of `Variants`, which are passed recursively from dependents to dependencies.
+
+If a Rule uses a `SelectVariants` Selector to indicate that a variant is required, consumers can use
+a `@[type]=[name]` address syntax extension to pass a variant that matches a particular configuration
+for a `@rule`. A dependency declared as `src/java/com/example/lib:lib` specifies no particular variant, but
+`src/java/com/example/lib:lib@java=java8` asks for the configured variant of the lib named "java8".
+
+Additionally, it is possible to specify the "default" variants for an Address by installing an `@rule`
+function that can provide `Variants(default=..)`. Since the purpose of variants is to collect
+information from dependents, only default variant values which have not been set by a dependent
+will be used.
+
+## Internal API
+
+Internally, the engine uses end user `@rule`s to create private `Node` objects and
+build a `Graph` of futures that links them to their dependency Nodes. A Node represents a unique
+computation and the data for a Node implicitly acts as its own key/identity.
+
+To compute a value for a Node, the engine uses the `Node.run` method starting from requested
+roots. If a Node needs more inputs, it requests them via `Context.get`, which will declare a
+dependency, and memoize the computation represented by the requested `Node`.
+
+The initial Nodes are [launched by the engine](https://github.com/pantsbuild/pants/blob/16d43a06ba3751e22fdc7f69f009faeb59a33930/src/rust/engine/src/scheduler.rs#L116-L126),
+but the rest of execution is driven by Nodes recursively calling `Context.get` to request their
+dependencies.
+
+## Execution
+
+The engine executes work concurrently wherever possible; to help visualize executions, a visualization
+tool is provided that, after executing a `Graph`, generates a `dot` file that can be rendered using
+Graphviz:
+
+```console
+$ mkdir viz
+$ ./pants --native-engine-visualize-to=viz list some/example/directory:
+$ ls viz
+run.0.dot
+```
+
+## Native Engine
+
+The native engine is integrated into the pants codebase via `native.py` in
+this directory along with `build-support/bin/native/bootstrap.sh` which ensures a
+pants native engine library is built and available for linking. The glue is the
+sha1 hash of the native engine source code used as its version by the `Native`
+class. This hash is maintained by `build-support/bin/native/bootstrap.sh` and
+output to the `native_engine_version` file in this directory. Any modification
+to this resource file's location will need adjustments in
+`build-support/bin/native/bootstrap.sh` to ensure the linking continues to work.
 
 ## History
 
@@ -28,134 +181,3 @@ in the context of scala and mixed scala & java builds.  Twitter spiked on a proj
 a target-level scheduling system scoped to just the jvm compilation tasks.  This bore fruit and
 served as further impetus to get a "tuple-engine" designed and constructed to bring the benefits
 seen in the jvm compilers to the wider pants world of tasks.
-
-### API
-
-#### End User API
-
-The end user API for the engine is based on the registration of `Rules`, which are made up of:
-
-1. a `Product` or return type of a function,
-2. a list of dependency `Selectors` which match inputs to the function,
-3. the function itself.
-
-A `Rule` fully declares the inputs and outputs for its function: there is no imperative API for
-requesting additional inputs during execution of a function. While a tight constraint,
-this has the advantage of forcing decomposition of work into functions which are loosely
-coupled by only the types of their inputs and outputs, and which are naturally isolated, cacheable,
-and parallelizable.
-
-A function is guaranteed to execute only when all of its inputs are ready for use. The Scheduler
-considers executing a Rule when it determines that it needs to produce the declared
-output `Product` type of that function for a particular `Subject`. But the Scheduler will only
-actually run a Rule if it is able to (recursively) find sources for each of the
-function's inputs.
-
-See below for more information on `Products`, `Subjects`, and `Selectors`.
-
-#### Internal API
-
-Internally, the `Scheduler` uses end user `Rules` to create private `Node` objects and
-build a `Graph` of futures that links them to their dependency Nodes. A Node represents a unique
-computation and the data for a Node implicitly acts as its own key/identity.
-
-To compute a value for a Node, the Scheduler uses the `Node.run` method starting from requested
-roots. If a Node needs more inputs, it requests them via `Context.get`, which will declare a
-dependency, and memoize the computation represented by the `Node`.
-
-The initial Nodes are [launched by the scheduler](https://github.com/pantsbuild/pants/blob/16d43a06ba3751e22fdc7f69f009faeb59a33930/src/rust/engine/src/scheduler.rs#L116-L126),
-but the rest of the scheduling is driven by Nodes recursively calling `Context.get` to request
-dependencies.
-
-### Products and Subjects
-
-A `Product` is a strongly typed value specific to a particular `Subject`. End user Rules execute
-in order to (recursively) compute a Product for a Subject: as a very simple example, one might
-register the following Rule that can compute a `String` Product given a single `Int` input
-by calling the `str` function:
-
-    @rule(StringType, [Select(IntType)])
-    def int_to_str(an_int):
-      return str(an_int)
-
-When the Scheduler wants to decide whether it can use this Rule to create a string for a
-Subject, it will first see whether there are any ways to get an IntType for that Subject. If
-the subject is already of `type(subject) == IntType`, then the Rule will be able to
-execute immediately. On the other hand, if the type _doesn't_ match, the Scheduler doesn't give up:
-it will next look for any other registered Rules that can compute an IntType Product for the
-Subject (and so on, recursively.)
-
-This recursive type search leads to some very interesting (and, admittedly, somewhat "magical")
-properties. If there is any path through the Rule graph that allows for conversion
-from one type to another, it will be found and executed.
-
-### Selectors
-
-As demonstrated above, the `Selector` classes select function inputs in the context of a particular
-`Subject` (and its `Variants`: discussed below). For example, it might select a `Product` for the given
-Subject (`Select`), or for other Subject(s) selected from fields of a Product (`SelectDependencies`,
-`SelectProjection`).
-
-One very important thing to keep in mind is that Selectors like `SelectDependencies` and `SelectProjection`
-"change" the Subject within a particular subgraph. For example, `SelectDependencies`
-results in new subgraphs for each Subject in a list of values that was computed for some original Subject.
-Concretely, a Rule could use SelectDependencies to select FileContent for each entry in a Files list,
-and then concatentate that content into a string:
-
-    @rule(StringType, [SelectDependencies(FileContent, Files)])
-    def concat(file_content_list):
-      return ''.join(fc.content for fc in file_content_list)
-
-This Rule declares that: "for any Subject for which we can compute a 'Files' object, we can also
-compute a StringType". Each subgraph will contain an attempt to get FileContent for a different
-File Subject from the Files list.
-
-In practical use, using `StringType` or `IntType` directly would probably not provide enough information
-to disambiguate between various types of data: So declaring small `datatype` definitions to provide
-a unique and descriptive type is strongly recommended:
-
-    class ConcattedFiles(datatype('ConcattedFiles', ['content'])):
-      pass
-
-### Variants
-
-Certain Rules will also need parameters provided by their dependents in order to tailor their output
-Products to their consumers.  For example, a javac planner might need to know
-the version of the java platform for a given dependent binary target (say Java 6), or an ivy Rule
-might need to identify a globally consistent ivy resolve for a test target.  To allow for this the
-engine introduces the concept of `variants`, which are passed recursively from dependents to
-dependencies.
-
-If a Rule uses a `SelectVariants` Selector to indicate that a variant is required, consumers can use
-a `@[type]=[name]` address syntax extension to pass a variant that matches a particular configuration
-for a Rule. A dependency declared as `src/java/com/example/lib:lib` specifies no particular variant, but
-`src/java/com/example/lib:lib@java=java8` asks for the configured variant of the lib named "java8".
-
-Additionally, it is possible to specify the "default" variants for an Address by installing a Rule
-function that can provide `Variants(default=..)`. Again, since the purpose of variants is to collect
-information from dependents, only default variant values which have not been set by a dependent
-will be used.
-
-## Execution
-
-The Scheduler executes work concurrently wherever possible; to help visualize executions, a visualization
-tool is provided that, after executing a `ProductGraph`, generates a `dot` file that can be rendered using
-Graphviz:
-
-```console
-$ mkdir viz
-$ ./pants --native-engine-visualize-to=viz list some/example/directory:
-$ ls viz
-run.0.dot
-```
-
-## Native Engine
-
-The native engine is integrated into the pants codebase via `native.py` in
-this directory along with `build-support/bin/native/bootstrap.sh` which ensures a
-pants native engine library is built and available for linking. The glue is the
-sha1 hash of the native engine source code used as its version by the `Native`
-class. This hash is maintained by `build-support/bin/native/bootstrap.sh` and
-output to the `native_engine_version` file in this directory. Any modification
-to this resource file's location will need adjustments in
-`build-support/bin/native/bootstrap.sh` to ensure the linking continues to work.
