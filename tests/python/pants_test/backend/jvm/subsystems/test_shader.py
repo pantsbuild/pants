@@ -65,6 +65,16 @@ class ShaderTest(unittest.TestCase):
     self.assertEqual(Shader.exclude_package(), rules[2])
     self.assertIn(Shader.exclude_package('javax.annotation'), rules[3:])
 
+  def test_assemble_classes_in_meta_inf(self):
+    input_jar = self.populate_input_jar('org/pantsbuild/tools/fake/Main.class',
+                                        'META-INF/versions/9/javax/xml/bind/ModuleInfo.class')
+
+    rules = self.shader.assemble_binary_rules('org.pantsbuild.tools.fake.Main', input_jar)
+
+    self.assertEqual(Shader.exclude_package('org.pantsbuild.tools.fake'), rules[0])
+    self.assertIn(Shader.exclude_package('javax.annotation'), rules[1:])
+    self.assertNotIn(Shading.create_relocate('META-INF.versions.9.javax.xml.bind.*'), rules[1:])
+
   def test_runner_command(self):
     input_jar = self.populate_input_jar('main.class', 'com/google/common/base/Function.class')
     custom_rules = [Shader.exclude_package('log4j', recursive=True)]
