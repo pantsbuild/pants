@@ -14,6 +14,7 @@ from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
 
 from pants.contrib.go.targets.go_target import GoTarget
+from pants.contrib.go.tasks.go_binary_fingerprint_strategy import GoBinaryFingerprintStrategy
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 
 
@@ -25,19 +26,31 @@ class GoCompile(GoWorkspaceTask):
   """
 
   @classmethod
+  def implementation_version(cls):
+    return super(GoCompile, cls).implementation_version() + [('GoCompile', 1)]
+
+  @classmethod
   def register_options(cls, register):
     super(GoCompile, cls).register_options(register)
-    register('--build-flags', default='', fingerprint=True,
-             help='Build flags to pass to Go compiler.')
+    # Build flags fingerprint is handled by a custom strategy to enable
+    # merging with task-specific flags.
+    register('--build-flags', default='', help='Build flags to pass to Go compiler.')
 
   @classmethod
   def product_types(cls):
     return ['exec_binary', 'deployable_archives']
 
   def execute(self):
+    build_flags_from_option = self.get_options().build_flags
+    build_flags_is_flagged = self.get_options().is_flagged('build_flags')
+    fingerprint_strategy = GoBinaryFingerprintStrategy(build_flags_from_option,
+                                                       build_flags_is_flagged,
+                                                       self._get_build_flags)
+
     self.context.products.safe_create_data('exec_binary', lambda: {})
     with self.invalidated(self.context.targets(self.is_go),
                           invalidate_dependents=True,
+                          fingerprint_strategy=fingerprint_strategy,
                           topological_order=True) as invalidation_check:
       # Maps each local/remote library target to its compiled binary.
       lib_binary_map = {}
@@ -50,7 +63,10 @@ class GoCompile(GoWorkspaceTask):
         if not vt.valid:
           self.ensure_workspace(vt.target)
           self._sync_binary_dep_links(vt.target, gopath, lib_binary_map)
-          self._go_install(vt.target, gopath)
+          build_flags = self._get_build_flags(vt.target,
+                                              build_flags_from_option,
+                                              build_flags_is_flagged)
+          self._go_install(vt.target, gopath, build_flags)
         if self.is_binary(vt.target):
           subdir, extension = self._get_cross_compiling_subdir_and_extension(gopath)
           binary_path = os.path.join(gopath, 'bin', subdir, os.path.basename(vt.target.address.spec_path) + extension)
@@ -61,23 +77,26 @@ class GoCompile(GoWorkspaceTask):
                                                    vt.target.import_path + '.a')
 
   @classmethod
-  def _split_build_flags(cls, build_flags):
-    """Visible for testing"""
-    return safe_shlex_split(build_flags)
-
-  def _go_install(self, target, gopath):
-    """Create and execute a `go install` command.
+  def _get_build_flags(cls, target, build_flags_from_option, is_flagged):
+    """Merge build flags with  global < target < command-line order
 
     Build flags can be defined as globals (in `pants.ini`), as arguments to a Target, and
-    via the command-line. Build flags are merged with order: global < target < command-line
+    via the command-line.
     """
-    is_flagged = self.get_options().is_flagged('build_flags')
-    # If self.get_options().build_flags returns a quoted string, remove the outer quotes.
-    bfo = re.sub(r'^"|"$', '', self.get_options().build_flags)
+    # If self.get_options().build_flags returns a quoted string, remove the outer quotes,
+    # which happens for flags passed from the command-line.
+    bfo = re.sub(r'^"|"$', '', build_flags_from_option)
     global_build_flags, ephemeral_build_flags = ('', bfo) if is_flagged else (bfo, '')
-    binary_build_flags = target.build_flags if target.build_flags else ''
-    joined_build_flags = ' '.join([global_build_flags, binary_build_flags, ephemeral_build_flags])
-    build_flags = self._split_build_flags(joined_build_flags)
+    target_build_flags = target.build_flags if getattr(target, 'build_flags', None) else ''
+    joined_build_flags = ' '.join([global_build_flags, target_build_flags, ephemeral_build_flags])
+    return cls._split_build_flags(joined_build_flags)
+
+  @staticmethod
+  def _split_build_flags(build_flags):
+    return safe_shlex_split(build_flags)  # Visible for testing
+
+  def _go_install(self, target, gopath, build_flags):
+    """Create and execute a `go install` command."""
     args = build_flags + [target.import_path]
     result, go_cmd = self.go_dist.execute_go_cmd(
       'install', gopath=gopath, args=args,
