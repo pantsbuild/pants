@@ -85,7 +85,7 @@ class GoCompile(GoWorkspaceTask):
     """
     # If self.get_options().build_flags returns a quoted string, remove the outer quotes,
     # which happens for flags passed from the command-line.
-    bfo = re.sub(r'^"|"$', '', build_flags_from_option)
+    bfo = re.sub(r'^["\']|["\']$', '', build_flags_from_option)
     global_build_flags, ephemeral_build_flags = ('', bfo) if is_flagged else (bfo, '')
     target_build_flags = target.build_flags if getattr(target, 'build_flags', None) else ''
     joined_build_flags = ' '.join([global_build_flags, target_build_flags, ephemeral_build_flags])
