@@ -9,7 +9,7 @@ import hashlib
 import logging
 import os
 
-from pants.base.build_environment import get_buildroot
+from pants.base.build_environment import get_buildroot, get_pants_cachedir
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
 from pants.net.http.fetcher import Fetcher
@@ -33,6 +33,11 @@ class CoursierSubsystem(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(CoursierSubsystem, cls).register_options(register)
+    register('--cache-dir', type=str, fingerprint=True,
+             default=os.path.join(get_pants_cachedir(), 'coursier'),
+             help='Version paired with --bootstrap-jar-url, in order to invalidate and fetch the new version.')
+    register('--repos', type=list, fingerprint=True,
+             help='Maven style repos', default=['https://repo1.maven.org/maven2'])
     register('--fetch-options', type=list, fingerprint=True,
              help='Additional options to pass to coursier fetch. See `coursier fetch --help`')
     register('--bootstrap-jar-url', fingerprint=True,

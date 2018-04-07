@@ -140,7 +140,8 @@ class CoursierMixin(NailgunTask):
         resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
 
         vt_set_results_dir = self._prepare_vts_results_dir(pants_workdir, resolve_vts)
-        coursier_cache_dir, pants_jar_base_dir = self._prepare_workdir(pants_workdir)
+        coursier_cache_dir = self.get_options().cache_dir
+        pants_jar_base_dir = self._prepare_workdir(pants_workdir)
 
         # Check each individual target without context first
         if not invalidation_check.invalid_vts:
@@ -187,15 +188,11 @@ class CoursierMixin(NailgunTask):
   def _prepare_workdir(self, pants_workdir):
     """
     Given pants workdir, prepare the location in pants workdir to store all the symlinks
-    and coursier cache dir.
+    to coursier cache dir.
     """
-    coursier_cache_dir = os.path.join(self.get_options().pants_bootstrapdir, 'coursier')
     pants_jar_base_dir = os.path.join(pants_workdir, 'coursier', 'cache')
-
-    # Only pants_jar_path_base needs to be touched whereas coursier_cache_path will
-    # be managed by coursier
     safe_mkdir(pants_jar_base_dir)
-    return coursier_cache_dir, pants_jar_base_dir
+    return pants_jar_base_dir
 
   def _get_result_from_coursier(self, jars_to_resolve, global_excludes, pinned_coords, pants_workdir,
                                 coursier_cache_path, sources, javadoc):
