@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import hashlib
+import itertools
 import json
 import os
 import urllib
@@ -45,7 +46,7 @@ class CoursierMixin(NailgunTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(CoursierMixin, cls).implementation_version() + [('CoursierMixin', 1)]
+    return super(CoursierMixin, cls).implementation_version() + [('CoursierMixin', 2)]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -140,8 +141,8 @@ class CoursierMixin(NailgunTask):
         resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
 
         vt_set_results_dir = self._prepare_vts_results_dir(pants_workdir, resolve_vts)
-        coursier_cache_dir = self.get_options().cache_dir
         pants_jar_base_dir = self._prepare_workdir(pants_workdir)
+        coursier_cache_dir = CoursierSubsystem.global_instance().get_options().cache_dir
 
         # Check each individual target without context first
         if not invalidation_check.invalid_vts:
@@ -246,11 +247,14 @@ class CoursierMixin(NailgunTask):
     coursier_subsystem_instance = CoursierSubsystem.global_instance()
     coursier_jar = coursier_subsystem_instance.bootstrap_coursier(self.context.new_workunit)
 
+    repos = coursier_subsystem_instance.get_options().repos
+    # make [repoX, repoY] -> ['-r', repoX, '-r', repoY]
+    repo_args = list(itertools.chain(*zip(['-r'] * len(repos), repos)))
     common_args = ['fetch',
                    # Print the resolution tree
                    '-t',
                    '--cache', coursier_cache_path
-                   ] + coursier_subsystem_instance.get_options().fetch_options
+                   ] + repo_args + coursier_subsystem_instance.get_options().fetch_options
 
     coursier_work_temp_dir = os.path.join(pants_workdir, 'tmp')
     safe_mkdir(coursier_work_temp_dir)
