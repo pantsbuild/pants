@@ -211,6 +211,57 @@ Toolchain
 Pants uses [Ivy](http://ant.apache.org/ivy/) to resolve `jar` dependencies. To change how Pants
 resolves these, configure `resolve.ivy`.
 
+Starting release `1.4.0.dev26`, Pants added an option to pick [coursier](https://github.com/coursier/coursier)
+as the JVM 3rdparty resolver, with performance improvement being the main motivation. The goal is to retire ivy
+eventually. Example config to use coursier:
+
+    :::ini
+    # This will turn on coursier and turn off ivy.
+    [resolver]
+    resolver: coursier
+
+    [resolve.coursier]
+    # jvm option in case of large resolves
+    jvm_options: ['-Xmx4g', '-XX:MaxMetaspaceSize=256m']
+    # The opposite of resolve.ivy.soft_excludes
+    allow_global_excludes: False
+
+    [cache.resolve.coursier]
+    # In order to enable remote caching, need to relativize the classpath entries serialized.
+    # https://github.com/pantsbuild/pants/issues/5187
+    # We still want to compute fingerprints so we can validate or invalidate,
+    # but do not want to check local or remote cache.
+    read: False
+    write: False
+
+    [export]
+    # Same if needed for large resolves
+    jvm_options: ['-Xmx4g', '-XX:MaxMetaspaceSize=256m']
+
+    [coursier]
+    # Change the following if you choose to [build coursier jar from scratch](https://github.com/coursier/coursier/blob/master/DEVELOPMENT.md#build-with-pants)
+    # or to fetch from different location.
+    bootstrap_jar_url: <url>
+    version: <version>
+
+    fetch_options: [
+        # Specify maven repos
+        '-r', 'https://repo1.maven.org/maven2/',
+        '-r', 'https://dl.google.com/dl/android/maven2/',
+
+        # Quiet mode
+        '-q',
+
+        # Do not use default public maven repo.
+        '--no-default',
+
+        # Concurrent workers
+        '-n', '10',
+
+        # Specify the type of artifacts to fetch
+        '-A', 'jar,bundle,test-jar,maven-plugin,src,doc,aar'
+      ]
+
 Pants uses [Nailgun](https://github.com/martylamb/nailgun) to speed up compiles. Nailgun is a
 JVM daemon that runs in the background. This means you don't need to start up a JVM and load
 classes for each JVM-based operation. Things go faster.
