@@ -208,16 +208,25 @@ contents a directory tree, a giant jar, or something else.
 Toolchain
 ---------
 
+### Ivy
+
 Pants uses [Ivy](http://ant.apache.org/ivy/) to resolve `jar` dependencies. To change how Pants
 resolves these, configure `resolve.ivy`.
+
+### Coursier
 
 Starting at release `1.4.0.dev26`, Pants added an option to pick [coursier](https://github.com/coursier/coursier)
 as the JVM 3rdparty resolver, with performance improvement being the main motivation. The goal is to retire ivy
 eventually.
 
-### Example config to use coursier
+#### *Limitation*
 
-#### For Pants >= 1.7.x
+* Currently coursier only supports maven style repo resolves. [Resolving with ivy settings is still not mature](https://github.com/coursier/coursier/issues/created_by/benjyw).
+* Coursier does not do publishing.
+
+#### Example config to use coursier
+
+##### For Pants >= 1.7.x
 
     :::ini
     # This will turn on coursier and turn off ivy.
@@ -246,7 +255,7 @@ eventually.
         :::bash
         ./pants --cache-ignore --resolver-resolver=coursier resolve.coursier --report examples/tests/scala/org/pantsbuild/example/hello/welcome -ldebug
 
-#### For Pants <= 1.6.x
+##### For Pants <= 1.6.x
 
     :::ini
     # This will turn on coursier and turn off ivy.
@@ -281,9 +290,13 @@ eventually.
         '-A', 'jar,bundle,test-jar,maven-plugin,src,doc,aar'
       ]
 
+### Nailgun
+
 Pants uses [Nailgun](https://github.com/martylamb/nailgun) to speed up compiles. Nailgun is a
 JVM daemon that runs in the background. This means you don't need to start up a JVM and load
 classes for each JVM-based operation. Things go faster.
+
+### Zinc
 
 Pants uses Zinc, a dependency tracking compiler facade that supports sub-target incremental
 compilation for Java and Scala.
