@@ -57,6 +57,8 @@ class CoursierMixin(NailgunTask):
     super(CoursierMixin, cls).register_options(register)
     register('--allow-global-excludes', type=bool, advanced=False, fingerprint=True, default=True,
              help='Whether global excludes are allowed.')
+    register('--report', type=bool, advanced=False, fingerprint=True, default=False,
+             help='Show the resolve output.')
 
   @staticmethod
   def _compute_jars_to_resolve_and_pin(raw_jars, artifact_set, manager):
@@ -333,14 +335,16 @@ class CoursierMixin(NailgunTask):
 
   def _call_coursier(self, cmd_args, coursier_jar, output_fn):
 
+    labels = [WorkUnitLabel.COMPILER] if self.get_options().report else [WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL]
+
     with self.context.new_workunit(name='coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
       return_code = self.runjava(
         classpath=[coursier_jar],
         main='coursier.cli.Coursier',
         args=cmd_args,
         jvm_options=self.get_options().jvm_options,
-        # to let stdout/err through, but don't print tool's label.
-        workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL])
+        workunit_labels=labels
+      )
 
       workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
 
