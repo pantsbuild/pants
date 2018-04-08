@@ -135,7 +135,7 @@ lives somewhere outside the workspace.
 ### Depending on a Jar
 
 The test example depends on a jar, `junit`. Instead of compiling from
-source, Pants invokes ivy to fetch such jars. To reduce the danger of
+source, Pants invokes the resolver to fetch such jars. To reduce the danger of
 version conflicts, we use the 3rdparty idiom: we keep references to
 these "third-party" jars together in `BUILD` files under the `3rdparty/`
 directory. Thus, the test has a `3rdparty` dependency:
