@@ -231,11 +231,12 @@ eventually. Example config to use coursier:
     jvm_options: ['-Xmx4g', '-XX:MaxMetaspaceSize=256m']
 
     [coursier]
+    repos: ['https://repo1.maven.org/maven2', 'https://dl.google.com/dl/android/maven2/']
+
     # Change the following if you choose to [build coursier jar from scratch](https://github.com/coursier/coursier/blob/master/DEVELOPMENT.md#build-with-pants)
     # or to fetch from different location.
     bootstrap_jar_url: <url>
     version: <version>
-    repos: ['https://repo1.maven.org/maven2', 'https://dl.google.com/dl/android/maven2/']
 
 ### For Pants <= 1.6.x
 
