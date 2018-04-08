@@ -219,7 +219,7 @@ Starting at release `1.4.0.dev26`, Pants added an option to pick [coursier](http
 as the JVM 3rdparty resolver, with performance improvement being the main motivation. The goal is to retire ivy
 eventually.
 
-#### *Limitation*
+#### Limitation
 
 * Currently coursier only supports maven style repo resolves. [Resolving with ivy settings is still not mature](https://github.com/coursier/coursier/issues/created_by/benjyw).
 * Coursier does not do publishing.
