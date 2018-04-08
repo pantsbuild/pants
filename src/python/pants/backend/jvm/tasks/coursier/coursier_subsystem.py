@@ -39,7 +39,20 @@ class CoursierSubsystem(Subsystem):
     register('--repos', type=list, fingerprint=True,
              help='Maven style repos', default=['https://repo1.maven.org/maven2'])
     register('--fetch-options', type=list, fingerprint=True,
+             default=[
+               # Quiet mode, so coursier does not show resolve progress,
+               # but still prints results if --report is specified.
+               '-q',
+               # Do not use default public maven repo.
+               '--no-default',
+               # Concurrent workers
+               '-n', '8',
+             ],
              help='Additional options to pass to coursier fetch. See `coursier fetch --help`')
+    register('--artifact-types', type=list, fingerprint=True,
+             default=['jar', 'bundle', 'test-jar', 'maven-plugin', 'src', 'doc', 'aar'],
+             help='Specify the type of artifacts to fetch. See `packaging` at https://maven.apache.org/pom.html#Maven_Coordinates, '
+                  'except `src` and `doc` being coursier specific terms for sources and javadoc.')
     register('--bootstrap-jar-url', fingerprint=True,
              default='https://dl.dropboxusercontent.com/s/zwh074l9kxhqlwp/coursier-cli-1.1.0.cf365ea27a710d5f09db1f0a6feee129aa1fc417.jar?dl=0',
              help='Location to download a bootstrap version of Coursier.')

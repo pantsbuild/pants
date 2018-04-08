@@ -252,11 +252,13 @@ class CoursierMixin(NailgunTask):
     repos = coursier_subsystem_instance.get_options().repos
     # make [repoX, repoY] -> ['-r', repoX, '-r', repoY]
     repo_args = list(itertools.chain(*zip(['-r'] * len(repos), repos)))
+    artifact_types_arg = ['-A', ','.join(coursier_subsystem_instance.get_options().artifact_types)]
+    advanced_options = coursier_subsystem_instance.get_options().fetch_options
     common_args = ['fetch',
                    # Print the resolution tree
                    '-t',
                    '--cache', coursier_cache_path
-                   ] + repo_args + coursier_subsystem_instance.get_options().fetch_options
+                   ] + repo_args + artifact_types_arg + advanced_options
 
     coursier_work_temp_dir = os.path.join(pants_workdir, 'tmp')
     safe_mkdir(coursier_work_temp_dir)
