@@ -213,9 +213,11 @@ resolves these, configure `resolve.ivy`.
 
 Starting at release `1.4.0.dev26`, Pants added an option to pick [coursier](https://github.com/coursier/coursier)
 as the JVM 3rdparty resolver, with performance improvement being the main motivation. The goal is to retire ivy
-eventually. Example config to use coursier:
+eventually.
 
-### For Pants >= 1.7.x
+### Example config to use coursier
+
+#### For Pants >= 1.7.x
 
     :::ini
     # This will turn on coursier and turn off ivy.
@@ -238,7 +240,13 @@ eventually. Example config to use coursier:
     bootstrap_jar_url: <url>
     version: <version>
 
-### For Pants <= 1.6.x
+* To inspect the resolve result, specify `--resolver-coursier-report`
+* To show coursier command line invocation, use `-ldebug`
+
+        :::bash
+        ./pants --cache-ignore --resolver-resolver=coursier resolve.coursier --report examples/tests/scala/org/pantsbuild/example/hello/welcome -ldebug
+
+#### For Pants <= 1.6.x
 
     :::ini
     # This will turn on coursier and turn off ivy.
