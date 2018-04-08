@@ -42,3 +42,10 @@ class CouriserIntegrationTest(PantsRunIntegrationTest):
     #  /Users/me/.cache/pants/coursier/https/repo1.maven.org/maven2/org/scalactic/scalactic_2.11/3.0.0/scalactic_2.11-3.0.0.jar
     self.assertIn('Result:', pants_run.stdout_data)
     self.assertIn('junit:junit:4.12', pants_run.stdout_data)
+
+  def test_coursier_no_report(self):
+    pants_run = self.run_pants(["--resolver-resolver=coursier",
+                                "resolve",
+                                "examples/tests/scala/org/pantsbuild/example/hello/welcome:welcome"])
+    self.assert_success(pants_run)
+    self.assertNotIn('Result:', pants_run.stdout_data)
