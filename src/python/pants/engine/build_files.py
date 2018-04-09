@@ -235,11 +235,12 @@ def addresses_from_address_families(address_mapper, specs):
     matched = False
     for af in address_families:
       for a in af.addressables.keys():
+        if a in included:
+          continue
         if not exclude_address(a) and (predicate is None or predicate(a)):
           matched = True
-          if a not in included:
-            addresses.append(a)
-            included.add(a)
+          addresses.append(a)
+          included.add(a)
     return matched
 
   for spec in specs.dependencies:
