@@ -726,7 +726,7 @@ impl Snapshot {
       &context.core.types.construct_snapshot,
       &[
         externs::store_bytes(&(item.digest.0).to_hex().as_bytes()),
-        externs::store_i32((item.digest.1 as i32)),
+        externs::store_i32(item.digest.1 as i32),
         externs::store_list(path_stats.iter().collect(), false),
       ],
     )
