@@ -674,7 +674,6 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       if self.get_options().colors:
         args.extend(['--color', 'yes'])
 
-      args.extend(self.get_options().options)
       args.extend(self.get_passthru_args())
 
       args.extend(test_args)
