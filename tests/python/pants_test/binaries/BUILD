@@ -6,7 +6,7 @@ python_tests(
   sources=['test_binary_util.py'],
   dependencies=[
     '3rdparty/python:mock',
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/binaries',
     'src/python/pants/net',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

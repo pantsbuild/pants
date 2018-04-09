@@ -13,7 +13,7 @@ python_library(
     'src/python/pants/base:project_tree',
     'src/python/pants/base:specs',
     'src/python/pants/base:workunit',
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/binaries',
     'src/python/pants/build_graph',
     'src/python/pants/core_tasks',
     'src/python/pants/engine/legacy:address_mapper',

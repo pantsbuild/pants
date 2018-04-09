@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name='binary_util',
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',

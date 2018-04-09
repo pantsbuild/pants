@@ -8,7 +8,7 @@ python_library(
     '3rdparty/python:six',
     'contrib/go/src/python/pants/contrib/go/targets',
     'src/python/pants/base:workunit',
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/binaries',
     'src/python/pants/fs',
     'src/python/pants/option',
     'src/python/pants/scm:git',
