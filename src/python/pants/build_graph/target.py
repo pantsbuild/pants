@@ -55,26 +55,6 @@ class AbstractTarget(object):
     """
     raise NotImplementedError()
 
-  @property
-  @deprecated('1.7.0.dev0',
-              'Old style resource specification is gone: check for dependencies of type '
-              '`Resources` instead.')
-  def has_resources(self):
-    """Returns True if the target has an associated set of Resources.
-
-    :API: public
-    """
-    return hasattr(self, 'resources') and self.resources
-
-  @property
-  @deprecated('1.7.0.dev0', 'use type tests and check the value of the `provides` attribute.')
-  def is_exported(self):
-    """Returns True if the target provides an artifact exportable from the repo.
-
-    :API: public
-    """
-    return getattr(self, 'provides', None) is not None
-
 
 class Target(AbstractTarget):
   """A generic target used to group dependencies.
