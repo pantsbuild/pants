@@ -57,7 +57,7 @@ class CoursierMixin(NailgunTask):
     super(CoursierMixin, cls).register_options(register)
     register('--allow-global-excludes', type=bool, advanced=False, fingerprint=True, default=True,
              help='Whether global excludes are allowed.')
-    register('--report', type=bool, advanced=False, fingerprint=True, default=False,
+    register('--report', type=bool, advanced=False, fingerprint=False, default=False,
              help='Show the resolve output.')
 
   @staticmethod
@@ -146,11 +146,11 @@ class CoursierMixin(NailgunTask):
         pants_jar_base_dir = self._prepare_workdir(pants_workdir)
         coursier_cache_dir = CoursierSubsystem.global_instance().get_options().cache_dir
 
-        # Check each individual target without context first
-        if not invalidation_check.invalid_vts:
-
+        # If a report is requested, do not proceed with loading validated result.
+        if not self.get_options().report:
+          # Check each individual target without context first
           # If the individuals are valid, check them as a VersionedTargetSet
-          if resolve_vts.valid:
+          if not invalidation_check.invalid_vts and resolve_vts.valid:
             # Load up from the results dir
             success = self._load_from_results_dir(compile_classpath, vt_set_results_dir,
                                                   coursier_cache_dir, invalidation_check, pants_jar_base_dir)
