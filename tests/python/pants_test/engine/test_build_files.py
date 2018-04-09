@@ -8,12 +8,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 
+from pants.base.project_tree import Dir, File
+from pants.base.specs import SingleAddress, Specs
 from pants.build_graph.address import Address
 from pants.engine.addressable import Exactly, addressable, addressable_dict
-from pants.engine.build_files import (ResolvedTypeMismatchError, create_graph_rules,
-                                      parse_address_family)
-from pants.engine.fs import Dir, FileContent, FilesContent, PathGlobs, create_fs_rules
-from pants.engine.mapper import AddressMapper, ResolveError
+from pants.engine.build_files import (ResolvedTypeMismatchError, addresses_from_address_families,
+                                      create_graph_rules, parse_address_family)
+from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot, create_fs_rules
+from pants.engine.mapper import AddressFamily, AddressMapper, ResolveError
 from pants.engine.nodes import Return, Throw
 from pants.engine.parser import SymbolTable
 from pants.engine.struct import Struct, StructWithDeps
@@ -31,6 +33,23 @@ class ParseAddressFamilyTest(unittest.TestCase):
         (FilesContent, PathGlobs): lambda _: FilesContent([FileContent('/dev/null/BUILD', '')])
       })
     self.assertEquals(len(af.objects_by_name), 0)
+
+
+class AddressesFromAddressFamiliesTest(unittest.TestCase):
+  def test_duplicated(self):
+    """Test that matching the same Spec twice succeeds."""
+    address = SingleAddress('a', 'a')
+    address_mapper = AddressMapper(JsonParser(TestTable()))
+    snapshot = Snapshot('xx', 2, [Path('a/BUILD', File('a/BUILD'))])
+    address_family = AddressFamily('a', {'a': ('a/BUILD', 'this is an object!')})
+
+    bfas = run_rule(addresses_from_address_families, address_mapper, Specs([address, address]), {
+        (Snapshot, PathGlobs): lambda _: snapshot,
+        (AddressFamily, Dir): lambda _: address_family,
+      })
+
+    self.assertEquals(len(bfas.dependencies), 1)
+    self.assertEquals(bfas.dependencies[0].spec, 'a:a')
 
 
 class ApacheThriftConfiguration(StructWithDeps):
