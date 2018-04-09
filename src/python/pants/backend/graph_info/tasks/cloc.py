@@ -26,9 +26,6 @@ class CountLinesOfCode(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(CountLinesOfCode, cls).register_options(register)
-    register('--version', advanced=True, fingerprint=True, default='1.66',
-             removal_version='1.7.0.dev0', removal_hint='Use --version in scope cloc-binary',
-             help='Version of cloc.')
     register('--transitive', type=bool, fingerprint=True, default=True,
              help='Operate on the transitive dependencies of the specified targets.  '
                   'Unset to operate only on the specified targets.')

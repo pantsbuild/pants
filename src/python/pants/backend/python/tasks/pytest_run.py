@@ -110,13 +110,6 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
                   "it's best to use an absolute path to make it easy to find the subprocess "
                   "profiles later.")
 
-    register('--options', type=list, fingerprint=True,
-             removal_version='1.7.0.dev0',
-             removal_hint='You can supply py.test options using the generic pass through the args '
-                          'facility. At the end of the pants command line, add `-- <py.test pass'
-                          'through args>`.',
-             help='Pass these options to pytest.')
-
     register('--coverage', fingerprint=True,
              help='Emit coverage information for specified packages or directories (absolute or '
                   'relative to the build root).  The special value "auto" indicates that Pants '

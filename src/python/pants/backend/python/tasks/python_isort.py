@@ -47,13 +47,6 @@ class IsortPythonTask(FmtTaskMixin, Task):
     super(IsortPythonTask, self).__init__(*args, **kwargs)
     self.options = self.get_options()
 
-  @classmethod
-  def register_options(cls, register):
-    super(IsortPythonTask, cls).register_options(register)
-    register('--version', advanced=True, fingerprint=True, default='4.2.5',
-             removal_version='1.7.0.dev0', removal_hint='Use --version in scope isort',
-             help='Version of isort.')
-
   def execute(self, test_output_file=None):
     sources = self._calculate_isortable_python_sources(
       self.get_targets(self.is_non_synthetic_python_target))

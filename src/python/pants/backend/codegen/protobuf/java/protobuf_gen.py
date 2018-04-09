@@ -35,32 +35,17 @@ class ProtobufGen(SimpleCodegenTask):
   def register_options(cls, register):
     super(ProtobufGen, cls).register_options(register)
 
-    # The protoc version and the plugin names are used as proxies for the identity of the protoc
-    # executable environment here.  Although version is an obvious proxy for the protoc binary
-    # itself, plugin names are less so and plugin authors must include a version in the name for
+    # The protoc plugin names are used as proxies for the identity of the protoc
+    # executable environment here.  Plugin authors must include a version in the name for
     # proper invalidation of protobuf products in the face of plugin modification that affects
     # plugin outputs.
-    register('--version', advanced=True, fingerprint=True,
-             removal_version='1.7.0.dev0',
-             removal_hint='Use --version in scope protoc instead.',
-             help='Version of protoc.  Used to create the default --javadeps and as part of '
-                  'the path to lookup the tool with --pants-support-baseurls and '
-                  '--pants-bootstrapdir.  When changing this parameter you may also need to '
-                  'update --javadeps.',
-             default='2.4.1')
     register('--protoc-plugins', advanced=True, fingerprint=True, type=list,
              help='Names of protobuf plugins to invoke.  Protoc will look for an executable '
                   'named protoc-gen-$NAME on PATH.')
-
     register('--extra_path', advanced=True, type=list,
              help='Prepend this path onto PATH in the environment before executing protoc. '
                   'Intended to help protoc find its plugins.',
              default=None)
-    register('--supportdir', advanced=True,
-             removal_version='1.7.0.dev0', removal_hint='Will no longer be configurable.',
-             help='Path to use for the protoc binary.  Used as part of the path to lookup the'
-                  'tool under --pants-bootstrapdir.',
-             default='bin/protobuf')
     register('--javadeps', advanced=True, type=list,
              help='Dependencies to bootstrap this task for generating java code.  When changing '
                   'this parameter you may also need to update --version.',
@@ -139,7 +124,7 @@ class ProtobufGen(SimpleCodegenTask):
 
     args.extend(sources)
 
-    # Tack on extra path entries. These can be used to find protoc plugins
+    # Tack on extra path entries. These can be used to find protoc plugins.
     protoc_environ = os.environ.copy()
     if self._extra_paths:
       protoc_environ['PATH'] = os.pathsep.join(self._extra_paths
