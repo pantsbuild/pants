@@ -11,6 +11,3 @@ from pants.binaries.binary_tool import NativeTool
 class Thrift(NativeTool):
   options_scope = 'thrift'
   default_version = '0.9.2'
-
-  replaces_scope = 'thrift-binary'
-  replaces_name = 'version'
