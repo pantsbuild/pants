@@ -13,7 +13,7 @@ from colors import red
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TaskError
-from pants.base.fingerprint_strategy import FingerprintStrategy
+from pants.base.fingerprint_strategy import FingerprintStrategy, StatelessFingerprintHashingMixin
 from pants.build_graph.build_graph import CycleException, sort_targets
 from pants.task.console_task import ConsoleTask
 from pants.task.task import Task
@@ -131,7 +131,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     E.g., a java_library targeted for Java 6 depends on a java_library targeted for java 7.
     """
 
-  class PlatformFingerprintStrategy(FingerprintStrategy):
+  class PlatformFingerprintStrategy(StatelessFingerprintHashingMixin, FingerprintStrategy):
     """Fingerprint strategy which only cares a target's platform and dependency ids."""
 
     def compute_fingerprint(self, target):
@@ -139,12 +139,6 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
       if hasattr(target, 'platform'):
         hasher.update(str(tuple(target.platform)))
       return hasher.hexdigest()
-
-    def __eq__(self, other):
-      return type(self) == type(other)
-
-    def __hash__(self):
-      return hash(type(self).__name__)
 
   @classmethod
   def product_types(cls):

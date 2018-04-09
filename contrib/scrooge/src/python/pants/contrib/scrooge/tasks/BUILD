@@ -12,7 +12,6 @@ python_library(
   name='scrooge_gen',
   sources=['scrooge_gen.py'],
   dependencies=[
-    ':java_thrift_library_fingerprint_strategy',
     ':thrift_util',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/codegen/thrift/java',
@@ -22,6 +21,7 @@ python_library(
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/build_graph',
     'src/python/pants/option',
     'src/python/pants/task',
@@ -48,13 +48,4 @@ python_library(
 python_library(
   name='thrift_util',
   sources=['thrift_util.py'],
-)
-
-python_library(
-  name='java_thrift_library_fingerprint_strategy',
-  sources=['java_thrift_library_fingerprint_strategy.py'],
-  dependencies=[
-    'src/python/pants/backend/codegen/thrift/java',
-    'src/python/pants/base:fingerprint_strategy',
-  ],
 )

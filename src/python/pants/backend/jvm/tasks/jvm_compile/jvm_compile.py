@@ -32,7 +32,7 @@ from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyze
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.fingerprint_strategy import FingerprintStrategy
+from pants.base.fingerprint_strategy import FingerprintStrategy, UnsharedFingerprintHashingMixin
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.resources import Resources
@@ -46,11 +46,11 @@ from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
 
 
-class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
+class _ResolvedJarAwareFingerprintStrategy(UnsharedFingerprintHashingMixin, FingerprintStrategy):
   """Task fingerprint strategy that also includes the resolved coordinates of dependent jars."""
 
   def __init__(self, classpath_products, dep_context):
-    super(ResolvedJarAwareFingerprintStrategy, self).__init__()
+    super(_ResolvedJarAwareFingerprintStrategy, self).__init__()
     self._classpath_products = classpath_products
     self._dep_context = dep_context
 
@@ -81,13 +81,7 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
   def dependencies(self, target):
     if self.direct(target):
       return target.strict_dependencies(self._dep_context)
-    return super(ResolvedJarAwareFingerprintStrategy, self).dependencies(target)
-
-  def __hash__(self):
-    return hash(type(self))
-
-  def __eq__(self, other):
-    return type(self) == type(other)
+    return super(_ResolvedJarAwareFingerprintStrategy, self).dependencies(target)
 
 
 class JvmCompile(NailgunTaskBase):
@@ -187,7 +181,7 @@ class JvmCompile(NailgunTaskBase):
     register('--suggest-missing-deps', type=bool,
              help='Suggest missing dependencies on a best-effort basis from target\'s transitive'
                   'deps for compilation failures that are due to class not found.')
-    
+
     register('--buildozer',
              help='Path to buildozer for suggest-missing-deps command lines. '
                   'If absent, no command line will be suggested to fix missing deps.')
@@ -424,7 +418,7 @@ class JvmCompile(NailgunTaskBase):
     return prop
 
   def _fingerprint_strategy(self, classpath_products):
-    return ResolvedJarAwareFingerprintStrategy(classpath_products, self._dep_context)
+    return _ResolvedJarAwareFingerprintStrategy(classpath_products, self._dep_context)
 
   @staticmethod
   def strict_deps_enabled(target):

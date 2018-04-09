@@ -13,14 +13,14 @@ from pex.interpreter import PythonIdentity, PythonInterpreter
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
+from pants.base.fingerprint_strategy import FingerprintStrategy, StatelessFingerprintHashingMixin
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.python.python_repos import PythonRepos
 from pants.task.task import Task
 from pants.util.dirutil import safe_mkdir_for
 
 
-class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
+class _PythonInterpreterFingerprintStrategy(StatelessFingerprintHashingMixin, FingerprintStrategy):
 
   def compute_fingerprint(self, python_target):
     # Only consider the compatibility requirements in the fingerprint, as only
@@ -49,7 +49,7 @@ class SelectInterpreter(Task):
 
   def execute(self):
     python_tgts = self.context.targets(lambda tgt: isinstance(tgt, PythonTarget))
-    fs = PythonInterpreterFingerprintStrategy()
+    fs = _PythonInterpreterFingerprintStrategy()
     with self.invalidated(python_tgts, fingerprint_strategy=fs) as invalidation_check:
       if PythonSetup.global_instance().interpreter_search_paths and PythonInterpreterCache.pex_python_paths():
         self.context.log.warn("Detected both PEX_PYTHON_PATH and --python-setup-interpreter-search-paths. "

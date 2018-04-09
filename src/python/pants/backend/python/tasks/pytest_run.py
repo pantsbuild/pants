@@ -24,7 +24,7 @@ from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import ErrorWhileTesting, TaskError
-from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
+from pants.base.fingerprint_strategy import FingerprintStrategy, StatelessFingerprintHashingMixin
 from pants.base.hash_utils import Sharder
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
@@ -588,7 +588,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
   # TODO(John Sirois): Its probably worth generalizing a means to mark certain options or target
   # attributes as making results un-cacheable. See: https://github.com/pantsbuild/pants/issues/4748
-  class NeverCacheFingerprintStrategy(DefaultFingerprintStrategy):
+  class NeverCacheFingerprintStrategy(StatelessFingerprintHashingMixin, FingerprintStrategy):
     def compute_fingerprint(self, target):
       return uuid.uuid4()
 

@@ -6,17 +6,43 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import functools
+import hashlib
 import os
 
 from pants.base.exceptions import TaskError
+from pants.base.fingerprint_strategy import FingerprintStrategy, UnsharedFingerprintHashingMixin
 from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_method
 from pants.util.strutil import safe_shlex_split
 
+from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.targets.go_target import GoTarget
-from pants.contrib.go.tasks.go_binary_fingerprint_strategy import GoBinaryFingerprintStrategy
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
+
+
+class _GoBinaryFingerprintStrategy(UnsharedFingerprintHashingMixin, FingerprintStrategy):
+  """Build flags aware fingerprint strategy.
+
+  This enables support for runtime merging of build flags (e.g.: config file, per-target, CLI),
+  which impact the output binary.
+  """
+
+  def __init__(self, get_build_flags_func):
+    """
+    :param func get_build_flags_func: Partial function that merges build_flags
+    """
+    self._get_build_flags_func = get_build_flags_func
+
+  def compute_fingerprint(self, target):
+    fp = target.payload.fingerprint()
+    if not isinstance(target, GoBinary):
+      return fp
+
+    hasher = hashlib.sha1()
+    hasher.update(fp)
+    hasher.update(str(self._get_build_flags_func(target)))
+    return hasher.hexdigest()
 
 
 class GoCompile(GoWorkspaceTask):
@@ -45,7 +71,7 @@ class GoCompile(GoWorkspaceTask):
     get_build_flags_func = functools.partial(self._get_build_flags,
                                              self.get_options().build_flags,
                                              self.get_options().is_flagged('build_flags'))
-    fingerprint_strategy = GoBinaryFingerprintStrategy(get_build_flags_func)
+    fingerprint_strategy = _GoBinaryFingerprintStrategy(get_build_flags_func)
     self.context.products.safe_create_data('exec_binary', lambda: {})
     with self.invalidated(self.context.targets(self.is_go),
                           invalidate_dependents=True,

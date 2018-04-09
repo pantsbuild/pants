@@ -9,12 +9,12 @@ import os
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.resources_task import ResourcesTask
-from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
+from pants.base.fingerprint_strategy import FingerprintStrategy, StatelessFingerprintHashingMixin
 from pants.base.hash_utils import stable_json_hash
 from pants.util.dirutil import safe_open
 
 
-class JvmServiceFingerprintStrategy(DefaultFingerprintStrategy):
+class _JvmServiceFingerprintStrategy(StatelessFingerprintHashingMixin, FingerprintStrategy):
   """Fingerprints a JvmTarget for its service provider configuration."""
 
   def compute_fingerprint(self, target):
@@ -40,7 +40,7 @@ class PrepareServices(ResourcesTask):
   def create_invalidation_strategy(self):
     # Service provider configuration has no dependency on target sources, deps or any other payload.
     # We just care about the services mapping.
-    return JvmServiceFingerprintStrategy()
+    return _JvmServiceFingerprintStrategy()
 
   def prepare_resources(self, target, chroot):
     for service, impls in target.services.items():

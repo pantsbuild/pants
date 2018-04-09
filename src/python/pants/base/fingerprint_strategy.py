@@ -14,18 +14,34 @@ from pants.util.meta import AbstractClass
 logger = logging.getLogger(__name__)
 
 
-class DefaultFingerprintHashingMixin(object):
-  """Default definitions for __hash__ and __eq__.
+class StatelessFingerprintHashingMixin(object):
+  """Definitions for `__hash__` and `__eq__` when a fingerprint strategy uses no stored state.
 
   Warning: Don't use this when the mixed in class has instance attributes mixed into its
-  fingerprints.  This will cause subtle bugs because fingerprints are cached on the Target
-  base class, and the cache key is the instance of the FingerprintStrategy."""
+  fingerprints _and_ the mixed in class will be used by more than one task type. This will cause
+  subtle bugs because fingerprints are cached on the `Target` base class, and the cache key is the
+  instance of the `FingerprintStrategy`.
+  """
 
   def __hash__(self):
     return hash(type(self))
 
   def __eq__(self, other):
     return type(self) == type(other)
+
+
+class UnsharedFingerprintHashingMixin(object):
+  """Definitions for `__hash__` and `__eq__` when a fingerprint strategy is used by only one task.
+
+  Warning: Don't use this when the mixed in class will be used by more than one `Task.invalidated`
+  call per-run - generally this means in more than one than one task type.
+  """
+
+  def __hash__(self):
+    return object.__hash__(self)
+
+  def __eq__(self, other):
+    return object.__eq__(self, other)
 
 
 class FingerprintStrategy(AbstractClass):
@@ -49,17 +65,22 @@ class FingerprintStrategy(AbstractClass):
   def dependencies(self, target):
     return target.dependencies
 
-  @abstractmethod
   def __hash__(self):
     """Subclasses must implement a hash so computed fingerprints can be safely memoized."""
 
-  @abstractmethod
   def __eq__(self, other):
-    """Subclasses must implement an equality check so computed fingerprints can be safely memoized."""
+    """Subclasses must implement an equality check so computed fingerprints can be safely memoized.
+
+    It is correct, but suboptimal, for fingerprint strategies that will produce the same results for
+    any `Target` to be unequal. It is incorrect for fingerprint strategies that will produce
+    different results for the same `Target` to be equal. Consider mixing in either
+    `StatelessFingerprintHashingMixin` or `UnsharedFingerprintHashingMixin` before providing your
+    own implementation.
+    """
 
 
-class DefaultFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
-  """The default FingerprintStrategy, which delegates to target.payload.invalidation_hash().
+class DefaultFingerprintStrategy(StatelessFingerprintHashingMixin, FingerprintStrategy):
+  """The default `FingerprintStrategy`, which delegates to `target.payload.invalidation_hash()`.
 
   :API: public
   """

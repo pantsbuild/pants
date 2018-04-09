@@ -16,7 +16,7 @@ from twitter.common.dirutil.fileset import fnmatch_translate_extended
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.base.build_environment import get_buildroot
-from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
+from pants.base.fingerprint_strategy import FingerprintStrategy, StatelessFingerprintHashingMixin
 from pants.fs.archive import ZIP
 from pants.task.task import Task
 
@@ -24,7 +24,7 @@ from pants.task.task import Task
 logger = logging.getLogger(__name__)
 
 
-class UnpackJarsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
+class _UnpackJarsFingerprintStrategy(StatelessFingerprintHashingMixin, FingerprintStrategy):
 
   def compute_fingerprint(self, target):
     """UnpackedJars targets need to be re-unpacked if any of its configuration changes or any of
@@ -145,7 +145,7 @@ class UnpackJars(Task):
     unpacked_jars_list = [t for t in closure if isinstance(t, UnpackedJars)]
 
     with self.invalidated(unpacked_jars_list,
-                          fingerprint_strategy=UnpackJarsFingerprintStrategy(),
+                          fingerprint_strategy=_UnpackJarsFingerprintStrategy(),
                           invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.invalid_vts:
         self._unpack(vt.target)
