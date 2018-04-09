@@ -3,7 +3,6 @@
 
 python_library(
   name='binary_util',
-  sources=['binary_tool.py', 'binary_util.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
@@ -17,16 +16,5 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:osutil',
-  ],
-)
-
-python_library(
-  name='thrift_util',
-  sources=['thrift_binary.py'],
-  dependencies=[
-    ':binary_util',
-    'src/python/pants/base:deprecated',
-    'src/python/pants/subsystem',
-    'src/python/pants/util:memo',
   ],
 )
