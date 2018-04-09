@@ -57,8 +57,8 @@ class CoursierMixin(NailgunTask):
     super(CoursierMixin, cls).register_options(register)
     register('--allow-global-excludes', type=bool, advanced=False, fingerprint=True, default=True,
              help='Whether global excludes are allowed.')
-    register('--report', type=bool, advanced=False, fingerprint=False, default=False,
-             help='Show the resolve output.')
+    register('--report', type=bool, advanced=False, default=False,
+             help='Show the resolve output. This would also force a resolve even if this task is validated.')
 
   @staticmethod
   def _compute_jars_to_resolve_and_pin(raw_jars, artifact_set, manager):
