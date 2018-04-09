@@ -253,7 +253,7 @@ eventually.
 * To show coursier command line invocation, use `-ldebug`
 
         :::bash
-        ./pants --cache-ignore --resolver-resolver=coursier resolve.coursier --report examples/tests/scala/org/pantsbuild/example/hello/welcome -ldebug
+        ./pants --resolver-resolver=coursier resolve.coursier --report examples/tests/scala/org/pantsbuild/example/hello/welcome -ldebug
 
 ##### For Pants <= 1.6.x
 
