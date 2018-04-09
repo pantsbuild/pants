@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.task.fmt_task_mixin import FmtTaskMixin
@@ -190,10 +189,3 @@ class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
   :API: public
   """
   fix = True
-
-
-# Deprecated old name for class.
-class JavascriptStyle(JavascriptStyleLint):
-  @deprecated('1.7.0.dev0', 'Replace with JavascriptStyleLint.')
-  def __init__(self, *args, **kwargs):
-    super(JavascriptStyle, self).__init__(*args, **kwargs)

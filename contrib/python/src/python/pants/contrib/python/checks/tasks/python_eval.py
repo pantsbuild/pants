@@ -62,10 +62,6 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     super(PythonEval, cls).register_options(register)
     register('--fail-slow', type=bool,
              help='Compile all targets and present the full list of errors.')
-    register('--closure', type=bool,
-             removal_version='1.7.0.dev0', removal_hint='Use --transitive instead.',
-             help='Eval all targets in the closure individually instead of just the targets '
-                  'specified on the command line.')
 
   def execute(self):
     # The default for --closure is False, while the default for --transitive is True, so we
