@@ -1353,6 +1353,7 @@ mod remote {
   use grpcio;
   use sha2::Sha256;
   use std::cmp::min;
+  use std::collections::HashSet;
   use std::sync::Arc;
   use std::time::Duration;
 
@@ -1509,7 +1510,7 @@ mod remote {
       }
     }
 
-    pub fn list_missing_digests(&self, digests: Vec<Digest>) -> Result<Vec<Digest>, String> {
+    pub fn list_missing_digests(&self, digests: Vec<Digest>) -> Result<HashSet<Digest>, String> {
       let mut request = bazel_protos::remote_execution::FindMissingBlobsRequest::new();
       for digest in digests.iter() {
         request.mut_blob_digests().push(digest.into());
@@ -1522,7 +1523,7 @@ mod remote {
             .get_missing_blob_digests()
             .iter()
             .map(|digest| digest.into())
-            .collect::<Vec<_>>()
+            .collect()
         })
         .map_err(|err| {
           format!(
@@ -1545,6 +1546,7 @@ mod remote {
     use futures::Future;
     use hashing::Digest;
     use mock::StubCAS;
+    use std::collections::HashSet;
     use std::fs::File;
     use std::io::Read;
     use std::path::PathBuf;
@@ -1764,7 +1766,10 @@ mod remote {
       let cas = new_cas(1024);
 
       let store = new_byte_store(&cas);
-      assert_eq!(store.list_missing_digests(vec![digest()]), Ok(vec![]));
+      assert_eq!(
+        store.list_missing_digests(vec![digest()]),
+        Ok(HashSet::new())
+      );
     }
 
     #[test]
@@ -1772,10 +1777,11 @@ mod remote {
       let cas = StubCAS::empty();
 
       let store = new_byte_store(&cas);
-      assert_eq!(
-        store.list_missing_digests(vec![digest()]),
-        Ok(vec![digest()])
-      );
+
+      let mut digest_set = HashSet::new();
+      digest_set.insert(digest());
+
+      assert_eq!(store.list_missing_digests(vec![digest()]), Ok(digest_set));
     }
 
     #[test]
