@@ -66,16 +66,6 @@ core_packages = set([
   Package("pantsbuild.pants.testinfra"),
 ])
 
-expected_package_owners = set([
-  "benjyw",
-  "illicitonion",
-  "ity",
-  "john.sirois",
-  "mateor",
-  "stuhood",
-  "wisechengyi",
-])
-
 
 def contrib_packages():
   output = subprocess.check_output(('bash', '-c', 'source contrib/release_packages.sh ; for pkg in "${CONTRIB_PACKAGES[@]}"; do echo "${!pkg}"; done'))
@@ -95,31 +85,39 @@ def get_pypi_config(section, option):
   return config.get(section, option)
 
 
-def check_ownership(users):
+def check_ownership(users, minimum_owner_count=3):
+  minimum_owner_count = max(len(users), minimum_owner_count)
   packages = sorted(all_packages())
   banner("Checking package ownership for {} packages".format(len(packages)))
   users = set(user.lower() for user in users)
-  non_expected_users = users.difference(expected_package_owners)
-  if non_expected_users:
-    raise ValueError('{} are not expected releasers. You may want to get added, as per https://www.pantsbuild.org/release.html#owners and then add yourself to expected_package_owners in file build-support/bin/release.py'.format(", ".join(non_expected_users)))
-
+  insufficient = set()
   unowned = dict()
 
   def check_ownership(i, package):
-    banner("[{}/{}] checking that {} owns {}".format(i, len(packages), ", ".join(users), package))
+    banner("[{}/{}] checking ownership for {}: > {} releasers including {}".format(i, len(packages), package, minimum_owner_count, ", ".join(users)))
     if not package.exists():
       print("The {} package is new! There are no owners yet.".format(package.name))
-    else:
-      difference = users.difference(package.owners())
-      for d in difference:
-        unowned.setdefault(d, set()).add(package)
+      return
+
+    owners = package.owners()
+    if len(owners) <= minimum_owner_count:
+      insufficient.add(package)
+
+    difference = users.difference(owners)
+    for d in difference:
+      unowned.setdefault(d, set()).add(package)
 
   for i, package in enumerate(packages):
     check_ownership(i, package)
 
-  if unowned:
-    for user, packages in sorted(unowned.items()):
-      print("Pypi account {} needs to be added as an owner for the following packages:\n{}".format(user, "\n".join(package.name for package in sorted(packages))), file=sys.stderr)
+  if insufficient or unowned:
+    if unowned:
+      for user, packages in sorted(unowned.items()):
+        print("Pypi account {} needs to be added as an owner for the following packages:\n{}".format(user, "\n".join(package.name for package in sorted(packages))), file=sys.stderr)
+
+    if insufficient:
+      print('The following packages have fewer than {} owners but should be setup for all releasers:\n{}'.format(minimum_owner_count, '\n'.join(package.name for package in insufficient)))
+
     sys.exit(1)
 
 
