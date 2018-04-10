@@ -18,7 +18,7 @@ Refactoring, Improvements, and Tooling
 * Upgrade virtualenv. (#5679)
   `PR #5679 <https://github.com/pantsbuild/pants/pull/5679>`_
 
-*  Narrow down BuildLocalPythonDistributions target type (#5659)
+* Narrow down BuildLocalPythonDistributions target type (#5659)
   `PR #5659 <https://github.com/pantsbuild/pants/pull/5659>`_
 
 1.6.0rc0 (04/04/2018)
