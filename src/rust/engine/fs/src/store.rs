@@ -1510,9 +1510,12 @@ mod remote {
       }
     }
 
-    pub fn list_missing_digests(&self, digests: Vec<Digest>) -> Result<HashSet<Digest>, String> {
+    pub fn list_missing_digests<'a, Digests: Iterator<Item = &'a Digest>>(
+      &self,
+      digests: Digests,
+    ) -> Result<HashSet<Digest>, String> {
       let mut request = bazel_protos::remote_execution::FindMissingBlobsRequest::new();
-      for digest in digests.iter() {
+      for digest in digests {
         request.mut_blob_digests().push(digest.into());
       }
       self
@@ -1767,7 +1770,7 @@ mod remote {
 
       let store = new_byte_store(&cas);
       assert_eq!(
-        store.list_missing_digests(vec![digest()]),
+        store.list_missing_digests(vec![digest()].iter()),
         Ok(HashSet::new())
       );
     }
@@ -1781,7 +1784,10 @@ mod remote {
       let mut digest_set = HashSet::new();
       digest_set.insert(digest());
 
-      assert_eq!(store.list_missing_digests(vec![digest()]), Ok(digest_set));
+      assert_eq!(
+        store.list_missing_digests(vec![digest()].iter()),
+        Ok(digest_set)
+      );
     }
 
     #[test]
@@ -1791,7 +1797,7 @@ mod remote {
       let store = new_byte_store(&cas);
 
       let error = store
-        .list_missing_digests(vec![digest()])
+        .list_missing_digests(vec![digest()].iter())
         .expect_err("Want error");
       assert!(
         error.contains("StubCAS is configured to always fail"),
