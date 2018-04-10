@@ -273,9 +273,7 @@ impl Store {
             .map(move |(digest, entry_type)| {
               let remote = remote.clone();
               local
-                .load_bytes_with(entry_type, digest.0, move |bytes| {
-                  remote.store_bytes(Bytes::from(bytes))
-                })
+                .load_bytes_with(entry_type, digest.0, move |bytes| remote.store_bytes(bytes))
                 .and_then(move |maybe_future| match maybe_future {
                   Some(future) => Ok(future),
                   None => Err(format!("Failed to upload digest {:?}: Not found", digest)),
@@ -1360,7 +1358,8 @@ mod remote {
 
   #[derive(Clone)]
   pub struct ByteStore {
-    client: Arc<bazel_protos::bytestream_grpc::ByteStreamClient>,
+    byte_stream_client: Arc<bazel_protos::bytestream_grpc::ByteStreamClient>,
+    cas_client: Arc<bazel_protos::remote_execution_grpc::ContentAddressableStorageClient>,
     env: Arc<grpcio::Environment>,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
@@ -1375,11 +1374,15 @@ mod remote {
     ) -> ByteStore {
       let env = Arc::new(grpcio::Environment::new(thread_count));
       let channel = grpcio::ChannelBuilder::new(env.clone()).connect(cas_address);
-      let client = Arc::new(bazel_protos::bytestream_grpc::ByteStreamClient::new(
-        channel,
+      let byte_stream_client = Arc::new(bazel_protos::bytestream_grpc::ByteStreamClient::new(
+        channel.clone(),
       ));
+      let cas_client = Arc::new(
+        bazel_protos::remote_execution_grpc::ContentAddressableStorageClient::new(channel),
+      );
       ByteStore {
-        client,
+        byte_stream_client,
+        cas_client,
         env,
         chunk_size_bytes,
         upload_timeout,
@@ -1399,7 +1402,7 @@ mod remote {
         bytes.len()
       );
       match self
-        .client
+        .byte_stream_client
         .write_opt(grpcio::CallOption::default().timeout(self.upload_timeout))
       {
         Err(err) => future::err(format!(
@@ -1429,7 +1432,7 @@ mod remote {
               },
             );
 
-          future::ok(self.client.clone())
+          future::ok(self.byte_stream_client.clone())
             .join(sender.send_all(stream).map_err(move |e| {
               format!(
                 "Error attempting to upload fingerprint {}: {:?}",
@@ -1467,7 +1470,7 @@ mod remote {
       digest: Digest,
       f: F,
     ) -> BoxFuture<Option<T>, String> {
-      match self.client.read(&{
+      match self.byte_stream_client.read(&{
         let mut req = bazel_protos::bytestream::ReadRequest::new();
         req.set_resource_name(format!("/blobs/{}/{}", digest.0, digest.1));
         req.set_read_offset(0);
@@ -1478,7 +1481,7 @@ mod remote {
         Ok(stream) => {
           // We shouldn't have to pass around the client here, it's a workaround for
           // https://github.com/pingcap/grpc-rs/issues/123
-          future::ok(self.client.clone())
+          future::ok(self.byte_stream_client.clone())
             .join(
               stream.fold(BytesMut::with_capacity(digest.1), move |mut bytes, r| {
                 bytes.extend_from_slice(&r.data);
@@ -1504,6 +1507,29 @@ mod remote {
           digest, err
         )).to_boxed() as BoxFuture<_, _>,
       }
+    }
+
+    pub fn list_missing_digests(&self, digests: Vec<Digest>) -> Result<Vec<Digest>, String> {
+      let mut request = bazel_protos::remote_execution::FindMissingBlobsRequest::new();
+      for digest in digests.iter() {
+        request.mut_blob_digests().push(digest.into());
+      }
+      self
+        .cas_client
+        .find_missing_blobs(&request)
+        .map(|response| {
+          response
+            .get_missing_blob_digests()
+            .iter()
+            .map(|digest| digest.into())
+            .collect::<Vec<_>>()
+        })
+        .map_err(|err| {
+          format!(
+            "Error from server in response to find_missing_blobs_request: {:?}",
+            err
+          )
+        })
     }
   }
 
@@ -1729,6 +1755,40 @@ mod remote {
         .expect_err("Want error");
       assert!(
         error.contains("Error attempting to upload fingerprint"),
+        format!("Bad error message, got: {}", error)
+      );
+    }
+
+    #[test]
+    fn list_missing_digests_none_missing() {
+      let cas = new_cas(1024);
+
+      let store = new_byte_store(&cas);
+      assert_eq!(store.list_missing_digests(vec![digest()]), Ok(vec![]));
+    }
+
+    #[test]
+    fn list_missing_digests_some_missing() {
+      let cas = StubCAS::empty();
+
+      let store = new_byte_store(&cas);
+      assert_eq!(
+        store.list_missing_digests(vec![digest()]),
+        Ok(vec![digest()])
+      );
+    }
+
+    #[test]
+    fn list_missing_digests_error() {
+      let cas = StubCAS::always_errors();
+
+      let store = new_byte_store(&cas);
+
+      let error = store
+        .list_missing_digests(vec![digest()])
+        .expect_err("Want error");
+      assert!(
+        error.contains("StubCAS is configured to always fail"),
         format!("Bad error message, got: {}", error)
       );
     }
