@@ -1732,7 +1732,7 @@ mod remote {
     fn write_file_multiple_chunks() {
       let cas = StubCAS::empty();
 
-      let store = ByteStore::new(&cas.address(), 1, 10 * 1024, Duration::from_secs(1));
+      let store = ByteStore::new(&cas.address(), 1, 10 * 1024, Duration::from_secs(10));
 
       let all_the_henries = {
         let mut f = File::open(

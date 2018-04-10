@@ -2,3 +2,6 @@
 version = "0.0.1"
 name = "testutil"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+
+[dependencies]
+bytes = "0.4.5"

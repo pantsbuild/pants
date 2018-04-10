@@ -649,6 +649,9 @@ dependencies = [
 [[package]]
 name = "testutil"
 version = "0.0.1"
+dependencies = [
+ "bytes 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "textwrap"
