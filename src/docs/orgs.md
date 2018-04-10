@@ -1,4 +1,4 @@
-# Pants for Organisations
+# Pants for Organizations
 
 Pants works well for organizations with a large number of developers working in a multi-tenant repo.
 Typically, repos become slower over time as more source and test files are added because most
