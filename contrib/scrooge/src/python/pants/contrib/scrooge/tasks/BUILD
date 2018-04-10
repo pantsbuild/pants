@@ -37,10 +37,11 @@ python_library(
     ':thrift_util',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
-    'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:worker_pool',
     'src/python/pants/base:workunit',
     'src/python/pants/option',
+    'src/python/pants/task'
   ],
 )
 
