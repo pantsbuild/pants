@@ -130,7 +130,7 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
       with self._create_thrift_project(thrift_files) as (srcdir, config):
         args = [
             # Necessary to use a newer thrift version.
-            '--thrift-binary-version=0.10.0',
+            '--thrift-version=0.10.0',
             'compile',
             os.path.join(srcdir, 'src/go/usethrift')
           ]
