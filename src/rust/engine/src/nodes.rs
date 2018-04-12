@@ -552,19 +552,27 @@ impl Node for ExecuteProcess {
   type Output = ProcessResult;
 
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
-    // TODO: Make this much less unwrap-happy with https://github.com/pantsbuild/pants/issues/5502
-
-    let tmpdir = TempDir::new("process-execution").unwrap();
+    let request = self.0;
+    let context2 = context.clone();
+    // TODO: Process pool management should likely move into the `process_executor` crate, which
+    // will have different strategies depending on remote/local execution.
     context
       .core
-      .store
-      .materialize_directory(tmpdir.path().to_owned(), self.0.input_files)
-      .wait()
-      .unwrap();
-    // TODO: this should run off-thread, and asynchronously
-    future::ok(ProcessResult(
-      process_executor::local::run_command_locally(self.0, tmpdir.path()).unwrap(),
-    )).to_boxed()
+      .pool
+      .spawn_fn(move || {
+        let tmpdir = TempDir::new("process-execution").unwrap();
+        context2
+          .core
+          .store
+          .materialize_directory(tmpdir.path().to_owned(), request.input_files)
+          .map(move |_| {
+            ProcessResult(
+              process_executor::local::run_command_locally(request, tmpdir.path()).unwrap(),
+            )
+          })
+          .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
+      })
+      .to_boxed()
   }
 }
 
