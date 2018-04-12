@@ -311,39 +311,13 @@ impl Select {
           .to_boxed(),
       ]
     } else if self.product() == &context.core.types.process_result {
-      let value = externs::val_for(&self.subject);
-
-      let mut env: BTreeMap<String, String> = BTreeMap::new();
-      let env_var_parts = externs::project_multi_strs(&value, "env");
-      // TODO: Error if env_var_parts.len() % 2 != 0
-      for i in 0..(env_var_parts.len() / 2) {
-        env.insert(
-          env_var_parts[2 * i].clone(),
-          env_var_parts[2 * i + 1].clone(),
-        );
-      }
-
-      // TODO: Make this much less unwrap-happy with https://github.com/pantsbuild/pants/issues/5502
-
-      let fingerprint = externs::project_str(&value, "input_files_digest");
-      let digest_length = externs::project_str(&value, "digest_length");
-      let digest_length_as_usize = digest_length.parse::<usize>().unwrap();
-      let digest = hashing::Digest(
-        hashing::Fingerprint::from_hex_string(&fingerprint).unwrap(),
-        digest_length_as_usize,
-      );
-
-      let request = process_executor::ExecuteProcessRequest {
-        argv: externs::project_multi_strs(&value, "argv"),
-        env: env,
-        input_files: digest,
-      };
+      let request = ExecuteProcess::lift(&self.subject);
       let tmpdir = TempDir::new("process-execution").unwrap();
 
       context
         .core
         .store
-        .materialize_directory(tmpdir.path().to_owned(), digest)
+        .materialize_directory(tmpdir.path().to_owned(), request.input_files)
         .wait()
         .unwrap();
       // TODO: this should run off-thread, and asynchronously
@@ -541,6 +515,41 @@ impl SelectDependencies {
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ExecuteProcess(process_executor::ExecuteProcessRequest);
+
+impl ExecuteProcess {
+  ///
+  /// Lifts a Key representing a python ExecuteProcessRequest value into a ExecuteProcess Node.
+  ///
+  fn lift(subject: &Key) -> process_executor::ExecuteProcessRequest {
+    let value = externs::val_for(subject);
+
+    let mut env: BTreeMap<String, String> = BTreeMap::new();
+    let env_var_parts = externs::project_multi_strs(&value, "env");
+    // TODO: Error if env_var_parts.len() % 2 != 0
+    for i in 0..(env_var_parts.len() / 2) {
+      env.insert(
+        env_var_parts[2 * i].clone(),
+        env_var_parts[2 * i + 1].clone(),
+      );
+    }
+
+    // TODO: Make this much less unwrap-happy with https://github.com/pantsbuild/pants/issues/5502
+
+    let fingerprint = externs::project_str(&value, "input_files_digest");
+    let digest_length = externs::project_str(&value, "digest_length");
+    let digest_length_as_usize = digest_length.parse::<usize>().unwrap();
+    let digest = hashing::Digest(
+      hashing::Fingerprint::from_hex_string(&fingerprint).unwrap(),
+      digest_length_as_usize,
+    );
+
+    process_executor::ExecuteProcessRequest {
+      argv: externs::project_multi_strs(&value, "argv"),
+      env: env,
+      input_files: digest,
+    }
+  }
+}
 
 #[derive(Clone, Debug)]
 pub struct ProcessResult(process_executor::ExecuteProcessResult);
