@@ -72,6 +72,7 @@ impl Core {
 
   pub fn pre_fork(&self) {
     self.pool.reset();
+    self.store.reset_lmdb_connections();
   }
 }
 
