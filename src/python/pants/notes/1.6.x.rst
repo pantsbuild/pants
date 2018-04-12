@@ -3,6 +3,15 @@
 
 This document describes releases leading up to the ``1.6.x`` ``stable`` series.
 
+1.6.0rc2 (04/12/2018)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Reset LMDB Environments when forking
+  `PR #5689 <https://github.com/pantsbuild/pants/pull/5689>`_
+
 1.6.0rc1 (04/09/2018)
 ---------------------
 
