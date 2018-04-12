@@ -311,27 +311,22 @@ impl Select {
           .to_boxed(),
       ]
     } else if self.product() == &context.core.types.process_result {
-      let request = ExecuteProcess::lift(&self.subject);
-      let tmpdir = TempDir::new("process-execution").unwrap();
-
-      context
-        .core
-        .store
-        .materialize_directory(tmpdir.path().to_owned(), request.input_files)
-        .wait()
-        .unwrap();
-      // TODO: this should run off-thread, and asynchronously
-      // TODO: request the Node that invokes the process, rather than invoke directly
-      let result = process_executor::local::run_command_locally(request, tmpdir.path()).unwrap();
+      let context2 = context.clone();
+      let execute_process_node = ExecuteProcess::lift(&self.subject);
       vec![
-        future::ok(externs::unsafe_call(
-          &context.core.types.construct_process_result,
-          &[
-            externs::store_bytes(&result.stdout),
-            externs::store_bytes(&result.stderr),
-            externs::store_i32(result.exit_code),
-          ],
-        )).to_boxed(),
+        context
+          .get(execute_process_node)
+          .map(move |result| {
+            externs::unsafe_call(
+              &context2.core.types.construct_process_result,
+              &[
+                externs::store_bytes(&result.0.stdout),
+                externs::store_bytes(&result.0.stderr),
+                externs::store_i32(result.0.exit_code),
+              ],
+            )
+          })
+          .to_boxed(),
       ]
     } else if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
       vec![future::ok(value.clone()).to_boxed()]
@@ -520,7 +515,7 @@ impl ExecuteProcess {
   ///
   /// Lifts a Key representing a python ExecuteProcessRequest value into a ExecuteProcess Node.
   ///
-  fn lift(subject: &Key) -> process_executor::ExecuteProcessRequest {
+  fn lift(subject: &Key) -> ExecuteProcess {
     let value = externs::val_for(subject);
 
     let mut env: BTreeMap<String, String> = BTreeMap::new();
@@ -534,7 +529,6 @@ impl ExecuteProcess {
     }
 
     // TODO: Make this much less unwrap-happy with https://github.com/pantsbuild/pants/issues/5502
-
     let fingerprint = externs::project_str(&value, "input_files_digest");
     let digest_length = externs::project_str(&value, "digest_length");
     let digest_length_as_usize = digest_length.parse::<usize>().unwrap();
@@ -543,11 +537,11 @@ impl ExecuteProcess {
       digest_length_as_usize,
     );
 
-    process_executor::ExecuteProcessRequest {
+    ExecuteProcess(process_executor::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
       input_files: digest,
-    }
+    })
   }
 }
 
@@ -558,20 +552,18 @@ impl Node for ExecuteProcess {
   type Output = ProcessResult;
 
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
-    let request = self.0.clone();
-
     // TODO: Make this much less unwrap-happy with https://github.com/pantsbuild/pants/issues/5502
 
     let tmpdir = TempDir::new("process-execution").unwrap();
     context
       .core
       .store
-      .materialize_directory(tmpdir.path().to_owned(), request.input_files)
+      .materialize_directory(tmpdir.path().to_owned(), self.0.input_files)
       .wait()
       .unwrap();
     // TODO: this should run off-thread, and asynchronously
     future::ok(ProcessResult(
-      process_executor::local::run_command_locally(request, tmpdir.path()).unwrap(),
+      process_executor::local::run_command_locally(self.0, tmpdir.path()).unwrap(),
     )).to_boxed()
   }
 }
