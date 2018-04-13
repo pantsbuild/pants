@@ -19,7 +19,7 @@ from pants.util.memo import memoized_method
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.tasks.node_task import NodeTask
 from pants.contrib.node.subsystems.command import command_gen
-from pants.contrib.node.subsystems.package_managers import PackageInstallationVersionOption
+from pants.contrib.node.subsystems.package_managers import PACKAGE_MANAGER_YARNPKG, PackageInstallationVersionOption
 
 
 class JavascriptStyleBase(NodeTask):
@@ -80,8 +80,10 @@ class JavascriptStyleBase(NodeTask):
     with pushd(bootstrap_dir):
       eslint_version = self.node_distribution.eslint_version
       eslint = 'eslint@{}'.format(eslint_version)
+      self.context.log.debug('Installing {}...'.format(eslint))
       result, add_command = self.add_package(
         package=eslint,
+        package_manager=self.node_distribution.get_package_manager(package_manager=PACKAGE_MANAGER_YARNPKG),
         version_option=PackageInstallationVersionOption.EXACT,
         workunit_name=self.INSTALL_JAVASCRIPTSTYLE_TARGET_NAME,
         workunit_labels=[WorkUnitLabel.PREP])
@@ -98,6 +100,7 @@ class JavascriptStyleBase(NodeTask):
     """
     with pushd(bootstrap_dir):
       result, install_command = self.install_module(
+        package_manager=self.node_distribution.get_package_manager(package_manager=PACKAGE_MANAGER_YARNPKG),
         workunit_name=self.INSTALL_JAVASCRIPTSTYLE_TARGET_NAME,
         workunit_labels=[WorkUnitLabel.PREP])
       if result != 0:
@@ -116,7 +119,7 @@ class JavascriptStyleBase(NodeTask):
 
   def _run_javascriptstyle(self, target, bootstrap_dir, files, config=None, ignore_path=None,
                            other_args=None):
-    args = ['--']
+    args = []
     if config:
       args.extend(['--config', config])
     else:

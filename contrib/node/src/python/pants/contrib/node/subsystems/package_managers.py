@@ -177,6 +177,7 @@ class PackageManagerYarnpkg(PackageManager):
         '{} does not support install with {} version, ignored'.format(self.name, version_option))
     else:
       return_args.append(package_version_option)
+    raise RuntimeError(' '.join(return_args))
     return return_args
 
 
@@ -221,4 +222,5 @@ class PackageManagerNpm(PackageManager):
         '{} does not support install with {} version, ignored.'.format(self.name, version_option))
     else:
       return_args.append(package_version_option)
+    raise RuntimeError(' '.join(return_args))
     return return_args

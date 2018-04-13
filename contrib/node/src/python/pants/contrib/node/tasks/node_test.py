@@ -67,6 +67,7 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
       self.context.log.debug(
         'Testing node module (first dependency): {}'.format(node_module))
       with pushd(node_paths.node_path(node_module)):
+        self._currently_executing_test_targets = [target]
         result, test_command = self.run_script(
           target.script_name,
           target=target,

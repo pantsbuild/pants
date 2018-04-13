@@ -65,7 +65,7 @@ class NodeRepl(ReplTaskMixin, NodeTask):
 
       with pushd(temp_dir):
         result, command = self.install_module(
-          package_manager=self.node_distribution.get_package_manager(package_manage=PACKAGE_MANAGER_NPM),
+          package_manager=self.node_distribution.get_package_manager(package_manager=PACKAGE_MANAGER_NPM),
           workunit_name=self.SYNTHETIC_NODE_TARGET_NAME)
         if result != 0:
           raise TaskError('npm install of synthetic REPL module failed:\n'
