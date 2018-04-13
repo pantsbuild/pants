@@ -10,6 +10,7 @@ from pants.task.task import Task
 from pants.util.memo import memoized_property
 
 from pants.contrib.node.subsystems.node_distribution import NodeDistribution
+from pants.contrib.node.subsystems.package_managers import PACKAGE_MANAGER_YARNPKG
 from pants.contrib.node.targets.node_bundle import NodeBundle
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.targets.node_package import NodePackage
@@ -118,6 +119,14 @@ class NodeTask(Task):
     )
     return self._execute_command(
       command, workunit_name=workunit_name, workunit_labels=workunit_labels)
+
+  def run_cli(self, cli, args=None, node_paths=None, workunit_name=None, workunit_labels=None):
+    package_manager = self.node_distribution.get_package_manager(
+      package_manager=PACKAGE_MANAGER_YARNPKG)
+    command = package_manager.run_cli(cli, args=args, node_paths=node_paths)
+    return self._execute_command(
+      command, workunit_name=workunit_name, workunit_labels=workunit_labels)
+
 
   def _execute_command(self, command, workunit_name, workunit_labels=None):
     """Executes a node or npm command via self._run_node_distribution_command.

@@ -135,6 +135,18 @@ class PackageManager(object):
       node_paths=node_paths,
     )
 
+  def run_cli(self, cli, args=None, node_paths=None):
+    cli_args = [cli]
+    if args:
+      cli_args.append('--')
+      cli_args.extend(args)
+    return command_gen(
+      self.tool_installations,
+      self.name,
+      args=cli_args,
+      node_paths = node_paths
+    )
+
 
 class PackageManagerYarnpkg(PackageManager):
 
@@ -177,7 +189,6 @@ class PackageManagerYarnpkg(PackageManager):
         '{} does not support install with {} version, ignored'.format(self.name, version_option))
     else:
       return_args.append(package_version_option)
-    raise RuntimeError(' '.join(return_args))
     return return_args
 
 
@@ -222,5 +233,7 @@ class PackageManagerNpm(PackageManager):
         '{} does not support install with {} version, ignored.'.format(self.name, version_option))
     else:
       return_args.append(package_version_option)
-    raise RuntimeError(' '.join(return_args))
     return return_args
+
+  def run_cli(self, cli, args=None, node_paths=None):
+    raise RuntimeError('npm does not support run cli directly.  Please use Yarn instead.')

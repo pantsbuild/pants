@@ -140,13 +140,7 @@ class JavascriptStyleBase(NodeTask):
       args.extend(other_args)
     args.extend(files)
     with pushd(bootstrap_dir):
-      command = command_gen([], 'eslint', args=args, node_paths=[bootstrap_dir])
-      result, run_command = self._execute_command(
-        command,
-        workunit_name=target.address.reference(),
-        workunit_labels=[WorkUnitLabel.PREP])
-      self.context.log.debug('Javascript style command: {}'.format(run_command))
-    return (result, run_command)
+      return self.run_cli('eslint', args=args)
 
   def execute(self):
     targets = self.get_lintable_node_targets(self.get_targets())
