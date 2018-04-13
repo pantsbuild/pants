@@ -19,7 +19,7 @@ use context::Context;
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
 use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDigest, VFS};
-use process_execution as process_executor;
+use process_execution;
 use hashing;
 use rule_graph;
 use selectors::{self, Selector};
@@ -509,7 +509,7 @@ impl SelectDependencies {
 /// A Node that represents executing a process.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ExecuteProcess(process_executor::ExecuteProcessRequest);
+pub struct ExecuteProcess(process_execution::ExecuteProcessRequest);
 
 impl ExecuteProcess {
   ///
@@ -537,7 +537,7 @@ impl ExecuteProcess {
       digest_length_as_usize,
     );
 
-    ExecuteProcess(process_executor::ExecuteProcessRequest {
+    ExecuteProcess(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
       input_files: digest,
@@ -546,7 +546,7 @@ impl ExecuteProcess {
 }
 
 #[derive(Clone, Debug)]
-pub struct ProcessResult(process_executor::ExecuteProcessResult);
+pub struct ProcessResult(process_execution::ExecuteProcessResult);
 
 impl Node for ExecuteProcess {
   type Output = ProcessResult;
@@ -554,7 +554,7 @@ impl Node for ExecuteProcess {
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0;
     let context2 = context.clone();
-    // TODO: Process pool management should likely move into the `process_executor` crate, which
+    // TODO: Process pool management should likely move into the `process_execution` crate, which
     // will have different strategies depending on remote/local execution.
     context
       .core
@@ -567,7 +567,7 @@ impl Node for ExecuteProcess {
           .materialize_directory(tmpdir.path().to_owned(), request.input_files)
           .map(move |_| {
             ProcessResult(
-              process_executor::local::run_command_locally(request, tmpdir.path()).unwrap(),
+              process_execution::local::run_command_locally(request, tmpdir.path()).unwrap(),
             )
           })
           .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
