@@ -137,7 +137,7 @@ class PackageManager(object):
     if args:
       cli_args.append('--')
       cli_args.extend(args)
-    return self.run_command(args=args, node_paths=node_paths)
+    return self.run_command(args=cli_args, node_paths=node_paths)
 
 
 class PackageManagerYarnpkg(PackageManager):
@@ -170,7 +170,7 @@ class PackageManagerYarnpkg(PackageManager):
     }.get(type_option)
     if package_type_option is None:
       logging.warning('{} does not support {} packages, ignored.'.format(self.name, type_option))
-    else:
+    elif package_type_option:  # Skip over '' entries
       return_args.append(package_type_option)
     package_version_option = {
       PackageInstallationVersionOption.EXACT: '--exact',
@@ -179,7 +179,7 @@ class PackageManagerYarnpkg(PackageManager):
     if package_version_option is None:
       LOG.warning(
         '{} does not support install with {} version, ignored'.format(self.name, version_option))
-    else:
+    elif package_version_option: # Skip over '' entries
       return_args.append(package_version_option)
     return return_args
 
@@ -211,10 +211,10 @@ class PackageManagerNpm(PackageManager):
       PackageInstallationTypeOption.OPTIONAL: '--save-optional',
       PackageInstallationTypeOption.BUNDLE: '--save-bundle',
       PackageInstallationTypeOption.NO_SAVE: '--no-save',
-    }
+    }.get(type_option)
     if package_type_option is None:
       logging.warning('{} does not support {} packages, ignored.'.format(self.name, type_option))
-    else:
+    elif package_type_option:  # Skip over '' entries
       return_args.append(package_type_option)
     package_version_option = {
       PackageInstallationVersionOption.EXACT: '--save-exact',
@@ -223,7 +223,7 @@ class PackageManagerNpm(PackageManager):
     if package_version_option is None:
       LOG.warning(
         '{} does not support install with {} version, ignored.'.format(self.name, version_option))
-    else:
+    elif package_version_option:  # Skip over '' entries
       return_args.append(package_version_option)
     return return_args
 

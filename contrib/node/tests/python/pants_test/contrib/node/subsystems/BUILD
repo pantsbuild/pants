@@ -11,3 +11,13 @@ python_tests(
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
+
+python_tests(
+  name='package_managers',
+  sources=['test_package_managers.py'],
+  dependencies=[
+    '3rdparty/python:mock',
+    'contrib/node/src/python/pants/contrib/node/subsystems',
+    'tests/python/pants_test:base_test',
+  ]
+)

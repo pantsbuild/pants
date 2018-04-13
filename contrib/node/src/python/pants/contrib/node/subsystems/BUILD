@@ -2,6 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  sources=[
+    'command.py',
+    'node_distribution.py',
+    'package_managers.py',
+    'yarnpkg_distribution.py',
+  ],
   dependencies=[
     'src/python/pants/base:deprecated',
     'src/python/pants/binaries:binary_util',
