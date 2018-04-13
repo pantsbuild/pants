@@ -65,6 +65,15 @@ class PackageManager(object):
     """
     raise NotImplementedError()
 
+  def run_command(self, args=None, node_paths=None):
+    """Returns a command that when executed will run an arbitury command via package manager."""
+    return command_gen(
+      self.tool_installations,
+      self.name,
+      args=args,
+      node_paths=node_paths
+    )
+
   def install_module(
     self,
     install_optional=False,
@@ -80,15 +89,11 @@ class PackageManager(object):
     :param node_paths: A list of path that should be included in $PATH when
       running installation.
     """
-    return command_gen(
-      self.tool_installations,
-      self.name,
-      args=self._get_installation_args(
-        install_optional=install_optional,
-        production_only=production_only,
-        force=force),
-      node_paths=node_paths
-    )
+    args=self._get_installation_args(
+      install_optional=install_optional,
+      production_only=production_only,
+      force=force)
+    return self.run_command(args=args, node_paths=node_paths)
 
   def run_script(self, script_name, script_args=None, node_paths=None):
     """Returns a command to execute a package.json script.
@@ -104,12 +109,7 @@ class PackageManager(object):
     if script_args:
       package_manager_args.append('--')
       package_manager_args.extend(script_args)
-    return command_gen(
-      self.tool_installations,
-      self.name,
-      args=package_manager_args,
-      node_paths=node_paths
-    )
+    return self.run_command(args=package_manager_args, node_paths=node_paths)
 
   def add_package(
     self,
@@ -125,27 +125,19 @@ class PackageManager(object):
     :param node_paths: A list of path that should be included in $PATH when
       running the script.
     """
-    return command_gen(
-      self.tool_installations,
-      self.name,
-      args=self._get_add_package_args(
-        package,
-        type_option=type_option,
-        version_option=version_option),
-      node_paths=node_paths,
-    )
+    args=self._get_add_package_args(
+      package,
+      type_option=type_option,
+      version_option=version_option)
+    return self.run_command(args=args, node_paths=node_paths)
 
   def run_cli(self, cli, args=None, node_paths=None):
+    """Returns a command that when executed will run an installed cli via package manager."""
     cli_args = [cli]
     if args:
       cli_args.append('--')
       cli_args.extend(args)
-    return command_gen(
-      self.tool_installations,
-      self.name,
-      args=cli_args,
-      node_paths = node_paths
-    )
+    return self.run_command(args=args, node_paths=node_paths)
 
 
 class PackageManagerYarnpkg(PackageManager):
