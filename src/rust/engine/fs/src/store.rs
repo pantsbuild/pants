@@ -72,6 +72,18 @@ impl Store {
     })
   }
 
+  ///
+  /// LMDB Environments aren't safe to be re-used after forking, so we need to drop them before
+  /// forking and re-create them afterwards.
+  ///
+  /// I haven't delved into the exact details as to what's fork-unsafe about LMDB, but if two pants
+  /// processes run using the same daemon, one takes out some kind of lock which the other cannot
+  /// ever acquire, so lmdb returns EAGAIN whenever a transaction is created in the second process.
+  ///
+  pub fn reset_lmdb_connections(&self) {
+    self.local.reset_lmdb_connections();
+  }
+
   pub fn store_file_bytes(&self, bytes: Bytes, initial_lease: bool) -> BoxFuture<Digest, String> {
     let len = bytes.len();
     self
@@ -273,9 +285,7 @@ impl Store {
             .map(move |(digest, entry_type)| {
               let remote = remote.clone();
               local
-                .load_bytes_with(entry_type, digest.0, move |bytes| {
-                  remote.store_bytes(Bytes::from(bytes))
-                })
+                .load_bytes_with(entry_type, digest.0, move |bytes| remote.store_bytes(bytes))
                 .and_then(move |maybe_future| match maybe_future {
                   Some(future) => Ok(future),
                   None => Err(format!("Failed to upload digest {:?}: Not found", digest)),
@@ -452,7 +462,7 @@ mod local {
   use std::collections::{BinaryHeap, HashMap};
   use std::fmt;
   use std::path::{Path, PathBuf};
-  use std::sync::Arc;
+  use std::sync::{Arc, RwLock};
   use std::time;
 
   use pool::ResettablePool;
@@ -478,16 +488,25 @@ mod local {
       Ok(ByteStore {
         inner: Arc::new(InnerStore {
           pool: pool,
-          file_dbs: ShardedLmdb::new(root.join("files"))?,
-          directory_dbs: ShardedLmdb::new(root.join("directories"))?,
+          file_dbs: ShardedLmdb::new(root.join("files")),
+          directory_dbs: ShardedLmdb::new(root.join("directories")),
         }),
       })
+    }
+
+    pub fn reset_lmdb_connections(&self) {
+      {
+        let mut file_dbs = self.inner.file_dbs.lmdbs.write().unwrap();
+        *file_dbs = None;
+      }
+      let mut directory_dbs = self.inner.directory_dbs.lmdbs.write().unwrap();
+      *directory_dbs = None;
     }
 
     // Note: This performs IO on the calling thread. Hopefully the IO is small enough not to matter.
     pub fn entry_type(&self, fingerprint: &Fingerprint) -> Result<Option<EntryType>, String> {
       {
-        let (env, directory_database, _) = self.inner.directory_dbs.get(fingerprint);
+        let (env, directory_database, _) = self.inner.directory_dbs.get(fingerprint)?;
         let txn = env
           .begin_ro_txn()
           .map_err(|err| format!("Failed to begin read transaction: {:?}", err))?;
@@ -502,7 +521,7 @@ mod local {
           }
         };
       }
-      let (env, file_database, _) = self.inner.file_dbs.get(fingerprint);
+      let (env, file_database, _) = self.inner.file_dbs.get(fingerprint)?;
       let txn = env
         .begin_ro_txn()
         .map_err(|err| format!("Failed to begin read transaction: {}", err))?;
@@ -525,7 +544,7 @@ mod local {
     ) -> Result<(), String> {
       let until = Self::default_lease_until_secs_since_epoch();
       for digest in digests {
-        let (env, _, lease_database) = self.inner.file_dbs.get(&digest.0);
+        let (env, _, lease_database) = self.inner.file_dbs.get(&digest.0)?;
         env
           .begin_rw_txn()
           .and_then(|mut txn| self.lease(&lease_database, &digest.0, until, &mut txn))
@@ -589,7 +608,7 @@ mod local {
           EntryType::File => self.inner.file_dbs.clone(),
           EntryType::Directory => self.inner.directory_dbs.clone(),
         };
-        let (env, database, lease_database) = lmdbs.get(&aged_fingerprint.fingerprint);
+        let (env, database, lease_database) = lmdbs.get(&aged_fingerprint.fingerprint)?;
         {
           env
             .begin_rw_txn()
@@ -622,7 +641,7 @@ mod local {
         EntryType::Directory => self.inner.directory_dbs.clone(),
       };
 
-      for &(ref env, ref database, ref lease_database) in database.all_lmdbs().iter() {
+      for &(ref env, ref database, ref lease_database) in database.all_lmdbs()?.iter() {
         let txn = env
           .begin_ro_txn()
           .map_err(|err| format!("Error beginning transaction to garbage collect: {}", err))?;
@@ -686,7 +705,7 @@ mod local {
             Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
           };
 
-          let (env, content_database, lease_database) = dbs.get(&fingerprint);
+          let (env, content_database, lease_database) = dbs.get(&fingerprint)?;
           let put_res = env.begin_rw_txn().and_then(|mut txn| {
             txn.put(content_database, &fingerprint, &bytes, NO_OVERWRITE)?;
             if initial_lease {
@@ -727,7 +746,7 @@ mod local {
         .inner
         .pool
         .spawn_fn(move || {
-          let (env, db, _) = dbs.get(&fingerprint);
+          let (env, db, _) = dbs.get(&fingerprint)?;
           let ro_txn = env
             .begin_ro_txn()
             .map_err(|err| format!("Failed to begin read transaction: {}", err));
@@ -751,12 +770,19 @@ mod local {
   struct ShardedLmdb {
     root_path: PathBuf,
     // First Database is content, second is leases.
-    lmdbs: HashMap<u8, (Arc<Environment>, Database, Database)>,
+    lmdbs: Arc<RwLock<Option<HashMap<u8, (Arc<Environment>, Database, Database)>>>>,
   }
 
   impl ShardedLmdb {
-    pub fn new(root_path: PathBuf) -> Result<ShardedLmdb, String> {
-      debug!("Initializing ShardedLmdb at root {:?}", root_path);
+    pub fn new(root_path: PathBuf) -> ShardedLmdb {
+      ShardedLmdb {
+        root_path: root_path,
+        lmdbs: Arc::new(RwLock::new(None)),
+      }
+    }
+
+    fn make_lmdbs(&self) -> Result<HashMap<u8, (Arc<Environment>, Database, Database)>, String> {
+      debug!("Initializing ShardedLmdb at root {:?}", self.root_path);
       let mut lmdbs = HashMap::new();
 
       for b in 0x00..0x10 {
@@ -767,7 +793,7 @@ mod local {
           fmt::Write::write_fmt(&mut s, format_args!("{:x}", key)).unwrap();
           s[0..1].to_owned()
         };
-        let dir = root_path.join(dirname);
+        let dir = self.root_path.join(dirname);
         super::super::safe_create_dir_all(&dir)
           .map_err(|err| format!("Error making directory for store at {:?}: {:?}", dir, err))?;
         debug!("Making ShardedLmdb env for {:?}", dir);
@@ -831,20 +857,51 @@ mod local {
 
         lmdbs.insert(key, (Arc::new(env), content_database, lease_database));
       }
-
-      Ok(ShardedLmdb {
-        root_path: root_path,
-        lmdbs: lmdbs,
-      })
+      Ok(lmdbs)
     }
 
     // First Database is content, second is leases.
-    pub fn get(&self, fingerprint: &Fingerprint) -> (Arc<Environment>, Database, Database) {
-      self.lmdbs.get(&(fingerprint.0[0] & 0xF0)).unwrap().clone()
+    pub fn get(
+      &self,
+      fingerprint: &Fingerprint,
+    ) -> Result<(Arc<Environment>, Database, Database), String> {
+      {
+        let maybe_lmdbs = self.lmdbs.read().unwrap();
+        match maybe_lmdbs.as_ref() {
+          Some(lmdbs) => return Ok(lmdbs.get(&(fingerprint.0[0] & 0xF0)).unwrap().clone()),
+          None => {}
+        }
+      }
+      {
+        let mut maybe_lmdbs = self.lmdbs.write().unwrap();
+        {
+          match maybe_lmdbs.as_ref() {
+            Some(_) => {}
+            None => {
+              *maybe_lmdbs = Some(self.make_lmdbs()?);
+            }
+          }
+        }
+        match maybe_lmdbs.as_ref() {
+          Some(lmdbs) => Ok(lmdbs.get(&(fingerprint.0[0] & 0xF0)).unwrap().clone()),
+          None => unreachable!(),
+        }
+      }
     }
 
-    pub fn all_lmdbs(&self) -> Vec<(Arc<Environment>, Database, Database)> {
-      self.lmdbs.values().map(|v| v.clone()).collect()
+    pub fn all_lmdbs(&self) -> Result<Vec<(Arc<Environment>, Database, Database)>, String> {
+      // TODO: Maybe do a read-locked check first (but this is only used when GCing so... Shrug).
+      let mut maybe_lmdbs = self.lmdbs.write().unwrap();
+      match maybe_lmdbs.as_ref() {
+        Some(_) => {}
+        None => {
+          *maybe_lmdbs = Some(self.make_lmdbs()?);
+        }
+      }
+      match maybe_lmdbs.as_ref() {
+        Some(lmdbs) => Ok(lmdbs.values().map(|v| v.clone()).collect()),
+        None => unreachable!(),
+      }
     }
   }
 
@@ -1355,12 +1412,14 @@ mod remote {
   use grpcio;
   use sha2::Sha256;
   use std::cmp::min;
+  use std::collections::HashSet;
   use std::sync::Arc;
   use std::time::Duration;
 
   #[derive(Clone)]
   pub struct ByteStore {
-    client: Arc<bazel_protos::bytestream_grpc::ByteStreamClient>,
+    byte_stream_client: Arc<bazel_protos::bytestream_grpc::ByteStreamClient>,
+    cas_client: Arc<bazel_protos::remote_execution_grpc::ContentAddressableStorageClient>,
     env: Arc<grpcio::Environment>,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
@@ -1375,11 +1434,15 @@ mod remote {
     ) -> ByteStore {
       let env = Arc::new(grpcio::Environment::new(thread_count));
       let channel = grpcio::ChannelBuilder::new(env.clone()).connect(cas_address);
-      let client = Arc::new(bazel_protos::bytestream_grpc::ByteStreamClient::new(
-        channel,
+      let byte_stream_client = Arc::new(bazel_protos::bytestream_grpc::ByteStreamClient::new(
+        channel.clone(),
       ));
+      let cas_client = Arc::new(
+        bazel_protos::remote_execution_grpc::ContentAddressableStorageClient::new(channel),
+      );
       ByteStore {
-        client,
+        byte_stream_client,
+        cas_client,
         env,
         chunk_size_bytes,
         upload_timeout,
@@ -1399,7 +1462,7 @@ mod remote {
         bytes.len()
       );
       match self
-        .client
+        .byte_stream_client
         .write_opt(grpcio::CallOption::default().timeout(self.upload_timeout))
       {
         Err(err) => future::err(format!(
@@ -1429,7 +1492,7 @@ mod remote {
               },
             );
 
-          future::ok(self.client.clone())
+          future::ok(self.byte_stream_client.clone())
             .join(sender.send_all(stream).map_err(move |e| {
               format!(
                 "Error attempting to upload fingerprint {}: {:?}",
@@ -1467,7 +1530,7 @@ mod remote {
       digest: Digest,
       f: F,
     ) -> BoxFuture<Option<T>, String> {
-      match self.client.read(&{
+      match self.byte_stream_client.read(&{
         let mut req = bazel_protos::bytestream::ReadRequest::new();
         req.set_resource_name(format!("/blobs/{}/{}", digest.0, digest.1));
         req.set_read_offset(0);
@@ -1478,7 +1541,7 @@ mod remote {
         Ok(stream) => {
           // We shouldn't have to pass around the client here, it's a workaround for
           // https://github.com/pingcap/grpc-rs/issues/123
-          future::ok(self.client.clone())
+          future::ok(self.byte_stream_client.clone())
             .join(
               stream.fold(BytesMut::with_capacity(digest.1), move |mut bytes, r| {
                 bytes.extend_from_slice(&r.data);
@@ -1505,6 +1568,32 @@ mod remote {
         )).to_boxed() as BoxFuture<_, _>,
       }
     }
+
+    pub fn list_missing_digests<'a, Digests: Iterator<Item = &'a Digest>>(
+      &self,
+      digests: Digests,
+    ) -> Result<HashSet<Digest>, String> {
+      let mut request = bazel_protos::remote_execution::FindMissingBlobsRequest::new();
+      for digest in digests {
+        request.mut_blob_digests().push(digest.into());
+      }
+      self
+        .cas_client
+        .find_missing_blobs(&request)
+        .map(|response| {
+          response
+            .get_missing_blob_digests()
+            .iter()
+            .map(|digest| digest.into())
+            .collect()
+        })
+        .map_err(|err| {
+          format!(
+            "Error from server in response to find_missing_blobs_request: {:?}",
+            err
+          )
+        })
+    }
   }
 
   #[cfg(test)]
@@ -1519,6 +1608,7 @@ mod remote {
     use futures::Future;
     use hashing::Digest;
     use mock::StubCAS;
+    use std::collections::HashSet;
     use std::fs::File;
     use std::io::Read;
     use std::path::PathBuf;
@@ -1729,6 +1819,47 @@ mod remote {
         .expect_err("Want error");
       assert!(
         error.contains("Error attempting to upload fingerprint"),
+        format!("Bad error message, got: {}", error)
+      );
+    }
+
+    #[test]
+    fn list_missing_digests_none_missing() {
+      let cas = new_cas(1024);
+
+      let store = new_byte_store(&cas);
+      assert_eq!(
+        store.list_missing_digests(vec![digest()].iter()),
+        Ok(HashSet::new())
+      );
+    }
+
+    #[test]
+    fn list_missing_digests_some_missing() {
+      let cas = StubCAS::empty();
+
+      let store = new_byte_store(&cas);
+
+      let mut digest_set = HashSet::new();
+      digest_set.insert(digest());
+
+      assert_eq!(
+        store.list_missing_digests(vec![digest()].iter()),
+        Ok(digest_set)
+      );
+    }
+
+    #[test]
+    fn list_missing_digests_error() {
+      let cas = StubCAS::always_errors();
+
+      let store = new_byte_store(&cas);
+
+      let error = store
+        .list_missing_digests(vec![digest()].iter())
+        .expect_err("Want error");
+      assert!(
+        error.contains("StubCAS is configured to always fail"),
         format!("Bad error message, got: {}", error)
       );
     }

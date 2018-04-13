@@ -7,7 +7,7 @@ use grpcio;
 
 use bytes::Bytes;
 use futures::{Future, IntoFuture, Stream};
-use hashing::Fingerprint;
+use hashing::{Digest, Fingerprint};
 
 ///
 /// Implements the ContentAddressableStorage gRPC API, answering read requests with either known
@@ -44,6 +44,9 @@ impl StubCAS {
       .register_service(bazel_protos::bytestream_grpc::create_byte_stream(
         responder.clone(),
       ))
+      .register_service(
+        bazel_protos::remote_execution_grpc::create_content_addressable_storage(responder.clone()),
+      )
       .bind("localhost", 0)
       .build()
       .unwrap();
@@ -324,6 +327,56 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
     _ctx: grpcio::RpcContext,
     _req: bazel_protos::bytestream::QueryWriteStatusRequest,
     sink: grpcio::UnarySink<bazel_protos::bytestream::QueryWriteStatusResponse>,
+  ) {
+    sink.fail(grpcio::RpcStatus::new(
+      grpcio::RpcStatusCode::Unimplemented,
+      None,
+    ));
+  }
+}
+
+impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASResponder {
+  fn find_missing_blobs(
+    &self,
+    _ctx: grpcio::RpcContext,
+    req: bazel_protos::remote_execution::FindMissingBlobsRequest,
+    sink: grpcio::UnarySink<bazel_protos::remote_execution::FindMissingBlobsResponse>,
+  ) {
+    if self.should_always_fail() {
+      sink.fail(grpcio::RpcStatus::new(
+        grpcio::RpcStatusCode::Internal,
+        Some("StubCAS is configured to always fail".to_owned()),
+      ));
+      return;
+    }
+    let blobs = self.blobs.lock().unwrap();
+    let mut response = bazel_protos::remote_execution::FindMissingBlobsResponse::new();
+    for digest in req.get_blob_digests() {
+      let hashing_digest: Digest = digest.into();
+      if !blobs.contains_key(&hashing_digest.0) {
+        response.mut_missing_blob_digests().push(digest.clone())
+      }
+    }
+    sink.success(response);
+  }
+
+  fn batch_update_blobs(
+    &self,
+    _ctx: grpcio::RpcContext,
+    _req: bazel_protos::remote_execution::BatchUpdateBlobsRequest,
+    sink: grpcio::UnarySink<bazel_protos::remote_execution::BatchUpdateBlobsResponse>,
+  ) {
+    sink.fail(grpcio::RpcStatus::new(
+      grpcio::RpcStatusCode::Unimplemented,
+      None,
+    ));
+  }
+
+  fn get_tree(
+    &self,
+    _ctx: grpcio::RpcContext,
+    _req: bazel_protos::remote_execution::GetTreeRequest,
+    sink: grpcio::UnarySink<bazel_protos::remote_execution::GetTreeResponse>,
   ) {
     sink.fail(grpcio::RpcStatus::new(
       grpcio::RpcStatusCode::Unimplemented,
