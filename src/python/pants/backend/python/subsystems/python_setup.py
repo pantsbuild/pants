@@ -64,6 +64,17 @@ class PythonSetup(Subsystem):
              help='A list of paths to search for python interpreters. Note that if a PEX_PYTHON_PATH '
               'variable is defined in a pexrc file, those interpreter paths will take precedence over ' 
               'this option.')
+    register('--resolver-blacklist', advanced=True, type=dict, default={},
+             metavar='<blacklist>',
+             help='A blacklist dict (str->str) that maps package name to an interpreter '
+              'constraint. If a package name is in the blacklist and its interpreter '
+              'constraint matches the target interpreter, skip the requirement. This is needed '
+              'to ensure that universal requirement resolves for a target interpreter version do '
+              'not error out on interpreter specific requirements such as backport libs like '
+              '`functools32`. For example, a valid blacklist is {"functools32": "CPython>3"}. '
+              'NOTE: this keyword is a temporary fix and will be reverted per: '
+              'https://github.com/pantsbuild/pants/issues/5696. The long term '
+              'solution is tracked by: https://github.com/pantsbuild/pex/issues/456.')
 
   @property
   def interpreter_constraints(self):
@@ -108,6 +119,10 @@ class PythonSetup(Subsystem):
   @property
   def resolver_allow_prereleases(self):
     return self.get_options().resolver_allow_prereleases
+
+  @property
+  def resolver_blacklist(self):
+    return self.get_options().resolver_blacklist
 
   @property
   def artifact_cache_dir(self):
