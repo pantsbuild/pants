@@ -252,12 +252,10 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
               if parts.len() != 6 || parts.get(1) != Some(&"uploads")
                 || parts.get(3) != Some(&"blobs")
               {
-                return Err(
-                  (grpcio::RpcStatus::new(
-                    grpcio::RpcStatusCode::InvalidArgument,
-                    Some(format!("Bad resource name: {}", resource_name)),
-                  )),
-                );
+                return Err(grpcio::RpcStatus::new(
+                  grpcio::RpcStatusCode::InvalidArgument,
+                  Some(format!("Bad resource name: {}", resource_name)),
+                ));
               }
               let fingerprint = match Fingerprint::from_hex_string(parts.get(4).unwrap()) {
                 Ok(f) => f,
