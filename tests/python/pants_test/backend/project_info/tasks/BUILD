@@ -98,16 +98,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'ide_gen',
-  sources = ['test_ide_gen.py'],
-  dependencies = [
-    'src/python/pants/backend/project_info/tasks:ide_gen',
-    'src/python/pants/source',
-    'tests/python/pants_test:base_test',
-  ]
-)
-
-python_tests(
   name = 'idea_plugin_integration',
   sources = ['test_idea_plugin_integration.py'],
   dependencies = [

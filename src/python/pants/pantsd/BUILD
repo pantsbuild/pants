@@ -40,7 +40,7 @@ python_library(
   sources = ['watchman_launcher.py'],
   dependencies = [
     ':watchman',
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/binaries',
     'src/python/pants/util:memo',
   ]
 )
@@ -60,7 +60,7 @@ python_library(
     '3rdparty/python:setproctitle',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exiter',
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/binaries',
     'src/python/pants/engine:native',
     'src/python/pants/goal:run_tracker',
     'src/python/pants/init',

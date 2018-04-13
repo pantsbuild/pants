@@ -24,21 +24,6 @@ class RagelGen(SimpleCodegenTask):
   def subsystem_dependencies(cls):
     return super(RagelGen, cls).subsystem_dependencies() + (Ragel.scoped(cls),)
 
-  @classmethod
-  def register_options(cls, register):
-    super(RagelGen, cls).register_options(register)
-    register('--supportdir', default='bin/ragel', advanced=True,
-             removal_version='1.7.0.dev0', removal_hint='No longer in use.',
-             help='The path to find the ragel binary.  Used as part of the path to lookup the'
-                  'tool with --pants-support-baseurls and --pants_bootstrapdir.')
-
-    # We take the cautious approach here and assume a version bump will always correspond to
-    # changes in ragel codegen products.
-    register('--version', default='6.9', advanced=True, fingerprint=True,
-             removal_version='1.7.0.dev0', removal_hint='Use --version in scope ragel.',
-             help='The version of ragel to use.  Used as part of the path to lookup the'
-                  'tool with --pants-support-baseurls and --pants-bootstrapdir')
-
   def __init__(self, *args, **kwargs):
     super(RagelGen, self).__init__(*args, **kwargs)
     self._java_out = os.path.join(self.workdir, 'gen-java')

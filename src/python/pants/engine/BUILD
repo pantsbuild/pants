@@ -185,7 +185,7 @@ python_library(
     ':selectors',
     '3rdparty/python:cffi',
     '3rdparty/python:setuptools',
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/binaries',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:objects'

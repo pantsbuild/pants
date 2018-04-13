@@ -55,7 +55,7 @@ python_library(
   dependencies=[
     ':planners',
     'src/python/pants/base:cmd_line_spec_parser',
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/binaries',
     'src/python/pants/build_graph',
     'src/python/pants/engine:scheduler',
     'src/python/pants/util:contextutil',

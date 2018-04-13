@@ -4,7 +4,7 @@
 
 python_library(
   dependencies=[
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/binaries',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
   ],

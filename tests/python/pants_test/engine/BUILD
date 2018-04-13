@@ -5,7 +5,7 @@ python_library(
   name = 'util',
   sources = ['util.py'],
   dependencies = [
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/binaries',
     'src/python/pants/engine:addressable',
     'src/python/pants/engine:native',
     'src/python/pants/engine:parser',

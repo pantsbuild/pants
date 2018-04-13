@@ -777,30 +777,3 @@ class PytestTest(PytestTestBase):
       assert_test_not_run('test_three')
       assert_test_run('test_four')
       assert_test_not_run('test_five')
-
-  def test_passthrough_args_legacy_option_single_style(self):
-    with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
-      self.run_tests([target], options=['-ktest_two or test_three'])
-      assert_test_not_run('test_one')
-      assert_test_run('test_two')
-      assert_test_run('test_three')
-      assert_test_not_run('test_four')
-      assert_test_not_run('test_five')
-
-  def test_passthrough_args_legacy_option_plus_arg_style(self):
-    with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
-      self.run_tests([target], options=['-m', 'red or green'])
-      assert_test_not_run('test_one')
-      assert_test_not_run('test_two')
-      assert_test_not_run('test_three')
-      assert_test_run('test_four')
-      assert_test_run('test_five')
-
-  def test_passthrough_args_combined(self):
-    with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
-      self.run_tests([target], '-mgreen or purple', options=['-ktest_two or test_three'])
-      assert_test_not_run('test_one')
-      assert_test_run('test_two')
-      assert_test_not_run('test_three')
-      assert_test_not_run('test_four')
-      assert_test_not_run('test_five')

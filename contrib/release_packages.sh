@@ -31,7 +31,7 @@ function pkg_scrooge_install_test() {
     --explain gen | grep "scrooge" &> /dev/null && \
   execute_packaged_pants_with_internal_backends \
     --plugins="['pantsbuild.pants.contrib.scrooge==${version}']" \
-    goals | grep "thrift-linter" &> /dev/null
+    --explain lint | grep "thrift" &> /dev/null
 }
 
 PKG_BUILDGEN=(

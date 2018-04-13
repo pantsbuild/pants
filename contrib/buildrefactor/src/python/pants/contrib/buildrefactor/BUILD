@@ -15,6 +15,6 @@ python_library(
   dependencies = [
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
-    'src/python/pants/binaries:binary_util'
+    'src/python/pants/binaries'
   ]
 )
