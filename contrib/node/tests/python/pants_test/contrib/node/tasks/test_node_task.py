@@ -115,7 +115,10 @@ class NodeTaskTest(TaskTestBase):
       with open(os.path.join(chroot, 'package.json'), 'wb') as fp:
         json.dump(package, fp)
       with pushd(chroot):
-        returncode, _ = task.execute_npm(['run-script', 'proof'], workunit_name='test')
+        returncode, _ = task.run_script(
+          'proof',
+          package_manager=task.node_distribution.get_package_manager(package_manager='npm'),
+          workunit_name='test')
 
       self.assertEqual(0, returncode)
       self.assertTrue(os.path.exists(proof))
@@ -137,7 +140,10 @@ class NodeTaskTest(TaskTestBase):
       with open(os.path.join(chroot, 'package.json'), 'wb') as fp:
         json.dump(package, fp)
       with pushd(chroot):
-        returncode, _ = task.execute_yarnpkg(['run', 'proof'], workunit_name='test')
+        returncode, _ = task.run_script(
+          'proof',
+          package_manager=task.node_distribution.get_package_manager(package_manager='yarnpkg'),
+          workunit_name='test')
 
       self.assertEqual(0, returncode)
       self.assertTrue(os.path.exists(proof))
