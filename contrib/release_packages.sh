@@ -6,19 +6,6 @@
 # `PKG_$NAME` definition.
 #
 
-PKG_ANDROID=(
-  "pantsbuild.pants.contrib.android"
-  "//contrib/android/src/python/pants/contrib/android:plugin"
-  "pkg_android_install_test"
-)
-function pkg_android_install_test() {
-  local version=$1
-  execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.android==${version}']" \
-    --explain apk | grep "apk" &> /dev/null
-}
-
-
 PKG_SCROOGE=(
   "pantsbuild.pants.contrib.scrooge"
   "//contrib/scrooge/src/python/pants/contrib/scrooge:plugin"
@@ -227,7 +214,6 @@ function pkg_googlejavaformat_install_test() {
 
 # Once individual (new) package is declared above, insert it into the array below)
 CONTRIB_PACKAGES=(
-  PKG_ANDROID
   PKG_SCROOGE
   PKG_BUILDGEN
   PKG_GO

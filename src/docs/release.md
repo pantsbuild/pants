@@ -220,7 +220,6 @@ Right now that's:
 
 - pantsbuild.pants
 - pantsbuild.pants.testinfra
-- pantsbuild.pants.contrib.android
 - pantsbuild.pants.contrib.scrooge
 - pantsbuild.pants.contrib.buildgen
 - pantsbuild.pants.contrib.go

@@ -1,8 +1,6 @@
 env:
   global:
     - PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.ini"
-    - ANDROID_SDK_INSTALL_LOCATION="${HOME}/opt/android-sdk-install"
-    - ANDROID_HOME="$ANDROID_SDK_INSTALL_LOCATION/android-sdk-linux"
     - PYTEST_PASSTHRU_ARGS="-v --duration=3"
 
 before_cache:
@@ -107,10 +105,6 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      before_script:
-        # The lint shard attempts to ivy resolve against the Android SDK due to
-        # references in `build-support/ivy/ivysettings.xml`.
-        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Various pants self checks and lint"
       script:
@@ -189,9 +183,6 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      before_script:
-        # Contrib tests need Android.
-        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Python contrib tests - shard 1"
       script:
@@ -218,9 +209,6 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      before_script:
-        # Contrib tests need Android.
-        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Python contrib tests - shard 2"
       script:
@@ -420,7 +408,7 @@ matrix:
       env:
         - SHARD="Rust tests"
       script:
-        - ./build-support/bin/ci.sh -abcfjklmnprtx
+        - ./build-support/bin/ci.sh -bcfjklmnprtx
 
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/s3/
