@@ -18,6 +18,8 @@ from pants.util.memo import memoized_method
 
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.tasks.node_task import NodeTask
+from pants.contrib.node.subsystems.command import command_gen
+from pants.contrib.node.subsystems.package_managers import PackageInstallationVersionOption
 
 
 class JavascriptStyleBase(NodeTask):
@@ -78,13 +80,14 @@ class JavascriptStyleBase(NodeTask):
     with pushd(bootstrap_dir):
       eslint_version = self.node_distribution.eslint_version
       eslint = 'eslint@{}'.format(eslint_version)
-      result, yarn_add_command = self.execute_yarnpkg(
-        args=['add', eslint],
+      result, add_command = self.add_package(
+        package=eslint,
+        version_option=PackageInstallationVersionOption.EXACT,
         workunit_name=self.INSTALL_JAVASCRIPTSTYLE_TARGET_NAME,
         workunit_labels=[WorkUnitLabel.PREP])
       if result != 0:
         raise TaskError('Failed to install eslint\n'
-                        '\t{} failed with exit code {}'.format(yarn_add_command, result))
+                        '\t{} failed with exit code {}'.format(add_command, result))
     return bootstrap_dir
 
   @memoized_method
@@ -94,13 +97,12 @@ class JavascriptStyleBase(NodeTask):
     :rtype: string
     """
     with pushd(bootstrap_dir):
-      result, yarn_install_command = self.execute_yarnpkg(
-        args=['install'],
+      result, install_command = self.install_module(
         workunit_name=self.INSTALL_JAVASCRIPTSTYLE_TARGET_NAME,
         workunit_labels=[WorkUnitLabel.PREP])
       if result != 0:
         raise TaskError('Failed to install ESLint\n'
-                        '\t{} failed with exit code {}'.format(yarn_install_command, result))
+                        '\t{} failed with exit code {}'.format(install_command, result))
 
     self.context.log.debug('Successfully installed ESLint to {}'.format(bootstrap_dir))
     return bootstrap_dir
@@ -114,7 +116,7 @@ class JavascriptStyleBase(NodeTask):
 
   def _run_javascriptstyle(self, target, bootstrap_dir, files, config=None, ignore_path=None,
                            other_args=None):
-    args = ['eslint', '--']
+    args = ['--']
     if config:
       args.extend(['--config', config])
     else:
@@ -135,12 +137,13 @@ class JavascriptStyleBase(NodeTask):
       args.extend(other_args)
     args.extend(files)
     with pushd(bootstrap_dir):
-      result, yarn_run_command = self.execute_yarnpkg(
-        args=args,
+      command = command_gen([], 'eslint', args=args, node_paths=[bootstrap_dir])
+      result, run_command = self._execute_command(
+        command,
         workunit_name=target.address.reference(),
         workunit_labels=[WorkUnitLabel.PREP])
-      self.context.log.debug('Javascript style command: {}'.format(yarn_run_command))
-    return (result, yarn_run_command)
+      self.context.log.debug('Javascript style command: {}'.format(run_command))
+    return (result, run_command)
 
   def execute(self):
     targets = self.get_lintable_node_targets(self.get_targets())

@@ -1,0 +1,222 @@
+# coding=utf-8
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
+
+import logging
+
+from pants.contrib.node.subsystems.command import command_gen
+
+
+LOG = logging.getLogger(__name__)
+
+PACKAGE_MANAGER_NPM = 'npm'
+PACKAGE_MANAGER_YARNPKG = 'yarnpkg' 
+
+
+# TODO: Change to enum type when migrated to Python 3.4+
+class PackageInstallationTypeOption(object):
+  PROD = 'prod'
+  DEV = 'dev'
+  PEER = 'peer'
+  BUNDLE = 'bundle'
+  OPTIONAL = 'optional'
+  NO_SAVE = 'not saved'
+
+
+class PackageInstallationVersionOption(object):
+  EXACT = 'exact'
+  TILDE = 'tilde'
+
+
+class PackageManager(object):
+  """Defines node package manager functionalities."""
+
+  def __init__(self, name, tool_installations):
+    self.name = name
+    self.tool_installations = tool_installations
+
+  def _get_installation_args(self, install_optional, production_only, force):
+    """Returns command line args for installing package.
+
+    :param install_optional: True to request install optional dependencies.
+    :param production_only: True to only install production dependencies, i.e.
+      ignore devDependencies.
+    :param force: True to force re-download dependencies.
+    :rtype: list of strings
+    """
+    raise NotImplementedError
+
+  def _get_run_script_args(self):
+    """Returns command line args to run a package.json script.
+
+    :rtype: list of strings
+    """
+    raise NotImplementedError
+
+  def _get_add_package_args(self, package, type_option, version_option):
+    """Returns command line args to add a node pacakge.
+
+    :rtype: list of strings
+    """
+    raise NotImplementedError()
+
+  def install_module(
+    self,
+    install_optional=False,
+    production_only=False,
+    force=False,
+    node_paths=None):
+    """Returns a command that when executed will install node package.
+
+    :param install_optional: True to install optional dependencies.
+    :param production_only: True to only install production dependencies, i.e.
+      ignore devDependencies.
+    :param force: True to force re-download dependencies.
+    :param node_paths: A list of path that should be included in $PATH when
+      running installation.
+    """
+    return command_gen(
+      self.tool_installations,
+      self.name,
+      args=self._get_installation_args(
+        install_optional=install_optional,
+        production_only=production_only,
+        force=force),
+      node_paths=node_paths
+    )
+
+  def run_script(self, script_name, script_args=None, node_paths=None):
+    """Returns a command to execute a package.json script.
+
+    :param script_name: Name of the script to name.  Note that script name 'test'
+      can be used to run node tests.
+    :param script_args: Args to be passed to package.json script.
+    :param node_paths: A list of path that should be included in $PATH when
+      running the script.
+    """
+    package_manager_args = self._get_run_script_args()
+    package_manager_args.append(script_name)
+    if script_args:
+      package_manager_args.append('--')
+      package_manager_args.extend(script_args)
+    return command_gen(
+      self.tool_installations,
+      self.name,
+      args=package_manager_args,
+      node_paths=node_paths
+    )
+
+  def add_package(
+    self,
+    package,
+    node_paths=None, 
+    type_option=PackageInstallationTypeOption.PROD,
+    version_option=None):
+    """Returns a command that when executed will add a node package to current node module.
+
+    :param package: string.  A valid npm/yarn package description.  The accepted forms are
+      package-name, package-name@version, package-name@tag, file:/folder, file:/path/to.tgz
+      https://url/to.tgz
+    :param node_paths: A list of path that should be included in $PATH when
+      running the script.
+    """
+    return command_gen(
+      self.tool_installations,
+      self.name,
+      args=self._get_add_package_args(
+        package,
+        type_option=type_option,
+        version_option=version_option),
+      node_paths=node_paths,
+    )
+
+
+class PackageManagerYarnpkg(PackageManager):
+
+  def __init__(self, tool_installation):
+    super(PackageManagerYarnpkg, self).__init__(PACKAGE_MANAGER_YARNPKG, tool_installation)
+
+  def _get_run_script_args(self):
+    return ['run']
+
+  def _get_installation_args(self, install_optional, production_only, force):
+    return_args = ['--non-interactive']
+    if not install_optional:
+      return_args.append('--ignore-optional')
+    if production_only:
+      return_args.append('--production=true')
+    if force:
+      return_args.append('--force')
+    return return_args
+
+  def _get_add_package_args(self, package, type_option, version_option):
+    return_args = ['add', package]
+    package_type_option = {
+      PackageInstallationTypeOption.PROD: '',  # Yarn save production is the default.
+      PackageInstallationTypeOption.DEV: '--dev',
+      PackageInstallationTypeOption.PEER: '--peer',
+      PackageInstallationTypeOption.OPTIONAL: '--optional',
+      PackageInstallationTypeOption.BUNDLE: None,
+      PackageInstallationTypeOption.NO_SAVE: None,
+    }.get(type_option)
+    if package_type_option is None:
+      logging.warning('{} does not support {} packages, ignored.'.format(self.name, type_option))
+    else:
+      return_args.append(package_type_option)
+    package_version_option = {
+      PackageInstallationVersionOption.EXACT: '--exact',
+      PackageInstallationVersionOption.TILDE: '--tilde',
+    }.get(version_option)
+    if package_version_option is None:
+      LOG.warning(
+        '{} does not support install with {} version, ignored'.format(self.name, version_option))
+    else:
+      return_args.append(package_version_option)
+    return return_args
+
+
+class PackageManagerNpm(PackageManager):
+
+  def __init__(self, tool_installation):
+    super(PackageManagerNpm, self).__init__(PACKAGE_MANAGER_NPM, tool_installation)
+
+  def _get_run_script_args(self):
+    return ['run-script']
+
+  def _get_installation_args(self, install_optional, production_only, force):
+    return_args = ['install']
+    if not install_optional:
+      return_args.append('--no-optional')
+    if production_only:
+      return_args.append('--production')
+    if force:
+      return_args.append('--force')
+    return return_args
+
+  def _get_add_package_args(self, package, type_option, version_option):
+    return_args = ['install', package]
+    package_type_option = {
+      PackageInstallationTypeOption.PROD: '--save-prod',
+      PackageInstallationTypeOption.DEV: '--save-dev',
+      PackageInstallationTypeOption.PEER: None,
+      PackageInstallationTypeOption.OPTIONAL: '--save-optional',
+      PackageInstallationTypeOption.BUNDLE: '--save-bundle',
+      PackageInstallationTypeOption.NO_SAVE: '--no-save',
+    }
+    if package_type_option is None:
+      logging.warning('{} does not support {} packages, ignored.'.format(self.name, type_option))
+    else:
+      return_args.append(package_type_option)
+    package_version_option = {
+      PackageInstallationVersionOption.EXACT: '--save-exact',
+      PackageInstallationVersionOption.TILDE: None,
+    }.get(version_option)
+    if package_version_option is None:
+      LOG.warning(
+        '{} does not support install with {} version, ignored.'.format(self.name, version_option))
+    else:
+      return_args.append(package_version_option)
+    return return_args

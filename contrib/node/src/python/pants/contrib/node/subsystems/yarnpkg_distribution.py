@@ -22,19 +22,3 @@ class YarnpkgDistribution(NativeTool):
   name = 'yarnpkg'
   default_version = 'v0.19.1'
   archive_type = 'tgz'
-
-  replaces_scope = 'node-distribution'
-  replaces_name = 'yarnpkg_version'
-
-  @memoized_method
-  def version(self, context=None):
-    # The versions reported by node and embedded in distribution package names are 'vX.Y.Z'.
-    # TODO: After the deprecation cycle is over we'll expect the values of the version option
-    # to already include the 'v' prefix, so there will be no need to normalize, and we can
-    # delete this entire method override.
-    version = super(YarnpkgDistribution, self).version(context)
-    deprecated_conditional(
-      lambda: not version.startswith('v'), entity_description='', removal_version='1.7.0.dev0',
-      hint_message='value of --version in scope {} must be of the form '
-                   'vX.Y.Z'.format(self.options_scope))
-    return version if version.startswith('v') else 'v' + version
