@@ -20,7 +20,8 @@ from pants.util.memo import memoized_method, memoized_property
 
 from pants.contrib.node.subsystems.command import command_gen
 from pants.contrib.node.subsystems.package_managers import (
-  PACKAGE_MANAGER_NPM, PACKAGE_MANAGER_YARNPKG, PackageManagerNpm, PackageManagerYarnpkg)
+  PACKAGE_MANAGER_NPM, PACKAGE_MANAGER_YARNPKG, PACKAGE_MANAGER_YARNPKG_ALIAS, VALID_PACKAGE_MANAGERS,
+  PackageManagerNpm, PackageManagerYarnpkg)
 from pants.contrib.node.subsystems.yarnpkg_distribution import YarnpkgDistribution
 
 
@@ -51,9 +52,9 @@ class NodeDistribution(NativeTool):
                   'lookup the distribution with --binary-util-baseurls and --pants-bootstrapdir')
 
     register('--package-manager', advanced=True, default='npm', fingerprint=True,
-             choices=NodeDistribution.VALID_PACKAGE_MANAGER_LIST.keys(),
+             choices=VALID_PACKAGE_MANAGERS,
              help='Default package manager config for repo. Should be one of {}'.format(
-               NodeDistribution.VALID_PACKAGE_MANAGER_LIST.keys()))
+               VALID_PACKAGE_MANAGERS))
     register('--eslint-setupdir', advanced=True, type=dir_option, fingerprint=True,
              help='Find the package.json and yarn.lock under this dir '
                   'for installing eslint and plugins.')
@@ -71,7 +72,7 @@ class NodeDistribution(NativeTool):
     return {
       PACKAGE_MANAGER_NPM: npm,
       PACKAGE_MANAGER_YARNPKG: yarnpkg,
-      'yarn': yarnpkg,  # Allow yarn to be used as an alias for yarnpkg
+      PACKAGE_MANAGER_YARNPKG_ALIAS: yarnpkg,  # Allow yarn to be used as an alias for yarnpkg
     }
 
   def get_package_manager(self, package_manager=None):

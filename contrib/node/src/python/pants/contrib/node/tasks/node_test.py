@@ -72,8 +72,8 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
           target=target,
           script_args=self.get_passthru_args(),
           node_paths=node_paths.all_node_paths,
-            workunit_name=target.address.reference(),
-            workunit_labels=[WorkUnitLabel.TEST])
+          workunit_name=target.address.reference(),
+          workunit_labels=[WorkUnitLabel.TEST])
         if result != 0:
           raise TaskError('test script failed:\n'
                           '\t{} failed with exit code {}'.format(test_command, result))

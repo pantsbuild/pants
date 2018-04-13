@@ -13,7 +13,9 @@ from pants.contrib.node.subsystems.command import command_gen
 LOG = logging.getLogger(__name__)
 
 PACKAGE_MANAGER_NPM = 'npm'
-PACKAGE_MANAGER_YARNPKG = 'yarnpkg' 
+PACKAGE_MANAGER_YARNPKG = 'yarnpkg'
+PACKAGE_MANAGER_YARNPKG_ALIAS = 'yarn'
+VALID_PACKAGE_MANAGERS = [PACKAGE_MANAGER_NPM, PACKAGE_MANAGER_YARNPKG, PACKAGE_MANAGER_YARNPKG_ALIAS]
 
 
 # TODO: Change to enum type when migrated to Python 3.4+
