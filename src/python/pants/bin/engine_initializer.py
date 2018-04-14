@@ -60,6 +60,7 @@ class LegacySymbolTable(SymbolTable):
 
     self._table['junit_tests'] = JunitTestsAdaptor
     self._table['jvm_app'] = AppAdaptor
+    self._table['python_app'] = AppAdaptor
     self._table['python_tests'] = PythonTestsAdaptor
     self._table['python_binary'] = PythonTargetAdaptor
     self._table['remote_sources'] = RemoteSourcesAdaptor

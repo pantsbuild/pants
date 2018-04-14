@@ -9,6 +9,7 @@ from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
+from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -20,6 +21,7 @@ from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
+from pants.backend.python.tasks.python_bundle import PythonBundle
 from pants.backend.python.tasks.python_isort import IsortPythonTask
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
@@ -34,6 +36,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 def build_file_aliases():
   return BuildFileAliases(
     targets={
+      PythonApp.alias():PythonApp,
       PythonBinary.alias(): PythonBinary,
       PythonLibrary.alias(): PythonLibrary,
       PythonTests.alias(): PythonTests,
@@ -65,6 +68,7 @@ def register_goals():
   task(name='setup-py', action=SetupPy).install()
   task(name='py', action=PythonBinaryCreate).install('binary')
   task(name='isort', action=IsortPythonTask).install('fmt')
+  task(name='py', action=PythonBundle).install('bundle')
 
 
 def rules():

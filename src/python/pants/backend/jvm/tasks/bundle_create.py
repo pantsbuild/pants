@@ -14,15 +14,15 @@ from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TargetDefinitionException, TaskError
+from pants.base.exceptions import TaskError
+from pants.build_graph.bundle_mixin import BundleMixin
 from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
-from pants.util.dirutil import absolute_symlink, safe_mkdir, safe_mkdir_for
-from pants.util.fileutil import atomic_copy
+from pants.util.dirutil import safe_mkdir
 from pants.util.objects import datatype
 
 
-class BundleCreate(JvmBinaryTask):
+class BundleCreate(BundleMixin, JvmBinaryTask):
   """
   :API: public
   """
@@ -41,16 +41,7 @@ class BundleCreate(JvmBinaryTask):
                   "directory, the root will only contain a synthetic jar with its manifest's "
                   "Class-Path set to those jars. This option is also defined in jvm_app target. "
                   "Precedence is CLI option > target option > pants.ini option.")
-    register('--archive', advanced=True, choices=list(archive.TYPE_NAMES),
-             fingerprint=True,
-             help='Create an archive of this type from the bundle. '
-                  'This option is also defined in jvm_app target. '
-                  'Precedence is CLI option > target option > pants.ini option.')
-    # `target.id` ensures global uniqueness, this flag is provided primarily for
-    # backward compatibility.
-    register('--use-basename-prefix', advanced=True, type=bool,
-             help='Use target basename to prefix bundle folder or archive; otherwise a unique '
-                  'identifier derived from target will be used.')
+    cls.register_common_options(register)
 
   @classmethod
   def implementation_version(cls):
@@ -86,38 +77,6 @@ class BundleCreate(JvmBinaryTask):
   def cache_target_dirs(self):
     return True
 
-  # TODO (Benjy): The following CLI > target > config logic
-  # should be implemented in the options system.
-  # https://github.com/pantsbuild/pants/issues/3538
-  def _resolved_option(self, target, key):
-    """Get value for option "key".
-
-    Resolution precedence is CLI option > target option > pants.ini option.
-    """
-    option_value = self.get_options().get(key)
-    if not isinstance(target, JvmApp) or self.get_options().is_flagged(key):
-      return option_value
-    v = target.payload.get_field_value(key, None)
-    return option_value if v is None else v
-
-  def _store_results(self, vt, bundle_dir, archivepath, app):
-    """Store a copy of the bundle and archive from the results dir in dist."""
-    # TODO (from mateor) move distdir management somewhere more general purpose.
-    dist_dir = self.get_options().pants_distdir
-    name = vt.target.basename if self.get_options().use_basename_prefix else app.id
-    bundle_copy = os.path.join(dist_dir, '{}-bundle'.format(name))
-    absolute_symlink(bundle_dir, bundle_copy)
-    self.context.log.info(
-      'created bundle copy {}'.format(os.path.relpath(bundle_copy, get_buildroot())))
-
-    if archivepath:
-      ext = archive.archive_extensions.get(app.archive, app.archive)
-      archive_copy = os.path.join(dist_dir,'{}.{}'.format(name, ext))
-      safe_mkdir_for(archive_copy)  # Ensure parent dir exists
-      atomic_copy(archivepath, archive_copy)
-      self.context.log.info(
-        'created archive copy {}'.format(os.path.relpath(archive_copy, get_buildroot())))
-
   def _add_product(self, deployable_archive, app, path):
     deployable_archive.add(
       app.target, os.path.dirname(path)).append(os.path.basename(path))
@@ -136,11 +95,11 @@ class BundleCreate(JvmBinaryTask):
 
       for vt in invalidation_check.all_vts:
         app = self.App.create_app(vt.target,
-                                  self._resolved_option(vt.target, 'deployjar'),
-                                  self._resolved_option(vt.target, 'archive'))
+                                  self.resolved_option(self.get_options(), vt.target, 'deployjar'),
+                                  self.resolved_option(self.get_options(), vt.target, 'archive'))
         archiver = archive.archiver(app.archive) if app.archive else None
 
-        bundle_dir = self._get_bundle_dir(app, vt.results_dir)
+        bundle_dir = self.get_bundle_dir(app.id, vt.results_dir)
         ext = archive.archive_extensions.get(app.archive, app.archive)
         filename = '{}.{}'.format(app.id, ext)
         archive_path = os.path.join(vt.results_dir, filename) if app.archive else ''
@@ -156,13 +115,16 @@ class BundleCreate(JvmBinaryTask):
 
         # For root targets, create symlink.
         if vt.target in self.context.target_roots:
-          self._store_results(vt, bundle_dir, archive_path, app)
+          self.publish_results(self.get_options().pants_distdir,
+                               self.get_options().use_basename_prefix,
+                               vt,
+                               bundle_dir,
+                               archive_path,
+                               app.id,
+                               app.archive)
 
   class BasenameConflictError(TaskError):
     """Indicates the same basename is used by two targets."""
-
-  def _get_bundle_dir(self, app, results_dir):
-    return os.path.join(results_dir, '{}-bundle'.format(app.id))
 
   def bundle(self, app, results_dir):
     """Create a self-contained application bundle.
@@ -171,7 +133,7 @@ class BundleCreate(JvmBinaryTask):
     """
     assert(isinstance(app, BundleCreate.App))
 
-    bundle_dir = self._get_bundle_dir(app, results_dir)
+    bundle_dir = self.get_bundle_dir(app.id, results_dir)
     self.context.log.debug('creating {}'.format(os.path.relpath(bundle_dir, get_buildroot())))
 
     safe_mkdir(bundle_dir, clean=True)
@@ -207,33 +169,9 @@ class BundleCreate(JvmBinaryTask):
         # TODO run in parallel to speed up
         self.shade_jar(shading_rules=app.binary.shading_rules, jar_path=jar_path)
 
-    self._symlink_bundles(app, bundle_dir)
+    self.symlink_bundles(app, bundle_dir)
 
     return bundle_dir
-
-  def _symlink_bundles(self, app, bundle_dir):
-    """For each bundle in the given app, symlinks relevant matched paths.
-
-    Validates that at least one path was matched by a bundle.
-    """
-    for bundle_counter, bundle in enumerate(app.bundles):
-      count = 0
-      for path, relpath in bundle.filemap.items():
-        bundle_path = os.path.join(bundle_dir, relpath)
-        count += 1
-        if os.path.exists(bundle_path):
-          continue
-
-        if os.path.isfile(path):
-          safe_mkdir(os.path.dirname(bundle_path))
-          os.symlink(path, bundle_path)
-        elif os.path.isdir(path):
-          safe_mkdir(bundle_path)
-
-      if count == 0:
-        raise TargetDefinitionException(app.target,
-                                        'Bundle index {} of "bundles" field '
-                                        'does not match any files.'.format(bundle_counter))
 
   def check_basename_conflicts(self, targets):
     """Apps' basenames are used as bundle directory names. Ensure they are all unique."""
