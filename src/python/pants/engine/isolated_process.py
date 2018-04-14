@@ -208,8 +208,22 @@ class ExecuteProcess(object):
     return TaskRule(product_type, inputs, func)
 
 
-class ExecuteProcessRequest(datatype('ExecuteProcessRequest', ['argv', 'env', 'input_files_digest', 'digest_length'])):
+class ExecuteProcessRequest(datatype('ExecuteProcessRequest', [
+    'argv',
+    'env',
+    'input_files_digest',
+    'digest_length',
+])):
   """Request for execution with args and snapshots to extract."""
+
+  @classmethod
+  def create_from_snapshot(cls, argv, env, snapshot):
+    return ExecuteProcessRequest(
+      argv=argv,
+      env=env,
+      input_files_digest=snapshot.fingerprint,
+      digest_length=snapshot.digest_length,
+    )
 
   def __new__(cls, argv, env, input_files_digest, digest_length):
     """
@@ -219,11 +233,15 @@ class ExecuteProcessRequest(datatype('ExecuteProcessRequest', ['argv', 'env', 'i
     """
     if not isinstance(argv, tuple):
       raise ValueError('argv must be a tuple.')
-    return super(ExecuteProcessRequest, cls).__new__(cls, argv, tuple(env), input_files_digest, digest_length)
+    return super(ExecuteProcessRequest, cls).__new__(
+      cls, argv, tuple(env), input_files_digest, digest_length)
 
 
-class ExecuteProcessResult(datatype('ExecuteProcessResult', ['stdout', 'stderr', 'exit_code'])):
-  pass
+class ExecuteProcessResult(datatype('ExecuteProcessResult', [
+    'stdout',
+    'stderr',
+    'exit_code',
+])): pass
 
 
 def create_process_rules():

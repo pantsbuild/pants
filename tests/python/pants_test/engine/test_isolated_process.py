@@ -64,20 +64,22 @@ class CatExecutionRequest(datatype('CatExecutionRequest', [
 ])): pass
 
 
-@rule(SnapshottedProcessRequest, [Select(CatExecutionRequest)])
+@rule(ExecuteProcessRequest, [Select(CatExecutionRequest)])
 def cat_files_snapshotted_process_request(cat_exe_req):
   cat_bin = cat_exe_req.shell_cat_binary
   cat_src = cat_exe_req.cat_source_files
   cat_files_snapshot = yield Get(Snapshot, CatSourceFiles, cat_src)
-  yield SnapshottedProcessRequest(
-    binary=cat_bin,
-    input_snapshots=(cat_files_snapshot,),
+  yield ExecuteProcessRequest.create_from_snapshot(
+    argv=cat_bin.gen_argv([cat_files_snapshot]),
+    env=tuple(),
+    snapshot=cat_files_snapshot,
   )
 
 
 @rule(Concatted, [Select(CatExecutionRequest)])
 def cat_files_process_result_concatted(cat_exe_req):
-  cat_process_result = yield Get(SnapshottedProcessResult, CatExecutionRequest, cat_exe_req)
+  cat_proc_req = yield Get(ExecuteProcessRequest, CatExecutionRequest, cat_exe_req)
+  cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, cat_proc_req)
   yield Concatted(value=cat_process_result.stdout)
 
 
@@ -209,9 +211,8 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     results = self.execute(scheduler, Concatted, cat_exe_req)
     self.assertEquals(1, len(results))
-    concatted = results[0].value
-
-    self.assertEqual(Concatted('one\ntwo\n', concatted))
+    concatted = results[0]
+    self.assertEqual(Concatted('one\ntwo\n'), concatted)
 
   # TODO: Re-write this test to work with non-tar-file snapshots
   @unittest.skip
