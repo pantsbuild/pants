@@ -22,10 +22,10 @@ Usage: $0 (-h|-opyld)
  -h           Print out this help message.
  -p           Publish the site to \$GIT_URL with an automated commit.
  -o           Open the published site in a web browser.
- -y           Continue publishing without prompting (prompting for what??? dumb)
+ -y           Continue publishing without a y/n prompt.
  -l  <dir>    Also publish the documentation into the existing local directory <dir>.
  -d  <dir>    publish the site to a subdir staging/<dir> (useful for public
-              previews)
+              previews).
 
 Environment Variables and Defaults:
 GIT_URL=$PANTS_GH_PAGES
@@ -42,30 +42,24 @@ EOF
 
 publish_path=""
 
-while getopts "hopyd:" opt; do
+while getopts "hopyl:d:" opt; do
   case ${opt} in
     h) usage ;;
     o) preview="true" ;;
     p) publish="true" ;;
     y) publish_confirmed="true" ;;
+    l) local_dir="${OPTARG}" ;;
     d) publish_path="staging/${OPTARG}" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
 
-# TODO(benjy): Instead of invoking Pants multiple times, these actions should be chained using
-# products, like everything else.
-
 set -x
 
-${PANTS_EXE} sitegen --pants-config-files=pants.publish.ini \
+${PANTS_EXE} --pants-config-files=pants.publish.ini \
+             sitegen --config-path='src/docs/docsite.json' \
              src:: examples:: contrib::  \
              testprojects/src/java/org/pantsbuild/testproject/page:readme
-
-${PANTS_EXE} reference \
-  --pants-reference-template=reference/pants_reference_body.html \
-  --build-dictionary-template=reference/build_dictionary_body.html \
-  || die "Failed to generate the reference and/or build dictionary documents."
 
 function do_open() {
   if [[ "${preview}" = "true" ]]; then
@@ -79,20 +73,15 @@ function do_open() {
   fi
 }
 
-# generate html from markdown pages.
-${PANTS_EXE} markdown --fragment \
-  src:: examples:: contrib::  \
-  testprojects/src/java/org/pantsbuild/testproject/page:readme || \
-    die "Failed to generate HTML from markdown'."
-
-
-# invoke doc site generator.
-${PANTS_EXE} sitegen --config-path=src/docs/docsite.json || \
-  die "Failed to generate doc site'."
-
 set +x
 
-do_open "${REPO_ROOT}/dist/docsite/index.html"
+if [[ -z "$local_dir" ]]; then
+  do_open "${REPO_ROOT}/dist/docsite/index.html"
+else
+  find "${REPO_ROOT}/dist/docsite" -mindepth 1 -maxdepth 1 \
+    | xargs -I '{}' cp -r '{}' "$local_dir"
+  do_open "${local_dir}/index.html"
+fi
 
 if [[ "${publish}" = "true" ]]; then
   url="http://pantsbuild.github.io/${publish_path}"
