@@ -70,6 +70,7 @@ class SiteGen(Task):
       write_en_pages(config, soups, precomputed, template)
       copy_extras(config)
 
+
 def load_config(json_path):
   """Load config info from a .json file and return it."""
   with open(json_path) as json_file:
@@ -98,6 +99,7 @@ class Precomputed(object):
     """
     self.page = page
     self.pantsref = pantsref
+
 
 class PrecomputedPageInfo(object):
   """Info we compute (and preserve) for each page before we mutate things."""
