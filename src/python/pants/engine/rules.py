@@ -57,14 +57,14 @@ def rule(output_type, input_selectors):
                          'got: {}'.format(name))
       return resolved
 
-    gets = []
+    gets = OrderedSet()
     for node in ast.iter_child_nodes(module_ast):
       if isinstance(node, ast.FunctionDef) and node.name == func.__name__:
         rule_visitor = _RuleVisitor()
         rule_visitor.visit(node)
-        gets.extend(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
+        gets.update(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
 
-    func._rule = TaskRule(output_type, input_selectors, func, input_gets=gets)
+    func._rule = TaskRule(output_type, input_selectors, func, input_gets=list(gets))
     return func
   return wrapper
 
