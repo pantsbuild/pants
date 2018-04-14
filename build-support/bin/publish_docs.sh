@@ -23,10 +23,11 @@ and/or remotely.
 
 Usage: $0 (-h|-opyld)
  -h           Print out this help message.
- -p           Publish the site to \$GIT_URL with an automated commit.
  -o           Open the published site in a web browser.
+ -p           Publish the site to \$GIT_URL with an automated commit.
  -y           Continue publishing without a y/n prompt.
- -l  <dir>    Also publish the documentation into the existing local directory <dir>.
+ -l  <dir>    Also publish the documentation into the existing local directory
+              <dir>.
  -d  <dir>    publish the site to a subdir staging/<dir> (useful for public
               previews).
 
