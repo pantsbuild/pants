@@ -5,10 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from internal_backend.sitegen.tasks.sitegen import SiteGen, ProductiveSiteGen
+from internal_backend.sitegen.tasks.sitegen import SiteGen
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def register_goals():
-  task(name='productive-site-gen', action=ProductiveSiteGen).install()
   task(name='sitegen', action=SiteGen).install()
