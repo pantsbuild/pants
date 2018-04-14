@@ -4,6 +4,98 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.7.0.dev0 (04/13/2018)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* @rules as coroutines (#5580)
+  `PR #5580 <https://github.com/pantsbuild/pants/pull/5580>`_
+
+API Changes
+~~~~~~~~~~~
+* Delete deprecated android backend (#5695)
+  `PR #5695 <https://github.com/pantsbuild/pants/pull/5695>`_
+
+* 1.7.0 deprecations (#5681)
+  `PR #5681 <https://github.com/pantsbuild/pants/pull/5681>`_
+
+* Remove SelectProjection. (#5672)
+  `PR #5672 <https://github.com/pantsbuild/pants/pull/5672>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fixup RST parsing error. (#5687)
+  `PR #5687 <https://github.com/pantsbuild/pants/pull/5687>`_
+
+* Fix shader to not shade .class files under META-INF directory (#5671)
+  `PR #5671 <https://github.com/pantsbuild/pants/pull/5671>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Use absolute path to check_rust_formatting (#5694)
+  `PR #5694 <https://github.com/pantsbuild/pants/pull/5694>`_
+
+* Remove unnecessary parens (#5693)
+  `PR #5693 <https://github.com/pantsbuild/pants/pull/5693>`_
+
+* Don't rename process_execution to process_executor (#5692)
+  `PR #5692 <https://github.com/pantsbuild/pants/pull/5692>`_
+
+* Run process execution Nodes on a CpuPool (#5691)
+  `PR #5691 <https://github.com/pantsbuild/pants/pull/5691>`_
+
+* add docs about how to run rust in IntelliJ (#5688)
+  `PR #5688 <https://github.com/pantsbuild/pants/pull/5688>`_
+
+* Prepare 1.6.0rc2 (#5690)
+  `PR #5690 <https://github.com/pantsbuild/pants/pull/5690>`_
+
+* Reset LMDB Environments when forking (#5689)
+  `PR #5689 <https://github.com/pantsbuild/pants/pull/5689>`_
+
+* Part 1: Add ability to check what CAS blobs are missing (#5686)
+  `PR #5686 <https://github.com/pantsbuild/pants/pull/5686>`_
+
+* Improve pypi package expected releasers pre-check. (#5669)
+  `PR #5669 <https://github.com/pantsbuild/pants/pull/5669>`_
+
+* Prepare 1.6.0rc1 (#5685)
+  `PR #5685 <https://github.com/pantsbuild/pants/pull/5685>`_
+
+* Make coursier resolve more friendly (#5675)
+  `PR #5675 <https://github.com/pantsbuild/pants/pull/5675>`_
+
+* Upgrade virtualenv. (#5679)
+  `PR #5679 <https://github.com/pantsbuild/pants/pull/5679>`_
+
+* Cleanup `unused_parens` warning for cast. (#5677)
+  `PR #5677 <https://github.com/pantsbuild/pants/pull/5677>`_
+
+* Add build_flags per go_binary (#5658)
+  `PR #5658 <https://github.com/pantsbuild/pants/pull/5658>`_
+
+* Bump to rust 1.25 (#5670)
+  `PR #5670 <https://github.com/pantsbuild/pants/pull/5670>`_
+
+* Add explicit JAXB dependencies in the junit-runner so it works in Java 9+ without --add-modules=java.xml.bind (#5667)
+  `PR #5667 <https://github.com/pantsbuild/pants/pull/5667>`_
+
+* [junit-runner] cache localhost lookups to ease OSX/JDK DNS issues (#5660)
+  `PR #5660 <https://github.com/pantsbuild/pants/pull/5660>`_
+
+* Narrow down BuildLocalPythonDistributions target type (#5659)
+  `PR #5659 <https://github.com/pantsbuild/pants/pull/5659>`_
+
+* Run `lint` in commit hooks. (#5666)
+  `PR #5666 <https://github.com/pantsbuild/pants/pull/5666>`_
+
+* Ban testprojects/pants-plugins from TestProjectsIntegrationTest. (#5665)
+  `PR #5665 <https://github.com/pantsbuild/pants/pull/5665>`_
+
 1.6.0rc0 (04/04/2018)
 ---------------------
 
