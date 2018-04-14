@@ -17,14 +17,8 @@ from six.moves import range
 
 from pants.backend.docgen.tasks.generate_pants_reference import GeneratePantsReference
 from pants.backend.docgen.tasks.markdown_to_html import MarkdownToHtml
-from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.engine.rules import rule
-from pants.engine.selectors import Select
 from pants.task.task import Task
-from pants.util.dirutil import read_file
-from pants.util.memo import memoized_property
-from pants.util.objects import datatype
 
 
 """Static Site Generator for the Pants Build documentation site.
@@ -219,6 +213,7 @@ def ensure_headings_linkable(soups):
   """
   for soup in soups.values():
     ensure_page_headings_linkable(soup)
+
 
 def ensure_page_headings_linkable(soup):
   # To avoid re-assigning an existing id, note 'em down.
