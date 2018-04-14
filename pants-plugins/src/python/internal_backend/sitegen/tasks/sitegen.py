@@ -16,6 +16,7 @@ from pystache import Renderer
 from six.moves import range
 
 from pants.backend.docgen.tasks.generate_pants_reference import GeneratePantsReference
+from pants.backend.docgen.tasks.markdown_to_html import MarkdownToHtml
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.engine.rules import rule
@@ -57,7 +58,7 @@ class SiteGen(Task):
   # products.
   @classmethod
   def prepare(cls, options, round_manager):
-    round_manager.require('markdown_html')
+    round_manager.require(MarkdownToHtml.MARKDOWN_HTML_PRODUCT)
     round_manager.require_data(GeneratePantsReference.PANTS_REFERENCE_PRODUCT)
     round_manager.require_data(GeneratePantsReference.BUILD_DICTIONARY_PRODUCT)
 

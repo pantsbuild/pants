@@ -6,6 +6,7 @@ python_library(
   dependencies = [
     'contrib/confluence/src/python/pants/contrib/confluence/util',
     'src/python/pants/backend/docgen/targets',
+    'src/python/pants/backend/docgen/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/task',
     'src/python/pants/util:desktop',
