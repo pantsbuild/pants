@@ -61,7 +61,17 @@ def cat_source_to_globs(cat_src):
 class CatExecutionRequest(datatype('CatExecutionRequest', [
     'shell_cat_binary',
     'cat_source_files',
-])): pass
+])):
+
+  def __new__(cls, shell_cat_binary, cat_source_files):
+    if not isinstance(shell_cat_binary, ShellCat):
+      raise ValueError('shell_cat_binary should be an instance of ShellCat')
+    if not isinstance(cat_source_files, CatSourceFiles):
+      raise ValueError(
+        'cat_source_files should be an instance of CatSourceFiles')
+
+    return super(CatExecutionRequest, cls).__new__(
+      cls, shell_cat_binary, cat_source_files)
 
 
 @rule(ExecuteProcessRequest, [Select(CatExecutionRequest)])
@@ -78,6 +88,10 @@ def cat_files_snapshotted_process_request(cat_exe_req):
 
 @rule(Concatted, [Select(CatExecutionRequest)])
 def cat_files_process_result_concatted(cat_exe_req):
+  # FIXME(cosmicexplorer): we should only have to run Get once here. this:
+  # yield Get(ExecuteProcessResult, CatExecutionRequest, cat_exe_req)
+  # fails because ExecuteProcessRequest is a RootRule (which shouldn't be true),
+  # but there's some work required in isolated_process.py to fix this.
   cat_proc_req = yield Get(ExecuteProcessRequest, CatExecutionRequest, cat_exe_req)
   cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, cat_proc_req)
   yield Concatted(value=cat_process_result.stdout)
