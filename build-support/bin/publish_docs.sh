@@ -7,6 +7,9 @@ set -eo pipefail
 PANTS_GH_PAGES='https://github.com/pantsbuild/pantsbuild.github.io.git'
 GIT_URL="${GIT_URL:-$PANTS_GH_PAGES}"
 
+PANTS_SITE_URL='https://pantsbuild.github.io'
+VIEW_PUBLISH_URL="${VIEW_PUBLISH_URL:-$PANTS_SITE_URL}"
+
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 
 source ${REPO_ROOT}/build-support/common.sh
@@ -30,7 +33,7 @@ Usage: $0 (-h|-opyld)
 Environment Variables and Defaults:
 GIT_URL=$PANTS_GH_PAGES
   URL of a git remote repository to publish to with an automated commit.
-VIEW_PUBLISH_URL=
+VIEW_PUBLISH_URL=$PANTS_SITE_URL
 EOF
 
   if (( $# > 0 )); then
@@ -85,16 +88,16 @@ else
 fi
 
 if [[ "${publish}" = "true" ]]; then
-  url="http://pantsbuild.github.io/${publish_path}"
+  url="${VIEW_PUBLISH_URL}/${publish_path}"
   if [[ "${publish_confirmed}" != "true" ]] ; then
     read -ep "To abort publishing these docs to ${url} press CTRL-C, otherwise press enter to \
 continue."
   fi
   (
-    ${REPO_ROOT}/src/docs/publish_via_git.sh \
-      $GIT_URL \
-      ${publish_path}
-    do_open ${url}/index.html
+    "${REPO_ROOT}/src/docs/publish_via_git.sh" \
+      "$GIT_URL" \
+      "$publish_path"
+    do_open "${url}/index.html"
   ) || die "Publish to ${url} failed."
 fi
 
