@@ -33,7 +33,6 @@ Bugfixes
 * Fix shader to not shade .class files under META-INF directory (#5671)
   `PR #5671 <https://github.com/pantsbuild/pants/pull/5671>`_
 
-
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -88,7 +87,7 @@ Refactoring, Improvements, and Tooling
 * [junit-runner] cache localhost lookups to ease OSX/JDK DNS issues (#5660)
   `PR #5660 <https://github.com/pantsbuild/pants/pull/5660>`_
 
-*  Narrow down BuildLocalPythonDistributions target type (#5659)
+* Narrow down BuildLocalPythonDistributions target type (#5659)
   `PR #5659 <https://github.com/pantsbuild/pants/pull/5659>`_
 
 * Run `lint` in commit hooks. (#5666)
@@ -96,7 +95,6 @@ Refactoring, Improvements, and Tooling
 
 * Ban testprojects/pants-plugins from TestProjectsIntegrationTest. (#5665)
   `PR #5665 <https://github.com/pantsbuild/pants/pull/5665>`_
-
 
 1.6.0rc0 (04/04/2018)
 ---------------------
@@ -127,7 +125,6 @@ Refactoring, Improvements, and Tooling
 
 * Include rust stdlib sources in bootstrap. (#5645)
   `PR #5645 <https://github.com/pantsbuild/pants/pull/5645>`_
-
 
 1.6.0.dev2 (04/01/2018)
 -----------------------

@@ -360,7 +360,7 @@ class BuildGraph(AbstractClass):
     """Construct the right context object for managing state during a transitive walk."""
     deprecated_conditional(
       lambda: leveled_predicate is not None,
-      '1.7.0.dev0',
+      '1.7.0.dev1',
       'leveled_predicate',
       '''
       Deprecated property leveled_predicate used. Please migrate to using dep_predicate.
