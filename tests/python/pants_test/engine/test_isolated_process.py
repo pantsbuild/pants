@@ -10,12 +10,13 @@ import tarfile
 import unittest
 
 from pants.engine.fs import PathGlobs, Snapshot, create_fs_rules
-from pants.engine.isolated_process import (Binary, ExecuteProcess, ExecuteProcessRequest,
-                                           ExecuteProcessResult, SnapshottedProcess,
-                                           SnapshottedProcessRequest, create_process_rules)
+from pants.engine.isolated_process import (
+  Binary, ExecuteProcess, ExecuteProcessRequest, ExecuteProcessResult,
+  SnapshottedProcess, SnapshottedProcessRequest, SnapshottedProcessResult,
+  create_process_rules)
 from pants.engine.nodes import Return, Throw
-from pants.engine.rules import SingletonRule
-from pants.engine.selectors import Select
+from pants.engine.rules import RootRule, SingletonRule, rule
+from pants.engine.selectors import Get, Select
 from pants.util.objects import datatype
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
@@ -28,6 +29,56 @@ class ShellCat(Binary):
   @property
   def bin_path(self):
     return '/bin/cat'
+
+  def gen_argv(self, snapshots):
+    cat_file_paths = []
+    for s in snapshots:
+      cat_file_paths.extend(f.path for f in s.files)
+    # TODO: ensure everything is a real path?
+    return (self.bin_path,) + tuple(cat_file_paths)
+
+
+class CatSourceFiles(datatype('CatSourceFiles', [
+    'globs',
+])):
+
+  def __new__(cls, globs):
+
+    if not isinstance(globs, PathGlobs):
+      raise ValueError('globs should be an instance of PathGlobs')
+
+    return super(CatSourceFiles, cls).__new__(cls, globs)
+
+  def as_path_globs(self):
+    return self.globs
+
+
+@rule(PathGlobs, [Select(CatSourceFiles)])
+def cat_source_to_globs(cat_src):
+  yield cat_src.as_path_globs()
+
+
+class CatExecutionRequest(datatype('CatExecutionRequest', [
+    'shell_cat_binary',
+    'cat_source_files',
+])): pass
+
+
+@rule(SnapshottedProcessRequest, [Select(CatExecutionRequest)])
+def cat_files_snapshotted_process_request(cat_exe_req):
+  cat_bin = cat_exe_req.shell_cat_binary
+  cat_src = cat_exe_req.cat_source_files
+  cat_files_snapshot = yield Get(Snapshot, CatSourceFiles, cat_src)
+  yield SnapshottedProcessRequest(
+    binary=cat_bin,
+    input_snapshots=(cat_files_snapshot,),
+  )
+
+
+@rule(Concatted, [Select(CatExecutionRequest)])
+def cat_files_process_result_concatted(cat_exe_req):
+  cat_process_result = yield Get(SnapshottedProcessResult, CatExecutionRequest, cat_exe_req)
+  yield Concatted(value=cat_process_result.stdout)
 
 
 def file_list_to_args_for_cat_with_snapshot_subjects_and_output_file(snapshot):
@@ -46,8 +97,18 @@ def process_result_to_concatted(process_result, sandbox_dir):
 
 
 class ShellCatToOutFile(Binary):
+  OUTPUT_FILE_PATH = 'outfile'
+
   def prefix_of_command(self):
-    return tuple(['sh', '-c', 'cat $@ > outfile', 'unused'])
+    return tuple([
+      'sh',
+      '-c',
+      'cat $@ > {}'.format(self.OUTPUT_FILE_PATH),
+      'unused',
+    ])
+
+  def expected_output_path_globs(self):
+    return PathGlobs.create(relative_to='', include=[self.OUTPUT_FILE_PATH])
 
 
 class ShellFailCommand(Binary):
@@ -130,6 +191,27 @@ class SnapshottedProcessRequestTest(SchedulerTestBase, unittest.TestCase):
 
 
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
+
+  def test_integration_concat_with_snapshots_stdout(self):
+    scheduler = self.mk_scheduler_in_example_fs([
+      RootRule(CatExecutionRequest),
+      cat_source_to_globs,
+      cat_files_snapshotted_process_request,
+      cat_files_process_result_concatted,
+    ])
+
+    cat_src_files = CatSourceFiles(
+      PathGlobs.create('', include=['fs_test/a/b/*']))
+    cat_exe_req = CatExecutionRequest(
+      shell_cat_binary=ShellCat(),
+      cat_source_files=cat_src_files,
+    )
+
+    results = self.execute(scheduler, Concatted, cat_exe_req)
+    self.assertEquals(1, len(results))
+    concatted = results[0].value
+
+    self.assertEqual(Concatted('one\ntwo\n', concatted))
 
   # TODO: Re-write this test to work with non-tar-file snapshots
   @unittest.skip

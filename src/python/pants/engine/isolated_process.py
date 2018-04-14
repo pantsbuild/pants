@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import functools
 import logging
 import os
-from abc import abstractproperty
+from abc import abstractmethod, abstractproperty
 from binascii import hexlify
 
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
@@ -98,38 +98,45 @@ def _post_process_execution(output_conversion, *args):
 class Binary(object):
   """Binary in the product graph.
 
-  TODO these should use BinaryUtil to find binaries.
+  TODO(cosmicexplorer): this should probably be coupled with instances of
+  BinaryTool subclasses.
   """
 
   @abstractproperty
   def bin_path(self):
     pass
 
-  def prefix_of_command(self):
-    return tuple([self.bin_path])
+  @abstractmethod
+  def gen_argv(self, snapshots):
+    pass
 
 
-class SnapshottedProcessRequest(datatype('SnapshottedProcessRequest',
-                                         ['args', 'snapshots', 'directories_to_create'])):
+class SnapshottedProcessRequest(datatype('SnapshottedProcessRequest', [
+    # TODO: add ctor arg for this
+    'binary',
+    'input_snapshots',
+])):
   """Request for execution with binary args and snapshots to extract."""
 
-  def __new__(cls, args, snapshots=tuple(), directories_to_create=tuple(), **kwargs):
+  def __new__(cls, binary, input_snapshots=tuple()):
     """
 
     :param args: Arguments to the binary being run.
     :param snapshot_subjects: Subjects used to request snapshots that will be checked out into the sandbox.
     :param directories_to_create: Directories to ensure exist in the sandbox before execution.
     """
-    if not isinstance(args, tuple):
-      raise ValueError('args must be a tuple.')
-    if not isinstance(snapshots, tuple):
-      raise ValueError('snapshots must be a tuple.')
-    if not isinstance(directories_to_create, tuple):
-      raise ValueError('directories_to_create must be a tuple.')
-    return super(SnapshottedProcessRequest, cls).__new__(cls, args, snapshots, directories_to_create, **kwargs)
+    if not isinstance(binary, Binary):
+      raise ValueError('binary must be an instance of Binary.')
+    if not isinstance(input_snapshots, tuple):
+      raise ValueError('input_snapshots must be a tuple.')
+    return super(SnapshottedProcessRequest, cls).__new__(cls, binary, input_snapshots)
 
 
-class SnapshottedProcessResult(datatype('SnapshottedProcessResult', ['stdout', 'stderr', 'exit_code'])):
+class SnapshottedProcessResult(datatype('SnapshottedProcessResult', [
+    'stdout',
+    'stderr',
+    'exit_code',
+])):
   """Contains the stdout, stderr and exit code from executing a process."""
 
 
@@ -221,9 +228,47 @@ class ExecuteProcessResult(datatype('ExecuteProcessResult', ['stdout', 'stderr',
 
 def create_process_rules():
   """Intrinsically replaced on the rust side."""
-  return [execute_process_noop, RootRule(ExecuteProcessRequest)]
+  return [
+    execute_process_noop,
+    RootRule(ExecuteProcessRequest),
+    execute_snapshotted_process,
+    RootRule(SnapshottedProcessRequest),
+  ]
 
 
 @rule(ExecuteProcessResult, [Select(ExecuteProcessRequest)])
 def execute_process_noop(*args):
   raise Exception('This task is replaced intrinsically, and should never run.')
+
+
+@rule(SnapshottedProcessResult, [Select(SnapshottedProcessRequest)])
+def execute_snapshotted_process(snapshot_proc_req):
+  snaps = snapshot_proc_req.input_snapshots
+  binary = snapshot_proc_req.binary
+  command = binary.gen_argv(snaps)
+
+  logger.debug('Running command: "{}" in {}'.format(command, os.getcwd()))
+  popen = subprocess.Popen(
+    args=command,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+  )
+  # TODO: At some point, we may want to replace this blocking wait with a
+  # timed one that returns some kind of in progress state.
+  popen.wait()
+  logger.debug('Done running command in {}'.format(os.getcwd()))
+
+  exit_code = popen.returncode
+  stdout = popen.stdout.read()
+  stderr = popen.stderr.read()
+
+  if exit_code != 0:
+    raise Exception(
+      'Running {} in {} failed with non-zero exit code: {}. stderr:\n{}'
+      .format(binary.bin_path, os.getcwd(), exit_code, stderr))
+
+  yield SnapshottedProcessResult(
+    stdout=stdout,
+    stderr=stderr,
+    exit_code=exit_code,
+  )
