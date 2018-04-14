@@ -59,7 +59,8 @@ set -x
 ${PANTS_EXE} --pants-config-files=pants.publish.ini \
              sitegen --config-path='src/docs/docsite.json' \
              src:: examples:: contrib::  \
-             testprojects/src/java/org/pantsbuild/testproject/page:readme
+             testprojects/src/java/org/pantsbuild/testproject/page:readme \
+  || die "Failed to generate doc site'."
 
 function do_open() {
   if [[ "${preview}" = "true" ]]; then
