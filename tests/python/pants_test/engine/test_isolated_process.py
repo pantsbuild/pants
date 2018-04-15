@@ -33,7 +33,7 @@ class ShellCat(Binary):
     cat_file_paths = []
     for s in snapshots:
       cat_file_paths.extend(f.path for f in s.files)
-    # TODO: ensure everything is a real path?
+    # TODO(cosmicexplorer): ensure everything is a real path?
     return (self.bin_path,) + tuple(cat_file_paths)
 
 
@@ -116,18 +116,8 @@ def process_result_to_concatted(process_result, sandbox_dir):
 
 
 class ShellCatToOutFile(Binary):
-  OUTPUT_FILE_PATH = 'outfile'
-
   def prefix_of_command(self):
-    return tuple([
-      'sh',
-      '-c',
-      'cat $@ > {}'.format(self.OUTPUT_FILE_PATH),
-      'unused',
-    ])
-
-  def expected_output_path_globs(self):
-    return PathGlobs.create(relative_to='', include=[self.OUTPUT_FILE_PATH])
+    return tuple(['sh', '-c', 'cat $@ > outfile', 'unused'])
 
 
 class ShellFailCommand(Binary):
