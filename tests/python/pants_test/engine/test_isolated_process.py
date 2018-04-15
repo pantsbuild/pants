@@ -285,15 +285,6 @@ def create_javac_compile_rules():
   ]
 
 
-def process_request_java_args_from_java_sources(binary, sources_snapshot, out_dir):
-  env = []
-  return ExecuteProcessRequest(
-    argv=binary.prefix_of_command() + tuple(f.path for f in sources_snapshot.files),
-    input_files_digest=str(sources_snapshot.fingerprint),
-    digest_length=sources_snapshot.digest_length,
-    env=env)
-
-
 class ClasspathEntry(datatype('ClasspathEntry', ['path'])):
   """A classpath entry for a subject."""
 
@@ -303,11 +294,6 @@ def process_result_to_classpath_entry(process_result, sandbox_dir):
     # this implies that we should pass some / all of the inputs to the output conversion so they
     # can grab config.
     # TODO string name association isn't great.
-    return ClasspathEntry(os.path.join(sandbox_dir, 'build'))
-
-
-def execute_process_result_to_classpath(process_result, sandbox_dir):
-  if not process_result.exit_code:
     return ClasspathEntry(os.path.join(sandbox_dir, 'build'))
 
 
