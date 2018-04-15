@@ -176,33 +176,6 @@ def create_snapshot_rules():
     ]
 
 
-class ExecuteProcess(object):
-  """A static helper for defining a task rule to execute a process."""
-
-  def __new__(cls, *args):
-    raise ValueError('Use `create` to declare a task function representing a process.')
-
-  @staticmethod
-  def create_in(product_type, input_selectors, input_conversion):
-    # TODO: combine create_in/create_out fucntions
-    func = functools.partial(_setup_process_execution, input_conversion)
-    func.__name__ = '{}_and_then_execute_process'.format(input_conversion.__name__)
-    inputs =  list(input_selectors)
-
-    # Return a task triple that executes the function to produce the product type.
-    return TaskRule(product_type, inputs, func)
-
-  @staticmethod
-  def create_out(product_type, input_selectors, output_conversion):
-    func = functools.partial(_post_process_execution,
-      output_conversion)
-    func.__name__ = 'execute_process_and_then_{}'.format(output_conversion.__name__)
-    inputs = list(input_selectors)
-
-    # Return a task triple that executes the function to produce the product type.
-    return TaskRule(product_type, inputs, func)
-
-
 class ExecuteProcessRequest(datatype('ExecuteProcessRequest', [
     'argv',
     'env',

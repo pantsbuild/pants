@@ -11,8 +11,8 @@ import unittest
 
 from pants.engine.fs import PathGlobs, Snapshot, create_fs_rules
 from pants.engine.isolated_process import (
-  Binary, ExecuteProcess, ExecuteProcessRequest, ExecuteProcessResult,
-  SnapshottedProcess, SnapshottedProcessRequest, create_process_rules)
+  Binary, ExecuteProcessRequest, ExecuteProcessResult, SnapshottedProcess,
+  SnapshottedProcessRequest, create_process_rules)
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RootRule, SingletonRule, rule
 from pants.engine.selectors import Get, Select
@@ -37,9 +37,7 @@ class ShellCat(Binary):
     return (self.bin_path,) + tuple(cat_file_paths)
 
 
-class CatSourceFiles(datatype('CatSourceFiles', [
-    'globs',
-])):
+class CatSourceFiles(datatype('CatSourceFiles', ['globs'])):
 
   def __new__(cls, globs):
 
@@ -48,13 +46,10 @@ class CatSourceFiles(datatype('CatSourceFiles', [
 
     return super(CatSourceFiles, cls).__new__(cls, globs)
 
-  def as_path_globs(self):
-    return self.globs
-
 
 @rule(PathGlobs, [Select(CatSourceFiles)])
 def cat_source_to_globs(cat_src):
-  yield cat_src.as_path_globs()
+  yield cat_src.globs
 
 
 class CatExecutionRequest(datatype('CatExecutionRequest', [
@@ -94,6 +89,15 @@ def cat_files_process_result_concatted(cat_exe_req):
   cat_proc_req = yield Get(ExecuteProcessRequest, CatExecutionRequest, cat_exe_req)
   cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, cat_proc_req)
   yield Concatted(value=cat_process_result.stdout)
+
+
+def create_cat_stdout_rules():
+  return [
+    cat_source_to_globs,
+    cat_files_snapshotted_process_request,
+    cat_files_process_result_concatted,
+    RootRule(CatExecutionRequest),
+  ]
 
 
 def file_list_to_args_for_cat_with_snapshot_subjects_and_output_file(snapshot):
@@ -160,13 +164,125 @@ def java_sources_to_javac_args(sources_snapshot, out_dir):
                                    directories_to_create=(out_dir.path,))
 
 
-def process_request_from_java_sources(binary):
-  env = []
-  return ExecuteProcessRequest(
-    argv=binary.prefix_of_command() + ('-version',),
-    env=env,
-    input_files_digest="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+class JavacVersionCommand(Javac):
+
+  def gen_argv(self, snapshots=None):
+    if snapshots:
+      raise ValueError("JavacVersionCommand cannot use input snapshots '{}'"
+                       .format(snapshots))
+    return (self.bin_path, '-version',)
+
+
+EMPTY_FINGERPRINT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+
+
+@rule(ExecuteProcessRequest, [Select(JavacVersionCommand)])
+def process_request_from_javac_version(javac_version_command):
+  yield ExecuteProcessRequest(
+    argv=javac_version_command.gen_argv(),
+    env=[],
+    input_files_digest=EMPTY_FINGERPRINT,
     digest_length=0)
+
+
+class JavacVersionOutput(datatype('JavacVersionOutput', [
+    'exit_code',
+    'version_output',
+])): pass
+
+
+@rule(JavacVersionOutput, [Select(JavacVersionCommand)])
+def get_javac_version_output(javac_version_command):
+  javac_version_proc_req = yield Get(
+    ExecuteProcessRequest, JavacVersionCommand, javac_version_command)
+  javac_version_proc_result = yield Get(
+    ExecuteProcessResult, ExecuteProcessRequest, javac_version_proc_req)
+  yield JavacVersionOutput(
+    exit_code=javac_version_proc_result.exit_code,
+    version_output=javac_version_proc_result.stderr,
+  )
+
+
+class JavacCompileCommand(Javac):
+
+  def gen_argv(self, snapshots):
+    snapshot_file_paths = []
+    for s in snapshots:
+      snapshot_file_paths.extend(f.path for f in s.files)
+
+    return (self.bin_path,) + tuple(snapshot_file_paths)
+
+
+class JavacSources(datatype('JavacSources', ['globs'])):
+
+  def __new__(cls, globs):
+
+    if not isinstance(globs, PathGlobs):
+      raise ValueError('globs should be an instance of PathGlobs')
+
+    return super(JavacSources, cls).__new__(cls, globs)
+
+
+@rule(PathGlobs, [Select(JavacSources)])
+def javac_sources_to_globs(javac_sources):
+  yield javac_sources.globs
+
+
+class JavacCompileRequest(datatype('JavacCompileRequest', [
+    'javac_compile_command',
+    'javac_sources',
+])):
+
+  def __new__(cls, javac_compile_command, javac_sources):
+
+    if not isinstance(javac_compile_command, JavacCompileCommand):
+      raise ValueError(
+        'javac_compile_command should be an instance of JavacCompileCommand')
+    if not isinstance(javac_sources, JavacSources):
+      raise ValueError(
+        'javac_sources should be an instance of JavacSources')
+
+    return super(JavacCompileRequest, cls).__new__(
+      cls, javac_compile_command, javac_sources)
+
+
+@rule(ExecuteProcessRequest, [Select(JavacCompileRequest)])
+def javac_compile_sources_execute_process_request(javac_compile_req):
+  javac_compiler = javac_compile_req.javac_compile_command
+  sources_snapshot = yield Get(
+    Snapshot, JavacSources, javac_compile_req.javac_sources)
+  yield ExecuteProcessRequest.create_from_snapshot(
+    argv=javac_compiler.gen_argv([sources_snapshot]),
+    env=tuple(),
+    snapshot=sources_snapshot,
+  )
+
+
+class JavacCompileResult(datatype('JavacCompileResult', [
+    'exit_code',
+    'stderr',
+])): pass
+
+
+@rule(JavacCompileResult, [Select(JavacCompileRequest)])
+def javac_compile_process_result(javac_compile_req):
+  javac_proc_req = yield Get(
+    ExecuteProcessRequest, JavacCompileRequest, javac_compile_req)
+  javac_proc_result = yield Get(
+    ExecuteProcessResult, ExecuteProcessRequest, javac_proc_req)
+  yield JavacCompileResult(
+    exit_code=javac_proc_result.exit_code,
+    stderr=javac_proc_result.stderr,
+  )
+
+
+def create_javac_compile_rules():
+  return [
+    javac_sources_to_globs,
+    javac_compile_sources_execute_process_request,
+    javac_compile_process_result,
+    RootRule(JavacCompileRequest),
+  ]
 
 
 def process_request_java_args_from_java_sources(binary, sources_snapshot, out_dir):
@@ -208,12 +324,7 @@ class SnapshottedProcessRequestTest(SchedulerTestBase, unittest.TestCase):
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
   def test_integration_concat_with_snapshots_stdout(self):
-    scheduler = self.mk_scheduler_in_example_fs([
-      RootRule(CatExecutionRequest),
-      cat_source_to_globs,
-      cat_files_snapshotted_process_request,
-      cat_files_process_result_concatted,
-    ])
+    scheduler = self.mk_scheduler_in_example_fs(create_cat_stdout_rules())
 
     cat_src_files = CatSourceFiles(
       PathGlobs.create('', include=['fs_test/a/b/*']))
@@ -250,22 +361,16 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertEqual(Concatted('one\ntwo\n'), concatted)
 
   def test_javac_version_example(self):
-    sources = PathGlobs.create('', include=['inputs/src/java/simple/Simple.java'])
     scheduler = self.mk_scheduler_in_example_fs([
-      ExecuteProcess.create_in(product_type=ExecuteProcessRequest,
-        input_selectors=(Select(Javac),),
-        input_conversion=process_request_from_java_sources),
-      SingletonRule(Javac, Javac()),
+      RootRule(JavacVersionCommand),
+      process_request_from_javac_version,
+      get_javac_version_output,
     ])
-    req = scheduler.product_request(ExecuteProcessRequest, [sources])
-    request = scheduler.execution_request([ExecuteProcessResult], req)
-    root_entries = scheduler.execute(request).root_products
-
-    self.assertEquals(1, len(root_entries))
-    state = self.assertFirstEntryIsReturn(root_entries, scheduler, request)
-    result = state.value
-    self.assertEqual(0, result.exit_code)
-    self.assertIn('javac', result.stderr)
+    results = self.execute(scheduler, JavacVersionOutput, JavacVersionCommand())
+    self.assertEquals(1, len(results))
+    javac_version_output = results[0]
+    self.assertEqual(0, javac_version_output.exit_code)
+    self.assertIn('javac', javac_version_output.version_output)
 
   # TODO: Re-write this test to work with non-tar-file snapshots
   @unittest.skip
@@ -294,46 +399,40 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertTrue(os.path.exists(os.path.join(classpath_entry.path, 'simple', 'Simple.class')))
 
   def test_javac_compilation_example_rust_success(self):
-    sources = PathGlobs.create('', include=['scheduler_inputs/src/java/simple/Simple.java'])
+    javac_sources = JavacSources(PathGlobs.create('', include=[
+      'scheduler_inputs/src/java/simple/Simple.java',
+    ]))
 
-    scheduler = self.mk_scheduler_in_example_fs([
-      ExecuteProcess.create_in(
-        product_type=ExecuteProcessRequest,
-        input_selectors=(Select(Javac), Select(Snapshot), Select(JavaOutputDir)),
-        input_conversion=process_request_java_args_from_java_sources),
-      SingletonRule(JavaOutputDir, JavaOutputDir('testing')),
-      SingletonRule(Javac, Javac()),
-    ])
-    req = scheduler.product_request(ExecuteProcessRequest, [sources])
-    request = scheduler.execution_request([ExecuteProcessResult], req)
+    scheduler = self.mk_scheduler_in_example_fs(create_javac_compile_rules())
 
-    root_entries = scheduler.execute(request).root_products
-    self.assertEquals(1, len(root_entries))
-    state = self.assertFirstEntryIsReturn(root_entries, scheduler, request)
-    execution_result = state.value
-    self.assertEqual(0, execution_result.exit_code)
+    request = JavacCompileRequest(
+      javac_compile_command=JavacCompileCommand(),
+      javac_sources=javac_sources,
+    )
+
+    results = self.execute(scheduler, JavacCompileResult, request)
+    self.assertEquals(1, len(results))
+    javac_compile_result = results[0]
+    self.assertEqual(0, javac_compile_result.exit_code)
     # TODO: Test that the output snapshot is good
 
   def test_javac_compilation_example_rust_failure(self):
-    sources = PathGlobs.create('', include=['scheduler_inputs/src/java/simple/Broken.java'])
+    javac_sources = JavacSources(PathGlobs.create('', include=[
+      'scheduler_inputs/src/java/simple/Broken.java',
+    ]))
 
-    scheduler = self.mk_scheduler_in_example_fs([
-      ExecuteProcess.create_in(
-        product_type=ExecuteProcessRequest,
-        input_selectors=(Select(Javac), Select(Snapshot), Select(JavaOutputDir)),
-        input_conversion=process_request_java_args_from_java_sources),
-      SingletonRule(JavaOutputDir, JavaOutputDir('testing')),
-      SingletonRule(Javac, Javac()),
-    ])
-    req = scheduler.product_request(ExecuteProcessRequest, [sources])
-    request = scheduler.execution_request([ExecuteProcessResult], req)
+    scheduler = self.mk_scheduler_in_example_fs(create_javac_compile_rules())
 
-    root_entries = scheduler.execute(request).root_products
-    self.assertEquals(1, len(root_entries))
-    state = self.assertFirstEntryIsReturn(root_entries, scheduler, request)
-    execution_result = state.value
-    self.assertEqual(1, execution_result.exit_code)
-    self.assertIn("NOT VALID JAVA", execution_result.stderr)
+    request = JavacCompileRequest(
+      javac_compile_command=JavacCompileCommand(),
+      javac_sources=javac_sources,
+    )
+
+    results = self.execute(scheduler, JavacCompileResult, request)
+    self.assertEquals(1, len(results))
+    javac_compile_result = results[0]
+    self.assertEqual(1, javac_compile_result.exit_code)
+    self.assertIn("NOT VALID JAVA", javac_compile_result.stderr)
 
   def test_failed_command_propagates_throw(self):
     scheduler = self.mk_scheduler_in_example_fs([
