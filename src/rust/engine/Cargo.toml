@@ -23,6 +23,7 @@ cc = "1.0"
 members = [
   "boxfuture",
   "fs",
+  "fs/brfs",
   "fs/fs_util",
   "hashing",
   "process_execution",
