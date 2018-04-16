@@ -11,6 +11,7 @@ import os
 from abc import abstractproperty
 from binascii import hexlify
 
+from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Select
 from pants.util.contextutil import open_tar, temporary_dir
@@ -138,33 +139,6 @@ class _Snapshots(datatype('_Snapshots', ['root'])):
   conversion tasks into a single Task node.
   """
 
-
-class SnapshottedProcess(object):
-  """A static helper for defining a task rule to execute a snapshotted process."""
-
-  def __new__(cls, *args):
-    raise ValueError('Use `create` to declare a task function representing a process.')
-
-  @staticmethod
-  def create(product_type, binary_type, input_selectors, input_conversion, output_conversion):
-    """TODO: Not clear that `binary_type` needs to be separate from the input selectors."""
-
-    # Select the concatenation of the snapshot directory, binary, and input selectors.
-    inputs = [Select(_Snapshots), Select(binary_type)] + list(input_selectors)
-
-    # Apply the input/output conversions to a top-level process-execution function which
-    # will receive all inputs, convert in, execute, and convert out.
-    func = functools.partial(_snapshotted_process,
-                             input_conversion,
-                             output_conversion)
-    func.__name__ = '{}_and_then_snapshotted_process_and_then_{}'.format(
-        input_conversion.__name__, output_conversion.__name__
-      )
-
-    # Return a task triple that executes the function to produce the product type.
-    return TaskRule(product_type, inputs, func)
-
-
 def create_snapshot_rules():
   """Intrinsically replaced on the rust side."""
   return [
@@ -184,6 +158,10 @@ class ExecuteProcessRequest(datatype('ExecuteProcessRequest', ['argv', 'env', 'i
       digest_length=snapshot.digest_length,
     )
 
+  @classmethod
+  def create_with_empty_snapshot(cls, argv, env):
+    return cls.create_from_snapshot(argv, env, EMPTY_SNAPSHOT)
+
   def __new__(cls, argv, env, input_files_digest, digest_length):
     """
 
@@ -192,7 +170,22 @@ class ExecuteProcessRequest(datatype('ExecuteProcessRequest', ['argv', 'env', 'i
     """
     if not isinstance(argv, tuple):
       raise ValueError('argv must be a tuple.')
-    return super(ExecuteProcessRequest, cls).__new__(cls, argv, tuple(env), input_files_digest, digest_length)
+
+    if not isinstance(env, tuple):
+      raise ValueError('env must be a tuple.')
+
+    if isinstance(input_files_digest, unicode):
+      input_files_digest = str(input_files_digest)
+
+    if not isinstance(input_files_digest, str):
+      raise ValueError('input_files_digest must be a str or unicode.')
+
+    if not isinstance(digest_length, int):
+      raise ValueError('digest_length must be an int.')
+    if digest_length < 0:
+      raise ValueError('digest_length must be >= 0.')
+
+    return super(ExecuteProcessRequest, cls).__new__(cls, argv, env, input_files_digest, digest_length)
 
 
 class ExecuteProcessResult(datatype('ExecuteProcessResult', ['stdout', 'stderr', 'exit_code'])):

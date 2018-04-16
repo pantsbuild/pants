@@ -85,6 +85,18 @@ class Snapshot(datatype('Snapshot', ['fingerprint', 'digest_length', 'path_stats
 FilesContent = Collection.of(FileContent)
 
 
+# TODO(cosmicexplorer): don't recreate this in python, get this from
+# fs::EMPTY_DIGEST somehow.
+_EMPTY_FINGERPRINT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+
+
+EMPTY_SNAPSHOT = Snapshot(
+  fingerprint=_EMPTY_FINGERPRINT,
+  digest_length=0,
+  path_stats=[],
+)
+
+
 @rule(Snapshot, [Select(PathGlobs)])
 def snapshot_noop(*args):
   raise Exception('This task is replaced intrinsically, and should never run.')

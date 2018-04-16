@@ -13,7 +13,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.engine.fs import PathGlobs, Snapshot, create_fs_rules
 from pants.engine.isolated_process import (
-  Binary, ExecuteProcessRequest, ExecuteProcessResult, SnapshottedProcess,
+  Binary, ExecuteProcessRequest, ExecuteProcessResult,
   SnapshottedProcessRequest, create_process_rules)
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RootRule, SingletonRule, rule
@@ -59,7 +59,7 @@ class CatExecutionRequest(datatype('CatExecutionRequest', [
 
 
 @rule(ExecuteProcessRequest, [Select(CatExecutionRequest)])
-def cat_files_snapshotted_process_request(cat_exe_req):
+def cat_files_process_request_input_snapshot(cat_exe_req):
   cat_bin = cat_exe_req.shell_cat_binary
   cat_files_snapshot = yield Get(Snapshot, PathGlobs, cat_exe_req.input_file_globs)
   yield ExecuteProcessRequest.create_from_snapshot(
@@ -82,46 +82,10 @@ def cat_files_process_result_concatted(cat_exe_req):
 
 def create_cat_stdout_rules():
   return [
-    cat_files_snapshotted_process_request,
+    cat_files_process_request_input_snapshot,
     cat_files_process_result_concatted,
     RootRule(CatExecutionRequest),
   ]
-
-
-def file_list_to_args_for_cat_with_snapshot_subjects_and_output_file(snapshot):
-  return SnapshottedProcessRequest(args=tuple(sorted(f.path for f in snapshot.files)),
-    snapshots=(snapshot,))
-
-
-def process_result_to_concatted_from_outfile(process_result, sandbox_dir):
-  with open(os.path.join(sandbox_dir, 'outfile')) as f:
-    # TODO might be better to allow for this to be done via Nodes. But I'm not sure how as yet.
-    return Concatted(f.read())
-
-
-def process_result_to_concatted(process_result, sandbox_dir):
-  return Concatted(process_result.stdout)
-
-
-class ShellCatToOutFile(Binary):
-  def prefix_of_command(self):
-    return tuple(['sh', '-c', 'cat $@ > outfile', 'unused'])
-
-
-class ShellFailCommand(Binary):
-  def prefix_of_command(self):
-    return tuple(['sh', '-c', 'exit 1'])
-
-  def __repr__(self):
-    return 'ShellFailCommand'
-
-
-def fail_process_result(process_result, sandbox_dir):
-  raise Exception('Failed in output conversion!')
-
-
-def empty_process_request():
-  return SnapshottedProcessRequest(args=tuple())
 
 
 class JavaOutputDir(datatype('JavaOutputDir', ['path'])):
@@ -135,29 +99,17 @@ class Javac(Binary):
     return '/usr/bin/javac'
 
 
-def java_sources_to_javac_args(sources_snapshot, out_dir):
-  return SnapshottedProcessRequest(args=('-d', out_dir.path)+
-                                        tuple(f.path for f in sources_snapshot.files),
-                                   snapshots=(sources_snapshot,),
-                                   directories_to_create=(out_dir.path,))
-
-
 class JavacVersionCommand(Javac):
 
   def gen_argv(self):
     return (self.bin_path, '-version',)
 
 
-EMPTY_FINGERPRINT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
-
-
 @rule(ExecuteProcessRequest, [Select(JavacVersionCommand)])
 def process_request_from_javac_version(javac_version_command):
-  yield ExecuteProcessRequest(
+  yield ExecuteProcessRequest.create_with_empty_snapshot(
     argv=javac_version_command.gen_argv(),
-    env=[],
-    input_files_digest=EMPTY_FINGERPRINT,
-    digest_length=0)
+    env=tuple())
 
 
 class JavacVersionOutput(datatype('JavacVersionOutput', ['version_output'])):
@@ -303,26 +255,18 @@ def create_javac_compile_rules():
   ]
 
 
-class ClasspathEntry(datatype('ClasspathEntry', ['path'])):
-  """A classpath entry for a subject."""
-
-
-def process_result_to_classpath_entry(process_result, sandbox_dir):
-  if not process_result.exit_code:
-    # this implies that we should pass some / all of the inputs to the output conversion so they
-    # can grab config.
-    # TODO string name association isn't great.
-    return ClasspathEntry(os.path.join(sandbox_dir, 'build'))
-
-
-class SnapshottedProcessRequestTest(SchedulerTestBase, unittest.TestCase):
-  def test_blows_up_on_unhashable_args(self):
+class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
+  def test_blows_up_on_invalid_args(self):
     with self.assertRaises(ValueError):
-      SnapshottedProcessRequest(args=['1'])
+      ExecuteProcessRequest(argv=['1'], env=tuple(), input_files_digest=unicode(), digest_length=0)
     with self.assertRaises(ValueError):
-      SnapshottedProcessRequest(args=('1',), snapshots=[])
+      ExecuteProcessRequest(argv=('1',), env=[], input_files_digest=unicode(), digest_length=0)
     with self.assertRaises(ValueError):
-      SnapshottedProcessRequest(args=('1',), directories_to_create=[])
+      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest=str(), digest_length='')
+    with self.assertRaises(ValueError):
+      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest=3, digest_length=0)
+    with self.assertRaises(ValueError):
+      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest=unicode(), digest_length=-1)
 
 
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
@@ -351,33 +295,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     javac_version_output = results[0]
     self.assertIn('javac', javac_version_output.version_output)
 
-  # TODO: Re-write this test to work with non-tar-file snapshots
-  @unittest.skip
-  def test_javac_compilation_example(self):
-    sources = PathGlobs.create('', include=['scheduler_inputs/src/java/simple/Simple.java'])
-
-    scheduler = self.mk_scheduler_in_example_fs([
-      SnapshottedProcess.create(ClasspathEntry,
-        Javac,
-        (Select(Snapshot), Select(JavaOutputDir)),
-        java_sources_to_javac_args,
-        process_result_to_classpath_entry),
-      SingletonRule(JavaOutputDir, JavaOutputDir('build')),
-      SingletonRule(Javac, Javac()),
-    ])
-
-    request = scheduler.execution_request(
-      [ClasspathEntry],
-      [sources])
-    root_entries = scheduler.execute(request).root_products
-
-    self.assertEquals(1, len(root_entries))
-    state = self.assertFirstEntryIsReturn(root_entries, scheduler, request)
-    classpath_entry = state.value
-    self.assertIsInstance(classpath_entry, ClasspathEntry)
-    self.assertTrue(os.path.exists(os.path.join(classpath_entry.path, 'simple', 'Simple.class')))
-
-  def test_javac_compilation_example_rust_success(self):
+  def test_javac_compilation_example_success(self):
     javac_sources = JavacSources(PathGlobs.create('', include=[
       'scheduler_inputs/src/java/simple/Simple.java',
     ]))
@@ -392,9 +310,10 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     results = self.execute(scheduler, JavacCompileResult, request)
     self.assertEquals(1, len(results))
     javac_compile_result = results[0]
-    # TODO: Test that the output snapshot is good
+    # TODO: Test that the output snapshot contains Simple.class at the correct
+    # path
 
-  def test_javac_compilation_example_rust_failure(self):
+  def test_javac_compilation_example_failure(self):
     javac_sources = JavacSources(PathGlobs.create('', include=[
       'scheduler_inputs/src/java/simple/Broken.java',
     ]))
@@ -412,46 +331,6 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     except ProcessExecutionFailure as e:
       self.assertEqual(1, e.exit_code)
       self.assertIn("NOT VALID JAVA", e.stderr)
-
-  def test_failed_command_propagates_throw(self):
-    scheduler = self.mk_scheduler_in_example_fs([
-      # subject to files / product of subject to files for snapshot.
-      SnapshottedProcess.create(product_type=Concatted,
-                                binary_type=ShellFailCommand,
-                                input_selectors=tuple(),
-                                input_conversion=empty_process_request,
-                                output_conversion=fail_process_result),
-      SingletonRule(ShellFailCommand, ShellFailCommand()),
-    ])
-
-    request = scheduler.execution_request([Concatted],
-                                          [PathGlobs.create('', include=['fs_test/a/b/*'])])
-    root_entries = scheduler.execute(request).root_products
-
-    self.assertEquals(1, len(root_entries))
-    self.assertFirstEntryIsThrow(root_entries,
-                                 in_msg='Running ShellFailCommand failed with non-zero exit code: 1')
-
-  # TODO: Enable a test when input/output conversions are worked out
-  @unittest.skip
-  def test_failed_output_conversion_propagates_throw(self):
-    scheduler = self.mk_scheduler_in_example_fs([
-      # subject to files / product of subject to files for snapshot.
-      SnapshottedProcess.create(product_type=Concatted,
-                                binary_type=ShellCatToOutFile,
-                                input_selectors=(Select(Snapshot),),
-                                input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
-                                output_conversion=fail_process_result),
-      SingletonRule(ShellCatToOutFile, ShellCatToOutFile()),
-    ])
-
-    request = scheduler.execution_request([Concatted],
-                                          [PathGlobs.create('', include=['fs_test/a/b/*'])])
-    root_entries = scheduler.execute(request).root_products
-
-    self.assertEquals(1, len(root_entries))
-    self.assertFirstEntryIsThrow(root_entries,
-                                 in_msg='Failed in output conversion!')
 
   def assertFirstEntryIsReturn(self, root_entries, scheduler, execution_request):
     root, state = root_entries[0]
