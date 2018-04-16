@@ -7,7 +7,7 @@ set -eo pipefail
 PANTS_GH_PAGES='https://github.com/pantsbuild/pantsbuild.github.io.git'
 GIT_URL="${GIT_URL:-$PANTS_GH_PAGES}"
 
-PANTS_SITE_URL='https://pantsbuild.github.io'
+PANTS_SITE_URL='https://www.pantsbuild.org'
 VIEW_PUBLISH_URL="${VIEW_PUBLISH_URL:-$PANTS_SITE_URL}"
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
