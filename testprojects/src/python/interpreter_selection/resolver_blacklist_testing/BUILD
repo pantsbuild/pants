@@ -11,8 +11,8 @@ python_binary(
 # on a transitive requirement of jupyter (functools32)
 # when resolving for Python 3.
 python_requirement_library(
-	name='reqlib',
-	requirements=[
-		python_requirement('jupyter')
-	]
+  name='reqlib',
+  requirements=[
+    python_requirement('jupyter'),
+  ]
 )
