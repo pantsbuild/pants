@@ -107,6 +107,8 @@ class FindBugs(NailgunTask):
     else:
       targets = filter(self._is_findbugs_target, self.context.target_roots)
 
+    targets = list(set(targets))
+
     bug_counts = { 'error': 0, 'high': 0, 'normal': 0, 'low': 0 }
     target_count = 0
     with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:

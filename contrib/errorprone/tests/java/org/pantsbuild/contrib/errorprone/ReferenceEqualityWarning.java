@@ -5,8 +5,8 @@ package org.pantsbuild.contrib.errorprone;
 
 public class ReferenceEqualityWarning {
   public static void main(String[] args) {
-    if ("one" == "two") {
-      System.out.println("one equals two?");
+    if (args[0] == "one") {
+      System.out.println("You should use equals() instead");
     }
   }
 }

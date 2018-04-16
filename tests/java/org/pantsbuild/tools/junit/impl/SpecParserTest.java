@@ -20,6 +20,7 @@ import static org.hamcrest.Matchers.contains;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class SpecParserTest {
   private static final String DUMMY_CLASS_NAME =
@@ -31,7 +32,7 @@ public class SpecParserTest {
     new SpecParser(new ArrayList<String>());
   }
 
-  @Test public void testParserClass() throws Exception {
+  @Test public void testParserClass() {
     SpecParser parser = new SpecParser(ImmutableList.of(DUMMY_CLASS_NAME));
     Collection<Spec> specs = parser.parse();
     Spec spec = Iterables.getOnlyElement(specs);
@@ -40,7 +41,7 @@ public class SpecParserTest {
     assertEquals(0, spec.getMethods().size());
   }
 
-  @Test public void testParserMethod() throws Exception {
+  @Test public void testParserMethod() {
     String specString = DUMMY_CLASS_NAME + "#" + DUMMY_METHOD_NAME;
     SpecParser parser = new SpecParser(ImmutableList.of(specString));
     Collection<Spec> specs = parser.parse();
@@ -50,11 +51,12 @@ public class SpecParserTest {
     assertThat(spec.getMethods(), contains(DUMMY_METHOD_NAME));
   }
 
-  @Test public void testMethodDupsClass() throws Exception {
+  @Test public void testMethodDupsClass() {
     String specString = DUMMY_CLASS_NAME + "#" + DUMMY_METHOD_NAME;
-    SpecParser parser = new SpecParser(ImmutableList.of(DUMMY_CLASS_NAME, specString));
+    SpecParser parser = new SpecParser(ImmutableList.of(specString, DUMMY_CLASS_NAME));
     try {
       parser.parse();
+      fail("Expected SpecException");
     } catch (SpecException expected) {
       assertThat(expected.getMessage(),
           containsString("Request for entire class already requesting individual methods"));
@@ -66,6 +68,7 @@ public class SpecParserTest {
     SpecParser parser = new SpecParser(ImmutableList.of(DUMMY_CLASS_NAME, specString));
     try {
       parser.parse();
+      fail("Expected SpecException");
     } catch (SpecException expected) {
       assertThat(expected.getMessage(),
           containsString("Expected only one # in spec"));
@@ -77,6 +80,7 @@ public class SpecParserTest {
     SpecParser parser = new SpecParser(ImmutableList.of(specString));
     try {
       parser.parse();
+      fail("Expected SpecException");
     } catch (SpecException expected) {
       assertThat(expected.getMessage(),
           containsString("Class org.foo.bar.Baz not found"));
@@ -88,13 +92,14 @@ public class SpecParserTest {
     SpecParser parser = new SpecParser(ImmutableList.of(specString));
     try {
       parser.parse();
+      fail("Expected SpecException");
     } catch (SpecException expected) {
       assertThat(expected.getMessage(),
           containsString("Method doesNotExist not found in class"));
     }
   }
 
-  private void assertNoSpecs(String className) throws Exception {
+  private void assertNoSpecs(String className) {
     String specString = "org.pantsbuild.tools.junit.lib." + className;
     SpecParser parser = new SpecParser(ImmutableList.of(specString));
     Collection<Spec> specs = parser.parse();
@@ -106,7 +111,7 @@ public class SpecParserTest {
    * and interfaces it finds, but if they get passed down to the BlockJUnit4Runner, the runner
    * will throw an InitializationError
    */
-  @Test public void testNotATestClassSpec() throws Exception {
+  @Test public void testNotATestClassSpec() {
     assertNoSpecs("NotATestAbstractClass");
     assertNoSpecs("NotATestInterface");
     assertNoSpecs("NotATestNonzeroArgConstructor");
@@ -115,14 +120,14 @@ public class SpecParserTest {
     assertNoSpecs("NotATestPrivateClass");
   }
 
-  @Test public void testNotATestMethodSpec() throws Exception {
+  @Test public void testNotATestMethodSpec() {
     String specString = "org.pantsbuild.tools.junit.lib.NotATestInterface#natif1";
     SpecParser parser = new SpecParser(ImmutableList.of(specString));
     Collection<Spec> specs = parser.parse();
     assertTrue(specs.isEmpty());
   }
 
-  @Test public void testJUnit3() throws Exception {
+  @Test public void testJUnit3() {
     String specString = "org.pantsbuild.tools.junit.lib.MockJUnit3Test";
     SpecParser parser = new SpecParser(ImmutableList.of(specString));
     Collection<Spec> specs = parser.parse();
@@ -130,7 +135,7 @@ public class SpecParserTest {
     assertEquals(MockJUnit3Test.class, spec.getSpecClass());
   }
 
-  @Test public void testRunWith() throws Exception {
+  @Test public void testRunWith() {
     String specString = "org.pantsbuild.tools.junit.lib.MockRunWithTest";
     SpecParser parser = new SpecParser(ImmutableList.of(specString));
     Collection<Spec> specs = parser.parse();
@@ -138,7 +143,7 @@ public class SpecParserTest {
     assertEquals(MockRunWithTest.class, spec.getSpecClass());
   }
 
-  @Test public void testScalaTest() throws Exception {
+  @Test public void testScalaTest() {
     String specString = "org.pantsbuild.tools.junit.lib.MockScalaTest";
     SpecParser parser = new SpecParser(ImmutableList.of(specString));
     Collection<Spec> specs = parser.parse();

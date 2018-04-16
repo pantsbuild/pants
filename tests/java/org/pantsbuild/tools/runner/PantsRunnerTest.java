@@ -152,17 +152,12 @@ public class PantsRunnerTest {
   private static void assertExceptionWasThrown(Class<? extends Exception> exceptionClass,
                                                String exceptionMessage,
                                                URL[] classpath, String[] args) {
-    boolean failed = true;
     try {
       runRunner(classpath, args);
-      failed = false;
+      fail("Expected " + exceptionClass);
     } catch (Exception e) {
       assertEquals(exceptionClass, e.getClass());
       assertEquals(exceptionMessage, e.getMessage());
-    }
-
-    if (!failed) {
-      fail();
     }
   }
 
