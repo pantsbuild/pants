@@ -640,7 +640,7 @@ fn unmount(mount_path: &str) -> i32 {
 #[cfg(target_os = "linux")]
 fn unmount(mount_path: &str) -> i32 {
   unsafe {
-    libc::umount(CString::new(mount_path).unwrap().as_ptr(), 0)
+    libc::umount(CString::new(mount_path).unwrap().as_ptr())
   }
 }
 
