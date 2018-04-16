@@ -36,11 +36,23 @@ macro_rules! futurify {
     {
         match $x {
             Ok(_) => {}
-            Err(error) => {return Box::new(future::err(error)) as BoxFuture<_, _>;}
+            Err(error) => {return future::err(error).to_boxed() as BoxFuture<_, _>;}
         }
     }
 };
 }
+
+macro_rules! futurify_with_ok_return {
+( $x:expr) => {
+    {
+        match $x {
+            Ok(value) => {value}
+            Err(error) => {return future::err(error).to_boxed() as BoxFuture<_, _>;}
+        }
+    }
+};
+}
+
 
 impl CommandRunner {
   pub fn new(address: &str, thread_count: usize, store: Store) -> CommandRunner {
@@ -203,13 +215,8 @@ impl CommandRunner {
       )).to_boxed() as BoxFuture<_, _>;
     }
     let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
-    match execute_response.merge_from_bytes(operation.get_response().get_value())
-        .map_err(|e| ExecutionError::Fatal(format!("Invalid ExecuteResponse: {:?}", e))) {
-      Ok(_)=>{}
-      Err(err)=>{
-        return future::err(err).to_boxed() as BoxFuture<_, _>;
-      }
-    }
+    futurify!(execute_response.merge_from_bytes(operation.get_response().get_value())
+      .map_err(|e| ExecutionError::Fatal(format!("Invalid ExecuteResponse: {:?}", e))));
     // TODO: Log less verbosely
     debug!("Got (nested) execute response: {:?}", execute_response);
     let stdout =
@@ -247,24 +254,21 @@ impl CommandRunner {
             "type.googleapis.com/{}",
             precondition_failure.descriptor().full_name()
           ) {
-            return future::err(ExecutionError::Fatal(format!(
-              "Received FailedPrecondition, but didn't know how to resolve it: {}, \
-             protobuf type {}",
-              execute_response.get_status().get_message(),
-              details.get_type_url()
-            ))).to_boxed() as BoxFuture<_, _>;;
+            return future::err(ExecutionError::Fatal(
+              format!("Received FailedPrecondition, but didn't know how to resolve it: {},\
+                      protobuf type {}",
+                      execute_response.get_status().get_message(),
+                      details.get_type_url()
+            ))).to_boxed() as BoxFuture<_, _>;
           }
-          match precondition_failure
+          futurify!(precondition_failure
               .merge_from_bytes(details.get_value())
               .map_err(|e| {
                 ExecutionError::Fatal(format!(
                   "Error deserializing FailedPrecondition proto: {:?}",
                   e
                 ))
-              }) {
-            Ok(_) => {}
-            Err(error) => return future::err(error).to_boxed() as BoxFuture<_, _>
-            }
+              }));
 
 
           let mut missing_digests = Vec::with_capacity(precondition_failure.get_violations().len());
@@ -284,26 +288,20 @@ impl CommandRunner {
               ))).to_boxed() as BoxFuture<_, _>;
             }
             let digest = Digest(
-              match Fingerprint::from_hex_string(parts.get(1).unwrap()).map_err(|e| {
+              futurify_with_ok_return!(Fingerprint::from_hex_string(parts.get(1).unwrap()).map_err(|e| {
                 ExecutionError::Fatal(format!(
                   "Bad digest in missing blob: {}: {}",
                   parts.get(1).unwrap(),
                   e
                 ))
-              }){
-                Ok(value) => {value}
-                Err(error) => {return future::err(error).to_boxed() as BoxFuture<_, _>}
-              },
-              match parts.get(2).unwrap().parse::<usize>().map_err(|e| {
+              })),
+              futurify_with_ok_return!(parts.get(2).unwrap().parse::<usize>().map_err(|e| {
                 ExecutionError::Fatal(format!(
                   "Missing blob had bad size: {}: {}",
                   parts.get(2).unwrap(),
                   e
                 ))
-              }) {
-                Ok(value) => {value}
-                Err(error) => {return future::err(error).to_boxed() as BoxFuture<_, _>}
-              },
+              })),
             );
             missing_digests.push(digest);
           }
