@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import functools
 import logging
 import os
-from abc import abstractmethod, abstractproperty
+from abc import abstractproperty
 from binascii import hexlify
 
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
@@ -106,10 +106,6 @@ class Binary(object):
   def bin_path(self):
     pass
 
-  @abstractmethod
-  def gen_argv(self, snapshots):
-    pass
-
 
 class SnapshottedProcessRequest(datatype('SnapshottedProcessRequest',
                                          ['args', 'snapshots', 'directories_to_create'])):
@@ -176,12 +172,7 @@ def create_snapshot_rules():
     ]
 
 
-class ExecuteProcessRequest(datatype('ExecuteProcessRequest', [
-    'argv',
-    'env',
-    'input_files_digest',
-    'digest_length',
-])):
+class ExecuteProcessRequest(datatype('ExecuteProcessRequest', ['argv', 'env', 'input_files_digest', 'digest_length'])):
   """Request for execution with args and snapshots to extract."""
 
   @classmethod
@@ -201,23 +192,16 @@ class ExecuteProcessRequest(datatype('ExecuteProcessRequest', [
     """
     if not isinstance(argv, tuple):
       raise ValueError('argv must be a tuple.')
-    return super(ExecuteProcessRequest, cls).__new__(
-      cls, argv, tuple(env), input_files_digest, digest_length)
+    return super(ExecuteProcessRequest, cls).__new__(cls, argv, tuple(env), input_files_digest, digest_length)
 
 
-class ExecuteProcessResult(datatype('ExecuteProcessResult', [
-    'stdout',
-    'stderr',
-    'exit_code',
-])): pass
+class ExecuteProcessResult(datatype('ExecuteProcessResult', ['stdout', 'stderr', 'exit_code'])):
+  pass
 
 
 def create_process_rules():
   """Intrinsically replaced on the rust side."""
-  return [
-    execute_process_noop,
-    RootRule(ExecuteProcessRequest),
-  ]
+  return [execute_process_noop, RootRule(ExecuteProcessRequest)]
 
 
 @rule(ExecuteProcessResult, [Select(ExecuteProcessRequest)])

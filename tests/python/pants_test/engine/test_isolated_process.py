@@ -9,6 +9,8 @@ import os
 import tarfile
 import unittest
 
+from twitter.common.collections import OrderedSet
+
 from pants.engine.fs import PathGlobs, Snapshot, create_fs_rules
 from pants.engine.isolated_process import (
   Binary, ExecuteProcessRequest, ExecuteProcessResult, SnapshottedProcess,
@@ -33,46 +35,33 @@ class ShellCat(Binary):
     cat_file_paths = []
     for s in snapshots:
       cat_file_paths.extend(f.path for f in s.files)
-    # TODO(cosmicexplorer): ensure everything is a real path?
+    # TODO(cosmicexplorer): We should have a structured way to create command
+    # lines which properly escape e.g. file arguments which would be parsed as
+    # options, for greater security and usability. This should probably be
+    # composable (see Javac and its subclasses below).
     return (self.bin_path,) + tuple(cat_file_paths)
-
-
-class CatSourceFiles(datatype('CatSourceFiles', ['globs'])):
-
-  def __new__(cls, globs):
-
-    if not isinstance(globs, PathGlobs):
-      raise ValueError('globs should be an instance of PathGlobs')
-
-    return super(CatSourceFiles, cls).__new__(cls, globs)
-
-
-@rule(PathGlobs, [Select(CatSourceFiles)])
-def cat_source_to_globs(cat_src):
-  yield cat_src.globs
 
 
 class CatExecutionRequest(datatype('CatExecutionRequest', [
     'shell_cat_binary',
-    'cat_source_files',
+    'input_file_globs',
 ])):
 
-  def __new__(cls, shell_cat_binary, cat_source_files):
+  def __new__(cls, shell_cat_binary, input_file_globs):
     if not isinstance(shell_cat_binary, ShellCat):
       raise ValueError('shell_cat_binary should be an instance of ShellCat')
-    if not isinstance(cat_source_files, CatSourceFiles):
+    if not isinstance(input_file_globs, PathGlobs):
       raise ValueError(
-        'cat_source_files should be an instance of CatSourceFiles')
+        'cat_source_files should be an instance of PathGlobs')
 
     return super(CatExecutionRequest, cls).__new__(
-      cls, shell_cat_binary, cat_source_files)
+      cls, shell_cat_binary, input_file_globs)
 
 
 @rule(ExecuteProcessRequest, [Select(CatExecutionRequest)])
 def cat_files_snapshotted_process_request(cat_exe_req):
   cat_bin = cat_exe_req.shell_cat_binary
-  cat_src = cat_exe_req.cat_source_files
-  cat_files_snapshot = yield Get(Snapshot, CatSourceFiles, cat_src)
+  cat_files_snapshot = yield Get(Snapshot, PathGlobs, cat_exe_req.input_file_globs)
   yield ExecuteProcessRequest.create_from_snapshot(
     argv=cat_bin.gen_argv([cat_files_snapshot]),
     env=tuple(),
@@ -93,7 +82,6 @@ def cat_files_process_result_concatted(cat_exe_req):
 
 def create_cat_stdout_rules():
   return [
-    cat_source_to_globs,
     cat_files_snapshotted_process_request,
     cat_files_process_result_concatted,
     RootRule(CatExecutionRequest),
@@ -156,10 +144,7 @@ def java_sources_to_javac_args(sources_snapshot, out_dir):
 
 class JavacVersionCommand(Javac):
 
-  def gen_argv(self, snapshots=None):
-    if snapshots:
-      raise ValueError("JavacVersionCommand cannot use input snapshots '{}'"
-                       .format(snapshots))
+  def gen_argv(self):
     return (self.bin_path, '-version',)
 
 
@@ -175,10 +160,33 @@ def process_request_from_javac_version(javac_version_command):
     digest_length=0)
 
 
-class JavacVersionOutput(datatype('JavacVersionOutput', [
-    'exit_code',
-    'version_output',
-])): pass
+class JavacVersionOutput(datatype('JavacVersionOutput', ['version_output'])):
+  pass
+
+
+class ProcessExecutionFailure(Exception):
+  """Used to denote that a process exited, but was unsuccessful in some way.
+
+  For example, exiting with a non-zero code.
+  """
+
+  MSG_FMT = """process '{desc}' failed with code {code}.
+stdout:
+{stdout}
+stderr:
+{stderr}
+"""
+
+  def __init__(self, exit_code, stdout, stderr, process_description):
+    # These are intentionally "public" members.
+    self.exit_code = exit_code
+    self.stdout = stdout
+    self.stderr = stderr
+
+    msg = self.MSG_FMT.format(
+      desc=process_description, code=exit_code, stdout=stdout, stderr=stderr)
+
+    super(ProcessExecutionFailure, self).__init__(msg)
 
 
 @rule(JavacVersionOutput, [Select(JavacVersionCommand)])
@@ -187,8 +195,15 @@ def get_javac_version_output(javac_version_command):
     ExecuteProcessRequest, JavacVersionCommand, javac_version_command)
   javac_version_proc_result = yield Get(
     ExecuteProcessResult, ExecuteProcessRequest, javac_version_proc_req)
+
+  exit_code = javac_version_proc_result.exit_code
+  if exit_code != 0:
+    stdout = javac_version_proc_result.stdout
+    stderr = javac_version_proc_result.stderr
+    raise ProcessExecutionFailure(
+      exit_code, stdout, stderr, 'obtaining javac version')
+
   yield JavacVersionOutput(
-    exit_code=javac_version_proc_result.exit_code,
     version_output=javac_version_proc_result.stderr,
   )
 
@@ -196,14 +211,24 @@ def get_javac_version_output(javac_version_command):
 class JavacCompileCommand(Javac):
 
   def gen_argv(self, snapshots):
-    snapshot_file_paths = []
+    # TODO(cosmicexplorer): We use an OrderedSet here to dedup file entries --
+    # should we be allowing different snapshots to have overlapping file paths
+    # when exposing them in python?
+    snapshot_file_paths = OrderedSet()
     for s in snapshots:
-      snapshot_file_paths.extend(f.path for f in s.files)
+      for f in s.files:
+        snapshot_file_paths.add(f.path)
 
     return (self.bin_path,) + tuple(snapshot_file_paths)
 
 
 class JavacSources(datatype('JavacSources', ['globs'])):
+  """PathGlobs wrapper for Java source files to show an example of making a
+  custom type to wrap generic types such as PathGlobs to add usage context.
+
+  See CatExecutionRequest and rules above for an example of using PathGlobs
+  which does not introduce this additional layer of indirection.
+  """
 
   def __new__(cls, globs):
 
@@ -248,10 +273,8 @@ def javac_compile_sources_execute_process_request(javac_compile_req):
   )
 
 
-class JavacCompileResult(datatype('JavacCompileResult', [
-    'exit_code',
-    'stderr',
-])): pass
+class JavacCompileResult(datatype('JavacCompileResult', [])):
+  pass
 
 
 @rule(JavacCompileResult, [Select(JavacCompileRequest)])
@@ -260,10 +283,15 @@ def javac_compile_process_result(javac_compile_req):
     ExecuteProcessRequest, JavacCompileRequest, javac_compile_req)
   javac_proc_result = yield Get(
     ExecuteProcessResult, ExecuteProcessRequest, javac_proc_req)
-  yield JavacCompileResult(
-    exit_code=javac_proc_result.exit_code,
-    stderr=javac_proc_result.stderr,
-  )
+
+  exit_code = javac_proc_result.exit_code
+  if exit_code != 0:
+    stdout = javac_proc_result.stdout
+    stderr = javac_proc_result.stderr
+    raise ProcessExecutionFailure(
+      exit_code, stdout, stderr, 'javac compilation')
+
+  yield JavacCompileResult()
 
 
 def create_javac_compile_rules():
@@ -302,38 +330,14 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
   def test_integration_concat_with_snapshots_stdout(self):
     scheduler = self.mk_scheduler_in_example_fs(create_cat_stdout_rules())
 
-    cat_src_files = CatSourceFiles(
-      PathGlobs.create('', include=['fs_test/a/b/*']))
     cat_exe_req = CatExecutionRequest(
       shell_cat_binary=ShellCat(),
-      cat_source_files=cat_src_files,
+      input_file_globs=PathGlobs.create('', include=['fs_test/a/b/*']),
     )
 
     results = self.execute(scheduler, Concatted, cat_exe_req)
     self.assertEquals(1, len(results))
     concatted = results[0]
-    self.assertEqual(Concatted('one\ntwo\n'), concatted)
-
-  # TODO: Re-write this test to work with non-tar-file snapshots
-  @unittest.skip
-  def test_integration_concat_with_snapshot_subjects_test(self):
-    scheduler = self.mk_scheduler_in_example_fs([
-      # subject to files / product of subject to files for snapshot.
-      SnapshottedProcess.create(product_type=Concatted,
-        binary_type=ShellCatToOutFile,
-        input_selectors=(Select(Snapshot),),
-        input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
-        output_conversion=process_result_to_concatted_from_outfile),
-      SingletonRule(ShellCatToOutFile, ShellCatToOutFile()),
-    ])
-
-    request = scheduler.execution_request([Concatted],
-      [PathGlobs.create('', include=['fs_test/a/b/*'])])
-    root_entries = scheduler.execute(request).root_products
-    self.assertEquals(1, len(root_entries))
-    state = self.assertFirstEntryIsReturn(root_entries, scheduler, request)
-    concatted = state.value
-
     self.assertEqual(Concatted('one\ntwo\n'), concatted)
 
   def test_javac_version_example(self):
@@ -345,7 +349,6 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     results = self.execute(scheduler, JavacVersionOutput, JavacVersionCommand())
     self.assertEquals(1, len(results))
     javac_version_output = results[0]
-    self.assertEqual(0, javac_version_output.exit_code)
     self.assertIn('javac', javac_version_output.version_output)
 
   # TODO: Re-write this test to work with non-tar-file snapshots
@@ -389,7 +392,6 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     results = self.execute(scheduler, JavacCompileResult, request)
     self.assertEquals(1, len(results))
     javac_compile_result = results[0]
-    self.assertEqual(0, javac_compile_result.exit_code)
     # TODO: Test that the output snapshot is good
 
   def test_javac_compilation_example_rust_failure(self):
@@ -404,11 +406,12 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       javac_sources=javac_sources,
     )
 
-    results = self.execute(scheduler, JavacCompileResult, request)
-    self.assertEquals(1, len(results))
-    javac_compile_result = results[0]
-    self.assertEqual(1, javac_compile_result.exit_code)
-    self.assertIn("NOT VALID JAVA", javac_compile_result.stderr)
+    try:
+      result = self.execute_raising_throw(scheduler, JavacCompileResult, request)
+      raise Exception("should have thrown")
+    except ProcessExecutionFailure as e:
+      self.assertEqual(1, e.exit_code)
+      self.assertIn("NOT VALID JAVA", e.stderr)
 
   def test_failed_command_propagates_throw(self):
     scheduler = self.mk_scheduler_in_example_fs([
