@@ -407,7 +407,7 @@ matrix:
           packages:
             - cmake
       before_install:
-        - sudo apt-get install -y pkg-config fuse
+        - sudo apt-get install -y pkg-config fuse libfuse-dev
         - sudo modprobe fuse
         - sudo chmod 666 /dev/fuse
         - sudo chown root:$USER /etc/fuse.conf
