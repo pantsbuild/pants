@@ -162,7 +162,8 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None):
   find_links = OrderedSet()
   for req in deduped_reqs:
     log.debug('  Dumping requirement: {}'.format(req))
-    builder.add_requirement(req.requirement)
+    if not req.key in PythonSetup.global_instance().resolver_blacklist:
+      builder.add_requirement(req.requirement)
     if req.repository:
       find_links.add(req.repository)
 
@@ -209,6 +210,7 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
       context=python_repos.get_network_context(),
       cache=requirements_cache_dir,
       cache_ttl=python_setup.resolver_cache_ttl,
-      allow_prereleases=python_setup.resolver_allow_prereleases)
+      allow_prereleases=python_setup.resolver_allow_prereleases,
+      pkg_blacklist=python_setup.resolver_blacklist)
 
   return distributions
