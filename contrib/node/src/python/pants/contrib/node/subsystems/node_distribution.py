@@ -17,11 +17,13 @@ from pants.option.custom_types import dir_option, file_option
 from pants.util.dirutil import safe_mkdir, safe_rmtree
 from pants.util.memo import memoized_method, memoized_property
 
-
 from pants.contrib.node.subsystems.command import command_gen
-from pants.contrib.node.subsystems.package_managers import (
-  PACKAGE_MANAGER_NPM, PACKAGE_MANAGER_YARNPKG, PACKAGE_MANAGER_YARNPKG_ALIAS, VALID_PACKAGE_MANAGERS,
-  PackageManagerNpm, PackageManagerYarnpkg)
+from pants.contrib.node.subsystems.package_managers import (PACKAGE_MANAGER_NPM,
+                                                            PACKAGE_MANAGER_YARNPKG,
+                                                            PACKAGE_MANAGER_YARNPKG_ALIAS,
+                                                            VALID_PACKAGE_MANAGERS,
+                                                            PackageManagerNpm,
+                                                            PackageManagerYarnpkg)
 from pants.contrib.node.subsystems.yarnpkg_distribution import YarnpkgDistribution
 
 

@@ -5,12 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import mock
 import unittest
 
-from pants.contrib.node.subsystems.package_managers import (
-  PackageInstallationTypeOption, PackageInstallationVersionOption,
-  PackageManagerNpm, PackageManagerYarnpkg)
+import mock
+
+from pants.contrib.node.subsystems.package_managers import (PackageInstallationTypeOption,
+                                                            PackageInstallationVersionOption,
+                                                            PackageManagerNpm,
+                                                            PackageManagerYarnpkg)
 
 
 def fake_install():
