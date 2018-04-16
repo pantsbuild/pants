@@ -46,11 +46,6 @@ class NodeDistribution(NativeTool):
   @classmethod
   def register_options(cls, register):
     super(NodeDistribution, cls).register_options(register)
-    register('--supportdir', advanced=True, default='bin/node',
-             removal_version='1.8.0.dev0', removal_hint='No longer supported.',
-             help='Find the Node distributions under this dir.  Used as part of the path to '
-                  'lookup the distribution with --binary-util-baseurls and --pants-bootstrapdir')
-
     register('--package-manager', advanced=True, default='npm', fingerprint=True,
              choices=VALID_PACKAGE_MANAGERS,
              help='Default package manager config for repo. Should be one of {}'.format(

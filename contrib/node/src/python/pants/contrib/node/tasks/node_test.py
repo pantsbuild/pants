@@ -70,6 +70,7 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
         self._currently_executing_test_targets = [target]
         result, test_command = self.run_script(
           target.script_name,
+          package_manager=self.get_package_manager(target=node_module),
           target=target,
           script_args=self.get_passthru_args(),
           node_paths=node_paths.all_node_paths,

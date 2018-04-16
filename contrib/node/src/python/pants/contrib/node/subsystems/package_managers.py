@@ -124,6 +124,10 @@ class PackageManager(object):
       https://url/to.tgz
     :param node_paths: A list of path that should be included in $PATH when
       running the script.
+    :param type_option: A value from PackageInstallationTypeOption that indicates the type
+      of package to be installed. Default to 'prod', which is a production dependency.
+    :param version_option: A value from PackageInstallationVersionOption that indicates how
+      to match version. Default to None, which uses package manager default.
     """
     args=self._get_add_package_args(
       package,

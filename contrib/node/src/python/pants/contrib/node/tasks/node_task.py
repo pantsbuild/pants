@@ -89,6 +89,7 @@ class NodeTask(Task):
       package,
       type_option=type_option,
       version_option=version_option,
+      node_paths=node_paths,
     )
     return self._execute_command(
       command, workunit_name=workunit_name, workunit_labels=workunit_labels)
@@ -128,7 +129,7 @@ class NodeTask(Task):
       command, workunit_name=workunit_name, workunit_labels=workunit_labels)
 
 
-  def _execute_command(self, command, workunit_name, workunit_labels=None):
+  def _execute_command(self, command, workunit_name=None, workunit_labels=None):
     """Executes a node or npm command via self._run_node_distribution_command.
 
     :param NodeDistribution.Command command: The command to run.
