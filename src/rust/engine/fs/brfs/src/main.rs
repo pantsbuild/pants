@@ -485,11 +485,10 @@ impl fuse::Filesystem for BuildResultFS {
         let result: Result<(), ()> = self
           .store
           .load_file_bytes_with(digest, move |bytes| {
+            let begin = std::cmp::min(offset as usize, bytes.len());
+            let end = std::cmp::min(offset as usize + size as usize, bytes.len());
             let mut reply = reply.lock().unwrap();
-            reply
-              .take()
-              .unwrap()
-              .data(&bytes.slice(offset as usize, offset as usize + size as usize));
+            reply.take().unwrap().data(&bytes.slice(begin, end));
           })
           .map(|v| match v {
             Some(_) => {}
@@ -632,16 +631,12 @@ fn main() {
 
 #[cfg(target_os = "macos")]
 fn unmount(mount_path: &str) -> i32 {
-  unsafe {
-    libc::unmount(CString::new(mount_path).unwrap().as_ptr(), 0)
-  }
+  unsafe { libc::unmount(CString::new(mount_path).unwrap().as_ptr(), 0) }
 }
 
 #[cfg(target_os = "linux")]
 fn unmount(mount_path: &str) -> i32 {
-  unsafe {
-    libc::umount(CString::new(mount_path).unwrap().as_ptr())
-  }
+  unsafe { libc::umount(CString::new(mount_path).unwrap().as_ptr()) }
 }
 
 #[cfg(test)]
