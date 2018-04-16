@@ -13,10 +13,9 @@ from twitter.common.collections import OrderedSet
 
 from pants.engine.fs import PathGlobs, Snapshot, create_fs_rules
 from pants.engine.isolated_process import (
-  Binary, ExecuteProcessRequest, ExecuteProcessResult,
-  SnapshottedProcessRequest, create_process_rules)
+  Binary, ExecuteProcessRequest, ExecuteProcessResult, create_process_rules)
 from pants.engine.nodes import Return, Throw
-from pants.engine.rules import RootRule, SingletonRule, rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
 from pants.util.objects import datatype
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -261,15 +260,15 @@ def create_javac_compile_rules():
 class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
   def test_blows_up_on_invalid_args(self):
     with self.assertRaises(ValueError):
-      ExecuteProcessRequest(argv=['1'], env=tuple(), input_files_digest=unicode(), digest_length=0)
+      ExecuteProcessRequest(argv=['1'], env=tuple(), input_files_digest='', digest_length=0)
     with self.assertRaises(ValueError):
-      ExecuteProcessRequest(argv=('1',), env=[], input_files_digest=unicode(), digest_length=0)
+      ExecuteProcessRequest(argv=('1',), env=[], input_files_digest='', digest_length=0)
     with self.assertRaises(ValueError):
-      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest=str(), digest_length='')
+      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest='', digest_length='')
     with self.assertRaises(ValueError):
       ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest=3, digest_length=0)
     with self.assertRaises(ValueError):
-      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest=unicode(), digest_length=-1)
+      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest='', digest_length=-1)
 
 
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
@@ -312,7 +311,6 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     results = self.execute(scheduler, JavacCompileResult, request)
     self.assertEquals(1, len(results))
-    javac_compile_result = results[0]
     # TODO: Test that the output snapshot contains Simple.class at the correct
     # path
 
@@ -330,7 +328,8 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     try:
       result = self.execute_raising_throw(scheduler, JavacCompileResult, request)
-      raise Exception("should have thrown")
+      raise Exception("error: should have thrown (result: '{}')"
+                      .format(repr(result)))
     except ProcessExecutionFailure as e:
       self.assertEqual(1, e.exit_code)
       self.assertIn("NOT VALID JAVA", e.stderr)

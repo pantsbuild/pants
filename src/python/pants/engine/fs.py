@@ -59,6 +59,11 @@ class Snapshot(datatype('Snapshot', ['fingerprint', 'digest_length', 'path_stats
   sandboxes.
   """
 
+  def __new__(cls, fingerprint, digest_length, path_stats):
+    # We get a unicode instance when this is instantiated, so ensure it is
+    # converted to a str.
+    return super(Snapshot, cls).__new__(cls, str(fingerprint), digest_length, path_stats)
+
   @property
   def dirs(self):
     return [p for p in self.path_stats if type(p.stat) == Dir]
