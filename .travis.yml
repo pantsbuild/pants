@@ -415,6 +415,15 @@ matrix:
         - SHARD="Rust tests"
       script:
         - ./build-support/bin/ci.sh -bcfjklmnprtx
+    - os: osx
+      # We request the oldest image we can (corresponding to OSX 10.10) for maximum compatibility.
+      # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
+      osx_image: xcode6.4
+      language: generic
+      env:
+        - SHARD="Rust tests OSX"
+      script:
+        - ./build-support/bin/ci.sh -bcfjklmnprtx
 
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/s3/
