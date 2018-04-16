@@ -603,15 +603,13 @@ fn main() {
 
   // Unmount whatever happens to be mounted there already.
   // This is handy for development, but should probably be removed :)
-  unsafe {
-    let unmount_return = libc::unmount(CString::new(mount_path).unwrap().as_ptr(), 0);
-    if unmount_return != 0 {
-      match errno::errno() {
-        errno::Errno(22) => {
-          debug!("unmount failed, continuing because error code suggests directory was not mounted")
-        }
-        v => panic!("Error unmounting: {:?}", v),
+  let unmount_return = unmount(mount_path);
+  if unmount_return != 0 {
+    match errno::errno() {
+      errno::Errno(22) => {
+        debug!("unmount failed, continuing because error code suggests directory was not mounted")
       }
+      v => panic!("Error unmounting: {:?}", v),
     }
   }
 
@@ -630,6 +628,20 @@ fn main() {
 
   let _fs = mount(mount_path, store).expect("Error mounting");
   loop {}
+}
+
+#[cfg(target_os = "macos")]
+fn unmount(mount_path: &str) -> i32 {
+  unsafe {
+    libc::unmount(CString::new(mount_path).unwrap().as_ptr(), 0)
+  }
+}
+
+#[cfg(target_os = "linux")]
+fn unmount(mount_path: &str) -> i32 {
+  unsafe {
+    libc::umount(CString::new(mount_path).unwrap().as_ptr(), 0)
+  }
 }
 
 #[cfg(test)]
