@@ -225,6 +225,9 @@ def javac_compile_sources_execute_process_request(javac_compile_req):
   )
 
 
+# TODO: make this contain the snapshot(s?) of the output files (or contain
+# something that contains it) once we've made it so processes can make snapshots
+# of the files they produce.
 class JavacCompileResult(datatype('JavacCompileResult', [])):
   pass
 
