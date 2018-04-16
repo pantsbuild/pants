@@ -399,12 +399,18 @@ matrix:
     # Rust tests
     - os: linux
       dist: trusty
+      sudo: required
       language: python
       python: "2.7.13"
       addons:
         apt:
           packages:
             - cmake
+      before_install:
+        - sudo apt-get install -y pkg-config fuse
+        - sudo modprobe fuse
+        - sudo chmod 666 /dev/fuse
+        - sudo chown root:$USER /etc/fuse.conf
       env:
         - SHARD="Rust tests"
       script:
