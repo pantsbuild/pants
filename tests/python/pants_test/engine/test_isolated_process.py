@@ -12,7 +12,6 @@ import unittest
 from pants.engine.fs import PathGlobs, Snapshot, create_fs_rules
 from pants.engine.isolated_process import (
   ExecuteProcessRequest, ExecuteProcessResult, create_process_rules)
-from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
 from pants.util.objects import datatype
@@ -252,7 +251,7 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
   def test_blows_up_on_invalid_args(self):
     try:
       self._default_args_execute_process_request()
-    except ValueError as e:
+    except ValueError:
       self.assertTrue(False, "should be able to construct without error")
 
     with self.assertRaises(ValueError):

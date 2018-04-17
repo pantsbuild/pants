@@ -6,17 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-import os
-from abc import abstractproperty
-from binascii import hexlify
 
 from pants.engine.fs import EMPTY_SNAPSHOT
-from pants.engine.rules import RootRule, SingletonRule, rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
-from pants.util.contextutil import open_tar, temporary_dir
-from pants.util.dirutil import safe_mkdir
 from pants.util.objects import datatype
-from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)

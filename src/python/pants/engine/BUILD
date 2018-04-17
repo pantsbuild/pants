@@ -90,14 +90,10 @@ python_library(
   name='isolated_process',
   sources=['isolated_process.py'],
   dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':addressable',
     ':fs',
-    ':nodes',
-    ':struct',
-    'src/python/pants/build_graph',
+    ':rules',
+    ':selectors',
     'src/python/pants/util:objects',
-    'src/python/pants/util:process_handler',
   ]
 )
 
