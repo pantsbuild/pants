@@ -16,8 +16,7 @@ from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot
-from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult, _Snapshots,
-                                           create_snapshot_rules)
+from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
@@ -91,7 +90,6 @@ class WrappedNativeScheduler(object):
       work_dir,
       ignore_patterns,
       Snapshot,
-      _Snapshots,
       FileContent,
       FilesContent,
       Path,
@@ -104,7 +102,6 @@ class WrappedNativeScheduler(object):
       constraint_for(Variants),
       constraint_for(PathGlobs),
       constraint_for(Snapshot),
-      constraint_for(_Snapshots),
       constraint_for(FilesContent),
       constraint_for(Dir),
       constraint_for(File),
@@ -326,7 +323,7 @@ class LocalScheduler(object):
     self._execution_request = None
 
     # Validate and register all provided and intrinsic tasks.
-    rules = list(rules) + create_snapshot_rules()
+    rules = list(rules)
     rule_index = RuleIndex.create(rules)
     self._scheduler = WrappedNativeScheduler(native,
                                              project_tree.build_root,
