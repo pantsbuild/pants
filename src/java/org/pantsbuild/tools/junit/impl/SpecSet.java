@@ -10,7 +10,7 @@ class SpecSet {
   private final Concurrency defaultConcurrency;
 
   public SpecSet(Collection<Spec> allSpecs, Concurrency defaultConcurrency) {
-    this.specs = new LinkedHashSet(allSpecs);
+    this.specs = new LinkedHashSet<Spec>(allSpecs);
     this.defaultConcurrency = defaultConcurrency;
   }
 
