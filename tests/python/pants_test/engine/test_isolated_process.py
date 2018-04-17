@@ -246,11 +246,25 @@ def create_javac_compile_rules():
 
 
 class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
+  def _default_args_execute_process_request(self, argv=tuple(), env=tuple()):
+    return ExecuteProcessRequest.create_with_empty_snapshot(
+      argv=argv,
+      env=env,
+    )
+
   def test_blows_up_on_invalid_args(self):
+    try:
+      self._default_args_execute_process_request()
+    except ValueError as e:
+      self.assertTrue(False, "should be able to construct without error")
+
     with self.assertRaises(ValueError):
-      ExecuteProcessRequest(argv=['1'], env=tuple(), input_files_digest='', digest_length=0)
+      self._default_args_execute_process_request(argv=['1'])
     with self.assertRaises(ValueError):
-      ExecuteProcessRequest(argv=('1',), env=[], input_files_digest='', digest_length=0)
+      self._default_args_execute_process_request(argv=('1',), env=[])
+
+    # TODO(cosmicexplorer): we should probably check that the digest info in
+    # ExecuteProcessRequest is valid, beyond just checking if it's a string.
     with self.assertRaises(ValueError):
       ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest='', digest_length='')
     with self.assertRaises(ValueError):
