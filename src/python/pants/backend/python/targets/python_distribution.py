@@ -65,3 +65,7 @@ class PythonDistribution(Target):
   @property
   def has_native_sources(self):
     return self.has_sources(extension=('.c', '.cpp', '.cc'))
+
+  @property
+  def platforms(self):
+    return ['current']

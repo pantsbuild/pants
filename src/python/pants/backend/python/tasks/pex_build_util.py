@@ -64,21 +64,18 @@ def tgt_closure_platforms(tgts):
   :param tgts: a list of :class:`Target` objects.
   :returns: a dict mapping a platform string to a list of targets that specify the platform.
   """
-
-  def insert_or_append_tgt_by_platform(platform, tgt, tgt_dict):
-    if platform in tgt_dict:
-      tgt_dict[platform].append(tgt)
-    else:
-      tgt_dict[platform] = [tgt]
-
   tgts_by_platforms = {}
+
+  def insert_or_append_tgt_by_platform(tgt):
+    if tgt.platforms:
+      for platform in tgt.platforms:
+        if platform in tgts_by_platforms:
+          tgts_by_platforms[platform].append(tgt)
+        else:
+          tgts_by_platforms[platform] = [tgt]
+
   for tgt in tgts:
-    if is_local_python_dist(tgt):
-      insert_or_append_tgt_by_platform('current', tgt, tgts_by_platforms)
-    else:
-      if tgt.platforms:
-        for platform in tgt.platforms:
-          insert_or_append_tgt_by_platform(platform, tgt, tgts_by_platforms)
+    insert_or_append_tgt_by_platform(tgt)
   # If no targets specify platforms, inherit the default platforms.
   if not tgts_by_platforms:
     for platform in PythonSetup.global_instance().platforms:
