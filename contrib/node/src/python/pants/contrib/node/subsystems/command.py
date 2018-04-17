@@ -9,6 +9,7 @@ import logging
 import os
 from collections import namedtuple
 
+from pants.util.contextutil import get_joined_path
 from pants.util.process_handler import subprocess
 
 
@@ -39,7 +40,7 @@ class Command(namedtuple('Command', ['executable', 'args', 'extra_paths'])):
     """
     kwargs = kwargs.copy()
     env = kwargs.pop('env', os.environ).copy()
-    env['PATH'] = os.path.pathsep.join(self.extra_paths + [env.get('PATH', '')])
+    env['PATH'] = get_joined_path(self.extra_paths, env=env, prepend=True)
     return env, kwargs
 
   def run(self, **kwargs):
