@@ -127,3 +127,13 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       if os.path.exists(pex):
         # Cleanup
         os.remove(pex)
+
+  def test_pants_tests_local_dists_for_current_platform_only(self):
+    # Cannot use 'platforms': ['current', 'linux-x86_64'] for testing because the test goal
+    # requires the coverage package and the pex resolver raises an Untranslatable error when
+    # attempting to translate the coverage sdist for linux platforms.
+    pants_ini_config = {'python-setup': {'platforms': ['macosx-10.12-x86_64']}}
+    # Clean all to rebuild requirements pex.
+    command=['clean-all', 'test', '{}:fasthello'.format(self.fasthello_tests)]
+    pants_run = self.run_pants(command=command, config=pants_ini_config)
+    self.assert_success(pants_run)
