@@ -31,18 +31,7 @@ enum ExecutionError {
   NotFinished(String),
 }
 
-macro_rules! futurify {
-( $x:expr) => {
-    {
-        match $x {
-            Ok(_) => {}
-            Err(error) => {return future::err(error).to_boxed() as BoxFuture<_, _>;}
-        }
-    }
-};
-}
-
-macro_rules! futurify_with_ok_return {
+macro_rules! try_future {
 ( $x:expr) => {
     {
         match $x {
@@ -156,6 +145,7 @@ impl CommandRunner {
                         let grpc_result = map_grpc_result(
                           operations_client.get_operation(&operation_request)
                         );
+                        //future::ok(future::Loop::Continue(try_future!(operation))).to_boxed() as BoxFuture<_, _>
                         match grpc_result {
                           Ok(operation) => {
                             future::ok(future::Loop::Continue(operation)).to_boxed()
@@ -215,14 +205,14 @@ impl CommandRunner {
       )).to_boxed() as BoxFuture<_, _>;
     }
     let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
-    futurify!(execute_response.merge_from_bytes(operation.get_response().get_value())
+    try_future!(execute_response.merge_from_bytes(operation.get_response().get_value())
       .map_err(|e| ExecutionError::Fatal(format!("Invalid ExecuteResponse: {:?}", e))));
     // TODO: Log less verbosely
     debug!("Got (nested) execute response: {:?}", execute_response);
     let stdout =
       if execute_response.get_result().has_stdout_digest() {
         self.store.load_file_bytes_with(
-          execute_response.get_result().get_stdout_digest().into(), |v: Bytes| v)
+          execute_response.get_result().get_stdout_digest().into(), |v| v)
             .map_err(|error| ExecutionError::Fatal(format!("Error fetching stdout: {:?}", error)))
             .and_then(|maybe_value| match maybe_value {
               Some(value) => {return Ok(value)}
@@ -261,7 +251,7 @@ impl CommandRunner {
                       details.get_type_url()
             ))).to_boxed() as BoxFuture<_, _>;
           }
-          futurify!(precondition_failure
+          try_future!(precondition_failure
               .merge_from_bytes(details.get_value())
               .map_err(|e| {
                 ExecutionError::Fatal(format!(
@@ -288,14 +278,14 @@ impl CommandRunner {
               ))).to_boxed() as BoxFuture<_, _>;
             }
             let digest = Digest(
-              futurify_with_ok_return!(Fingerprint::from_hex_string(parts.get(1).unwrap()).map_err(|e| {
+              try_future!(Fingerprint::from_hex_string(parts.get(1).unwrap()).map_err(|e| {
                 ExecutionError::Fatal(format!(
                   "Bad digest in missing blob: {}: {}",
                   parts.get(1).unwrap(),
                   e
                 ))
               })),
-              futurify_with_ok_return!(parts.get(2).unwrap().parse::<usize>().map_err(|e| {
+              try_future!(parts.get(2).unwrap().parse::<usize>().map_err(|e| {
                 ExecutionError::Fatal(format!(
                   "Missing blob had bad size: {}: {}",
                   parts.get(2).unwrap(),
@@ -407,9 +397,7 @@ mod tests {
 
   #[derive(Debug, PartialEq)]
   enum StdoutType {
-    //
     Raw(String),
-    //
     Digest(Digest),
   }
   #[test]
@@ -466,31 +454,15 @@ mod tests {
   }
 
   #[test]
-  fn successful_execution_after_one_getoperation_with_digest() {
-    let execute_request = echo_foo_request();
-
-    let mock_server = {
-      let op_name = "gimme-foo".to_string();
-
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().1,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_successful_operation(&op_name, StdoutType::Digest(digest()), "", 0),
-        ],
-      ))
-    };
-
-    let result = run_command_remote(&mock_server.address(), execute_request).unwrap();
-
-    assert_eq!(
-    result,
-    ExecuteProcessResult {
-      stdout: str_bytes(),
-      stderr: as_byte_owned_vec(""),
-      exit_code: 0,
-    }
+  fn extract_response_with_digest_stdout() {
+    assert_eq(
+      extract_execute_response(
+        make_successful_operation("gimme-foo".to_owned(), StdoutType::Digest(digest()), "", 0)),
+        Ok(ExecuteProcessResult {
+          stdout: str_bytes(),
+          stderr: as_byte_owned_vec(""),
+          exit_code: 0,
+        })
     );
   }
 
