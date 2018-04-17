@@ -9,8 +9,6 @@ import os
 import tarfile
 import unittest
 
-from twitter.common.collections import OrderedSet
-
 from pants.engine.fs import PathGlobs, Snapshot, create_fs_rules
 from pants.engine.isolated_process import (
   ExecuteProcessRequest, ExecuteProcessResult, create_process_rules)
@@ -75,10 +73,10 @@ def cat_files_process_request_input_snapshot(cat_exe_req):
 
 @rule(Concatted, [Select(CatExecutionRequest)])
 def cat_files_process_result_concatted(cat_exe_req):
-  # FIXME(cosmicexplorer): we should only have to run Get once here. this:
-  # yield Get(ExecuteProcessResult, CatExecutionRequest, cat_exe_req)
-  # fails because ExecuteProcessRequest is a RootRule (which shouldn't be true),
-  # but there's some work required in isolated_process.py to fix this.
+  # FIXME(cosmicexplorer): we should only have to run Get once here. this: yield
+  # Get(ExecuteProcessResult, CatExecutionRequest, cat_exe_req) fails because
+  # ExecuteProcessRequest is a RootRule (which shouldn't be true), but there's
+  # probably some work required in isolated_process.py to fix this (see #5718).
   cat_proc_req = yield Get(ExecuteProcessRequest, CatExecutionRequest, cat_exe_req)
   cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, cat_proc_req)
   yield Concatted(value=cat_process_result.stdout)
@@ -145,6 +143,8 @@ def get_javac_version_output(javac_version_command):
   if exit_code != 0:
     stdout = javac_version_proc_result.stdout
     stderr = javac_version_proc_result.stderr
+    # TODO(cosmicexplorer): We should probably make this automatic for most
+    # process invocations (see #5719).
     raise ProcessExecutionFailure(
       exit_code, stdout, stderr, 'obtaining javac version')
 
@@ -193,10 +193,7 @@ class JavacCompileRequest(datatype('JavacCompileRequest', [
       cls, bin_path, javac_sources)
 
   def argv_from_source_snapshot(self, snapshot):
-    # TODO(cosmicexplorer): We use an OrderedSet here to dedup file entries --
-    # should we be allowing different snapshots to have overlapping file paths
-    # when exposing them in python?
-    snapshot_file_paths = OrderedSet([f.path for f in snapshot.files])
+    snapshot_file_paths = [f.path for f in snapshot.files]
 
     return (self.bin_path,) + tuple(snapshot_file_paths)
 
