@@ -51,7 +51,7 @@ class CatExecutionRequest(datatype('CatExecutionRequest', [
       raise ValueError('shell_cat_binary should be an instance of ShellCat')
     if not isinstance(input_file_globs, PathGlobs):
       raise ValueError(
-        'cat_source_files should be an instance of PathGlobs')
+        'input_file_globs should be an instance of PathGlobs')
 
     return super(CatExecutionRequest, cls).__new__(
       cls, shell_cat_binary, input_file_globs)
@@ -334,18 +334,6 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       self.assertEqual(1, e.exit_code)
       self.assertIn("NOT VALID JAVA", e.stderr)
 
-  def assertFirstEntryIsReturn(self, root_entries, scheduler, execution_request):
-    root, state = root_entries[0]
-    self.assertReturn(state, scheduler, execution_request)
-    return state
-
-  def assertFirstEntryIsThrow(self, root_entries, in_msg=None):
-    root, state = root_entries[0]
-    self.assertIsInstance(state, Throw)
-    if in_msg:
-      self.assertIn(in_msg, str(state))
-    return state
-
   def mk_example_fs_tree(self):
     fs_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
     test_fs = os.path.join(fs_tree.build_root, 'fs_test')
@@ -356,16 +344,3 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
   def mk_scheduler_in_example_fs(self, rules):
     rules = list(rules) + create_fs_rules() + create_process_rules()
     return self.mk_scheduler(rules=rules, project_tree=self.mk_example_fs_tree())
-
-  def assertReturn(self, state, scheduler, execution_request):
-    is_return = isinstance(state, Return)
-    if is_return:
-      return
-    else:
-      self.fail('Expected a Return, but found a {}. trace below:\n{}'
-                .format(state, '\n'.join(scheduler.trace(execution_request))))
-
-  def assertPathContains(self, expected_files, path):
-    for i in expected_files:
-      self.assertTrue(os.path.exists(os.path.join(path, i)),
-                      'Expected {} to exist in {} but did not'.format(i, path))

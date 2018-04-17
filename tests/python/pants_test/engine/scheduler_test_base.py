@@ -73,7 +73,7 @@ class SchedulerTestBase(object):
         raise ValueError('At least one request failed: {}. Visualized as {}'.format(states, dot_file))
     return list(state.value for state in states)
 
-  def execute_raising_throw(self, scheduler, product, subject):
+  def execute_expecting_one_result(self, scheduler, product, subject):
     request = scheduler.execution_request([product], [subject])
     result = scheduler.execute(request)
 
@@ -83,7 +83,10 @@ class SchedulerTestBase(object):
     states = [state for _, state in result.root_products]
     self.assertEqual(len(states), 1)
 
-    resulting_value = states[0]
+    return states[0]
+
+  def execute_raising_throw(self, scheduler, product, subject):
+    resulting_value = self.execute_expecting_one_result(scheduler, product, subject)
     self.assertTrue(type(resulting_value) is Throw)
 
     raise resulting_value.exc
