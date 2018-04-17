@@ -22,18 +22,6 @@ from pants.util.process_handler import subprocess
 logger = logging.getLogger(__name__)
 
 
-class Binary(object):
-  """Binary in the product graph.
-
-  TODO(cosmicexplorer): this should probably be coupled with instances of
-  BinaryTool subclasses.
-  """
-
-  @abstractproperty
-  def bin_path(self):
-    pass
-
-
 class ExecuteProcessRequest(datatype('ExecuteProcessRequest', ['argv', 'env', 'input_files_digest', 'digest_length'])):
   """Request for execution with args and snapshots to extract."""
 

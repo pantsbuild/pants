@@ -13,7 +13,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.engine.fs import PathGlobs, Snapshot, create_fs_rules
 from pants.engine.isolated_process import (
-  Binary, ExecuteProcessRequest, ExecuteProcessResult, create_process_rules)
+  ExecuteProcessRequest, ExecuteProcessResult, create_process_rules)
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
@@ -25,19 +25,24 @@ class Concatted(datatype('Concatted', ['value'])):
   pass
 
 
-class ShellCat(Binary):
-  @property
-  def bin_path(self):
-    return '/bin/cat'
+class ShellCat(datatype('ShellCat', ['bin_path'])):
+  """Wrapper class to show an example of using an auxiliary class (which wraps
+  an executable) to generate an argv instead of doing it all in
+  CatExecutionRequest. This can be used to encapsulate operations such as
+  sanitizing command-line arguments which are specific to the executable, which
+  can reduce boilerplate for generating ExecuteProcessRequest instances if the
+  executable is used in different ways across multiple different types of
+  process execution requests."""
 
-  def gen_argv(self, snapshots):
-    cat_file_paths = []
-    for s in snapshots:
-      cat_file_paths.extend(f.path for f in s.files)
-    # TODO(cosmicexplorer): We should have a structured way to create command
-    # lines which properly escape e.g. file arguments which would be parsed as
-    # options, for greater security and usability. This should probably be
-    # composable (see Javac and its subclasses below).
+  def argv_from_snapshot(self, snapshot):
+    cat_file_paths = [f.path for f in snapshot.files]
+
+    option_like_files = [p for p in cat_file_paths if p.startswith('-')]
+    if option_like_files:
+      raise Exception(
+        "invalid file names: '{}' look like command-line options"
+        .format(option_like_files))
+
     return (self.bin_path,) + tuple(cat_file_paths)
 
 
@@ -62,7 +67,7 @@ def cat_files_process_request_input_snapshot(cat_exe_req):
   cat_bin = cat_exe_req.shell_cat_binary
   cat_files_snapshot = yield Get(Snapshot, PathGlobs, cat_exe_req.input_file_globs)
   yield ExecuteProcessRequest.create_from_snapshot(
-    argv=cat_bin.gen_argv([cat_files_snapshot]),
+    argv=cat_bin.argv_from_snapshot(cat_files_snapshot),
     env=tuple(),
     snapshot=cat_files_snapshot,
   )
@@ -87,24 +92,13 @@ def create_cat_stdout_rules():
   ]
 
 
-class JavaOutputDir(datatype('JavaOutputDir', ['path'])):
-  pass
-
-
-class Javac(Binary):
-
-  @property
-  def bin_path(self):
-    return '/usr/bin/javac'
-
-
-class JavacVersionCommand(Javac):
+class JavacVersionExecutionRequest(datatype('JavacVersionExecutionRequest', ['bin_path'])):
 
   def gen_argv(self):
     return (self.bin_path, '-version',)
 
 
-@rule(ExecuteProcessRequest, [Select(JavacVersionCommand)])
+@rule(ExecuteProcessRequest, [Select(JavacVersionExecutionRequest)])
 def process_request_from_javac_version(javac_version_command):
   yield ExecuteProcessRequest.create_with_empty_snapshot(
     argv=javac_version_command.gen_argv(),
@@ -140,10 +134,10 @@ stderr:
     super(ProcessExecutionFailure, self).__init__(msg)
 
 
-@rule(JavacVersionOutput, [Select(JavacVersionCommand)])
+@rule(JavacVersionOutput, [Select(JavacVersionExecutionRequest)])
 def get_javac_version_output(javac_version_command):
   javac_version_proc_req = yield Get(
-    ExecuteProcessRequest, JavacVersionCommand, javac_version_command)
+    ExecuteProcessRequest, JavacVersionExecutionRequest, javac_version_command)
   javac_version_proc_result = yield Get(
     ExecuteProcessResult, ExecuteProcessRequest, javac_version_proc_req)
 
@@ -157,20 +151,6 @@ def get_javac_version_output(javac_version_command):
   yield JavacVersionOutput(
     version_output=javac_version_proc_result.stderr,
   )
-
-
-class JavacCompileCommand(Javac):
-
-  def gen_argv(self, snapshots):
-    # TODO(cosmicexplorer): We use an OrderedSet here to dedup file entries --
-    # should we be allowing different snapshots to have overlapping file paths
-    # when exposing them in python?
-    snapshot_file_paths = OrderedSet()
-    for s in snapshots:
-      for f in s.files:
-        snapshot_file_paths.add(f.path)
-
-    return (self.bin_path,) + tuple(snapshot_file_paths)
 
 
 class JavacSources(datatype('JavacSources', ['globs'])):
@@ -195,30 +175,38 @@ def javac_sources_to_globs(javac_sources):
 
 
 class JavacCompileRequest(datatype('JavacCompileRequest', [
-    'javac_compile_command',
+    'bin_path',
     'javac_sources',
 ])):
 
-  def __new__(cls, javac_compile_command, javac_sources):
+  def __new__(cls, bin_path, javac_sources):
 
-    if not isinstance(javac_compile_command, JavacCompileCommand):
-      raise ValueError(
-        'javac_compile_command should be an instance of JavacCompileCommand')
+    # TODO(cosmicexplorer): This may be an instance of unicode, so convert to
+    # str. In general, there should be a more fluent way to check types in
+    # datatype constructors and perform simple conversions such as this.
+    bin_path = str(bin_path)
     if not isinstance(javac_sources, JavacSources):
       raise ValueError(
         'javac_sources should be an instance of JavacSources')
 
     return super(JavacCompileRequest, cls).__new__(
-      cls, javac_compile_command, javac_sources)
+      cls, bin_path, javac_sources)
+
+  def argv_from_source_snapshot(self, snapshot):
+    # TODO(cosmicexplorer): We use an OrderedSet here to dedup file entries --
+    # should we be allowing different snapshots to have overlapping file paths
+    # when exposing them in python?
+    snapshot_file_paths = OrderedSet([f.path for f in snapshot.files])
+
+    return (self.bin_path,) + tuple(snapshot_file_paths)
 
 
 @rule(ExecuteProcessRequest, [Select(JavacCompileRequest)])
 def javac_compile_sources_execute_process_request(javac_compile_req):
-  javac_compiler = javac_compile_req.javac_compile_command
   sources_snapshot = yield Get(
     Snapshot, JavacSources, javac_compile_req.javac_sources)
   yield ExecuteProcessRequest.create_from_snapshot(
-    argv=javac_compiler.gen_argv([sources_snapshot]),
+    argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
     env=tuple(),
     snapshot=sources_snapshot,
   )
@@ -277,7 +265,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs(create_cat_stdout_rules())
 
     cat_exe_req = CatExecutionRequest(
-      shell_cat_binary=ShellCat(),
+      shell_cat_binary=ShellCat(bin_path='/bin/cat'),
       input_file_globs=PathGlobs.create('', include=['fs_test/a/b/*']),
     )
 
@@ -288,11 +276,13 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
   def test_javac_version_example(self):
     scheduler = self.mk_scheduler_in_example_fs([
-      RootRule(JavacVersionCommand),
+      RootRule(JavacVersionExecutionRequest),
       process_request_from_javac_version,
       get_javac_version_output,
     ])
-    results = self.execute(scheduler, JavacVersionOutput, JavacVersionCommand())
+    results = self.execute(
+      scheduler, JavacVersionOutput,
+      JavacVersionExecutionRequest(bin_path='/usr/bin/javac'))
     self.assertEquals(1, len(results))
     javac_version_output = results[0]
     self.assertIn('javac', javac_version_output.version_output)
@@ -305,7 +295,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs(create_javac_compile_rules())
 
     request = JavacCompileRequest(
-      javac_compile_command=JavacCompileCommand(),
+      bin_path='/usr/bin/javac',
       javac_sources=javac_sources,
     )
 
@@ -322,7 +312,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs(create_javac_compile_rules())
 
     request = JavacCompileRequest(
-      javac_compile_command=JavacCompileCommand(),
+      bin_path='/usr/bin/javac',
       javac_sources=javac_sources,
     )
 
