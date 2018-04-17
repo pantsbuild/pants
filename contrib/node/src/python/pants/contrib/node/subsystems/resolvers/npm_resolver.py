@@ -59,8 +59,8 @@ class NpmResolver(Subsystem, NodeResolverBase):
         workunit_name=target.address.reference(),
         workunit_labels=[WorkUnitLabel.COMPILER])
       if result != 0:
-          raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
-                          .format(target.address.reference(), command, result))
+        raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
+                        .format(target.address.reference(), command, result))
 
   @staticmethod
   def _emit_package_descriptor(node_task, target, results_dir, node_paths):

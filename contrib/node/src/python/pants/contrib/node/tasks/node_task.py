@@ -128,7 +128,6 @@ class NodeTask(Task):
     return self._execute_command(
       command, workunit_name=workunit_name, workunit_labels=workunit_labels)
 
-
   def _execute_command(self, command, workunit_name=None, workunit_labels=None):
     """Executes a node or npm command via self._run_node_distribution_command.
 

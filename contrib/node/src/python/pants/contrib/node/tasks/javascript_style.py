@@ -16,7 +16,6 @@ from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.contextutil import pushd
 from pants.util.memo import memoized_method
 
-from pants.contrib.node.subsystems.command import command_gen
 from pants.contrib.node.subsystems.package_managers import (PACKAGE_MANAGER_YARNPKG,
                                                             PackageInstallationVersionOption)
 from pants.contrib.node.targets.node_module import NodeModule
