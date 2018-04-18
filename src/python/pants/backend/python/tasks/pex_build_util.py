@@ -74,8 +74,7 @@ def tgt_closure_platforms(tgts):
         else:
           tgts_by_platforms[platform] = [tgt]
 
-  for tgt in tgts:
-    insert_or_append_tgt_by_platform(tgt)
+  map(insert_or_append_tgt_by_platform, tgts)
   # If no targets specify platforms, inherit the default platforms.
   if not tgts_by_platforms:
     for platform in PythonSetup.global_instance().platforms:
