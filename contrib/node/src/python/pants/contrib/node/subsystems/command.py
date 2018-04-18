@@ -16,6 +16,7 @@ from pants.util.process_handler import subprocess
 logger = logging.getLogger(__name__)
 
 
+# TODO: Consider generalizing this into pants.util.
 class Command(namedtuple('Command', ['executable', 'args', 'extra_paths'])):
   """Describes a command to be run using a Node distribution."""
 
@@ -70,7 +71,7 @@ class Command(namedtuple('Command', ['executable', 'args', 'extra_paths'])):
 
 
 def command_gen(tool_installations, tool_executable, args=None, node_paths=None):
-  """Generate a Command object with requires tools installed and paths setup.
+  """Generate a Command object with required tools installed and paths set up.
 
   :param list tool_installations: A list of functions to install required tools.  Those functions
     should take no parameter and return an installation path to be included in the runtime path.

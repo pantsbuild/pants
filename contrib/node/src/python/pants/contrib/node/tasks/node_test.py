@@ -38,7 +38,7 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
   def _run_node_distribution_command(self, command, workunit):
     """Overrides NodeTask._run_node_distribution_command.
 
-    This is what ultimately used to run the Command.
+    This is what is ultimately used to run the Command.
     It must return the return code of the process. The base implementation just calls
     command.run immediately. We override here to invoke TestRunnerTaskMixin._spawn_and_wait,
     which ultimately invokes _spawn, which finally calls command.run.

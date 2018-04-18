@@ -104,6 +104,7 @@ class PackageManager(object):
     :param node_paths: A list of path that should be included in $PATH when
       running the script.
     """
+    # TODO: consider add a pants.util function to manipulate command line.
     package_manager_args = self._get_run_script_args()
     package_manager_args.append(script_name)
     if script_args:
