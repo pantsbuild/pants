@@ -90,7 +90,7 @@ impl CommandRunner {
 
     match execute_request_result {
       Ok((command, execute_request)) => {
-        let commandRunner = self.clone();
+        let command_runner = self.clone();
         self.upload_command(&command, execute_request.get_action().get_command_digest().into())
           .and_then(move |_| {
             debug!("Executing remotely request: {:?} (command: {:?})", execute_request, command);
@@ -112,7 +112,7 @@ impl CommandRunner {
               let execution_client2 = execution_client2.clone();
               let store = store.clone();
               let operations_client = operations_client.clone();
-              commandRunner.extract_execute_response(operation)
+              command_runner.extract_execute_response(operation)
                   .map(|value|  future::Loop::Break(value))
                   .or_else(move |value| {
                     match value {
