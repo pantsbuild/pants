@@ -469,9 +469,10 @@ mod tests {
 
   #[test]
   fn extract_response_with_digest_stdout() {
-    assert_eq(
+    let op_name = "gimme-foo".to_string();
+    assert_eq!(
       extract_execute_response(make_successful_operation(
-        "gimme-foo".to_owned(),
+        &op_name,
         StdoutType::Digest(digest()),
         "",
         0,
@@ -480,7 +481,7 @@ mod tests {
         stdout: str_bytes(),
         stderr: as_byte_owned_vec(""),
         exit_code: 0,
-      }),
+      })
     );
   }
 
@@ -1085,7 +1086,10 @@ mod tests {
   fn extract_execute_response(
     mut operation: bazel_protos::operations::Operation,
   ) -> Result<ExecuteProcessResult, ExecutionError> {
-    let cas = mock::StubCAS::empty();
+    let cas = mock::StubCAS::new(
+      1024,
+      vec![(fingerprint(), str_bytes())].into_iter().collect(),
+    );
     let command_runner = create_command_runner("", &cas);
     command_runner.extract_execute_response(operation).wait()
   }
