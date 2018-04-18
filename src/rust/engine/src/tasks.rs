@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, FNV};
 use externs;
 use selectors::{Get, Select, SelectDependencies, Selector};
+use types::Types;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
@@ -17,14 +18,15 @@ pub struct Task {
 }
 
 ///
-/// Registry of Tasks able to produce each type, and Singletons, which are the only
-/// provider of a type.
+/// Registry of native (rust) Intrinsic tasks, user (python) Tasks, and Singletons.
 ///
 #[derive(Clone)]
 pub struct Tasks {
+  // output product type -> Intrinsic providing it
+  intrinsics: HashMap<TypeConstraint, Intrinsic, FNV>,
   // Singleton Values to be returned for a given TypeConstraint.
   singletons: HashMap<TypeConstraint, (Key, Value), FNV>,
-  // any-subject, selector -> list of tasks implementing it
+  // output product type -> list of tasks providing it
   tasks: HashMap<TypeConstraint, Vec<Task>, FNV>,
   // Used during the construction of the tasks map.
   preparing: Option<Task>,
@@ -44,6 +46,7 @@ pub struct Tasks {
 impl Tasks {
   pub fn new() -> Tasks {
     Tasks {
+      intrinsics: Default::default(),
       singletons: Default::default(),
       tasks: Default::default(),
       preparing: None,
@@ -67,8 +70,29 @@ impl Tasks {
     self.singletons.get(product)
   }
 
+  pub fn gen_intrinsic(&self, product: &TypeConstraint) -> Option<&Intrinsic> {
+    self.intrinsics.get(product)
+  }
+
   pub fn gen_tasks(&self, product: &TypeConstraint) -> Option<&Vec<Task>> {
     self.tasks.get(product)
+  }
+
+  pub fn intrinsics_set(&mut self, types: &Types) {
+    self.intrinsics = vec![
+      Intrinsic {
+        kind: IntrinsicKind::Snapshot,
+        product: types.snapshot,
+        input: types.path_globs,
+      },
+      Intrinsic {
+        kind: IntrinsicKind::FilesContent,
+        product: types.files_content,
+        input: types.snapshot,
+      },
+    ].into_iter()
+      .map(|i| (i.product.clone(), i))
+      .collect();
   }
 
   pub fn singleton_add(&mut self, value: Value, product: TypeConstraint) {
@@ -165,4 +189,20 @@ impl Tasks {
     task.gets.shrink_to_fit();
     tasks.push(task);
   }
+}
+
+// TODO: This definition of `Intrinsic` is broken. Like `Tasks`, Intrinsics may have zero or more
+// input type requirements. As an example, `Snapshot` should have zero inputs, but currently it
+// "depends on" the subgraph that instantiates its PathGlobs object.
+#[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
+pub struct Intrinsic {
+  pub kind: IntrinsicKind,
+  pub product: TypeConstraint,
+  pub input: TypeConstraint,
+}
+
+#[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
+pub enum IntrinsicKind {
+  Snapshot,
+  FilesContent,
 }

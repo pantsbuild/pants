@@ -23,7 +23,7 @@ use process_execution;
 use hashing;
 use rule_graph;
 use selectors::{self, Selector};
-use tasks;
+use tasks::{self, Intrinsic, IntrinsicKind};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -261,56 +261,12 @@ impl Select {
   }
 
   ///
-  /// Gets a Snapshot for the current subject.
-  ///
-  fn get_snapshot(&self, context: &Context) -> NodeFuture<fs::Snapshot> {
-    // TODO: Hacky... should have an intermediate Node to Select PathGlobs for the subject
-    // before executing, and then treat this as an intrinsic. Otherwise, Snapshots for
-    // different subjects but identical PathGlobs will cause redundant work.
-    if self.entries.len() > 1 {
-      // TODO do something better than this.
-      panic!("we're supposed to get a snapshot, but there's more than one entry!");
-    } else if self.entries.is_empty() {
-      panic!("we're supposed to get a snapshot, but there are no matching rule entries!");
-    }
-
-    context.get(Snapshot {
-      subject: self.subject.clone(),
-      product: self.product().clone(),
-      variants: self.variants.clone(),
-      entry: self.entries[0].clone(),
-    })
-  }
-
-  ///
   /// Return Futures for each Task/Node that might be able to compute the given product for the
   /// given subject and variants.
   ///
   fn gen_nodes(&self, context: &Context) -> Vec<NodeFuture<Value>> {
     // TODO: These `product==` hooks are hacky.
-    if self.product() == &context.core.types.snapshot {
-      // If the requested product is a Snapshot, execute a Snapshot Node and then lower to a Value
-      // for this caller.
-      let context = context.clone();
-      vec![
-        self
-          .get_snapshot(&context)
-          .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
-          .to_boxed(),
-      ]
-    } else if self.product() == &context.core.types.files_content {
-      // If the requested product is FilesContent, request a Snapshot and lower it as FilesContent.
-      let context = context.clone();
-      vec![
-        self
-          .get_snapshot(&context)
-          .and_then(move |snapshot|
-            // Request the file contents of the Snapshot, and then store them.
-            snapshot.contents(context.core.store.clone()).map_err(|e| throw(&e))
-              .map(move |files_content| Snapshot::store_files_content(&context, &files_content)))
-          .to_boxed(),
-      ]
-    } else if self.product() == &context.core.types.process_result {
+    if self.product() == &context.core.types.process_result {
       let context2 = context.clone();
       let execute_process_node = ExecuteProcess::lift(&self.subject);
       vec![
@@ -334,16 +290,57 @@ impl Select {
       self
         .entries
         .iter()
-        .map(|entry| {
-          let task = context.core.rule_graph.task_for_inner(entry);
-          context.get(Task {
-            subject: self.subject.clone(),
-            product: self.product().clone(),
-            variants: self.variants.clone(),
-            task: task,
-            entry: Arc::new(entry.clone()),
-          })
-        })
+        .map(
+          |entry| match context.core.rule_graph.rule_for_inner(entry) {
+            &rule_graph::Rule::Task(ref task) => context.get(Task {
+              subject: self.subject.clone(),
+              product: self.product().clone(),
+              variants: self.variants.clone(),
+              task: task.clone(),
+              entry: Arc::new(entry.clone()),
+            }),
+            &rule_graph::Rule::Intrinsic(Intrinsic {
+              kind: IntrinsicKind::Snapshot,
+              input,
+              ..
+            }) => {
+              // TODO: Select the input product type first.
+              let context = context.clone();
+              context
+                .get(Snapshot {
+                  subject: self.subject.clone(),
+                  variants: self.variants.clone(),
+                  entry: entry.clone(),
+                })
+                .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
+                .to_boxed()
+            }
+            &rule_graph::Rule::Intrinsic(Intrinsic {
+              kind: IntrinsicKind::FilesContent,
+              input,
+              ..
+            }) => {
+              // TODO: Select the input product type first.
+              let context = context.clone();
+              context
+                .get(Snapshot {
+                  subject: self.subject.clone(),
+                  variants: self.variants.clone(),
+                  entry: entry.clone(),
+                })
+                .and_then(move |snapshot| {
+                  // Request the file contents of the Snapshot, and then store them.
+                  snapshot
+                    .contents(context.core.store.clone())
+                    .map_err(|e| throw(&e))
+                    .map(move |files_content| {
+                      Snapshot::store_files_content(&context, &files_content)
+                    })
+                })
+                .to_boxed()
+            }
+          },
+        )
         .collect::<Vec<NodeFuture<Value>>>()
     }
   }
@@ -693,7 +690,6 @@ impl From<Scandir> for NodeKey {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Snapshot {
   subject: Key,
-  product: TypeConstraint,
   variants: Variants,
   entry: rule_graph::Entry,
 }
@@ -705,7 +701,7 @@ impl Snapshot {
     // and fs::Snapshot::from_path_stats tracking dependencies for file digests.
     context
       .expand(path_globs)
-      .map_err(|e| format!("PlatGlobs expansion failed: {:?}", e))
+      .map_err(|e| format!("PathGlobs expansion failed: {:?}", e))
       .and_then(move |path_stats| {
         fs::Snapshot::from_path_stats(context.core.store.clone(), context.clone(), path_stats)
           .map_err(move |e| format!("Snapshot failed: {}", e))

@@ -216,35 +216,37 @@ pub extern "C" fn scheduler_create(
   let ignore_patterns = ignore_patterns_buf
     .to_strings()
     .unwrap_or_else(|e| panic!("Failed to decode ignore patterns as UTF8: {:?}", e));
-  let tasks = with_tasks(tasks_ptr, |tasks| tasks.clone());
+  let types = Types {
+    construct_snapshot: construct_snapshot,
+    construct_file_content: construct_file_content,
+    construct_files_content: construct_files_content,
+    construct_path_stat: construct_path_stat,
+    construct_dir: construct_dir,
+    construct_file: construct_file,
+    construct_link: construct_link,
+    construct_process_result: construct_process_result,
+    address: type_address,
+    has_products: type_has_products,
+    has_variants: type_has_variants,
+    path_globs: type_path_globs,
+    snapshot: type_snapshot,
+    files_content: type_files_content,
+    dir: type_dir,
+    file: type_file,
+    link: type_link,
+    process_request: type_process_request,
+    process_result: type_process_result,
+    generator: type_generator,
+    string: type_string,
+    bytes: type_bytes,
+  };
+  let mut tasks = with_tasks(tasks_ptr, |tasks| tasks.clone());
+  tasks.intrinsics_set(&types);
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(Box::new(Scheduler::new(Core::new(
     root_type_ids.clone(),
     tasks,
-    Types {
-      construct_snapshot: construct_snapshot,
-      construct_file_content: construct_file_content,
-      construct_files_content: construct_files_content,
-      construct_path_stat: construct_path_stat,
-      construct_dir: construct_dir,
-      construct_file: construct_file,
-      construct_link: construct_link,
-      construct_process_result: construct_process_result,
-      address: type_address,
-      has_products: type_has_products,
-      has_variants: type_has_variants,
-      path_globs: type_path_globs,
-      snapshot: type_snapshot,
-      files_content: type_files_content,
-      dir: type_dir,
-      file: type_file,
-      link: type_link,
-      process_request: type_process_request,
-      process_result: type_process_result,
-      generator: type_generator,
-      string: type_string,
-      bytes: type_bytes,
-    },
+    types,
     build_root_buf.to_os_string().as_ref(),
     ignore_patterns,
     work_dir_buf.to_os_string().as_ref(),
