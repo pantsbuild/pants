@@ -65,13 +65,16 @@ def tgt_closure_platforms(tgts):
   :returns: a dict mapping a platform string to a list of targets that specify the platform.
   """
   tgts_by_platforms = {}
-  for tgt in tgts:
+
+  def insert_or_append_tgt_by_platform(tgt):
     if tgt.platforms:
       for platform in tgt.platforms:
         if platform in tgts_by_platforms:
           tgts_by_platforms[platform].append(tgt)
         else:
           tgts_by_platforms[platform] = [tgt]
+
+  map(insert_or_append_tgt_by_platform, tgts)
   # If no targets specify platforms, inherit the default platforms.
   if not tgts_by_platforms:
     for platform in PythonSetup.global_instance().platforms:
@@ -89,7 +92,9 @@ def build_for_current_platform_only_check(tgts):
   :return: a boolean value indicating whether the current target closure has native sources.
   """
   if tgt_closure_has_native_sources(filter(is_local_python_dist, tgts)):
-    platforms = tgt_closure_platforms(filter(is_python_binary, tgts))
+    def predicate(x):
+      return is_python_binary(x) or is_local_python_dist(x)
+    platforms = tgt_closure_platforms(filter(predicate, tgts))
     if len(platforms.keys()) > 1 or not 'current' in platforms.keys():
       raise IncompatiblePlatformsError('The target set contains one or more targets that depend on '
         'native code. Please ensure that the platform arguments in all relevant targets and build '
