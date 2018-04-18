@@ -59,6 +59,11 @@ class Snapshot(datatype('Snapshot', ['fingerprint', 'digest_length', 'path_stats
   sandboxes.
   """
 
+  def __new__(cls, fingerprint, digest_length, path_stats):
+    # We get a unicode instance when this is instantiated, so ensure it is
+    # converted to a str.
+    return super(Snapshot, cls).__new__(cls, str(fingerprint), digest_length, path_stats)
+
   @property
   def dirs(self):
     return [p for p in self.path_stats if type(p.stat) == Dir]
@@ -83,6 +88,18 @@ class Snapshot(datatype('Snapshot', ['fingerprint', 'digest_length', 'path_stats
 
 
 FilesContent = Collection.of(FileContent)
+
+
+# TODO(cosmicexplorer): don't recreate this in python, get this from
+# fs::EMPTY_DIGEST somehow.
+_EMPTY_FINGERPRINT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+
+
+EMPTY_SNAPSHOT = Snapshot(
+  fingerprint=_EMPTY_FINGERPRINT,
+  digest_length=0,
+  path_stats=[],
+)
 
 
 @rule(Snapshot, [Select(PathGlobs)])

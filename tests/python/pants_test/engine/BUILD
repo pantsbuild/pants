@@ -86,9 +86,8 @@ python_tests(
     ':scheduler_test_base',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:isolated_process',
-    'src/python/pants/engine:nodes',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test/testutils:git_util',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:selectors',
     'tests/python/pants_test/engine/examples:fs_test',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
   ]

@@ -187,7 +187,6 @@ pub extern "C" fn externs_val_for(key: Key) -> Value {
 pub extern "C" fn scheduler_create(
   tasks_ptr: *mut Tasks,
   construct_snapshot: Function,
-  construct_snapshots: Function,
   construct_file_content: Function,
   construct_files_content: Function,
   construct_path_stat: Function,
@@ -200,7 +199,6 @@ pub extern "C" fn scheduler_create(
   type_has_variants: TypeConstraint,
   type_path_globs: TypeConstraint,
   type_snapshot: TypeConstraint,
-  type_snapshots: TypeConstraint,
   type_files_content: TypeConstraint,
   type_dir: TypeConstraint,
   type_file: TypeConstraint,
@@ -226,7 +224,6 @@ pub extern "C" fn scheduler_create(
     tasks,
     Types {
       construct_snapshot: construct_snapshot,
-      construct_snapshots: construct_snapshots,
       construct_file_content: construct_file_content,
       construct_files_content: construct_files_content,
       construct_path_stat: construct_path_stat,
@@ -239,7 +236,6 @@ pub extern "C" fn scheduler_create(
       has_variants: type_has_variants,
       path_globs: type_path_globs,
       snapshot: type_snapshot,
-      snapshots: type_snapshots,
       files_content: type_files_content,
       dir: type_dir,
       file: type_file,

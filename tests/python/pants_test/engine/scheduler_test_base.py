@@ -9,7 +9,7 @@ import os
 import shutil
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.engine.nodes import Return
+from pants.engine.nodes import Return, Throw
 from pants.engine.scheduler import LocalScheduler
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
@@ -72,3 +72,21 @@ class SchedulerTestBase(object):
         scheduler.visualize_graph_to_file(request, dot_file)
         raise ValueError('At least one request failed: {}. Visualized as {}'.format(states, dot_file))
     return list(state.value for state in states)
+
+  def execute_expecting_one_result(self, scheduler, product, subject):
+    request = scheduler.execution_request([product], [subject])
+    result = scheduler.execute(request)
+
+    if result.error:
+      raise result.error
+
+    states = [state for _, state in result.root_products]
+    self.assertEqual(len(states), 1)
+
+    return states[0]
+
+  def execute_raising_throw(self, scheduler, product, subject):
+    resulting_value = self.execute_expecting_one_result(scheduler, product, subject)
+    self.assertTrue(type(resulting_value) is Throw)
+
+    raise resulting_value.exc
