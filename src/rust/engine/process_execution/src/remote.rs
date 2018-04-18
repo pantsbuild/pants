@@ -42,7 +42,6 @@ macro_rules! try_future {
 };
 }
 
-
 impl CommandRunner {
   pub fn new(address: &str, thread_count: usize, store: Store) -> CommandRunner {
     let env = Arc::new(grpcio::Environment::new(thread_count));
@@ -145,14 +144,9 @@ impl CommandRunner {
                         let grpc_result = map_grpc_result(
                           operations_client.get_operation(&operation_request)
                         );
-                        //future::ok(future::Loop::Continue(try_future!(operation))).to_boxed() as BoxFuture<_, _>
-                        match grpc_result {
-                          Ok(operation) => {
-                            future::ok(future::Loop::Continue(operation)).to_boxed()
-                                as BoxFuture<_, _>
-                          },
-                          Err(err) => future::err(err).to_boxed() as BoxFuture<_, _>,
-                        }
+                        future::ok(
+                          future::Loop::Continue(
+                            try_future!(grpc_result))).to_boxed() as BoxFuture<_, _>
                       },
                     }
                   })
@@ -186,7 +180,6 @@ impl CommandRunner {
       .to_boxed()
   }
 
-
   fn extract_execute_response(
     &self,
     mut operation: bazel_protos::operations::Operation,
@@ -194,10 +187,12 @@ impl CommandRunner {
     // TODO: Log less verbosely
     debug!("Got operation response: {:?}", operation);
     if !operation.get_done() {
-      return future::err(ExecutionError::NotFinished(operation.take_name())).to_boxed() as BoxFuture<_, _>;
+      return future::err(ExecutionError::NotFinished(operation.take_name())).to_boxed()
+        as BoxFuture<_, _>;
     }
     if operation.has_error() {
-      return future::err(ExecutionError::Fatal(format_error(&operation.get_error()))).to_boxed() as BoxFuture<_, _>;
+      return future::err(ExecutionError::Fatal(format_error(&operation.get_error()))).to_boxed()
+        as BoxFuture<_, _>;
     }
     if !operation.has_response() {
       return future::err(ExecutionError::Fatal(
@@ -205,109 +200,128 @@ impl CommandRunner {
       )).to_boxed() as BoxFuture<_, _>;
     }
     let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
-    try_future!(execute_response.merge_from_bytes(operation.get_response().get_value())
-      .map_err(|e| ExecutionError::Fatal(format!("Invalid ExecuteResponse: {:?}", e))));
+    try_future!(
+      execute_response
+        .merge_from_bytes(operation.get_response().get_value())
+        .map_err(|e| ExecutionError::Fatal(format!("Invalid ExecuteResponse: {:?}", e)))
+    );
     // TODO: Log less verbosely
     debug!("Got (nested) execute response: {:?}", execute_response);
-    let stdout =
-      if execute_response.get_result().has_stdout_digest() {
-        self.store.load_file_bytes_with(
-          execute_response.get_result().get_stdout_digest().into(), |v| v)
-            .map_err(|error| ExecutionError::Fatal(format!("Error fetching stdout: {:?}", error)))
-            .and_then(|maybe_value| match maybe_value {
-              Some(value) => {return Ok(value)}
-              None => {return Err(ExecutionError::Fatal("Couldn't find stdout, when fetching.".to_owned()))}
-
-            }).to_boxed()
-      }
-      else {
-        future::ok(execute_response.take_result().take_stdout_raw()).to_boxed() as BoxFuture<_, _>
-      };
-    stdout.and_then(move |stdout| {
-      match grpcio::RpcStatusCode::from(execute_response.get_status().get_code()) {
-        grpcio::RpcStatusCode::Ok => future::ok(ExecuteProcessResult {
-          stdout: stdout,
-          stderr: execute_response.get_result().get_stderr_raw().to_vec(),
-          exit_code: execute_response.get_result().get_exit_code(),
-        }).to_boxed() as BoxFuture<_, _>,
-        grpcio::RpcStatusCode::FailedPrecondition => {
-          if execute_response.get_status().get_details().len() != 1 {
-            return future::err(ExecutionError::Fatal(format!(
+    let stdout = if execute_response.get_result().has_stdout_digest() {
+      let digest = execute_response.get_result().get_stdout_digest().into();
+      self
+        .store
+        .load_file_bytes_with(digest, |v| v)
+        .map_err(move |error| {
+          ExecutionError::Fatal(format!(
+            "Error fetching stdout digest ({:?}): {:?}",
+            digest, error
+          ))
+        })
+        .and_then(move |maybe_value| match maybe_value {
+          Some(value) => return Ok(value),
+          None => {
+            return Err(ExecutionError::Fatal(format!(
+              "Couldn't find stdout digest ({:?}), when fetching.",
+              digest
+            )))
+          }
+        })
+        .to_boxed()
+    } else {
+      future::ok(execute_response.take_result().take_stdout_raw()).to_boxed() as BoxFuture<_, _>
+    };
+    stdout
+      .and_then(move |stdout| {
+        match grpcio::RpcStatusCode::from(execute_response.get_status().get_code()) {
+          grpcio::RpcStatusCode::Ok => future::ok(ExecuteProcessResult {
+            stdout: stdout,
+            stderr: execute_response.get_result().get_stderr_raw().to_vec(),
+            exit_code: execute_response.get_result().get_exit_code(),
+          }).to_boxed() as BoxFuture<_, _>,
+          grpcio::RpcStatusCode::FailedPrecondition => {
+            if execute_response.get_status().get_details().len() != 1 {
+              return future::err(ExecutionError::Fatal(format!(
               "Received multiple details in FailedPrecondition ExecuteResponse's status field: {:?}",
               execute_response.get_status().get_details()
             ))).to_boxed() as BoxFuture<_, _>;
-          }
-          let details = execute_response.get_status().get_details().get(0).unwrap();
-          let mut precondition_failure = bazel_protos::error_details::PreconditionFailure::new();
-          if details.get_type_url()
+            }
+            let details = execute_response.get_status().get_details().get(0).unwrap();
+            let mut precondition_failure = bazel_protos::error_details::PreconditionFailure::new();
+            if details.get_type_url()
               != format!(
-            "type.googleapis.com/{}",
-            precondition_failure.descriptor().full_name()
-          ) {
-            return future::err(ExecutionError::Fatal(
-              format!("Received FailedPrecondition, but didn't know how to resolve it: {},\
-                      protobuf type {}",
-                      execute_response.get_status().get_message(),
-                      details.get_type_url()
-            ))).to_boxed() as BoxFuture<_, _>;
-          }
-          try_future!(precondition_failure
-              .merge_from_bytes(details.get_value())
-              .map_err(|e| {
-                ExecutionError::Fatal(format!(
+                "type.googleapis.com/{}",
+                precondition_failure.descriptor().full_name()
+              ) {
+              return future::err(ExecutionError::Fatal(format!(
+                "Received FailedPrecondition, but didn't know how to resolve it: {},\
+                 protobuf type {}",
+                execute_response.get_status().get_message(),
+                details.get_type_url()
+              ))).to_boxed() as BoxFuture<_, _>;
+            }
+            try_future!(
+              precondition_failure
+                .merge_from_bytes(details.get_value())
+                .map_err(|e| ExecutionError::Fatal(format!(
                   "Error deserializing FailedPrecondition proto: {:?}",
                   e
-                ))
-              }));
-
-
-          let mut missing_digests = Vec::with_capacity(precondition_failure.get_violations().len());
-
-          for violation in precondition_failure.get_violations() {
-            if violation.get_field_type() != "MISSING" {
-              return future::err(ExecutionError::Fatal(format!(
-                "Didn't know how to process PreconditionFailure violation: {:?}",
-                violation
-              ))).to_boxed() as BoxFuture<_, _>;
-            }
-            let parts: Vec<_> = violation.get_subject().split("/").collect();
-            if parts.len() != 3 || parts.get(0).unwrap() != &"blobs" {
-              return future::err(ExecutionError::Fatal(format!(
-                "Received FailedPrecondition MISSING but didn't recognize subject {}",
-                violation.get_subject()
-              ))).to_boxed() as BoxFuture<_, _>;
-            }
-            let digest = Digest(
-              try_future!(Fingerprint::from_hex_string(parts.get(1).unwrap()).map_err(|e| {
-                ExecutionError::Fatal(format!(
-                  "Bad digest in missing blob: {}: {}",
-                  parts.get(1).unwrap(),
-                  e
-                ))
-              })),
-              try_future!(parts.get(2).unwrap().parse::<usize>().map_err(|e| {
-                ExecutionError::Fatal(format!(
-                  "Missing blob had bad size: {}: {}",
-                  parts.get(2).unwrap(),
-                  e
-                ))
-              })),
+                )))
             );
-            missing_digests.push(digest);
+
+            let mut missing_digests =
+              Vec::with_capacity(precondition_failure.get_violations().len());
+
+            for violation in precondition_failure.get_violations() {
+              if violation.get_field_type() != "MISSING" {
+                return future::err(ExecutionError::Fatal(format!(
+                  "Didn't know how to process PreconditionFailure violation: {:?}",
+                  violation
+                ))).to_boxed() as BoxFuture<_, _>;
+              }
+              let parts: Vec<_> = violation.get_subject().split("/").collect();
+              if parts.len() != 3 || parts.get(0).unwrap() != &"blobs" {
+                return future::err(ExecutionError::Fatal(format!(
+                  "Received FailedPrecondition MISSING but didn't recognize subject {}",
+                  violation.get_subject()
+                ))).to_boxed() as BoxFuture<_, _>;
+              }
+              let digest = Digest(
+                try_future!(
+                  Fingerprint::from_hex_string(parts.get(1).unwrap()).map_err(|e| {
+                    ExecutionError::Fatal(format!(
+                      "Bad digest in missing blob: {}: {}",
+                      parts.get(1).unwrap(),
+                      e
+                    ))
+                  })
+                ),
+                try_future!(parts.get(2).unwrap().parse::<usize>().map_err(|e| {
+                  ExecutionError::Fatal(format!(
+                    "Missing blob had bad size: {}: {}",
+                    parts.get(2).unwrap(),
+                    e
+                  ))
+                })),
+              );
+              missing_digests.push(digest);
+            }
+            if missing_digests.len() == 0 {
+              return future::err(ExecutionError::Fatal(
+                "Error from remote execution: FailedPrecondition, but no details".to_owned(),
+              )).to_boxed() as BoxFuture<_, _>;;
+            }
+            return future::err(ExecutionError::MissingDigests(missing_digests)).to_boxed()
+              as BoxFuture<_, _>;
           }
-          if missing_digests.len() == 0 {
-            return future::err(ExecutionError::Fatal(
-              "Error from remote execution: FailedPrecondition, but no details".to_owned(),
-            )).to_boxed() as BoxFuture<_, _>;;
-          }
-          return future::err(ExecutionError::MissingDigests(missing_digests)).to_boxed() as BoxFuture<_, _>;
+          code => future::err(ExecutionError::Fatal(format!(
+            "Error from remote execution: {:?}: {:?}",
+            code,
+            execute_response.get_status().get_message()
+          ))).to_boxed() as BoxFuture<_, _>,
         }
-        code => future::err(ExecutionError::Fatal(format!(
-          "Error from remote execution: {:?}: {:?}",
-          code,
-          execute_response.get_status().get_message()
-        ))).to_boxed() as BoxFuture<_, _>,
-      }}).to_boxed()
+      })
+      .to_boxed()
   }
 }
 
@@ -456,13 +470,17 @@ mod tests {
   #[test]
   fn extract_response_with_digest_stdout() {
     assert_eq(
-      extract_execute_response(
-        make_successful_operation("gimme-foo".to_owned(), StdoutType::Digest(digest()), "", 0)),
-        Ok(ExecuteProcessResult {
-          stdout: str_bytes(),
-          stderr: as_byte_owned_vec(""),
-          exit_code: 0,
-        })
+      extract_execute_response(make_successful_operation(
+        "gimme-foo".to_owned(),
+        StdoutType::Digest(digest()),
+        "",
+        0,
+      )),
+      Ok(ExecuteProcessResult {
+        stdout: str_bytes(),
+        stderr: as_byte_owned_vec(""),
+        exit_code: 0,
+      }),
     );
   }
 
@@ -989,8 +1007,12 @@ mod tests {
       response_proto.set_result({
         let mut action_result = bazel_protos::remote_execution::ActionResult::new();
         match stdout {
-          StdoutType::Raw(stdout_raw) => {action_result.set_stdout_raw(Bytes::from(stdout_raw));},
-          StdoutType::Digest(stdout_digest) => {action_result.set_stdout_digest((&stdout_digest).into());},
+          StdoutType::Raw(stdout_raw) => {
+            action_result.set_stdout_raw(Bytes::from(stdout_raw));
+          }
+          StdoutType::Digest(stdout_digest) => {
+            action_result.set_stdout_digest((&stdout_digest).into());
+          }
         }
         action_result.set_stderr_raw(Bytes::from(stderr));
         action_result.set_exit_code(exit_code);
@@ -1034,13 +1056,13 @@ mod tests {
     operation
   }
 
-  fn run_command_remote(address: &str, request: ExecuteProcessRequest,
+  fn run_command_remote(
+    address: &str,
+    request: ExecuteProcessRequest,
   ) -> Result<ExecuteProcessResult, String> {
     let cas = mock::StubCAS::new(
       1024,
-      vec![(fingerprint(), str_bytes())]
-          .into_iter()
-          .collect(),
+      vec![(fingerprint(), str_bytes())].into_iter().collect(),
     );
     let command_runner = create_command_runner(address, &cas);
     command_runner.run_command_remote(request).wait()
@@ -1060,7 +1082,8 @@ mod tests {
     CommandRunner::new(address, 1, store)
   }
 
-  fn extract_execute_response(mut operation: bazel_protos::operations::Operation,
+  fn extract_execute_response(
+    mut operation: bazel_protos::operations::Operation,
   ) -> Result<ExecuteProcessResult, ExecutionError> {
     let cas = mock::StubCAS::empty();
     let command_runner = create_command_runner("", &cas);
