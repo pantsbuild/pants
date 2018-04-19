@@ -432,6 +432,10 @@ class JarBuilderTask(JarTask):
       if isinstance(target, JvmBinary):
         self._add_manifest_entries(target, self._manifest)
         products_added = True
+
+      # Ensure that JavaAgent entries are added to the manifest. Either by adding all of the
+      # transitive JavaAgent deps, if recursive, or by adding the root target, if the root target
+      # is itself a JavaAgent.
       if recursive:
         agents = [t for t in target.closure() if isinstance(t, JavaAgent)]
         if len(agents) > 1:
