@@ -21,7 +21,7 @@ class JUnit(JvmToolMixin, InjectablesMixin, Subsystem):
   RUNNER_MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   LIBRARY_JAR = JarDependency(org='junit', name='junit', rev=LIBRARY_REV)
-  _RUNNER_JAR = JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.23')
+  _RUNNER_JAR = JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.24')
 
   @classmethod
   def register_options(cls, register):
@@ -43,6 +43,8 @@ class JUnit(JvmToolMixin, InjectablesMixin, Subsystem):
                           # @Before, as well as other annotations, but there is also the Assert
                           # class and some subset of the @Rules, @Theories and @RunWith APIs.
                           custom_rules=[
+                            Shader.exclude_package('com.sun.xml', recursive=True),
+                            Shader.exclude_package('javax.xml.bind', recursive=True),
                             Shader.exclude_package('junit.framework', recursive=True),
                             Shader.exclude_package('org.junit', recursive=True),
                             Shader.exclude_package('org.hamcrest', recursive=True),

@@ -100,20 +100,20 @@ class RegistryOfTests(object):
 class ParseError(Exception):
   """Indicates an error parsing a junit xml report file."""
 
-  def __init__(self, junit_xml_path, cause):
+  def __init__(self, xml_path, cause):
     super(ParseError, self).__init__('Error parsing test result file {}: {}'
-                                     .format(junit_xml_path, cause))
-    self._junit_xml_path = junit_xml_path
+                                     .format(xml_path, cause))
+    self._xml_path = xml_path
     self._cause = cause
 
   @property
-  def junit_xml_path(self):
+  def xml_path(self):
     """Return the path of the file the parse error was encountered in.
 
     :return: The path of the file the parse error was encountered in.
     :rtype: string
     """
-    return self._junit_xml_path
+    return self._xml_path
 
   @property
   def cause(self):
