@@ -79,10 +79,21 @@ class TypeCheckError(TypedDatatypeInstanceConstructionError):
       type_name, formatted_msg, *args, **kwargs)
 
 
-def typed_datatype(type_name, **field_decls):
-  if not isinstance(type_name, str):
+def typed_datatype(type_name, field_decls):
+  if not (isinstance(type_name, str) or isinstance(type_name, unicode)):
     raise TypedDatatypeClassConstructionError(
-      "type_name '{}' is not a str".format(repr(type_name)))
+      repr(type_name),
+      "type_name '{}' is not a str or unicode".format(repr(type_name)))
+
+  if not isinstance(field_decls, dict):
+    raise TypedDatatypeClassConstructionError(
+      type_name,
+      "field_decls is not a dict: '{}'".format(field_decls))
+
+  if not field_decls:
+    raise TypedDatatypeClassConstructionError(
+      type_name,
+      "no fields were declared")
 
   # TODO: Make this kind of exception pattern (filter for errors then display
   # them all at once) more ergonomic.
@@ -117,15 +128,16 @@ def typed_datatype(type_name, **field_decls):
           "unrecognized fields were provided: '{}'".format(unrecognized))
 
       type_failures = {}
-      for field_name, field_value in kwargs:
+      for field_name, field_value in kwargs.items():
         field_type = field_decls[field_name]
         if not isinstance(field_value, field_type):
           type_failures[field_name] = (field_value, field_type)
       if type_failures:
         type_failure_msgs = []
         for field_name, (field_value, field_type) in type_failures.items():
-          "'{}' is not an instance of '{}' (in field '{}')"
-          .format(field_value, field_type, field_name)
+          type_failure_msgs.append(
+            "'{}' is not an instance of '{}' (in field '{}')"
+            .format(field_value, field_type, field_name))
         raise TypeCheckError(type_name, '\n'.join(type_failure_msgs))
 
       return super(TypedDatatype, cls).__new__(cls, **kwargs)
