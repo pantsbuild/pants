@@ -54,6 +54,6 @@ pub struct ExecuteProcessRequest {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExecuteProcessResult {
   pub stdout: Bytes,
-  pub stderr: Vec<u8>,
+  pub stderr: Bytes,
   pub exit_code: i32,
 }
