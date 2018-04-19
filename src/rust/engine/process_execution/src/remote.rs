@@ -397,11 +397,12 @@ mod tests {
   use fs;
   use futures::Future;
   use grpcio;
-  use hashing::{Digest, Fingerprint};
+  use hashing::Digest;
   use protobuf::{self, Message, ProtobufEnum};
   use mock;
   use tempdir::TempDir;
   use testutil::{as_byte_owned_vec, as_bytes, owned_string_vec};
+  use testutil::data::{TestData, TestDirectory};
 
   use super::{CommandRunner, ExecuteProcessRequest, ExecuteProcessResult, ExecutionError};
   use std::collections::BTreeMap;
@@ -470,15 +471,16 @@ mod tests {
   #[test]
   fn extract_response_with_digest_stdout() {
     let op_name = "gimme-foo".to_string();
+    let testdata = TestData::roland();
     assert_eq!(
       extract_execute_response(make_successful_operation(
         &op_name,
-        StdoutType::Digest(digest()),
+        StdoutType::Digest(testdata.digest()),
         "",
         0,
       )),
       Ok(ExecuteProcessResult {
-        stdout: str_bytes(),
+        stdout: testdata.bytes(),
         stderr: as_byte_owned_vec(""),
         exit_code: 0,
       })
@@ -676,14 +678,7 @@ mod tests {
 
   #[test]
   fn execute_missing_file_uploads_if_known() {
-    let missing_digests = vec![
-      {
-        let mut violation = bazel_protos::error_details::PreconditionFailure_Violation::new();
-        violation.set_field_type("MISSING".to_owned());
-        violation.set_subject(format!("blobs/{}/{}", digest().0, digest().1));
-        violation
-      },
-    ];
+    let roland = TestData::roland();
 
     let mock_server = {
       let op_name = "cat".to_owned();
@@ -695,19 +690,16 @@ mod tests {
           .1,
         vec![
           make_incomplete_operation(&op_name),
-          make_precondition_failure_operation(missing_digests.clone()),
-          make_successful_operation("cat2", StdoutType::Raw(STR.to_owned()), "", 0),
+          make_precondition_failure_operation(vec![
+            missing_preconditionfailure_violation(&roland.digest()),
+          ]),
+          make_successful_operation("cat2", StdoutType::Raw(roland.string()), "", 0),
         ],
       ))
     };
 
     let store_dir = TempDir::new("store").unwrap();
-    let cas = mock::StubCAS::new(
-      1024,
-      vec![(directory_fingerprint(), directory_bytes())]
-        .into_iter()
-        .collect(),
-    );
+    let cas = mock::StubCAS::with_content(1024, vec![], vec![TestDirectory::containing_roland()]);
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
@@ -717,7 +709,7 @@ mod tests {
       Duration::from_secs(1),
     ).expect("Failed to make store");
     store
-      .store_file_bytes(str_bytes(), false)
+      .store_file_bytes(roland.bytes(), false)
       .wait()
       .expect("Saving file bytes to store");
 
@@ -727,27 +719,20 @@ mod tests {
     assert_eq!(
       result,
       Ok(ExecuteProcessResult {
-        stdout: str_bytes(),
+        stdout: roland.bytes(),
         stderr: "".as_bytes().to_vec(),
         exit_code: 0,
       })
     );
     {
       let blobs = cas.blobs.lock().unwrap();
-      assert_eq!(blobs.get(&fingerprint()), Some(&str_bytes()));
+      assert_eq!(blobs.get(&roland.fingerprint()), Some(&roland.bytes()));
     }
   }
 
   #[test]
   fn execute_missing_file_errors_if_unknown() {
-    let missing_digests = vec![
-      {
-        let mut violation = bazel_protos::error_details::PreconditionFailure_Violation::new();
-        violation.set_field_type("MISSING".to_owned());
-        violation.set_subject(format!("blobs/{}/{}", digest().0, digest().1));
-        violation
-      },
-    ];
+    let missing_digest = TestData::roland().digest();
 
     let mock_server = {
       let op_name = "cat".to_owned();
@@ -759,18 +744,15 @@ mod tests {
           .1,
         vec![
           make_incomplete_operation(&op_name),
-          make_precondition_failure_operation(missing_digests.clone()),
+          make_precondition_failure_operation(vec![
+            missing_preconditionfailure_violation(&missing_digest),
+          ]),
         ],
       ))
     };
 
     let store_dir = TempDir::new("store").unwrap();
-    let cas = mock::StubCAS::new(
-      1024,
-      vec![(directory_fingerprint(), directory_bytes())]
-        .into_iter()
-        .collect(),
-    );
+    let cas = mock::StubCAS::with_content(1024, vec![], vec![TestDirectory::containing_roland()]);
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
@@ -784,7 +766,7 @@ mod tests {
       .run_command_remote(cat_roland_request())
       .wait()
       .expect_err("Want error");
-    assert_contains(&error, &format!("{}", digest().0));
+    assert_contains(&error, &format!("{}", missing_digest.0));
   }
 
   #[test]
@@ -849,26 +831,15 @@ mod tests {
 
   #[test]
   fn extract_execute_response_missing_digests() {
-    let missing_files = vec![digest(), directory_digest()];
-
-    let missing = vec![
-      {
-        let mut violation = bazel_protos::error_details::PreconditionFailure_Violation::new();
-        violation.set_field_type("MISSING".to_owned());
-        violation.set_subject(format!("blobs/{}/{}", fingerprint(), STR.len()));
-        violation
-      },
-      {
-        let mut violation = bazel_protos::error_details::PreconditionFailure_Violation::new();
-        violation.set_field_type("MISSING".to_owned());
-        violation.set_subject(format!(
-          "blobs/{}/{}",
-          directory_fingerprint(),
-          directory_bytes().len()
-        ));
-        violation
-      },
+    let missing_files = vec![
+      TestData::roland().digest(),
+      TestDirectory::containing_roland().digest(),
     ];
+
+    let missing = missing_files
+      .iter()
+      .map(missing_preconditionfailure_violation)
+      .collect();
 
     let operation = make_precondition_failure_operation(missing);
 
@@ -881,12 +852,7 @@ mod tests {
   #[test]
   fn extract_execute_response_missing_other_things() {
     let missing = vec![
-      {
-        let mut violation = bazel_protos::error_details::PreconditionFailure_Violation::new();
-        violation.set_field_type("MISSING".to_owned());
-        violation.set_subject(format!("blobs/{}/{}", fingerprint(), STR.len()));
-        violation
-      },
+      missing_preconditionfailure_violation(&TestData::roland().digest()),
       {
         let mut violation = bazel_protos::error_details::PreconditionFailure_Violation::new();
         violation.set_field_type("MISSING".to_owned());
@@ -1061,10 +1027,7 @@ mod tests {
     address: &str,
     request: ExecuteProcessRequest,
   ) -> Result<ExecuteProcessResult, String> {
-    let cas = mock::StubCAS::new(
-      1024,
-      vec![(fingerprint(), str_bytes())].into_iter().collect(),
-    );
+    let cas = mock::StubCAS::with_roland_and_directory(1024);
     let command_runner = create_command_runner(address, &cas);
     command_runner.run_command_remote(request).wait()
   }
@@ -1086,10 +1049,7 @@ mod tests {
   fn extract_execute_response(
     mut operation: bazel_protos::operations::Operation,
   ) -> Result<ExecuteProcessResult, ExecutionError> {
-    let cas = mock::StubCAS::new(
-      1024,
-      vec![(fingerprint(), str_bytes())].into_iter().collect(),
-    );
+    let cas = mock::StubCAS::with_roland_and_directory(1024);
     let command_runner = create_command_runner("", &cas);
     command_runner.extract_execute_response(operation).wait()
   }
@@ -1104,6 +1064,17 @@ mod tests {
     any
   }
 
+  fn missing_preconditionfailure_violation(
+    digest: &Digest,
+  ) -> bazel_protos::error_details::PreconditionFailure_Violation {
+    {
+      let mut violation = bazel_protos::error_details::PreconditionFailure_Violation::new();
+      violation.set_field_type("MISSING".to_owned());
+      violation.set_subject(format!("blobs/{}/{}", digest.0, digest.1));
+      violation
+    }
+  }
+
   fn assert_contains(haystack: &str, needle: &str) {
     assert!(
       haystack.contains(needle),
@@ -1113,68 +1084,11 @@ mod tests {
     )
   }
 
-  pub const STR: &str = "European Burmese";
-  pub const HASH: &str = "693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d";
-  pub const DIRECTORY_HASH: &str = "63949aa823baf765eff07b946050d76e\
-                                    c0033144c785a94d3ebd82baa931cd16";
-
-  pub fn str_bytes() -> Bytes {
-    Bytes::from(STR)
-  }
-
-  pub fn fingerprint() -> Fingerprint {
-    Fingerprint::from_hex_string(HASH).unwrap()
-  }
-
-  pub fn digest() -> Digest {
-    Digest(fingerprint(), STR.len())
-  }
-
-  pub fn directory() -> bazel_protos::remote_execution::Directory {
-    make_directory("roland")
-  }
-
-  pub fn make_directory(file_name: &str) -> bazel_protos::remote_execution::Directory {
-    let mut directory = bazel_protos::remote_execution::Directory::new();
-    directory.mut_files().push({
-      let mut file = bazel_protos::remote_execution::FileNode::new();
-      file.set_name(file_name.to_string());
-      file.set_digest({
-        let mut digest = bazel_protos::remote_execution::Digest::new();
-        digest.set_hash(HASH.to_string());
-        digest.set_size_bytes(STR.len() as i64);
-        digest
-      });
-      file.set_is_executable(false);
-      file
-    });
-    directory
-  }
-
-  pub fn directory_bytes() -> Bytes {
-    Bytes::from(
-      directory()
-        .write_to_bytes()
-        .expect("Error serializing proto"),
-    )
-  }
-
-  pub fn directory_fingerprint() -> Fingerprint {
-    Fingerprint::from_hex_string(DIRECTORY_HASH).unwrap()
-  }
-
-  pub fn directory_digest() -> Digest {
-    Digest(
-      Fingerprint::from_hex_string(DIRECTORY_HASH).unwrap(),
-      directory_bytes().len(),
-    )
-  }
-
   fn cat_roland_request() -> ExecuteProcessRequest {
     ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/cat", "roland"]),
       env: BTreeMap::new(),
-      input_files: directory_digest(),
+      input_files: TestDirectory::containing_roland().digest(),
     }
   }
 }

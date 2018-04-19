@@ -10,3 +10,4 @@ futures = "0.1.16"
 grpcio = { version = "0.2.0", features = ["secure"] }
 hashing = { path = "../../hashing" }
 protobuf = { version = "1.4.1", features = ["with-bytes"] }
+testutil = { path = ".." }
