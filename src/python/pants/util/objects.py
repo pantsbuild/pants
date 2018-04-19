@@ -139,10 +139,18 @@ class Union(datatype('Union', ['types']), TypeDecl):
     return self
 
 
+# NB: An @rule can be used to convert a typed_datatype with a Union-typed field
+# into something specific (for example, converting a StrOrUnicode into a str).
 StrOrUnicode = Union(str, unicode)
 
 
 def typed_datatype(type_name, field_decls):
+  """A wrapper over namedtuple which accepts a dict of field names and types.
+
+  This can be used to very concisely define classes which have fields that are
+  type-checked at construction.
+  """
+
   if not (isinstance(type_name, str) or isinstance(type_name, unicode)):
     raise TypedDatatypeClassConstructionError(
       repr(type_name),
@@ -188,14 +196,20 @@ def typed_datatype(type_name, field_decls):
       "field types were not a type object or list of type objects:\n{}"
       .format('\n'.join(invalid_type_decls)))
 
-  field_name_set = frozenset(field_decls.keys())
+  field_name_set = frozenset(processed_type_decls.keys())
 
   datatype_cls = datatype(type_name, list(field_name_set))
 
   class TypedDatatype(datatype_cls):
 
     # We intentionally disallow positional arguments here.
-    def __new__(cls, **kwargs):
+    def __new__(cls, *args, **kwargs):
+      if args:
+        raise TypedDatatypeInstanceConstructionError(
+          type_name,
+          "no positional args are allowed in this constructor. "
+          "the args were: '{}'".format(args))
+
       given_field_set = frozenset(kwargs.keys())
 
       not_provided = given_field_set - field_name_set
@@ -212,21 +226,11 @@ def typed_datatype(type_name, field_decls):
 
       type_failure_msgs = []
       for field_name, field_value in kwargs.items():
-        field_type = field_decls[field_name]
-        if isinstance(field_type, type):
-          if not isinstance(field_value, field_type):
-            type_failure_msgs.append(
-              "field '{}' is not an instance of '{}'. type='{}', value='{}'"
-              .format(field_name, field_type, type(field_value), field_value))
-        elif isinstance(field_type, list):
-          # NB: We assume here that if the type is a list, each element is a
-          # type object, because we checked that in the class constructor.
-          # TODO: check the other if branch?
-          if not any([isinstance(field_value, ty) for ty in field_type]):
-            type_failure_msgs.append(
-              "field '{}' is not an instance of any of '{}'. "
-              "type='{}', value='{}'"
-              .format(field_name, field_type, type(field_value), field_value))
+        field_type = processed_type_decls[field_name]
+        if not field_type.matches_value(field_value):
+          type_failure_msgs.append(
+            "field '{}' is not an instance of '{}'. type='{}', value='{}'"
+            .format(field_name, field_type, type(field_value), field_value))
       if type_failure_msgs:
         raise TypeCheckError(type_name, '\n'.join(type_failure_msgs))
 

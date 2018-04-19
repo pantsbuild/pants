@@ -14,15 +14,15 @@ from pants.engine.isolated_process import (
   ExecuteProcessRequest, ExecuteProcessResult, create_process_rules)
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
-from pants.util.objects import datatype
+from pants.util.objects import typed_datatype, StrOrUnicode
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
-class Concatted(datatype('Concatted', ['value'])):
+class Concatted(typed_datatype('Concatted', {'value': StrOrUnicode})):
   pass
 
 
-class ShellCat(datatype('ShellCat', ['bin_path'])):
+class ShellCat(typed_datatype('ShellCat', {'bin_path': StrOrUnicode})):
   """Wrapper class to show an example of using an auxiliary class (which wraps
   an executable) to generate an argv instead of doing it all in
   CatExecutionRequest. This can be used to encapsulate operations such as
@@ -43,20 +43,11 @@ class ShellCat(datatype('ShellCat', ['bin_path'])):
     return (self.bin_path,) + tuple(cat_file_paths)
 
 
-class CatExecutionRequest(datatype('CatExecutionRequest', [
-    'shell_cat_binary',
-    'input_file_globs',
-])):
-
-  def __new__(cls, shell_cat_binary, input_file_globs):
-    if not isinstance(shell_cat_binary, ShellCat):
-      raise ValueError('shell_cat_binary should be an instance of ShellCat')
-    if not isinstance(input_file_globs, PathGlobs):
-      raise ValueError(
-        'input_file_globs should be an instance of PathGlobs')
-
-    return super(CatExecutionRequest, cls).__new__(
-      cls, shell_cat_binary, input_file_globs)
+class CatExecutionRequest(typed_datatype('CatExecutionRequest', {
+    'shell_cat_binary': ShellCat,
+    'input_file_globs': PathGlobs,
+})):
+  pass
 
 
 @rule(ExecuteProcessRequest, [Select(CatExecutionRequest)])
@@ -89,7 +80,11 @@ def create_cat_stdout_rules():
   ]
 
 
-class JavacVersionExecutionRequest(datatype('JavacVersionExecutionRequest', ['bin_path'])):
+class JavacVersionExecutionRequest(typed_datatype(
+    'JavacVersionExecutionRequest', {
+      'bin_path': StrOrUnicode,
+    },
+)):
 
   def gen_argv(self):
     return (self.bin_path, '-version',)
@@ -102,7 +97,9 @@ def process_request_from_javac_version(javac_version_command):
     env=tuple())
 
 
-class JavacVersionOutput(datatype('JavacVersionOutput', ['version_output'])):
+class JavacVersionOutput(typed_datatype('JavacVersionOutput', {
+    'version_output': StrOrUnicode,
+})):
   pass
 
 
@@ -152,7 +149,7 @@ def get_javac_version_output(javac_version_command):
   )
 
 
-class JavacSources(datatype('JavacSources', ['globs'])):
+class JavacSources(typed_datatype('JavacSources', {'globs': PathGlobs})):
   """PathGlobs wrapper for Java source files to show an example of making a
   custom type to wrap generic types such as PathGlobs to add usage context.
 
@@ -160,23 +157,16 @@ class JavacSources(datatype('JavacSources', ['globs'])):
   which does not introduce this additional layer of indirection.
   """
 
-  def __new__(cls, globs):
-
-    if not isinstance(globs, PathGlobs):
-      raise ValueError('globs should be an instance of PathGlobs')
-
-    return super(JavacSources, cls).__new__(cls, globs)
-
 
 @rule(PathGlobs, [Select(JavacSources)])
 def javac_sources_to_globs(javac_sources):
   yield javac_sources.globs
 
 
-class JavacCompileRequest(datatype('JavacCompileRequest', [
-    'bin_path',
-    'javac_sources',
-])):
+class JavacCompileRequest(typed_datatype('JavacCompileRequest', {
+    'bin_path': StrOrUnicode,
+    'javac_sources': JavacSources,
+})):
 
   def __new__(cls, bin_path, javac_sources):
 
@@ -184,12 +174,9 @@ class JavacCompileRequest(datatype('JavacCompileRequest', [
     # str. In general, there should be a more fluent way to check types in
     # datatype constructors and perform simple conversions such as this.
     bin_path = str(bin_path)
-    if not isinstance(javac_sources, JavacSources):
-      raise ValueError(
-        'javac_sources should be an instance of JavacSources')
 
     return super(JavacCompileRequest, cls).__new__(
-      cls, bin_path, javac_sources)
+      cls, bin_path=bin_path, javac_sources=javac_sources)
 
   def argv_from_source_snapshot(self, snapshot):
     snapshot_file_paths = [f.path for f in snapshot.files]
@@ -211,7 +198,7 @@ def javac_compile_sources_execute_process_request(javac_compile_req):
 # TODO: make this contain the snapshot(s?) of the output files (or contain
 # something that contains it) once we've made it so processes can make snapshots
 # of the files they produce.
-class JavacCompileResult(datatype('JavacCompileResult', [])):
+class JavacCompileResult(object):
   pass
 
 
@@ -282,7 +269,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     results = self.execute(scheduler, Concatted, cat_exe_req)
     self.assertEquals(1, len(results))
     concatted = results[0]
-    self.assertEqual(Concatted('one\ntwo\n'), concatted)
+    self.assertEqual(Concatted(value='one\ntwo\n'), concatted)
 
   def test_javac_version_example(self):
     scheduler = self.mk_scheduler_in_example_fs([
@@ -298,7 +285,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertIn('javac', javac_version_output.version_output)
 
   def test_javac_compilation_example_success(self):
-    javac_sources = JavacSources(PathGlobs.create('', include=[
+    javac_sources = JavacSources(globs=PathGlobs.create('', include=[
       'scheduler_inputs/src/java/simple/Simple.java',
     ]))
 
@@ -315,7 +302,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     # path
 
   def test_javac_compilation_example_failure(self):
-    javac_sources = JavacSources(PathGlobs.create('', include=[
+    javac_sources = JavacSources(globs=PathGlobs.create('', include=[
       'scheduler_inputs/src/java/simple/Broken.java',
     ]))
 

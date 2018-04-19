@@ -231,8 +231,8 @@ class TypedDatatypeTest(BaseTest):
     with self.assertRaises(TypeCheckError):
       UnionFieldTypedDatatype(an_arg=unicode('wow'))
 
-    # no positional args
-    with self.assertRaises(TypeError):
+    # no positional args are allowed
+    with self.assertRaises(TypedDatatypeInstanceConstructionError):
       SomeTypedDatatype('hey')
 
     # not providing all the fields
