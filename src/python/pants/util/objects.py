@@ -52,6 +52,87 @@ def datatype(*args, **kwargs):
   return DataType
 
 
+class TypedDatatypeClassConstructionError(Exception):
+
+  # TODO(cosmicexplorer): make some wrapper exception class to make this kind of
+  # prefixing easy (maybe using a class field format string?).
+  def __init__(self, type_name, msg, *args, **kwargs):
+    full_msg =  "while trying to generate typed dataype '{}': {}".format(
+      type_name, msg)
+    super(TypedDatatypeClassConstructionError, self).__init__(
+      full_msg, *args, **kwargs)
+
+
+class TypedDatatypeInstanceConstructionError(Exception):
+
+  def __init__(self, type_name, msg, *args, **kwargs):
+    full_msg = "in constructor of type '{}': {}".format(type_name, msg)
+    super(TypedDatatypeInstanceConstructionError, self).__init__(
+      full_msg, *args, **kwargs)
+
+
+class TypeCheckError(TypedDatatypeInstanceConstructionError):
+
+  def __init__(self, type_name, msg, *args, **kwargs):
+    formatted_msg = "type check error:\n{}".format(msg)
+    super(TypeCheckError, self).__init__(
+      type_name, formatted_msg, *args, **kwargs)
+
+
+def typed_datatype(type_name, **field_decls):
+  if not isinstance(type_name, str):
+    raise TypedDatatypeClassConstructionError(
+      "type_name '{}' is not a str".format(repr(type_name)))
+
+  # TODO: Make this kind of exception pattern (filter for errors then display
+  # them all at once) more ergonomic.
+  invalid_fields = {
+    name:cls for name, cls in field_decls.items() if not isinstance(cls, type)
+  }
+  if invalid_fields:
+    raise TypedDatatypeClassConstructionError(
+      type_name,
+      "field types were not type objects: {}".format(invalid_fields))
+
+  field_name_set = frozenset(field_decls.keys())
+
+  datatype_cls = datatype(type_name, list(field_name_set))
+
+  class TypedDatatype(datatype_cls):
+
+    # We intentionally disallow positional arguments here.
+    def __new__(cls, **kwargs):
+      given_field_set = frozenset(kwargs.keys())
+
+      not_provided = given_field_set - field_name_set
+      if not_provided:
+        raise TypedDatatypeInstanceConstructionError(
+          type_name,
+          "must provide fields '{}'".format(not_provided))
+
+      unrecognized = field_name_set - given_field_set
+      if unrecognized:
+        raise TypedDatatypeInstanceConstructionError(
+          type_name,
+          "unrecognized fields were provided: '{}'".format(unrecognized))
+
+      type_failures = {}
+      for field_name, field_value in kwargs:
+        field_type = field_decls[field_name]
+        if not isinstance(field_value, field_type):
+          type_failures[field_name] = (field_value, field_type)
+      if type_failures:
+        type_failure_msgs = []
+        for field_name, (field_value, field_type) in type_failures.items():
+          "'{}' is not an instance of '{}' (in field '{}')"
+          .format(field_value, field_type, field_name)
+        raise TypeCheckError(type_name, '\n'.join(type_failure_msgs))
+
+      return super(TypedDatatype, cls).__new__(cls, **kwargs)
+
+  return TypedDatatype
+
+
 class Collection(object):
   """Constructs classes representing collections of objects of a particular type."""
 
