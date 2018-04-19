@@ -11,7 +11,8 @@ import pickle
 from pants_test.base_test import BaseTest
 from pants.util.objects import (
   datatype, typed_datatype, TypedDatatypeClassConstructionError,
-  TypedDatatypeInstanceConstructionError, TypeCheckError)
+  TypedDatatypeInstanceConstructionError, TypeCheckError, TypeDecl,
+  SimpleTypeDecl, Union)
 
 
 class ExportedDatatype(datatype('ExportedDatatype', ['val'])):
@@ -37,8 +38,14 @@ class UnicodeNamedTypedDatatype(typed_datatype(
     unicode('UnicodeNamedTypedDatatype'), {
       'nothing_special': str,
       'just_another_arg': int,
-    }
+    },
 )):
+  pass
+
+
+class UnionFieldTypedDatatype(typed_datatype('UnionFieldTypedDatatype', {
+    'an_arg': [str, int],
+})):
   pass
 
 
@@ -144,6 +151,40 @@ class DatatypeTest(BaseTest):
       bar(other=1)
 
 
+class TypeDeclTest(BaseTest):
+
+  def test_type_decl_construction(self):
+    int_type_decl = SimpleTypeDecl(int)
+
+    self.assertTrue(int_type_decl.matches_value(3))
+    self.assertFalse(int_type_decl.matches_value('wow'))
+
+    with self.assertRaises(TypeDecl.ConstructionError):
+      SimpleTypeDecl(3)
+
+    simple_union = Union(str, bytes)
+
+    self.assertTrue(simple_union.matches_value(str('asdf')))
+    self.assertTrue(simple_union.matches_value(bytes('asdf')))
+    self.assertFalse(simple_union.matches_value(unicode('asdf')))
+
+    with self.assertRaises(TypeDecl.ConstructionError):
+      Union()
+
+    with self.assertRaises(TypeDecl.ConstructionError):
+      Union(str, 3)
+
+  def test_type_decl_composition(self):
+    str_type_decl = SimpleTypeDecl(str)
+    some_union_decl = Union(unicode, int)
+
+    composed_decl = str_type_decl.compose(some_union_decl)
+    self.assertTrue(composed_decl.matches_value(str('asdf')))
+    self.assertTrue(composed_decl.matches_value(unicode('asdf')))
+    self.assertTrue(composed_decl.matches_value(3))
+    self.assertFalse(composed_decl.matches_value(type('asdf')))
+
+
 class TypedDatatypeTest(BaseTest):
 
   def test_class_construction(self):
@@ -165,7 +206,30 @@ class TypedDatatypeTest(BaseTest):
     with self.assertRaises(TypedDatatypeClassConstructionError):
       class NonTypeFields(typed_datatype('NonTypeFields', {'a': 3})): pass
 
+    with self.assertRaises(TypedDatatypeClassConstructionError):
+      class NonTypeUnionFields(typed_datatype('NonTypeUnionFields', {
+          'a': [str, 3],
+      })): pass
+
   def test_instance_construction(self):
+
+    some_val = SomeTypedDatatype(my_val=3)
+    self.assertIn('SomeTypedDatatype', repr(some_val))
+    self.assertIn('my_val', repr(some_val))
+    self.assertIn('3', repr(some_val))
+
+    union_val = UnionFieldTypedDatatype(an_arg=str('huh'))
+    self.assertIn('UnionFieldTypedDatatype', repr(union_val))
+    self.assertIn('an_arg', repr(union_val))
+    self.assertIn('huh', repr(union_val))
+
+    other_union_val = UnionFieldTypedDatatype(an_arg=3)
+    self.assertIn('UnionFieldTypedDatatype', repr(other_union_val))
+    self.assertIn('an_arg', repr(other_union_val))
+    self.assertIn('3', repr(other_union_val))
+
+    with self.assertRaises(TypeCheckError):
+      UnionFieldTypedDatatype(an_arg=unicode('wow'))
 
     # no positional args
     with self.assertRaises(TypeError):
