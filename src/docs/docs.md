@@ -40,7 +40,8 @@ is derived from the docstrings of the classes implementing those symbols.
 Generating the site
 -------------------
 
-The site is generated with a script at `build-support/bin/publish_docs.sh`. To see the options available for this script, run:
+The site is generated with a script at `build-support/bin/publish_docs.sh`. To
+see the options available for this script, run:
 
     :::bash
     ./build-support/bin/publish_docs.sh -h
@@ -49,8 +50,13 @@ To see http://www.pantsbuild.org/ site's content as it would be generated based 
 copy of the pants repo, enter the command:
 
     :::bash
-    # This publishes the docs **locally** and opens (-o) them in your browser for review
+    # This publishes the docs in dist/docsite and opens (-o) them in your browser for review
     ./build-support/bin/publish_docs.sh -o
+
+The `-l <dir>` option will copy the site over to the existing local directory
+`<dir>` after generation, which can be used to publish the site into a non-git
+repo, for example. If this option is specified along with `-o`, the script will
+open the version of the site in `<dir>` instead of in `dist/docsite`.
 
 Publishing the site
 -------------------

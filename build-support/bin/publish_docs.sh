@@ -5,10 +5,10 @@
 set -eo pipefail
 
 PANTS_GH_PAGES='https://github.com/pantsbuild/pantsbuild.github.io.git'
-GIT_URL="${GIT_URL:-$PANTS_GH_PAGES}"
+GIT_URL="${GIT_URL:-${PANTS_GH_PAGES}}"
 
 PANTS_SITE_URL='https://www.pantsbuild.org'
-VIEW_PUBLISH_URL="${VIEW_PUBLISH_URL:-$PANTS_SITE_URL}"
+VIEW_PUBLISH_URL="${VIEW_PUBLISH_URL:-${PANTS_SITE_URL}}"
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 
@@ -23,18 +23,20 @@ and/or remotely.
 
 Usage: $0 (-h|-opyld)
  -h           Print out this help message.
- -o           Open the published site in a web browser.
+ -o           Open the published site in a web browser at \$VIEW_PUBLISH_URL.
  -p           Publish the site to \$GIT_URL with an automated commit.
  -y           Continue publishing without a y/n prompt.
  -l  <dir>    Also publish the documentation into the existing local directory
               <dir>.
- -d  <dir>    publish the site to a subdir staging/<dir> (useful for public
-              previews).
+ -d  <dir>    Publish the site to a subdir staging/<dir>. This is useful for
+              Pants maintainers to make public previews of potential site
+              changes without modifying the main Pants site.
 
 Environment Variables and Defaults:
-GIT_URL=$PANTS_GH_PAGES
+GIT_URL=${PANTS_GH_PAGES}
   URL of a git remote repository to publish to with an automated commit.
-VIEW_PUBLISH_URL=$PANTS_SITE_URL
+VIEW_PUBLISH_URL=${PANTS_SITE_URL}
+  URL of the web page to open after publishing, if '-o' is provided.
 EOF
 
   if (( $# > 0 )); then
@@ -80,11 +82,11 @@ function do_open() {
 
 set +x
 
-if [[ -z "$local_dir" ]]; then
+if [[ -z "${local_dir}" ]]; then
   do_open "${REPO_ROOT}/dist/docsite/index.html"
 else
   find "${REPO_ROOT}/dist/docsite" -mindepth 1 -maxdepth 1 \
-    | xargs -I '{}' cp -r '{}' "$local_dir"
+    | xargs -I '{}' cp -r '{}' "${local_dir}"
   do_open "${local_dir}/index.html"
 fi
 
@@ -96,8 +98,8 @@ continue."
   fi
   (
     "${REPO_ROOT}/src/docs/publish_via_git.sh" \
-      "$GIT_URL" \
-      "$publish_path"
+      "${GIT_URL}" \
+      "${publish_path}"
     do_open "${url}/index.html"
   ) || die "Publish to ${url} failed."
 fi
