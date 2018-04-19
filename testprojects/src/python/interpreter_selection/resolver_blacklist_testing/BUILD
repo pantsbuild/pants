@@ -16,3 +16,19 @@ python_requirement_library(
     python_requirement('jupyter'),
   ]
 )
+
+# Test non-blacklisted backport usage.
+python_binary(
+  name='test_py2',
+  source='import_futures.py',
+  dependencies=[
+    ':futures_reqlib'
+  ]
+)
+
+python_requirement_library(
+  name='futures_reqlib',
+  requirements=[
+    python_requirement('futures'),
+  ]
+)

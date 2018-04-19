@@ -203,6 +203,11 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
         config=pants_ini_config
       )
       self.assert_success(pants_run_36)
+      pants_run_27 = self.run_pants(
+        command=['clean-all', 'run', '{}:test_py2'.format(os.path.join(self.testproject,'resolver_blacklist_testing'))],
+        config=pants_ini_config
+      )
+      self.assert_success(pants_run_27)
     finally:
       if os.path.exists(pex):
         os.remove(pex)
