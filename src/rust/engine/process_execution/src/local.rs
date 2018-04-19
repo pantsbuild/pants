@@ -6,6 +6,7 @@ use std::process::Command;
 
 use super::{ExecuteProcessRequest, ExecuteProcessResult};
 
+use bytes::Bytes;
 ///
 /// Runs a command on this machine in the pwd.
 ///
@@ -23,7 +24,7 @@ pub fn run_command_locally(
     .envs(req.env)
     .output()
     .map(|output| ExecuteProcessResult {
-      stdout: output.stdout,
+      stdout: Bytes::from(output.stdout),
       stderr: output.stderr,
       exit_code: output.status.code().unwrap(),
     })
@@ -37,7 +38,7 @@ mod tests {
   use fs;
   use std::collections::BTreeMap;
   use std::path::PathBuf;
-  use self::testutil::{as_byte_owned_vec, owned_string_vec};
+  use self::testutil::{as_byte_owned_vec, as_bytes, owned_string_vec};
 
   #[test]
   #[cfg(unix)]
@@ -54,7 +55,7 @@ mod tests {
     assert_eq!(
       result.unwrap(),
       ExecuteProcessResult {
-        stdout: as_byte_owned_vec("foo"),
+        stdout: as_bytes("foo"),
         stderr: as_byte_owned_vec(""),
         exit_code: 0,
       }
@@ -76,7 +77,7 @@ mod tests {
     assert_eq!(
       result.unwrap(),
       ExecuteProcessResult {
-        stdout: as_byte_owned_vec("foo"),
+        stdout: as_bytes("foo"),
         stderr: as_byte_owned_vec("bar"),
         exit_code: 1,
       }
@@ -99,7 +100,7 @@ mod tests {
       &PathBuf::from("/"),
     );
 
-    let stdout = String::from_utf8(result.unwrap().stdout).unwrap();
+    let stdout = String::from_utf8(result.unwrap().stdout.to_vec()).unwrap();
     let got_env: BTreeMap<String, String> = stdout
       .split("\n")
       .filter(|line| !line.is_empty())

@@ -1,6 +1,9 @@
+extern crate bytes;
+
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+use bytes::Bytes;
 
 pub fn owned_string_vec(args: &[&str]) -> Vec<String> {
   args.into_iter().map(|s| s.to_string()).collect()
@@ -8,6 +11,10 @@ pub fn owned_string_vec(args: &[&str]) -> Vec<String> {
 
 pub fn as_byte_owned_vec(str: &str) -> Vec<u8> {
   Vec::from(str.as_bytes())
+}
+
+pub fn as_bytes(str: &str) -> Bytes {
+  Bytes::from(str.as_bytes())
 }
 
 pub fn make_file(path: &Path, contents: &[u8], mode: u32) {

@@ -145,7 +145,7 @@ fn main() {
         .expect("Error executing locally")
     }
   };
-  print!("{}", String::from_utf8(result.stdout).unwrap());
+  print!("{}", String::from_utf8(result.stdout.to_vec()).unwrap());
   eprint!("{}", String::from_utf8(result.stderr).unwrap());
   exit(result.exit_code);
 }
