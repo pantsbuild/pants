@@ -21,6 +21,7 @@ python_requirement_library(
 python_binary(
   name='test_py2',
   source='import_futures.py',
+  compatibility=['CPython<3'],
   dependencies=[
     ':futures_reqlib'
   ]
