@@ -166,12 +166,14 @@ def typed_datatype(type_name, field_decls):
       type_name,
       "no fields were declared")
 
+  # Turn every type declaration into an instance of TypeDecl, and place the
+  # results in processed_type_decls.
   # TODO: Make this kind of exception pattern (filter for errors then display
   # them all at once) more ergonomic.
   processed_type_decls = {}
   invalid_type_decls = []
   for name, cls in field_decls.items():
-    if isinstance(cls, SimpleTypeDecl) or isinstance(cls, Union):
+    if isinstance(cls, TypeDecl):
       processed_type_decls[name] = cls
       continue
     if isinstance(cls, type):
