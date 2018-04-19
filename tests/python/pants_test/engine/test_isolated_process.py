@@ -14,15 +14,15 @@ from pants.engine.isolated_process import (
   ExecuteProcessRequest, ExecuteProcessResult, create_process_rules)
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
-from pants.util.objects import typed_datatype, StrOrUnicode
+from pants.util.objects import typed_datatype
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
-class Concatted(typed_datatype('Concatted', {'value': StrOrUnicode})):
+class Concatted(typed_datatype('Concatted', {'value': str})):
   pass
 
 
-class ShellCat(typed_datatype('ShellCat', {'bin_path': StrOrUnicode})):
+class ShellCat(typed_datatype('ShellCat', {'bin_path': str})):
   """Wrapper class to show an example of using an auxiliary class (which wraps
   an executable) to generate an argv instead of doing it all in
   CatExecutionRequest. This can be used to encapsulate operations such as
@@ -69,7 +69,7 @@ def cat_files_process_result_concatted(cat_exe_req):
   # probably some work required in isolated_process.py to fix this (see #5718).
   cat_proc_req = yield Get(ExecuteProcessRequest, CatExecutionRequest, cat_exe_req)
   cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, cat_proc_req)
-  yield Concatted(value=cat_process_result.stdout)
+  yield Concatted(value=str(cat_process_result.stdout))
 
 
 def create_cat_stdout_rules():
@@ -82,7 +82,7 @@ def create_cat_stdout_rules():
 
 class JavacVersionExecutionRequest(typed_datatype(
     'JavacVersionExecutionRequest', {
-      'bin_path': StrOrUnicode,
+      'bin_path': str,
     },
 )):
 
@@ -98,7 +98,7 @@ def process_request_from_javac_version(javac_version_command):
 
 
 class JavacVersionOutput(typed_datatype('JavacVersionOutput', {
-    'version_output': StrOrUnicode,
+    'version_output': str,
 })):
   pass
 
@@ -164,7 +164,7 @@ def javac_sources_to_globs(javac_sources):
 
 
 class JavacCompileRequest(typed_datatype('JavacCompileRequest', {
-    'bin_path': StrOrUnicode,
+    'bin_path': str,
     'javac_sources': JavacSources,
 })):
 
@@ -262,14 +262,14 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs(create_cat_stdout_rules())
 
     cat_exe_req = CatExecutionRequest(
-      shell_cat_binary=ShellCat(bin_path='/bin/cat'),
+      shell_cat_binary=ShellCat(bin_path=str('/bin/cat')),
       input_file_globs=PathGlobs.create('', include=['fs_test/a/b/*']),
     )
 
     results = self.execute(scheduler, Concatted, cat_exe_req)
     self.assertEquals(1, len(results))
     concatted = results[0]
-    self.assertEqual(Concatted(value='one\ntwo\n'), concatted)
+    self.assertEqual(Concatted(value=str('one\ntwo\n')), concatted)
 
   def test_javac_version_example(self):
     scheduler = self.mk_scheduler_in_example_fs([
@@ -279,7 +279,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     ])
     results = self.execute(
       scheduler, JavacVersionOutput,
-      JavacVersionExecutionRequest(bin_path='/usr/bin/javac'))
+      JavacVersionExecutionRequest(bin_path=str('/usr/bin/javac')))
     self.assertEquals(1, len(results))
     javac_version_output = results[0]
     self.assertIn('javac', javac_version_output.version_output)
@@ -292,7 +292,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs(create_javac_compile_rules())
 
     request = JavacCompileRequest(
-      bin_path='/usr/bin/javac',
+      bin_path=str('/usr/bin/javac'),
       javac_sources=javac_sources,
     )
 
@@ -309,7 +309,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs(create_javac_compile_rules())
 
     request = JavacCompileRequest(
-      bin_path='/usr/bin/javac',
+      bin_path=str('/usr/bin/javac'),
       javac_sources=javac_sources,
     )
 

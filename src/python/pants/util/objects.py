@@ -139,11 +139,6 @@ class Union(datatype('Union', ['types']), TypeDecl):
     return self
 
 
-# NB: An @rule can be used to convert a typed_datatype with a Union-typed field
-# into something specific (for example, converting a StrOrUnicode into a str).
-StrOrUnicode = Union(str, unicode)
-
-
 def typed_datatype(type_name, field_decls):
   """A wrapper over namedtuple which accepts a dict of field names and types.
 
@@ -151,10 +146,7 @@ def typed_datatype(type_name, field_decls):
   type-checked at construction.
   """
 
-  if not (isinstance(type_name, str) or isinstance(type_name, unicode)):
-    raise TypedDatatypeClassConstructionError(
-      repr(type_name),
-      "type_name '{}' is not a str or unicode".format(repr(type_name)))
+  type_name = str(type_name)
 
   if not isinstance(field_decls, dict):
     raise TypedDatatypeClassConstructionError(

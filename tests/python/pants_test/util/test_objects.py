@@ -34,10 +34,29 @@ class AnotherTypedDatatype(typed_datatype(str('AnotherTypedDatatype'), {
   pass
 
 
-class UnicodeNamedTypedDatatype(typed_datatype(
-    unicode('UnicodeNamedTypedDatatype'), {
+# TODO(cosmicexplorer): Could we have a more concise syntax for narrowing values
+# acceptable as args in a type using a predicate?
+class NonNegativeInt(typed_datatype('NonNegativeInt', {
+    'value': int,
+})):
+
+  def __new__(cls, value):
+    result = super(NonNegativeInt, cls).__new__(cls, value=value)
+
+    if result.value < 0:
+      raise TypeCheckError(
+        'NonNegativeInt', "value is negative: '{}'".format(value))
+
+    return result
+
+
+StrOrInt = SimpleTypeDecl(int).compose(SimpleTypeDecl(str))
+
+
+class YetAnotherNamedTypedDatatype(typed_datatype(
+    'YetAnotherNamedTypedDatatype', {
       'nothing_special': str,
-      'just_another_arg': int,
+      'just_another_arg': StrOrInt,
     },
 )):
   pass
@@ -166,7 +185,7 @@ class TypeDeclTest(BaseTest):
 
     self.assertTrue(simple_union.matches_value(str('asdf')))
     self.assertTrue(simple_union.matches_value(bytes('asdf')))
-    self.assertFalse(simple_union.matches_value(unicode('asdf')))
+    self.assertFalse(simple_union.matches_value(type('asdf')))
 
     with self.assertRaises(TypeDecl.ConstructionError):
       Union()
@@ -176,13 +195,22 @@ class TypeDeclTest(BaseTest):
 
   def test_type_decl_composition(self):
     str_type_decl = SimpleTypeDecl(str)
-    some_union_decl = Union(unicode, int)
+    some_union_decl = Union(list, int)
 
     composed_decl = str_type_decl.compose(some_union_decl)
     self.assertTrue(composed_decl.matches_value(str('asdf')))
-    self.assertTrue(composed_decl.matches_value(unicode('asdf')))
+    self.assertTrue(composed_decl.matches_value([]))
     self.assertTrue(composed_decl.matches_value(3))
     self.assertFalse(composed_decl.matches_value(type('asdf')))
+
+  def test_type_with_pred(self):
+    with self.assertRaises(TypeCheckError):
+      NonNegativeInt(value='asdf')
+
+    self.assertEqual(NonNegativeInt(value=3).value, 3)
+
+    with self.assertRaises(TypeCheckError):
+      NonNegativeInt(value=-1)
 
 
 class TypedDatatypeTest(BaseTest):
@@ -191,7 +219,9 @@ class TypedDatatypeTest(BaseTest):
     # NB: typed_datatype subclasses declared at top level are the success cases
     # here by not failing on import.
 
-    with self.assertRaises(TypedDatatypeClassConstructionError):
+    # If the type_name can't be converted into a suitable identifier, throw a
+    # ValueError.
+    with self.assertRaises(ValueError):
       class NonStrType(typed_datatype(3, {'a': int})): pass
 
     # This raises a TypeError because it doesn't provide a required argument.
@@ -211,6 +241,16 @@ class TypedDatatypeTest(BaseTest):
           'a': [str, 3],
       })): pass
 
+    some_object = YetAnotherNamedTypedDatatype(
+      nothing_special=str('asdf'),
+      just_another_arg=3)
+    self.assertEqual(3, some_object.just_another_arg)
+
+    another_object = YetAnotherNamedTypedDatatype(
+      nothing_special=str('huh'),
+      just_another_arg=str('wow'))
+    self.assertEqual(str('wow'), another_object.just_another_arg)
+
   def test_instance_construction(self):
 
     some_val = SomeTypedDatatype(my_val=3)
@@ -229,7 +269,7 @@ class TypedDatatypeTest(BaseTest):
     self.assertIn('3', repr(other_union_val))
 
     with self.assertRaises(TypeCheckError):
-      UnionFieldTypedDatatype(an_arg=unicode('wow'))
+      UnionFieldTypedDatatype(an_arg=[])
 
     # no positional args are allowed
     with self.assertRaises(TypedDatatypeInstanceConstructionError):
