@@ -3,7 +3,7 @@
 
 use std;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 use core::TypeId;
 use externs;
@@ -79,26 +79,15 @@ impl Core {
 #[derive(Clone)]
 pub struct Context {
   pub entry_id: EntryId,
-  pub core: Weak<Core>,
+  pub core: Arc<Core>,
 }
 
 impl Context {
-  pub fn new(entry_id: EntryId, core: Weak<Core>) -> Context {
+  pub fn new(entry_id: EntryId, core: Arc<Core>) -> Context {
     Context {
       entry_id: entry_id,
       core: core,
     }
-  }
-
-  pub fn core(&self) -> Arc<Core> {
-    // The effect of this is that when a `Scheduler` is dropped, the only strong reference to the
-    // `Core` will also be dropped, and any un-run `Nodes` will become un-runnable. I believe that
-    // panic'ing in this situation is reasonable, because without a `Scheduler` reference, it is
-    // impossible to actually access the `Nodes`.
-    self
-      .core
-      .upgrade()
-      .expect("The Core of the Scheduler that this Node was created for has been dropped.")
   }
 
   ///
@@ -109,7 +98,7 @@ impl Context {
     maybe_drain_handles().map(|handles| {
       externs::drop_handles(handles);
     });
-    self.core().graph.get(self.entry_id, self, node)
+    self.core.graph.get(self.entry_id, self, node)
   }
 }
 
