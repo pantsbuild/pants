@@ -13,6 +13,9 @@ use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
 
 use super::{ExecuteProcessRequest, ExecuteProcessResult};
+use std::cmp::min;
+use std::thread;
+use std::time::Duration;
 
 #[derive(Clone)]
 pub struct CommandRunner {
@@ -96,7 +99,7 @@ impl CommandRunner {
             debug!("Executing remotely request: {:?} (command: {:?})", execute_request, command);
 
             map_grpc_result(execution_client.execute(&execute_request))
-                .map(|result| (Arc::new(execute_request), result))
+                .map(|result| (Arc::new(execute_request), result, 0))
           })
 
           // TODO: Use some better looping-frequency strategy than a tight-loop:
@@ -105,8 +108,8 @@ impl CommandRunner {
           // TODO: Add a timeout of some kind.
           // https://github.com/pantsbuild/pants/issues/5504
 
-          .and_then(move |(execute_request, operation)| {
-            future::loop_fn(operation, move |operation| {
+          .and_then(move |(execute_request, operation, iter_num)| {
+            future::loop_fn((operation, iter_num), move |(operation, iter_num)| {
 
               let execute_request = execute_request.clone();
               let execution_client2 = execution_client2.clone();
@@ -134,19 +137,24 @@ impl CommandRunner {
                                 )
                               )
                             })
-                            .map(|operation| future::Loop::Continue(operation))
+                            .map(|operation| future::Loop::Continue((operation, 0))) // iter_num does not matter for `MissingDigests`
                             .to_boxed()
                       },
                       ExecutionError::NotFinished(operation_name) => {
                         let mut operation_request =
                           bazel_protos::operations::GetOperationRequest::new();
                         operation_request.set_name(operation_name);
+
+                        let max_wait = 5000;
+                        let backoff_period = min(max_wait, ((1 + iter_num) * 500));
+                        thread::sleep(Duration::from_millis(backoff_period.clone()));
+
                         let grpc_result = map_grpc_result(
                           operations_client.get_operation(&operation_request)
                         );
                         future::ok(
                           future::Loop::Continue(
-                            try_future!(grpc_result))).to_boxed() as BoxFuture<_, _>
+                            (try_future!(grpc_result), iter_num + 1))).to_boxed() as BoxFuture<_, _>
                       },
                     }
                   })
@@ -408,6 +416,7 @@ mod tests {
   use std::iter::{self, FromIterator};
   use std::sync::Arc;
   use std::time::Duration;
+  use std::time::SystemTime;
 
   #[derive(Debug, PartialEq)]
   enum StdoutType {
@@ -977,6 +986,51 @@ mod tests {
       "a32cd427e5df6a998199266681692989f56c19cabd1cc637bdd56ae2e62619b4"
     );
     assert_eq!(digest.get_size_bytes(), 32)
+  }
+
+  #[test]
+  fn wait_between_request_1_retry() {
+    // wait at least 500 milli for one retry
+    {
+      let execute_request = echo_foo_request();
+      let mock_server = {
+        let op_name = "gimme-foo".to_string();
+        mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request).unwrap().1,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_successful_operation(&op_name, StdoutType::Raw("foo".to_owned()), "", 0),
+          ],
+        ))
+      };
+      let start_time = SystemTime::now();
+      let result = run_command_remote(&mock_server.address(), execute_request).unwrap();
+      assert!(start_time.elapsed().unwrap() >= Duration::from_millis(500));
+    }
+  }
+  #[test]
+  fn wait_between_request_3_retry() {
+    // wait at least 500 + 1000 + 1500 = 3000 milli for 3 retries.
+    {
+      let execute_request = echo_foo_request();
+      let mock_server = {
+        let op_name = "gimme-foo".to_string();
+        mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request).unwrap().1,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_incomplete_operation(&op_name),
+            make_incomplete_operation(&op_name),
+            make_successful_operation(&op_name, StdoutType::Raw("foo".to_owned()), "", 0),
+          ],
+        ))
+      };
+      let start_time = SystemTime::now();
+      let result = run_command_remote(&mock_server.address(), execute_request).unwrap();
+      assert!(start_time.elapsed().unwrap() >= Duration::from_millis(3000));
+    }
   }
 
   fn echo_foo_request() -> ExecuteProcessRequest {
