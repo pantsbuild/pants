@@ -14,7 +14,14 @@ use std::time::Duration;
 
 use pool::ResettablePool;
 
-const MAX_LOCAL_STORE_SIZE_BYTES: usize = 4 * 1024 * 1024 * 1024;
+// This is the maximum size any particular local LMDB store file is allowed to grow to.
+// It doesn't reflect space allocated on disk, or RAM allocated (it may be reflected in VIRT but
+// not RSS). There is no practical upper bound on this number, so we set it ridiculously high.
+const MAX_LOCAL_STORE_SIZE_BYTES: usize = 1024 * 1024 * 1024 * 1024;
+
+// This is the target number of bytes which should be present in all combined LMDB store files
+// after garbage collection. We almost certainly want to make this configurable.
+const LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * 1024 * 1024 * 1024;
 
 ///
 /// A content-addressed store of file contents, and Directories.
@@ -306,7 +313,7 @@ impl Store {
   }
 
   pub fn garbage_collect(&self) -> Result<(), String> {
-    let target = MAX_LOCAL_STORE_SIZE_BYTES / 2;
+    let target = LOCAL_STORE_GC_TARGET_BYTES;
     match self.local.shrink(target) {
       Ok(size) => {
         if size > target {
@@ -833,7 +840,7 @@ mod local {
             .set_flags(NO_SYNC | NO_TLS)
             // 2 DBs; one for file contents, one for leases.
             .set_max_dbs(2)
-            .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES / 16)
+            .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES)
             .open(&dir)
             .map_err(|e| format!("Error making env for store at {:?}: {}", dir, e))?;
 
