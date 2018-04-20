@@ -8318,7 +8318,7 @@ use it by default!
 In the medium term, we're interested in making the isolated strategy the default jvm compilation
 strategy, so your assistance and feedback is appreciated!
 
-Special thanks to Stu Hood and Nick Howard for lots of work over the past months to get this point.
+Special thanks to Stu Hood and Nora Howard for lots of work over the past months to get this point.
 
 API Changes
 ~~~~~~~~~~~

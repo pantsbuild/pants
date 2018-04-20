@@ -8,7 +8,7 @@ Active Committers
 * Kris Wilson
 * Larry Hosken
 * Mateo Rodriguez
-* Nick Howard
+* Nora Howard
 * Stu Hood
 * Yi Cheng
 * Daniel Wagner-Hall
