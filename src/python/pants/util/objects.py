@@ -8,10 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import sys
 from collections import OrderedDict, namedtuple
 
-from abc import abstractmethod
-
 from pants.util.memo import memoized
-from pants.util.meta import AbstractClass
 
 
 def datatype(*args, **kwargs):
@@ -82,61 +79,52 @@ class TypeCheckError(TypedDatatypeInstanceConstructionError):
       type_name, formatted_msg, *args, **kwargs)
 
 
-class TypeDecl(AbstractClass):
+class TypeMatcher(datatype('TypeMatcher', ['types'])):
 
   class ConstructionError(Exception):
     pass
 
-  @abstractmethod
+  def __new__(cls, types):
+    try:
+      type_set = frozenset(types)
+    except TypeError as e:
+      raise cls.ConstructionError(
+        "'types' argument must be convertible to frozenset: '{}'".format(types))
+
+    if not type_set:
+      raise cls.ConstructionError("at least one type must be provided to Union")
+
+    non_type_args = []
+    for ty in type_set:
+      if not isinstance(ty, type):
+        non_type_args.append(ty)
+    if non_type_args:
+      raise cls.ConstructionError(
+        "all elements of 'types' must be a type. non-type args: '{}'"
+        .format(non_type_args))
+
+    return super(TypeMatcher, cls).__new__(cls, types=type_set)
+
+  @classmethod
+  def create(cls, decl_val):
+    if isinstance(decl_val, cls):
+      return decl_val
+
+    if isinstance(decl_val, type):
+      return cls(types=[decl_val])
+
+    # Interpret it as an iterable of types, or raise ConstructionError.
+    return cls(types=decl_val)
+
   def matches_value(self, val):
     """Return whether or not the argument matches the type described by this
-  class.
-    """
-
-  @abstractmethod
-  def as_union(self):
-    """Return a version of this object which is an instance of Union."""
+  class."""
+    return type(val) in self.types
 
   def compose(self, rhs):
-    """Return a TypeDecl which matches either this or another TypeDecl."""
-    self_types = self.as_union().types
-    rhs_types = rhs.as_union().types
-    all_types = self_types + rhs_types
-    return Union(*all_types)
-
-
-class SimpleTypeDecl(datatype('SimpleTypeDecl', ['matching_type']), TypeDecl):
-
-  def __new__(cls, matching_type):
-    if not isinstance(matching_type, type):
-      raise cls.ConstructionError(
-        "argument should be a type: '{}'".format(matching_type))
-
-    return super(SimpleTypeDecl, cls).__new__(cls, matching_type)
-
-  def matches_value(self, val):
-    return isinstance(val, self.matching_type)
-
-  def as_union(self):
-    return Union(self.matching_type)
-
-
-class Union(datatype('Union', ['types']), TypeDecl):
-
-  def __new__(cls, *types):
-    if len(types) == 0:
-      raise cls.ConstructionError("at least one type must be provided to Union")
-    if not all([isinstance(ty, type) for ty in types]):
-      raise cls.ConstructionError(
-        "all arguments to Union should be types: '{}'".format(types))
-
-    return super(Union, cls).__new__(cls, types)
-
-  def matches_value(self, val):
-    return any([isinstance(val, ty) for ty in self.types])
-
-  def as_union(self):
-    return self
+    """Return a TypeMatcher which matches either this or another TypeMatcher."""
+    all_types = self.types | rhs.types
+    return TypeMatcher(types=all_types)
 
 
 def typed_datatype(type_name, field_decls):
@@ -158,37 +146,23 @@ def typed_datatype(type_name, field_decls):
       type_name,
       "no fields were declared")
 
-  # Turn every type declaration into an instance of TypeDecl, and place the
+  # Turn every type declaration into an instance of TypeMatcher, and place the
   # results in processed_type_decls.
   # TODO: Make this kind of exception pattern (filter for errors then display
   # them all at once) more ergonomic.
   processed_type_decls = {}
   invalid_type_decls = []
-  for name, cls in field_decls.items():
-    if isinstance(cls, TypeDecl):
-      processed_type_decls[name] = cls
-      continue
-    if isinstance(cls, type):
-      try:
-        processed_type_decls[name] = SimpleTypeDecl(cls)
-      except TypeDecl.ConstructionError as e:
-        invalid_type_decls.append("in field '{}': {}".format(name, e))
-      continue
-    if isinstance(cls, list):
-      try:
-        processed_type_decls[name] = Union(*cls)
-      except TypeDecl.ConstructionError as e:
-        invalid_type_decls.append("in field '{}': {}".format(name, e))
-      continue
-    else:
+  for name, maybe_decl in field_decls.items():
+    try:
+      processed_type_decls[name] = TypeMatcher.create(maybe_decl)
+    except TypeMatcher.ConstructionError as e:
       invalid_type_decls.append(
-        "field '{}' was not declared as a type or union of types: '{}'"
-        .format(name, cls))
+        "in field '{}': {}".format(name, e))
+
   if invalid_type_decls:
     raise TypedDatatypeClassConstructionError(
       type_name,
-      "field types were not a type object or list of type objects:\n{}"
-      .format('\n'.join(invalid_type_decls)))
+      "invalid field declarations:\n{}".format('\n'.join(invalid_type_decls)))
 
   field_name_set = frozenset(processed_type_decls.keys())
 

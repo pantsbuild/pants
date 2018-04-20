@@ -8,11 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import copy
 import pickle
 
-from pants_test.base_test import BaseTest
 from pants.util.objects import (
-  datatype, typed_datatype, TypedDatatypeClassConstructionError,
-  TypedDatatypeInstanceConstructionError, TypeCheckError, TypeDecl,
-  SimpleTypeDecl, Union)
+  TypeCheckError, TypedDatatypeClassConstructionError,
+  TypedDatatypeInstanceConstructionError, TypeMatcher,
+  datatype, typed_datatype)
+from pants_test.base_test import BaseTest
 
 
 class ExportedDatatype(datatype('ExportedDatatype', ['val'])):
@@ -50,13 +50,10 @@ class NonNegativeInt(typed_datatype('NonNegativeInt', {
     return result
 
 
-StrOrInt = SimpleTypeDecl(int).compose(SimpleTypeDecl(str))
-
-
 class YetAnotherNamedTypedDatatype(typed_datatype(
     'YetAnotherNamedTypedDatatype', {
       'nothing_special': str,
-      'just_another_arg': StrOrInt,
+      'just_another_arg': [int, str],
     },
 )):
   pass
@@ -170,38 +167,35 @@ class DatatypeTest(BaseTest):
       bar(other=1)
 
 
-class TypeDeclTest(BaseTest):
+class TypeMatcherTest(BaseTest):
 
-  def test_type_decl_construction(self):
-    int_type_decl = SimpleTypeDecl(int)
+  def test_type_matcher_construction(self):
+    int_type_matcher = TypeMatcher.create(int)
 
-    self.assertTrue(int_type_decl.matches_value(3))
-    self.assertFalse(int_type_decl.matches_value('wow'))
+    self.assertTrue(int_type_matcher.matches_value(3))
+    self.assertFalse(int_type_matcher.matches_value('wow'))
 
-    with self.assertRaises(TypeDecl.ConstructionError):
-      SimpleTypeDecl(3)
+    with self.assertRaises(TypeMatcher.ConstructionError):
+      TypeMatcher.create(3)
 
-    simple_union = Union(str, bytes)
+    simple_union = TypeMatcher.create([str, bytes])
 
     self.assertTrue(simple_union.matches_value(str('asdf')))
     self.assertTrue(simple_union.matches_value(bytes('asdf')))
     self.assertFalse(simple_union.matches_value(type('asdf')))
 
-    with self.assertRaises(TypeDecl.ConstructionError):
-      Union()
+    with self.assertRaises(TypeMatcher.ConstructionError):
+      TypeMatcher.create([str, 3])
 
-    with self.assertRaises(TypeDecl.ConstructionError):
-      Union(str, 3)
+  def test_type_matcher_composition(self):
+    str_type_matcher = TypeMatcher.create(str)
+    some_union_matcher = TypeMatcher.create([list, int])
 
-  def test_type_decl_composition(self):
-    str_type_decl = SimpleTypeDecl(str)
-    some_union_decl = Union(list, int)
-
-    composed_decl = str_type_decl.compose(some_union_decl)
-    self.assertTrue(composed_decl.matches_value(str('asdf')))
-    self.assertTrue(composed_decl.matches_value([]))
-    self.assertTrue(composed_decl.matches_value(3))
-    self.assertFalse(composed_decl.matches_value(type('asdf')))
+    composed_matcher = str_type_matcher.compose(some_union_matcher)
+    self.assertTrue(composed_matcher.matches_value(str('asdf')))
+    self.assertTrue(composed_matcher.matches_value([]))
+    self.assertTrue(composed_matcher.matches_value(3))
+    self.assertFalse(composed_matcher.matches_value(type('asdf')))
 
   def test_type_with_pred(self):
     with self.assertRaises(TypeCheckError):
