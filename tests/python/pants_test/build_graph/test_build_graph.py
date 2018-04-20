@@ -323,53 +323,6 @@ class BuildGraphTest(BaseTest):
         '\s+referenced from //:a$'):
       self.inject_address_closure('//:a')
 
-  def test_leveled_predicate(self):
-    # Keeping the test of this until it is removed to ensure it continues to function.
-    a = self.make_target(spec='a')
-    b = self.make_target(spec='b', dependencies=[a])
-    c = self.make_target(spec='c', dependencies=[b])
-    d = self.make_target(spec='d', dependencies=[a])
-
-    subgraph_funcs = (self.build_graph.transitive_subgraph_of_addresses,
-                      self.build_graph.transitive_subgraph_of_addresses_bfs)
-
-    def check_funcs(expected, roots, **kwargs):
-      for func in subgraph_funcs:
-        seen_targets = defaultdict(lambda: 0)
-        def predicate_sees(target):
-          seen_targets[target] += 1
-          return True
-
-        result = func([t.address for t in roots], predicate=predicate_sees, **kwargs)
-        self.assertEquals(set(expected), set(result))
-        if any(ct > 1 for ct in seen_targets.values()):
-          self.fail('func {} visited {} more than once.'.format(
-            func,
-            ', '.join(t.address for t, ct in seen_targets.items() if ct > 1))
-          )
-
-    def only_roots(_, __):
-      # This is a silly constraint, because it effectively turns the transitive subgraph functions
-      # into the identity function.
-      return False
-
-    def only_direct_deps(_, depth):
-      return depth == 0
-
-    def only_indirect_a(target, depth):
-      # This is a really weird constraint just to demonstrate functionality.
-      return target != a or depth > 0
-
-    check_funcs({a, b, d}, {b, d}, leveled_predicate=None)
-    check_funcs({b, d}, {b, d}, leveled_predicate=only_roots)
-    check_funcs({a, b, d}, {b, d}, leveled_predicate=only_direct_deps)
-    check_funcs({d, a}, {d}, leveled_predicate=only_direct_deps)
-    check_funcs({b, c}, {c}, leveled_predicate=only_direct_deps)
-    check_funcs({b, c, d, a}, {c, d}, leveled_predicate=only_direct_deps)
-    check_funcs({b, d}, {b, d}, leveled_predicate=only_indirect_a)
-    check_funcs({a, b, c, d}, {c, d}, leveled_predicate=only_indirect_a)
-    check_funcs({a, b, c}, {c}, leveled_predicate=only_indirect_a)
-
   def test_dep_predicate(self):
     a = self.make_target(spec='a')
     b = self.make_target(spec='b', dependencies=[a])

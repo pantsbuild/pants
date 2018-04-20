@@ -12,7 +12,6 @@ from collections import OrderedDict, defaultdict, deque
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.injectables_mixin import InjectablesMixin
@@ -79,37 +78,15 @@ class BuildGraph(AbstractClass):
     def dep_predicate(self, target, dep, level):
       return True
 
-  class DepthAgnosticWalk(NoDepPredicateWalk):
+  class DepPredicateWalk(NoDepPredicateWalk):
     """This is a utility class to aid in graph traversals that don't care about the depth."""
 
     def __init__(self, dep_predicate):
-      super(BuildGraph.DepthAgnosticWalk, self).__init__()
+      super(BuildGraph.DepPredicateWalk, self).__init__()
       self._dep_predicate = dep_predicate
 
     def dep_predicate(self, target, dep, level):
       return self._dep_predicate(target, dep)
-
-  class DepthAwareWalk(NoDepPredicateWalk):
-    """This is a utility class to aid in graph traversals that care about the depth."""
-
-    def __init__(self, leveled_predicate):
-      super(BuildGraph.DepthAwareWalk, self).__init__()
-      self._expanded = defaultdict(set)
-      self._leveled_predicate = leveled_predicate
-
-    def expand_once(self, vertex, level):
-      """Returns True if this (vertex, level) pair has never been expanded, and False otherwise.
-
-      This method marks the (vertex, level) pair as expanded after executing, such that this method
-      will return True for a given (vertex, level) pair exactly once.
-      """
-      if level in self._expanded[vertex]:
-        return False
-      self._expanded[vertex].add(level)
-      return True
-
-    def dep_predicate(self, target, dep, level):
-      return self._leveled_predicate(dep, level)
 
   @staticmethod
   def closure(*vargs, **kwargs):
@@ -356,27 +333,11 @@ class BuildGraph(AbstractClass):
     """
     return sort_targets(self.targets())
 
-  def _walk_factory(self, dep_predicate, leveled_predicate):
+  def _walk_factory(self, dep_predicate):
     """Construct the right context object for managing state during a transitive walk."""
-    deprecated_conditional(
-      lambda: leveled_predicate is not None,
-      '1.7.0.dev1',
-      'leveled_predicate',
-      '''
-      Deprecated property leveled_predicate used. Please migrate to using dep_predicate.
-      ''',
-      stacklevel=5
-    )
-    if leveled_predicate and dep_predicate:
-      raise ValueError('Cannot specify both leveled_predicate and dep_predicate')
-    # Use the DepthAgnosticWalk if we can, because DepthAwareWalk does a bit of extra work that can
-    # slow things down by few millis.
-
     walk = None
-    if leveled_predicate:
-      walk = self.DepthAwareWalk(leveled_predicate)
-    elif dep_predicate:
-      walk = self.DepthAgnosticWalk(dep_predicate)
+    if dep_predicate:
+      walk = self.DepPredicateWalk(dep_predicate)
     else:
       walk = self.NoDepPredicateWalk()
     return walk
@@ -386,7 +347,6 @@ class BuildGraph(AbstractClass):
                                        work,
                                        predicate=None,
                                        postorder=False,
-                                       leveled_predicate=None,
                                        dep_predicate=None):
     """Given a work function, walks the transitive dependency closure of `addresses` using DFS.
 
@@ -405,11 +365,8 @@ class BuildGraph(AbstractClass):
       the current target. If this parameter is not given, no dependencies will be filtered
       when traversing the closure. If it is given, when the predicate fails, the edge to the dependency
       will not be expanded.
-    :param function leveled_predicate: Deprecated. Behaves identically to predicate, but takes the depth of the
-      target in the search tree as a second parameter, and it is checked just before a dependency is
-      expanded.
     """
-    walk = self._walk_factory(dep_predicate, leveled_predicate)
+    walk = self._walk_factory(dep_predicate)
 
     def _walk_rec(addr, level=0):
       # If we've followed an edge to this address, stop recursing.
@@ -500,9 +457,6 @@ class BuildGraph(AbstractClass):
       the current target. If this parameter is not given, no dependencies will be filtered
       when traversing the closure. If it is given, when the predicate fails, the edge to the dependency
       will not be expanded.
-    :param function leveled_predicate: Deprecated. Behaves identically to predicate, but takes the depth of the
-      target in the search tree as a second parameter, and it is checked just before a dependency is
-      expanded.
     """
     ret = OrderedSet()
     self.walk_transitive_dependency_graph(addresses, ret.add,
@@ -513,7 +467,6 @@ class BuildGraph(AbstractClass):
   def transitive_subgraph_of_addresses_bfs(self,
                                            addresses,
                                            predicate=None,
-                                           leveled_predicate=None,
                                            dep_predicate=None):
     """Returns the transitive dependency closure of `addresses` using BFS.
 
@@ -528,11 +481,8 @@ class BuildGraph(AbstractClass):
       the current target. If this parameter is not given, no dependencies will be filtered
       when traversing the closure. If it is given, when the predicate fails, the edge to the dependency
       will not be expanded.
-    :param function leveled_predicate: Deprecated. Behaves identically to predicate, but takes the depth of the
-      target in the search tree as a second parameter, and it is checked just before a dependency is
-      expanded.
     """
-    walk = self._walk_factory(dep_predicate, leveled_predicate)
+    walk = self._walk_factory(dep_predicate)
 
     ordered_closure = OrderedSet()
     to_walk = deque((0, addr) for addr in addresses)
