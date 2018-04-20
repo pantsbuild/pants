@@ -78,11 +78,11 @@ class BuildGraph(AbstractClass):
     def dep_predicate(self, target, dep, level):
       return True
 
-  class DepthAgnosticWalk(NoDepPredicateWalk):
+  class DepPredicateWalk(NoDepPredicateWalk):
     """This is a utility class to aid in graph traversals that don't care about the depth."""
 
     def __init__(self, dep_predicate):
-      super(BuildGraph.DepthAgnosticWalk, self).__init__()
+      super(BuildGraph.DepPredicateWalk, self).__init__()
       self._dep_predicate = dep_predicate
 
     def dep_predicate(self, target, dep, level):
@@ -335,12 +335,9 @@ class BuildGraph(AbstractClass):
 
   def _walk_factory(self, dep_predicate):
     """Construct the right context object for managing state during a transitive walk."""
-    # Use the DepthAgnosticWalk if we can, because DepthAwareWalk does a bit of extra work that can
-    # slow things down by few millis.
-
     walk = None
     if dep_predicate:
-      walk = self.DepthAgnosticWalk(dep_predicate)
+      walk = self.DepPredicateWalk(dep_predicate)
     else:
       walk = self.NoDepPredicateWalk()
     return walk
