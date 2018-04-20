@@ -240,10 +240,6 @@ impl Store {
   /// Ensures that the remote ByteStore has a copy of each passed Fingerprint, including any files
   /// contained in any Directories in the list.
   ///
-  /// At some point in the future we may want to make a call to
-  /// ContentAddressableStorage.FindMissingBlobs to avoid uploading things which are already present
-  /// remotely, but this optimization has not yet been made.
-  ///
   pub fn ensure_remote_has_recursive(&self, digests: Vec<Digest>) -> BoxFuture<(), String> {
     let remote = match self.remote {
       Some(ref remote) => remote,
@@ -276,6 +272,7 @@ impl Store {
 
     let local = self.local.clone();
     let remote = remote.clone();
+    let remote2 = remote.clone();
     future::join_all(expanding_futures)
       .map(move |futures| {
         for mut digests in futures {
@@ -286,13 +283,24 @@ impl Store {
         expanded_digests
       })
       .and_then(move |digests| {
+        if Store::upload_is_faster_than_checking_whether_to_upload(&digests) {
+          return Ok((digests.keys().cloned().collect(), digests));
+        }
+        remote
+          .list_missing_digests(digests.keys())
+          .map(|filtered_digests| (filtered_digests, digests))
+      })
+      .and_then(move |(filtered_digests, digest_entry_types)| {
         future::join_all(
-          digests
+          filtered_digests
             .into_iter()
-            .map(move |(digest, entry_type)| {
-              let remote = remote.clone();
+            .map(move |digest| {
+              let entry_type = digest_entry_types.get(&digest).unwrap();
+              let remote = remote2.clone();
               local
-                .load_bytes_with(entry_type, digest.0, move |bytes| remote.store_bytes(bytes))
+                .load_bytes_with(entry_type.clone(), digest.0, move |bytes| {
+                  remote.store_bytes(bytes)
+                })
                 .and_then(move |maybe_future| match maybe_future {
                   Some(future) => Ok(future),
                   None => Err(format!("Failed to upload digest {:?}: Not found", digest)),
@@ -324,6 +332,26 @@ impl Store {
       Err(err) => return Err(format!("Garbage collection failed: {:?}", err)),
     };
     Ok(())
+  }
+
+  ///
+  /// To check if it might be faster to upload the digests recursively
+  /// vs checking if the files are present first.
+  ///
+  /// The values are guesses, feel free to tweak them.
+  ///
+  fn upload_is_faster_than_checking_whether_to_upload(
+    digests: &HashMap<Digest, EntryType>,
+  ) -> bool {
+    if digests.len() < 3 {
+      let mut num_bytes = 0;
+      for digest in digests.keys() {
+        num_bytes += digest.1;
+      }
+      num_bytes < 1024 * 1024
+    } else {
+      false
+    }
   }
 
   fn expand_directory(&self, digest: Digest) -> BoxFuture<HashMap<Digest, EntryType>, String> {
@@ -1608,7 +1636,7 @@ mod remote {
 
     extern crate tempdir;
 
-    use super::{ByteStore, Fingerprint};
+    use super::ByteStore;
     use super::super::EntryType;
     use super::super::super::EMPTY_DIGEST;
     use bytes::Bytes;
@@ -1616,13 +1644,10 @@ mod remote {
     use hashing::Digest;
     use mock::StubCAS;
     use std::collections::HashSet;
-    use std::fs::File;
-    use std::io::Read;
-    use std::path::PathBuf;
     use std::time::Duration;
 
-    use super::super::tests::{digest, directory_bytes, directory_digest, fingerprint, new_cas,
-                              str_bytes};
+    use super::super::tests::{big_file_bytes, big_file_digest, big_file_fingerprint, digest,
+                              directory_bytes, directory_digest, fingerprint, new_cas, str_bytes};
 
     #[test]
     fn loads_file() {
@@ -1739,27 +1764,15 @@ mod remote {
     fn write_file_multiple_chunks() {
       let cas = StubCAS::empty();
 
-      let store = ByteStore::new(&cas.address(), 1, 10 * 1024, Duration::from_secs(10));
+      let store = ByteStore::new(&cas.address(), 1, 10 * 1024, Duration::from_secs(5));
 
-      let all_the_henries = {
-        let mut f = File::open(
-          PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("testdata")
-            .join("all_the_henries"),
-        ).expect("Error opening all_the_henries");
-        let mut bytes = Vec::new();
-        f.read_to_end(&mut bytes)
-          .expect("Error reading all_the_henries");
-        Bytes::from(bytes)
-      };
+      let all_the_henries = big_file_bytes();
 
-      let fingerprint = Fingerprint::from_hex_string(
-        "8dfba0adc29389c63062a68d76b2309b9a2486f1ab610c4720beabbdc273301f",
-      ).unwrap();
+      let fingerprint = big_file_fingerprint();
 
       assert_eq!(
         store.store_bytes(all_the_henries.clone()).wait(),
-        Ok(Digest(fingerprint, all_the_henries.len()))
+        Ok(big_file_digest())
       );
 
       let blobs = cas.blobs.lock().unwrap();
@@ -1911,9 +1924,10 @@ mod tests {
   use sha2::Sha256;
   use std;
   use std::collections::HashMap;
+  use std::fs::File;
   use std::io::Read;
   use std::os::unix::fs::PermissionsExt;
-  use std::path::Path;
+  use std::path::{Path, PathBuf};
   use std::sync::Arc;
   use std::time::Duration;
   use tempdir::TempDir;
@@ -1942,6 +1956,42 @@ mod tests {
 
   pub fn str_bytes() -> Bytes {
     Bytes::from(STR)
+  }
+
+  pub fn big_file_fingerprint() -> Fingerprint {
+    Fingerprint::from_hex_string("8dfba0adc29389c63062a68d76b2309b9a2486f1ab610c4720beabbdc273301f")
+      .unwrap()
+  }
+
+  pub fn big_file_digest() -> Digest {
+    Digest(big_file_fingerprint(), big_file_bytes().len())
+  }
+
+  pub fn big_file_bytes() -> Bytes {
+    let mut f = File::open(
+      PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("testdata")
+        .join("all_the_henries"),
+    ).expect("Error opening all_the_henries");
+    let mut bytes = Vec::new();
+    f.read_to_end(&mut bytes)
+      .expect("Error reading all_the_henries");
+    Bytes::from(bytes)
+  }
+
+  pub fn extra_big_file_fingerprint() -> Fingerprint {
+    Fingerprint::from_hex_string("8ae6924fa104396614b99ce1f6aa3b4d85273ef158191b3784c6dbbdb47055cd")
+      .unwrap()
+  }
+
+  pub fn extra_big_file_digest() -> Digest {
+    Digest(extra_big_file_fingerprint(), extra_big_file_bytes().len())
+  }
+
+  pub fn extra_big_file_bytes() -> Bytes {
+    let mut bytes = big_file_bytes();
+    bytes.extend(&big_file_bytes());
+    bytes
   }
 
   pub fn directory() -> bazel_protos::remote_execution::Directory {
@@ -2520,6 +2570,130 @@ mod tests {
     assert_eq!(
       cas.blobs.lock().unwrap().get(&fingerprint()),
       Some(&str_bytes())
+    );
+  }
+
+  #[test]
+  fn uploads_files_recursively_when_under_three_digests_ignoring_items_already_in_cas() {
+    let dir = TempDir::new("store").unwrap();
+    let cas = StubCAS::empty();
+
+    new_local_store(dir.path())
+      .record_directory(&directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+    new_local_store(dir.path())
+      .store_file_bytes(str_bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
+
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![digest()])
+      .wait()
+      .expect("Error uploading file");
+
+    assert_eq!(cas.write_message_sizes.lock().unwrap().len(), 1);
+    assert_eq!(
+      cas.blobs.lock().unwrap().get(&fingerprint()),
+      Some(&str_bytes())
+    );
+    assert_eq!(
+      cas.blobs.lock().unwrap().get(&directory_fingerprint()),
+      None
+    );
+
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![directory_digest()])
+      .wait()
+      .expect("Error uploading directory");
+
+    assert_eq!(cas.write_message_sizes.lock().unwrap().len(), 3);
+    assert_eq!(
+      cas.blobs.lock().unwrap().get(&directory_fingerprint()),
+      Some(&directory_bytes())
+    );
+  }
+
+  #[test]
+  fn does_not_reupload_file_already_in_cas_when_requested_with_three_other_digests() {
+    let dir = TempDir::new("store").unwrap();
+    let cas = StubCAS::empty();
+
+    new_local_store(dir.path())
+      .record_directory(&directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+    new_local_store(dir.path())
+      .store_file_bytes(str_bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
+    new_local_store(dir.path())
+      .store_file_bytes(catnip_bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
+
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![digest()])
+      .wait()
+      .expect("Error uploading big file");
+
+    assert_eq!(cas.write_message_sizes.lock().unwrap().len(), 1);
+    assert_eq!(
+      cas.blobs.lock().unwrap().get(&fingerprint()),
+      Some(&str_bytes())
+    );
+    assert_eq!(cas.blobs.lock().unwrap().get(&catnip_fingerprint()), None);
+    assert_eq!(
+      cas.blobs.lock().unwrap().get(&directory_fingerprint()),
+      None
+    );
+
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![directory_digest(), catnip_digest()])
+      .wait()
+      .expect("Error uploading directory");
+
+    assert_eq!(cas.write_message_sizes.lock().unwrap().len(), 3);
+    assert_eq!(
+      cas.blobs.lock().unwrap().get(&catnip_fingerprint()),
+      Some(&catnip_bytes())
+    );
+    assert_eq!(
+      cas.blobs.lock().unwrap().get(&directory_fingerprint()),
+      Some(&directory_bytes())
+    );
+  }
+
+  #[test]
+  fn does_not_reupload_big_file_already_in_cas() {
+    let dir = TempDir::new("store").unwrap();
+    let cas = StubCAS::empty();
+
+    new_local_store(dir.path())
+      .store_file_bytes(extra_big_file_bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
+
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![extra_big_file_digest()])
+      .wait()
+      .expect("Error uploading directory");
+
+    assert_eq!(cas.write_message_sizes.lock().unwrap().len(), 1);
+    assert_eq!(
+      cas.blobs.lock().unwrap().get(&extra_big_file_fingerprint()),
+      Some(&extra_big_file_bytes())
+    );
+
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![extra_big_file_digest()])
+      .wait()
+      .expect("Error uploading directory");
+
+    assert_eq!(cas.write_message_sizes.lock().unwrap().len(), 1);
+    assert_eq!(
+      cas.blobs.lock().unwrap().get(&extra_big_file_fingerprint()),
+      Some(&extra_big_file_bytes())
     );
   }
 
