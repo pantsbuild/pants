@@ -15,12 +15,14 @@ use std::time::Duration;
 use pool::ResettablePool;
 
 // This is the maximum size any particular local LMDB store file is allowed to grow to.
-// It doesn't reflect space allocated on disk, or RAM allocated (it may be reflected in VIRT but
-// not RSS). There is no practical upper bound on this number, so we set it ridiculously high.
+// It doesn't reflect space allocated on disk or actual memory allocated, but it needs to be
+// small enough that all Store instances that are live within one process do not exhaust virtual
+// memory.
 const MAX_LOCAL_STORE_SIZE_BYTES: usize = 1024 * 1024 * 1024 * 1024;
 
 // This is the target number of bytes which should be present in all combined LMDB store files
-// after garbage collection. We almost certainly want to make this configurable.
+// after garbage collection: it should be considerably smaller than `MAX_LOCAL_STORE_SIZE_BYTES`.
+// We almost certainly want to make it configurable.
 const LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * 1024 * 1024 * 1024;
 
 ///

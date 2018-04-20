@@ -60,7 +60,7 @@ impl VFS<Failure> for Context {
   }
 
   fn is_ignored(&self, stat: &fs::Stat) -> bool {
-    self.core.vfs.is_ignored(stat)
+    self.core().vfs.is_ignored(stat)
   }
 
   fn mk_error(msg: &str) -> Failure {
@@ -199,7 +199,7 @@ impl Select {
     // Else, check whether it has-a instance of the product.
     // TODO: returning only the first literal configuration of a given type/variant. Need to
     // define mergeability for products.
-    if externs::satisfied_by(&context.core.types.has_products, &candidate) {
+    if externs::satisfied_by(&context.core().types.has_products, &candidate) {
       for child in externs::project_multi(&candidate, "products") {
         if self.select_literal_single(&child, variant_value) {
           return Some(child);
@@ -288,7 +288,7 @@ impl Select {
   ///
   fn gen_nodes(&self, context: &Context) -> Vec<NodeFuture<Value>> {
     // TODO: These `product==` hooks are hacky.
-    if self.product() == &context.core.types.snapshot {
+    if self.product() == &context.core().types.snapshot {
       // If the requested product is a Snapshot, execute a Snapshot Node and then lower to a Value
       // for this caller.
       let context = context.clone();
@@ -298,7 +298,7 @@ impl Select {
           .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
           .to_boxed(),
       ]
-    } else if self.product() == &context.core.types.files_content {
+    } else if self.product() == &context.core().types.files_content {
       // If the requested product is FilesContent, request a Snapshot and lower it as FilesContent.
       let context = context.clone();
       vec![
@@ -306,11 +306,11 @@ impl Select {
           .get_snapshot(&context)
           .and_then(move |snapshot|
             // Request the file contents of the Snapshot, and then store them.
-            snapshot.contents(context.core.store.clone()).map_err(|e| throw(&e))
+            snapshot.contents(context.core().store.clone()).map_err(|e| throw(&e))
               .map(move |files_content| Snapshot::store_files_content(&context, &files_content)))
           .to_boxed(),
       ]
-    } else if self.product() == &context.core.types.process_result {
+    } else if self.product() == &context.core().types.process_result {
       let context2 = context.clone();
       let execute_process_node = ExecuteProcess::lift(&self.subject);
       vec![
@@ -318,7 +318,7 @@ impl Select {
           .get(execute_process_node)
           .map(move |result| {
             externs::unsafe_call(
-              &context2.core.types.construct_process_result,
+              &context2.core().types.construct_process_result,
               &[
                 externs::store_bytes(&result.0.stdout),
                 externs::store_bytes(&result.0.stderr),
@@ -328,14 +328,14 @@ impl Select {
           })
           .to_boxed(),
       ]
-    } else if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
+    } else if let Some(&(_, ref value)) = context.core().tasks.gen_singleton(self.product()) {
       vec![future::ok(value.clone()).to_boxed()]
     } else {
       self
         .entries
         .iter()
         .map(|entry| {
-          let task = context.core.rule_graph.task_for_inner(entry);
+          let task = context.core().rule_graph.task_for_inner(entry);
           context.get(Task {
             subject: self.subject.clone(),
             product: self.product().clone(),
@@ -557,12 +557,12 @@ impl Node for ExecuteProcess {
     // TODO: Process pool management should likely move into the `process_execution` crate, which
     // will have different strategies depending on remote/local execution.
     context
-      .core
+      .core()
       .pool
       .spawn_fn(move || {
         let tmpdir = TempDir::new("process-execution").unwrap();
         context2
-          .core
+          .core()
           .store
           .materialize_directory(tmpdir.path().to_owned(), request.input_files)
           .map(move |_| {
@@ -597,7 +597,7 @@ impl Node for ReadLink {
   fn run(self, context: Context) -> NodeFuture<LinkDest> {
     let link = self.0.clone();
     context
-      .core
+      .core()
       .vfs
       .read_link(&self.0)
       .map(|dest_path| LinkDest(dest_path))
@@ -624,7 +624,7 @@ impl Node for DigestFile {
   fn run(self, context: Context) -> NodeFuture<hashing::Digest> {
     let file = self.0.clone();
     context
-      .core
+      .core()
       .vfs
       .read_file(&self.0)
       .map_err(move |e| {
@@ -636,7 +636,7 @@ impl Node for DigestFile {
       })
       .and_then(move |c| {
         context
-          .core
+          .core()
           .store
           .store_file_bytes(c.content, true)
           .map_err(|e| throw(&e))
@@ -667,7 +667,7 @@ impl Node for Scandir {
   fn run(self, context: Context) -> NodeFuture<DirectoryListing> {
     let dir = self.0.clone();
     context
-      .core
+      .core()
       .vfs
       .scandir(&self.0)
       .then(move |listing_res| match listing_res {
@@ -707,7 +707,7 @@ impl Snapshot {
       .expand(path_globs)
       .map_err(|e| format!("PlatGlobs expansion failed: {:?}", e))
       .and_then(move |path_stats| {
-        fs::Snapshot::from_path_stats(context.core.store.clone(), context.clone(), path_stats)
+        fs::Snapshot::from_path_stats(context.core().store.clone(), context.clone(), path_stats)
           .map_err(move |e| format!("Snapshot failed: {}", e))
       })
       .map_err(|e| throw(&e))
@@ -732,7 +732,7 @@ impl Snapshot {
       .map(|ps| Self::store_path_stat(context, ps))
       .collect();
     externs::unsafe_call(
-      &context.core.types.construct_snapshot,
+      &context.core().types.construct_snapshot,
       &[
         externs::store_bytes(&(item.digest.0).to_hex().as_bytes()),
         externs::store_i32(item.digest.1 as i32),
@@ -747,12 +747,12 @@ impl Snapshot {
 
   fn store_dir(context: &Context, item: &Dir) -> Value {
     let args = [Self::store_path(item.0.as_path())];
-    externs::unsafe_call(&context.core.types.construct_dir, &args)
+    externs::unsafe_call(&context.core().types.construct_dir, &args)
   }
 
   fn store_file(context: &Context, item: &File) -> Value {
     let args = [Self::store_path(item.path.as_path())];
-    externs::unsafe_call(&context.core.types.construct_file, &args)
+    externs::unsafe_call(&context.core().types.construct_file, &args)
   }
 
   fn store_path_stat(context: &Context, item: &PathStat) -> Value {
@@ -764,12 +764,12 @@ impl Snapshot {
         vec![Self::store_path(path), Self::store_file(context, stat)]
       }
     };
-    externs::unsafe_call(&context.core.types.construct_path_stat, &args)
+    externs::unsafe_call(&context.core().types.construct_path_stat, &args)
   }
 
   fn store_file_content(context: &Context, item: &FileContent) -> Value {
     externs::unsafe_call(
-      &context.core.types.construct_file_content,
+      &context.core().types.construct_file_content,
       &[
         Self::store_path(&item.path),
         externs::store_bytes(&item.content),
@@ -783,7 +783,7 @@ impl Snapshot {
       .map(|e| Self::store_file_content(context, e))
       .collect();
     externs::unsafe_call(
-      &context.core.types.construct_files_content,
+      &context.core().types.construct_files_content,
       &[externs::store_list(entries.iter().collect(), false)],
     )
   }
@@ -794,13 +794,13 @@ impl Node for Snapshot {
 
   fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
     let ref edges = context
-      .core
+      .core()
       .rule_graph
       .edges_for_inner(&self.entry)
       .expect("edges for snapshot exist.");
     // Compute and parse PathGlobs for the subject.
     Select::new(
-      context.core.types.path_globs.clone(),
+      context.core().types.path_globs.clone(),
       self.subject.clone(),
       self.variants.clone(),
       edges,
@@ -834,7 +834,7 @@ pub struct Task {
 impl Task {
   fn get(&self, context: &Context, selector: Selector) -> NodeFuture<Value> {
     let ref edges = context
-      .core
+      .core()
       .rule_graph
       .edges_for_inner(&self.entry)
       .expect("edges for task exist.");
@@ -860,7 +860,7 @@ impl Task {
       .map(|get| {
         let externs::Get(product, subject) = get;
         let entries = context
-          .core
+          .core()
           .rule_graph
           .edges_for_inner(&entry)
           .expect("edges for task exist.")
@@ -927,7 +927,7 @@ impl Node for Task {
       })
       .then(move |task_result| match task_result {
         Ok(val) => {
-          if externs::satisfied_by(&context.core.types.generator, &val) {
+          if externs::satisfied_by(&context.core().types.generator, &val) {
             Self::generate(context, entry, val)
           } else {
             ok(val)

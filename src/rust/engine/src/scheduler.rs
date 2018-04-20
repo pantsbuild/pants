@@ -175,6 +175,6 @@ pub type RootResult = Result<Value, Failure>;
 
 impl ContextFactory for Arc<Core> {
   fn create(&self, entry_id: EntryId) -> Context {
-    Context::new(entry_id, self.clone())
+    Context::new(entry_id, Arc::downgrade(self))
   }
 }

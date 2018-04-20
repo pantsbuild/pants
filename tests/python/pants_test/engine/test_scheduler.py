@@ -50,6 +50,13 @@ class SchedulerTest(unittest.TestCase):
     self.managed_resolve_latest = Address.parse('3rdparty/jvm/managed:latest-hadoop')
     self.inferred_deps = Address.parse('src/scala/inferred_deps')
 
+  def tearDown(self):
+    super(SchedulerTest, self).tearDown()
+    # Without eagerly dropping this reference, each instance created for a test method
+    # will live until all tests in this class have completed: can confirm by editing
+    # the `scheduler_destroy` call in `src/python/pants/engine/native.py`.
+    self.scheduler = None
+
   def parse_specs(self, *specs):
     return Specs(tuple(self.spec_parser.parse_spec(spec) for spec in specs))
 

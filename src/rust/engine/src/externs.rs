@@ -563,9 +563,6 @@ impl log::Log for FfiLogger {
   }
 
   fn log(&self, record: &log::Record) {
-    if !self.enabled(record.metadata()) {
-      return;
-    }
     let level: PythonLogLevel = record.level().into();
     let message = format!("{}", record.args());
     with_externs(|e| {
