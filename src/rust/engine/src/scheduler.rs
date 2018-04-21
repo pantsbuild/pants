@@ -166,6 +166,14 @@ impl Scheduler {
   }
 }
 
+impl Drop for Scheduler {
+  fn drop(&mut self) {
+    // Because Nodes may hold references to the Core in their closure, this is intended to
+    // break cycles between Nodes and the Core.
+    self.core.graph.clear();
+  }
+}
+
 ///
 /// Root requests are limited to Selectors that produce (python) Values.
 ///
