@@ -9,10 +9,112 @@ import copy
 import pickle
 
 from pants.util.objects import (
-  TypeCheckError, TypedDatatypeClassConstructionError,
-  TypedDatatypeInstanceConstructionError, TypeMatcher,
+  Exactly, SubclassesOf, SuperclassesOf, TypeCheckError, TypeConstraintError,
+  TypedDatatypeClassConstructionError,
+  TypedDatatypeInstanceConstructionError,
   datatype, typed_datatype)
 from pants_test.base_test import BaseTest
+
+
+class TypeConstraintTestBase(BaseTest):
+  class A(object):
+    pass
+
+  class B(A):
+    pass
+
+  class C(B):
+    pass
+
+  class BPrime(A):
+    pass
+
+
+class SuperclassesOfTest(TypeConstraintTestBase):
+  def test_none(self):
+    with self.assertRaises(ValueError):
+      SubclassesOf()
+
+  def test_single(self):
+    superclasses_of_b = SuperclassesOf(self.B)
+    self.assertEqual((self.B,), superclasses_of_b.types)
+    self.assertTrue(superclasses_of_b.satisfied_by(self.A()))
+    self.assertTrue(superclasses_of_b.satisfied_by(self.B()))
+    self.assertFalse(superclasses_of_b.satisfied_by(self.BPrime()))
+    self.assertFalse(superclasses_of_b.satisfied_by(self.C()))
+
+  def test_multiple(self):
+    superclasses_of_a_or_b = SuperclassesOf(self.A, self.B)
+    self.assertEqual((self.A, self.B), superclasses_of_a_or_b.types)
+    self.assertTrue(superclasses_of_a_or_b.satisfied_by(self.A()))
+    self.assertTrue(superclasses_of_a_or_b.satisfied_by(self.B()))
+    self.assertFalse(superclasses_of_a_or_b.satisfied_by(self.BPrime()))
+    self.assertFalse(superclasses_of_a_or_b.satisfied_by(self.C()))
+
+
+class ExactlyTest(TypeConstraintTestBase):
+  def test_none(self):
+    with self.assertRaises(ValueError):
+      Exactly()
+
+  def test_single(self):
+    exactly_b = Exactly(self.B)
+    self.assertEqual((self.B,), exactly_b.types)
+    self.assertFalse(exactly_b.satisfied_by(self.A()))
+    self.assertTrue(exactly_b.satisfied_by(self.B()))
+    self.assertFalse(exactly_b.satisfied_by(self.BPrime()))
+    self.assertFalse(exactly_b.satisfied_by(self.C()))
+
+  def test_multiple(self):
+    exactly_a_or_b = Exactly(self.A, self.B)
+    self.assertEqual((self.A, self.B), exactly_a_or_b.types)
+    self.assertTrue(exactly_a_or_b.satisfied_by(self.A()))
+    self.assertTrue(exactly_a_or_b.satisfied_by(self.B()))
+    self.assertFalse(exactly_a_or_b.satisfied_by(self.BPrime()))
+    self.assertFalse(exactly_a_or_b.satisfied_by(self.C()))
+
+  def test_disallows_unsplatted_lists(self):
+    with self.assertRaises(TypeError):
+      Exactly([1])
+
+  def test_str_and_repr(self):
+    exactly_b_types = Exactly(self.B, description='B types')
+    self.assertEquals("=(B types)", str(exactly_b_types))
+    self.assertEquals("Exactly(B types)", repr(exactly_b_types))
+
+    exactly_b = Exactly(self.B)
+    self.assertEquals("=B", str(exactly_b))
+    self.assertEquals("Exactly(B)", repr(exactly_b))
+
+    exactly_multiple = Exactly(self.A, self.B)
+    self.assertEquals("=(A, B)", str(exactly_multiple))
+    self.assertEquals("Exactly(A, B)", repr(exactly_multiple))
+
+  def test_checking_via_bare_type(self):
+    self.assertTrue(Exactly(self.B).satisfied_by_type(self.B))
+    self.assertFalse(Exactly(self.B).satisfied_by_type(self.C))
+
+
+class SubclassesOfTest(TypeConstraintTestBase):
+  def test_none(self):
+    with self.assertRaises(ValueError):
+      SubclassesOf()
+
+  def test_single(self):
+    subclasses_of_b = SubclassesOf(self.B)
+    self.assertEqual((self.B,), subclasses_of_b.types)
+    self.assertFalse(subclasses_of_b.satisfied_by(self.A()))
+    self.assertTrue(subclasses_of_b.satisfied_by(self.B()))
+    self.assertFalse(subclasses_of_b.satisfied_by(self.BPrime()))
+    self.assertTrue(subclasses_of_b.satisfied_by(self.C()))
+
+  def test_multiple(self):
+    subclasses_of_b_or_c = SubclassesOf(self.B, self.C)
+    self.assertEqual((self.B, self.C), subclasses_of_b_or_c.types)
+    self.assertTrue(subclasses_of_b_or_c.satisfied_by(self.B()))
+    self.assertTrue(subclasses_of_b_or_c.satisfied_by(self.C()))
+    self.assertFalse(subclasses_of_b_or_c.satisfied_by(self.BPrime()))
+    self.assertFalse(subclasses_of_b_or_c.satisfied_by(self.A()))
 
 
 class ExportedDatatype(datatype('ExportedDatatype', ['val'])):
@@ -35,7 +137,10 @@ class AnotherTypedDatatype(typed_datatype(str('AnotherTypedDatatype'), {
 
 
 # TODO(cosmicexplorer): Could we have a more concise syntax for narrowing values
-# acceptable as args in a type using a predicate?
+# acceptable as args in a type using a predicate? The exception raised should
+# almost definitely be a subclass of TypeConstraintError so that failing the
+# predicate would be the same kind of type error as providing a value that fails
+# the type constraint.
 class NonNegativeInt(typed_datatype('NonNegativeInt', {
     'value': int,
 })):
@@ -165,46 +270,6 @@ class DatatypeTest(BaseTest):
     bar = datatype('Bar', ['val'])
     with self.assertRaises(TypeError):
       bar(other=1)
-
-
-class TypeMatcherTest(BaseTest):
-
-  def test_type_matcher_construction(self):
-    int_type_matcher = TypeMatcher.create(int)
-
-    self.assertTrue(int_type_matcher.matches_value(3))
-    self.assertFalse(int_type_matcher.matches_value('wow'))
-
-    with self.assertRaises(TypeMatcher.ConstructionError):
-      TypeMatcher.create(3)
-
-    simple_union = TypeMatcher.create([str, bytes])
-
-    self.assertTrue(simple_union.matches_value(str('asdf')))
-    self.assertTrue(simple_union.matches_value(bytes('asdf')))
-    self.assertFalse(simple_union.matches_value(type('asdf')))
-
-    with self.assertRaises(TypeMatcher.ConstructionError):
-      TypeMatcher.create([str, 3])
-
-  def test_type_matcher_composition(self):
-    str_type_matcher = TypeMatcher.create(str)
-    some_union_matcher = TypeMatcher.create([list, int])
-
-    composed_matcher = str_type_matcher.compose(some_union_matcher)
-    self.assertTrue(composed_matcher.matches_value(str('asdf')))
-    self.assertTrue(composed_matcher.matches_value([]))
-    self.assertTrue(composed_matcher.matches_value(3))
-    self.assertFalse(composed_matcher.matches_value(type('asdf')))
-
-  def test_type_with_pred(self):
-    with self.assertRaises(TypeCheckError):
-      NonNegativeInt(value='asdf')
-
-    self.assertEqual(NonNegativeInt(value=3).value, 3)
-
-    with self.assertRaises(TypeCheckError):
-      NonNegativeInt(value=-1)
 
 
 class TypedDatatypeTest(BaseTest):

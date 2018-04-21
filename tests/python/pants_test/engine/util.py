@@ -9,13 +9,14 @@ import re
 from types import GeneratorType
 
 from pants.binaries.binary_util import BinaryUtilPrivate
-from pants.engine.addressable import SubclassesOf, addressable_list
+from pants.engine.addressable import addressable_list
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import RuleIndex
 from pants.engine.scheduler import WrappedNativeScheduler
 from pants.engine.selectors import Get
 from pants.engine.struct import HasProducts, Struct
+from pants.util.objects import SubclassesOf
 from pants_test.option.util.fakes import create_options_for_optionables
 from pants_test.subsystem.subsystem_util import init_subsystem
 

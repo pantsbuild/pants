@@ -10,9 +10,10 @@ from collections import MutableMapping, MutableSequence
 
 import six
 
-from pants.engine.addressable import SubclassesOf, SuperclassesOf, addressable, addressable_list
+from pants.engine.addressable import addressable, addressable_list
 from pants.engine.objects import Serializable, SerializableFactory, Validatable, ValidationError
 from pants.util.meta import AbstractClass
+from pants.util.objects import SubclassesOf, SuperclassesOf
 
 
 def _normalize_utf8_keys(kwargs):

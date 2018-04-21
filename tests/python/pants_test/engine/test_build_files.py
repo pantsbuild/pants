@@ -11,7 +11,7 @@ import unittest
 from pants.base.project_tree import Dir, File
 from pants.base.specs import SingleAddress, Specs
 from pants.build_graph.address import Address
-from pants.engine.addressable import Exactly, addressable, addressable_dict
+from pants.engine.addressable import addressable, addressable_dict
 from pants.engine.build_files import (ResolvedTypeMismatchError, addresses_from_address_families,
                                       create_graph_rules, parse_address_family)
 from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot, create_fs_rules
@@ -19,6 +19,7 @@ from pants.engine.mapper import AddressFamily, AddressMapper, ResolveError
 from pants.engine.nodes import Return, Throw
 from pants.engine.parser import SymbolTable
 from pants.engine.struct import Struct, StructWithDeps
+from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import (JsonParser, PythonAssignmentsParser,
                                                 PythonCallbacksParser)
 from pants_test.engine.scheduler_test_base import SchedulerTestBase

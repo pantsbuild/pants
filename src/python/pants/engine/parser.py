@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractmethod
 
-from pants.engine.addressable import Exactly
 from pants.util.meta import AbstractClass
+from pants.util.objects import Exactly
 
 
 class ParseError(Exception):

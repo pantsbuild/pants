@@ -10,9 +10,8 @@ from abc import abstractproperty
 
 import six
 
-from pants.engine.addressable import Exactly
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
+from pants.util.objects import Exactly, datatype
 
 
 def type_or_constraint_repr(constraint):

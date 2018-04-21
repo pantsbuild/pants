@@ -38,8 +38,8 @@ python_library(
   name='struct',
   sources=['struct.py'],
   dependencies=[
-    ':addressable',
     ':objects',
+    'src/python/pants/util:objects',
   ]
 )
 
@@ -136,7 +136,6 @@ python_library(
   sources=['rules.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':addressable',
     ':selectors',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
@@ -149,7 +148,6 @@ python_library(
   sources=['selectors.py'],
   dependencies=[
     '3rdparty/python:six',
-    ':addressable',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]
@@ -160,7 +158,6 @@ python_library(
   sources=['scheduler.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':addressable',
     ':fs',
     ':isolated_process',
     ':native',

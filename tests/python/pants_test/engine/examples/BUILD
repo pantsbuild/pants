@@ -46,6 +46,7 @@ python_library(
     'src/python/pants/engine:fs',
     'src/python/pants/engine:struct',
     'src/python/pants/source',
+    'src/python/pants/util:objects',
   ]
 )
 

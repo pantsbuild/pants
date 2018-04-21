@@ -10,14 +10,14 @@ from abc import abstractproperty
 
 from six import string_types
 
-from pants.engine.addressable import Exactly, addressable_list
+from pants.engine.addressable import addressable_list
 from pants.engine.fs import PathGlobs
 from pants.engine.objects import Locatable
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.contextutil import exception_logging
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
+from pants.util.objects import Exactly, datatype
 
 
 logger = logging.getLogger(__name__)

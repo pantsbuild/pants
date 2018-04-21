@@ -14,7 +14,6 @@ from types import GeneratorType
 from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
-from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
@@ -23,7 +22,7 @@ from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import Select, SelectDependencies, SelectVariant, constraint_for
 from pants.engine.struct import HasProducts, Variants
 from pants.util.contextutil import temporary_file_path
-from pants.util.objects import datatype
+from pants.util.objects import SubclassesOf, datatype
 
 
 logger = logging.getLogger(__name__)
