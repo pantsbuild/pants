@@ -134,6 +134,10 @@ impl Entry {
       .and_then(|state| state.peek().map(|nr| Entry::unwrap::<N>(nr)))
   }
 
+  fn clear(&mut self) {
+    self.state = None;
+  }
+
   fn format<N: Node>(&self) -> String {
     let state = match self.peek::<N>() {
       Some(Ok(ref nr)) => format!("{:?}", nr),
@@ -255,6 +259,12 @@ impl InnerGraph {
     }
   }
 
+  fn clear(&mut self) {
+    for eid in self.nodes.values() {
+      self.pg.node_weight_mut(*eid).map(|entry| entry.clear());
+    }
+  }
+
   ///
   /// Finds all Nodes with the given subjects, and invalidates their transitive dependents.
   ///
@@ -316,7 +326,7 @@ impl InnerGraph {
     );
   }
 
-  pub fn visualize(&self, roots: &Vec<NodeKey>, path: &Path) -> io::Result<()> {
+  fn visualize(&self, roots: &Vec<NodeKey>, path: &Path) -> io::Result<()> {
     let file = try!(File::create(path));
     let mut f = BufWriter::new(file);
     let mut viz_colors = HashMap::new();
@@ -374,7 +384,7 @@ impl InnerGraph {
     Ok(())
   }
 
-  pub fn trace(&self, root: &NodeKey, path: &Path) -> io::Result<()> {
+  fn trace(&self, root: &NodeKey, path: &Path) -> io::Result<()> {
     let file = try!(OpenOptions::new().append(true).open(path));
     let mut f = BufWriter::new(file);
 
@@ -443,7 +453,7 @@ impl InnerGraph {
     Ok(())
   }
 
-  pub fn all_digests(&self) -> Vec<hashing::Digest> {
+  fn all_digests(&self) -> Vec<hashing::Digest> {
     self
       .pg
       .node_indices()
@@ -555,6 +565,14 @@ impl Graph {
     };
     // ...but only `get` it outside the lock.
     state.get::<N>()
+  }
+
+  ///
+  /// Clears the state of all Nodes in the Graph by dropping their state fields.
+  ///
+  pub fn clear(&self) {
+    let mut inner = self.inner.lock().unwrap();
+    inner.clear()
   }
 
   pub fn invalidate(&self, paths: HashSet<PathBuf>) -> usize {
