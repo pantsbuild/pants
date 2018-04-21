@@ -101,6 +101,11 @@ class TypeConstraint(AbstractClass):
     :param type *types: The focus of this type constraint.
     :param str description: A description for this constraint if the list of types is too long.
     """
+    # TODO(cosmicexplorer): Could we turn `types` into a frozenset? I'm not sure
+    # there would ever be enough types to warrant this for performance
+    # reasons. self.types claims that it returns a tuple, but we're not checking
+    # that here, just that it's iterable, so some more validation or conversion
+    # needs to be done somewhere.
     if not types:
       raise ValueError('Must supply at least one type')
     if any(not isinstance(t, type) for t in types):
@@ -137,7 +142,6 @@ class TypeConstraint(AbstractClass):
     :raises: `TypeConstraintError` if the given object does not satisfy this
     type constraint.
     """
-
     if self.satisfied_by(obj):
       return obj
 
