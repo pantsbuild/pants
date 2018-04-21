@@ -226,6 +226,18 @@ class SubclassesOf(TypeConstraint):
     return issubclass(obj_type, self._types)
 
 
+# TODO 3: make a `newtype` method as well, which wraps an existing type and
+# gives it a new name, and generates an `@rule` to convert <new type> ->
+# <existing type> by accessing the (only) field (of type <existing type>).
+
+
+# TODO 2: get the `type_name` arg of `typed_datatype()` automatically from the
+# name of the subclass! This may require turning it into a decorator or
+# something?
+
+
+# TODO 1: make field_decls a star (a tuple of types, which are distinct, with
+# accessor properties generated from the types' names)!
 def typed_datatype(type_name, field_decls):
   """A wrapper over namedtuple which accepts a dict of field names and types.
 
