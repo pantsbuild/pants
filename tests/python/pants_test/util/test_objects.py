@@ -125,14 +125,15 @@ class AbsClass(object):
   pass
 
 
-class SomeTypedDatatype(typed_datatype('SomeTypedDatatype', {'my_val': int})):
+class SomeTypedDatatype(typed_datatype('SomeTypedDatatype', (int,))):
   pass
 
 
-class AnotherTypedDatatype(typed_datatype(str('AnotherTypedDatatype'), {
-    'a_field': str,
-    'better_field': list,
-})):
+class AnotherTypedDatatype(typed_datatype('AnotherTypedDatatype', (str, list))):
+  pass
+
+class YetAnotherNamedTypedDatatype(typed_datatype(
+    'YetAnotherNamedTypedDatatype', (str,int))):
   pass
 
 
@@ -141,9 +142,7 @@ class AnotherTypedDatatype(typed_datatype(str('AnotherTypedDatatype'), {
 # almost definitely be a subclass of TypeConstraintError so that failing the
 # predicate would be the same kind of type error as providing a value that fails
 # the type constraint.
-class NonNegativeInt(typed_datatype('NonNegativeInt', {
-    'value': int,
-})):
+class NonNegativeInt(typed_datatype('NonNegativeInt', (int,))):
 
   def __new__(cls, value):
     result = super(NonNegativeInt, cls).__new__(cls, value=value)
@@ -153,21 +152,6 @@ class NonNegativeInt(typed_datatype('NonNegativeInt', {
         'NonNegativeInt', "value is negative: '{}'".format(value))
 
     return result
-
-
-class YetAnotherNamedTypedDatatype(typed_datatype(
-    'YetAnotherNamedTypedDatatype', {
-      'nothing_special': str,
-      'just_another_arg': [int, str],
-    },
-)):
-  pass
-
-
-class UnionFieldTypedDatatype(typed_datatype('UnionFieldTypedDatatype', {
-    'an_arg': [str, int],
-})):
-  pass
 
 
 class ReturnsNotImplemented(object):
@@ -281,85 +265,59 @@ class TypedDatatypeTest(BaseTest):
     # If the type_name can't be converted into a suitable identifier, throw a
     # ValueError.
     with self.assertRaises(ValueError):
-      class NonStrType(typed_datatype(3, {'a': int})): pass
+      class NonStrType(typed_datatype(3, (int,))): pass
 
     # This raises a TypeError because it doesn't provide a required argument.
     with self.assertRaises(TypeError):
       class NoFields(typed_datatype('NoFields')): pass
 
     with self.assertRaises(TypedDatatypeClassConstructionError):
-      class NonDictFields(typed_datatype('NonDictFields', [
-          ('field', 'value'),
-      ])): pass
+      class NonTupleTypeFields(typed_datatype('NonTupleTypeFields', [str])):
+        pass
 
     with self.assertRaises(TypedDatatypeClassConstructionError):
-      class NonTypeFields(typed_datatype('NonTypeFields', {'a': 3})): pass
-
-    with self.assertRaises(TypedDatatypeClassConstructionError):
-      class NonTypeUnionFields(typed_datatype('NonTypeUnionFields', {
-          'a': [str, 3],
-      })): pass
-
-    some_object = YetAnotherNamedTypedDatatype(
-      nothing_special=str('asdf'),
-      just_another_arg=3)
-    self.assertEqual(3, some_object.just_another_arg)
-
-    another_object = YetAnotherNamedTypedDatatype(
-      nothing_special=str('huh'),
-      just_another_arg=str('wow'))
-    self.assertEqual(str('wow'), another_object.just_another_arg)
+      class NonTypeFields(typed_datatype('NonTypeFields', (3,))): pass
 
   def test_instance_construction(self):
 
-    some_val = SomeTypedDatatype(my_val=3)
+    # TODO: test with non-primitive types as well, lol
+    some_val = SomeTypedDatatype(3)
     self.assertIn('SomeTypedDatatype', repr(some_val))
-    self.assertIn('my_val', repr(some_val))
+    self.assertIn('primitive__int', repr(some_val))
     self.assertIn('3', repr(some_val))
 
-    union_val = UnionFieldTypedDatatype(an_arg=str('huh'))
-    self.assertIn('UnionFieldTypedDatatype', repr(union_val))
-    self.assertIn('an_arg', repr(union_val))
-    self.assertIn('huh', repr(union_val))
-
-    other_union_val = UnionFieldTypedDatatype(an_arg=3)
-    self.assertIn('UnionFieldTypedDatatype', repr(other_union_val))
-    self.assertIn('an_arg', repr(other_union_val))
-    self.assertIn('3', repr(other_union_val))
+    some_object = YetAnotherNamedTypedDatatype(str('asdf'), 3)
+    self.assertEqual(3, some_object.primitive__int)
 
     with self.assertRaises(TypeCheckError):
-      UnionFieldTypedDatatype(an_arg=[])
+      SomeTypedDatatype([])
 
-    # no positional args are allowed
+    # TODO: FIX THIS: ensure construction with any kwargs has its own
+    # exception!! also check incorrect number of args!
     with self.assertRaises(TypedDatatypeInstanceConstructionError):
-      SomeTypedDatatype('hey')
+      SomeTypedDatatype(primitive__int=3)
 
     # not providing all the fields
     try:
       SomeTypedDatatype()
       self.fail("should have errored: not providing all constructor fields")
     except TypedDatatypeInstanceConstructionError as e:
-      self.assertIn('my_val', str(e))
-
-    with self.assertRaises(TypedDatatypeInstanceConstructionError):
-      AnotherTypedDatatype(a_field='a')
+      self.assertIn('primitive__int', str(e))
 
     # unrecognized fields
     try:
-      SomeTypedDatatype(not_a_val=3)
+      SomeTypedDatatype(3, 4)
       self.fail("should have an unrecognized field error")
     except TypedDatatypeInstanceConstructionError as e:
-      self.assertIn('not_a_val', str(e))
+      self.assertIn('(3, 4)', str(e))
 
     # type checking failures
     with self.assertRaises(TypeCheckError):
-      SomeTypedDatatype(my_val='not a number')
+      SomeTypedDatatype('not a number')
 
     try:
-      AnotherTypedDatatype(
-        a_field=3,
-        better_field=3)
+      AnotherTypedDatatype(3, 3)
       self.fail("should have had a type check error")
     except TypeCheckError as e:
-      self.assertIn('a_field', str(e))
-      self.assertIn('better_field', str(e))
+      self.assertIn('primitive__str', str(e))
+      self.assertIn('primitive__list', str(e))

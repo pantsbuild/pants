@@ -5,10 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import re
 import sys
 from collections import OrderedDict, namedtuple
 
 from abc import abstractmethod
+from twitter.common.collections import OrderedSet
 
 from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
@@ -193,20 +195,6 @@ class Exactly(TypeConstraint):
 
   _variance_symbol = '='
 
-  @classmethod
-  def from_type_or_collection(cls, maybe_decl):
-    if isinstance(maybe_decl, cls):
-      return maybe_decl
-    if isinstance(maybe_decl, type):
-      return cls(maybe_decl)
-
-    try:
-      return cls(*maybe_decl)
-    except TypeError:
-      raise TypeConstraintError(
-        "value '{}' could not be interpreted as an Exactly type constraint, "
-        "a specific type, or a collection of types".format(maybe_decl))
-
   def satisfied_by_type(self, obj_type):
     return obj_type in self._types
 
@@ -226,14 +214,86 @@ class SubclassesOf(TypeConstraint):
     return issubclass(obj_type, self._types)
 
 
+class FieldType(Exactly):
+  """???"""
+
+  class FieldTypeConstructionError(Exception):
+    """Raised on invalid arguments on creation."""
+
+  class FieldTypeNameError(FieldTypeConstructionError):
+    """Raised if a type object has an invalid name."""
+
+  CAMEL_CASE_TYPE_NAME = re.compile('\A([A-Z][a-z]*)+\Z')
+  CAMEL_CASE_SPLIT_PATTERN = re.compile('[A-Z][a-z]*')
+
+  LOWER_CASE_TYPE_NAME = re.compile('\A[a-z]+\Z')
+
+  @classmethod
+  def _transform_type_field_name(cls, type_name):
+    if cls.LOWER_CASE_TYPE_NAME.match(type_name):
+      # double underscore here ensures no clash with camel-case type names
+      return 'primitive__{}'.format(type_name)
+
+    if cls.CAMEL_CASE_TYPE_NAME.match(type_name):
+      split_by_camel = [
+        m.group(0) for m in self.CAMEL_CASE_SPLIT_PATTERN.finditer(type_name)
+      ]
+      return '_'.join(split_by_camel)
+
+    raise cls.FieldTypeNameError(
+      "Type name '{}' must be camel-cased with an initial capital, "
+      "or all lowercase. Only ASCII alphabetical characters are allowed."
+      .format(name))
+
+  def __init__(self, single_type, field_name):
+    if not isinstance(single_type, type):
+      raise self.FieldTypeConstructionError(
+        "single_type is not a type: was {} ({})."
+        .format(single_type, type(single_type)))
+    if not isinstance(field_name, str):
+      raise self.FieldTypeConstructionError(
+        "field_name is not a str: was {} ({})"
+        .format(field_name, type(field_name)))
+
+    super(FieldType, self).__init__(single_type)
+
+    self._field_name = field_name
+
+  @property
+  def field_name(self):
+    return self._field_name
+
+  @property
+  def field_type(self):
+    return self.types[0]
+
+  # TODO(cosmicexplorer): add __str__()?
+  def __repr__(self):
+    fmt_str = '{type_constraint_type}({field_name}{field_type})'
+    return fmt_str.format(type_constraint_type=type(self).__name__,
+                          field_name=self.field_name,
+                          field_type=self.field_type)
+
+  @classmethod
+  def create_from_type(cls, type_obj):
+    """???"""
+    if not isinstance(type_obj, type):
+      raise cls.FieldTypeConstructionError(
+        "type_obj is not a type: was {} ({})."
+        .format(type_obj, type(type_obj)))
+    transformed_type_name = cls._transform_type_field_name(type_obj.__name__)
+    return cls(type_obj, str(transformed_type_name))
+
+
 # TODO 3: make a `newtype` method as well, which wraps an existing type and
 # gives it a new name, and generates an `@rule` to convert <new type> ->
 # <existing type> by accessing the (only) field (of type <existing type>).
 
 
+
 # TODO 2: get the `type_name` arg of `typed_datatype()` automatically from the
 # name of the subclass! This may require turning it into a decorator or
-# something?
+# something (???)
 
 
 # TODO 1: make field_decls a star (a tuple of types, which are distinct, with
@@ -247,36 +307,40 @@ def typed_datatype(type_name, field_decls):
 
   type_name = str(type_name)
 
-  if not isinstance(field_decls, dict):
+  if not isinstance(field_decls, tuple):
     raise TypedDatatypeClassConstructionError(
       type_name,
-      "field_decls is not a dict: '{}'".format(field_decls))
-  if not field_decls:
+      "field_decls is not a tuple: '{}'".format(field_decls))
+  if field_decls is ():
     raise TypedDatatypeClassConstructionError(
       type_name,
       "no fields were declared")
 
-  # Turn every type declaration into an instance of Exactly, and place the
-  # results in processed_type_decls.
   # TODO: Make this kind of exception pattern (filter for errors then display
   # them all at once) more ergonomic.
-  processed_type_decls = {}
-  invalid_type_decls = []
-  for name, maybe_decl in field_decls.items():
+  type_constraints = OrderedSet()
+  invalid_decl_errs = []
+  for maybe_decl in field_decls:
     try:
-      processed_type_decls[name] = Exactly.from_type_or_collection(maybe_decl)
-    except TypeConstraintError as e:
-      invalid_type_decls.append(
-        "in field '{}': {}"
-        .format(name, e))
-  if invalid_type_decls:
+      field_constraint = FieldType.create_from_type(maybe_decl)
+    except FieldType.FieldTypeConstructionError as e:
+      invalid_decl_errs.append(str(e))
+      continue
+
+    if field_constraint in type_constraints:
+      invalid_decl_errs.append(
+        "type constraint '{}' was already used as a field"
+        .format(field_constraint))
+    else:
+      type_constraints.add(field_constraint)
+  if invalid_decl_errs:
     raise TypedDatatypeClassConstructionError(
       type_name,
-      "invalid field declarations:\n{}".format('\n'.join(invalid_type_decls)))
+      "invalid field declarations:\n{}".format('\n'.join(invalid_decl_errs)))
 
-  field_name_set = frozenset(processed_type_decls.keys())
+  field_type_tuple = tuple(type_constraints)
 
-  datatype_cls = datatype(type_name, list(field_name_set))
+  datatype_cls = datatype(type_name, [t.field_name for t in field_type_tuple])
 
   # TODO(cosmicexplorer): Make the repr use the 'description' kwarg in
   # TypeConstraint?
@@ -284,39 +348,36 @@ def typed_datatype(type_name, field_decls):
 
     # We intentionally disallow positional arguments here.
     def __new__(cls, *args, **kwargs):
-      if args:
+      if kwargs:
         raise TypedDatatypeInstanceConstructionError(
           type_name,
-          "no positional args are allowed in this constructor. "
-          "the args were: '{}'".format(args))
+          "typed_datatype() subclasses can only be constructed with "
+          "positional arguments! This class requires {} as arguments.\n"
+          "args provided were: {}.\n"
+          "kwargs provided were: {}."
+          .format(repr(field_type_tuple), repr(args), repr(kwargs)))
 
-      given_field_set = frozenset(kwargs.keys())
-
-      not_provided = given_field_set - field_name_set
-      if not_provided:
+      if len(args) != len(field_type_tuple):
         raise TypedDatatypeInstanceConstructionError(
           type_name,
-          "must provide fields '{}'".format(not_provided))
-
-      unrecognized = field_name_set - given_field_set
-      if unrecognized:
-        raise TypedDatatypeInstanceConstructionError(
-          type_name,
-          "unrecognized fields were provided: '{}'".format(unrecognized))
+          "{} args were provided, but expected {}: {}. "
+          "The args provided were: {}."
+          .format(len(args), len(field_type_tuple), repr(field_type_tuple),
+                  args))
 
       type_failure_msgs = []
-      for field_name, field_value in kwargs.items():
-        field_type = processed_type_decls[field_name]
+      for field_idx, field_value in enumerate(args):
+        constraint_for_field = field_type_tuple[field_idx]
         try:
-          field_type.validate_satisfied_by(field_value)
+          constraint_for_field.validate_satisfied_by(field_value)
         except TypeConstraintError as e:
           type_failure_msgs.append(
             "field '{}' was invalid: {}"
-            .format(field_name, field_value, e))
+            .format(constraint_for_field.field_name, field_value, e))
       if type_failure_msgs:
         raise TypeCheckError(type_name, '\n'.join(type_failure_msgs))
 
-      return super(TypedDatatype, cls).__new__(cls, **kwargs)
+      return super(TypedDatatype, cls).__new__(cls, *args)
 
   return TypedDatatype
 
