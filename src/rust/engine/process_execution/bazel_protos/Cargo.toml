@@ -5,6 +5,6 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
 [dependencies]
 bytes = "0.4.5"
-futures = "0.1.16"
+futures = "0.1.21"
 grpcio = { version = "0.2.0", features = ["secure"] }
 protobuf = { version = "1.4.1", features = ["with-bytes"] }
