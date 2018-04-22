@@ -137,7 +137,7 @@ impl CommandRunner {
                                 )
                               )
                             })
-                            .map(|operation| future::Loop::Continue((operation, 0))) // iter_num does not matter for `MissingDigests`
+                            .map(|operation| future::Loop::Continue((operation, 0))) // reset `iter_num` on `MissingDigests`
                             .to_boxed()
                       },
                       ExecutionError::NotFinished(operation_name) => {
@@ -147,7 +147,7 @@ impl CommandRunner {
 
                         let max_wait = 5000;
                         let backoff_period = min(max_wait, ((1 + iter_num) * 500));
-                        thread::sleep(Duration::from_millis(backoff_period.clone()));
+                        thread::sleep(Duration::from_millis(backoff_period));
 
                         let grpc_result = map_grpc_result(
                           operations_client.get_operation(&operation_request)
