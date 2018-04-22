@@ -102,9 +102,6 @@ impl CommandRunner {
                 .map(|result| (Arc::new(execute_request), result, 0))
           })
 
-          // TODO: Use some better looping-frequency strategy than a tight-loop:
-          // https://github.com/pantsbuild/pants/issues/5503
-
           // TODO: Add a timeout of some kind.
           // https://github.com/pantsbuild/pants/issues/5504
 
