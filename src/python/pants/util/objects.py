@@ -337,24 +337,26 @@ def typed_datatype(type_name, field_decls):
   # TODO(cosmicexplorer): override the __repr__()!
   class TypedDatatype(datatype_cls):
 
-    # We intentionally disallow positional arguments here.
     def __new__(cls, *args, **kwargs):
       if kwargs:
         raise TypedDatatypeInstanceConstructionError(
           type_name,
-          "typed_datatype() subclasses can only be constructed with "
-          "positional arguments! This class requires {} as arguments.\n"
-          "args provided were: {}.\n"
-          "kwargs provided were: {}."
-          .format(repr(field_type_tuple), repr(args), repr(kwargs)))
+          "typed_datatype() subclasses can only be constructed with positional "
+          "arguments! The class '{class_name}' requires {field_types} "
+          "as arguments.\n"
+          "The args provided were: {args}.\n"
+          "The kwargs provided were: {kwargs}.\n"
+          .format(class_name=cls.__name__,
+                  field_types=field_type_tuple,
+                  args=args,
+                  kwargs=kwargs))
 
       if len(args) != len(field_type_tuple):
         raise TypedDatatypeInstanceConstructionError(
           type_name,
           "{} args were provided, but expected {}: {}. "
           "The args provided were: {}."
-          .format(len(args), len(field_type_tuple), repr(field_type_tuple),
-                  args))
+          .format(len(args), len(field_type_tuple), field_type_tuple, args))
 
       type_failure_msgs = []
       for field_idx, field_value in enumerate(args):
@@ -384,8 +386,6 @@ def typed_datatype(type_name, field_decls):
 # class MyTypedData(typed_datatype('MyTypedData', (int, str)), SomeMixin):
 #   # source code...
 def typed_data(*fields):
-
-  # TODO: check that all fields are type()s!
 
   def from_class(cls):
     if not inspect.isclass(cls):

@@ -125,44 +125,42 @@ class AbsClass(object):
   pass
 
 
-# TODO: add a test with at least one base class!
+# TODO: add a test with at least one mixin or something!
 @typed_data(int)
-class SomeTypedDatatype(): pass
+class SomeTypedDatatype: pass
 
 
 @typed_data(str, list)
-class AnotherTypedDatatype(): pass
+class AnotherTypedDatatype: pass
 
 
 @typed_data(str, int)
-class YetAnotherNamedTypedDatatype(): pass
+class YetAnotherNamedTypedDatatype: pass
 
 
-# TODO(cosmicexplorer): Could we have a more concise syntax for narrowing values
-# acceptable as args in a type using a predicate? The exception raised should
-# almost definitely be a subclass of TypeConstraintError so that failing the
-# predicate would be the same kind of type error as providing a value that fails
-# the type constraint.
 @typed_data(int)
-class NonNegativeInt():
+class NonNegativeInt:
+  "???"
 
-  def __new__(cls, value):
+  # NB: TypedDatatype.__new__() will raise if any kwargs are provided, but
+  # subclasses are free to use kwargs as long as they don't pass them on to the
+  # TypedDatatype constructor.
+  def __new__(cls, *args, **kwargs):
     # Call the superclass ctor first to ensure the type is correct.
-    result = super(NonNegativeInt, cls).__new__(cls, value)
+    this_object = super(NonNegativeInt, cls).__new__(cls, *args, **kwargs)
 
-    result_value = result.primitive__int
-
-    assert(result_value == value)
+    value = this_object.primitive__int
 
     if value < 0:
+      # TODO: make a method to do this without having to provide the class name.
       raise TypeCheckError(
-        'NonNegativeInt', "value is negative: '{}'".format(value))
+        cls.__name__, "value is negative: '{}'".format(value))
 
-    return result
+    return this_object
 
 
 @typed_data(NonNegativeInt)
-class CamelCaseWrapper(): pass
+class CamelCaseWrapper: pass
 
 
 class ReturnsNotImplemented(object):
