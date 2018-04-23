@@ -136,6 +136,19 @@ class TypeConstraint(AbstractClass):
     :rtype: bool
     """
 
+  def validate_satisfied_by(self, obj):
+    """Return `obj` if the object satisfies this type constraint, or raise.
+
+    :raises: `TypeConstraintError` if `obj` does not satisfy the constraint.
+    """
+
+    if self.satisfied_by(obj):
+      return obj
+
+    raise TypeConstraintError(
+      "value {!r} (with type {!r}) does not satisfy this type constraint: {!r}."
+      .format(obj, type(obj).__name__, self))
+
   def __hash__(self):
     return hash((type(self), self._types))
 
@@ -261,6 +274,9 @@ class FieldType(Exactly):
 
   def validate_satisfies_field(self, obj):
     """Return `obj` if it satisfies this type constraint, or raise.
+
+    Use this method over `self.validate_satisfied_by()` to provide a more
+    specific error message for the FieldType class.
 
     :raises: `TypeConstraintError` if the given object does not satisfy this
     type constraint.
