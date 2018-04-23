@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import copy
 import pickle
 
+from abc import abstractmethod
+
 from pants.util.objects import (
   Exactly, FieldType, SubclassesOf, SuperclassesOf, TypeCheckError,
   TypeConstraintError, TypedDatatypeClassConstructionError,
@@ -124,9 +126,25 @@ class AbsClass(object):
   pass
 
 
-# TODO: add a test with at least one mixin or something!
 @typed_data(int)
 class SomeTypedDatatype: pass
+
+
+class SomeMixin(object):
+
+  @abstractmethod
+  def as_str(self): pass
+
+  def stripped(self):
+    return self.as_str().strip()
+
+
+@typed_data(str)
+class TypedWithMixin(SomeMixin):
+  """Example of using `@typed_data()` with a mixin."""
+
+  def as_str(self):
+    return self.primitive__str
 
 
 class AnotherTypedDatatype(typed_datatype('AnotherTypedDatatype', (str, list))):
@@ -379,6 +397,14 @@ class TypedDatatypeTest(BaseTest):
     self.assertEqual(
       str(wrapped_nonneg_int),
       str("CamelCaseWrapper(non_negative_int<NonNegativeInt>=NonNegativeInt(primitive__int<int>=45))"))
+
+  def test_mixin_type_construction(self):
+    obj_with_mixin = TypedWithMixin(str(' asdf '))
+    self.assertEqual(repr(obj_with_mixin), "TypedWithMixin(' asdf ')")
+    self.assertEqual(str(obj_with_mixin),
+                     "TypedWithMixin(primitive__str<str>= asdf )")
+    self.assertEqual(obj_with_mixin.as_str(), ' asdf ')
+    self.assertEqual(obj_with_mixin.stripped(), 'asdf')
 
   def test_instance_construction_errors(self):
     with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:

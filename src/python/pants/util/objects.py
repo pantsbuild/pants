@@ -301,8 +301,8 @@ def typed_datatype(type_name, field_decls):
       type_name,
       "no fields were declared")
 
-  # TODO: Make this kind of exception pattern (filter for errors then display
-  # them all at once) more ergonomic.
+  # TODO(cosmicexplorer): Make this kind of exception pattern (filter for errors
+  # then display them all at once) more ergonomic.
   type_constraints = OrderedSet()
   invalid_decl_errs = []
   for maybe_decl in field_decls:
