@@ -263,11 +263,14 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     cat_exe_req = CatExecutionRequest(
       ShellCat(BinaryLocation(str('/bin/cat'))),
-      PathGlobs.create('', include=['fs_test/a/b/*']),
-    )
+      PathGlobs.create('', include=[unicode('fs_test/a/b/*')]))
+
+    self.assertEqual(
+      repr(cat_exe_req),
+      str("CatExecutionRequest(ShellCat(BinaryLocation('/bin/cat')), PathGlobs(include=(u'fs_test/a/b/*',), exclude=()))"))
 
     results = self.execute(scheduler, Concatted, cat_exe_req)
-    self.assertEquals(1, len(results))
+    self.assertEqual(1, len(results))
     concatted = results[0]
     self.assertEqual(Concatted(str('one\ntwo\n')), concatted)
 
@@ -277,10 +280,15 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       process_request_from_javac_version,
       get_javac_version_output,
     ])
-    results = self.execute(
-      scheduler, JavacVersionOutput,
-      JavacVersionExecutionRequest(BinaryLocation(str('/usr/bin/javac'))))
-    self.assertEquals(1, len(results))
+
+    request = JavacVersionExecutionRequest(BinaryLocation(str('/usr/bin/javac')))
+
+    self.assertEqual(
+      repr(request),
+      "JavacVersionExecutionRequest(BinaryLocation('/usr/bin/javac'))")
+
+    results = self.execute(scheduler, JavacVersionOutput, request)
+    self.assertEqual(1, len(results))
     javac_version_output = results[0]
     self.assertIn('javac', javac_version_output.primitive__str)
 
@@ -290,12 +298,15 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     request = JavacCompileRequest(
       BinaryLocation(str('/usr/bin/javac')),
       JavacSources(PathGlobs.create('', include=[
-        'scheduler_inputs/src/java/simple/Simple.java',
-      ])),
-    )
+        unicode('scheduler_inputs/src/java/simple/Simple.java'),
+      ])))
+
+    self.assertEqual(
+      repr(request),
+      "JavacCompileRequest(BinaryLocation('/usr/bin/javac'), JavacSources(PathGlobs(include=(u'scheduler_inputs/src/java/simple/Simple.java',), exclude=())))")
 
     results = self.execute(scheduler, JavacCompileResult, request)
-    self.assertEquals(1, len(results))
+    self.assertEqual(1, len(results))
     # TODO: Test that the output snapshot contains Simple.class at the correct
     # path
 
@@ -306,15 +317,17 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       BinaryLocation(str('/usr/bin/javac')),
       JavacSources(PathGlobs.create('', include=[
         'scheduler_inputs/src/java/simple/Broken.java',
-      ])),
-    )
+      ])))
 
-    try:
-      result = self.execute_raising_throw(scheduler, JavacCompileResult, request)
-      self.fail("should have thrown (result: '{}')".format(result))
-    except ProcessExecutionFailure as e:
-      self.assertEqual(1, e.exit_code)
-      self.assertIn("NOT VALID JAVA", e.stderr)
+    self.assertEqual(
+      repr(request),
+      "JavacCompileRequest(BinaryLocation('/usr/bin/javac'), JavacSources(PathGlobs(include=(u'scheduler_inputs/src/java/simple/Broken.java',), exclude=())))")
+
+    with self.assertRaises(ProcessExecutionFailure) as cm:
+      self.execute_raising_throw(scheduler, JavacCompileResult, request)
+    e = cm.exception
+    self.assertEqual(1, e.exit_code)
+    self.assertIn("NOT VALID JAVA", e.stderr)
 
   def mk_example_fs_tree(self):
     fs_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))

@@ -9,8 +9,8 @@ import copy
 import pickle
 
 from pants.util.objects import (
-  Exactly, SubclassesOf, SuperclassesOf, TypeCheckError, TypeConstraintError,
-  TypedDatatypeClassConstructionError,
+  Exactly, FieldType, SubclassesOf, SuperclassesOf, TypeCheckError,
+  TypeConstraintError, TypedDatatypeClassConstructionError,
   TypedDatatypeInstanceConstructionError,
   datatype, typed_datatype, typed_data)
 from pants_test.base_test import BaseTest
@@ -130,8 +130,8 @@ class AbsClass(object):
 class SomeTypedDatatype: pass
 
 
-@typed_data(str, list)
-class AnotherTypedDatatype: pass
+class AnotherTypedDatatype(typed_datatype('AnotherTypedDatatype', (str, list))):
+  """This is an example of successfully using `typed_datatype()` without `@typed_data()`."""
 
 
 @typed_data(str, int)
@@ -152,9 +152,7 @@ class NonNegativeInt:
     value = this_object.primitive__int
 
     if value < 0:
-      # TODO: make a method to do this without having to provide the class name.
-      raise TypeCheckError(
-        cls.__name__, "value is negative: '{}'".format(value))
+      raise cls.make_type_error("value is negative: {!r}.".format(value))
 
     return this_object
 
@@ -267,78 +265,161 @@ class DatatypeTest(BaseTest):
 
 class TypedDatatypeTest(BaseTest):
 
-  def test_class_construction(self):
+  def test_class_construction_errors(self):
     # NB: typed_datatype subclasses declared at top level are the success cases
     # here by not failing on import.
 
     # If the type_name can't be converted into a suitable identifier, throw a
     # ValueError.
-    with self.assertRaises(ValueError):
+    with self.assertRaises(ValueError) as cm:
       class NonStrType(typed_datatype(3, (int,))): pass
+    expected_msg = "Type names and field names cannot start with a number: '3'"
+    self.assertEqual(str(cm.exception), str(expected_msg))
 
     # This raises a TypeError because it doesn't provide a required argument.
-    with self.assertRaises(TypeError):
+    with self.assertRaises(TypeError) as cm:
       class NoFields(typed_datatype('NoFields')): pass
+    expected_msg = "typed_datatype() takes exactly 2 arguments (1 given)"
+    self.assertEqual(str(cm.exception), str(expected_msg))
 
-    with self.assertRaises(TypedDatatypeClassConstructionError):
-      class NonTupleTypeFields(typed_datatype('NonTupleTypeFields', [str])):
-        pass
+    with self.assertRaises(TypedDatatypeClassConstructionError) as cm:
+      class NonTupleFields(typed_datatype('NonTupleFields', [str])): pass
+    expected_msg = (
+      "error: while trying to generate typed datatype NonTupleFields: "
+      "field_decls is not a tuple: [<type 'str'>]")
+    self.assertEqual(str(cm.exception), str(expected_msg))
 
-    with self.assertRaises(TypedDatatypeClassConstructionError):
+    with self.assertRaises(TypedDatatypeClassConstructionError) as cm:
+      class EmptyTupleFields(typed_datatype('EmptyTupleFields', ())): pass
+    expected_msg = (
+      "error: while trying to generate typed datatype EmptyTupleFields: "
+      "no fields were declared")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    with self.assertRaises(TypedDatatypeClassConstructionError) as cm:
       class NonTypeFields(typed_datatype('NonTypeFields', (3,))): pass
+    expected_msg = (
+      "error: while trying to generate typed datatype NonTypeFields: "
+      "invalid field declarations:\n"
+      "type_obj is not a type: was 3 (<type 'int'>)")
+    self.assertEqual(str(cm.exception), str(expected_msg))
 
-  def test_instance_construction(self):
+  def test_decorator_construction_errors(self):
+    with self.assertRaises(TypedDatatypeClassConstructionError) as cm:
+      @typed_data(str('hm'))
+      class NonTypeFieldDecorated: pass
+    expected_msg = (
+      "error: while trying to generate typed datatype NonTypeFieldDecorated: "
+      "invalid field declarations:\n"
+      "type_obj is not a type: was 'hm' (<type 'str'>)")
+    self.assertEqual(str(cm.exception), str(expected_msg))
 
-    # TODO: test with non-primitive types as well, lol
+    with self.assertRaises(ValueError) as cm:
+      @typed_data(int)
+      def some_fun(): pass
+    expected_msg = ("The @typed_data() decorator must be applied "
+                    "innermost of all decorators.")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+  def test_instance_construction_by_repr(self):
     some_val = SomeTypedDatatype(3)
-    self.assertIn('SomeTypedDatatype', repr(some_val))
-    self.assertIn('primitive__int', repr(some_val))
-    self.assertIn('3', repr(some_val))
+    self.assertEqual(3, some_val.primitive__int)
+    self.assertEqual(repr(some_val), "SomeTypedDatatype(3)")
+    self.assertEqual(str(some_val), "SomeTypedDatatype(primitive__int<int>=3)")
 
-    some_object = YetAnotherNamedTypedDatatype(str('asdf'), 3)
-    self.assertEqual(3, some_object.primitive__int)
-
-    with self.assertRaises(TypeCheckError):
-      SomeTypedDatatype([])
-
-    # TODO: FIX THIS: ensure construction with any kwargs has its own
-    # exception!! also check incorrect number of args!
-    with self.assertRaises(TypedDatatypeInstanceConstructionError):
-      SomeTypedDatatype(primitive__int=3)
-
-    # not providing all the fields
-    try:
-      SomeTypedDatatype()
-      self.fail("should have errored: not providing all constructor fields")
-    except TypedDatatypeInstanceConstructionError as e:
-      self.assertIn('primitive__int', str(e))
-
-    # unrecognized fields
-    try:
-      SomeTypedDatatype(3, 4)
-      self.fail("should have an unrecognized field error")
-    except TypedDatatypeInstanceConstructionError as e:
-      self.assertIn('(3, 4)', str(e))
-
-    # type checking failures
-    with self.assertRaises(TypeCheckError):
-      SomeTypedDatatype('not a number')
-
-    with self.assertRaises(TypeCheckError):
-      NonNegativeInt('asdf')
-
-    with self.assertRaises(TypeCheckError):
-      NonNegativeInt(-3)
+    some_object = YetAnotherNamedTypedDatatype(str('asdf'), 45)
+    self.assertEqual(some_object.primitive__str, 'asdf')
+    self.assertEqual(some_object.primitive__int, 45)
+    self.assertEqual(repr(some_object),
+                     "YetAnotherNamedTypedDatatype('asdf', 45)")
+    self.assertEqual(
+      str(some_object),
+      str("YetAnotherNamedTypedDatatype(primitive__str<str>=asdf, primitive__int<int>=45)"))
 
     some_nonneg_int = NonNegativeInt(3)
     self.assertEqual(3, some_nonneg_int.primitive__int)
+    self.assertEqual(repr(some_nonneg_int), "NonNegativeInt(3)")
+    self.assertEqual(str(some_nonneg_int),
+                     "NonNegativeInt(primitive__int<int>=3)")
 
-    some_wrapped_nonneg_int = CamelCaseWrapper(NonNegativeInt(45))
-    self.assertEqual(45, some_wrapped_nonneg_int.non_negative_int.primitive__int)
+    wrapped_nonneg_int = CamelCaseWrapper(NonNegativeInt(45))
+    # test attribute naming for camel-cased types
+    self.assertEqual(45, wrapped_nonneg_int.non_negative_int.primitive__int)
+    # test that repr() is called inside repr(), and str() inside str()
+    self.assertEqual(repr(wrapped_nonneg_int),
+                     "CamelCaseWrapper(NonNegativeInt(45))")
+    self.assertEqual(
+      str(wrapped_nonneg_int),
+      str("CamelCaseWrapper(non_negative_int<NonNegativeInt>=NonNegativeInt(primitive__int<int>=45))"))
 
-    try:
-      AnotherTypedDatatype(3, 3)
-      self.fail("should have had a type check error")
-    except TypeCheckError as e:
-      self.assertIn('primitive__str', str(e))
-      self.assertIn('primitive__list', str(e))
+  def test_instance_construction_errors(self):
+    # TODO: test with non-primitive types as well, lol
+    with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
+      SomeTypedDatatype(primitive__int=3)
+    expected_msg = (
+      "error: in constructor of type SomeTypedDatatype: "
+      "typed_datatype() subclasses can only be constructed with positional "
+      "arguments! The class SomeTypedDatatype requires (int,) as arguments.\n"
+      "The args provided were: ().\n"
+      "The kwargs provided were: {'primitive__int': 3}.\n")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    # not providing all the fields
+    with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
+      SomeTypedDatatype()
+    expected_msg = (
+      "error: in constructor of type SomeTypedDatatype: "
+      "0 args were provided, "
+      "but expected 1: (int,). "
+      "The args provided were: ().")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    # unrecognized fields
+    with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
+      SomeTypedDatatype(3, 4)
+    expected_msg = (
+      "error: in constructor of type SomeTypedDatatype: "
+      "2 args were provided, "
+      "but expected 1: (int,). "
+      "The args provided were: (3, 4).")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+  def test_type_check_errors(self):
+    # single type checking failure
+    with self.assertRaises(TypeCheckError) as cm:
+      SomeTypedDatatype([])
+    expected_msg = (
+      """error: in constructor of type SomeTypedDatatype: type check error:
+field 'primitive__int' was invalid: value [] (with type 'list') must be an instance of type 'int'.""")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    # type checking failure with multiple arguments (one is correct)
+    with self.assertRaises(TypeCheckError) as cm:
+      AnotherTypedDatatype(str('correct'), str('should be list'))
+    expected_msg = (
+      """error: in constructor of type AnotherTypedDatatype: type check error:
+field 'primitive__list' was invalid: value 'should be list' (with type 'str') must be an instance of type 'list'.""")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    # type checking failure on both arguments
+    with self.assertRaises(TypeCheckError) as cm:
+      AnotherTypedDatatype(3, str('should be list'))
+    expected_msg = (
+      """error: in constructor of type AnotherTypedDatatype: type check error:
+field 'primitive__str' was invalid: value 3 (with type 'int') must be an instance of type 'str'.
+field 'primitive__list' was invalid: value 'should be list' (with type 'str') must be an instance of type 'list'.""")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    with self.assertRaises(TypeCheckError) as cm:
+      NonNegativeInt(str('asdf'))
+    expected_msg = (
+      """error: in constructor of type NonNegativeInt: type check error:
+field 'primitive__int' was invalid: value 'asdf' (with type 'str') must be an instance of type 'int'.""")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    with self.assertRaises(TypeCheckError) as cm:
+      NonNegativeInt(-3)
+    expected_msg = (
+      """error: in constructor of type NonNegativeInt: type check error:
+value is negative: -3.""")
+    self.assertEqual(str(cm.exception), str(expected_msg))

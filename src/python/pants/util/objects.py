@@ -63,7 +63,7 @@ class TypedDatatypeClassConstructionError(Exception):
   # TODO(cosmicexplorer): make some wrapper exception class to make this kind of
   # prefixing easy (maybe using a class field format string?).
   def __init__(self, type_name, msg, *args, **kwargs):
-    full_msg =  "while trying to generate typed dataype '{}': {}".format(
+    full_msg =  "error: while trying to generate typed datatype {}: {}".format(
       type_name, msg)
     super(TypedDatatypeClassConstructionError, self).__init__(
       full_msg, *args, **kwargs)
@@ -72,7 +72,7 @@ class TypedDatatypeClassConstructionError(Exception):
 class TypedDatatypeInstanceConstructionError(Exception):
 
   def __init__(self, type_name, msg, *args, **kwargs):
-    full_msg = "in constructor of type '{}': {}".format(type_name, msg)
+    full_msg = "error: in constructor of type {}: {}".format(type_name, msg)
     super(TypedDatatypeInstanceConstructionError, self).__init__(
       full_msg, *args, **kwargs)
 
@@ -138,19 +138,6 @@ class TypeConstraint(AbstractClass):
 
     :rtype: bool
     """
-
-  def validate_satisfied_by(self, obj):
-    """Return `obj` if it satisfies this type constraint, or raise.
-
-    :raises: `TypeConstraintError` if the given object does not satisfy this
-    type constraint.
-    """
-    if self.satisfied_by(obj):
-      return obj
-
-    raise TypeConstraintError(
-      "Value '{}' (with type '{}') did not satisfy type constraint '{!r}'."
-      .format(obj, type(obj).__name__, self))
 
   def __hash__(self):
     return hash((type(self), self._types))
@@ -270,18 +257,33 @@ class FieldType(Exactly):
   def field_type(self):
     return self.types[0]
 
+  def validate_satisfies_field(self, obj):
+    """Return `obj` if it satisfies this type constraint, or raise.
+
+    :raises: `TypeConstraintError` if the given object does not satisfy this
+    type constraint.
+    """
+    if self.satisfied_by(obj):
+      return obj
+
+    raise TypeConstraintError(
+      "value {!r} (with type {!r}) must be an instance of type {!r}."
+      .format(obj, type(obj).__name__, self.field_type.__name__))
+
   def __repr__(self):
-    fmt_str = '{type_constraint_type}({field_name}{field_type!r})'
+    fmt_str = '{type_constraint_type}({field_type}, {field_name!r})'
     return fmt_str.format(type_constraint_type=type(self).__name__,
-                          field_name=self.field_name,
-                          field_type=self.field_type)
+                          field_type=self.field_type.__name__,
+                          field_name=self.field_name)
+
+  # def __str__(self)
 
   @classmethod
   def create_from_type(cls, type_obj):
     """???"""
     if not isinstance(type_obj, type):
       raise cls.FieldTypeConstructionError(
-        "type_obj is not a type: was {} ({})."
+        "type_obj is not a type: was {!r} ({!r})"
         .format(type_obj, type(type_obj)))
     transformed_type_name = cls._transform_type_field_name(type_obj.__name__)
     return cls(type_obj, str(transformed_type_name))
@@ -302,7 +304,7 @@ def typed_datatype(type_name, field_decls):
   if not isinstance(field_decls, tuple):
     raise TypedDatatypeClassConstructionError(
       type_name,
-      "field_decls is not a tuple: '{}'".format(field_decls))
+      "field_decls is not a tuple: {!r}".format(field_decls))
   if field_decls is ():
     raise TypedDatatypeClassConstructionError(
       type_name,
@@ -330,7 +332,11 @@ def typed_datatype(type_name, field_decls):
       type_name,
       "invalid field declarations:\n{}".format('\n'.join(invalid_decl_errs)))
 
+  # This is a tuple of FieldType instances for the arguments given.
   field_type_tuple = tuple(type_constraints)
+  # This is a tuple of type names, for use in error messages.
+  type_names_joined = "({})".format(
+    ' '.join("{},".format(f.field_type.__name__) for f in field_type_tuple))
 
   datatype_cls = datatype(type_name, [t.field_name for t in field_type_tuple])
 
@@ -342,35 +348,62 @@ def typed_datatype(type_name, field_decls):
         raise TypedDatatypeInstanceConstructionError(
           type_name,
           "typed_datatype() subclasses can only be constructed with positional "
-          "arguments! The class '{class_name}' requires {field_types} "
+          "arguments! The class {class_name} requires {field_types} "
           "as arguments.\n"
-          "The args provided were: {args}.\n"
-          "The kwargs provided were: {kwargs}.\n"
+          "The args provided were: {args!r}.\n"
+          "The kwargs provided were: {kwargs!r}.\n"
           .format(class_name=cls.__name__,
-                  field_types=field_type_tuple,
+                  field_types=type_names_joined,
                   args=args,
                   kwargs=kwargs))
 
       if len(args) != len(field_type_tuple):
         raise TypedDatatypeInstanceConstructionError(
           type_name,
-          "{} args were provided, but expected {}: {}. "
-          "The args provided were: {}."
-          .format(len(args), len(field_type_tuple), field_type_tuple, args))
+          "{num_args} args were provided, "
+          "but expected {expected_num_args}: {field_types}. "
+          "The args provided were: {args!r}."
+          .format(num_args=len(args),
+                  expected_num_args=len(field_type_tuple),
+                  field_types=type_names_joined,
+                  args=args))
 
       type_failure_msgs = []
       for field_idx, field_value in enumerate(args):
         constraint_for_field = field_type_tuple[field_idx]
         try:
-          constraint_for_field.validate_satisfied_by(field_value)
+          constraint_for_field.validate_satisfies_field(field_value)
         except TypeConstraintError as e:
           type_failure_msgs.append(
             "field '{}' was invalid: {}"
-            .format(constraint_for_field.field_name, field_value, e))
+            .format(constraint_for_field.field_name, e))
       if type_failure_msgs:
         raise TypeCheckError(type_name, '\n'.join(type_failure_msgs))
 
       return super(TypedDatatype, cls).__new__(cls, *args)
+
+    def __repr__(self):
+      formatted_args = [repr(arg) for arg in self.__getnewargs__()]
+      return '{class_name}({args_joined})'.format(
+        class_name=type(self).__name__,
+        args_joined=', '.join(formatted_args))
+
+    def __str__(self):
+      arg_tuple = self.__getnewargs__()
+      elements_formatted = []
+      for field_idx, field_value in enumerate(arg_tuple):
+        constraint_for_field = field_type_tuple[field_idx]
+        elements_formatted.append("{field_name}<{type_name}>={arg}".format(
+          field_name=constraint_for_field.field_name,
+          type_name=constraint_for_field.field_type.__name__,
+          arg=field_value))
+      return '{class_name}({typed_tagged_elements})'.format(
+        class_name=type(self).__name__,
+        typed_tagged_elements=', '.join(elements_formatted))
+
+    @classmethod
+    def make_type_error(cls, msg):
+      return TypeCheckError(cls.__name__, msg)
 
   return TypedDatatype
 
@@ -389,7 +422,7 @@ def typed_data(*fields):
 
   def from_class(cls):
     if not inspect.isclass(cls):
-      raise ValueError("The @typed_data decorator must be applied "
+      raise ValueError("The @typed_data() decorator must be applied "
                        "innermost of all decorators.")
 
     typed_base = typed_datatype(cls.__name__, tuple(fields))
