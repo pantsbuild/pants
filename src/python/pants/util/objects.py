@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import inspect
 import re
 import sys
 from collections import OrderedDict, namedtuple
@@ -236,14 +237,14 @@ class FieldType(Exactly):
 
     if cls.CAMEL_CASE_TYPE_NAME.match(type_name):
       split_by_camel = [
-        m.group(0) for m in self.CAMEL_CASE_SPLIT_PATTERN.finditer(type_name)
+        m.group(0) for m in cls.CAMEL_CASE_SPLIT_PATTERN.finditer(type_name)
       ]
       return '_'.join(split_by_camel)
 
     raise cls.FieldTypeNameError(
       "Type name '{}' must be camel-cased with an initial capital, "
       "or all lowercase. Only ASCII alphabetical characters are allowed."
-      .format(name))
+      .format(type_name))
 
   def __init__(self, single_type, field_name):
     if not isinstance(single_type, type):
@@ -267,9 +268,8 @@ class FieldType(Exactly):
   def field_type(self):
     return self.types[0]
 
-  # TODO(cosmicexplorer): add __str__()?
   def __repr__(self):
-    fmt_str = '{type_constraint_type}({field_name}{field_type})'
+    fmt_str = '{type_constraint_type}({field_name}{field_type!r})'
     return fmt_str.format(type_constraint_type=type(self).__name__,
                           field_name=self.field_name,
                           field_type=self.field_type)
@@ -285,19 +285,9 @@ class FieldType(Exactly):
     return cls(type_obj, str(transformed_type_name))
 
 
-# TODO 3: make a `newtype` method as well, which wraps an existing type and
-# gives it a new name, and generates an `@rule` to convert <new type> ->
-# <existing type> by accessing the (only) field (of type <existing type>).
-
-
-
-# TODO 2: get the `type_name` arg of `typed_datatype()` automatically from the
-# name of the subclass! This may require turning it into a decorator or
-# something (???)
-
-
-# TODO 1: make field_decls a star (a tuple of types, which are distinct, with
-# accessor properties generated from the types' names)!
+# TODO (but maybe not): make a `newtype` method as well, which wraps an existing
+# type and gives it a new name, and generates an `@rule` to convert <new type>
+# -> <existing type> by accessing the (only) field (of type <existing type>).
 def typed_datatype(type_name, field_decls):
   """A wrapper over namedtuple which accepts a dict of field names and types.
 
@@ -342,8 +332,7 @@ def typed_datatype(type_name, field_decls):
 
   datatype_cls = datatype(type_name, [t.field_name for t in field_type_tuple])
 
-  # TODO(cosmicexplorer): Make the repr use the 'description' kwarg in
-  # TypeConstraint?
+  # TODO(cosmicexplorer): override the __repr__()!
   class TypedDatatype(datatype_cls):
 
     # We intentionally disallow positional arguments here.
@@ -380,6 +369,33 @@ def typed_datatype(type_name, field_decls):
       return super(TypedDatatype, cls).__new__(cls, *args)
 
   return TypedDatatype
+
+
+# @typed_data(int, str)
+# class MyTypedData(SomeMixin):
+#   # source code...
+#
+#         |
+#         |
+#         V
+#
+# class MyTypedData(typed_datatype('MyTypedData', (int, str)), SomeMixin):
+#   # source code...
+def typed_data(*fields):
+
+  # TODO: check that all fields are type()s!
+
+  def from_class(cls):
+    if not inspect.isclass(cls):
+      raise ValueError("The @typed_data decorator must be applied "
+                       "innermost of all decorators.")
+
+    typed_base = typed_datatype(cls.__name__, tuple(fields))
+    all_bases = (typed_base,) + cls.__bases__
+
+    return type(cls.__name__, all_bases, cls.__dict__)
+
+  return from_class
 
 
 class Collection(object):

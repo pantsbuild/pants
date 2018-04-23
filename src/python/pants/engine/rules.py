@@ -52,6 +52,7 @@ def rule(output_type, input_selectors):
     def resolve_type(name):
       resolved = caller_frame.f_globals.get(name) or caller_frame.f_builtins.get(name)
       if not isinstance(resolved, (TypeType, Exactly)):
+        # TODO(cosmicexplorer): should this say "...or Exactly instance;"?
         raise ValueError('Expected either a `type` constructor or TypeConstraint instance; '
                          'got: {}'.format(name))
       return resolved

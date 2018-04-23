@@ -12,7 +12,7 @@ from pants.util.objects import (
   Exactly, SubclassesOf, SuperclassesOf, TypeCheckError, TypeConstraintError,
   TypedDatatypeClassConstructionError,
   TypedDatatypeInstanceConstructionError,
-  datatype, typed_datatype)
+  datatype, typed_datatype, typed_data)
 from pants_test.base_test import BaseTest
 
 
@@ -125,16 +125,17 @@ class AbsClass(object):
   pass
 
 
-class SomeTypedDatatype(typed_datatype('SomeTypedDatatype', (int,))):
-  pass
+# TODO: add a test with at least one base class!
+@typed_data(int)
+class SomeTypedDatatype(): pass
 
 
-class AnotherTypedDatatype(typed_datatype('AnotherTypedDatatype', (str, list))):
-  pass
+@typed_data(str, list)
+class AnotherTypedDatatype(): pass
 
-class YetAnotherNamedTypedDatatype(typed_datatype(
-    'YetAnotherNamedTypedDatatype', (str,int))):
-  pass
+
+@typed_data(str, int)
+class YetAnotherNamedTypedDatatype(): pass
 
 
 # TODO(cosmicexplorer): Could we have a more concise syntax for narrowing values
@@ -142,12 +143,18 @@ class YetAnotherNamedTypedDatatype(typed_datatype(
 # almost definitely be a subclass of TypeConstraintError so that failing the
 # predicate would be the same kind of type error as providing a value that fails
 # the type constraint.
-class NonNegativeInt(typed_datatype('NonNegativeInt', (int,))):
+@typed_data(int)
+class NonNegativeInt():
 
   def __new__(cls, value):
-    result = super(NonNegativeInt, cls).__new__(cls, value=value)
+    # Call the superclass ctor first to ensure the type is correct.
+    result = super(NonNegativeInt, cls).__new__(cls, value)
 
-    if result.value < 0:
+    result_value = result.primitive__int
+
+    assert(result_value == value)
+
+    if value < 0:
       raise TypeCheckError(
         'NonNegativeInt', "value is negative: '{}'".format(value))
 
@@ -314,6 +321,15 @@ class TypedDatatypeTest(BaseTest):
     # type checking failures
     with self.assertRaises(TypeCheckError):
       SomeTypedDatatype('not a number')
+
+    with self.assertRaises(TypeCheckError):
+      NonNegativeInt('asdf')
+
+    with self.assertRaises(TypeCheckError):
+      NonNegativeInt(-3)
+
+    some_nonneg_int = NonNegativeInt(3)
+    self.assertEqual(3, some_nonneg_int.primitive__int)
 
     try:
       AnotherTypedDatatype(3, 3)
