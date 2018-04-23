@@ -23,7 +23,7 @@ from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Get, Select, SelectDependencies
 from pants.engine.struct import Struct
 from pants.util.dirutil import fast_relpath_optional
-from pants.util.objects import datatype, TypeConstraintError
+from pants.util.objects import TypeConstraintError, datatype
 
 
 class ResolvedTypeMismatchError(ResolveError):

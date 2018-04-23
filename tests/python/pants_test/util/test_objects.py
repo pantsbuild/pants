@@ -7,13 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import copy
 import pickle
-
 from abc import abstractmethod
 
-from pants.util.objects import (
-  Exactly, FieldType, SubclassesOf, SuperclassesOf, TypeCheckError,
-  TypeConstraintError, TypedDatatypeClassConstructionError,
-  TypedDatatypeInstanceConstructionError, datatype, typed_datatype, typed_data)
+from pants.util.objects import (Exactly, FieldType, SubclassesOf, SuperclassesOf, TypeCheckError,
+                                TypeConstraintError, TypedDatatypeClassConstructionError,
+                                TypedDatatypeInstanceConstructionError, datatype, typed_data,
+                                typed_datatype)
 from pants_test.base_test import BaseTest
 
 

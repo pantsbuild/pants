@@ -5,11 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.engine.addressable import (MutationError, NotSerializableError,
-                                      addressable, addressable_dict,
-                                      addressable_list)
+from pants.engine.addressable import (MutationError, NotSerializableError, addressable,
+                                      addressable_dict, addressable_list)
 from pants.engine.objects import Resolvable, Serializable
-from pants.util.objects import (Exactly, TypeConstraintError)
+from pants.util.objects import Exactly, TypeConstraintError
 from pants_test.base_test import BaseTest
 
 

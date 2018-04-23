@@ -10,8 +10,8 @@ import tarfile
 import unittest
 
 from pants.engine.fs import PathGlobs, Snapshot, create_fs_rules
-from pants.engine.isolated_process import (
-  ExecuteProcessRequest, ExecuteProcessResult, create_process_rules)
+from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
+                                           create_process_rules)
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
 from pants.util.objects import TypeCheckError, typed_data

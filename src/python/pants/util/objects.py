@@ -8,9 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import inspect
 import re
 import sys
+from abc import abstractmethod
 from collections import OrderedDict, namedtuple
 
-from abc import abstractmethod
 from twitter.common.collections import OrderedSet
 
 from pants.util.memo import memoized
