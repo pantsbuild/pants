@@ -16,6 +16,7 @@ extern crate sha2;
 extern crate tempdir;
 #[cfg(test)]
 extern crate testutil;
+extern crate tokio_timer;
 
 use bytes::Bytes;
 use std::collections::BTreeMap;

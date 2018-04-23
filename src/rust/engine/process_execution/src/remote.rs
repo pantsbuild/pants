@@ -11,11 +11,14 @@ use hashing::{Digest, Fingerprint};
 use grpcio;
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
+use tokio_timer::Delay;
 
 use super::{ExecuteProcessRequest, ExecuteProcessResult};
 use std::cmp::min;
 use std::thread;
 use std::time::Duration;
+use std::time::Instant;
+
 
 #[derive(Clone)]
 pub struct CommandRunner {
@@ -144,7 +147,17 @@ impl CommandRunner {
 
                         let max_wait = 5000;
                         let backoff_period = min(max_wait, ((1 + iter_num) * 500));
+
                         thread::sleep(Duration::from_millis(backoff_period));
+                        let when = Instant::now() + Duration::from_millis(backoff_period);
+
+                        Delay::new(when)
+                            .and_then(|_| {
+                              println!("Hello world!");
+                              Ok(())
+                            })
+                            .map_err(|e| panic!("delay errored; err={:?}", e));
+
 
                         let grpc_result = map_grpc_result(
                           operations_client.get_operation(&operation_request)
