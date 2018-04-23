@@ -246,19 +246,19 @@ class FieldType(Exactly):
       return '_'.join(split_by_camel_downcased)
 
     raise cls.FieldTypeNameError(
-      "Type name '{}' must be camel-cased with an initial capital, "
+      "Type name {!r} must be camel-cased with an initial capital, "
       "or all lowercase. Only ASCII alphabetical characters are allowed."
       .format(type_name))
 
   def __init__(self, single_type, field_name):
     if not isinstance(single_type, type):
       raise self.FieldTypeConstructionError(
-        "single_type is not a type: was {} ({})."
-        .format(single_type, type(single_type)))
+        "single_type is not a type: was {!r} (type {!r})."
+        .format(single_type, type(single_type).__name__))
     if not isinstance(field_name, str):
       raise self.FieldTypeConstructionError(
-        "field_name is not a str: was {} ({})"
-        .format(field_name, type(field_name)))
+        "field_name is not a str: was {!r} (type {!r})."
+        .format(field_name, type(field_name).__name__))
 
     super(FieldType, self).__init__(single_type)
 

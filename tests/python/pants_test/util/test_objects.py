@@ -280,7 +280,7 @@ class DatatypeTest(BaseTest):
 
 
 class FieldTypeTest(BaseTest):
-  def test_field_type_creation(self):
+  def test_field_type_validation(self):
     str_field = FieldType.create_from_type(str)
     self.assertEqual(repr(str_field), "FieldType(str, 'primitive__str')")
 
@@ -301,10 +301,39 @@ class FieldTypeTest(BaseTest):
       NonNegativeInt(45),
       nonneg_int_field.validate_satisfies_field(NonNegativeInt(45)))
 
+    # test that camel-cased versions of primitive type names are given the
+    # correct field name.
+    class Int(int): pass
+    int_wrapper_field = FieldType.create_from_type(Int)
+    self.assertEqual(repr(int_wrapper_field), "FieldType(Int, 'int')")
+    self.assertEqual(
+      45,
+      int_wrapper_field.validate_satisfies_field(Int(45)))
+
     with self.assertRaises(TypeConstraintError) as cm:
       nonneg_int_field.validate_satisfies_field(-3)
     expected_msg = ("value -3 (with type 'int') must be an instance "
                     "of type 'NonNegativeInt'.")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+  def test_field_type_creation_errors(self):
+    class invalid_class_name(object): pass
+    with self.assertRaises(FieldType.FieldTypeNameError) as cm:
+      FieldType.create_from_type(invalid_class_name)
+    expected_msg = (
+      "Type name 'invalid_class_name' must be camel-cased "
+      "with an initial capital, or all lowercase. Only ASCII alphabetical "
+      "characters are allowed.")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    with self.assertRaises(FieldType.FieldTypeConstructionError) as cm:
+      FieldType(3, 'asdf')
+    expected_msg = "single_type is not a type: was 3 (type 'int')."
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    with self.assertRaises(FieldType.FieldTypeConstructionError) as cm:
+      FieldType(int, 45)
+    expected_msg = "field_name is not a str: was 45 (type 'int')."
     self.assertEqual(str(cm.exception), str(expected_msg))
 
 
