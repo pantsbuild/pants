@@ -157,7 +157,7 @@ class YetAnotherNamedTypedDatatype: pass
 
 @typed_data(int)
 class NonNegativeInt:
-  "???"
+  """Example of overriding __new__() to perform deeper argument checking."""
 
   # NB: TypedDatatype.__new__() will raise if any kwargs are provided, but
   # subclasses are free to use kwargs as long as they don't pass them on to the

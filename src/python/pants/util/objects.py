@@ -200,7 +200,12 @@ class SubclassesOf(TypeConstraint):
 
 
 class FieldType(Exactly):
-  """???"""
+  """A TypeConstraint which matches exactly one type, with a name string.
+
+  Create using `FieldType.create_from_type(cls)` to generate a FieldType with a
+  predictable, unique name string from the class `cls` which is used in
+  `typed_datatype()` to generate property names passed in to `datatype()`.
+  """
 
   class FieldTypeConstructionError(Exception):
     """Raised on invalid arguments on creation."""
@@ -274,7 +279,12 @@ class FieldType(Exactly):
 
   @classmethod
   def create_from_type(cls, type_obj):
-    """???"""
+    """Generate a FieldType with a predictable name string from the given type.
+
+    The field name will be a deterministic and unique string generated from the
+    type `type_obj`. `type_obj` must have a camel-cased name (e.g. MyType) or
+    all-lowercased name (e.g. int).
+    """
     if not isinstance(type_obj, type):
       raise cls.FieldTypeConstructionError(
         "type_obj is not a type: was {!r} ({!r})"
