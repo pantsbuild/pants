@@ -161,6 +161,10 @@ class NonNegativeInt():
     return result
 
 
+@typed_data(NonNegativeInt)
+class CamelCaseWrapper(): pass
+
+
 class ReturnsNotImplemented(object):
   def __eq__(self, other):
     return NotImplemented
@@ -330,6 +334,9 @@ class TypedDatatypeTest(BaseTest):
 
     some_nonneg_int = NonNegativeInt(3)
     self.assertEqual(3, some_nonneg_int.primitive__int)
+
+    some_wrapped_nonneg_int = CamelCaseWrapper(NonNegativeInt(45))
+    self.assertEqual(45, some_wrapped_nonneg_int.non_negative_int.primitive__int)
 
     try:
       AnotherTypedDatatype(3, 3)

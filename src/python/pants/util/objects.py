@@ -236,10 +236,12 @@ class FieldType(Exactly):
       return 'primitive__{}'.format(type_name)
 
     if cls.CAMEL_CASE_TYPE_NAME.match(type_name):
-      split_by_camel = [
-        m.group(0) for m in cls.CAMEL_CASE_SPLIT_PATTERN.finditer(type_name)
-      ]
-      return '_'.join(split_by_camel)
+      split_by_camel_downcased = []
+      for m in cls.CAMEL_CASE_SPLIT_PATTERN.finditer(type_name):
+        camel_group = m.group(0)
+        downcased = camel_group.lower()
+        split_by_camel_downcased.append(downcased)
+      return '_'.join(split_by_camel_downcased)
 
     raise cls.FieldTypeNameError(
       "Type name '{}' must be camel-cased with an initial capital, "
