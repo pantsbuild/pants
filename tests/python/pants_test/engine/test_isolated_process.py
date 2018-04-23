@@ -173,6 +173,7 @@ class JavacSources:
   which does not introduce this additional layer of indirection.
   """
 
+
 @typed_data(BinaryLocation, JavacSources)
 class JavacCompileRequest:
 
@@ -263,7 +264,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     cat_exe_req = CatExecutionRequest(
       ShellCat(BinaryLocation(str('/bin/cat'))),
-      PathGlobs.create('', include=[unicode('fs_test/a/b/*')]))
+      PathGlobs.create('', include=[u'fs_test/a/b/*']))
 
     self.assertEqual(
       repr(cat_exe_req),
@@ -298,7 +299,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     request = JavacCompileRequest(
       BinaryLocation(str('/usr/bin/javac')),
       JavacSources(PathGlobs.create('', include=[
-        unicode('scheduler_inputs/src/java/simple/Simple.java'),
+        u'scheduler_inputs/src/java/simple/Simple.java',
       ])))
 
     self.assertEqual(

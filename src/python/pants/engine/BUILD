@@ -29,7 +29,6 @@ python_library(
     ':objects',
     'src/python/pants/build_graph',
     'src/python/pants/util:memo',
-    'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]
 )

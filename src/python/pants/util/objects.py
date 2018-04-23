@@ -271,12 +271,9 @@ class FieldType(Exactly):
       .format(obj, type(obj).__name__, self.field_type.__name__))
 
   def __repr__(self):
-    fmt_str = '{type_constraint_type}({field_type}, {field_name!r})'
-    return fmt_str.format(type_constraint_type=type(self).__name__,
-                          field_type=self.field_type.__name__,
+    fmt_str = 'FieldType({field_type}, {field_name!r})'
+    return fmt_str.format(field_type=self.field_type.__name__,
                           field_name=self.field_name)
-
-  # def __str__(self)
 
   @classmethod
   def create_from_type(cls, type_obj):

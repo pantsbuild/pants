@@ -9,8 +9,7 @@ from pants.engine.addressable import (MutationError, NotSerializableError,
                                       addressable, addressable_dict,
                                       addressable_list)
 from pants.engine.objects import Resolvable, Serializable
-from pants.util.objects import (Exactly, SubclassesOf, SuperclassesOf,
-                                TypeConstraintError)
+from pants.util.objects import (Exactly, TypeConstraintError)
 from pants_test.base_test import BaseTest
 
 

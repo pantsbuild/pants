@@ -11,8 +11,7 @@ import pickle
 from pants.util.objects import (
   Exactly, FieldType, SubclassesOf, SuperclassesOf, TypeCheckError,
   TypeConstraintError, TypedDatatypeClassConstructionError,
-  TypedDatatypeInstanceConstructionError,
-  datatype, typed_datatype, typed_data)
+  TypedDatatypeInstanceConstructionError, datatype, typed_datatype, typed_data)
 from pants_test.base_test import BaseTest
 
 
@@ -261,6 +260,35 @@ class DatatypeTest(BaseTest):
     bar = datatype('Bar', ['val'])
     with self.assertRaises(TypeError):
       bar(other=1)
+
+
+class FieldTypeTest(BaseTest):
+  def test_field_type_creation(self):
+    str_field = FieldType.create_from_type(str)
+    self.assertEqual(repr(str_field), "FieldType(str, 'primitive__str')")
+
+    self.assertEqual(str('asdf'),
+                     str_field.validate_satisfies_field(str('asdf')))
+
+    with self.assertRaises(TypeConstraintError) as cm:
+      str_field.validate_satisfies_field(3)
+    expected_msg = (
+      "value 3 (with type 'int') must be an instance of type 'str'.")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    nonneg_int_field = FieldType.create_from_type(NonNegativeInt)
+    self.assertEqual(repr(nonneg_int_field),
+                     "FieldType(NonNegativeInt, 'non_negative_int')")
+
+    self.assertEqual(
+      NonNegativeInt(45),
+      nonneg_int_field.validate_satisfies_field(NonNegativeInt(45)))
+
+    with self.assertRaises(TypeConstraintError) as cm:
+      nonneg_int_field.validate_satisfies_field(-3)
+    expected_msg = ("value -3 (with type 'int') must be an instance "
+                    "of type 'NonNegativeInt'.")
+    self.assertEqual(str(cm.exception), str(expected_msg))
 
 
 class TypedDatatypeTest(BaseTest):
