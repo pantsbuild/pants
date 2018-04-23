@@ -346,7 +346,17 @@ class TypedDatatypeTest(BaseTest):
     expected_msg = (
       "error: while trying to generate typed datatype NonTypeFields: "
       "invalid field declarations:\n"
-      "type_obj is not a type: was 3 (<type 'int'>)")
+      "type_obj is not a type: was 3 (type 'int')")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    with self.assertRaises(TypedDatatypeClassConstructionError) as cm:
+      class MultipleOfSameType(typed_datatype(
+          'MultipleOfSameType', (int, str, int))):
+        pass
+    expected_msg = (
+      "error: while trying to generate typed datatype MultipleOfSameType: "
+      "invalid field declarations:\n"
+      "type 'int' was already used as a field")
     self.assertEqual(str(cm.exception), str(expected_msg))
 
   def test_decorator_construction_errors(self):
@@ -356,7 +366,7 @@ class TypedDatatypeTest(BaseTest):
     expected_msg = (
       "error: while trying to generate typed datatype NonTypeFieldDecorated: "
       "invalid field declarations:\n"
-      "type_obj is not a type: was 'hm' (<type 'str'>)")
+      "type_obj is not a type: was 'hm' (type 'str')")
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     with self.assertRaises(ValueError) as cm:

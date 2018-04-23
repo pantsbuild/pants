@@ -303,8 +303,8 @@ class FieldType(Exactly):
     """
     if not isinstance(type_obj, type):
       raise cls.FieldTypeConstructionError(
-        "type_obj is not a type: was {!r} ({!r})"
-        .format(type_obj, type(type_obj)))
+        "type_obj is not a type: was {!r} (type {!r})"
+        .format(type_obj, type(type_obj).__name__))
     transformed_type_name = cls._transform_type_field_name(type_obj.__name__)
     return cls(type_obj, str(transformed_type_name))
 
@@ -340,8 +340,8 @@ def typed_datatype(type_name, field_decls):
 
     if field_constraint in type_constraints:
       invalid_decl_errs.append(
-        "type constraint '{}' was already used as a field"
-        .format(field_constraint))
+        "type {!r} was already used as a field"
+        .format(field_constraint.field_type.__name__))
     else:
       type_constraints.add(field_constraint)
   if invalid_decl_errs:
