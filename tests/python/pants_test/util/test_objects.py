@@ -385,31 +385,42 @@ class TypedDatatypeTest(BaseTest):
     with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
       SomeTypedDatatype(primitive__int=3)
     expected_msg = (
-      "error: in constructor of type SomeTypedDatatype: "
-      "typed_datatype() subclasses can only be constructed with positional "
-      "arguments! The class SomeTypedDatatype requires (int,) as arguments.\n"
-      "The args provided were: ().\n"
-      "The kwargs provided were: {'primitive__int': 3}.\n")
+      """error: in constructor of type SomeTypedDatatype: typed_datatype() subclasses can only be constructed with positional arguments! The class SomeTypedDatatype requires (int,) as arguments.
+The args provided were: ().
+The kwargs provided were: {'primitive__int': 3}.""")
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     # not providing all the fields
     with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
       SomeTypedDatatype()
     expected_msg = (
-      "error: in constructor of type SomeTypedDatatype: "
-      "0 args were provided, "
-      "but expected 1: (int,). "
-      "The args provided were: ().")
+      """error: in constructor of type SomeTypedDatatype: 0 args were provided, but expected 1: (int,).
+The args provided were: ().""")
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     # unrecognized fields
     with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
       SomeTypedDatatype(3, 4)
     expected_msg = (
-      "error: in constructor of type SomeTypedDatatype: "
-      "2 args were provided, "
-      "but expected 1: (int,). "
-      "The args provided were: (3, 4).")
+      """error: in constructor of type SomeTypedDatatype: 2 args were provided, but expected 1: (int,).
+The args provided were: (3, 4).""")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
+      CamelCaseWrapper(non_negative_int=3)
+    expected_msg = (
+      """error: in constructor of type CamelCaseWrapper: typed_datatype() subclasses can only be constructed with positional arguments! The class CamelCaseWrapper requires (NonNegativeInt,) as arguments.
+The args provided were: ().
+The kwargs provided were: {'non_negative_int': 3}.""")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    # test that kwargs with keywords that aren't field names fail the same way
+    with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
+      CamelCaseWrapper(4, a=3)
+    expected_msg = (
+      """error: in constructor of type CamelCaseWrapper: typed_datatype() subclasses can only be constructed with positional arguments! The class CamelCaseWrapper requires (NonNegativeInt,) as arguments.
+The args provided were: (4,).
+The kwargs provided were: {'a': 3}.""")
     self.assertEqual(str(cm.exception), str(expected_msg))
 
   def test_type_check_errors(self):

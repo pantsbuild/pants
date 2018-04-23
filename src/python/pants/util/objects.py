@@ -104,17 +104,14 @@ class TypeConstraint(AbstractClass):
     :param type *types: The focus of this type constraint.
     :param str description: A description for this constraint if the list of types is too long.
     """
-    # TODO(cosmicexplorer): Could we turn `types` into a frozenset? I'm not sure
-    # there would ever be enough types to warrant this for performance
-    # reasons. self.types claims that it returns a tuple, but we're not checking
-    # that here, just that it's iterable, so some more validation or conversion
-    # needs to be done somewhere.
     if not types:
       raise ValueError('Must supply at least one type')
     if any(not isinstance(t, type) for t in types):
       raise TypeError('Supplied types must be types. {!r}'.format(types))
 
-    self._types = types
+    # NB: `types` is converted to tuple here because self.types's docstring says
+    # it returns a tuple. Does it matter what type this field is?
+    self._types = tuple(types)
     self._desc = kwargs.get('description', None)
 
   @property
@@ -286,9 +283,6 @@ class FieldType(Exactly):
     return cls(type_obj, str(transformed_type_name))
 
 
-# TODO (but maybe not): make a `newtype` method as well, which wraps an existing
-# type and gives it a new name, and generates an `@rule` to convert <new type>
-# -> <existing type> by accessing the (only) field (of type <existing type>).
 def typed_datatype(type_name, field_decls):
   """A wrapper over namedtuple which accepts a dict of field names and types.
 
@@ -337,18 +331,15 @@ def typed_datatype(type_name, field_decls):
 
   datatype_cls = datatype(type_name, [t.field_name for t in field_type_tuple])
 
-  # TODO(cosmicexplorer): override the __repr__()!
   class TypedDatatype(datatype_cls):
 
     def __new__(cls, *args, **kwargs):
       if kwargs:
         raise TypedDatatypeInstanceConstructionError(
           type_name,
-          "typed_datatype() subclasses can only be constructed with positional "
-          "arguments! The class {class_name} requires {field_types} "
-          "as arguments.\n"
-          "The args provided were: {args!r}.\n"
-          "The kwargs provided were: {kwargs!r}.\n"
+          """typed_datatype() subclasses can only be constructed with positional arguments! The class {class_name} requires {field_types} as arguments.
+The args provided were: {args!r}.
+The kwargs provided were: {kwargs!r}."""
           .format(class_name=cls.__name__,
                   field_types=type_names_joined,
                   args=args,
@@ -357,9 +348,8 @@ def typed_datatype(type_name, field_decls):
       if len(args) != len(field_type_tuple):
         raise TypedDatatypeInstanceConstructionError(
           type_name,
-          "{num_args} args were provided, "
-          "but expected {expected_num_args}: {field_types}. "
-          "The args provided were: {args!r}."
+          """{num_args} args were provided, but expected {expected_num_args}: {field_types}.
+The args provided were: {args!r}."""
           .format(num_args=len(args),
                   expected_num_args=len(field_type_tuple),
                   field_types=type_names_joined,
