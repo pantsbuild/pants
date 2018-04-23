@@ -147,24 +147,23 @@ impl CommandRunner {
 
                         let max_wait = 5000;
                         let backoff_period = min(max_wait, ((1 + iter_num) * 500));
-
-                        thread::sleep(Duration::from_millis(backoff_period));
                         let when = Instant::now() + Duration::from_millis(backoff_period);
-
-                        Delay::new(when)
-                            .and_then(|_| {
-                              println!("Hello world!");
-                              Ok(())
-                            })
-                            .map_err(|e| panic!("delay errored; err={:?}", e));
-
 
                         let grpc_result = map_grpc_result(
                           operations_client.get_operation(&operation_request)
                         );
-                        future::ok(
-                          future::Loop::Continue(
-                            (try_future!(grpc_result), iter_num + 1))).to_boxed() as BoxFuture<_, _>
+
+                        Delay::new(when)
+                            .then(move |res| {
+                              match res {
+                                Ok(_) => {
+                                  future::ok(
+                                    future::Loop::Continue(
+                                      (try_future!(grpc_result), iter_num + 1))).to_boxed() as BoxFuture<_, _>
+                                }
+                                Err(e) => future::err(e.to_string()).to_boxed()
+                              }
+                            }).to_boxed()
                       },
                     }
                   })
