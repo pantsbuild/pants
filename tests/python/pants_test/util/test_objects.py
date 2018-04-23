@@ -381,7 +381,6 @@ class TypedDatatypeTest(BaseTest):
       str("CamelCaseWrapper(non_negative_int<NonNegativeInt>=NonNegativeInt(primitive__int<int>=45))"))
 
   def test_instance_construction_errors(self):
-    # TODO: test with non-primitive types as well, lol
     with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
       SomeTypedDatatype(primitive__int=3)
     expected_msg = (

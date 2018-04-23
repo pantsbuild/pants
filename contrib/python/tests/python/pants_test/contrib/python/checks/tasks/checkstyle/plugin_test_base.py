@@ -41,8 +41,10 @@ class CheckstylePluginTestBase(unittest.TestCase):
     return self.plugin_type(options_object, python_file)
 
   def assertNit(self, file_content, expected_code, expected_severity=Nit.ERROR,
-                expected_line_number=None):
-    plugin = self.get_plugin(file_content)
+                expected_line_number=None, options=None):
+    if options is None:
+      options = {}
+    plugin = self.get_plugin(file_content, **options)
     nits = list(plugin.nits())
     self.assertEqual(1, len(nits), 'Expected single nit, got: {}'.format(nits))
     nit = nits[0]
@@ -52,7 +54,9 @@ class CheckstylePluginTestBase(unittest.TestCase):
       self.assertEqual(expected_line_number, nit.line_number)
     return nit
 
-  def assertNoNits(self, file_content):
-    plugin = self.get_plugin(file_content)
+  def assertNoNits(self, file_content, options=None):
+    if options is None:
+      options = {}
+    plugin = self.get_plugin(file_content, **options)
     nits = list(plugin.nits())
     self.assertEqual([], nits)

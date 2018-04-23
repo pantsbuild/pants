@@ -415,7 +415,7 @@ def typed_data(*fields):
     typed_base = typed_datatype(cls.__name__, tuple(fields))
     all_bases = (typed_base,) + cls.__bases__
 
-    return type(cls.__name__, all_bases, cls.__dict__)
+    return type(cls.__name__, all_bases, dict(cls.__dict__))
 
   return from_class
 

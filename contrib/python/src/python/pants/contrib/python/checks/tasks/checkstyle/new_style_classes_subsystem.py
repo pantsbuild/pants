@@ -11,6 +11,13 @@ from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import P
 class NewStyleClassesSubsystem(PluginSubsystemBase):
   options_scope = 'pycheck-newstyle-classes'
 
+  @classmethod
+  def register_options(cls, register):
+    super(NewStyleClassesSubsystem, cls).register_options(register)
+    register('--special-decorators', metavar='<decorators>', type=list,
+             default=[], advanced=True, fingerprint=True,
+             help="")
+
   def get_plugin_type(self):
     from pants.contrib.python.checks.tasks.checkstyle.new_style_classes import NewStyleClasses
     return NewStyleClasses
