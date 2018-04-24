@@ -268,8 +268,19 @@ impl BuildResultFS {
           name: OsString::from("directory"),
         },
       ]),
-      // Skip digest contents because enumerating them takes forever.
-      // Subdirectories will still work, they just won't show up in a readdir.
+      // readdir on /digest or /directory will return an empty set.
+      // readdir on /directory/abc123... will properly list the contents of that Directory.
+      //
+      // We skip directory listing for the roots because they will just be very long lists of
+      // digests. The only other behaviours we could reasonable use are:
+      //  1. Enumerate the entire contents of the local Store (which will be large), ignoring the
+      //     remote Store (so the directory listing will still be incomplete - stuff which can be
+      //     getattr'd/open'd will still not be present in the directory listing).
+      //  2. Store a cache of requests we've successfully served, and claim that the directory
+      //     contains exactly those files/directories.
+      // All three of these end up with the same problem that readdir doesn't show things which, if
+      // you were to getattr/open would actually exist. So we choose the cheapest, and most
+      // consistent one: readdir is always empty.
       DIGEST_ROOT | DIRECTORY_ROOT => Ok(vec![]),
       inode => {
         match self.inode_digest_cache.get(&inode) {
