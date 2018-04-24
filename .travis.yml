@@ -416,13 +416,13 @@ matrix:
       script:
         - ./build-support/bin/ci.sh -bcfjklmnprtx
     - os: osx
+      # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.1
       language: generic
       env:
         - SHARD="Rust tests OSX"
       before_install:
-        - brew tap caskroom/cask
-        - brew update && brew cask install osxfuse
+        - brew tap caskroom/cask && brew update && brew cask install osxfuse
       script:
         - ./build-support/bin/ci.sh -bcfjklmnprtx
 
