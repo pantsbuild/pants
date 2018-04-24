@@ -416,7 +416,7 @@ matrix:
       script:
         - ./build-support/bin/ci.sh -bcfjklmnprtx
     - os: osx
-      osx_image: xcode9.3
+      osx_image: xcode8.1
       language: generic
       env:
         - SHARD="Rust tests OSX"
