@@ -11,12 +11,11 @@ use hashing::{Digest, Fingerprint};
 use grpcio;
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
-use tokio_timer::Delay;
+use futures_timer::Delay;
 
 use super::{ExecuteProcessRequest, ExecuteProcessResult};
 use std::cmp::min;
 use std::time::Duration;
-use std::time::Instant;
 
 
 #[derive(Clone)]
@@ -146,12 +145,11 @@ impl CommandRunner {
 
                         let max_wait = 5000;
                         let backoff_period = min(max_wait, ((1 + iter_num) * 500));
-                        let when = Instant::now() + Duration::from_millis(backoff_period);
 
                         let grpc_result = map_grpc_result(
                           operations_client.get_operation(&operation_request)
                         );
-                        Delay::new(when)
+                        Delay::new(Duration::from_millis(backoff_period))
                             .then(move |res| {
                               match res {
                                 Ok(_) => {
