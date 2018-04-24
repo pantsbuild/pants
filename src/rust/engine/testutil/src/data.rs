@@ -50,6 +50,10 @@ impl TestData {
   pub fn string(&self) -> String {
     self.string.clone()
   }
+
+  pub fn len(&self) -> usize {
+    self.string.len()
+  }
 }
 
 pub struct TestDirectory {

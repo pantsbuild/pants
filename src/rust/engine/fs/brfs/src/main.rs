@@ -10,6 +10,8 @@ extern crate libc;
 #[macro_use]
 extern crate log;
 extern crate protobuf;
+extern crate tempdir;
+extern crate testutil;
 extern crate time;
 
 use futures::future::Future;
@@ -132,7 +134,6 @@ impl BuildResultFS {
     None
   }
 
-  // TODO: Unify with inode_for_directory
   pub fn inode_for_file(
     &mut self,
     digest: Digest,
@@ -187,6 +188,8 @@ impl BuildResultFS {
       Occupied(entry) => Ok(Some(*entry.get())),
       Vacant(entry) => match self.store.load_directory(digest).wait() {
         Ok(Some(_)) => {
+          // TODO: Kick off some background futures to pre-load the contents of this Directory into
+          // an in-memory cache. Keep a background CPU pool driving those Futures.
           let inode = self.next_inode;
           self.next_inode += 1;
           entry.insert(inode);
@@ -218,29 +221,13 @@ impl BuildResultFS {
   }
 
   pub fn dir_attr_for(&mut self, digest: Digest) -> Result<fuse::FileAttr, i32> {
-    match self.directory_inode_cache.entry(digest) {
-      Vacant(entry) => match self.store.load_directory(digest).wait() {
-        Ok(Some(_)) => {
-          let inode = self.next_inode;
-          self.next_inode += 1;
-          entry.insert(inode);
-          self.inode_digest_cache.insert(
-            inode,
-            InodeDetails {
-              digest: digest,
-              entry_type: EntryType::Directory,
-              is_executable: true,
-            },
-          );
-          Ok(dir_attr_for(inode))
-        }
-        Ok(None) => Err(libc::ENOENT),
-        Err(err) => {
-          error!("Error loading directory {:?}: {}", digest, err);
-          Err(libc::EINVAL)
-        }
-      },
-      Occupied(entry) => Ok(dir_attr_for(*entry.get())),
+    match self.inode_for_directory(digest) {
+      Ok(Some(inode)) => Ok(dir_attr_for(inode)),
+      Ok(None) => Err(libc::ENOENT),
+      Err(err) => {
+        error!("Error getting directory for digest {:?}: {}", digest, err);
+        Err(libc::EINVAL)
+      }
     }
   }
 
@@ -282,88 +269,84 @@ impl BuildResultFS {
       // you were to getattr/open would actually exist. So we choose the cheapest, and most
       // consistent one: readdir is always empty.
       DIGEST_ROOT | DIRECTORY_ROOT => Ok(vec![]),
-      inode => {
-        match self.inode_digest_cache.get(&inode) {
-          Some(&InodeDetails {
-            digest,
-            entry_type: EntryType::Directory,
-            ..
-          }) => {
-            let maybe_directory = self.store.load_directory(digest).wait();
+      inode => match self.inode_digest_cache.get(&inode) {
+        Some(&InodeDetails {
+          digest,
+          entry_type: EntryType::Directory,
+          ..
+        }) => {
+          let maybe_directory = self.store.load_directory(digest).wait();
 
-            match maybe_directory {
-              Ok(Some(directory)) => {
-                let mut entries = vec![
-                  ReaddirEntry {
-                    inode: inode,
-                    kind: fuse::FileType::Directory,
-                    name: OsString::from("."),
-                  },
-                  ReaddirEntry {
-                    inode: DIRECTORY_ROOT,
-                    kind: fuse::FileType::Directory,
-                    name: OsString::from(".."),
-                  },
-                ];
+          match maybe_directory {
+            Ok(Some(directory)) => {
+              let mut entries = vec![
+                ReaddirEntry {
+                  inode: inode,
+                  kind: fuse::FileType::Directory,
+                  name: OsString::from("."),
+                },
+                ReaddirEntry {
+                  inode: DIRECTORY_ROOT,
+                  kind: fuse::FileType::Directory,
+                  name: OsString::from(".."),
+                },
+              ];
 
-                // TODO: Unify codepath with for files
-                for child in directory.get_directories() {
-                  let child_digest = child.get_digest().into();
-                  let maybe_child_inode = self.inode_for_directory(child_digest);
-                  match maybe_child_inode {
-                    Ok(Some(child_inode)) => {
-                      entries.push(ReaddirEntry {
-                        inode: child_inode,
-                        kind: fuse::FileType::Directory,
-                        name: OsString::from(child.get_name()),
-                      });
-                    }
-                    Ok(None) => {
-                      return Err(libc::ENOENT);
-                    }
-                    Err(err) => {
-                      error!("Error reading child directory {:?}: {}", child_digest, err);
-                      return Err(libc::EINVAL);
-                    }
+              let directories = directory.get_directories().iter().map(|directory| {
+                (
+                  directory.get_digest(),
+                  directory.get_name(),
+                  fuse::FileType::Directory,
+                  true,
+                )
+              });
+              let files = directory.get_files().iter().map(|file| {
+                (
+                  file.get_digest(),
+                  file.get_name(),
+                  fuse::FileType::RegularFile,
+                  file.get_is_executable(),
+                )
+              });
+
+              for (digest, name, filetype, is_executable) in directories.chain(files) {
+                let child_digest = digest.into();
+                let maybe_child_inode = match filetype {
+                  fuse::FileType::Directory => self.inode_for_directory(child_digest),
+                  fuse::FileType::RegularFile => self.inode_for_file(child_digest, is_executable),
+                  _ => unreachable!(),
+                };
+                match maybe_child_inode {
+                  Ok(Some(child_inode)) => {
+                    entries.push(ReaddirEntry {
+                      inode: child_inode,
+                      kind: filetype,
+                      name: OsString::from(name),
+                    });
+                  }
+                  Ok(None) => {
+                    return Err(libc::ENOENT);
+                  }
+                  Err(err) => {
+                    error!("Error reading child directory {:?}: {}", child_digest, err);
+                    return Err(libc::EINVAL);
                   }
                 }
+              }
 
-                for file in directory.get_files() {
-                  let child_digest = file.get_digest().into();
-                  let maybe_child_inode =
-                    self.inode_for_file(child_digest, file.get_is_executable());
-                  match maybe_child_inode {
-                    Ok(Some(child_inode)) => {
-                      entries.push(ReaddirEntry {
-                        inode: child_inode,
-                        kind: fuse::FileType::RegularFile,
-                        name: OsString::from(file.get_name()),
-                      });
-                    }
-                    Ok(None) => {
-                      return Err(libc::ENOENT);
-                    }
-                    Err(err) => {
-                      error!("Error reading child file {:?}: {}", child_digest, err);
-                      return Err(libc::EINVAL);
-                    }
-                  }
-                }
-
-                Ok(entries)
-              }
-              Ok(None) => {
-                return Err(libc::ENOENT);
-              }
-              Err(err) => {
-                error!("Error loading directory {:?}: {}", digest, err);
-                return Err(libc::EINVAL);
-              }
+              Ok(entries)
+            }
+            Ok(None) => {
+              return Err(libc::ENOENT);
+            }
+            Err(err) => {
+              error!("Error loading directory {:?}: {}", digest, err);
+              return Err(libc::EINVAL);
             }
           }
-          _ => return Err(libc::ENOENT),
         }
-      }
+        _ => return Err(libc::ENOENT),
+      },
     }
   }
 }
@@ -492,7 +475,8 @@ impl fuse::Filesystem for BuildResultFS {
       }) => {
         let reply = Arc::new(Mutex::new(Some(reply)));
         let reply2 = reply.clone();
-        // TODO: Drive futures async from a pool and queue somewhere.
+        // TODO: Read from a cache of Futures driven from a CPU pool, so we can merge in-flight
+        // requests, rather than reading from the store directly here.
         let result: Result<(), ()> = self
           .store
           .load_file_bytes_with(digest, move |bytes| {
@@ -890,21 +874,68 @@ mod test {
     assert!(!file::is_executable(&virtual_dir.join("food")));
   }
 
-  fn digest_to_filepath(digest: &hashing::Digest) -> String {
+  pub fn digest_to_filepath(digest: &hashing::Digest) -> String {
     format!("{}-{}", digest.0, digest.1)
   }
+}
 
-  // TODO: Write a bunch of syscall-y tests. Example syscalls:
-  //    unsafe {
-  //        let fd = libc::open(CString::new("/Users/dwagnerhall/tmp/cats/pets/roland").unwrap().as_ptr(), 0);
-  //        println ! ("DWH: fd: {}", fd);
-  //        let mut buf: Vec < u8> = Vec::with_capacity(7);
-  //        buf.resize(7, 0);
-  //        println !("DWH: {}", libc::read(fd, buf.as_mut_ptr() as * mut libc::c_void, buf.capacity()));
-  //        libc::close(fd);
-  //        println ! ("DWH: {:?}", buf);
-  //        println ! ("DWH: ({})", String::from_utf8(buf).unwrap());
-  //    }
+// TODO: Write a bunch more syscall-y tests to test that each syscall for each file/directory type
+// acts as we expect.
+#[cfg(test)]
+mod syscall_tests {
 
-  // /usr/local/include/fuse/fuse_lowlevel.h
+  use fs;
+  use futures::Future;
+  use libc;
+  use std::sync::Arc;
+  use super::mount;
+  use super::test::digest_to_filepath;
+  use tempdir::TempDir;
+  use testutil::data::TestData;
+  use std::ffi::CString;
+  use std::path::Path;
+
+  #[test]
+  fn read_file_by_digest_exact_bytes() {
+    let store_dir = TempDir::new("store").unwrap();
+    let mount_dir = TempDir::new("mount").unwrap();
+
+    let store = fs::Store::local_only(
+      store_dir.path(),
+      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
+    ).expect("Error creating local store");
+
+    let test_bytes = TestData::roland();
+
+    store
+      .store_file_bytes(test_bytes.bytes(), false)
+      .wait()
+      .expect("Storing bytes");
+
+    let _fs = mount(mount_dir.path(), store).expect("Mounting");
+
+    unsafe {
+      let path = mount_dir
+        .path()
+        .join("digest")
+        .join(digest_to_filepath(&test_bytes.digest()));
+      let fd = libc::open(path_to_cstring(&path).as_ptr(), 0);
+      assert!(fd > 0, "Bad fd {}", fd);
+      let mut buf = make_buffer(test_bytes.len());
+      let read_bytes = libc::read(fd, buf.as_mut_ptr() as *mut libc::c_void, buf.capacity());
+      assert_eq!(test_bytes.len() as isize, read_bytes);
+      assert_eq!(0, libc::close(fd));
+      assert_eq!(test_bytes.string(), String::from_utf8(buf).unwrap());
+    }
+  }
+
+  fn path_to_cstring(path: &Path) -> CString {
+    CString::new(path.to_string_lossy().as_bytes().to_owned()).unwrap()
+  }
+
+  fn make_buffer(size: usize) -> Vec<u8> {
+    let mut buf: Vec<u8> = Vec::new();
+    buf.resize(size, 0);
+    buf
+  }
 }
