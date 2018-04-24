@@ -15,7 +15,6 @@ use tokio_timer::Delay;
 
 use super::{ExecuteProcessRequest, ExecuteProcessResult};
 use std::cmp::min;
-use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -102,14 +101,14 @@ impl CommandRunner {
             debug!("Executing remotely request: {:?} (command: {:?})", execute_request, command);
 
             map_grpc_result(execution_client.execute(&execute_request))
-                .map(|result| (Arc::new(execute_request), result, 0))
+                .map(|result| (Arc::new(execute_request), result))
           })
 
           // TODO: Add a timeout of some kind.
           // https://github.com/pantsbuild/pants/issues/5504
 
-          .and_then(move |(execute_request, operation, iter_num)| {
-            future::loop_fn((operation, iter_num), move |(operation, iter_num)| {
+          .and_then(move |(execute_request, operation)| {
+            future::loop_fn((operation, 0), move |(operation, iter_num)| {
 
               let execute_request = execute_request.clone();
               let execution_client2 = execution_client2.clone();
@@ -152,7 +151,6 @@ impl CommandRunner {
                         let grpc_result = map_grpc_result(
                           operations_client.get_operation(&operation_request)
                         );
-
                         Delay::new(when)
                             .then(move |res| {
                               match res {
