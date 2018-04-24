@@ -165,9 +165,10 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None):
   """
   deduped_reqs = OrderedSet(reqs)
   find_links = OrderedSet()
+  blacklist = PythonSetup.global_instance().resolver_blacklist
   for req in deduped_reqs:
     log.debug('  Dumping requirement: {}'.format(req))
-    if not req.key in PythonSetup.global_instance().resolver_blacklist:
+    if not (req.key in blacklist and interpreter.identity.matches(blacklist[req.key])):
       builder.add_requirement(req.requirement)
     if req.repository:
       find_links.add(req.repository)

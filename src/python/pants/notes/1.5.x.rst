@@ -3,6 +3,21 @@
 
 This document describes releases leading up to the ``1.5.x`` ``stable`` series.
 
+1.5.1rc2 (04/22/2018)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Do not fail for a particular Spec if some other Spec has already matched it.
+  `PR #5683 <https://github.com/pantsbuild/pants/pull/5683>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Upgrade virtualenv. (#5679)
+  `PR #5679 <https://github.com/pantsbuild/pants/pull/5679>`_
+
 1.5.1rc1 (03/31/2018)
 ---------------------
 

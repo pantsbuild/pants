@@ -12,6 +12,7 @@ from pants.base.exceptions import TaskError
 from pants.task.repl_task_mixin import ReplTaskMixin
 from pants.util.contextutil import pushd, temporary_dir
 
+from pants.contrib.node.subsystems.package_managers import PACKAGE_MANAGER_NPM
 from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
 
@@ -63,12 +64,12 @@ class NodeRepl(ReplTaskMixin, NodeTask):
         args=args, node_paths=node_paths.all_node_paths if node_paths else None)
 
       with pushd(temp_dir):
-        # TODO: Expose npm command options via node subsystems.
-        result, npm_install = self.execute_npm(['install', '--no-optional'],
-                                               workunit_name=self.SYNTHETIC_NODE_TARGET_NAME)
+        result, command = self.install_module(
+          package_manager=self.node_distribution.get_package_manager(package_manager=PACKAGE_MANAGER_NPM),
+          workunit_name=self.SYNTHETIC_NODE_TARGET_NAME)
         if result != 0:
           raise TaskError('npm install of synthetic REPL module failed:\n'
-                          '\t{} failed with exit code {}'.format(npm_install, result))
+                          '\t{} failed with exit code {}'.format(command, result))
 
         repl_session = node_repl.run()
         repl_session.wait()

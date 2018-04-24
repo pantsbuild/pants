@@ -4,6 +4,43 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.7.0.dev1 (04/20/2018)
+-----------------------
+
+New features
+~~~~~~~~~~~~
+
+* Plumb requirement blacklist through to the pex resolver (#5697)
+  `PR #5697 <https://github.com/pantsbuild/pants/pull/5697>`_
+
+* Add interpreter identity check for non-blacklisted interpreters (#5724)
+  `PR #5724 <https://github.com/pantsbuild/pants/pull/5724>`_
+
+* Eagerly fetch stdout on remote execution response (#5712)
+  `PR #5712 <https://github.com/pantsbuild/pants/pull/5712>`_
+
+Bugfixes
+~~~~~~~~
+
+* java_agent gets added to manifest for java_binary targets (#5722)
+  `PR #5722 <https://github.com/pantsbuild/pants/pull/5722>`_
+
+* Ensure test goal implicitly targets current platform when using python_dist targets (#5720)
+  `PR #5720 <https://github.com/pantsbuild/pants/pull/5720>`_
+  `PR #5618 <https://github.com/pantsbuild/pants/pull/5618>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Update junit-runner to 1.0.24 and use junit-runner-annotations 0.0.21 in tests (#5721)
+  `PR #5721 <https://github.com/pantsbuild/pants/pull/5721>`_
+
+* convert usages of the ExecuteProcess helper into simple @rules to simplify snapshot consumption for process execution (#5703)
+  `PR #5703 <https://github.com/pantsbuild/pants/pull/5703>`_
+
+* Fix some errorprone warnings and remove duplicates from findbugs targets (#5711)
+  `PR #5711 <https://github.com/pantsbuild/pants/pull/5711>`_
+
 1.7.0.dev0 (04/13/2018)
 -----------------------
 
