@@ -50,6 +50,7 @@ class AntJunitXmlReportListener extends RunListener {
    */
   @XmlRootElement
   @XmlAccessorType(XmlAccessType.FIELD)
+  @SuppressWarnings("JavaLangClash")
   static class Exception {
     @XmlAttribute private final String message;
     @XmlAttribute private final String type;

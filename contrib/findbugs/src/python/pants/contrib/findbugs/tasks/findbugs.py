@@ -14,6 +14,7 @@ from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
@@ -62,9 +63,9 @@ class FindBugs(NailgunTask):
     cls.register_jvm_tool(register,
                           'findbugs',
                           classpath=[
-                            JarDependency(org='com.google.code.findbugs',
-                                          name='findbugs',
-                                          rev='3.0.1'),
+                            JarDependency(org='com.github.spotbugs',
+                                          name='spotbugs',
+                                          rev='3.1.3')
                           ],
                           main=cls._FINDBUGS_MAIN,
                           custom_rules=[
@@ -154,8 +155,12 @@ class FindBugs(NailgunTask):
     safe_mkdir(output_dir)
     output_file = os.path.join(output_dir, 'findbugsXml.xml')
 
+    aux_classpath_file = os.path.join(self.workdir, '{}.classpath'.format(os.path.basename(output_dir)))
+    with open(aux_classpath_file, 'w') as f:
+      f.write('\n'.join(aux_classpath - target_jars))
+
     args = [
-      '-auxclasspath', ':'.join(aux_classpath - target_jars),
+      '-auxclasspathFromFile', aux_classpath_file,
       '-projectName', target.address.spec,
       '-xml:withMessages',
       '-effort:{}'.format(self.get_options().effort),
@@ -181,6 +186,17 @@ class FindBugs(NailgunTask):
       args.extend(['-progress'])
 
     args.extend(target_jars)
+
+    # Try to run spotbugs with the same java version as the target
+    # The minimum JDK for spotbugs is JDK 1.8
+    min_jdk_version = max(target.platform.target_level, Revision.lenient('1.8'))
+    if min_jdk_version.components[0] == 1:
+      max_jdk_version = Revision(min_jdk_version.components[0], min_jdk_version.components[1], '9999')
+    else:
+      max_jdk_version = Revision(min_jdk_version.components[0], '9999')
+
+    self.set_distribution(minimum_version=min_jdk_version, maximum_version=max_jdk_version, jdk=True)
+
     result = self.runjava(classpath=self.tool_classpath('findbugs'),
                           main=self._FINDBUGS_MAIN,
                           jvm_options=self.get_options().jvm_options,

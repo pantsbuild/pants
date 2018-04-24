@@ -381,6 +381,8 @@ public class JarBuilder implements Closeable {
   /**
    * Input stream that always ensures that a non-empty stream ends with a newline.
    */
+  // TODO: implement read(byte[], int, int) for faster multibyte reads
+  @SuppressWarnings("InputStreamSlowMultibyteRead")
   private static class NewlineAppendingInputStream extends InputStream {
     private InputStream underlyingStream;
     private int lastByteRead = -1;
