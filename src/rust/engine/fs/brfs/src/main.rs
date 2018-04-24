@@ -657,7 +657,6 @@ mod test {
   extern crate tempdir;
   extern crate testutil;
 
-  use env_logger;
   use fs;
   use futures::future::Future;
   use hashing;

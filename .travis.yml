@@ -417,7 +417,7 @@ matrix:
         - ./build-support/bin/ci.sh -bcfjklmnprtx
     - os: osx
       # Fuse actually works on this image. It hangs on many others.
-      osx_image: xcode8.1
+      osx_image: xcode8.3
       language: generic
       env:
         - SHARD="Rust tests OSX"

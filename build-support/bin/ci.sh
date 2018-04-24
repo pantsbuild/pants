@@ -213,8 +213,16 @@ if [[ "${skip_rust_tests:-false}" == "false" ]]; then
   (
     source "${REPO_ROOT}/build-support/pants_venv"
     source "${REPO_ROOT}/build-support/bin/native/bootstrap.sh"
+
+    test_threads_flag=""
+    if [[ "$(uname)" == "Darwin" ]]; then
+      # The osx travis environment has a low file descriptors ulimit, so we avoid running too many
+      # tests in parallel.
+      test_threads_flag="--test-threads=2"
+    fi
+
     activate_pants_venv
-    RUST_BACKTRACE=1 PANTS_SRCPATH="${REPO_ROOT}/src/python" ensure_cffi_sources=1 run_cargo test "${MODE_FLAG}" --all --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml"
+    RUST_BACKTRACE=1 PANTS_SRCPATH="${REPO_ROOT}/src/python" ensure_cffi_sources=1 run_cargo test "${MODE_FLAG}" --all --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" -- "${test_threads_flag}"
   ) || die "Pants rust test failure"
   end_travis_section
 fi
