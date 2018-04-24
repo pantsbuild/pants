@@ -81,7 +81,6 @@ impl TestDirectory {
   // Directory structure:
   //
   // /cats/roland
-  // /treats
   pub fn nested() -> TestDirectory {
     let mut directory = bazel_protos::remote_execution::Directory::new();
     directory.mut_directories().push({
