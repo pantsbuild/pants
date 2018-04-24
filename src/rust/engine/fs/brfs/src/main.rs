@@ -52,11 +52,11 @@ pub fn digest_from_filepath(str: &str) -> Result<Digest, String> {
   let mut parts = str.split("-");
   let fingerprint_str = parts
     .next()
-    .ok_or_else(|| format!("Invalid digest: {}", str))?;
+    .ok_or_else(|| format!("Invalid digest: {} wasn't of form fingerprint-size", str))?;
   let fingerprint = Fingerprint::from_hex_string(fingerprint_str)?;
   let size_bytes = parts
     .next()
-    .ok_or_else(|| format!("Invalid digest: {}", str))?
+    .ok_or_else(|| format!("Invalid digest: {} wasn't of form fingerprint-size", str))?
     .parse::<usize>()
     .map_err(|err| format!("Invalid digest; size {} not a number: {}", str, err))?;
   Ok(Digest(fingerprint, size_bytes))
@@ -381,14 +381,14 @@ impl fuse::Filesystem for BuildResultFS {
               .ok_or(libc::ENOENT)
           }),
         Err(err) => {
-          warn!("Invalid digest: {:?}", err);
+          warn!("Invalid digest for file in digest root: {}", err);
           Err(libc::ENOENT)
         }
       },
       (DIRECTORY_ROOT, Some(digest_str)) => match digest_from_filepath(digest_str) {
         Ok(digest) => self.dir_attr_for(digest),
         Err(err) => {
-          warn!("Invalid digest: {:?}", err);
+          warn!("Invalid digest for directroy in directory root: {}", err);
           Err(libc::ENOENT)
         }
       },
