@@ -23,6 +23,7 @@ cc = "1.0"
 # We need to explicitly list these, because otherwise the standalone tools
 # (e.g. fs_util) won't be included when we build/test things.
 members = [
+  ".",
   "boxfuture",
   "fs",
   "fs/brfs",
@@ -44,6 +45,7 @@ members = [
 # In particular, it does not contain the fs/brfs package, which will not compile without a fuse installation.
 # On Ubuntu, that means installing libfuse-dev. On OSX, that means installing OSXFUSE.
 default-members = [
+  ".",
   "boxfuture",
   "fs",
   "fs/fs_util",
