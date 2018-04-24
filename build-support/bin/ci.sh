@@ -214,7 +214,7 @@ if [[ "${skip_rust_tests:-false}" == "false" ]]; then
     source "${REPO_ROOT}/build-support/pants_venv"
     source "${REPO_ROOT}/build-support/bin/native/bootstrap.sh"
     activate_pants_venv
-    RUST_BACKTRACE=1 PANTS_SRCPATH="${REPO_ROOT}/src/python" ensure_cffi_sources=1 run_cargo test "${MODE_FLAG}" --all --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml"
+    RUST_BACKTRACE=1 PANTS_SRCPATH="${REPO_ROOT}/src/python" ensure_cffi_sources=1 run_cargo test "${MODE_FLAG}" --manifest-path="${REPO_ROOT}/src/rust/engine/fs/brfs/Cargo.toml" -- --test-threads=1 --nocapture
   ) || die "Pants rust test failure"
   end_travis_section
 fi
