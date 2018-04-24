@@ -19,6 +19,10 @@ class ErrorProneTest(PantsRunIntegrationTest):
       'GLOBAL': {
         'pythonpath': ["%(buildroot)s/contrib/errorprone/src/python"],
         'backend_packages': ["pants.backend.codegen", "pants.backend.jvm", "pants.contrib.errorprone"]
+      },
+      'jvm-platform': {
+        'default_platform': 'java8',
+        'platforms': {'java8': {'source': '8', 'target': '8', 'args': [] }}
       }
     }
     if config:
@@ -32,6 +36,7 @@ class ErrorProneTest(PantsRunIntegrationTest):
     cmd = ['compile', 'contrib/errorprone/tests/java/org/pantsbuild/contrib/errorprone:none']
     pants_run = self.run_pants(cmd)
     self.assert_success(pants_run)
+    self.assertNotIn('Exception caught:', pants_run.stderr_data)
     self.assertNotIn('warning:', pants_run.stdout_data)
     self.assertNotIn('error:', pants_run.stdout_data)
 
@@ -39,6 +44,7 @@ class ErrorProneTest(PantsRunIntegrationTest):
     cmd = ['compile', 'contrib/errorprone/tests/java/org/pantsbuild/contrib/errorprone:empty']
     pants_run = self.run_pants(cmd)
     self.assert_success(pants_run)
+    self.assertNotIn('Exception caught:', pants_run.stderr_data)
     self.assertNotIn('warning:', pants_run.stdout_data)
     self.assertNotIn('error:', pants_run.stdout_data)
 
@@ -46,6 +52,7 @@ class ErrorProneTest(PantsRunIntegrationTest):
     cmd = ['compile', 'contrib/errorprone/tests/java/org/pantsbuild/contrib/errorprone:warning']
     pants_run = self.run_pants(cmd)
     self.assert_success(pants_run)
+    self.assertNotIn('Exception caught:', pants_run.stderr_data)
     self.assertIn('warning: [ReferenceEquality] Comparison using reference equality instead of value equality', pants_run.stdout_data)
     self.assertIn('(see http://errorprone.info/bugpattern/ReferenceEquality)', pants_run.stdout_data)
     self.assertNotIn('error:', pants_run.stdout_data)
@@ -73,16 +80,20 @@ class ErrorProneTest(PantsRunIntegrationTest):
 
       pants_run = self.run_pants(args)
       self.assert_success(pants_run)
+      self.assertNotIn('Exception caught:', pants_run.stderr_data)
       self.assertIn('[errorprone]', pants_run.stdout_data)
       self.assertIn('No cached artifacts', pants_run.stdout_data)
       self.assertIn('1 warning', pants_run.stdout_data)
+      self.assertIn('SUCCESS', pants_run.stdout_data)
 
       pants_run = self.run_pants(args)
       self.assert_success(pants_run)
+      self.assertNotIn('Exception caught:', pants_run.stderr_data)
       self.assertIn('[errorprone]', pants_run.stdout_data)
       self.assertIn('Using cached artifacts', pants_run.stdout_data)
       self.assertNotIn('No cached artifacts', pants_run.stdout_data)
       self.assertNotIn('1 warning', pants_run.stdout_data)
+      self.assertIn('SUCCESS', pants_run.stdout_data)
 
   def test_error_does_not_get_cached(self):
     with self.temporary_cachedir() as cache:
@@ -97,12 +108,17 @@ class ErrorProneTest(PantsRunIntegrationTest):
 
       pants_run = self.run_pants(args)
       self.assert_failure(pants_run)
+      self.assertNotIn('Exception caught:', pants_run.stderr_data)
       self.assertIn('[errorprone]', pants_run.stdout_data)
       self.assertIn('No cached artifacts', pants_run.stdout_data)
       self.assertIn('1 error', pants_run.stdout_data)
+      self.assertIn('FAILURE: ErrorProne checks failed', pants_run.stdout_data)
 
       pants_run = self.run_pants(args)
+
       self.assert_failure(pants_run)
+      self.assertNotIn('Exception caught:', pants_run.stderr_data)
       self.assertIn('[errorprone]', pants_run.stdout_data)
       self.assertIn('Using cached artifacts', pants_run.stdout_data)
       self.assertIn('1 error', pants_run.stdout_data)
+      self.assertIn('FAILURE: ErrorProne checks failed', pants_run.stdout_data)
