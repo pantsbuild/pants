@@ -914,19 +914,22 @@ mod syscall_tests {
 
     let _fs = mount(mount_dir.path(), store).expect("Mounting");
 
+    let path = mount_dir
+      .path()
+      .join("digest")
+      .join(digest_to_filepath(&test_bytes.digest()));
+
+    let mut buf = make_buffer(test_bytes.len());
+
     unsafe {
-      let path = mount_dir
-        .path()
-        .join("digest")
-        .join(digest_to_filepath(&test_bytes.digest()));
       let fd = libc::open(path_to_cstring(&path).as_ptr(), 0);
       assert!(fd > 0, "Bad fd {}", fd);
-      let mut buf = make_buffer(test_bytes.len());
       let read_bytes = libc::read(fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len());
       assert_eq!(test_bytes.len() as isize, read_bytes);
       assert_eq!(0, libc::close(fd));
-      assert_eq!(test_bytes.string(), String::from_utf8(buf).unwrap());
     }
+
+    assert_eq!(test_bytes.string(), String::from_utf8(buf).unwrap());
   }
 
   fn path_to_cstring(path: &Path) -> CString {
