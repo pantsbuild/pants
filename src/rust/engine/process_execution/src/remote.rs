@@ -135,7 +135,8 @@ impl CommandRunner {
                                 )
                               )
                             })
-                            .map(|operation| future::Loop::Continue((operation, 0))) // reset `iter_num` on `MissingDigests`
+                            // Reset `iter_num` on `MissingDigests`
+                            .map(|operation| future::Loop::Continue((operation, 0)))
                             .to_boxed()
                       },
                       ExecutionError::NotFinished(operation_name) => {
@@ -155,7 +156,8 @@ impl CommandRunner {
                                 Ok(_) => {
                                   future::ok(
                                     future::Loop::Continue(
-                                      (try_future!(grpc_result), iter_num + 1))).to_boxed() as BoxFuture<_, _>
+                                      (try_future!(grpc_result), iter_num + 1)))
+                                      .to_boxed() as BoxFuture<_, _>
                                 }
                                 Err(e) => future::err(e.to_string()).to_boxed()
                               }
