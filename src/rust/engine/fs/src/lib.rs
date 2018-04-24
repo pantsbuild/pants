@@ -32,6 +32,8 @@ extern crate ordermap;
 extern crate protobuf;
 extern crate sha2;
 extern crate tempdir;
+#[cfg(test)]
+extern crate testutil;
 
 use std::collections::HashSet;
 use std::os::unix::fs::PermissionsExt;

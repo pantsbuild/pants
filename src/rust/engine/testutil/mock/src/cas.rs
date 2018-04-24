@@ -8,6 +8,7 @@ use grpcio;
 use bytes::Bytes;
 use futures::{Future, IntoFuture, Stream};
 use hashing::{Digest, Fingerprint};
+use testutil::data::{TestData, TestDirectory};
 
 ///
 /// Implements the ContentAddressableStorage gRPC API, answering read requests with either known
@@ -21,6 +22,21 @@ pub struct StubCAS {
 }
 
 impl StubCAS {
+  pub fn with_content(
+    chunk_size_bytes: i64,
+    files: Vec<TestData>,
+    directories: Vec<TestDirectory>,
+  ) -> StubCAS {
+    let mut blobs = HashMap::new();
+    for file in files.into_iter() {
+      blobs.insert(file.fingerprint(), file.bytes());
+    }
+    for directory in directories.into_iter() {
+      blobs.insert(directory.fingerprint(), directory.bytes());
+    }
+    StubCAS::with_unverified_content(chunk_size_bytes, blobs)
+  }
+
   ///
   /// # Arguments
   /// * `chunk_size_bytes` - The maximum number of bytes of content to include per streamed message.
@@ -29,7 +45,10 @@ impl StubCAS {
   ///                        If a negative value is given, all requests will receive an error.
   /// * `blobs`            - Known Fingerprints and their content responses. These are not checked
   ///                        for correctness.
-  pub fn new(chunk_size_bytes: i64, blobs: HashMap<Fingerprint, Bytes>) -> StubCAS {
+  pub fn with_unverified_content(
+    chunk_size_bytes: i64,
+    blobs: HashMap<Fingerprint, Bytes>,
+  ) -> StubCAS {
     let env = Arc::new(grpcio::Environment::new(1));
     let read_request_count = Arc::new(Mutex::new(0));
     let write_message_sizes = Arc::new(Mutex::new(Vec::new()));
@@ -52,21 +71,28 @@ impl StubCAS {
       .unwrap();
     server_transport.start();
 
-    let cas = StubCAS {
+    StubCAS {
       server_transport,
       read_request_count,
       write_message_sizes,
       blobs,
-    };
-    cas
+    }
+  }
+
+  pub fn with_roland_and_directory(chunk_size_bytes: i64) -> StubCAS {
+    StubCAS::with_content(
+      chunk_size_bytes,
+      vec![TestData::roland()],
+      vec![TestDirectory::containing_roland()],
+    )
   }
 
   pub fn empty() -> StubCAS {
-    StubCAS::new(1024, HashMap::new())
+    StubCAS::with_unverified_content(1024, HashMap::new())
   }
 
   pub fn always_errors() -> StubCAS {
-    StubCAS::new(-1, HashMap::new())
+    StubCAS::with_unverified_content(-1, HashMap::new())
   }
 
   ///

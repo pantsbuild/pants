@@ -1,0 +1,35 @@
+use bytes;
+use std;
+use std::io::Read;
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
+
+pub fn list_dir(path: &Path) -> Vec<String> {
+  let mut v: Vec<_> = std::fs::read_dir(path)
+    .expect(&format!("Listing dir {:?}", path))
+    .map(|entry| {
+      entry
+        .expect("Error reading entry")
+        .file_name()
+        .to_string_lossy()
+        .to_string()
+    })
+    .collect();
+  v.sort();
+  v
+}
+
+pub fn contents(path: &Path) -> bytes::Bytes {
+  let mut contents = Vec::new();
+  std::fs::File::open(path)
+    .and_then(|mut f| f.read_to_end(&mut contents))
+    .expect("Error reading file");
+  bytes::Bytes::from(contents)
+}
+
+pub fn is_executable(path: &Path) -> bool {
+  std::fs::metadata(path)
+    .expect("Getting file metadata")
+    .permissions()
+    .mode() & 0o100 == 0o100
+}
