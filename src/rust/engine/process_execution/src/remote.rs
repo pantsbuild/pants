@@ -17,7 +17,6 @@ use super::{ExecuteProcessRequest, ExecuteProcessResult};
 use std::cmp::min;
 use std::time::Duration;
 
-
 #[derive(Clone)]
 pub struct CommandRunner {
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
