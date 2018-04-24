@@ -218,7 +218,7 @@ if [[ "${skip_rust_tests:-false}" == "false" ]]; then
     if [[ "$(uname)" == "Darwin" ]]; then
       # The osx travis environment has a low file descriptors ulimit, so we avoid running too many
       # tests in parallel.
-      test_threads_flag="--test-threads=2"
+      test_threads_flag="--test-threads=1"
     fi
 
     activate_pants_venv
