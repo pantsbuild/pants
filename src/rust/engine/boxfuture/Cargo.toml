@@ -4,4 +4,4 @@ name = "boxfuture"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
 [dependencies]
-futures = "0.1.21"
+futures = "0.1.16"

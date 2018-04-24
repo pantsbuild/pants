@@ -9,6 +9,6 @@ clap = "2"
 env_logger = "0.5.4"
 fs = { path = "../fs" }
 hashing = { path = "../hashing" }
-futures = "0.1.21"
+futures = "0.1.16"
 process_execution = { path = "../process_execution" }
 tempdir = "0.3.5"
