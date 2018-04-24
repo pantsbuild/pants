@@ -4,6 +4,7 @@ extern crate bytes;
 extern crate digest;
 extern crate fs;
 extern crate futures;
+extern crate futures_timer;
 extern crate grpcio;
 extern crate hashing;
 #[macro_use]
@@ -16,7 +17,6 @@ extern crate sha2;
 extern crate tempdir;
 #[cfg(test)]
 extern crate testutil;
-extern crate futures_timer;
 
 use bytes::Bytes;
 use std::collections::BTreeMap;
