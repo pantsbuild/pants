@@ -619,7 +619,7 @@ class Native(object):
     lib_path = os.path.join(safe_mkdtemp(), lib_name)
     with closing(pkg_resources.resource_stream(__name__, lib_name)) as input_fp:
       # NB: The header stripping code here must be coordinated with header insertion code in
-      #     build-support/bin/native/bootstrap.sh
+      #     build-support/bin/native/bootstrap_code.sh
       engine_version = input_fp.readline().strip()
       repo_version = input_fp.readline().strip()
       logger.debug('using {} built at {}'.format(engine_version, repo_version))

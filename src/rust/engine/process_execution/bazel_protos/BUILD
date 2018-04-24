@@ -4,7 +4,6 @@
 # Track files depended on to build the native engine to allow for downstream invalidations.
 files(
   sources=zglobs(
-    'generate-grpc.sh',
     '**/Cargo.*',
     '**/*.rs',
     exclude=[

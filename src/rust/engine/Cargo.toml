@@ -15,6 +15,7 @@ codegen-units = 1
 crate-type = ["cdylib"]
 
 [build-dependencies]
+build_utils = { path = "build_utils" }
 cc = "1.0"
 
 [workspace]
