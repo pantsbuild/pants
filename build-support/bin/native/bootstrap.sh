@@ -153,7 +153,7 @@ function _wait_noisily() {
 function _build_native_code() {
   # Builds the native code, and echos the path of the built binary.
 
-  ensure_cffi_sources=1 run_cargo build ${MODE_FLAG} --manifest-path ${NATIVE_ROOT}/Cargo.toml || die
+  ensure_cffi_sources=1 run_cargo build ${MODE_FLAG} --manifest-path ${NATIVE_ROOT}/Cargo.toml -p engine || die
   echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 }
 

@@ -399,14 +399,30 @@ matrix:
     # Rust tests
     - os: linux
       dist: trusty
+      sudo: required
       language: python
       python: "2.7.13"
       addons:
         apt:
           packages:
             - cmake
+      before_install:
+        - sudo apt-get install -y pkg-config fuse libfuse-dev
+        - sudo modprobe fuse
+        - sudo chmod 666 /dev/fuse
+        - sudo chown root:$USER /etc/fuse.conf
       env:
-        - SHARD="Rust tests"
+        - SHARD="Rust Tests Linux"
+      script:
+        - ./build-support/bin/ci.sh -bcfjklmnprtx
+    - os: osx
+      # Fuse actually works on this image. It hangs on many others.
+      osx_image: xcode8.3
+      language: generic
+      env:
+        - SHARD="Rust Tests OSX"
+      before_install:
+        - brew tap caskroom/cask && brew update && brew cask install osxfuse
       script:
         - ./build-support/bin/ci.sh -bcfjklmnprtx
 
