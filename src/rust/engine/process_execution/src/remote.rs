@@ -156,7 +156,7 @@ impl CommandRunner {
 
                         Delay::new(Duration::from_millis(backoff_period))
                           .map_err(move |e| format!(
-                            "Error from Future Delay when polling for execution result for operation {}: {}",
+                            "Future-Delay errored at operation result polling for {}: {}",
                               operation_name, e))
                             .and_then(move |_| {
                               future::ok(
