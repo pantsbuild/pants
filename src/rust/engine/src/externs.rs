@@ -54,16 +54,8 @@ pub fn satisfied_by_type(constraint: &TypeConstraint, cls: &TypeId) -> bool {
   with_externs(|e| (e.satisfied_by_type)(e.context, interns.get(&constraint.0), cls))
 }
 
-pub fn store_list(values: Vec<&Value>, merge: bool) -> Value {
-  with_externs(|e| {
-    let values_clone: Vec<*const Value> = values.into_iter().map(|v| v as *const Value).collect();
-    (e.store_list)(
-      e.context,
-      values_clone.as_ptr(),
-      values_clone.len() as u64,
-      merge,
-    )
-  })
+pub fn store_tuple(values: &[Value]) -> Value {
+  with_externs(|e| (e.store_tuple)(e.context, values.as_ptr(), values.len() as u64))
 }
 
 pub fn store_bytes(bytes: &[u8]) -> Value {
@@ -227,7 +219,7 @@ pub struct Externs {
   pub drop_handles: DropHandlesExtern,
   pub satisfied_by: SatisfiedByExtern,
   pub satisfied_by_type: SatisfiedByTypeExtern,
-  pub store_list: StoreListExtern,
+  pub store_tuple: StoreTupleExtern,
   pub store_bytes: StoreBytesExtern,
   pub store_i32: StoreI32Extern,
   pub project_ignoring_type: ProjectIgnoringTypeExtern,
@@ -245,10 +237,8 @@ unsafe impl Send for Externs {}
 
 pub type LogExtern = extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
 
-// TODO: Type alias used to avoid rustfmt breaking itself by rendering a 101 character line.
-pub type SatisfedBool = bool;
 pub type SatisfiedByExtern =
-  extern "C" fn(*const ExternContext, *const Value, *const Value) -> SatisfedBool;
+  extern "C" fn(*const ExternContext, *const Value, *const Value) -> bool;
 
 pub type SatisfiedByTypeExtern =
   extern "C" fn(*const ExternContext, *const Value, *const TypeId) -> bool;
@@ -261,8 +251,7 @@ pub type CloneValExtern = extern "C" fn(*const ExternContext, *const Value) -> V
 
 pub type DropHandlesExtern = extern "C" fn(*const ExternContext, *const Handle, u64);
 
-pub type StoreListExtern =
-  extern "C" fn(*const ExternContext, *const *const Value, u64, bool) -> Value;
+pub type StoreTupleExtern = extern "C" fn(*const ExternContext, *const Value, u64) -> Value;
 
 pub type StoreBytesExtern = extern "C" fn(*const ExternContext, *const u8, u64) -> Value;
 
