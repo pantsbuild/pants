@@ -10,8 +10,6 @@ extern crate libc;
 #[macro_use]
 extern crate log;
 extern crate protobuf;
-extern crate tempdir;
-extern crate testutil;
 extern crate time;
 
 use futures::future::Future;
@@ -883,6 +881,8 @@ mod test {
 // acts as we expect.
 #[cfg(test)]
 mod syscall_tests {
+  extern crate tempdir;
+  extern crate testutil;
 
   use fs;
   use futures::Future;
@@ -890,8 +890,8 @@ mod syscall_tests {
   use std::sync::Arc;
   use super::mount;
   use super::test::digest_to_filepath;
-  use tempdir::TempDir;
-  use testutil::data::TestData;
+  use self::tempdir::TempDir;
+  use self::testutil::data::TestData;
   use std::ffi::CString;
   use std::path::Path;
 
