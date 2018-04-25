@@ -183,12 +183,13 @@ impl Snapshot {
   fn merge_helper(
     store: Store,
     path_so_far: PathBuf,
-    mut dir_digests: Vec<Digest>,
+    dir_digests: Vec<Digest>,
   ) -> BoxFuture<Digest, String> {
     if dir_digests.is_empty() {
       // TODO: This will not have been stored... we'll need to explicitly store it.
       return future::ok(EMPTY_DIGEST).to_boxed();
     } else if dir_digests.len() == 1 {
+      let mut dir_digests = dir_digests;
       return future::ok(dir_digests.pop().unwrap()).to_boxed();
     }
 
@@ -407,10 +408,11 @@ mod tests {
   use tempdir::TempDir;
   use self::testutil::make_file;
 
-  use super::super::{File, FileContent, Path, PathGlobs, PathStat, PosixFS, ResettablePool,
+  use super::super::{Dir, File, FileContent, Path, PathGlobs, PathStat, PosixFS, ResettablePool,
                      Snapshot, Store, StoreFileByDigest, VFS};
 
   use std;
+  use std::collections::HashSet;
   use std::error::Error;
   use std::path::PathBuf;
   use std::sync::Arc;
@@ -512,6 +514,65 @@ mod tests {
   }
 
   #[test]
+  fn snapshot_merge_two_files() {
+    let (store, tempdir, _, digester) = setup();
+
+    let common_dir_name = "tower";
+    let common_dir = PathBuf::from(common_dir_name);
+
+    let dir = make_dir_stat(tempdir.path(), &common_dir);
+    let file1 = make_file_stat(
+      tempdir.path(),
+      &common_dir.join("roland"),
+      STR.as_bytes(),
+      false,
+    );
+    let file2 = make_file_stat(
+      tempdir.path(),
+      &common_dir.join("susannah"),
+      STR.as_bytes(),
+      true,
+    );
+
+    let merged = {
+      let snapshot1 =
+        Snapshot::from_path_stats(store.clone(), digester.clone(), vec![dir.clone(), file1])
+          .wait()
+          .unwrap();
+      let snapshot2 = Snapshot::from_path_stats(store.clone(), digester, vec![dir, file2])
+        .wait()
+        .unwrap();
+      Snapshot::merge(store.clone(), &[snapshot1, snapshot2])
+        .wait()
+        .unwrap()
+    };
+    let merged_root_directory = store.load_directory(merged.digest).wait().unwrap().unwrap();
+
+    assert_eq!(merged.path_stats.len(), 3);
+    assert_eq!(merged_root_directory.files.len(), 0);
+    assert_eq!(merged_root_directory.directories.len(), 1);
+
+    let merged_child_dirnode = merged_root_directory.directories[0].clone();
+    let merged_child_directory = store
+      .load_directory(merged_child_dirnode.get_digest().into())
+      .wait()
+      .unwrap()
+      .unwrap();
+
+    assert_eq!(merged_child_dirnode.name, common_dir_name);
+    assert_eq!(
+      merged_child_directory
+        .files
+        .iter()
+        .map(|filenode| filenode.name.clone())
+        .collect::<HashSet<_>>(),
+      vec!["roland".to_string(), "susannah".to_string()]
+        .into_iter()
+        .collect()
+    );
+  }
+
+  #[test]
   fn contents_for_one_file() {
     let (store, dir, posix_fs, digester) = setup();
 
@@ -579,6 +640,26 @@ mod tests {
 
   #[derive(Clone)]
   struct FileSaver(Store, Arc<PosixFS>);
+
+  fn make_dir_stat(root: &Path, relpath: &Path) -> PathStat {
+    std::fs::create_dir(root.join(relpath)).unwrap();
+    PathStat::dir(relpath.to_owned(), Dir(relpath.to_owned()))
+  }
+
+  fn make_file_stat(root: &Path, relpath: &Path, contents: &[u8], is_executable: bool) -> PathStat {
+    make_file(
+      &root.join(relpath),
+      contents,
+      if is_executable { 0o555 } else { 0o444 },
+    );
+    PathStat::file(
+      relpath.to_owned(),
+      File {
+        path: relpath.to_owned(),
+        is_executable,
+      },
+    )
+  }
 
   impl StoreFileByDigest<String> for FileSaver {
     fn store_by_digest(&self, file: &File) -> BoxFuture<Digest, String> {
