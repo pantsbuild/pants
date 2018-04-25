@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import importlib
-import logging
 import traceback
 
 from pkg_resources import Requirement
@@ -15,8 +14,6 @@ from twitter.common.collections import OrderedSet
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 
-
-logger = logging.getLogger(__name__)
 
 
 class PluginLoadingError(Exception): pass
@@ -150,7 +147,6 @@ def load_backend(build_configuration, backend_package):
 
   rules = invoke_entrypoint('rules')
   if rules:
-    logger.debug("rules: {!r}".format(rules))
     build_configuration.register_rules(rules)
 
   invoke_entrypoint('register_goals')
