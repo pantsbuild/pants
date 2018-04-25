@@ -412,7 +412,7 @@ matrix:
         - sudo chmod 666 /dev/fuse
         - sudo chown root:$USER /etc/fuse.conf
       env:
-        - SHARD="Rust tests"
+        - SHARD="Rust Tests Linux"
       script:
         - ./build-support/bin/ci.sh -bcfjklmnprtx
     - os: osx
@@ -420,7 +420,7 @@ matrix:
       osx_image: xcode8.3
       language: generic
       env:
-        - SHARD="Rust tests OSX"
+        - SHARD="Rust Tests OSX"
       before_install:
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
       script:
