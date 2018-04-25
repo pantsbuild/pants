@@ -37,7 +37,7 @@ class BuildLocalPythonDistributions(Task):
     # Note that we don't actually place the products in the product map. We stitch
     # them into the build graph instead.  This is just to force the round engine
     # to run this task when dists need to be built.
-    return [PythonRequirementLibrary]
+    return [PythonRequirementLibrary, 'local_wheels']
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -81,6 +81,7 @@ class BuildLocalPythonDistributions(Task):
             )
           self._create_dist(vt.target, vt.results_dir, interpreter)
 
+        local_wheel_products = self.context.products.get('local_wheels')
         for vt in invalidation_check.all_vts:
           dist = self._get_whl_from_dir(os.path.join(vt.results_dir, 'dist'))
           req_lib_addr = Address.parse('{}__req_lib'.format(vt.target.address.spec))
@@ -89,6 +90,7 @@ class BuildLocalPythonDistributions(Task):
           # for downstream consumption.
           for dependent in self.context.build_graph.dependents_of(vt.target.address):
             self.context.build_graph.inject_dependency(dependent, req_lib_addr)
+          local_wheel_products.add(vt.target, os.path.dirname(dist)).append(os.path.basename(dist))
 
   def _copy_sources(self, dist_tgt, dist_target_dir):
     # Copy sources and setup.py over to vt results directory for packaging.
