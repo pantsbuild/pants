@@ -11,8 +11,11 @@ use hashing::{Digest, Fingerprint};
 use grpcio;
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
+use futures_timer::Delay;
 
 use super::{ExecuteProcessRequest, ExecuteProcessResult};
+use std::cmp::min;
+use std::time::Duration;
 
 #[derive(Clone)]
 pub struct CommandRunner {
@@ -43,6 +46,9 @@ macro_rules! try_future {
 }
 
 impl CommandRunner {
+  const BACKOFF_INCR_WAIT_MILLIS: u64 = 500;
+  const BACKOFF_MAX_WAIT_MILLIS: u64 = 5000;
+
   pub fn new(address: &str, thread_count: usize, store: Store) -> CommandRunner {
     let env = Arc::new(grpcio::Environment::new(thread_count));
     let channel = grpcio::ChannelBuilder::new(env.clone()).connect(address);
@@ -99,14 +105,11 @@ impl CommandRunner {
                 .map(|result| (Arc::new(execute_request), result))
           })
 
-          // TODO: Use some better looping-frequency strategy than a tight-loop:
-          // https://github.com/pantsbuild/pants/issues/5503
-
           // TODO: Add a timeout of some kind.
           // https://github.com/pantsbuild/pants/issues/5504
 
           .and_then(move |(execute_request, operation)| {
-            future::loop_fn(operation, move |operation| {
+            future::loop_fn((operation, 0), move |(operation, iter_num)| {
 
               let execute_request = execute_request.clone();
               let execution_client2 = execution_client2.clone();
@@ -134,19 +137,31 @@ impl CommandRunner {
                                 )
                               )
                             })
-                            .map(|operation| future::Loop::Continue(operation))
+                            // Reset `iter_num` on `MissingDigests`
+                            .map(|operation| future::Loop::Continue((operation, 0)))
                             .to_boxed()
                       },
                       ExecutionError::NotFinished(operation_name) => {
                         let mut operation_request =
                           bazel_protos::operations::GetOperationRequest::new();
-                        operation_request.set_name(operation_name);
+                        operation_request.set_name(operation_name.clone());
+
+                        let backoff_period = min(
+                      CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
+                      ((1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS));
+
                         let grpc_result = map_grpc_result(
-                          operations_client.get_operation(&operation_request)
-                        );
-                        future::ok(
-                          future::Loop::Continue(
-                            try_future!(grpc_result))).to_boxed() as BoxFuture<_, _>
+                    operations_client.get_operation(&operation_request));
+
+                        Delay::new(Duration::from_millis(backoff_period))
+                          .map_err(move |e| format!(
+                            "Future-Delay errored at operation result polling for {}: {}",
+                              operation_name, e))
+                            .and_then(move |_| {
+                              future::ok(
+                             future::Loop::Continue(
+                                  (try_future!(grpc_result), iter_num + 1))).to_boxed()
+                            }).to_boxed() as BoxFuture<_, _>
                       },
                     }
                   })
@@ -409,6 +424,7 @@ mod tests {
   use std::iter::{self, FromIterator};
   use std::sync::Arc;
   use std::time::Duration;
+  use std::time::SystemTime;
 
   #[derive(Debug, PartialEq)]
   enum StdoutType {
@@ -943,6 +959,51 @@ mod tests {
       "a32cd427e5df6a998199266681692989f56c19cabd1cc637bdd56ae2e62619b4"
     );
     assert_eq!(digest.get_size_bytes(), 32)
+  }
+
+  #[test]
+  fn wait_between_request_1_retry() {
+    // wait at least 500 milli for one retry
+    {
+      let execute_request = echo_foo_request();
+      let mock_server = {
+        let op_name = "gimme-foo".to_string();
+        mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request).unwrap().1,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_successful_operation(&op_name, StdoutType::Raw("foo".to_owned()), "", 0),
+          ],
+        ))
+      };
+      let start_time = SystemTime::now();
+      let result = run_command_remote(&mock_server.address(), execute_request).unwrap();
+      assert!(start_time.elapsed().unwrap() >= Duration::from_millis(500));
+    }
+  }
+  #[test]
+  fn wait_between_request_3_retry() {
+    // wait at least 500 + 1000 + 1500 = 3000 milli for 3 retries.
+    {
+      let execute_request = echo_foo_request();
+      let mock_server = {
+        let op_name = "gimme-foo".to_string();
+        mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request).unwrap().1,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_incomplete_operation(&op_name),
+            make_incomplete_operation(&op_name),
+            make_successful_operation(&op_name, StdoutType::Raw("foo".to_owned()), "", 0),
+          ],
+        ))
+      };
+      let start_time = SystemTime::now();
+      let result = run_command_remote(&mock_server.address(), execute_request).unwrap();
+      assert!(start_time.elapsed().unwrap() >= Duration::from_millis(3000));
+    }
   }
 
   fn echo_foo_request() -> ExecuteProcessRequest {
