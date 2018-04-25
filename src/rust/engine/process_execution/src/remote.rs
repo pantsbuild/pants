@@ -522,34 +522,37 @@ mod tests {
   fn extract_response_with_digest_stdout() {
     let op_name = "gimme-foo".to_string();
     let testdata = TestData::roland();
+    let testdata_empty = TestData::empty();
     assert_eq!(
       extract_execute_response(make_successful_operation(
         &op_name,
         StdoutType::Digest(testdata.digest()),
-        "",
+        StderrType::Raw(testdata_empty.string()),
         0,
       )),
       Ok(ExecuteProcessResult {
-        stdout: as_bytes("foo"),
-        stderr: as_bytes(""),
+        stdout: testdata.bytes(),
+        stderr: testdata_empty.bytes(),
         exit_code: 0,
-    }),
+      })
     );
   }
 
   #[test]
   fn extract_response_with_digest_stderr() {
     let op_name = "gimme-foo".to_string();
+    let testdata = TestData::roland();
+    let testdata_empty = TestData::empty();
     assert_eq!(
       extract_execute_response(make_successful_operation(
         &op_name,
-        StdoutType::Raw("foo".to_owned()),
-        StderrType::Digest(digest()),
+        StdoutType::Raw(testdata_empty.string()),
+        StderrType::Digest(testdata.digest()),
         0,
       )),
       Ok(ExecuteProcessResult {
-        stdout: as_bytes("foo"),
-        stderr: str_bytes(),
+        stdout: testdata_empty.bytes(),
+        stderr: testdata.bytes(),
         exit_code: 0,
       })
     );
@@ -761,7 +764,12 @@ mod tests {
           make_precondition_failure_operation(vec![
             missing_preconditionfailure_violation(&roland.digest()),
           ]),
-          make_successful_operation("cat2", StdoutType::Raw(roland.string()), StderrType::Raw("".to_owned()), 0),
+          make_successful_operation(
+            "cat2",
+            StdoutType::Raw(roland.string()),
+            StderrType::Raw("".to_owned()),
+            0,
+          ),
         ],
       ))
     };
