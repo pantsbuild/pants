@@ -131,15 +131,22 @@ class BuildConfiguration(object):
     return self._subsystems
 
   def register_rules(self, rules):
-    """???"""
+    """Registers the given rules.
+
+    :param rules: The rules to register.
+    :type rules: :class:`collections.Iterable` containing
+                 :class:`pants.engine.rules.Rule` instances.
+    """
 
     if not isinstance(rules, Iterable):
       raise TypeError('The rules must be an iterable, given {}'.format(rules))
-    # TODO: ensure that they are all rules
     self._rules.extend(rules)
 
   def rules(self):
-    """???"""
+    """Returns the registered rules.
+
+    :rtype list
+    """
     return self._rules
 
   @memoized_method
