@@ -148,19 +148,19 @@ impl CommandRunner {
                         operation_request.set_name(operation_name.clone());
 
                         let backoff_period = min(
-                          CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
-                          ((1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS));
+                      CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
+                      ((1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS));
 
                         let grpc_result = map_grpc_result(
-                          operations_client.get_operation(&operation_request));
+                    operations_client.get_operation(&operation_request));
 
                         Delay::new(Duration::from_millis(backoff_period))
-                            .map_err(move |e|
-                                format!("Error from Future Delay when polling for execution result for operation {}: {}",
-                                        operation_name, e))
+                          .map_err(move |e| format!(
+                            "Error from Future Delay when polling for execution result for operation {}: {}",
+                              operation_name, e))
                             .and_then(move |_| {
                               future::ok(
-                                future::Loop::Continue(
+                             future::Loop::Continue(
                                   (try_future!(grpc_result), iter_num + 1))).to_boxed()
                             }).to_boxed() as BoxFuture<_, _>
                       },
