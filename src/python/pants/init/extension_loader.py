@@ -15,7 +15,6 @@ from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 
 
-
 class PluginLoadingError(Exception): pass
 
 
