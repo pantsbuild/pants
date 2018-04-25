@@ -92,7 +92,7 @@ class SetupPyInvocationEnvironment(datatype('SetupPyInvocationEnvironment', [
 
 @rule(SetupPyInvocationEnvironment, [Select(Platform), Select(NativeToolchain)])
 def get_setup_py_env(platform, native_toolchain):
-  is_linux = platform.normed_os_name == 'linux'
+  is_linux = platform.normalized_os_name == 'linux'
   joined_path = get_joined_path(
     native_toolchain.path_entries(), os.environ.copy(), prepend=is_linux)
   return SetupPyInvocationEnvironment(joined_path)

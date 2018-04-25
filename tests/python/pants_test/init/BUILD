@@ -10,6 +10,8 @@ python_tests(
     '3rdparty/python:setuptools',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:selectors',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
     'src/python/pants/init',
@@ -17,6 +19,7 @@ python_tests(
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:objects',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/subsystem:subsystem_utils'
   ],
