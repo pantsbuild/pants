@@ -205,18 +205,6 @@ class Script(BinaryToolBase):
     return (script_relpath, snapshot)
 
 
-class ExecutablePathProvider(object):
-  """Mixin for subsystems which provide directories containing executables.
-
-  This is useful to abstract over different sources of executables
-  (e.g. BinaryTool archives or files from the host filesystem), or for
-  aggregating multiple such subsystems.
-  """
-
-  def path_entries(self):
-    return []
-
-
 class XZ(NativeTool):
   options_scope = 'xz'
   default_version = '5.2.4-3'

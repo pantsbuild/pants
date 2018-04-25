@@ -5,20 +5,18 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.native.subsystems.native_toolchain import NativeToolchain
-from pants.engine.rules import RootRule, SingletonRule
-from pants.util.objects import datatype
-from pants.util.osutil import get_normalized_os_name
-
-
-class Platform(datatype(['normalized_os_name'])):
-
-  def __new__(cls):
-    return super(Platform, cls).__new__(cls, get_normalized_os_name())
+from pants.backend.native.config.environment import create_native_environment_rules
+from pants.backend.native.subsystems.native_toolchain import create_native_toolchain_rules
+from pants.backend.native.subsystems.binaries.binutils import create_binutils_rules
+from pants.backend.native.subsystems.binaries.gcc import create_gcc_rules
+from pants.backend.native.subsystems.binaries.llvm import create_llvm_rules
 
 
 def rules():
-  return [
-    RootRule(NativeToolchain),
-    SingletonRule(Platform, Platform()),
-  ]
+  return (
+    create_native_environment_rules() +
+    create_native_toolchain_rules() +
+    create_binutils_rules() +
+    create_gcc_rules() +
+    create_llvm_rules()
+  )
