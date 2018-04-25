@@ -46,7 +46,6 @@ macro_rules! try_future {
 }
 
 impl CommandRunner {
-
   const BACKOFF_INCR_WAIT_MILLIS: u64 = 500;
   const BACKOFF_MAX_WAIT_MILLIS: u64 = 5000;
 
