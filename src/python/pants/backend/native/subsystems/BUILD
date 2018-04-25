@@ -3,6 +3,13 @@
 
 python_library(
   dependencies=[
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/backend/native/subsystems/platform_specific/darwin',
+    'src/python/pants/backend/native/subsystems/platform_specific/linux',
+    'src/python/pants/binaries',
+    'src/python/pants/subsystem',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:memo',
+    'src/python/pants/util:osutil',
+    'src/python/pants/util:process_handler',
   ],
 )

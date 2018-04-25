@@ -17,6 +17,7 @@ extern crate tempdir;
 #[cfg(test)]
 extern crate testutil;
 
+use bytes::Bytes;
 use std::collections::BTreeMap;
 
 pub mod local;
@@ -52,7 +53,7 @@ pub struct ExecuteProcessRequest {
 ///
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExecuteProcessResult {
-  pub stdout: Vec<u8>,
+  pub stdout: Bytes,
   pub stderr: Vec<u8>,
   pub exit_code: i32,
 }

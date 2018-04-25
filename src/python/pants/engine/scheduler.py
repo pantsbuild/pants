@@ -9,19 +9,18 @@ import logging
 import os
 import time
 from collections import defaultdict
+from types import GeneratorType
 
 from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot
-from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult, _Snapshots,
-                                           create_snapshot_rules)
+from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
-from pants.engine.selectors import (Select, SelectDependencies, SelectProjection, SelectVariant,
-                                    constraint_for)
+from pants.engine.selectors import Select, SelectDependencies, SelectVariant, constraint_for
 from pants.engine.struct import HasProducts, Variants
 from pants.util.contextutil import temporary_file_path
 from pants.util.objects import datatype
@@ -91,7 +90,6 @@ class WrappedNativeScheduler(object):
       work_dir,
       ignore_patterns,
       Snapshot,
-      _Snapshots,
       FileContent,
       FilesContent,
       Path,
@@ -104,13 +102,13 @@ class WrappedNativeScheduler(object):
       constraint_for(Variants),
       constraint_for(PathGlobs),
       constraint_for(Snapshot),
-      constraint_for(_Snapshots),
       constraint_for(FilesContent),
       constraint_for(Dir),
       constraint_for(File),
       constraint_for(Link),
       constraint_for(ExecuteProcessRequest),
       constraint_for(ExecuteProcessResult),
+      constraint_for(GeneratorType),
     )
 
   def _root_type_ids(self):
@@ -189,10 +187,9 @@ class WrappedNativeScheduler(object):
 
   def _register_task(self, output_constraint, rule):
     """Register the given TaskRule with the native scheduler."""
-    input_selects = rule.input_selectors
     func = rule.func
     self._native.lib.tasks_task_begin(self._tasks, Function(self._to_key(func)), output_constraint)
-    for selector in input_selects:
+    for selector in rule.input_selectors:
       selector_type = type(selector)
       product_constraint = self._to_constraint(selector.product)
       if selector_type is Select:
@@ -208,14 +205,12 @@ class WrappedNativeScheduler(object):
                                                        self._to_constraint(selector.dep_product),
                                                        self._to_utf8_buf(selector.field),
                                                        self._to_ids_buf(selector.field_types))
-      elif selector_type is SelectProjection:
-        self._native.lib.tasks_add_select_projection(self._tasks,
-                                                     self._to_constraint(selector.product),
-                                                     TypeId(self._to_id(selector.projected_subject)),
-                                                     self._to_utf8_buf(selector.field),
-                                                     self._to_constraint(selector.input_product))
       else:
         raise ValueError('Unrecognized Selector type: {}'.format(selector))
+    for get in rule.input_gets:
+      self._native.lib.tasks_add_get(self._tasks,
+                                     self._to_constraint(get.product),
+                                     TypeId(self._to_id(get.subject)))
     self._native.lib.tasks_task_end(self._tasks)
 
   def visualize_graph_to_file(self, execution_request, filename):
@@ -328,7 +323,7 @@ class LocalScheduler(object):
     self._execution_request = None
 
     # Validate and register all provided and intrinsic tasks.
-    rules = list(rules) + create_snapshot_rules()
+    rules = list(rules)
     rule_index = RuleIndex.create(rules)
     self._scheduler = WrappedNativeScheduler(native,
                                              project_tree.build_root,

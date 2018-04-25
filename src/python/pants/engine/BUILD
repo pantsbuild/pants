@@ -90,14 +90,10 @@ python_library(
   name='isolated_process',
   sources=['isolated_process.py'],
   dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':addressable',
     ':fs',
-    ':nodes',
-    ':struct',
-    'src/python/pants/build_graph',
+    ':rules',
+    ':selectors',
     'src/python/pants/util:objects',
-    'src/python/pants/util:process_handler',
   ]
 )
 
@@ -182,9 +178,10 @@ python_library(
   sources=['native.py'],
   dependencies=[
     ':native_engine_shared_library',
+    ':selectors',
     '3rdparty/python:cffi',
     '3rdparty/python:setuptools',
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/binaries',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:objects'

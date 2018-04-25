@@ -64,14 +64,6 @@ class SpecSourceMapper(SourceMapper):
         yield address
       elif self._address_mapper.is_declaring_file(address, source):
         yield address
-      elif target.has_resources:
-        for resource in target.resources:
-          """
-          :type resource: pants.build_graph.resources.Resources
-          """
-          if resource.payload.sources.matches(source):
-            yield address
-            break
 
 
 class LazySourceMapper(SourceMapper):
@@ -151,10 +143,6 @@ class LazySourceMapper(SourceMapper):
     for address in self._address_mapper.addresses_in_spec_path(spec_path):
       self._build_graph.inject_address_closure(address)
       target = self._build_graph.get_target(address)
-      if target.has_resources:
-        for resource in target.resources:
-          for item in resource.sources_relative_to_buildroot():
-            self._source_to_address[item].add(address)
 
       for target_source in target.sources_relative_to_buildroot():
         self._source_to_address[target_source].add(address)

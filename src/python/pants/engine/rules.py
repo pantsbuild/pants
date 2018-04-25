@@ -5,19 +5,33 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import ast
+import inspect
 import logging
 from abc import abstractproperty
 from collections import OrderedDict
+from types import TypeType
 
 from twitter.common.collections import OrderedSet
 
 from pants.engine.addressable import Exactly
-from pants.engine.selectors import type_or_constraint_repr
+from pants.engine.selectors import Get, type_or_constraint_repr
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
+
+
+class _RuleVisitor(ast.NodeVisitor):
+  def __init__(self):
+    super(_RuleVisitor, self).__init__()
+    self.gets = []
+
+  def visit_Call(self, node):
+    if not isinstance(node.func, ast.Name) or node.func.id != Get.__name__:
+      return
+    self.gets.append(Get.extract_constraints(node))
 
 
 def rule(output_type, input_selectors):
@@ -28,8 +42,29 @@ def rule(output_type, input_selectors):
   :param list input_selectors: A list of Selector instances that matches the number of arguments
     to the @decorated function.
   """
+
   def wrapper(func):
-    func._rule = TaskRule(output_type, input_selectors, func)
+    if not inspect.isfunction(func):
+      raise ValueError('The @rule decorator must be applied innermost of all decorators.')
+
+    caller_frame = inspect.stack()[1][0]
+    module_ast = ast.parse(inspect.getsource(func))
+
+    def resolve_type(name):
+      resolved = caller_frame.f_globals.get(name) or caller_frame.f_builtins.get(name)
+      if not isinstance(resolved, (TypeType, Exactly)):
+        raise ValueError('Expected either a `type` constructor or TypeConstraint instance; '
+                         'got: {}'.format(name))
+      return resolved
+
+    gets = OrderedSet()
+    for node in ast.iter_child_nodes(module_ast):
+      if isinstance(node, ast.FunctionDef) and node.name == func.__name__:
+        rule_visitor = _RuleVisitor()
+        rule_visitor.visit(node)
+        gets.update(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
+
+    func._rule = TaskRule(output_type, input_selectors, func, input_gets=list(gets))
     return func
   return wrapper
 
@@ -50,10 +85,13 @@ class Rule(AbstractClass):
     """Collection of input selectors."""
 
 
-class TaskRule(datatype('TaskRule', ['output_constraint', 'input_selectors', 'func']), Rule):
-  """A Rule that runs a task function when all of its input selectors are satisfied."""
+class TaskRule(datatype('TaskRule', ['output_constraint', 'input_selectors', 'input_gets', 'func']), Rule):
+  """A Rule that runs a task function when all of its input selectors are satisfied.
+  
+  TODO: Make input_gets non-optional when more/all rules are using them.
+  """
 
-  def __new__(cls, output_type, input_selectors, func):
+  def __new__(cls, output_type, input_selectors, func, input_gets=None):
     # Validate result type.
     if isinstance(output_type, Exactly):
       constraint = output_type
@@ -68,8 +106,14 @@ class TaskRule(datatype('TaskRule', ['output_constraint', 'input_selectors', 'fu
       raise TypeError("Expected a list of Selectors for rule `{}`, got: {}".format(
         func.__name__, type(input_selectors)))
 
+    # Validate gets.
+    input_gets = [] if input_gets is None else input_gets
+    if not isinstance(input_gets, list):
+      raise TypeError("Expected a list of Gets for rule `{}`, got: {}".format(
+        func.__name__, type(input_gets)))
+
     # Create.
-    return super(TaskRule, cls).__new__(cls, constraint, tuple(input_selectors), func)
+    return super(TaskRule, cls).__new__(cls, constraint, tuple(input_selectors), tuple(input_gets), func)
 
   def __str__(self):
     return '({}, {!r}, {})'.format(type_or_constraint_repr(self.output_constraint),
@@ -134,7 +178,7 @@ class RuleIndex(datatype('RuleIndex', ['rules', 'roots'])):
       # TODO: The heterogenity here has some confusing implications here:
       # see https://github.com/pantsbuild/pants/issues/4005
       for kind in rule.output_constraint.types:
-        # NB Ensure that interior types from SelectDependencies / SelectProjections work by
+        # NB Ensure that interior types from SelectDependencies work by
         # indexing on the list of types in the constraint.
         add_task(kind, rule)
       add_task(rule.output_constraint, rule)

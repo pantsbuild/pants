@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 import re
 from collections import namedtuple
@@ -18,6 +19,9 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem, SubsystemError
 from pants.util.contextutil import temporary_file
 from pants.util.memo import memoized_method
+
+
+logger = logging.getLogger(__name__)
 
 
 class UnaryRule(namedtuple('UnaryRule', ['name', 'pattern'])):
@@ -308,7 +312,7 @@ class Shader(object):
   def _potential_package_path(path):
     # TODO(John Sirois): Implement a full valid java package name check, `-` just happens to get
     # the common non-package cases like META-INF/...
-    return path.endswith('.class') or path.endswith('.java') and '-' not in path
+    return (path.endswith('.class') or path.endswith('.java')) and '-' not in path
 
   @classmethod
   def _iter_dir_packages(cls, path):
@@ -435,6 +439,7 @@ class Shader(object):
     :rtype: :class:`pants.java.executor.Executor.Runner`
     """
     with self.temporary_rules_file(rules) as rules_file:
+      logger.debug('Running jarjar with rules:\n{}'.format(' '.join(rule.render() for rule in rules)))
       yield self._executor.runner(classpath=self._jarjar_classpath,
                                   main='org.pantsbuild.jarjar.Main',
                                   jvm_options=jvm_options,

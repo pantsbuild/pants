@@ -9,10 +9,9 @@ import os
 
 import six
 
-from pants.base.specs import AscendantAddresses, SingleAddress
+from pants.base.specs import AscendantAddresses, SingleAddress, Specs
 from pants.build_graph.address import parse_spec
 from pants.build_graph.source_mapper import SourceMapper
-from pants.engine.build_files import Specs
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import HydratedTargets
 from pants.source.filespec import any_matches_filespec

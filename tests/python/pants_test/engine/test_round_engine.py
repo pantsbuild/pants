@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import itertools
 
 from pants.engine.round_engine import RoundEngine
+from pants.goal.goal import Goal
 from pants.task.task import Task
 from pants_test.base_test import BaseTest
 from pants_test.engine.base_engine_test import EngineTestBase
@@ -25,9 +26,11 @@ class RoundEngineTest(EngineTestBase, BaseTest):
 
     self.engine = RoundEngine()
     self.actions = []
+    self._context = None
 
   def tearDown(self):
-    self.assertTrue(not self._context or self._context.is_unlocked())
+    if self._context is not None:
+      self.assertTrue(not self._context or self._context.is_unlocked())
     super(RoundEngineTest, self).tearDown()
 
   def alternate_target_roots_action(self, tag):
@@ -214,6 +217,19 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     self.engine.attempt(self._context,
                         self.as_goals('goal1', 'goal2', 'goal1', 'goal3', 'goal2'))
     self.assert_actions('task1', 'task2', 'task3')
+
+  def test_task_subclass_singletons(self):
+    # Install the same task class twice (before/after Goal.clear()) and confirm that the
+    # resulting task is equal.
+    class MyTask(Task):
+      pass
+    def install():
+      reg = super(RoundEngineTest, self).install_task(name='task1', action=MyTask, goal='goal1')
+      return reg.task_types()
+    task1_pre, = install()
+    Goal.clear()
+    task1_post, = install()
+    self.assertEquals(task1_pre, task1_post)
 
   def test_replace_target_roots(self):
     task1 = self.install_task('task1', goal='goal1')

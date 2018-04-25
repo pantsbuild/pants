@@ -30,6 +30,26 @@ jar_library(name='jansi',
               jar('org.fusesource.jansi', 'jansi', '1.11'),
             ])
 
+jar_library(name='javax-activation',
+            jars=[
+              jar('com.sun.activation', 'javax.activation', '1.2.0'),
+            ])
+
+jar_library(name='jaxb-api',
+            jars=[
+              jar('javax.xml.bind', 'jaxb-api', '2.3.0'),
+            ])
+
+jar_library(name='jaxb-core',
+            jars=[
+              jar('com.sun.xml.bind', 'jaxb-core', '2.3.0'),
+            ])
+
+jar_library(name='jaxb-impl',
+            jars=[
+              jar('com.sun.xml.bind', 'jaxb-impl', '2.3.0'),
+            ])
+
 jar_library(name='jsr305',
             jars=[
               jar('com.google.code.findbugs', 'jsr305', '3.0.2'),

@@ -8,3 +8,11 @@ python_binary(
     'src/python/pants/util:contextutil',
   ],
 )
+
+python_binary(
+  name = 'packages',
+  source = 'packages.py',
+  dependencies = [
+    'src/python/pants/util:process_handler',
+  ],
+)

@@ -83,6 +83,9 @@ python_library(
 python_library(
   name = 'objects',
   sources = ['objects.py'],
+  dependencies = [
+    ':memo',
+  ],
 )
 
 python_library(
@@ -94,6 +97,7 @@ python_library(
   name = 'process_handler',
   sources = ['process_handler.py'],
   dependencies=[
+    '3rdparty/python:six',
     '3rdparty/python:subprocess32',
     ':meta',
   ]

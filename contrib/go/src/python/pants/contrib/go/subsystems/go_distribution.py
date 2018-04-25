@@ -22,14 +22,6 @@ class GoDistribution(NativeTool):
   default_version = '1.8.3'
   archive_type = 'tgz'
 
-  @classmethod
-  def register_options(cls, register):
-    super(GoDistribution, cls).register_options(register)
-    register('--supportdir', advanced=True, default='bin/go',
-             removal_version='1.7.0.dev0', removal_hint='No longer supported.',
-             help='Find the go distributions under this dir.  Used as part of the path to lookup '
-                  'the distribution with --binary-util-baseurls and --pants-bootstrapdir')
-
   @memoized_property
   def goroot(self):
     """Returns the $GOROOT for this go distribution.

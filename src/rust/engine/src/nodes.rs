@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use futures::future::{self, Future};
 use tempdir::TempDir;
@@ -18,7 +19,7 @@ use context::Context;
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
 use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDigest, VFS};
-use process_execution as process_executor;
+use process_execution;
 use hashing;
 use rule_graph;
 use selectors::{self, Selector};
@@ -121,6 +122,21 @@ impl Select {
       subject: subject,
       variants: variants,
       entries: edges.entries_for(&select_key),
+    }
+  }
+
+  pub fn new_with_entries(
+    product: TypeConstraint,
+    subject: Key,
+    variants: Variants,
+    entries: rule_graph::Entries,
+  ) -> Select {
+    let selector = selectors::Select::without_variant(product);
+    Select {
+      selector: selector,
+      subject: subject,
+      variants: variants,
+      entries: entries,
     }
   }
 
@@ -295,53 +311,22 @@ impl Select {
           .to_boxed(),
       ]
     } else if self.product() == &context.core.types.process_result {
-      let value = externs::val_for(&self.subject);
-
-      let mut env: BTreeMap<String, String> = BTreeMap::new();
-      let env_var_parts = externs::project_multi_strs(&value, "env");
-      // TODO: Error if env_var_parts.len() % 2 != 0
-      for i in 0..(env_var_parts.len() / 2) {
-        env.insert(
-          env_var_parts[2 * i].clone(),
-          env_var_parts[2 * i + 1].clone(),
-        );
-      }
-
-      // TODO: Make this much less unwrap-happy with https://github.com/pantsbuild/pants/issues/5502
-
-      let fingerprint = externs::project_str(&value, "input_files_digest");
-      let digest_length = externs::project_str(&value, "digest_length");
-      let digest_length_as_usize = digest_length.parse::<usize>().unwrap();
-      let digest = hashing::Digest(
-        hashing::Fingerprint::from_hex_string(&fingerprint).unwrap(),
-        digest_length_as_usize,
-      );
-
-      let request = process_executor::ExecuteProcessRequest {
-        argv: externs::project_multi_strs(&value, "argv"),
-        env: env,
-        input_files: digest,
-      };
-      let tmpdir = TempDir::new("process-execution").unwrap();
-
-      context
-        .core
-        .store
-        .materialize_directory(tmpdir.path().to_owned(), digest)
-        .wait()
-        .unwrap();
-      // TODO: this should run off-thread, and asynchronously
-      // TODO: request the Node that invokes the process, rather than invoke directly
-      let result = process_executor::local::run_command_locally(request, tmpdir.path()).unwrap();
+      let context2 = context.clone();
+      let execute_process_node = ExecuteProcess::lift(&self.subject);
       vec![
-        future::ok(externs::unsafe_call(
-          &context.core.types.construct_process_result,
-          &[
-            externs::store_bytes(&result.stdout),
-            externs::store_bytes(&result.stderr),
-            externs::store_i32(result.exit_code),
-          ],
-        )).to_boxed(),
+        context
+          .get(execute_process_node)
+          .map(move |result| {
+            externs::unsafe_call(
+              &context2.core.types.construct_process_result,
+              &[
+                externs::store_bytes(&result.0.stdout),
+                externs::store_bytes(&result.0.stderr),
+                externs::store_i32(result.0.exit_code),
+              ],
+            )
+          })
+          .to_boxed(),
       ]
     } else if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
       vec![future::ok(value.clone()).to_boxed()]
@@ -356,7 +341,7 @@ impl Select {
             product: self.product().clone(),
             variants: self.variants.clone(),
             task: task,
-            entry: entry.clone(),
+            entry: Arc::new(entry.clone()),
           })
         })
         .collect::<Vec<NodeFuture<Value>>>()
@@ -520,114 +505,74 @@ impl SelectDependencies {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectProjection {
-  subject: Key,
-  variants: Variants,
-  selector: selectors::SelectProjection,
-  input_product_entries: rule_graph::Entries,
-  projected_entries: rule_graph::Entries,
-}
-
-impl SelectProjection {
-  fn new(
-    selector: selectors::SelectProjection,
-    subject: Key,
-    variants: Variants,
-    edges: &rule_graph::RuleEdges,
-  ) -> SelectProjection {
-    let dep_p_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
-      Selector::SelectProjection(selector.clone()),
-      selectors::Select::without_variant(selector.clone().input_product),
-    ));
-    let p_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedNestedSelect(
-      Selector::SelectProjection(selector.clone()),
-      selector.projected_subject.clone(),
-      selectors::Select::without_variant(selector.clone().product),
-    ));
-    SelectProjection {
-      subject: subject,
-      variants: variants,
-      selector: selector.clone(),
-      input_product_entries: dep_p_entries,
-      projected_entries: p_entries,
-    }
-  }
-}
-
-impl SelectProjection {
-  fn run(self, context: Context) -> NodeFuture<Value> {
-    // Request the product we need to compute the subject.
-    Select {
-      selector: selectors::Select {
-        product: self.selector.input_product,
-        variant_key: None,
-      },
-      subject: self.subject.clone(),
-      variants: self.variants.clone(),
-      entries: self.input_product_entries.clone(),
-    }.run(context.clone())
-      .then(move |dep_product_res| {
-        match dep_product_res {
-          Ok(dep_product) => {
-            // And then project the relevant field.
-            let projected_subject = externs::project(
-              &dep_product,
-              &self.selector.field,
-              &self.selector.projected_subject,
-            );
-            Select {
-              selector: selectors::Select::without_variant(self.selector.product),
-              subject: externs::key_for(projected_subject),
-              variants: self.variants.clone(),
-              // NB: Unlike SelectDependencies , we don't need to filter by
-              // subject here, because there is only one projected type.
-              entries: self.projected_entries.clone(),
-            }.run(context.clone())
-              .then(move |output_res| {
-                // If the output product is available, return it.
-                match output_res {
-                  Ok(output) => Ok(output),
-                  Err(failure) => Err(was_required(failure)),
-                }
-              })
-              .to_boxed()
-          }
-          Err(failure) => err(failure),
-        }
-      })
-      .to_boxed()
-  }
-}
-
 ///
 /// A Node that represents executing a process.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ExecuteProcess(process_executor::ExecuteProcessRequest);
+pub struct ExecuteProcess(process_execution::ExecuteProcessRequest);
+
+impl ExecuteProcess {
+  ///
+  /// Lifts a Key representing a python ExecuteProcessRequest value into a ExecuteProcess Node.
+  ///
+  fn lift(subject: &Key) -> ExecuteProcess {
+    let value = externs::val_for(subject);
+
+    let mut env: BTreeMap<String, String> = BTreeMap::new();
+    let env_var_parts = externs::project_multi_strs(&value, "env");
+    // TODO: Error if env_var_parts.len() % 2 != 0
+    for i in 0..(env_var_parts.len() / 2) {
+      env.insert(
+        env_var_parts[2 * i].clone(),
+        env_var_parts[2 * i + 1].clone(),
+      );
+    }
+
+    // TODO: Make this much less unwrap-happy with https://github.com/pantsbuild/pants/issues/5502
+    let fingerprint = externs::project_str(&value, "input_files_digest");
+    let digest_length = externs::project_str(&value, "digest_length");
+    let digest_length_as_usize = digest_length.parse::<usize>().unwrap();
+    let digest = hashing::Digest(
+      hashing::Fingerprint::from_hex_string(&fingerprint).unwrap(),
+      digest_length_as_usize,
+    );
+
+    ExecuteProcess(process_execution::ExecuteProcessRequest {
+      argv: externs::project_multi_strs(&value, "argv"),
+      env: env,
+      input_files: digest,
+    })
+  }
+}
 
 #[derive(Clone, Debug)]
-pub struct ProcessResult(process_executor::ExecuteProcessResult);
+pub struct ProcessResult(process_execution::ExecuteProcessResult);
 
 impl Node for ExecuteProcess {
   type Output = ProcessResult;
 
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
-    let request = self.0.clone();
-
-    // TODO: Make this much less unwrap-happy with https://github.com/pantsbuild/pants/issues/5502
-
-    let tmpdir = TempDir::new("process-execution").unwrap();
+    let request = self.0;
+    let context2 = context.clone();
+    // TODO: Process pool management should likely move into the `process_execution` crate, which
+    // will have different strategies depending on remote/local execution.
     context
       .core
-      .store
-      .materialize_directory(tmpdir.path().to_owned(), request.input_files)
-      .wait()
-      .unwrap();
-    // TODO: this should run off-thread, and asynchronously
-    future::ok(ProcessResult(
-      process_executor::local::run_command_locally(request, tmpdir.path()).unwrap(),
-    )).to_boxed()
+      .pool
+      .spawn_fn(move || {
+        let tmpdir = TempDir::new("process-execution").unwrap();
+        context2
+          .core
+          .store
+          .materialize_directory(tmpdir.path().to_owned(), request.input_files)
+          .map(move |_| {
+            ProcessResult(
+              process_execution::local::run_command_locally(request, tmpdir.path()).unwrap(),
+            )
+          })
+          .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
+      })
+      .to_boxed()
   }
 }
 
@@ -790,7 +735,7 @@ impl Snapshot {
       &context.core.types.construct_snapshot,
       &[
         externs::store_bytes(&(item.digest.0).to_hex().as_bytes()),
-        externs::store_i32((item.digest.1 as i32)),
+        externs::store_i32(item.digest.1 as i32),
         externs::store_list(path_stats.iter().collect(), false),
       ],
     )
@@ -883,7 +828,7 @@ pub struct Task {
   product: TypeConstraint,
   variants: Variants,
   task: tasks::Task,
-  entry: rule_graph::Entry,
+  entry: Arc<rule_graph::Entry>,
 }
 
 impl Task {
@@ -902,11 +847,61 @@ impl Task {
         SelectDependencies::new(s, self.subject.clone(), self.variants.clone(), edges)
           .run(context.clone())
       }
-      Selector::SelectProjection(s) => {
-        SelectProjection::new(s, self.subject.clone(), self.variants.clone(), edges)
-          .run(context.clone())
-      }
     }
+  }
+
+  fn gen_get(
+    context: &Context,
+    entry: Arc<rule_graph::Entry>,
+    gets: Vec<externs::Get>,
+  ) -> NodeFuture<Vec<Value>> {
+    let get_futures = gets
+      .into_iter()
+      .map(|get| {
+        let externs::Get(product, subject) = get;
+        let entries = context
+          .core
+          .rule_graph
+          .edges_for_inner(&entry)
+          .expect("edges for task exist.")
+          .entries_for(&rule_graph::SelectKey::JustGet(selectors::Get {
+            product: product,
+            subject: subject.type_id().clone(),
+          }));
+        Select::new_with_entries(product, subject, Default::default(), entries)
+          .run(context.clone())
+          .map_err(|e| was_required(e))
+      })
+      .collect::<Vec<_>>();
+    future::join_all(get_futures).to_boxed()
+  }
+
+  ///
+  /// Given a python generator Value, loop to request the generator's dependencies until
+  /// it completes with a result Value.
+  ///
+  fn generate(
+    context: Context,
+    entry: Arc<rule_graph::Entry>,
+    generator: Value,
+  ) -> NodeFuture<Value> {
+    future::loop_fn(externs::eval("None").unwrap(), move |input| {
+      let context = context.clone();
+      let entry = entry.clone();
+      future::result(externs::generator_send(&generator, &input)).and_then(move |response| {
+        match response {
+          externs::GeneratorResponse::Get(get) => Self::gen_get(&context, entry, vec![get])
+            .map(|vs| future::Loop::Continue(vs.into_iter().next().unwrap()))
+            .to_boxed() as BoxFuture<_, _>,
+          externs::GeneratorResponse::GetMulti(gets) => Self::gen_get(&context, entry, gets)
+            .map(|vs| future::Loop::Continue(externs::store_list(vs.iter().collect(), false)))
+            .to_boxed() as BoxFuture<_, _>,
+          externs::GeneratorResponse::Break(val) => {
+            future::ok(future::Loop::Break(val)).to_boxed() as BoxFuture<_, _>
+          }
+        }
+      })
+    }).to_boxed()
   }
 }
 
@@ -923,11 +918,22 @@ impl Node for Task {
         .collect::<Vec<_>>(),
     );
 
-    let task = self.task.clone();
+    let func = self.task.func.clone();
+    let entry = self.entry.clone();
     deps
       .then(move |deps_result| match deps_result {
-        Ok(deps) => externs::call(&externs::val_for(&task.func.0), &deps),
-        Err(err) => Err(err),
+        Ok(deps) => externs::call(&externs::val_for(&func.0), &deps),
+        Err(failure) => Err(failure),
+      })
+      .then(move |task_result| match task_result {
+        Ok(val) => {
+          if externs::satisfied_by(&context.core.types.generator, &val) {
+            Self::generate(context, entry, val)
+          } else {
+            ok(val)
+          }
+        }
+        Err(failure) => err(failure),
       })
       .to_boxed()
   }

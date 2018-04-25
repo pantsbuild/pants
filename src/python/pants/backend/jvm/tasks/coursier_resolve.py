@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import hashlib
+import itertools
 import json
 import os
 import urllib
@@ -45,7 +46,7 @@ class CoursierMixin(NailgunTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(CoursierMixin, cls).implementation_version() + [('CoursierMixin', 1)]
+    return super(CoursierMixin, cls).implementation_version() + [('CoursierMixin', 2)]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -56,6 +57,8 @@ class CoursierMixin(NailgunTask):
     super(CoursierMixin, cls).register_options(register)
     register('--allow-global-excludes', type=bool, advanced=False, fingerprint=True, default=True,
              help='Whether global excludes are allowed.')
+    register('--report', type=bool, advanced=False, default=False,
+             help='Show the resolve output. This would also force a resolve even if the resolve task is validated.')
 
   @staticmethod
   def _compute_jars_to_resolve_and_pin(raw_jars, artifact_set, manager):
@@ -140,13 +143,14 @@ class CoursierMixin(NailgunTask):
         resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
 
         vt_set_results_dir = self._prepare_vts_results_dir(pants_workdir, resolve_vts)
-        coursier_cache_dir, pants_jar_base_dir = self._prepare_workdir(pants_workdir)
+        pants_jar_base_dir = self._prepare_workdir(pants_workdir)
+        coursier_cache_dir = CoursierSubsystem.global_instance().get_options().cache_dir
 
-        # Check each individual target without context first
-        if not invalidation_check.invalid_vts:
-
+        # If a report is requested, do not proceed with loading validated result.
+        if not self.get_options().report:
+          # Check each individual target without context first
           # If the individuals are valid, check them as a VersionedTargetSet
-          if resolve_vts.valid:
+          if not invalidation_check.invalid_vts and resolve_vts.valid:
             # Load up from the results dir
             success = self._load_from_results_dir(compile_classpath, vt_set_results_dir,
                                                   coursier_cache_dir, invalidation_check, pants_jar_base_dir)
@@ -187,15 +191,11 @@ class CoursierMixin(NailgunTask):
   def _prepare_workdir(self, pants_workdir):
     """
     Given pants workdir, prepare the location in pants workdir to store all the symlinks
-    and coursier cache dir.
+    to coursier cache dir.
     """
-    coursier_cache_dir = os.path.join(self.get_options().pants_bootstrapdir, 'coursier')
     pants_jar_base_dir = os.path.join(pants_workdir, 'coursier', 'cache')
-
-    # Only pants_jar_path_base needs to be touched whereas coursier_cache_path will
-    # be managed by coursier
     safe_mkdir(pants_jar_base_dir)
-    return coursier_cache_dir, pants_jar_base_dir
+    return pants_jar_base_dir
 
   def _get_result_from_coursier(self, jars_to_resolve, global_excludes, pinned_coords, pants_workdir,
                                 coursier_cache_path, sources, javadoc):
@@ -249,11 +249,16 @@ class CoursierMixin(NailgunTask):
     coursier_subsystem_instance = CoursierSubsystem.global_instance()
     coursier_jar = coursier_subsystem_instance.bootstrap_coursier(self.context.new_workunit)
 
+    repos = coursier_subsystem_instance.get_options().repos
+    # make [repoX, repoY] -> ['-r', repoX, '-r', repoY]
+    repo_args = list(itertools.chain(*zip(['-r'] * len(repos), repos)))
+    artifact_types_arg = ['-A', ','.join(coursier_subsystem_instance.get_options().artifact_types)]
+    advanced_options = coursier_subsystem_instance.get_options().fetch_options
     common_args = ['fetch',
                    # Print the resolution tree
                    '-t',
                    '--cache', coursier_cache_path
-                   ] + coursier_subsystem_instance.get_options().fetch_options
+                   ] + repo_args + artifact_types_arg + advanced_options
 
     coursier_work_temp_dir = os.path.join(pants_workdir, 'tmp')
     safe_mkdir(coursier_work_temp_dir)
@@ -332,14 +337,16 @@ class CoursierMixin(NailgunTask):
 
   def _call_coursier(self, cmd_args, coursier_jar, output_fn):
 
+    labels = [WorkUnitLabel.COMPILER] if self.get_options().report else [WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL]
+
     with self.context.new_workunit(name='coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
       return_code = self.runjava(
         classpath=[coursier_jar],
         main='coursier.cli.Coursier',
         args=cmd_args,
         jvm_options=self.get_options().jvm_options,
-        # to let stdout/err through, but don't print tool's label.
-        workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL])
+        workunit_labels=labels
+      )
 
       workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
 

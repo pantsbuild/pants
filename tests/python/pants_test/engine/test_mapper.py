@@ -10,10 +10,10 @@ import unittest
 from contextlib import contextmanager
 from textwrap import dedent
 
-from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
+from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress, Specs
 from pants.build_graph.address import Address
-from pants.engine.addressable import BuildFileAddresses, Collection
-from pants.engine.build_files import Specs, UnhydratedStruct, create_graph_rules
+from pants.engine.addressable import BuildFileAddresses
+from pants.engine.build_files import UnhydratedStruct, create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
                                  DuplicateNameError, UnaddressableObjectError)
@@ -22,6 +22,7 @@ from pants.engine.rules import TaskRule
 from pants.engine.selectors import SelectDependencies
 from pants.engine.struct import Struct
 from pants.util.dirutil import safe_open
+from pants.util.objects import Collection
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.engine.util import Target, TargetTable

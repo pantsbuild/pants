@@ -184,3 +184,30 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
                '--quiet']
     pants_run = self.run_pants(command=command)
     return pants_run.stdout_data.rstrip().split('\n')[-1]
+
+  def test_pex_resolver_blacklist_integration(self):
+    py3 = '3'
+    if self.skip_if_no_python(py3):
+      return
+    pex = os.path.join(os.getcwd(), 'dist', 'test_bin.pex')
+    try:
+      pants_ini_config = {'python-setup': {'resolver_blacklist': {"functools32": "CPython>3"}}}
+      # clean-all to ensure that Pants resolves requirements for each run.
+      pants_binary_36 = self.run_pants(
+        command=['clean-all', 'binary', '{}:test_bin'.format(os.path.join(self.testproject,'resolver_blacklist_testing'))],
+        config=pants_ini_config
+      )
+      self.assert_success(pants_binary_36)
+      pants_run_36 = self.run_pants(
+        command=['clean-all', 'run', '{}:test_bin'.format(os.path.join(self.testproject,'resolver_blacklist_testing'))],
+        config=pants_ini_config
+      )
+      self.assert_success(pants_run_36)
+      pants_run_27 = self.run_pants(
+        command=['clean-all', 'run', '{}:test_py2'.format(os.path.join(self.testproject,'resolver_blacklist_testing'))],
+        config=pants_ini_config
+      )
+      self.assert_success(pants_run_27)
+    finally:
+      if os.path.exists(pex):
+        os.remove(pex)

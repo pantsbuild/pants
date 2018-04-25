@@ -35,8 +35,8 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     """A richer failure exception type useful for tests."""
 
     def __init__(self, *args, **kwargs):
-      compiled = kwargs.pop('compiled')
-      failed = kwargs.pop('failed')
+      compiled = kwargs.pop(b'compiled')
+      failed = kwargs.pop(b'failed')
       super(PythonEval.Error, self).__init__(*args, **kwargs)
       self.compiled = compiled
       self.failed = failed
@@ -62,26 +62,9 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     super(PythonEval, cls).register_options(register)
     register('--fail-slow', type=bool,
              help='Compile all targets and present the full list of errors.')
-    register('--closure', type=bool,
-             removal_version='1.7.0.dev0', removal_hint='Use --transitive instead.',
-             help='Eval all targets in the closure individually instead of just the targets '
-                  'specified on the command line.')
 
   def execute(self):
-    # The default for --closure is False, while the default for --transitive is True, so we
-    # can't just OR the two values, and have to explicitly detect when --transitive is not
-    # explicitly specified.
-    if self.get_options().is_default('transitive'):
-      if self.get_options().skip:
-        targets = []
-      else:
-        targets = (self.context.targets(self._is_evalable) if self.get_options().closure
-                   else filter(self._is_evalable, self.context.target_roots))
-    else:
-      # TODO(benjy): After removing --closure, targets should always be set to this, and the
-      # entire other branch of this if statement (and the if statement itself) should be removed.
-      targets = self.get_targets(self._is_evalable)
-    with self.invalidated(targets,
+    with self.invalidated(self.get_targets(self._is_evalable),
                           invalidate_dependents=True,
                           topological_order=True) as invalidation_check:
       compiled = self._compile_targets(invalidation_check.invalid_vts)
@@ -198,9 +181,9 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
           target.entry_point, target.address.spec))
       module = components[0]
       if len(components) == 2:
-        function = components[1]
+        func = components[1]
         data = TemplateData(source=source,
-                            import_statement='from {} import {}'.format(module, function))
+                            import_statement='from {} import {}'.format(module, func))
       else:
         data = TemplateData(source=source, import_statement='import {}'.format(module))
       modules.append(data)

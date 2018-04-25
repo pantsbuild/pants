@@ -328,7 +328,7 @@ python_library(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/binaries',
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:meta',
@@ -507,7 +507,7 @@ python_library(
   dependencies = [
     ':jvm_task',
     'src/python/pants/base:exceptions',
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/binaries',
     'src/python/pants/task',
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',

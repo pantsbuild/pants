@@ -17,8 +17,9 @@ function run_local_pants() {
 
 # NB: Pants core does not have the ability to change its own version, so we compute the
 # suffix here and mutate the VERSION_FILE to affect the current version.
+readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
+readonly PANTS_STABLE_VERSION="$(cat "${VERSION_FILE}")"
 readonly HEAD_SHA=$(git rev-parse --verify HEAD)
-readonly PANTS_STABLE_VERSION="$(cat "${ROOT}/src/python/pants/VERSION")"
 readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+${HEAD_SHA:0:8}"
 
 readonly DEPLOY_DIR="${ROOT}/dist/deploy"
@@ -29,8 +30,6 @@ readonly DEPLOY_3RDPARTY_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_3RDPARTY_WHEELS_PATH}
 readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
 readonly DEPLOY_PANTS_SDIST_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_SDIST_PATH}"
 
-readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
-
 # A space-separated list of pants packages to include in any pexes that are built: by default,
 # only pants core is included.
 : ${PANTS_PEX_PACKAGES:="pantsbuild.pants"}
@@ -40,9 +39,9 @@ source ${ROOT}/contrib/release_packages.sh
 source "${ROOT}/build-support/bin/native/bootstrap.sh"
 
 function find_pkg() {
-  local readonly pkg_name=$1
-  local readonly version=$2
-  local readonly search_dir=$3
+  local -r pkg_name=$1
+  local -r version=$2
+  local -r search_dir=$3
   find "${search_dir}" -type f -name "${pkg_name}-${version}-*.whl"
 }
 
@@ -322,7 +321,9 @@ function dry_run_install() {
 
 ALLOWED_ORIGIN_URLS=(
   git@github.com:pantsbuild/pants.git
+  git@github.com:pantsbuild/pants
   https://github.com/pantsbuild/pants.git
+  https://github.com/pantsbuild/pants
 )
 
 function check_origin() {
@@ -384,45 +385,6 @@ function get_pgp_keyid() {
   git config --get user.signingkey
 }
 
-function check_pypi() {
-  if [[ ! -r ~/.pypirc ]]
-  then
-    msg=$(cat << EOM
-You must create a ~/.pypirc file with your pypi credentials:
-cat << EOF > ~/.pypirc && chmod 600 ~/.pypirc
-[server-login]
-username: <fill me in>
-password: <fill me in>
-EOF
-
-More information is here: https://wiki.python.org/moin/EnhancedPyPI
-EOM
-)
-    die "${msg}"
-  fi
-  "${PY}" << EOF || die
-from __future__ import print_function
-
-import os
-import sys
-from ConfigParser import ConfigParser
-
-config = ConfigParser()
-config.read(os.path.expanduser('~/.pypirc'))
-
-def check_option(section, option):
-  if config.has_option(section, option):
-    return config.get(section, option)
-  print('Your ~/.pypirc must define a {} option in the {} section'.format(option, section))
-
-username = check_option('server-login', 'username')
-if not (username or check_option('server-login', 'password')):
-  sys.exit(1)
-else:
-  print(username)
-EOF
-}
-
 function tag_release() {
   release_version="${PANTS_STABLE_VERSION}" && \
   tag_name="release_${release_version}" && \
@@ -442,102 +404,8 @@ function publish_docs_if_master() {
   fi
 }
 
-function list_packages() {
-  echo "Releases the following source distributions to PyPi."
-  version="${PANTS_STABLE_VERSION}"
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
-  do
-    echo "  $(pkg_name $PACKAGE)-${version}"
-  done
-}
-
-function package_exists() {
-  package_name="$1"
-
-  curl --fail --head https://pypi.python.org/pypi/${package_name} &>/dev/null
-}
-
-function get_owners() {
-  package_name="$1"
-
-  latest_package_path=$(
-    curl -s https://pypi.python.org/pypi/${package_name} | \
-        grep -oE  "/pypi/${package_name}/[0-9]+\.[0-9]+\.[0-9]+([-.]?(rc|dev)[0-9]+)?" | head -n1
-  )
-  curl -s "https://pypi.python.org${latest_package_path}" | \
-    grep -A1 "Owner" | tail -1 | \
-    cut -d'>' -f2 | cut -d'<' -f1 | \
-    tr ',' ' ' | sed -E -e "s|[[:space:]]+| |g"
-}
-
-function list_owners() {
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
-  do
-    package_name=$(pkg_name $PACKAGE)
-    if package_exists ${package_name}
-    then
-      echo "Owners of ${package_name}:"
-      owners=($(get_owners ${package_name}))
-      for owner in "${owners[@]}"
-      do
-        echo "  ${owner}"
-      done
-    else
-      echo "The ${package_name} package is new!  There are no owners yet."
-    fi
-    echo
-  done
-}
-
-function check_owner() {
-  username=$(echo "$1" | tr '[:upper:]' '[:lower:]')
-  package_name="$2"
-
-  for owner in $(get_owners ${package_name})
-  do
-    # NB: A case-insensitive comparison is done since pypi is case-insensitive wrt usernames.
-    owner=$(echo "${owner}" | tr '[:upper:]' '[:lower:]')
-    if [[ "${username}" == "${owner}" ]]
-    then
-      return 0
-    fi
-  done
-  return 1
-}
-
 function check_owners() {
-  username="$(check_pypi)"
-
-  total=${#RELEASE_PACKAGES[@]}
-  banner "Checking package ownership for pypi user ${username} of ${total} packages"
-  dont_own=()
-  index=0
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
-  do
-    index=$((index+1))
-    package_name="$(pkg_name $PACKAGE)"
-    banner "[${index}/${total}] checking that ${username} owns ${package_name}"
-    if package_exists ${package_name}
-    then
-      if ! check_owner "${username}" "${package_name}"
-      then
-        dont_own+=("${package_name}")
-      fi
-    else
-      echo "The ${package_name} package is new!  There are no owners yet."
-    fi
-  done
-
-  if (( ${#dont_own[@]} > 0 ))
-  then
-    msg=$(cat << EOM
-Your pypi account ${username} needs to be added as an owner for the
-following packages:
-$(echo "${dont_own[@]}" | tr ' ' '\n' | sed -E "s|^|  |")
-EOM
-)
-    die "${msg}"
-  fi
+  run_local_pants -q run src/python/pants/releases:packages -- check-my-ownership
 }
 
 function reversion_whls() {
@@ -580,7 +448,7 @@ EOF
 }
 
 function fetch_prebuilt_wheels() {
-  local readonly to_dir="$1"
+  local -r to_dir="$1"
 
   banner "Fetching prebuilt wheels for ${PANTS_UNSTABLE_VERSION}"
   (
@@ -664,7 +532,7 @@ function adjust_wheel_platform() {
 }
 
 function activate_twine() {
-  local readonly venv_dir="${ROOT}/build-support/twine-deps.venv"
+  local -r venv_dir="${ROOT}/build-support/twine-deps.venv"
 
   rm -rf "${venv_dir}"
   "${ROOT}/build-support/virtualenv" "${venv_dir}"
@@ -813,8 +681,8 @@ while getopts "hdntcloepqw" opt; do
     d) debug="true" ;;
     n) dry_run="true" ;;
     t) test_release="true" ;;
-    l) list_packages ; exit $? ;;
-    o) list_owners ; exit $? ;;
+    l) run_local_pants -q run src/python/pants/releases:packages -- list ; exit $? ;;
+    o) run_local_pants -q run src/python/pants/releases:packages -- list-owners ; exit $? ;;
     e) fetch_and_check_prebuilt_wheels ; exit $? ;;
     p) build_pex fetch ; exit $? ;;
     q) build_pex build ; exit $? ;;

@@ -1,4 +1,4 @@
-Created by running `./build-support/bin/contributors.sh`.
+Created by running `build-support/bin/contributors.sh`.
 
 + Aaron Mitchell
 + Adam Chainz
@@ -124,7 +124,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Nadav Samet
 + Neil Sanchala
 + Nicholas Santos
-+ Nick Howard
++ Nora Howard
 + Nik Shkrob
 + Nitay Joffe
 + Ny Saechao

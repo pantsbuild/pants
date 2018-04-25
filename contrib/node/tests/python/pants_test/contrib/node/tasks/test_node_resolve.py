@@ -263,17 +263,13 @@ class NodeResolveTest(TaskTestBase):
     })
     task = self.create_task(context)
 
-    method_to_mock = {
-      'npm': 'execute_npm',
-      'yarn': 'execute_yarnpkg'
-    }[package_manager]
-    with mock.patch.object(task, method_to_mock) as exec_call:
-      exec_call.return_value = (0, None)
+    package_manager_obj = task.get_package_manager(target=target)
+    with mock.patch.object(package_manager_obj, 'run_command') as exec_call:
+      exec_call.return_value.run.return_value.wait.return_value = 0
       task.execute()
       exec_call.assert_called_once_with(
-        expected_params,
-        workunit_labels=mock.ANY,
-        workunit_name=mock.ANY)
+        args=expected_params,
+        node_paths=None)
 
   def test_resolve_default_no_optional_install_npm(self):
     self._test_resolve_optional_install_helper(
@@ -290,11 +286,11 @@ class NodeResolveTest(TaskTestBase):
   def test_resolve_default_no_optional_install_yarn(self):
     self._test_resolve_optional_install_helper(
       install_optional=False,
-      package_manager='yarn',
-      expected_params=['--ignore-optional'])
+      package_manager='yarnpkg',
+      expected_params=['--non-interactive', '--ignore-optional'])
 
   def test_resolve_optional_install_yarn(self):
     self._test_resolve_optional_install_helper(
       install_optional=True,
-      package_manager='yarn',
-      expected_params=[])
+      package_manager='yarnpkg',
+      expected_params=['--non-interactive'])

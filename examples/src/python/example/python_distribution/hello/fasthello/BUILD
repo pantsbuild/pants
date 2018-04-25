@@ -7,7 +7,8 @@
 python_dist(
   name='fasthello',
   sources=[
-    'super_greet.c',
+    'c_greet.c',
+    'cpp_greet.cpp',
     'hello_package/hello.py',
     'hello_package/__init__.py',
     'setup.py'
@@ -19,5 +20,6 @@ python_binary(
   source='main.py',
   dependencies=[
     ':fasthello',
-  ]
+  ],
+  platforms=['current']
 )

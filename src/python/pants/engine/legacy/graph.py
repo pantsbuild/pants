@@ -14,21 +14,19 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
-from pants.base.specs import SingleAddress
-from pants.base.target_roots import ChangedTargetRoots, LiteralTargetRoots
+from pants.base.specs import SingleAddress, Specs
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
-from pants.engine.addressable import BuildFileAddresses, Collection
-from pants.engine.build_files import Specs
+from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.rules import TaskRule, rule
-from pants.engine.selectors import Select, SelectDependencies, SelectProjection
+from pants.engine.selectors import Get, Select, SelectDependencies
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
-from pants.util.objects import datatype
+from pants.util.objects import Collection, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -208,14 +206,8 @@ class LegacyBuildGraph(BuildGraph):
       pass
 
   def inject_roots_closure(self, target_roots, fail_fast=None):
-    if type(target_roots) is ChangedTargetRoots:
-      for address in self._inject_addresses(target_roots.addresses):
-        yield address
-    elif type(target_roots) is LiteralTargetRoots:
-      for address in self._inject_specs(target_roots.specs):
-        yield address
-    else:
-      raise ValueError('Unrecognized TargetRoots type: `{}`.'.format(target_roots))
+    for address in self._inject_specs(target_roots.specs):
+      yield address
 
   def inject_specs_closure(self, specs, fail_fast=None):
     # Request loading of these specs.
@@ -307,18 +299,19 @@ class HydratedTargets(Collection.of(HydratedTarget)):
   """An intransitive set of HydratedTarget objects."""
 
 
-@rule(TransitiveHydratedTargets, [SelectDependencies(TransitiveHydratedTarget,
-                                                     BuildFileAddresses,
-                                                     field_types=(Address,),
-                                                     field='addresses')])
-def transitive_hydrated_targets(transitive_hydrated_targets):
-  """Kicks off recursion on expansion of TransitiveHydratedTarget objects.
+@rule(TransitiveHydratedTargets, [Select(BuildFileAddresses)])
+def transitive_hydrated_targets(build_file_addresses):
+  """Given BuildFileAddresses, kicks off recursion on expansion of TransitiveHydratedTargets.
 
   The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk
   and flatten here. The engine memoizes the computation of TransitiveHydratedTarget, so
   when multiple TransitiveHydratedTargets objects are being constructed for multiple
   roots, their structure will be shared.
   """
+
+  transitive_hydrated_targets = yield [Get(TransitiveHydratedTarget, Address, a)
+                                       for a in build_file_addresses.addresses]
+
   closure = set()
   to_visit = deque(transitive_hydrated_targets)
 
@@ -329,25 +322,20 @@ def transitive_hydrated_targets(transitive_hydrated_targets):
     closure.add(tht.root)
     to_visit.extend(tht.dependencies)
 
-  return TransitiveHydratedTargets(tuple(tht.root for tht in transitive_hydrated_targets), closure)
+  yield TransitiveHydratedTargets(tuple(tht.root for tht in transitive_hydrated_targets), closure)
 
 
-@rule(TransitiveHydratedTarget, [Select(HydratedTarget),
-                                 SelectDependencies(TransitiveHydratedTarget,
-                                                    HydratedTarget,
-                                                    field_types=(Address,),
-                                                    field='addresses')])
-def transitive_hydrated_target(root, dependencies):
-  return TransitiveHydratedTarget(root, dependencies)
+@rule(TransitiveHydratedTarget, [Select(HydratedTarget)])
+def transitive_hydrated_target(root):
+  dependencies = yield [Get(TransitiveHydratedTarget, Address, d) for d in root.dependencies]
+  yield TransitiveHydratedTarget(root, dependencies)
 
 
-@rule(HydratedTargets, [SelectDependencies(HydratedTarget,
-                                           BuildFileAddresses,
-                                           field_types=(Address,),
-                                           field='addresses')])
-def hydrated_targets(targets):
-  """Requests HydratedTarget instances."""
-  return HydratedTargets(targets)
+@rule(HydratedTargets, [Select(BuildFileAddresses)])
+def hydrated_targets(build_file_addresses):
+  """Requests HydratedTarget instances for BuildFileAddresses."""
+  targets = yield [Get(HydratedTarget, Address, a) for a in build_file_addresses.addresses]
+  yield HydratedTargets(targets)
 
 
 class HydratedField(datatype('HydratedField', ['name', 'value'])):
@@ -380,22 +368,22 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
                               files_hash=snapshot.fingerprint)
 
 
-@rule(HydratedField,
-      [Select(SourcesField),
-       SelectProjection(Snapshot, PathGlobs, 'path_globs', SourcesField)])
-def hydrate_sources(sources_field, snapshot):
-  """Given a SourcesField and a Snapshot for its path_globs, create an EagerFilesetWithSpec."""
+@rule(HydratedField, [Select(SourcesField)])
+def hydrate_sources(sources_field):
+  """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec."""
+
+  snapshot = yield Get(Snapshot, PathGlobs, sources_field.path_globs)
   fileset_with_spec = _eager_fileset_with_spec(sources_field.address.spec_path,
                                                sources_field.filespecs,
                                                snapshot)
-  return HydratedField(sources_field.arg, fileset_with_spec)
+  yield HydratedField(sources_field.arg, fileset_with_spec)
 
 
-@rule(HydratedField,
-      [Select(BundlesField),
-       SelectDependencies(Snapshot, BundlesField, 'path_globs_list', field_types=(PathGlobs,))])
-def hydrate_bundles(bundles_field, snapshot_list):
-  """Given a BundlesField and a Snapshot for each of its filesets create a list of BundleAdaptors."""
+@rule(HydratedField, [Select(BundlesField)])
+def hydrate_bundles(bundles_field):
+  """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
+  snapshot_list = yield [Get(Snapshot, PathGlobs, pg) for pg in bundles_field.path_globs_list]
+
   bundles = []
   zipped = zip(bundles_field.bundles,
                bundles_field.filespecs_list,
@@ -411,7 +399,7 @@ def hydrate_bundles(bundles_field, snapshot_list):
                                                  snapshot,
                                                  include_dirs=True)
     bundles.append(BundleAdaptor(**kwargs))
-  return HydratedField('bundles', bundles)
+  yield HydratedField('bundles', bundles)
 
 
 def create_legacy_graph_tasks(symbol_table):

@@ -7,7 +7,8 @@ use grpcio;
 
 use bytes::Bytes;
 use futures::{Future, IntoFuture, Stream};
-use hashing::Fingerprint;
+use hashing::{Digest, Fingerprint};
+use testutil::data::{TestData, TestDirectory};
 
 ///
 /// Implements the ContentAddressableStorage gRPC API, answering read requests with either known
@@ -21,6 +22,21 @@ pub struct StubCAS {
 }
 
 impl StubCAS {
+  pub fn with_content(
+    chunk_size_bytes: i64,
+    files: Vec<TestData>,
+    directories: Vec<TestDirectory>,
+  ) -> StubCAS {
+    let mut blobs = HashMap::new();
+    for file in files.into_iter() {
+      blobs.insert(file.fingerprint(), file.bytes());
+    }
+    for directory in directories.into_iter() {
+      blobs.insert(directory.fingerprint(), directory.bytes());
+    }
+    StubCAS::with_unverified_content(chunk_size_bytes, blobs)
+  }
+
   ///
   /// # Arguments
   /// * `chunk_size_bytes` - The maximum number of bytes of content to include per streamed message.
@@ -29,7 +45,10 @@ impl StubCAS {
   ///                        If a negative value is given, all requests will receive an error.
   /// * `blobs`            - Known Fingerprints and their content responses. These are not checked
   ///                        for correctness.
-  pub fn new(chunk_size_bytes: i64, blobs: HashMap<Fingerprint, Bytes>) -> StubCAS {
+  pub fn with_unverified_content(
+    chunk_size_bytes: i64,
+    blobs: HashMap<Fingerprint, Bytes>,
+  ) -> StubCAS {
     let env = Arc::new(grpcio::Environment::new(1));
     let read_request_count = Arc::new(Mutex::new(0));
     let write_message_sizes = Arc::new(Mutex::new(Vec::new()));
@@ -44,26 +63,36 @@ impl StubCAS {
       .register_service(bazel_protos::bytestream_grpc::create_byte_stream(
         responder.clone(),
       ))
+      .register_service(
+        bazel_protos::remote_execution_grpc::create_content_addressable_storage(responder.clone()),
+      )
       .bind("localhost", 0)
       .build()
       .unwrap();
     server_transport.start();
 
-    let cas = StubCAS {
+    StubCAS {
       server_transport,
       read_request_count,
       write_message_sizes,
       blobs,
-    };
-    cas
+    }
+  }
+
+  pub fn with_roland_and_directory(chunk_size_bytes: i64) -> StubCAS {
+    StubCAS::with_content(
+      chunk_size_bytes,
+      vec![TestData::roland()],
+      vec![TestDirectory::containing_roland()],
+    )
   }
 
   pub fn empty() -> StubCAS {
-    StubCAS::new(1024, HashMap::new())
+    StubCAS::with_unverified_content(1024, HashMap::new())
   }
 
   pub fn always_errors() -> StubCAS {
-    StubCAS::new(-1, HashMap::new())
+    StubCAS::with_unverified_content(-1, HashMap::new())
   }
 
   ///
@@ -249,12 +278,10 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
               if parts.len() != 6 || parts.get(1) != Some(&"uploads")
                 || parts.get(3) != Some(&"blobs")
               {
-                return Err(
-                  (grpcio::RpcStatus::new(
-                    grpcio::RpcStatusCode::InvalidArgument,
-                    Some(format!("Bad resource name: {}", resource_name)),
-                  )),
-                );
+                return Err(grpcio::RpcStatus::new(
+                  grpcio::RpcStatusCode::InvalidArgument,
+                  Some(format!("Bad resource name: {}", resource_name)),
+                ));
               }
               let fingerprint = match Fingerprint::from_hex_string(parts.get(4).unwrap()) {
                 Ok(f) => f,
@@ -324,6 +351,56 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
     _ctx: grpcio::RpcContext,
     _req: bazel_protos::bytestream::QueryWriteStatusRequest,
     sink: grpcio::UnarySink<bazel_protos::bytestream::QueryWriteStatusResponse>,
+  ) {
+    sink.fail(grpcio::RpcStatus::new(
+      grpcio::RpcStatusCode::Unimplemented,
+      None,
+    ));
+  }
+}
+
+impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASResponder {
+  fn find_missing_blobs(
+    &self,
+    _ctx: grpcio::RpcContext,
+    req: bazel_protos::remote_execution::FindMissingBlobsRequest,
+    sink: grpcio::UnarySink<bazel_protos::remote_execution::FindMissingBlobsResponse>,
+  ) {
+    if self.should_always_fail() {
+      sink.fail(grpcio::RpcStatus::new(
+        grpcio::RpcStatusCode::Internal,
+        Some("StubCAS is configured to always fail".to_owned()),
+      ));
+      return;
+    }
+    let blobs = self.blobs.lock().unwrap();
+    let mut response = bazel_protos::remote_execution::FindMissingBlobsResponse::new();
+    for digest in req.get_blob_digests() {
+      let hashing_digest: Digest = digest.into();
+      if !blobs.contains_key(&hashing_digest.0) {
+        response.mut_missing_blob_digests().push(digest.clone())
+      }
+    }
+    sink.success(response);
+  }
+
+  fn batch_update_blobs(
+    &self,
+    _ctx: grpcio::RpcContext,
+    _req: bazel_protos::remote_execution::BatchUpdateBlobsRequest,
+    sink: grpcio::UnarySink<bazel_protos::remote_execution::BatchUpdateBlobsResponse>,
+  ) {
+    sink.fail(grpcio::RpcStatus::new(
+      grpcio::RpcStatusCode::Unimplemented,
+      None,
+    ));
+  }
+
+  fn get_tree(
+    &self,
+    _ctx: grpcio::RpcContext,
+    _req: bazel_protos::remote_execution::GetTreeRequest,
+    sink: grpcio::UnarySink<bazel_protos::remote_execution::GetTreeResponse>,
   ) {
     sink.fail(grpcio::RpcStatus::new(
       grpcio::RpcStatusCode::Unimplemented,

@@ -10,9 +10,9 @@ import unittest
 from textwrap import dedent
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
+from pants.base.specs import Specs
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import Specs
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RootRule, TaskRule
 from pants.engine.selectors import Select, SelectVariant
@@ -49,6 +49,13 @@ class SchedulerTest(unittest.TestCase):
     self.managed_hadoop = Address.parse('3rdparty/jvm/managed:hadoop-common')
     self.managed_resolve_latest = Address.parse('3rdparty/jvm/managed:latest-hadoop')
     self.inferred_deps = Address.parse('src/scala/inferred_deps')
+
+  def tearDown(self):
+    super(SchedulerTest, self).tearDown()
+    # Without eagerly dropping this reference, each instance created for a test method
+    # will live until all tests in this class have completed: can confirm by editing
+    # the `scheduler_destroy` call in `src/python/pants/engine/native.py`.
+    self.scheduler = None
 
   def parse_specs(self, *specs):
     return Specs(tuple(self.spec_parser.parse_spec(spec) for spec in specs))

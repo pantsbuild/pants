@@ -32,6 +32,8 @@ extern crate ordermap;
 extern crate protobuf;
 extern crate sha2;
 extern crate tempdir;
+#[cfg(test)]
+extern crate testutil;
 
 use std::collections::HashSet;
 use std::os::unix::fs::PermissionsExt;
@@ -697,19 +699,14 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
 
         // If there were any new PathGlobs, continue the expansion.
         if expansion.todo.is_empty() {
-          future::Loop::Break(expansion)
+          future::Loop::Break(expansion.outputs)
         } else {
           future::Loop::Continue(expansion)
         }
       })
-    }).map(|expansion| {
-      assert!(
-        expansion.todo.is_empty(),
-        "Loop shouldn't have exited with work to do: {:?}",
-        expansion.todo,
-      );
+    }).map(|expansion_outputs| {
       // Finally, capture the resulting PathStats from the expansion.
-      expansion.outputs.into_iter().map(|(k, _)| k).collect()
+      expansion_outputs.into_iter().map(|(k, _)| k).collect()
     })
       .to_boxed()
   }

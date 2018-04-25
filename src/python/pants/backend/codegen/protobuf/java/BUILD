@@ -13,7 +13,7 @@ python_library(
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/base:workunit',
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/binaries',
     'src/python/pants/build_graph',
     'src/python/pants/fs',
     'src/python/pants/goal:task_registrar',

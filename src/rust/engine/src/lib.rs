@@ -42,10 +42,11 @@ use std::path::{Path, PathBuf};
 use context::Core;
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern,
-              DropHandlesExtern, EqualsExtern, EvalExtern, ExternContext, Externs, IdentifyExtern,
-              LogExtern, ProjectExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult,
-              SatisfiedByExtern, SatisfiedByTypeExtern, StoreBytesExtern, StoreI32Extern,
-              StoreListExtern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern};
+              DropHandlesExtern, EqualsExtern, EvalExtern, ExternContext, Externs,
+              GeneratorSendExtern, IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern,
+              ProjectMultiExtern, PyResult, SatisfiedByExtern, SatisfiedByTypeExtern,
+              StoreBytesExtern, StoreI32Extern, StoreListExtern, TypeIdBuffer, TypeToStrExtern,
+              ValToStrExtern};
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler};
 use tasks::Tasks;
@@ -119,10 +120,11 @@ impl RawNodes {
 
 #[no_mangle]
 pub extern "C" fn externs_set(
-  ext_context: *const ExternContext,
+  context: *const ExternContext,
   log: LogExtern,
   log_level: u8,
   call: CallExtern,
+  generator_send: GeneratorSendExtern,
   eval: EvalExtern,
   identify: IdentifyExtern,
   equals: EqualsExtern,
@@ -135,17 +137,17 @@ pub extern "C" fn externs_set(
   store_list: StoreListExtern,
   store_bytes: StoreBytesExtern,
   store_i32: StoreI32Extern,
-  project: ProjectExtern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
   py_str_type: TypeId,
 ) {
-  externs::set_externs(Externs::new(
-    ext_context,
+  externs::set_externs(Externs {
+    context,
     log,
     log_level,
     call,
+    generator_send,
     eval,
     identify,
     equals,
@@ -158,12 +160,11 @@ pub extern "C" fn externs_set(
     store_list,
     store_bytes,
     store_i32,
-    project,
     project_ignoring_type,
     project_multi,
     create_exception,
     py_str_type,
-  ));
+  });
 }
 
 #[no_mangle]
@@ -186,7 +187,6 @@ pub extern "C" fn externs_val_for(key: Key) -> Value {
 pub extern "C" fn scheduler_create(
   tasks_ptr: *mut Tasks,
   construct_snapshot: Function,
-  construct_snapshots: Function,
   construct_file_content: Function,
   construct_files_content: Function,
   construct_path_stat: Function,
@@ -199,13 +199,13 @@ pub extern "C" fn scheduler_create(
   type_has_variants: TypeConstraint,
   type_path_globs: TypeConstraint,
   type_snapshot: TypeConstraint,
-  type_snapshots: TypeConstraint,
   type_files_content: TypeConstraint,
   type_dir: TypeConstraint,
   type_file: TypeConstraint,
   type_link: TypeConstraint,
   type_process_request: TypeConstraint,
   type_process_result: TypeConstraint,
+  type_generator: TypeConstraint,
   type_string: TypeId,
   type_bytes: TypeId,
   build_root_buf: Buffer,
@@ -224,7 +224,6 @@ pub extern "C" fn scheduler_create(
     tasks,
     Types {
       construct_snapshot: construct_snapshot,
-      construct_snapshots: construct_snapshots,
       construct_file_content: construct_file_content,
       construct_files_content: construct_files_content,
       construct_path_stat: construct_path_stat,
@@ -237,13 +236,13 @@ pub extern "C" fn scheduler_create(
       has_variants: type_has_variants,
       path_globs: type_path_globs,
       snapshot: type_snapshot,
-      snapshots: type_snapshots,
       files_content: type_files_content,
       dir: type_dir,
       file: type_file,
       link: type_link,
       process_request: type_process_request,
       process_result: type_process_result,
+      generator: type_generator,
       string: type_string,
       bytes: type_bytes,
     },
@@ -324,6 +323,13 @@ pub extern "C" fn tasks_task_begin(
 }
 
 #[no_mangle]
+pub extern "C" fn tasks_add_get(tasks_ptr: *mut Tasks, product: TypeConstraint, subject: TypeId) {
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.add_get(product, subject);
+  })
+}
+
+#[no_mangle]
 pub extern "C" fn tasks_add_select(tasks_ptr: *mut Tasks, product: TypeConstraint) {
   with_tasks(tasks_ptr, |tasks| {
     tasks.add_select(product, None);
@@ -358,24 +364,6 @@ pub extern "C" fn tasks_add_select_dependencies(
       dep_product,
       field.to_string().expect("field to be a string"),
       field_types.to_vec(),
-    );
-  })
-}
-
-#[no_mangle]
-pub extern "C" fn tasks_add_select_projection(
-  tasks_ptr: *mut Tasks,
-  product: TypeConstraint,
-  projected_subject: TypeId,
-  field: Buffer,
-  input_product: TypeConstraint,
-) {
-  with_tasks(tasks_ptr, |tasks| {
-    tasks.add_select_projection(
-      product,
-      projected_subject,
-      field.to_string().expect("field to be a string"),
-      input_product,
     );
   })
 }

@@ -5,13 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import sys
 from collections import OrderedDict, namedtuple
+
+from pants.util.memo import memoized
 
 
 def datatype(*args, **kwargs):
-  """A wrapper for `namedtuple` that accounts for the type of the object in equality.
-
-  """
+  """A wrapper for `namedtuple` that accounts for the type of the object in equality."""
   class DataType(namedtuple(*args, **kwargs)):
     __slots__ = ()
 
@@ -49,3 +50,21 @@ def datatype(*args, **kwargs):
       return tuple(super(DataType, self).__iter__())
 
   return DataType
+
+
+class Collection(object):
+  """Constructs classes representing collections of objects of a particular type."""
+
+  @classmethod
+  @memoized
+  def of(cls, *element_types):
+    union = '|'.join(element_type.__name__ for element_type in element_types)
+    type_name = b'{}.of({})'.format(cls.__name__, union)
+    supertypes = (cls, datatype('Collection', ['dependencies']))
+    properties = {'element_types': element_types}
+    collection_of_type = type(type_name, supertypes, properties)
+
+    # Expose the custom class type at the module level to be pickle compatible.
+    setattr(sys.modules[cls.__module__], type_name, collection_of_type)
+
+    return collection_of_type

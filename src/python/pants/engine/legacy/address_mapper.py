@@ -9,11 +9,10 @@ import logging
 import os
 
 from pants.base.build_file import BuildFile
-from pants.base.specs import DescendantAddresses, SiblingAddresses
+from pants.base.specs import DescendantAddresses, SiblingAddresses, Specs
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import BuildFilesCollection, Specs
 from pants.engine.mapper import ResolveError
 from pants.engine.nodes import Throw
 from pants.util.dirutil import fast_relpath
@@ -33,14 +32,10 @@ class LegacyAddressMapper(AddressMapper):
     self._build_root = build_root
 
   def scan_build_files(self, base_path):
-    specs = (DescendantAddresses(base_path),)
-    build_files_collection, = self._scheduler.product_request(BuildFilesCollection, [Specs(specs)])
+    build_file_addresses = self._internal_scan_specs([DescendantAddresses(base_path)],
+                                                     missing_is_fatal=False)
 
-    build_files_set = set()
-    for build_files in build_files_collection.dependencies:
-      build_files_set.update(f.path for f in build_files.files_content.dependencies)
-
-    return build_files_set
+    return {bfa.rel_path for bfa in build_file_addresses}
 
   @staticmethod
   def any_is_declaring_file(address, file_paths):

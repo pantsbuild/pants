@@ -29,7 +29,6 @@ function usage() {
   echo "              if running core python tests, divide them into"
   echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
   echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
-  echo " -a           skip android targets when running tests"
   echo " -n           skip contrib python tests"
   echo " -e           skip rust tests"
   echo " -y SHARD_NUMBER/TOTAL_SHARDS"
@@ -76,18 +75,11 @@ while getopts "hfxbkmsrjlpeu:ny:ci:at" opt; do
     y) python_contrib_shard=${OPTARG} ;;
     c) skip_integration="true" ;;
     i) python_intg_shard=${OPTARG} ;;
-    a) skip_android="true" ;;
     t) skip_lint="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
 shift $((${OPTIND} - 1))
-
-# Android testing requires the SDK to be installed and configured in Pants.
-# Skip if ANDROID_HOME isn't configured in the environment
-if [[ -z "${ANDROID_HOME}"  || "${skip_android:-false}" == "true" ]] ; then
-  export SKIP_ANDROID_PATTERN='contrib/android'
-fi
 
 echo
 if [[ $# > 0 ]]; then
@@ -209,8 +201,7 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
   fi
   start_travis_section "ContribTests" "Running contrib python tests${shard_desc}"
   (
-    ./pants.pex ${PANTS_ARGS[@]} --exclude-target-regexp='.*/testprojects/.*' \
-    --build-ignore=$SKIP_ANDROID_PATTERN test.pytest \
+    ./pants.pex ${PANTS_ARGS[@]} --exclude-target-regexp='.*/testprojects/.*' test.pytest \
     --test-pytest-test-shard=${python_contrib_shard} \
     contrib:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Contrib python test failure"
@@ -222,8 +213,16 @@ if [[ "${skip_rust_tests:-false}" == "false" ]]; then
   (
     source "${REPO_ROOT}/build-support/pants_venv"
     source "${REPO_ROOT}/build-support/bin/native/bootstrap.sh"
+
+    test_threads_flag=""
+    if [[ "$(uname)" == "Darwin" ]]; then
+      # The osx travis environment has a low file descriptors ulimit, so we avoid running too many
+      # tests in parallel.
+      test_threads_flag="--test-threads=1"
+    fi
+
     activate_pants_venv
-    RUST_BACKTRACE=1 PANTS_SRCPATH="${REPO_ROOT}/src/python" ensure_cffi_sources=1 run_cargo test "${MODE_FLAG}" --all --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml"
+    RUST_BACKTRACE=1 PANTS_SRCPATH="${REPO_ROOT}/src/python" ensure_cffi_sources=1 run_cargo test "${MODE_FLAG}" --all --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" -- "${test_threads_flag}"
   ) || die "Pants rust test failure"
   end_travis_section
 fi

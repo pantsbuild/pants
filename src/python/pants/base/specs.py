@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from abc import abstractmethod
 
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
+from pants.util.objects import Collection, datatype
 
 
 class Spec(AbstractClass):
@@ -58,3 +58,7 @@ class AscendantAddresses(datatype('AscendantAddresses', ['directory']), Spec):
 
   def to_spec_string(self):
     return '{}^'.format(self.directory)
+
+
+class Specs(Collection.of(Spec)):
+  """A collection of Spec subclasses."""

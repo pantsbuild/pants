@@ -110,7 +110,7 @@ final class Util {
       return vanillaDisplayName;
     }
 
-    StringBuffer sb = new StringBuffer(className.length() + methodName.length() + 1);
+    StringBuilder sb = new StringBuilder(className.length() + methodName.length() + 1);
     sb.append(className);
     sb.append("#");
     sb.append(methodName);

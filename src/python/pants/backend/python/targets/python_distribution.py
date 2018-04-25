@@ -61,3 +61,11 @@ class PythonDistribution(Target):
         PythonIdentity.parse_requirement(req)
       except ValueError as e:
         raise TargetDefinitionException(self, str(e))
+
+  @property
+  def has_native_sources(self):
+    return self.has_sources(extension=('.c', '.cpp', '.cc'))
+
+  @property
+  def platforms(self):
+    return ['current']

@@ -48,6 +48,6 @@ junit_tests(name='annotated-serial',
 jar_library(
   name='junit-runner-annotations',
   jars=[
-    jar(org='org.pantsbuild', name='junit-runner-annotations', rev='0.0.11'),
+    jar(org='org.pantsbuild', name='junit-runner-annotations', rev='0.0.21'),
   ],
 )

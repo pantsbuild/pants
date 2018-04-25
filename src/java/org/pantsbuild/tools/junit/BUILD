@@ -14,6 +14,10 @@ java_library(
   dependencies=[
     '3rdparty:args4j',
     '3rdparty:guava',
+    '3rdparty:javax-activation',
+    '3rdparty:jaxb-api',
+    '3rdparty:jaxb-core',
+    '3rdparty:jaxb-impl',
     '3rdparty:junit',
     '3rdparty/jvm/commons-io:commons-io',
     'src/java/org/pantsbuild/args4j',

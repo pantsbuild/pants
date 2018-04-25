@@ -6,12 +6,8 @@ target(
   dependencies = [
     ':dependencies',
     ':depmap',
-    ':eclipse_gen',
-    ':ensime_gen',
     ':export',
     ':filedeps',
-    ':ide_gen',
-    ':idea_gen',
     ':idea_plugin_gen',
   ],
 )
@@ -36,42 +32,6 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/task',
   ],
-)
-
-python_library(
-  name = 'eclipse_gen',
-  sources = ['eclipse_gen.py'],
-  dependencies = [
-    ':eclipse_gen_resources',
-    ':ide_gen',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:generator',
-    'src/python/pants/util:dirutil',
-  ],
-)
-
-resources(
-  name = 'eclipse_gen_resources',
-  sources = globs('templates/eclipse/*.mustache', 'templates/eclipse/*.prefs'),
-)
-
-python_library(
-  name = 'ensime_gen',
-  sources = ['ensime_gen.py'],
-  dependencies = [
-    ':ensime_gen_resources',
-    ':ide_gen',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:generator',
-    'src/python/pants/util:dirutil',
-  ],
-)
-
-resources(
-  name = 'ensime_gen_resources',
-  sources = globs('templates/ensime/*.mustache'),
 )
 
 python_library(
@@ -110,44 +70,6 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
     'src/python/pants/task',
-  ],
-)
-
-python_library(
-  name = 'ide_gen',
-  sources = ['ide_gen.py'],
-  dependencies = [
-    '3rdparty/python:pathspec',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/jvm/subsystems:scala_platform',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/jvm/tasks:classpath_products',
-    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
-    'src/python/pants/backend/jvm/tasks:nailgun_task',
-    'src/python/pants/backend/python/targets',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:build_file',
-    'src/python/pants/base:deprecated',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/build_graph',
-    'src/python/pants/util:desktop',
-    'src/python/pants/util:dirutil',
-  ],
-)
-
-python_library(
-  name = 'idea_gen',
-  sources = ['idea_gen.py'],
-  dependencies = [
-    ':ide_gen',
-    ':idea_resources',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:generator',
-    'src/python/pants/scm:git',
-    'src/python/pants/util:dirutil',
   ],
 )
 
