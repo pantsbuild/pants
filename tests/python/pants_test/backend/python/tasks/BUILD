@@ -54,7 +54,7 @@ python_tests(
 
 python_tests(
   name='integration',
-  sources=globs('test_python_distribution_integration.py'),
+  sources=globs('*_integration.py'),
   dependencies=[
     '3rdparty/python:pex',
     'src/python/pants/util:contextutil',
