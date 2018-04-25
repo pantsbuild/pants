@@ -47,7 +47,7 @@ macro_rules! try_future {
 
 impl CommandRunner {
 
-  const BACKOFF_INCREMENTAL_MILLIS: u64 = 500;
+  const BACKOFF_INCR_WAIT_MILLIS: u64 = 500;
   const BACKOFF_MAX_WAIT_MILLIS: u64 = 5000;
 
   pub fn new(address: &str, thread_count: usize, store: Store) -> CommandRunner {
@@ -149,7 +149,7 @@ impl CommandRunner {
 
                         let backoff_period = min(
                           CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
-                          ((1 + iter_num) * CommandRunner::BACKOFF_INCREMENTAL_MILLIS));
+                          ((1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS));
 
                         let grpc_result = map_grpc_result(
                           operations_client.get_operation(&operation_request));
