@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.binaries.binary_tool import ExecutablePathProvider, NativeTool
+from pants.backend.native.config.environment import Linker, LinkerProvider
+from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
-from pants.util.memo import memoized_method
 
 
 class LLVMReleaseUrlGenerator(BinaryToolUrlGenerator):
@@ -31,7 +31,7 @@ class LLVMReleaseUrlGenerator(BinaryToolUrlGenerator):
     return [self._DIST_URL_FMT.format(version=version, base=archive_basename)]
 
 
-class LLVM(NativeTool, ExecutablePathProvider):
+class LLVM(NativeTool, LinkerProvider):
   options_scope = 'llvm'
   default_version = '6.0.0'
   archive_type = 'txz'
@@ -51,3 +51,14 @@ class LLVM(NativeTool, ExecutablePathProvider):
 
   def path_entries(self):
     return [os.path.join(self.select(), 'bin')]
+
+  _PLATFORM_SPECIFIC_LINKER_NAME = {
+    'darwin': 'ld64.lld',
+    'linux': 'lld',
+  }
+
+  def linker(self, platform):
+    return Linker(
+      path_entries=self.path_entries(),
+      exe_filename=platform.resolve_platform_specific(
+        self._PLATFORM_SPECIFIC_LINKER_NAME))

@@ -18,7 +18,7 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.pex_build_util import _resolve_multi
-from pants.backend.python.tasks.setup_py import SetupPyInvocationEnvironment, SetupPyRunner
+from pants.backend.python.tasks.setup_py import SetupPyExecutionEnvironment, SetupPyRunner
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -26,7 +26,7 @@ from pants.build_graph.address import Address
 from pants.task.task import Task
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdir
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_property
 
 
 class BuildLocalPythonDistributions(Task):
@@ -53,9 +53,17 @@ class BuildLocalPythonDistributions(Task):
   def subsystem_dependencies(cls):
     return super(BuildLocalPythonDistributions, cls).subsystem_dependencies() + (NativeToolchain.scoped(cls),)
 
-  @memoized_method
-  def _native_toolchain_instance(self):
+  @memoized_property
+  def _native_toolchain(self):
     return NativeToolchain.scoped_instance(self)
+
+  def _request_single(self, product, subject):
+    # This is not supposed to be exposed to Tasks yet -- see #4769 to track the
+    # status of exposing v2 products in v1 tasks.
+    return self.context._scheduler.product_request(product, [subject])[0]
+
+  def _setup_py_environment(self):
+    return self._request_single(SetupPyExecutionEnvironment, self._native_toolchain)
 
   @property
   def cache_target_dirs(self):
@@ -141,11 +149,6 @@ class BuildLocalPythonDistributions(Task):
                                   src_relative_to_target_base)
       shutil.copyfile(abs_src_path, src_rel_to_results_dir)
 
-  def _request_single(self, product, subject):
-    # This is not supposed to be exposed to Tasks yet -- see #4769 to track the
-    # status of exposing v2 products in v1 tasks.
-    return self.context._scheduler.product_request(product, [subject])[0]
-
   # FIXME(cosmicexplorer): We should be isolating the path to just our provided
   # toolchain, but this causes errors in Travis because distutils looks for
   # "x86_64-linux-gnu-gcc" when linking native extensions. We almost definitely
@@ -153,10 +156,10 @@ class BuildLocalPythonDistributions(Task):
   # setup.py to be able to invoke our toolchain on hosts that already have a
   # compiler installed. Right now we just put our tools at the end of the PATH.
   @contextmanager
-  def _setup_py_invocation_environment(self, pythonpath):
+  def _setup_py_execution_environment(self, pythonpath):
     setup_py_env = self._request_single(
-      SetupPyInvocationEnvironment, self._native_toolchain_instance())
-    env = setup_py_env.as_env_dict()
+      SetupPyExecutionEnvironment, self._native_toolchain)
+    env = setup_py_env.as_environment()
     if pythonpath:
       self.context.log.debug('Setting PYTHONPATH with setup_requires site directory: {}'
                              .format(pythonpath))
@@ -171,7 +174,7 @@ class BuildLocalPythonDistributions(Task):
     # TODO(cosmicexplorer): don't invoke the native toolchain unless the current
     # dist_tgt.has_native_sources? Would need some way to check whether the
     # toolchain is invoked in an integration test.
-    with self._setup_py_invocation_environment(pythonpath=pythonpath):
+    with self._setup_py_execution_environment(pythonpath=pythonpath):
       # Build a whl using SetupPyRunner and return its absolute path.
       setup_runner = SetupPyRunner(dist_target_dir, 'bdist_wheel', interpreter=interpreter)
       setup_runner.run()

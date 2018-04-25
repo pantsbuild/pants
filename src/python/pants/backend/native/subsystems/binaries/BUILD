@@ -4,8 +4,10 @@
 
 python_library(
   dependencies=[
+    'src/python/pants/backend/native/config',
     'src/python/pants/binaries',
-    'src/python/pants/subsystem',
-    'src/python/pants/util:dirutil',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:selectors',
+    'src/python/pants/util:objects',
   ],
 )

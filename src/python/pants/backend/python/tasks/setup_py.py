@@ -19,6 +19,7 @@ from pex.interpreter import PythonInterpreter
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
+from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -31,10 +32,10 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
 from pants.engine.rules import rule
-from pants.engine.selectors import Select
+from pants.engine.selectors import Get, Select
 from pants.task.task import Task
 from pants.util.contextutil import get_joined_path
-from pants.util.dirutil import safe_rmtree, safe_walk
+from pants.util.dirutil import is_executable, safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -79,21 +80,67 @@ class SetupPyRunner(InstallerBase):
     return self.__setup_command
 
 
-class SetupPyInvocationEnvironment(datatype(['joined_path'])):
+class XCodeToolsUnavailable(Exception):
+  """Raised if the XCode CLI tools were required, but could not be found."""
 
-  def as_env_dict(self):
+
+_XCODE_TOOL_LOCATIONS = {
+  'linker': '/usr/bin/ld',
+  'clang': '/usr/bin/clang',
+  'clang++': '/usr/bin/clang++',
+}
+
+
+def _detect_xcode_tools():
+  for tool_name, tool_location in _XCODE_TOOL_LOCATIONS.items():
+    if not is_executable(tool_location):
+      raise XCodeToolsUnavailable(
+        "The file at {} does not exist or is not executable. The XCode {} is "
+        "required to build native code on OSX. You may need to install the "
+        "XCode command line developer tools."
+        .format(tool_location, tool_name))
+
+  return SetupPyExecutionEnvironment(
+    exec_path='/usr/bin',
+    c_compiler_name='clang',
+    cpp_compiler_name='clang++')
+
+
+class SetupPyExecutionEnvironment(datatype([
+    'exec_path',
+    'c_compiler_name',
+    'cpp_compiler_name',
+])):
+
+  def as_environment(self):
+    # NB: Overridding LD or LDSHARED causes setup.py to try to invoke that
+    # linker directly without going through the compiler, which fails. We should
+    # probably implement #5661 soon to avoid these kind of minefields.
     return {
-      'CC': 'gcc',
-      'CXX': 'g++',
-      'PATH': self.joined_path,
+      'PATH': self.exec_path,
+      'CC': self.c_compiler_name,
+      'CXX': self.cpp_compiler_name,
     }
 
 
-@rule(SetupPyInvocationEnvironment, [Select(NativeToolchain)])
-def get_setup_py_env(native_toolchain):
-  joined_path = get_joined_path(
-    native_toolchain.path_entries(), os.environ.copy())
-  return SetupPyInvocationEnvironment(joined_path)
+@rule(SetupPyExecutionEnvironment, [Select(Platform), Select(NativeToolchain)])
+def get_setup_py_environment(platform, native_toolchain):
+  # TODO(cosmicexplorer): make it possible to yield Get with a non-static
+  # subject type and use `platform.resolve_platform_specific()`.
+  if platform.normalized_os_name == 'darwin':
+    yield _detect_xcode_tools()
+  else:
+    c_compiler = yield Get(CCompiler, NativeToolchain, native_toolchain)
+    cpp_compiler = yield Get(CppCompiler, NativeToolchain, native_toolchain)
+    linker = yield Get(Linker, NativeToolchain, native_toolchain)
+    joined_path = get_joined_path(
+      linker.path_entries +
+      c_compiler.path_entries +
+      cpp_compiler.path_entries)
+    yield SetupPyExecutionEnvironment(
+      exec_path=joined_path,
+      c_compiler_name=c_compiler.exe_filename,
+      cpp_compiler_name=cpp_compiler.exe_filename)
 
 
 class TargetAncestorIterator(object):
@@ -666,5 +713,5 @@ class SetupPy(Task):
 
 def create_setup_py_rules():
   return [
-    get_setup_py_env,
+    get_setup_py_environment,
   ]
