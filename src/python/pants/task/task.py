@@ -133,8 +133,13 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   @classmethod
   def invoke_prepare(cls, options, round_manager):
-    # Subclasses should not generally need to override this method.
+    # Subclasses should not override this method.
     return cls.prepare(cls._scoped_options(options), round_manager)
+
+  @classmethod
+  def invoke_address_products(cls, options):
+    # Subclasses should not override this method.
+    return cls.address_products(cls._scoped_options(options))
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -145,8 +150,38 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     Typically a task that requires products from other goals would register interest in those
     products here and then retrieve the requested product mappings when executed.
 
+    Only one of either `def prepare` or `def address_products` may be declared.
+
     :API: public
     """
+  prepare.__func__._canary = None
+
+  @classmethod
+  def address_products(cls, options):
+    """A tuple of product types for the root `pants.base.spec.Spec` subjects of a run.
+
+    Only one of either `def prepare` or `def address_products` may be declared.
+
+    :API: experimental
+    """
+    return tuple()
+  address_products.__func__._canary = None
+
+  @classmethod
+  def defines_prepare(cls):
+    return not hasattr(cls.prepare, '_canary')
+
+  @classmethod
+  def defines_address_products(cls):
+    return not hasattr(cls.address_products, '_canary')
+
+  @classmethod
+  def _validate_exclusive_product_methods(cls):
+    """Validates that at most one of `def prepare` and `def address_products` are implemented."""
+    if cls.defines_prepare() and cls.defines_address_products():
+      raise AssertionError(
+          'At most one of `def prepare` and `def address_products` may be defined '
+          'by a Task, but {} defines both (perhaps indirectly).'.format(cls.__name__))
 
   def __init__(self, context, workdir):
     """Subclass __init__ methods, if defined, *must* follow this idiom:
@@ -163,6 +198,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :API: public
     """
     super(TaskBase, self).__init__()
+    self._validate_exclusive_product_methods()
     self.context = context
     self._workdir = workdir
 
@@ -192,6 +228,13 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       raise TaskError('{0} Does not support passthru args.'.format(self.stable_name()))
     else:
       return self.context.options.passthru_args_for_scope(self.options_scope)
+
+  def get_address_products(self):
+    """Returns the address products for this task as a dict from product type to value list.
+
+    :API: experimental
+    """
+    return self.context.get_address_products(type(self))
 
   @property
   def skip_execution(self):

@@ -6,13 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.exceptions import TaskError
+from pants.engine.addressable import BuildFileAddresses
 from pants.task.console_task import ConsoleTask
 
 
 class ListTargets(ConsoleTask):
   """Lists all targets matching the target specs.
-
-  If no targets are specified, lists all targets in the workspace.
   """
 
   @classmethod
@@ -27,6 +26,10 @@ class ListTargets(ConsoleTask):
     register('--documented', type=bool,
              help='Print only targets that are documented with a description.')
 
+  @classmethod
+  def address_products(cls, options):
+    return (BuildFileAddresses,)
+
   def __init__(self, *args, **kwargs):
     super(ListTargets, self).__init__(*args, **kwargs)
     options = self.get_options()
@@ -34,7 +37,19 @@ class ListTargets(ConsoleTask):
     self._provides_columns = options.provides_columns
     self._documented = options.documented
 
-  def console_output(self, targets):
+  def render(self):
+    
+    visited = set()
+    for addresses in self.get_address_products()[BuildFileAddresses]:
+      for address in addresses.dependencies:
+        if address not in visited:
+          visited.add(address)
+          yield address.spec
+
+    # TODO
+    return
+    
+
     if self._provides:
       extractors = dict(
           address=lambda target: target.address.spec,

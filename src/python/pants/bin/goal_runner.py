@@ -95,7 +95,7 @@ class GoalRunnerFactory(object):
     :param TargetRoots target_roots: The existing `TargetRoots` object, if any.
     :param LegacyGraphHelper graph_helper: A LegacyGraphHelper to use for graph construction,
                                            if available. This would usually come from the daemon.
-    :returns: A tuple of (BuildGraph, AddressMapper, opt Scheduler, TargetRoots).
+    :returns: A tuple of (BuildGraph, AddressMapper, opt Scheduler, TargetRoots, products).
     """
     # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
     if not graph_helper:
@@ -118,8 +118,8 @@ class GoalRunnerFactory(object):
       build_root=self._root_dir,
       change_calculator=graph_helper.change_calculator
     )
-    graph, address_mapper = graph_helper.create_build_graph(target_roots, self._root_dir)
-    return graph, address_mapper, graph_helper.scheduler, target_roots
+    graph, address_mapper, products = graph_helper.create_build_graph(target_roots, self._root_dir)
+    return graph, address_mapper, graph_helper.scheduler, target_roots, products
 
   def _determine_goals(self, requested_goals):
     """Check and populate the requested goals for a given run."""
@@ -160,7 +160,7 @@ class GoalRunnerFactory(object):
 
   def _setup_context(self):
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
-      self._build_graph, self._address_mapper, scheduler, target_roots = self._init_graph(
+      self._build_graph, self._address_mapper, scheduler, target_roots, products = self._init_graph(
         self._global_options.pants_ignore,
         self._global_options.build_ignore,
         self._global_options.exclude_target_regexp,
@@ -174,7 +174,9 @@ class GoalRunnerFactory(object):
       goals = self._determine_goals(self._requested_goals)
       is_quiet = self._should_be_quiet(goals)
 
-      target_root_instances = self._roots_to_targets(target_roots)
+      # TODO: How will tag filtering work without Targets? May need to make tag filters
+      # a property of the `pants.base.spec.Spec` instances.
+      target_root_instances = self._roots_to_targets(target_roots) if self._build_graph is not None else None
 
       # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
       self._run_tracker.run_info.add_scm_info()
@@ -191,6 +193,7 @@ class GoalRunnerFactory(object):
                         build_graph=self._build_graph,
                         build_file_parser=self._build_file_parser,
                         address_mapper=self._address_mapper,
+                        products=products,
                         invalidation_report=invalidation_report,
                         scheduler=scheduler)
       return goals, context
