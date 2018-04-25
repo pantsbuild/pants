@@ -96,6 +96,9 @@ impl Store {
     }
   }
 
+  ///
+  /// Store a file locally.
+  ///
   pub fn store_file_bytes(&self, bytes: Bytes, initial_lease: bool) -> BoxFuture<Digest, String> {
     let len = bytes.len();
     self
@@ -106,7 +109,8 @@ impl Store {
   }
 
   ///
-  /// Loads the bytes of the file with the passed fingerprint, and returns the result of applying f
+  /// Loads the bytes of the file with the passed fingerprint from the local store
+  /// and back-fill from remote when necessary, and returns the result of applying f
   /// to that value.
   ///
   pub fn load_file_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
@@ -128,8 +132,9 @@ impl Store {
   }
 
   ///
-  /// Save the bytes of the Directory proto, without regard for any of the contents of any FileNodes
-  /// or DirectoryNodes therein (i.e. does not require that its children are already stored).
+  /// Save the bytes of the Directory proto locally, without regard for any of the
+  /// contents of any FileNodes or DirectoryNodes therein (i.e. does not require that its
+  /// children are already stored).
   ///
   pub fn record_directory(
     &self,
@@ -150,6 +155,8 @@ impl Store {
       .to_boxed()
   }
 
+  ///
+  /// Loads a directory proto from the local store, back-filling from remote if necessary.
   ///
   /// Guarantees that if an Ok Some value is returned, it is valid, and canonical, and its
   /// fingerprint exactly matches that which is requested. Will return an Err if it would return a
@@ -190,6 +197,11 @@ impl Store {
     )
   }
 
+  ///
+  /// Loads bytes from remote cas. Takes two functions f_local and f_remote. These functions are
+  /// any validation or transformations you want to perform on the bytes received from the
+  /// local and remote cas.
+  ///
   fn load_bytes_with<
     T: Send + 'static,
     FLocal: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
@@ -315,6 +327,71 @@ impl Store {
       .to_boxed()
   }
 
+  ///
+  /// Downloads directories from remote CAS recursively to the local one.
+  ///
+  pub fn ensure_local_has_recursive(&self, digests: Vec<Digest>) -> BoxFuture<(), String> {
+    let directory_queue = Vec::new();
+    let mut directory_futures = Vec::new();
+    let mut file_futures = Vec::new();
+
+    let remote = match self.remote {
+      Some(ref remote) => remote,
+      None => {
+        return future::err(format!(
+          "Cannot ensure local has blobs from remote without a remote"
+        )).to_boxed()
+      }
+    };
+
+    for digest in digests {
+      match self.local.entry_type(&digest.0) {
+        Ok(Some(EntryType::File)) => {
+          // Not sure what the function should be or if we need to be doing validation on the file
+          // just return the bytes returned from the remote cas
+          file_futures.push(self.load_file_bytes_with(digest, |bytes| bytes));
+        }
+        Ok(Some(EntryType::Directory)) => {
+          directory_futures.push(self.load_directory(digest));
+        }
+        Ok(None) => {
+          return future::err(format!(
+            "Failed to load from remote for digest {:?}: Not found",
+            digest
+          )).to_boxed() as BoxFuture<_, _>
+        }
+        Err(err) => {
+          return future::err(format!(
+            "Failed to load from remote for digest {:?}: {:?}",
+            digest, err
+          )).to_boxed() as BoxFuture<_, _>
+        }
+      };
+    }
+
+    // I  don't think this is needed...?
+    future::join_all(file_futures).map(|_| ());
+
+    future::join_all(directory_futures).map(|futures| {
+      // unpack option
+      for directory in futures {
+        match directory {
+          Some(dir) => {
+            let mut digests = Vec::new();
+            for file in dir.get_files().into_iter() {
+              digests.push(file.get_digest());
+            }
+            for subdir in dir.get_directories().into_iter() {
+              digests.push(subdir.get_digest());
+            }
+            self.ensure_local_has_recursive(digests.clone());
+          }
+          None => Err(format!("An error occurred")),
+        }
+      }
+    })
+  }
+
   pub fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(&self, digests: Ds) -> Result<(), String> {
     self.local.lease_all(digests)
   }
@@ -405,6 +482,10 @@ impl Store {
       .to_boxed()
   }
 
+  ///
+  /// Lays out the directory and all of its contents (files and directories) on disk so that a
+  /// process which uses the directory structure can run.
+  ///
   pub fn materialize_directory(
     &self,
     destination: PathBuf,
