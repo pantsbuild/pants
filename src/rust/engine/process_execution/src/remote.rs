@@ -141,7 +141,7 @@ impl CommandRunner {
                       ExecutionError::NotFinished(operation_name) => {
                         let mut operation_request =
                           bazel_protos::operations::GetOperationRequest::new();
-                        operation_request.set_name(operation_name);
+                        operation_request.set_name(operation_name.clone());
 
                         let max_wait = 5000;
                         let backoff_period = min(max_wait, ((1 + iter_num) * 500));
@@ -149,18 +149,16 @@ impl CommandRunner {
                         let grpc_result = map_grpc_result(
                           operations_client.get_operation(&operation_request)
                         );
+
                         Delay::new(Duration::from_millis(backoff_period))
-                            .then(move |res| {
-                              match res {
-                                Ok(_) => {
-                                  future::ok(
-                                    future::Loop::Continue(
-                                      (try_future!(grpc_result), iter_num + 1)))
-                                      .to_boxed() as BoxFuture<_, _>
-                                }
-                                Err(e) => future::err(e.to_string()).to_boxed()
-                              }
-                            }).to_boxed()
+                            .map_err(move |e|
+                                format!("Error from Future Delay when polling for execution result for operation {}: {}",
+                                        operation_name, e))
+                            .and_then(move |_| {
+                              future::ok(
+                                future::Loop::Continue(
+                                  (try_future!(grpc_result), iter_num + 1))).to_boxed()
+                            }).to_boxed() as BoxFuture<_, _>
                       },
                     }
                   })
