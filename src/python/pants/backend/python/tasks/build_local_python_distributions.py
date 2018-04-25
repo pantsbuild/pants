@@ -104,6 +104,8 @@ class BuildLocalPythonDistributions(Task):
       shutil.copyfile(abs_src_path, src_rel_to_results_dir)
 
   def _request_single(self, product, subject):
+    # This is not supposed to be exposed to Tasks yet -- see #4769 to track the
+    # status of exposing v2 products in v1 tasks.
     return self.context._scheduler.product_request(product, [subject])[0]
 
   # FIXME(cosmicexplorer): We should be isolating the path to just our provided
