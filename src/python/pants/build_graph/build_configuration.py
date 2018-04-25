@@ -33,6 +33,7 @@ class BuildConfiguration(object):
     self._exposed_object_by_alias = {}
     self._exposed_context_aware_object_factory_by_alias = {}
     self._subsystems = set()
+    self._rules = []
 
   def registered_aliases(self):
     """Return the registered aliases exposed in BUILD files.
@@ -128,6 +129,18 @@ class BuildConfiguration(object):
     :rtype set
     """
     return self._subsystems
+
+  def register_rules(self, rules):
+    """???"""
+
+    if not isinstance(rules, Iterable):
+      raise TypeError('The rules must be an iterable, given {}'.format(rules))
+    # TODO: ensure that they are all rules
+    self._rules.extend(rules)
+
+  def rules(self):
+    """???"""
+    return self._rules
 
   @memoized_method
   def _get_addressable_factory(self, target_type, alias):
