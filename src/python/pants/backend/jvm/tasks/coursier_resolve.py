@@ -341,7 +341,7 @@ class CoursierMixin(NailgunTask):
 
     with self.context.new_workunit(name='coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
       return_code = self.runjava(
-        classpath=[coursier_jar],
+        classpath=['/Users/yic/workspace/coursier_dev/dist/coursier-cli.jar'],
         main='coursier.cli.Coursier',
         args=cmd_args,
         jvm_options=self.get_options().jvm_options,
