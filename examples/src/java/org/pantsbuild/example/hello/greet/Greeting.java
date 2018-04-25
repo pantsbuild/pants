@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Scanner;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 public final class Greeting {
   public static String greetFromFile(String filename) throws IOException {
     FileInputStream is = new FileInputStream(filename);
@@ -28,7 +30,7 @@ public final class Greeting {
   }
 
   public static String greetFromStream(InputStream is) throws IOException {
-    return greet(new Scanner(is).useDelimiter("\\Z").next());
+    return greet(new Scanner(is, UTF_8.name()).useDelimiter("\\Z").next());
   }
 
   public static String greet(String greetee) {

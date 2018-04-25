@@ -1,9 +1,17 @@
+extern crate bazel_protos;
 extern crate bytes;
+extern crate digest;
+extern crate hashing;
+extern crate protobuf;
+extern crate sha2;
 
+use bytes::Bytes;
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
-use bytes::Bytes;
+
+pub mod data;
+pub mod file;
 
 pub fn owned_string_vec(args: &[&str]) -> Vec<String> {
   args.into_iter().map(|s| s.to_string()).collect()
