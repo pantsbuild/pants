@@ -11,8 +11,9 @@ use futures::future::{self, join_all};
 use hashing::{Digest, Fingerprint};
 use itertools::Itertools;
 use {File, FileContent, PathStat, Store};
+use ordermap::{self, OrderMap};
 use protobuf;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fmt;
 use std::path::PathBuf;
@@ -157,22 +158,38 @@ impl Snapshot {
   /// copy should be straightforward.
   ///
   pub fn merge(store: Store, snapshots: &[Snapshot]) -> BoxFuture<Snapshot, String> {
-    // TODO: We can expect to fail for colliding files in `merge_helper`, but we will need to
-    // de-dupe PathStat::Dir entries here.
-    let path_stats = snapshots
-      .iter()
-      .map(|s| s.path_stats.iter().cloned())
-      .flatten()
-      .collect();
-    // Recursively merge the Digests in the Snapshots, while verifying no collisions.
-    Self::merge_helper(
-      store,
-      PathBuf::from(""),
-      snapshots.iter().map(|s| s.digest).collect(),
-    ).map(move |root_digest| Snapshot {
-      digest: root_digest,
-      path_stats: path_stats,
-    })
+    // We dedupe PathStats by their symbolic names, as those will be their names within the
+    // `Directory` structure. Only `Dir+Dir` collisions are legal.
+    let path_stats = {
+      let mut uniq_paths: OrderMap<PathBuf, PathStat> = OrderMap::new();
+      for path_stat in snapshots
+        .iter()
+        .map(|s| s.path_stats.iter().cloned())
+        .flatten()
+      {
+        match uniq_paths.entry(path_stat.path().to_owned()) {
+          ordermap::Entry::Occupied(e) => match (&path_stat, e.get()) {
+            (&PathStat::Dir { .. }, &PathStat::Dir { .. }) => (),
+            (x, y) => {
+              return future::err(format!(
+                "Snapshots contained duplicate path: {:?} vs {:?}",
+                x, y
+              )).to_boxed()
+            }
+          },
+          ordermap::Entry::Vacant(v) => {
+            v.insert(path_stat);
+          }
+        }
+      }
+      uniq_paths.into_iter().map(|(_, v)| v).collect()
+    };
+    // Recursively merge the Digests in the Snapshots.
+    Self::merge_helper(store, snapshots.iter().map(|s| s.digest).collect())
+      .map(move |root_digest| Snapshot {
+        digest: root_digest,
+        path_stats: path_stats,
+      })
       .to_boxed()
   }
 
@@ -180,11 +197,7 @@ impl Snapshot {
   /// Given Digest(s) representing Directory instances, merge them recursively into a single
   /// output Directory Digest. Fails for collisions.
   ///
-  fn merge_helper(
-    store: Store,
-    path_so_far: PathBuf,
-    dir_digests: Vec<Digest>,
-  ) -> BoxFuture<Digest, String> {
+  fn merge_helper(store: Store, dir_digests: Vec<Digest>) -> BoxFuture<Digest, String> {
     if dir_digests.is_empty() {
       // TODO: This will not have been stored... we'll need to explicitly store it.
       return future::ok(EMPTY_DIGEST).to_boxed();
@@ -208,23 +221,7 @@ impl Snapshot {
       .and_then(move |mut directories| {
         let mut out_dir = bazel_protos::remote_execution::Directory::new();
 
-        // Merge FileNodes, failing for any duplicates.
-        let duplicated_filenames = {
-          let mut uniq_filenames = HashSet::new();
-          directories
-            .iter()
-            .map(|directory| directory.files.iter())
-            .flatten()
-            .filter(move |filenode| !uniq_filenames.insert(filenode.name.clone()))
-            .map(|filenode| filenode.name.clone())
-            .collect::<Vec<_>>()
-        };
-        if !duplicated_filenames.is_empty() {
-          return future::err(format!(
-            "Multiple instances of filename {:?} existed under path {:?}.",
-            duplicated_filenames, path_so_far
-          )).to_boxed() as BoxFuture<_, _>;
-        }
+        // Merge FileNodes.
         out_dir.set_files(protobuf::RepeatedField::from_vec(
           directories
             .iter_mut()
@@ -253,7 +250,6 @@ impl Snapshot {
             .map(move |(child_name, group)| {
               Self::merge_helper(
                 store2.clone(),
-                path_so_far.join(&child_name),
                 group.map(|d| d.get_digest().into()).collect(),
               ).map(move |merged_digest| {
                 let mut child_dir = bazel_protos::remote_execution::DirectoryNode::new();
@@ -570,6 +566,33 @@ mod tests {
         .into_iter()
         .collect()
     );
+  }
+
+  #[test]
+  fn snapshot_merge_colliding() {
+    let (store, tempdir, _, digester) = setup();
+
+    let file = make_file_stat(
+      tempdir.path(),
+      &PathBuf::from("roland"),
+      STR.as_bytes(),
+      false,
+    );
+
+    let merged_res = {
+      let snapshot = Snapshot::from_path_stats(store.clone(), digester.clone(), vec![file])
+        .wait()
+        .unwrap();
+      Snapshot::merge(store.clone(), &[snapshot.clone(), snapshot]).wait()
+    };
+
+    match merged_res {
+      Err(ref msg) if msg.contains("Snapshots contained duplicate path: ") => (),
+      x => panic!(
+        "Snapshot::merge should have failed with a useful message; got: {:?}",
+        x
+      ),
+    }
   }
 
   #[test]
