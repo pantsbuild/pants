@@ -1,9 +1,10 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use futures::future::{self, Future};
 
@@ -14,6 +15,29 @@ use graph::EntryId;
 use nodes::{NodeKey, Select};
 use rule_graph;
 use selectors;
+
+pub struct Session {
+  // The set of roots that have been requested within this session.
+  roots: Mutex<HashSet<Root>>,
+}
+
+impl Session {
+  fn new() -> Session {
+    Session {
+      roots: Mutex::new(HashSet::new())
+    }
+  }
+
+  fn extend(&self, new_roots: &[Root]) {
+    let mut roots = self.roots.lock().unwrap();
+    roots.extend(new_roots.iter().cloned());
+  }
+
+  fn root_nodes(&self) -> Vec<NodeKey> {
+    let mut roots = self.roots.lock().unwrap();
+    roots.iter().map(|r| r.clone().into()).collect()
+  }
+}
 
 pub struct ExecutionRequest {
   // Set of roots for an execution, in the order they were declared.
@@ -94,6 +118,15 @@ impl Scheduler {
   }
 
   ///
+  /// TODO: Convert `extern::store_i32` to i64, and expand the range here. 
+  ///
+  pub fn metrics(&self, session: &Session) -> HashMap<&str, i32> {
+    let mut m = HashMap::new();
+    m.insert("affected_files", self.core.graph.reachable_digest_count(&session.root_nodes()) as i32);
+    m
+  }
+
+  ///
   /// Attempts to complete all of the given roots, retrying the entire set (up to `count`
   /// times) if any of them fail with `Failure::Invalidated`.
   ///
@@ -145,11 +178,14 @@ impl Scheduler {
   /// Compute the results for roots in the given request.
   ///
   pub fn execute<'e>(
-    &mut self,
+    &self,
     request: &'e ExecutionRequest,
+    session: &Session,
   ) -> Vec<(&'e Key, &'e TypeConstraint, RootResult)> {
     // Bootstrap tasks for the roots, and then wait for all of them.
     debug!("Launching {} roots.", request.roots.len());
+
+    session.extend(&request.roots);
 
     // Wait for all roots to complete. Failure here should be impossible, because each
     // individual Future in the join was (eventually) mapped into success.
