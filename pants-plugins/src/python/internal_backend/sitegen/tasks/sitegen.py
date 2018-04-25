@@ -251,22 +251,46 @@ def generate_site_toc(config, precomputed, here):
 
   def recurse(tree, depth_so_far):
     for node in tree:
-      if 'heading' in node:
+      if 'heading' in node and 'pages' in node:
+        heading = node['heading']
+        pages = node['pages']
+        links = []
+        for i in pages:
+          if i == here:
+            link = here +'.html'
+          else:
+            link = os.path.relpath(i + '.html', os.path.dirname(here))
+          links.append(dict(link=link, 
+                            text=precomputed.page[i].title,
+                            here=(i == here)))
+        site_toc.append(dict(depth=depth_so_far,
+                             links=links,
+                             dropdown=True,
+                             heading=heading,
+                             id=heading.replace(' ','-')))
+      if 'heading' in node and 'pages' not in node:
         heading = node['heading']
         site_toc.append(dict(depth=depth_so_far,
-                             link=None,
-                             text=heading,
-                             here=False))
-      if 'page' in node and node['page'] != 'index':
-        dst = node['page']
-        if dst == here:
-          link = here + '.html'
-        else:
-          link = os.path.relpath(dst + '.html', os.path.dirname(here))
+                             links=None,
+                             dropdown=False,
+                             heading=heading,
+                             id=heading.replace(' ','-')))
+      if 'pages' in node and 'heading' not in node:
+        pages = node['pages']
+        links = []
+        for i in pages:
+          if i == here:
+            link = here +'.html'
+          else:
+            link = os.path.relpath(i + '.html', os.path.dirname(here))
+          links.append(dict(link=link, 
+                            text=precomputed.page[i].title,
+                            here=(i == here)))
         site_toc.append(dict(depth=depth_so_far,
-                             link=link,
-                             text=precomputed.page[dst].title,
-                             here=(dst == here)))
+                             links=links,
+                             dropdown=False,
+                             heading=None,
+                             id=heading.replace(' ','-')))
       if 'children' in node:
         recurse(node['children'], depth_so_far + 1)
   if 'tree' in config:
