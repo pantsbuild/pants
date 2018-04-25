@@ -46,6 +46,10 @@ macro_rules! try_future {
 }
 
 impl CommandRunner {
+
+  const BACKOFF_INCREMENTAL_MILLIS: u64 = 500;
+  const BACKOFF_MAX_WAIT_MILLIS: u64 = 5000;
+
   pub fn new(address: &str, thread_count: usize, store: Store) -> CommandRunner {
     let env = Arc::new(grpcio::Environment::new(thread_count));
     let channel = grpcio::ChannelBuilder::new(env.clone()).connect(address);
@@ -143,12 +147,12 @@ impl CommandRunner {
                           bazel_protos::operations::GetOperationRequest::new();
                         operation_request.set_name(operation_name.clone());
 
-                        let max_wait = 5000;
-                        let backoff_period = min(max_wait, ((1 + iter_num) * 500));
+                        let backoff_period = min(
+                          CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
+                          ((1 + iter_num) * CommandRunner::BACKOFF_INCREMENTAL_MILLIS));
 
                         let grpc_result = map_grpc_result(
-                          operations_client.get_operation(&operation_request)
-                        );
+                          operations_client.get_operation(&operation_request));
 
                         Delay::new(Duration::from_millis(backoff_period))
                             .map_err(move |e|
