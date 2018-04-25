@@ -7,12 +7,12 @@ use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use futures::Future;
-use futures::future::join_all;
+use futures::future::{self, join_all};
 use hashing::{Digest, Fingerprint};
 use itertools::Itertools;
 use {File, FileContent, PathStat, Store};
 use protobuf;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::fmt;
 use std::path::PathBuf;
@@ -144,6 +144,129 @@ impl Snapshot {
         directory.set_directories(protobuf::RepeatedField::from_vec(dirs));
         directory.set_files(protobuf::RepeatedField::from_vec(files));
         store.record_directory(&directory, true)
+      })
+      .to_boxed()
+  }
+
+  ///
+  /// Given N Snapshots, returns a new Snapshot that merges them.
+  ///
+  /// Any files that exist in multiple Snapshots will cause this method to fail: the assumption
+  /// behind this behaviour is that almost any colliding file would represent a Rule implementation
+  /// error, and in cases where overwriting a file is desirable, explicitly removing a duplicated
+  /// copy should be straightforward.
+  ///
+  pub fn merge(store: Store, snapshots: &[Snapshot]) -> BoxFuture<Snapshot, String> {
+    // TODO: We can expect to fail for colliding files in `merge_helper`, but we will need to
+    // de-dupe PathStat::Dir entries here.
+    let path_stats = snapshots
+      .iter()
+      .map(|s| s.path_stats.iter().cloned())
+      .flatten()
+      .collect();
+    // Recursively merge the Digests in the Snapshots, while verifying no collisions.
+    Self::merge_helper(
+      store,
+      PathBuf::from(""),
+      snapshots.iter().map(|s| s.digest).collect(),
+    ).map(move |root_digest| Snapshot {
+      digest: root_digest,
+      path_stats: path_stats,
+    })
+      .to_boxed()
+  }
+
+  ///
+  /// Given Digest(s) representing Directory instances, merge them recursively into a single
+  /// output Directory Digest. Fails for collisions.
+  ///
+  fn merge_helper(
+    store: Store,
+    path_so_far: PathBuf,
+    mut dir_digests: Vec<Digest>,
+  ) -> BoxFuture<Digest, String> {
+    if dir_digests.is_empty() {
+      // TODO: This will not have been stored... we'll need to explicitly store it.
+      return future::ok(EMPTY_DIGEST).to_boxed();
+    } else if dir_digests.len() == 1 {
+      return future::ok(dir_digests.pop().unwrap()).to_boxed();
+    }
+
+    let directories = dir_digests
+      .into_iter()
+      .map(|digest| {
+        store
+          .load_directory(digest)
+          .and_then(move |maybe_directory| {
+            maybe_directory
+              .ok_or_else(|| format!("Digest {:?} did not exist in the Store.", digest))
+          })
+      })
+      .collect::<Vec<_>>();
+    join_all(directories)
+      .and_then(move |mut directories| {
+        let mut out_dir = bazel_protos::remote_execution::Directory::new();
+
+        // Merge FileNodes, failing for any duplicates.
+        let duplicated_filenames = {
+          let mut uniq_filenames = HashSet::new();
+          directories
+            .iter()
+            .map(|directory| directory.files.iter())
+            .flatten()
+            .filter(move |filenode| !uniq_filenames.insert(filenode.name.clone()))
+            .map(|filenode| filenode.name.clone())
+            .collect::<Vec<_>>()
+        };
+        if !duplicated_filenames.is_empty() {
+          return future::err(format!(
+            "Multiple instances of filename {:?} existed under path {:?}.",
+            duplicated_filenames, path_so_far
+          )).to_boxed() as BoxFuture<_, _>;
+        }
+        out_dir.set_files(protobuf::RepeatedField::from_vec(
+          directories
+            .iter_mut()
+            .map(|directory| directory.take_files().into_iter())
+            .flatten()
+            .collect(),
+        ));
+        out_dir.mut_files().sort_by(|a, b| a.name.cmp(&b.name));
+
+        // Group and recurse for DirectoryNodes.
+        let sorted_child_directories = {
+          let mut merged_directories = directories
+            .iter_mut()
+            .map(|directory| directory.take_directories().into_iter())
+            .flatten()
+            .collect::<Vec<_>>();
+          merged_directories.sort_by(|a, b| a.name.cmp(&b.name));
+          merged_directories
+        };
+        let store2 = store.clone();
+        join_all(
+          sorted_child_directories
+            .into_iter()
+            .group_by(|d| d.name.clone())
+            .into_iter()
+            .map(move |(child_name, group)| {
+              Self::merge_helper(
+                store2.clone(),
+                path_so_far.join(&child_name),
+                group.map(|d| d.get_digest().into()).collect(),
+              ).map(move |merged_digest| {
+                let mut child_dir = bazel_protos::remote_execution::DirectoryNode::new();
+                child_dir.set_name(child_name);
+                child_dir.set_digest((&merged_digest).into());
+                child_dir
+              })
+            })
+            .collect::<Vec<_>>(),
+        ).and_then(move |child_directories| {
+          out_dir.set_directories(protobuf::RepeatedField::from_vec(child_directories));
+          store.record_directory(&out_dir, true)
+        })
+          .to_boxed() as BoxFuture<_, _>
       })
       .to_boxed()
   }
