@@ -12,5 +12,5 @@ class InvalidSpecConstraint(Exception):
   """Raised when invalid constraints are given via target specs and arguments like --changed*."""
 
 
-class TargetRoots(datatype('TargetRoots', ['specs'])):
+class TargetRoots(datatype(['specs'])):
   """Determines the target roots for a given pants run."""

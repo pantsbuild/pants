@@ -69,7 +69,7 @@ class JarDependencyParseContextWrapper(object):
                          excludes, self._parse_context.rel_path)
 
 
-class JarDependency(datatype('JarDependency', [
+class JarDependency(datatype([
   'org', 'base_name', 'rev', 'force', 'ext', 'url', 'apidocs',
   'classifier', 'mutable', 'intransitive', 'excludes', 'base_path'])):
   """A pre-built Maven repository dependency.

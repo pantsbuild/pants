@@ -46,7 +46,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     """
     return ()
 
-  class ExtraFile(datatype('ExtraFile', ['path', 'content'])):
+  class ExtraFile(datatype(['path', 'content'])):
     """Models an extra file to place in a PEX."""
 
     @classmethod

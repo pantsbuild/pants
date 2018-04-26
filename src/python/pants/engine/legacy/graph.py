@@ -42,7 +42,7 @@ def target_types_from_symbol_table(symbol_table):
   return target_types
 
 
-class _DestWrapper(datatype('DestWrapper', ['target_types'])):
+class _DestWrapper(datatype(['target_types'])):
   """A wrapper for dest field of RemoteSources target.
 
   This is only used when instantiating RemoteSources target.
@@ -264,7 +264,7 @@ class LegacyBuildGraph(BuildGraph):
       yield hydrated_target.address
 
 
-class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependencies'])):
+class HydratedTarget(datatype(['address', 'adaptor', 'dependencies'])):
   """A wrapper for a fully hydrated TargetAdaptor object.
 
   Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge amount
@@ -287,11 +287,11 @@ class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependen
     return hash(self.address)
 
 
-class TransitiveHydratedTarget(datatype('TransitiveHydratedTarget', ['root', 'dependencies'])):
+class TransitiveHydratedTarget(datatype(['root', 'dependencies'])):
   """A recursive structure wrapping a HydratedTarget root and TransitiveHydratedTarget deps."""
 
 
-class TransitiveHydratedTargets(datatype('TransitiveHydratedTargets', ['roots', 'closure'])):
+class TransitiveHydratedTargets(datatype(['roots', 'closure'])):
   """A set of HydratedTarget roots, and their transitive, flattened, de-duped closure."""
 
 
@@ -338,7 +338,7 @@ def hydrated_targets(build_file_addresses):
   yield HydratedTargets(targets)
 
 
-class HydratedField(datatype('HydratedField', ['name', 'value'])):
+class HydratedField(datatype(['name', 'value'])):
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
 
 

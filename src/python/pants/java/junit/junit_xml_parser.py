@@ -16,7 +16,7 @@ from pants.util.objects import datatype
 from pants.util.xml_parser import XmlParser
 
 
-class Test(datatype('Test', ['classname', 'methodname'])):
+class Test(datatype(['classname', 'methodname'])):
   """Describes a junit-style test or collection of tests."""
 
   def __new__(cls, classname, methodname=None):

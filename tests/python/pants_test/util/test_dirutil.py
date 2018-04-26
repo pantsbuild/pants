@@ -143,10 +143,10 @@ class DirutilTest(unittest.TestCase):
       with temporary_dir() as dst:
         yield root, dst
 
-  class Dir(datatype('Dir', ['path'])):
+  class Dir(datatype(['path'])):
     pass
 
-  class File(datatype('File', ['path', 'contents'])):
+  class File(datatype(['path', 'contents'])):
     @classmethod
     def empty(cls, path):
       return cls(path, contents=b'')
@@ -156,7 +156,7 @@ class DirutilTest(unittest.TestCase):
       with open(os.path.join(root, relpath)) as fp:
         return cls(relpath, fp.read())
 
-  class Symlink(datatype('Symlink', ['path'])):
+  class Symlink(datatype(['path'])):
     pass
 
   def assert_tree(self, root, *expected):

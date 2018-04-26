@@ -32,7 +32,7 @@ def constraint_for(type_or_constraint):
     raise TypeError("Expected a type or constraint: got: {}".format(type_or_constraint))
 
 
-class Get(datatype('Get', ['product', 'subject'])):
+class Get(datatype(['product', 'subject'])):
   """Experimental synchronous generator API.
 
   May be called equivalently as either:
@@ -96,7 +96,7 @@ class Selector(AbstractClass):
     """The product that this selector produces."""
 
 
-class Select(datatype('Select', ['product', 'optional']), Selector):
+class Select(datatype(['product', 'optional']), Selector):
   """Selects the given Product for the Subject provided to the constructor.
 
   If optional=True and no matching product can be produced, will return None.
@@ -112,7 +112,7 @@ class Select(datatype('Select', ['product', 'optional']), Selector):
                              ', optional=True' if self.optional else '')
 
 
-class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
+class SelectVariant(datatype(['product', 'variant_key']), Selector):
   """Selects the matching Product and variant name for the Subject provided to the constructor.
 
   For example: a SelectVariant with a variant_key of "thrift" and a product of type ApacheThrift
@@ -132,7 +132,7 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
                                repr(self.variant_key))
 
 
-class SelectDependencies(datatype('Dependencies', ['product', 'dep_product', 'field', 'field_types']),
+class SelectDependencies(datatype(['product', 'dep_product', 'field', 'field_types']),
                          Selector):
   """Selects a product for each of the dependencies of a product for the Subject.
 

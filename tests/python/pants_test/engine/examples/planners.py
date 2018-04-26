@@ -92,12 +92,12 @@ class ScalaInferredDepsSources(Sources):
   extensions = ('.scala',)
 
 
-class JVMPackageName(datatype('JVMPackageName', ['name'])):
+class JVMPackageName(datatype(['name'])):
   """A typedef to represent a fully qualified JVM package name."""
   pass
 
 
-class SourceRoots(datatype('SourceRoots', ['srcroots'])):
+class SourceRoots(datatype(['srcroots'])):
   """Placeholder for the SourceRoot subsystem."""
 
 
@@ -283,7 +283,7 @@ def write_name_file(name):
   return Classpath(creator='write_name_file')
 
 
-class Scrooge(datatype('Scrooge', ['tool_address'])):
+class Scrooge(datatype(['tool_address'])):
   """Placeholder for a Scrooge subsystem."""
 
 

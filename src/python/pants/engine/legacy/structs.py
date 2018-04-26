@@ -69,7 +69,7 @@ class Field(object):
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
 
 
-class SourcesField(datatype('SourcesField', ['address', 'arg', 'filespecs', 'path_globs']), Field):
+class SourcesField(datatype(['address', 'arg', 'filespecs', 'path_globs']), Field):
   """Represents the `sources` argument for a particular Target.
 
   Sources are currently eagerly computed in-engine in order to provide the `BuildGraph`
@@ -123,7 +123,7 @@ class JunitTestsAdaptor(TargetAdaptor):
     return self.java_test_globs + self.scala_test_globs
 
 
-class BundlesField(datatype('BundlesField', ['address', 'bundles', 'filespecs_list', 'path_globs_list']), Field):
+class BundlesField(datatype(['address', 'bundles', 'filespecs_list', 'path_globs_list']), Field):
   """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
 
   def __eq__(self, other):

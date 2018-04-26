@@ -18,11 +18,11 @@ from pants.util.objects import TypeCheckError, datatype
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
-class Concatted(datatype('Concatted', [('value', str)])):
+class Concatted(datatype([('value', str)])):
   pass
 
 
-class BinaryLocation(datatype('BinaryLocation', [('bin_path', str)])):
+class BinaryLocation(datatype([('bin_path', str)])):
 
   def __new__(cls, *args, **kwargs):
     this_object = super(BinaryLocation, cls).__new__(cls, *args, **kwargs)
@@ -37,7 +37,7 @@ class BinaryLocation(datatype('BinaryLocation', [('bin_path', str)])):
       "path {} does not name an existing executable file.".format(bin_path))
 
 
-class ShellCat(datatype('ShellCat', [('binary_location', BinaryLocation)])):
+class ShellCat(datatype([('binary_location', BinaryLocation)])):
   """Wrapper class to show an example of using an auxiliary class (which wraps
   an executable) to generate an argv instead of doing it all in
   CatExecutionRequest. This can be used to encapsulate operations such as
@@ -62,7 +62,7 @@ class ShellCat(datatype('ShellCat', [('binary_location', BinaryLocation)])):
     return (self.bin_path,) + tuple(cat_file_paths)
 
 
-class CatExecutionRequest(datatype('CatExecutionRequest', [
+class CatExecutionRequest(datatype([
     ('shell_cat', ShellCat),
     ('path_globs', PathGlobs),
 ])):
@@ -99,7 +99,7 @@ def create_cat_stdout_rules():
   ]
 
 
-class JavacVersionExecutionRequest(datatype('JavacVersionExecutionRequest', [
+class JavacVersionExecutionRequest(datatype([
     ('binary_location', BinaryLocation),
 ])):
 
@@ -118,7 +118,7 @@ def process_request_from_javac_version(javac_version_exe_req):
     env=tuple())
 
 
-class JavacVersionOutput(datatype('JavacVersionOutput', [('value', str)])):
+class JavacVersionOutput(datatype([('value', str)])):
   pass
 
 
@@ -166,7 +166,7 @@ def get_javac_version_output(javac_version_command):
   yield JavacVersionOutput(str(javac_version_proc_result.stderr))
 
 
-class JavacSources(datatype('JavacSources', [('path_globs', PathGlobs)])):
+class JavacSources(datatype([('path_globs', PathGlobs)])):
   """PathGlobs wrapper for Java source files to show an example of making a
   custom type to wrap generic types such as PathGlobs to add usage context.
 
@@ -175,7 +175,7 @@ class JavacSources(datatype('JavacSources', [('path_globs', PathGlobs)])):
   """
 
 
-class JavacCompileRequest(datatype('JavacCompileRequest', [
+class JavacCompileRequest(datatype([
     ('binary_location', BinaryLocation),
     ('javac_sources', JavacSources),
 ])):

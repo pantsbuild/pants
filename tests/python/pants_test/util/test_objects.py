@@ -10,7 +10,6 @@ import pickle
 from abc import abstractmethod
 
 from pants.util.objects import (Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
-                                TypeConstraintError, TypedDatatypeClassConstructionError,
                                 TypedDatatypeInstanceConstructionError, datatype)
 from pants_test.base_test import BaseTest
 
@@ -116,7 +115,7 @@ class SubclassesOfTest(TypeConstraintTestBase):
     self.assertFalse(subclasses_of_b_or_c.satisfied_by(self.A()))
 
 
-class ExportedDatatype(datatype('ExportedDatatype', ['val'])):
+class ExportedDatatype(datatype(['val'])):
   pass
 
 
@@ -124,7 +123,7 @@ class AbsClass(object):
   pass
 
 
-class SomeTypedDatatype(datatype('SomeTypedDatatype', [('val', int)])): pass
+class SomeTypedDatatype(datatype([('val', int)])): pass
 
 
 class SomeMixin(object):
@@ -136,35 +135,35 @@ class SomeMixin(object):
     return self.as_str().strip()
 
 
-class TypedWithMixin(datatype('TypedWithMixin', [('val', str)]), SomeMixin):
+class TypedWithMixin(datatype([('val', str)]), SomeMixin):
   """Example of using `datatype()` with a mixin."""
 
   def as_str(self):
     return self.val
 
 
-class AnotherTypedDatatype(datatype('AnotherTypedDatatype', [
+class AnotherTypedDatatype(datatype([
     ('string', str),
     ('elements', list),
 ])):
   pass
 
 
-class YetAnotherNamedTypedDatatype(datatype('YetAnotherNamedTypedDatatype', [
+class YetAnotherNamedTypedDatatype(datatype([
     ('a_string', str),
     ('an_int', int),
 ])):
   pass
 
 
-class MixedTyping(datatype('MixedTyping', [
+class MixedTyping(datatype([
     'value',
     ('name', str),
 ])):
   pass
 
 
-class NonNegativeInt(datatype('NonNegativeInt', [
+class NonNegativeInt(datatype([
     ('an_int', int),
 ])):
   """Example of overriding __new__() to perform deeper argument checking."""
@@ -184,7 +183,7 @@ class NonNegativeInt(datatype('NonNegativeInt', [
     return this_object
 
 
-class CamelCaseWrapper(datatype('CamelCaseWrapper', [
+class CamelCaseWrapper(datatype([
     ('nonneg_int', NonNegativeInt),
 ])):
   pass
@@ -198,20 +197,20 @@ class ReturnsNotImplemented(object):
 class DatatypeTest(BaseTest):
 
   def test_eq_with_not_implemented_super(self):
-    class DatatypeSuperNotImpl(datatype('Foo', ['val']), ReturnsNotImplemented, tuple):
+    class DatatypeSuperNotImpl(datatype(['val']), ReturnsNotImplemented, tuple):
       pass
 
     self.assertNotEqual(DatatypeSuperNotImpl(1), DatatypeSuperNotImpl(1))
 
   def test_type_included_in_eq(self):
-    foo = datatype('Foo', ['val'])
-    bar = datatype('Bar', ['val'])
+    foo = datatype(['val'])
+    bar = datatype(['val'])
 
     self.assertFalse(foo(1) == bar(1))
     self.assertTrue(foo(1) != bar(1))
 
   def test_subclasses_not_equal(self):
-    foo = datatype('Foo', ['val'])
+    foo = datatype(['val'])
     class Bar(foo):
       pass
 
@@ -219,16 +218,16 @@ class DatatypeTest(BaseTest):
     self.assertTrue(foo(1) != Bar(1))
 
   def test_repr(self):
-    bar = datatype('Bar', ['val', 'zal'])
+    bar = datatype(['val', 'zal'], superclass_name='Bar')
     self.assertEqual('Bar(val=1, zal=1)', repr(bar(1, 1)))
 
-    class Foo(datatype('F', ['val']), AbsClass):
+    class Foo(datatype(['val'], superclass_name='F'), AbsClass):
       pass
 
     self.assertEqual('Foo(val=1)', repr(Foo(1)))
 
   def test_not_iterable(self):
-    bar = datatype('Bar', ['val'])
+    bar = datatype(['val'])
     with self.assertRaises(TypeError):
       for x in bar(1):
         pass
@@ -236,33 +235,33 @@ class DatatypeTest(BaseTest):
   def test_deep_copy(self):
     # deep copy calls into __getnewargs__, which namedtuple defines as implicitly using __iter__.
 
-    bar = datatype('Bar', ['val'])
+    bar = datatype(['val'])
 
     self.assertEqual(bar(1), copy.deepcopy(bar(1)))
 
   def test_atrs(self):
-    bar = datatype('Bar', ['val'])
+    bar = datatype(['val'])
     self.assertEqual(1, bar(1).val)
 
   def test_as_dict(self):
-    bar = datatype('Bar', ['val'])
+    bar = datatype(['val'])
 
     self.assertEqual({'val': 1}, bar(1)._asdict())
 
   def test_replace_non_iterable(self):
-    bar = datatype('Bar', ['val', 'zal'])
+    bar = datatype(['val', 'zal'])
 
     self.assertEqual(bar(1, 3), bar(1, 2)._replace(zal=3))
 
   def test_properties_not_assignable(self):
-    bar = datatype('Bar', ['val'])
+    bar = datatype(['val'])
     bar_inst = bar(1)
     with self.assertRaises(AttributeError):
       bar_inst.val = 2
 
   def test_invalid_field_name(self):
     with self.assertRaises(ValueError):
-      datatype('Bar', ['0isntanallowedfirstchar'])
+      datatype(['0isntanallowedfirstchar'])
 
   def test_subclass_pickleable(self):
     before = ExportedDatatype(1)
@@ -271,22 +270,22 @@ class DatatypeTest(BaseTest):
     self.assertEqual(before, after)
 
   def test_mixed_argument_types(self):
-    bar = datatype('Bar', ['val', 'zal'])
+    bar = datatype(['val', 'zal'])
     self.assertEqual(bar(1, 2), bar(val=1, zal=2))
     self.assertEqual(bar(1, 2), bar(zal=2, val=1))
 
   def test_double_passed_arg(self):
-    bar = datatype('Bar', ['val', 'zal'])
+    bar = datatype(['val', 'zal'])
     with self.assertRaises(TypeError):
       bar(1, val=1)
 
   def test_too_many_args(self):
-    bar = datatype('Bar', ['val', 'zal'])
+    bar = datatype(['val', 'zal'])
     with self.assertRaises(TypeError):
       bar(1, 1, 1)
 
   def test_unexpect_kwarg(self):
-    bar = datatype('Bar', ['val'])
+    bar = datatype(['val'])
     with self.assertRaises(TypeError):
       bar(other=1)
 
@@ -300,35 +299,37 @@ class TypedDatatypeTest(BaseTest):
     # If the type_name can't be converted into a suitable identifier, throw a
     # ValueError.
     with self.assertRaises(ValueError) as cm:
-      class NonStrType(datatype(3, [int,])): pass
-    expected_msg = "Type names and field names cannot start with a number: '3'"
+      class NonStrType(datatype([int,])): pass
+    expected_msg = (
+      "Type names and field names can only contain alphanumeric "
+      "characters and underscores: \"<type 'int'>\"")
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     # This raises a TypeError because it doesn't provide a required argument.
     with self.assertRaises(TypeError) as cm:
-      class NoFields(datatype('NoFields')): pass
-    expected_msg = "datatype() takes exactly 2 arguments (1 given)"
+      class NoFields(datatype()): pass
+    expected_msg = "datatype() takes at least 1 argument (0 given)"
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     with self.assertRaises(ValueError) as cm:
-      class NonTupleFields(datatype('NonTupleFields', [str])): pass
+      class NonTupleFields(datatype([str])): pass
     expected_msg = (
       "Type names and field names can only contain alphanumeric characters "
       "and underscores: \"<type 'str'>\"")
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     with self.assertRaises(ValueError) as cm:
-      class NonTypeFields(datatype('NonTypeFields', (3,))): pass
+      class NonTypeFields(datatype((3,))): pass
     expected_msg = "Type names and field names cannot start with a number: '3'"
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     with self.assertRaises(TypeError) as cm:
-      class NonTypeTypes(datatype('NonTypeTypes', [('field', 4)])): pass
+      class NonTypeTypes(datatype([('field', 4)])): pass
     expected_msg = "Supplied types must be types. (4,)"
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     with self.assertRaises(ValueError) as cm:
-      class MultipleSameName(datatype('MultipleSameName', [
+      class MultipleSameName(datatype([
           'field_a',
           'field_b',
           'field_a',
@@ -338,8 +339,7 @@ class TypedDatatypeTest(BaseTest):
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     with self.assertRaises(ValueError) as cm:
-      class MultipleSameNameWithType(datatype(
-          'MultipleSameNameWithType', [
+      class MultipleSameNameWithType(datatype([
             'field_a',
             ('field_a', int),
           ])):

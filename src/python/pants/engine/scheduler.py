@@ -28,7 +28,7 @@ from pants.util.objects import SubclassesOf, datatype
 logger = logging.getLogger(__name__)
 
 
-class ExecutionRequest(datatype('ExecutionRequest', ['roots', 'native'])):
+class ExecutionRequest(datatype(['roots', 'native'])):
   """Holds the roots for an execution, which might have been requested by a user.
 
   To create an ExecutionRequest, see `LocalScheduler.build_request` (which performs goal
@@ -39,7 +39,7 @@ class ExecutionRequest(datatype('ExecutionRequest', ['roots', 'native'])):
   """
 
 
-class ExecutionResult(datatype('ExecutionResult', ['error', 'root_products'])):
+class ExecutionResult(datatype(['error', 'root_products'])):
   """Represents the result of a single execution."""
 
   @classmethod

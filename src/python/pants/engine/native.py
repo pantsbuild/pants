@@ -501,27 +501,27 @@ def _initialize_externs(ffi):
     return call(c, eval, [to_py_str(python_code_str_ptr, python_code_str_len)])
 
 
-class Value(datatype('Value', ['handle'])):
+class Value(datatype(['handle'])):
   """Corresponds to the native object of the same name."""
 
 
-class Key(datatype('Key', ['id_', 'type_id'])):
+class Key(datatype(['id_', 'type_id'])):
   """Corresponds to the native object of the same name."""
 
 
-class Function(datatype('Function', ['key'])):
+class Function(datatype(['key'])):
   """Corresponds to the native object of the same name."""
 
 
-class TypeConstraint(datatype('TypeConstraint', ['key'])):
+class TypeConstraint(datatype(['key'])):
   """Corresponds to the native object of the same name."""
 
 
-class TypeId(datatype('TypeId', ['id_'])):
+class TypeId(datatype(['id_'])):
   """Corresponds to the native object of the same name."""
 
 
-class PyResult(datatype('PyResult', ['is_throw', 'value'])):
+class PyResult(datatype(['is_throw', 'value'])):
   """Corresponds to the native object of the same name."""
 
 

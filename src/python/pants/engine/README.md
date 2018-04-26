@@ -68,8 +68,10 @@ In practical use, using basic types like `StringType` or `IntType` does not prov
 information to disambiguate between various types of data: So declaring small `datatype`
 definitions to provide a unique and descriptive type is strongly recommended:
 
+<!-- FIXME(cosmicexplorer): document the datatype() type checking in this file! -->
+
 ```python
-class FormattedInt(datatype('FormattedInt', ['content'])): pass
+class FormattedInt(datatype(['content'])): pass
 
 @rule(FormattedInt, [Select(IntType)])
 def int_to_str(an_int):

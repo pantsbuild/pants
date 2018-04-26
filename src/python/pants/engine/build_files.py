@@ -57,7 +57,7 @@ def parse_address_family(address_mapper, directory):
   yield AddressFamily.create(directory.path, address_maps)
 
 
-class UnhydratedStruct(datatype('UnhydratedStruct', ['address', 'struct', 'dependencies'])):
+class UnhydratedStruct(datatype(['address', 'struct', 'dependencies'])):
   """A product type that holds a Struct which has not yet been hydrated.
 
   A Struct counts as "hydrated" when all of its members (which are not themselves dependencies

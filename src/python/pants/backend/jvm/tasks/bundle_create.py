@@ -65,7 +65,7 @@ class BundleCreate(JvmBinaryTask):
   def product_types(cls):
     return ['jvm_archives', 'jvm_bundles', 'deployable_archives']
 
-  class App(datatype('App', ['address', 'binary', 'bundles', 'id', 'deployjar', 'archive', 'target'])):
+  class App(datatype(['address', 'binary', 'bundles', 'id', 'deployjar', 'archive', 'target'])):
     """A uniform interface to an app."""
 
     @staticmethod

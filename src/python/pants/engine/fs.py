@@ -14,7 +14,7 @@ from pants.engine.selectors import Select
 from pants.util.objects import Collection, datatype
 
 
-class FileContent(datatype('FileContent', ['path', 'content'])):
+class FileContent(datatype(['path', 'content'])):
   """The content of a file."""
 
   def __repr__(self):
@@ -24,14 +24,14 @@ class FileContent(datatype('FileContent', ['path', 'content'])):
     return repr(self)
 
 
-class Path(datatype('Path', ['path', 'stat'])):
+class Path(datatype(['path', 'stat'])):
   """A filesystem path, holding both its symbolic path name, and underlying canonical Stat.
 
   Both values are relative to the ProjectTree's buildroot.
   """
 
 
-class PathGlobs(datatype('PathGlobs', ['include', 'exclude'])):
+class PathGlobs(datatype(['include', 'exclude'])):
   """A wrapper around sets of filespecs to include and exclude.
 
   The syntax supported is roughly git's glob syntax.
@@ -51,7 +51,7 @@ class PathGlobs(datatype('PathGlobs', ['include', 'exclude'])):
                      tuple(join(relative_to, f) for f in exclude))
 
 
-class Snapshot(datatype('Snapshot', ['fingerprint', 'digest_length', 'path_stats'])):
+class Snapshot(datatype(['fingerprint', 'digest_length', 'path_stats'])):
   """A Snapshot is a collection of Files and Dirs fingerprinted by their names/content.
 
   Snapshots are used to make it easier to isolate process execution by fixing the contents

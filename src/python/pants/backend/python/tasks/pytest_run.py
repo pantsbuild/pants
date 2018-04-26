@@ -38,7 +38,7 @@ from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.xml_parser import XmlParser
 
 
-class _Workdirs(datatype('_Workdirs', ['root_dir', 'partition'])):
+class _Workdirs(datatype(['root_dir', 'partition'])):
   @classmethod
   def for_partition(cls, work_dir, partition):
     root_dir = os.path.join(work_dir, Target.maybe_readable_identify(partition))

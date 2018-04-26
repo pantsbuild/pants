@@ -9,17 +9,21 @@ import sys
 from abc import abstractmethod
 from collections import OrderedDict, namedtuple
 
-from twitter.common.collections import OrderedSet
-
 from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
 
 
-def datatype(name, field_decls, **kwargs):
-  """A wrapper for `namedtuple` that accounts for the type of the object in equality."""
+def datatype(field_decls, superclass_name=None, **kwargs):
+  """A wrapper for `namedtuple` that accounts for the type of the object in equality.
+
+  FIXME:
+  A wrapper over namedtuple which accepts a dict of field names and types.
+
+  This can be used to very concisely define classes which have fields that are
+  type-checked at construction.
+  """
   field_names = []
   fields_with_constraints = OrderedDict()
-  invalid_decl_errs = []
   for maybe_decl in field_decls:
     # ('field_name', type)
     if isinstance(maybe_decl, tuple):
@@ -31,10 +35,9 @@ def datatype(name, field_decls, **kwargs):
     # namedtuple() already checks field uniqueness
     field_names.append(field_name)
 
-  namedtuple_cls = namedtuple(
-    name,
-    # '_anonymous_namedtuple_subclass',
-    field_names, **kwargs)
+  if not superclass_name:
+    superclass_name = '_anonymous_namedtuple_subclass'
+  namedtuple_cls = namedtuple(superclass_name, field_names, **kwargs)
 
   class DataType(namedtuple_cls):
     # TODO: remove this? namedtuple already does this
@@ -127,8 +130,7 @@ def datatype(name, field_decls, **kwargs):
         class_name=type(self).__name__,
         typed_tagged_elements=', '.join(elements_formatted))
 
-  # TODO: remove!
-  DataType.__name__ = str(name)
+  DataType.__name__ = str(superclass_name)
 
   return DataType
 
@@ -287,14 +289,6 @@ class SubclassesOf(TypeConstraint):
     return issubclass(obj_type, self._types)
 
 
-# def typed_datatype(type_name, field_decls):
-#   """A wrapper over namedtuple which accepts a dict of field names and types.
-
-#   This can be used to very concisely define classes which have fields that are
-#   type-checked at construction.
-#   """
-
-
 class Collection(object):
   """Constructs classes representing collections of objects of a particular type."""
 
@@ -303,7 +297,7 @@ class Collection(object):
   def of(cls, *element_types):
     union = '|'.join(element_type.__name__ for element_type in element_types)
     type_name = b'{}.of({})'.format(cls.__name__, union)
-    supertypes = (cls, datatype('Collection', ['dependencies']))
+    supertypes = (cls, datatype(['dependencies'], superclass_name='Collection'))
     properties = {'element_types': element_types}
     collection_of_type = type(type_name, supertypes, properties)
 
