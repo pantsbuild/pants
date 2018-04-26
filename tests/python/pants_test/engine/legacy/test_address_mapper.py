@@ -64,7 +64,7 @@ class LegacyAddressMapperTest(unittest.TestCase):
       build_root=build_root,
       native=self._native
     )
-    return LegacyAddressMapper(scheduler, build_root)
+    return LegacyAddressMapper(scheduler.new_session(), build_root)
 
   def test_is_valid_single_address(self):
     with temporary_dir() as build_root:

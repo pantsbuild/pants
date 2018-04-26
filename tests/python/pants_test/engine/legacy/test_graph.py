@@ -63,7 +63,8 @@ class GraphTestBase(unittest.TestCase):
   def create_graph_from_specs(self, graph_helper, specs):
     Subsystem.reset()
     target_roots = self.create_target_roots(specs)
-    graph = graph_helper.create_build_graph(target_roots)[0]
+    session = graph_helper.scheduler.new_session()
+    graph = graph_helper.create_build_graph(session, target_roots)[0]
     return graph, target_roots
 
   def create_target_roots(self, specs):

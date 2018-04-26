@@ -19,8 +19,8 @@ from pants.engine.selectors import Select, SelectVariant
 from pants.util.contextutil import temporary_dir
 from pants_test.engine.examples.planners import (ApacheThriftJavaConfiguration, Classpath, GenGoal,
                                                  Jar, ThriftSources, setup_json_scheduler)
-from pants_test.engine.util import (assert_equal_with_printing, create_native_scheduler,
-                                    init_native, remove_locations_from_traceback)
+from pants_test.engine.util import (assert_equal_with_printing, create_scheduler, init_native,
+                                    remove_locations_from_traceback)
 
 
 walk = "TODO: Should port tests that attempt to inspect graph internals to the native code."
@@ -265,11 +265,11 @@ class SchedulerTraceTest(unittest.TestCase):
       TaskRule(A, [Select(B)], nested_raise)
     ]
 
-    scheduler = create_native_scheduler(rules)
+    scheduler = create_scheduler(rules)
     request = scheduler._native.new_execution_request()
     subject = B()
     scheduler.add_root_selection(request, subject, A)
-    scheduler.run_and_return_roots(request)
+    scheduler.new_session().run_and_return_roots(request)
 
     trace = '\n'.join(scheduler.graph_trace(request))
     # NB removing location info to make trace repeatable

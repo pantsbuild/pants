@@ -129,7 +129,7 @@ class Scheduler(object):
       constraint_for(GeneratorType),
     )
 
-    self.assert_ruleset_valid()
+    self._assert_ruleset_valid()
 
   def _root_type_ids(self):
     return self._to_ids_buf(sorted(self._root_subject_types))
@@ -141,7 +141,7 @@ class Scheduler(object):
         for line in fd.readlines():
           yield line.rstrip()
 
-  def assert_ruleset_valid(self):
+  def _assert_ruleset_valid(self):
     raw_value = self._native.lib.validator_run(self._scheduler)
     value = self._from_value(raw_value)
 
