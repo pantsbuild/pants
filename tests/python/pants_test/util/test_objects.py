@@ -312,15 +312,20 @@ class TypedDatatypeTest(BaseTest):
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     with self.assertRaises(ValueError) as cm:
-      class NonTupleFields(datatype([str])): pass
+      class JustTypeField(datatype([str])): pass
     expected_msg = (
       "Type names and field names can only contain alphanumeric characters "
       "and underscores: \"<type 'str'>\"")
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     with self.assertRaises(ValueError) as cm:
-      class NonTypeFields(datatype((3,))): pass
+      class NonStringField(datatype([3])): pass
     expected_msg = "Type names and field names cannot start with a number: '3'"
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    with self.assertRaises(ValueError) as cm:
+      class NonStringTypeField(datatype([(32, int)])): pass
+    expected_msg = "Type names and field names cannot start with a number: '32'"
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     with self.assertRaises(TypeError) as cm:
