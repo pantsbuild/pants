@@ -9,9 +9,9 @@ use bytes::Bytes;
 use futures::Future;
 use futures::future::{self, join_all};
 use hashing::{Digest, Fingerprint};
+use indexmap::{self, IndexMap};
 use itertools::Itertools;
 use {File, FileContent, PathStat, Store};
-use ordermap::{self, OrderMap};
 use protobuf;
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -161,14 +161,14 @@ impl Snapshot {
     // We dedupe PathStats by their symbolic names, as those will be their names within the
     // `Directory` structure. Only `Dir+Dir` collisions are legal.
     let path_stats = {
-      let mut uniq_paths: OrderMap<PathBuf, PathStat> = OrderMap::new();
+      let mut uniq_paths: IndexMap<PathBuf, PathStat> = IndexMap::new();
       for path_stat in snapshots
         .iter()
         .map(|s| s.path_stats.iter().cloned())
         .flatten()
       {
         match uniq_paths.entry(path_stat.path().to_owned()) {
-          ordermap::Entry::Occupied(e) => match (&path_stat, e.get()) {
+          indexmap::map::Entry::Occupied(e) => match (&path_stat, e.get()) {
             (&PathStat::Dir { .. }, &PathStat::Dir { .. }) => (),
             (x, y) => {
               return future::err(format!(
@@ -177,7 +177,7 @@ impl Snapshot {
               )).to_boxed()
             }
           },
-          ordermap::Entry::Vacant(v) => {
+          indexmap::map::Entry::Vacant(v) => {
             v.insert(path_stat);
           }
         }
