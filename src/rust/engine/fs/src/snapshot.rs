@@ -408,7 +408,6 @@ mod tests {
                      Snapshot, Store, StoreFileByDigest, VFS};
 
   use std;
-  use std::collections::HashSet;
   use std::error::Error;
   use std::path::PathBuf;
   use std::sync::Arc;
@@ -531,20 +530,23 @@ mod tests {
     );
 
     let merged = {
-      let snapshot1 =
-        Snapshot::from_path_stats(store.clone(), digester.clone(), vec![dir.clone(), file1])
+      let snapshot1 = Snapshot::from_path_stats(
+        store.clone(),
+        digester.clone(),
+        vec![dir.clone(), file1.clone()],
+      ).wait()
+        .unwrap();
+      let snapshot2 =
+        Snapshot::from_path_stats(store.clone(), digester, vec![dir.clone(), file2.clone()])
           .wait()
           .unwrap();
-      let snapshot2 = Snapshot::from_path_stats(store.clone(), digester, vec![dir, file2])
-        .wait()
-        .unwrap();
       Snapshot::merge(store.clone(), &[snapshot1, snapshot2])
         .wait()
         .unwrap()
     };
     let merged_root_directory = store.load_directory(merged.digest).wait().unwrap().unwrap();
 
-    assert_eq!(merged.path_stats.len(), 3);
+    assert_eq!(merged.path_stats, vec![dir, file1, file2]);
     assert_eq!(merged_root_directory.files.len(), 0);
     assert_eq!(merged_root_directory.directories.len(), 1);
 
@@ -561,10 +563,8 @@ mod tests {
         .files
         .iter()
         .map(|filenode| filenode.name.clone())
-        .collect::<HashSet<_>>(),
-      vec!["roland".to_string(), "susannah".to_string()]
-        .into_iter()
-        .collect()
+        .collect::<Vec<_>>(),
+      vec!["roland".to_string(), "susannah".to_string()],
     );
   }
 
@@ -587,7 +587,7 @@ mod tests {
     };
 
     match merged_res {
-      Err(ref msg) if msg.contains("Snapshots contained duplicate path: ") => (),
+      Err(ref msg) if msg.contains("contained duplicate path") && msg.contains("roland") => (),
       x => panic!(
         "Snapshot::merge should have failed with a useful message; got: {:?}",
         x
