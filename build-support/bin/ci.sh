@@ -222,7 +222,7 @@ if [[ "${skip_rust_tests:-false}" == "false" ]]; then
     fi
 
     activate_pants_venv
-    RUST_BACKTRACE=1 PANTS_SRCPATH="${REPO_ROOT}/src/python" ensure_cffi_sources=1 run_cargo test "${MODE_FLAG}" --all --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" -- "${test_threads_flag}"
+    RUST_BACKTRACE=1 PANTS_SRCPATH="${REPO_ROOT}/src/python" ensure_cffi_sources=1 run_cargo test --all --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" -- "${test_threads_flag}"
   ) || die "Pants rust test failure"
   end_travis_section
 fi
