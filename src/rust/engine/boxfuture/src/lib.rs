@@ -8,15 +8,15 @@ use futures::future::Future;
 
 pub type BoxFuture<T, E> = Box<Future<Item = T, Error = E> + Send>;
 
-pub trait Boxable {
-  fn to_boxed(self) -> Box<Self>;
+pub trait Boxable<T, E> {
+  fn to_boxed(self) -> BoxFuture<T, E>;
 }
 
-impl<F, T, E> Boxable for F
+impl<F, T, E> Boxable<T, E> for F
 where
-  F: Future<Item = T, Error = E> + Send,
+  F: Future<Item = T, Error = E> + Send + 'static,
 {
-  fn to_boxed(self) -> Box<Self>
+  fn to_boxed(self) -> BoxFuture<T, E>
   where
     Self: Sized,
   {

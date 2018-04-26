@@ -39,7 +39,7 @@ macro_rules! try_future {
     {
         match $x {
             Ok(value) => {value}
-            Err(error) => {return future::err(error).to_boxed() as BoxFuture<_, _>;}
+            Err(error) => {return future::err(error).to_boxed();}
         }
     }
 };
@@ -120,7 +120,7 @@ impl CommandRunner {
                   .or_else(move |value| {
                     match value {
                       ExecutionError::Fatal(err) => {
-                        future::err(err).to_boxed() as BoxFuture<_, _>
+                        future::err(err).to_boxed()
                       },
                       ExecutionError::MissingDigests(missing_digests) => {
                         debug!(
@@ -161,7 +161,7 @@ impl CommandRunner {
                               future::ok(
                              future::Loop::Continue(
                                   (try_future!(grpc_result), iter_num + 1))).to_boxed()
-                            }).to_boxed() as BoxFuture<_, _>
+                            }).to_boxed()
                       },
                     }
                   })
@@ -202,17 +202,15 @@ impl CommandRunner {
     // TODO: Log less verbosely
     debug!("Got operation response: {:?}", operation);
     if !operation.get_done() {
-      return future::err(ExecutionError::NotFinished(operation.take_name())).to_boxed()
-        as BoxFuture<_, _>;
+      return future::err(ExecutionError::NotFinished(operation.take_name())).to_boxed();
     }
     if operation.has_error() {
-      return future::err(ExecutionError::Fatal(format_error(&operation.get_error()))).to_boxed()
-        as BoxFuture<_, _>;
+      return future::err(ExecutionError::Fatal(format_error(&operation.get_error()))).to_boxed();
     }
     if !operation.has_response() {
       return future::err(ExecutionError::Fatal(
         "Operation finished but no response supplied".to_string(),
-      )).to_boxed() as BoxFuture<_, _>;
+      )).to_boxed();
     }
     let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
     try_future!(
@@ -232,13 +230,13 @@ impl CommandRunner {
             stdout: stdout,
             stderr: stderr,
             exit_code: execute_response.get_result().get_exit_code(),
-          }).to_boxed() as BoxFuture<_, _>,
+          }).to_boxed(),
           grpcio::RpcStatusCode::FailedPrecondition => {
             if execute_response.get_status().get_details().len() != 1 {
               return future::err(ExecutionError::Fatal(format!(
               "Received multiple details in FailedPrecondition ExecuteResponse's status field: {:?}",
               execute_response.get_status().get_details()
-            ))).to_boxed() as BoxFuture<_, _>;
+            ))).to_boxed();
             }
             let details = execute_response.get_status().get_details().get(0).unwrap();
             let mut precondition_failure = bazel_protos::error_details::PreconditionFailure::new();
@@ -252,7 +250,7 @@ impl CommandRunner {
                  protobuf type {}",
                 execute_response.get_status().get_message(),
                 details.get_type_url()
-              ))).to_boxed() as BoxFuture<_, _>;
+              ))).to_boxed();
             }
             try_future!(
               precondition_failure
@@ -271,14 +269,14 @@ impl CommandRunner {
                 return future::err(ExecutionError::Fatal(format!(
                   "Didn't know how to process PreconditionFailure violation: {:?}",
                   violation
-                ))).to_boxed() as BoxFuture<_, _>;
+                ))).to_boxed();
               }
               let parts: Vec<_> = violation.get_subject().split("/").collect();
               if parts.len() != 3 || parts.get(0).unwrap() != &"blobs" {
                 return future::err(ExecutionError::Fatal(format!(
                   "Received FailedPrecondition MISSING but didn't recognize subject {}",
                   violation.get_subject()
-                ))).to_boxed() as BoxFuture<_, _>;
+                ))).to_boxed();
               }
               let digest = Digest(
                 try_future!(
@@ -303,16 +301,15 @@ impl CommandRunner {
             if missing_digests.len() == 0 {
               return future::err(ExecutionError::Fatal(
                 "Error from remote execution: FailedPrecondition, but no details".to_owned(),
-              )).to_boxed() as BoxFuture<_, _>;;
+              )).to_boxed();
             }
-            return future::err(ExecutionError::MissingDigests(missing_digests)).to_boxed()
-              as BoxFuture<_, _>;
+            return future::err(ExecutionError::MissingDigests(missing_digests)).to_boxed();
           }
           code => future::err(ExecutionError::Fatal(format!(
             "Error from remote execution: {:?}: {:?}",
             code,
             execute_response.get_status().get_message()
-          ))).to_boxed() as BoxFuture<_, _>,
+          ))).to_boxed(),
         }
       })
       .to_boxed()
@@ -345,7 +342,6 @@ impl CommandRunner {
         .to_boxed()
     } else {
       future::ok(Bytes::from(execute_response.get_result().get_stdout_raw())).to_boxed()
-        as BoxFuture<_, _>
     };
     return stdout;
   }
@@ -377,7 +373,6 @@ impl CommandRunner {
         .to_boxed()
     } else {
       future::ok(Bytes::from(execute_response.get_result().get_stderr_raw())).to_boxed()
-        as BoxFuture<_, _>
     };
     return stderr;
   }
