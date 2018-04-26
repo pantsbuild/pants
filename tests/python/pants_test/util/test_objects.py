@@ -9,10 +9,9 @@ import copy
 import pickle
 from abc import abstractmethod
 
-from pants.util.objects import (Exactly, FieldType, SubclassesOf, SuperclassesOf, TypeCheckError,
+from pants.util.objects import (Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
                                 TypeConstraintError, TypedDatatypeClassConstructionError,
-                                TypedDatatypeInstanceConstructionError, datatype, typed_data,
-                                typed_datatype)
+                                TypedDatatypeInstanceConstructionError, datatype)
 from pants_test.base_test import BaseTest
 
 
@@ -125,8 +124,7 @@ class AbsClass(object):
   pass
 
 
-@typed_data(int)
-class SomeTypedDatatype: pass
+class SomeTypedDatatype(datatype('SomeTypedDatatype', [('val', int)])): pass
 
 
 class SomeMixin(object):
@@ -138,24 +136,37 @@ class SomeMixin(object):
     return self.as_str().strip()
 
 
-@typed_data(str)
-class TypedWithMixin(SomeMixin):
-  """Example of using `@typed_data()` with a mixin."""
+class TypedWithMixin(datatype('TypedWithMixin', [('val', str)]), SomeMixin):
+  """Example of using `datatype()` with a mixin."""
 
   def as_str(self):
-    return self.primitive__str
+    return self.val
 
 
-class AnotherTypedDatatype(typed_datatype('AnotherTypedDatatype', (str, list))):
-  """This is an example of successfully using `typed_datatype()` without `@typed_data()`."""
+class AnotherTypedDatatype(datatype('AnotherTypedDatatype', [
+    ('string', str),
+    ('elements', list),
+])):
+  pass
 
 
-@typed_data(str, int)
-class YetAnotherNamedTypedDatatype: pass
+class YetAnotherNamedTypedDatatype(datatype('YetAnotherNamedTypedDatatype', [
+    ('a_string', str),
+    ('an_int', int),
+])):
+  pass
 
 
-@typed_data(int)
-class NonNegativeInt:
+class MixedTyping(datatype('MixedTyping', [
+    'value',
+    ('name', str),
+])):
+  pass
+
+
+class NonNegativeInt(datatype('NonNegativeInt', [
+    ('an_int', int),
+])):
   """Example of overriding __new__() to perform deeper argument checking."""
 
   # NB: TypedDatatype.__new__() will raise if any kwargs are provided, but
@@ -165,7 +176,7 @@ class NonNegativeInt:
     # Call the superclass ctor first to ensure the type is correct.
     this_object = super(NonNegativeInt, cls).__new__(cls, *args, **kwargs)
 
-    value = this_object.primitive__int
+    value = this_object.an_int
 
     if value < 0:
       raise cls.make_type_error("value is negative: {!r}.".format(value))
@@ -173,8 +184,10 @@ class NonNegativeInt:
     return this_object
 
 
-@typed_data(NonNegativeInt)
-class CamelCaseWrapper: pass
+class CamelCaseWrapper(datatype('CamelCaseWrapper', [
+    ('nonneg_int', NonNegativeInt),
+])):
+  pass
 
 
 class ReturnsNotImplemented(object):
@@ -212,8 +225,7 @@ class DatatypeTest(BaseTest):
     class Foo(datatype('F', ['val']), AbsClass):
       pass
 
-    # Maybe this should be 'Foo(val=1)'?
-    self.assertEqual('F(val=1)', repr(Foo(1)))
+    self.assertEqual('Foo(val=1)', repr(Foo(1)))
 
   def test_not_iterable(self):
     bar = datatype('Bar', ['val'])
@@ -279,211 +291,136 @@ class DatatypeTest(BaseTest):
       bar(other=1)
 
 
-class FieldTypeTest(BaseTest):
-  def test_field_type_validation(self):
-    str_field = FieldType.create_from_type(str)
-    self.assertEqual(repr(str_field), "FieldType(str, 'primitive__str')")
-
-    self.assertEqual(str('asdf'),
-                     str_field.validate_satisfies_field(str('asdf')))
-
-    with self.assertRaises(TypeConstraintError) as cm:
-      str_field.validate_satisfies_field(3)
-    expected_msg = (
-      "value 3 (with type 'int') must be an instance of type 'str'.")
-    self.assertEqual(str(cm.exception), str(expected_msg))
-
-    nonneg_int_field = FieldType.create_from_type(NonNegativeInt)
-    self.assertEqual(repr(nonneg_int_field),
-                     "FieldType(NonNegativeInt, 'non_negative_int')")
-
-    self.assertEqual(
-      NonNegativeInt(45),
-      nonneg_int_field.validate_satisfies_field(NonNegativeInt(45)))
-
-    # test that camel-cased versions of primitive type names are given the
-    # correct field name.
-    class Int(int): pass
-    int_wrapper_field = FieldType.create_from_type(Int)
-    self.assertEqual(repr(int_wrapper_field), "FieldType(Int, 'int')")
-    self.assertEqual(
-      45,
-      int_wrapper_field.validate_satisfies_field(Int(45)))
-
-    with self.assertRaises(TypeConstraintError) as cm:
-      nonneg_int_field.validate_satisfies_field(-3)
-    expected_msg = ("value -3 (with type 'int') must be an instance "
-                    "of type 'NonNegativeInt'.")
-    self.assertEqual(str(cm.exception), str(expected_msg))
-
-  def test_field_type_creation_errors(self):
-    class invalid_class_name(object): pass
-    with self.assertRaises(FieldType.FieldTypeNameError) as cm:
-      FieldType.create_from_type(invalid_class_name)
-    expected_msg = (
-      "Type name 'invalid_class_name' must be camel-cased "
-      "with an initial capital, or all lowercase. Only ASCII alphabetical "
-      "characters are allowed.")
-    self.assertEqual(str(cm.exception), str(expected_msg))
-
-    with self.assertRaises(FieldType.FieldTypeConstructionError) as cm:
-      FieldType(3, 'asdf')
-    expected_msg = "single_type is not a type: was 3 (type 'int')."
-    self.assertEqual(str(cm.exception), str(expected_msg))
-
-    with self.assertRaises(FieldType.FieldTypeConstructionError) as cm:
-      FieldType(int, 45)
-    expected_msg = "field_name is not a str: was 45 (type 'int')."
-    self.assertEqual(str(cm.exception), str(expected_msg))
-
-
 class TypedDatatypeTest(BaseTest):
 
   def test_class_construction_errors(self):
-    # NB: typed_datatype subclasses declared at top level are the success cases
+    # NB: datatype subclasses declared at top level are the success cases
     # here by not failing on import.
 
     # If the type_name can't be converted into a suitable identifier, throw a
     # ValueError.
     with self.assertRaises(ValueError) as cm:
-      class NonStrType(typed_datatype(3, (int,))): pass
+      class NonStrType(datatype(3, [int,])): pass
     expected_msg = "Type names and field names cannot start with a number: '3'"
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     # This raises a TypeError because it doesn't provide a required argument.
     with self.assertRaises(TypeError) as cm:
-      class NoFields(typed_datatype('NoFields')): pass
-    expected_msg = "typed_datatype() takes exactly 2 arguments (1 given)"
-    self.assertEqual(str(cm.exception), str(expected_msg))
-
-    with self.assertRaises(TypedDatatypeClassConstructionError) as cm:
-      class NonTupleFields(typed_datatype('NonTupleFields', [str])): pass
-    expected_msg = (
-      "error: while trying to generate typed datatype NonTupleFields: "
-      "field_decls is not a tuple: [<type 'str'>]")
-    self.assertEqual(str(cm.exception), str(expected_msg))
-
-    with self.assertRaises(TypedDatatypeClassConstructionError) as cm:
-      class EmptyTupleFields(typed_datatype('EmptyTupleFields', ())): pass
-    expected_msg = (
-      "error: while trying to generate typed datatype EmptyTupleFields: "
-      "no fields were declared")
-    self.assertEqual(str(cm.exception), str(expected_msg))
-
-    with self.assertRaises(TypedDatatypeClassConstructionError) as cm:
-      class NonTypeFields(typed_datatype('NonTypeFields', (3,))): pass
-    expected_msg = (
-      "error: while trying to generate typed datatype NonTypeFields: "
-      "invalid field declarations:\n"
-      "type_obj is not a type: was 3 (type 'int')")
-    self.assertEqual(str(cm.exception), str(expected_msg))
-
-    with self.assertRaises(TypedDatatypeClassConstructionError) as cm:
-      class MultipleOfSameType(typed_datatype(
-          'MultipleOfSameType', (int, str, int))):
-        pass
-    expected_msg = (
-      "error: while trying to generate typed datatype MultipleOfSameType: "
-      "invalid field declarations:\n"
-      "type 'int' was already used as a field")
-    self.assertEqual(str(cm.exception), str(expected_msg))
-
-  def test_decorator_construction_errors(self):
-    with self.assertRaises(TypedDatatypeClassConstructionError) as cm:
-      @typed_data(str('hm'))
-      class NonTypeFieldDecorated: pass
-    expected_msg = (
-      "error: while trying to generate typed datatype NonTypeFieldDecorated: "
-      "invalid field declarations:\n"
-      "type_obj is not a type: was 'hm' (type 'str')")
+      class NoFields(datatype('NoFields')): pass
+    expected_msg = "datatype() takes exactly 2 arguments (1 given)"
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     with self.assertRaises(ValueError) as cm:
-      @typed_data(int)
-      def some_fun(): pass
-    expected_msg = ("The @typed_data() decorator must be applied "
-                    "innermost of all decorators.")
+      class NonTupleFields(datatype('NonTupleFields', [str])): pass
+    expected_msg = (
+      "Type names and field names can only contain alphanumeric characters "
+      "and underscores: \"<type 'str'>\"")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    with self.assertRaises(ValueError) as cm:
+      class NonTypeFields(datatype('NonTypeFields', (3,))): pass
+    expected_msg = "Type names and field names cannot start with a number: '3'"
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    with self.assertRaises(TypeError) as cm:
+      class NonTypeTypes(datatype('NonTypeTypes', [('field', 4)])): pass
+    expected_msg = "Supplied types must be types. (4,)"
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    with self.assertRaises(ValueError) as cm:
+      class MultipleSameName(datatype('MultipleSameName', [
+          'field_a',
+          'field_b',
+          'field_a',
+      ])):
+        pass
+    expected_msg = "Encountered duplicate field name: 'field_a'"
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
+    with self.assertRaises(ValueError) as cm:
+      class MultipleSameNameWithType(datatype(
+          'MultipleSameNameWithType', [
+            'field_a',
+            ('field_a', int),
+          ])):
+        pass
+    expected_msg = "Encountered duplicate field name: 'field_a'"
     self.assertEqual(str(cm.exception), str(expected_msg))
 
   def test_instance_construction_by_repr(self):
     some_val = SomeTypedDatatype(3)
-    self.assertEqual(3, some_val.primitive__int)
-    self.assertEqual(repr(some_val), "SomeTypedDatatype(3)")
-    self.assertEqual(str(some_val), "SomeTypedDatatype(primitive__int<int>=3)")
+    self.assertEqual(3, some_val.val)
+    self.assertEqual(repr(some_val), "SomeTypedDatatype(val=3)")
+    self.assertEqual(str(some_val), "SomeTypedDatatype(val<=int>=3)")
 
     some_object = YetAnotherNamedTypedDatatype(str('asdf'), 45)
-    self.assertEqual(some_object.primitive__str, 'asdf')
-    self.assertEqual(some_object.primitive__int, 45)
+    self.assertEqual(some_object.a_string, 'asdf')
+    self.assertEqual(some_object.an_int, 45)
     self.assertEqual(repr(some_object),
-                     "YetAnotherNamedTypedDatatype('asdf', 45)")
+                     "YetAnotherNamedTypedDatatype(a_string='asdf', an_int=45)")
     self.assertEqual(
       str(some_object),
-      str("YetAnotherNamedTypedDatatype(primitive__str<str>=asdf, primitive__int<int>=45)"))
+      str("YetAnotherNamedTypedDatatype(a_string<=str>=asdf, an_int<=int>=45)"))
 
-    some_nonneg_int = NonNegativeInt(3)
-    self.assertEqual(3, some_nonneg_int.primitive__int)
-    self.assertEqual(repr(some_nonneg_int), "NonNegativeInt(3)")
-    self.assertEqual(str(some_nonneg_int),
-                     "NonNegativeInt(primitive__int<int>=3)")
+    some_nonneg_int = NonNegativeInt(an_int=3)
+    self.assertEqual(3, some_nonneg_int.an_int)
+    self.assertEqual(repr(some_nonneg_int), "NonNegativeInt(an_int=3)")
+    self.assertEqual(str(some_nonneg_int), "NonNegativeInt(an_int<=int>=3)")
 
     wrapped_nonneg_int = CamelCaseWrapper(NonNegativeInt(45))
     # test attribute naming for camel-cased types
-    self.assertEqual(45, wrapped_nonneg_int.non_negative_int.primitive__int)
+    self.assertEqual(45, wrapped_nonneg_int.nonneg_int.an_int)
     # test that repr() is called inside repr(), and str() inside str()
     self.assertEqual(repr(wrapped_nonneg_int),
-                     "CamelCaseWrapper(NonNegativeInt(45))")
+                     "CamelCaseWrapper(nonneg_int=NonNegativeInt(an_int=45))")
     self.assertEqual(
       str(wrapped_nonneg_int),
-      str("CamelCaseWrapper(non_negative_int<NonNegativeInt>=NonNegativeInt(primitive__int<int>=45))"))
+      str("CamelCaseWrapper(nonneg_int<=NonNegativeInt>=NonNegativeInt(an_int<=int>=45))"))
+
+    mixed_type_obj = MixedTyping(value=3, name=str('asdf'))
+    self.assertEqual(3, mixed_type_obj.value)
+    self.assertEqual(repr(mixed_type_obj),
+                     str("MixedTyping(value=3, name='asdf')"))
+    self.assertEqual(str(mixed_type_obj),
+                     str("MixedTyping(value=3, name<=str>=asdf)"))
 
   def test_mixin_type_construction(self):
     obj_with_mixin = TypedWithMixin(str(' asdf '))
-    self.assertEqual(repr(obj_with_mixin), "TypedWithMixin(' asdf ')")
+    self.assertEqual(repr(obj_with_mixin), "TypedWithMixin(val=' asdf ')")
     self.assertEqual(str(obj_with_mixin),
-                     "TypedWithMixin(primitive__str<str>= asdf )")
+                     "TypedWithMixin(val<=str>= asdf )")
     self.assertEqual(obj_with_mixin.as_str(), ' asdf ')
     self.assertEqual(obj_with_mixin.stripped(), 'asdf')
 
   def test_instance_construction_errors(self):
-    with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
-      SomeTypedDatatype(primitive__int=3)
-    expected_msg = (
-      """error: in constructor of type SomeTypedDatatype: typed_datatype() subclasses can only be constructed with positional arguments! The class SomeTypedDatatype requires (int,) as arguments.
-The args provided were: ().
-The kwargs provided were: {'primitive__int': 3}.""")
+    with self.assertRaises(TypeError) as cm:
+      SomeTypedDatatype(something=3)
+    expected_msg = "__new__() got an unexpected keyword argument 'something'"
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     # not providing all the fields
-    with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
+    with self.assertRaises(TypeError) as cm:
       SomeTypedDatatype()
-    expected_msg = (
-      """error: in constructor of type SomeTypedDatatype: 0 args were provided, but expected 1: (int,).
-The args provided were: ().""")
+    expected_msg = "__new__() takes exactly 2 arguments (1 given)"
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     # unrecognized fields
-    with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
+    with self.assertRaises(TypeError) as cm:
       SomeTypedDatatype(3, 4)
-    expected_msg = (
-      """error: in constructor of type SomeTypedDatatype: 2 args were provided, but expected 1: (int,).
-The args provided were: (3, 4).""")
+    expected_msg = "__new__() takes exactly 2 arguments (3 given)"
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
-      CamelCaseWrapper(non_negative_int=3)
+      CamelCaseWrapper(nonneg_int=3)
     expected_msg = (
-      """error: in constructor of type CamelCaseWrapper: typed_datatype() subclasses can only be constructed with positional arguments! The class CamelCaseWrapper requires (NonNegativeInt,) as arguments.
-The args provided were: ().
-The kwargs provided were: {'non_negative_int': 3}.""")
+      """error: in constructor of type CamelCaseWrapper: type check error:
+field 'nonneg_int' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly(NonNegativeInt).""")
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     # test that kwargs with keywords that aren't field names fail the same way
-    with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
+    with self.assertRaises(TypeError) as cm:
       CamelCaseWrapper(4, a=3)
-    expected_msg = (
-      """error: in constructor of type CamelCaseWrapper: typed_datatype() subclasses can only be constructed with positional arguments! The class CamelCaseWrapper requires (NonNegativeInt,) as arguments.
-The args provided were: (4,).
-The kwargs provided were: {'a': 3}.""")
+    expected_msg = "__new__() got an unexpected keyword argument 'a'"
     self.assertEqual(str(cm.exception), str(expected_msg))
 
   def test_type_check_errors(self):
@@ -492,7 +429,7 @@ The kwargs provided were: {'a': 3}.""")
       SomeTypedDatatype([])
     expected_msg = (
       """error: in constructor of type SomeTypedDatatype: type check error:
-field 'primitive__int' was invalid: value [] (with type 'list') must be an instance of type 'int'.""")
+field 'val' was invalid: value [] (with type 'list') must satisfy this type constraint: Exactly(int).""")
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     # type checking failure with multiple arguments (one is correct)
@@ -500,7 +437,7 @@ field 'primitive__int' was invalid: value [] (with type 'list') must be an insta
       AnotherTypedDatatype(str('correct'), str('should be list'))
     expected_msg = (
       """error: in constructor of type AnotherTypedDatatype: type check error:
-field 'primitive__list' was invalid: value 'should be list' (with type 'str') must be an instance of type 'list'.""")
+field 'elements' was invalid: value 'should be list' (with type 'str') must satisfy this type constraint: Exactly(list).""")
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     # type checking failure on both arguments
@@ -508,15 +445,15 @@ field 'primitive__list' was invalid: value 'should be list' (with type 'str') mu
       AnotherTypedDatatype(3, str('should be list'))
     expected_msg = (
       """error: in constructor of type AnotherTypedDatatype: type check error:
-field 'primitive__str' was invalid: value 3 (with type 'int') must be an instance of type 'str'.
-field 'primitive__list' was invalid: value 'should be list' (with type 'str') must be an instance of type 'list'.""")
+field 'string' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly(str).
+field 'elements' was invalid: value 'should be list' (with type 'str') must satisfy this type constraint: Exactly(list).""")
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     with self.assertRaises(TypeCheckError) as cm:
       NonNegativeInt(str('asdf'))
     expected_msg = (
       """error: in constructor of type NonNegativeInt: type check error:
-field 'primitive__int' was invalid: value 'asdf' (with type 'str') must be an instance of type 'int'.""")
+field 'an_int' was invalid: value 'asdf' (with type 'str') must satisfy this type constraint: Exactly(int).""")
     self.assertEqual(str(cm.exception), str(expected_msg))
 
     with self.assertRaises(TypeCheckError) as cm:

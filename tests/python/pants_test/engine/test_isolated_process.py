@@ -14,21 +14,20 @@ from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcess
                                            create_process_rules)
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
-from pants.util.objects import TypeCheckError, typed_data
+from pants.util.objects import TypeCheckError, datatype
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
-@typed_data(str)
-class Concatted: pass
+class Concatted(datatype('Concatted', [('value', str)])):
+  pass
 
 
-@typed_data(str)
-class BinaryLocation:
+class BinaryLocation(datatype('BinaryLocation', [('bin_path', str)])):
 
   def __new__(cls, *args, **kwargs):
     this_object = super(BinaryLocation, cls).__new__(cls, *args, **kwargs)
 
-    bin_path = this_object.primitive__str
+    bin_path = this_object.bin_path
 
     if os.path.isfile(bin_path) and os.access(bin_path, os.X_OK):
       return this_object
@@ -38,8 +37,7 @@ class BinaryLocation:
       "path {} does not name an existing executable file.".format(bin_path))
 
 
-@typed_data(BinaryLocation)
-class ShellCat:
+class ShellCat(datatype('ShellCat', [('binary_location', BinaryLocation)])):
   """Wrapper class to show an example of using an auxiliary class (which wraps
   an executable) to generate an argv instead of doing it all in
   CatExecutionRequest. This can be used to encapsulate operations such as
@@ -50,7 +48,7 @@ class ShellCat:
 
   @property
   def bin_path(self):
-    return self.binary_location.primitive__str
+    return self.binary_location.bin_path
 
   def argv_from_snapshot(self, snapshot):
     cat_file_paths = [f.path for f in snapshot.files]
@@ -64,8 +62,11 @@ class ShellCat:
     return (self.bin_path,) + tuple(cat_file_paths)
 
 
-@typed_data(ShellCat, PathGlobs)
-class CatExecutionRequest: pass
+class CatExecutionRequest(datatype('CatExecutionRequest', [
+    ('shell_cat', ShellCat),
+    ('path_globs', PathGlobs),
+])):
+  pass
 
 
 @rule(ExecuteProcessRequest, [Select(CatExecutionRequest)])
@@ -98,12 +99,13 @@ def create_cat_stdout_rules():
   ]
 
 
-@typed_data(BinaryLocation)
-class JavacVersionExecutionRequest:
+class JavacVersionExecutionRequest(datatype('JavacVersionExecutionRequest', [
+    ('binary_location', BinaryLocation),
+])):
 
   @property
   def bin_path(self):
-    return self.binary_location.primitive__str
+    return self.binary_location.bin_path
 
   def gen_argv(self):
     return (self.bin_path, '-version',)
@@ -116,8 +118,8 @@ def process_request_from_javac_version(javac_version_exe_req):
     env=tuple())
 
 
-@typed_data(str)
-class JavacVersionOutput: pass
+class JavacVersionOutput(datatype('JavacVersionOutput', [('value', str)])):
+  pass
 
 
 class ProcessExecutionFailure(Exception):
@@ -164,8 +166,7 @@ def get_javac_version_output(javac_version_command):
   yield JavacVersionOutput(str(javac_version_proc_result.stderr))
 
 
-@typed_data(PathGlobs)
-class JavacSources:
+class JavacSources(datatype('JavacSources', [('path_globs', PathGlobs)])):
   """PathGlobs wrapper for Java source files to show an example of making a
   custom type to wrap generic types such as PathGlobs to add usage context.
 
@@ -174,12 +175,14 @@ class JavacSources:
   """
 
 
-@typed_data(BinaryLocation, JavacSources)
-class JavacCompileRequest:
+class JavacCompileRequest(datatype('JavacCompileRequest', [
+    ('binary_location', BinaryLocation),
+    ('javac_sources', JavacSources),
+])):
 
   @property
   def bin_path(self):
-    return self.binary_location.primitive__str
+    return self.binary_location.bin_path
 
   def argv_from_source_snapshot(self, snapshot):
     snapshot_file_paths = [f.path for f in snapshot.files]
@@ -268,7 +271,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     self.assertEqual(
       repr(cat_exe_req),
-      str("CatExecutionRequest(ShellCat(BinaryLocation('/bin/cat')), PathGlobs(include=(u'fs_test/a/b/*',), exclude=()))"))
+      str("CatExecutionRequest(shell_cat=ShellCat(binary_location=BinaryLocation(bin_path='/bin/cat')), path_globs=PathGlobs(include=(u'fs_test/a/b/*',), exclude=()))"))
 
     results = self.execute(scheduler, Concatted, cat_exe_req)
     self.assertEqual(1, len(results))
@@ -286,12 +289,12 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     self.assertEqual(
       repr(request),
-      "JavacVersionExecutionRequest(BinaryLocation('/usr/bin/javac'))")
+      "JavacVersionExecutionRequest(binary_location=BinaryLocation(bin_path='/usr/bin/javac'))")
 
     results = self.execute(scheduler, JavacVersionOutput, request)
     self.assertEqual(1, len(results))
     javac_version_output = results[0]
-    self.assertIn('javac', javac_version_output.primitive__str)
+    self.assertIn('javac', javac_version_output.value)
 
   def test_javac_compilation_example_success(self):
     scheduler = self.mk_scheduler_in_example_fs(create_javac_compile_rules())
@@ -304,7 +307,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     self.assertEqual(
       repr(request),
-      "JavacCompileRequest(BinaryLocation('/usr/bin/javac'), JavacSources(PathGlobs(include=(u'scheduler_inputs/src/java/simple/Simple.java',), exclude=())))")
+      "JavacCompileRequest(binary_location=BinaryLocation(bin_path='/usr/bin/javac'), javac_sources=JavacSources(path_globs=PathGlobs(include=(u'scheduler_inputs/src/java/simple/Simple.java',), exclude=())))")
 
     results = self.execute(scheduler, JavacCompileResult, request)
     self.assertEqual(1, len(results))
@@ -322,7 +325,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     self.assertEqual(
       repr(request),
-      "JavacCompileRequest(BinaryLocation('/usr/bin/javac'), JavacSources(PathGlobs(include=(u'scheduler_inputs/src/java/simple/Broken.java',), exclude=())))")
+      "JavacCompileRequest(binary_location=BinaryLocation(bin_path='/usr/bin/javac'), javac_sources=JavacSources(path_globs=PathGlobs(include=(u'scheduler_inputs/src/java/simple/Broken.java',), exclude=())))")
 
     with self.assertRaises(ProcessExecutionFailure) as cm:
       self.execute_raising_throw(scheduler, JavacCompileResult, request)
