@@ -22,9 +22,9 @@ pub struct Session {
 }
 
 impl Session {
-  fn new() -> Session {
+  pub fn new() -> Session {
     Session {
-      roots: Mutex::new(HashSet::new())
+      roots: Mutex::new(HashSet::new()),
     }
   }
 
@@ -34,7 +34,7 @@ impl Session {
   }
 
   fn root_nodes(&self) -> Vec<NodeKey> {
-    let mut roots = self.roots.lock().unwrap();
+    let roots = self.roots.lock().unwrap();
     roots.iter().map(|r| r.clone().into()).collect()
   }
 }
@@ -118,11 +118,17 @@ impl Scheduler {
   }
 
   ///
-  /// TODO: Convert `extern::store_i32` to i64, and expand the range here. 
+  /// TODO: Convert `extern::store_i32` to i64, and expand the range here.
   ///
   pub fn metrics(&self, session: &Session) -> HashMap<&str, i32> {
     let mut m = HashMap::new();
-    m.insert("affected_files", self.core.graph.reachable_digest_count(&session.root_nodes()) as i32);
+    m.insert(
+      "affected_files",
+      self
+        .core
+        .graph
+        .reachable_digest_count(&session.root_nodes()) as i32,
+    );
     m
   }
 

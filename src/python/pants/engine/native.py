@@ -121,6 +121,7 @@ typedef PyResult            (*extern_ptr_eval)(ExternContext*, uint8_t*, uint64_
 
 typedef void Tasks;
 typedef void Scheduler;
+typedef void Session;
 typedef void ExecutionRequest;
 
 typedef struct {
@@ -202,8 +203,12 @@ Scheduler* scheduler_create(Tasks*,
                             BufferBuffer,
                             TypeIdBuffer);
 void scheduler_pre_fork(Scheduler*);
+Value scheduler_metrics(Scheduler*, Session*);
+RawNodes* scheduler_execute(Scheduler*, Session*, ExecutionRequest*);
 void scheduler_destroy(Scheduler*);
 
+Session* session_create(void);
+void session_destroy(Session*);
 
 ExecutionRequest* execution_request_create(void);
 void execution_request_destroy(ExecutionRequest*);
@@ -214,7 +219,6 @@ void graph_visualize(Scheduler*, ExecutionRequest*, char*);
 void graph_trace(Scheduler*, ExecutionRequest*, char*);
 
 PyResult  execution_add_root_select(Scheduler*, ExecutionRequest*, Key, TypeConstraint);
-RawNodes* execution_execute(Scheduler*, ExecutionRequest*);
 
 Value validator_run(Scheduler*);
 
@@ -596,6 +600,7 @@ class Native(object):
     """
     :param visualize_to_dir: An existing directory (or None) to visualize executions to.
     """
+    # TODO: This should likely be a per-session property... ie, not a bootstrap option.
     self._visualize_to_dir = visualize_to_dir
 
   @property
@@ -698,6 +703,9 @@ class Native(object):
 
   def new_execution_request(self):
     return self.gc(self.lib.execution_request_create(), self.lib.execution_request_destroy)
+
+  def new_session(self):
+    return self.gc(self.lib.session_create(), self.lib.session_destroy)
 
   def new_scheduler(self,
                     tasks,

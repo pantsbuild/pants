@@ -78,9 +78,12 @@ class WrappedNativeScheduler(object):
     has_products_constraint = SubclassesOf(HasProducts)
     self._root_subject_types = sorted(rule_index.roots)
 
-    # Create the ExternContext, and the native Scheduler.
+    # Create the native Scheduler and Session.
+    # TODO: This `_tasks` reference could be a local variable, since it is not used
+    # after construction.
     self._tasks = native.new_tasks()
     self._register_rules(rule_index)
+    self.reset_session()
 
     self._scheduler = native.new_scheduler(
       self._tasks,
@@ -269,8 +272,15 @@ class WrappedNativeScheduler(object):
   def pre_fork(self):
     self._native.lib.scheduler_pre_fork(self._scheduler)
 
+  def reset_session(self):
+    """Resets the Session for this Scheduler.
+
+    This has the effect of clearing metrics, but no other memoized data (ie, not the Graph).
+    """
+    self._session = self._native.new_session()
+
   def run_and_return_roots(self, execution_request):
-    raw_roots = self._native.lib.execution_execute(self._scheduler, execution_request)
+    raw_roots = self._native.lib.scheduler_execute(self._scheduler, execution_request, self._session)
     try:
       roots = []
       for raw_root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
@@ -404,6 +414,9 @@ class LocalScheduler(object):
 
   def node_count(self):
     return self._scheduler.graph_len()
+
+  def reset_session(self):
+    self._scheduler.reset_session()
 
   def pre_fork(self):
     self._scheduler.pre_fork()

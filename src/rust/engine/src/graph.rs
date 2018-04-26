@@ -232,7 +232,12 @@ impl InnerGraph {
   /// Begins a topological walk from the given roots. Provides both the current entry as well as the
   /// depth from the root.
   ///
-  fn leveled_walk<P>(&self, roots: Vec<EntryId>, predicate: P, direction: Direction) -> LeveledWalk<P>
+  fn leveled_walk<P>(
+    &self,
+    roots: Vec<EntryId>,
+    predicate: P,
+    direction: Direction,
+  ) -> LeveledWalk<P>
   where
     P: Fn(EntryId, Level) -> bool,
   {
@@ -271,7 +276,10 @@ impl InnerGraph {
           })
         })
         .collect();
-      self.walk(root_ids, Direction::Incoming).map(|eid| eid).collect()
+      self
+        .walk(root_ids, Direction::Incoming)
+        .map(|eid| eid)
+        .collect()
     };
 
     // Then remove all entries in one shot.
@@ -441,20 +449,27 @@ impl InnerGraph {
   }
 
   fn reachable_digest_count(&self, roots: &[NodeKey]) -> usize {
-    let root_ids =
-      roots.iter()
-        .cloned()
-        .filter_map(|node| self.entry_id(&EntryKey::Valid(node)))
-        .cloned()
-        .collect();
-    self.digests_internal(self.walk(root_ids, Direction::Outgoing).collect()).count()
+    let root_ids = roots
+      .iter()
+      .cloned()
+      .filter_map(|node| self.entry_id(&EntryKey::Valid(node)))
+      .cloned()
+      .collect();
+    self
+      .digests_internal(self.walk(root_ids, Direction::Outgoing).collect())
+      .count()
   }
 
   fn all_digests(&self) -> Vec<hashing::Digest> {
-    self.digests_internal(self.pg.node_indices().collect()).collect()
+    self
+      .digests_internal(self.pg.node_indices().collect())
+      .collect()
   }
 
-  fn digests_internal<'g>(&'g self, entryids: Vec<EntryId>) -> Box<Iterator<Item=hashing::Digest> + 'g> {
+  fn digests_internal<'g>(
+    &'g self,
+    entryids: Vec<EntryId>,
+  ) -> Box<Iterator<Item = hashing::Digest> + 'g> {
     Box::new(
       entryids
         .into_iter()
@@ -466,8 +481,8 @@ impl InnerGraph {
         .filter_map(|output| match output {
           Some(Ok(digest)) => Some(digest),
           _ => None,
-        })
-    )   
+        }),
+    )
   }
 }
 

@@ -47,7 +47,7 @@ use externs::{Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionE
               StoreBytesExtern, StoreI32Extern, StoreTupleExtern, TypeIdBuffer, TypeToStrExtern,
               ValToStrExtern};
 use rule_graph::{GraphMaker, RuleGraph};
-use scheduler::{ExecutionRequest, RootResult, Scheduler};
+use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
 use tasks::Tasks;
 use types::Types;
 
@@ -254,22 +254,25 @@ pub extern "C" fn scheduler_create(
 }
 
 ///
-/// Returns a Value representing a list of tuples of metric name string and metric value int.
+/// Returns a Value representing a tuple of tuples of metric name string and metric value int.
 ///
 #[no_mangle]
-pub extern "C" fn scheduler_metrics(scheduler_ptr: *mut Scheduler, session_ptr: *mut Session) -> Value {
+pub extern "C" fn scheduler_metrics(
+  scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
+) -> Value {
   with_scheduler(scheduler_ptr, |scheduler| {
     with_session(session_ptr, |session| {
-      let values = 
-        scheduler.metrics(session)
-          .into_iter()
-          .map(|metric, value| {
-            externs::store_tuple(vec![
-              &externs::store_bytes(metric),
-              &externs::store_i32(value),
-            ])
-          })
-          .collect::<Vec<Value>>();
+      let values = scheduler
+        .metrics(session)
+        .into_iter()
+        .map(|(metric, value)| {
+          externs::store_tuple(&[
+            externs::store_bytes(&metric.bytes().collect::<Vec<_>>()),
+            externs::store_i32(value),
+          ])
+        })
+        .collect::<Vec<_>>();
       externs::store_tuple(&values)
     })
   })
@@ -285,13 +288,15 @@ pub extern "C" fn scheduler_pre_fork(scheduler_ptr: *mut Scheduler) {
 #[no_mangle]
 pub extern "C" fn scheduler_execute(
   scheduler_ptr: *mut Scheduler,
-  execution_request_ptr: *mut ExecutionRequest,
   session_ptr: *mut Session,
+  execution_request_ptr: *mut ExecutionRequest,
 ) -> *const RawNodes {
   with_scheduler(scheduler_ptr, |scheduler| {
     with_execution_request(execution_request_ptr, |execution_request| {
       with_session(session_ptr, |session| {
-        Box::into_raw(RawNodes::create(scheduler.execute(execution_request, session)))
+        Box::into_raw(RawNodes::create(
+          scheduler.execute(execution_request, session),
+        ))
       })
     })
   })
@@ -469,6 +474,16 @@ pub extern "C" fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
 }
 
 #[no_mangle]
+pub extern "C" fn session_create() -> *const Session {
+  Box::into_raw(Box::new(Session::new()))
+}
+
+#[no_mangle]
+pub extern "C" fn session_destroy(ptr: *mut Session) {
+  let _ = unsafe { Box::from_raw(ptr) };
+}
+
+#[no_mangle]
 pub extern "C" fn execution_request_create() -> *const ExecutionRequest {
   Box::into_raw(Box::new(ExecutionRequest::new()))
 }
@@ -593,7 +608,7 @@ fn with_scheduler<F, T>(scheduler_ptr: *mut Scheduler, f: F) -> T
 where
   F: FnOnce(&Scheduler) -> T,
 {
-  let mut scheduler = unsafe { Box::from_raw(scheduler_ptr) };
+  let scheduler = unsafe { Box::from_raw(scheduler_ptr) };
   let t = f(&scheduler);
   mem::forget(scheduler);
   t
@@ -606,7 +621,7 @@ fn with_session<F, T>(session_ptr: *mut Session, f: F) -> T
 where
   F: FnOnce(&Session) -> T,
 {
-  let mut session = unsafe { Box::from_raw(session_ptr) };
+  let session = unsafe { Box::from_raw(session_ptr) };
   let t = f(&session);
   mem::forget(session);
   t
