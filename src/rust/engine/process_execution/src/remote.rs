@@ -148,7 +148,7 @@ impl CommandRunner {
 
                         let backoff_period = min(
                       CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
-                      ((1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS));
+                      (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS);
 
                         let grpc_result = map_grpc_result(
                     operations_client.get_operation(&operation_request));
@@ -580,7 +580,7 @@ mod tests {
   }
 
   #[test]
-  fn successful_execution_after_ten_getoperations() {
+  fn successful_execution_after_four_getoperations() {
     let execute_request = echo_foo_request();
 
     let mock_server = {
@@ -591,7 +591,7 @@ mod tests {
         super::make_execute_request(&execute_request).unwrap().1,
         Vec::from_iter(
           iter::repeat(make_incomplete_operation(&op_name))
-            .take(10)
+            .take(4)
             .chain(iter::once(make_successful_operation(
               &op_name,
               StdoutType::Raw("foo".to_owned()),
@@ -1065,7 +1065,7 @@ mod tests {
         ))
       };
       let start_time = SystemTime::now();
-      let result = run_command_remote(&mock_server.address(), execute_request).unwrap();
+      run_command_remote(&mock_server.address(), execute_request).unwrap();
       assert!(start_time.elapsed().unwrap() >= Duration::from_millis(500));
     }
   }
@@ -1093,7 +1093,7 @@ mod tests {
         ))
       };
       let start_time = SystemTime::now();
-      let result = run_command_remote(&mock_server.address(), execute_request).unwrap();
+      run_command_remote(&mock_server.address(), execute_request).unwrap();
       assert!(start_time.elapsed().unwrap() >= Duration::from_millis(3000));
     }
   }
