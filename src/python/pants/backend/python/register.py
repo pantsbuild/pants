@@ -17,7 +17,8 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
 from pants.backend.python.tasks.gather_sources import GatherSources
-from pants.backend.python.tasks.local_python_distribution_artifact import LocalPythonDistributionArtifact
+from pants.backend.python.tasks.local_python_distribution_artifact import \
+  LocalPythonDistributionArtifact
 from pants.backend.python.tasks.pytest_prep import PytestPrep
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate

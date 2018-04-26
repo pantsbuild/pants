@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+
 from pants.backend.python.tasks.pex_build_util import is_local_python_dist
 from pants.base.build_environment import get_buildroot
 from pants.task.task import Task
