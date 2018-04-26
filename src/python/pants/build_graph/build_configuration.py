@@ -139,7 +139,7 @@ class BuildConfiguration(object):
     """
 
     if not isinstance(rules, Iterable):
-      raise TypeError('The rules must be an iterable, given {}'.format(rules))
+      raise TypeError('The rules must be an iterable, given {!r}'.format(rules))
     self._rules.extend(rules)
 
   def rules(self):

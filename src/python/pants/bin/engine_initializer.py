@@ -154,6 +154,9 @@ class EngineInitializer(object):
     if not build_file_aliases:
       build_file_aliases = EngineInitializer.get_default_build_file_aliases()
 
+    if not rules:
+      rules = []
+
     symbol_table = LegacySymbolTable(build_file_aliases)
 
     project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
@@ -174,8 +177,6 @@ class EngineInitializer(object):
 
     # Create a Scheduler containing graph and filesystem tasks, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.
-    if not rules:
-      rules = []
     tasks = (
       create_legacy_graph_tasks(symbol_table) +
       create_fs_rules() +
