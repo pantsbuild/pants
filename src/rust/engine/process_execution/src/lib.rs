@@ -4,6 +4,7 @@ extern crate bytes;
 extern crate digest;
 extern crate fs;
 extern crate futures;
+extern crate futures_timer;
 extern crate grpcio;
 extern crate hashing;
 #[macro_use]
