@@ -13,7 +13,7 @@ use petgraph::stable_graph::{NodeIndex, StableDiGraph, StableGraph};
 use futures::future::{self, Future};
 
 use externs;
-use boxfuture::{BoxFuture, Boxable};
+use boxfuture::Boxable;
 use context::ContextFactory;
 use core::{Failure, Noop, FNV};
 use hashing;
@@ -111,12 +111,7 @@ impl Entry {
           let node = n.clone();
           future::lazy(move || node.run(context)).to_boxed()
         }
-        &EntryKey::Cyclic(_) => {
-          // The type-checker cannot unify BoxFuture<_, Failure> with BoxFuture<NodeResult, Failure>
-          // so we need to explicitly specify the BoxFuture type parameters here.
-          // See https://github.com/rust-lang/rust/issues/44976
-          future::err(Failure::Noop(Noop::Cycle)).to_boxed() as BoxFuture<NodeResult, Failure>
-        }
+        &EntryKey::Cyclic(_) => future::err(Failure::Noop(Noop::Cycle)).to_boxed(),
       };
 
       self.state = Some(state.shared());
@@ -538,9 +533,7 @@ impl Graph {
       inner
         .entry_for_id_mut(dst_id)
         .map(|entry| entry.state(context, dst_id))
-        .unwrap_or_else(|| {
-          (future::err(Failure::Invalidated).to_boxed() as BoxFuture<_, _>).shared()
-        })
+        .unwrap_or_else(|| future::err(Failure::Invalidated).to_boxed().shared())
     };
 
     // Got the destination's state. Now that we're outside the graph locks, we can safely
@@ -559,9 +552,7 @@ impl Graph {
       inner
         .entry_for_id_mut(id)
         .map(|entry| entry.state(context, id))
-        .unwrap_or_else(|| {
-          (future::err(Failure::Invalidated).to_boxed() as BoxFuture<_, _>).shared()
-        })
+        .unwrap_or_else(|| future::err(Failure::Invalidated).to_boxed().shared())
     };
     // ...but only `get` it outside the lock.
     state.get::<N>()

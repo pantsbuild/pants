@@ -203,10 +203,8 @@ impl Store {
       .load_bytes_with(entry_type, digest.0, f_local)
       .and_then(
         move |maybe_local_value| match (maybe_local_value, maybe_remote) {
-          (Some(value_result), _) => {
-            future::done(value_result.map(|v| Some(v))).to_boxed() as BoxFuture<_, _>
-          }
-          (None, None) => future::ok(None).to_boxed() as BoxFuture<_, _>,
+          (Some(value_result), _) => future::done(value_result.map(|v| Some(v))).to_boxed(),
+          (None, None) => future::ok(None).to_boxed(),
           (None, Some(remote)) => remote
             .load_bytes_with(entry_type, digest, move |bytes: Bytes| bytes)
             .and_then(move |maybe_bytes: Option<Bytes>| match maybe_bytes {
@@ -228,7 +226,7 @@ impl Store {
                     })
                 })
                 .to_boxed(),
-              None => future::ok(None).to_boxed() as BoxFuture<_, _>,
+              None => future::ok(None).to_boxed(),
             })
             .to_boxed(),
         },
@@ -261,11 +259,9 @@ impl Store {
         }
         Ok(None) => {
           return future::err(format!("Failed to upload digest {:?}: Not found", digest)).to_boxed()
-            as BoxFuture<_, _>
         }
         Err(err) => {
           return future::err(format!("Failed to upload digest {:?}: {:?}", digest, err)).to_boxed()
-            as BoxFuture<_, _>
         }
       };
     }
@@ -400,7 +396,6 @@ impl Store {
         }
         None => {
           return future::err(format!("Could not expand unknown directory: {:?}", digest)).to_boxed()
-            as BoxFuture<_, _>
         }
       })
       .to_boxed()
@@ -1513,7 +1508,7 @@ mod remote {
         Err(err) => future::err(format!(
           "Error attempting to connect to upload fingerprint {}: {:?}",
           fingerprint, err
-        )).to_boxed() as BoxFuture<_, _>,
+        )).to_boxed(),
         Ok((sender, receiver)) => {
           let chunk_size_bytes = self.chunk_size_bytes;
           let stream =
@@ -1610,7 +1605,7 @@ mod remote {
         Err(err) => future::err(format!(
           "Error making CAS read request for {:?}: {:?}",
           digest, err
-        )).to_boxed() as BoxFuture<_, _>,
+        )).to_boxed(),
       }
     }
 
