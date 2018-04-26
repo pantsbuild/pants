@@ -25,7 +25,7 @@ pub fn run_command_locally(
     .output()
     .map(|output| ExecuteProcessResult {
       stdout: Bytes::from(output.stdout),
-      stderr: output.stderr,
+      stderr: Bytes::from(output.stderr),
       exit_code: output.status.code().unwrap(),
     })
 }
@@ -38,7 +38,7 @@ mod tests {
   use fs;
   use std::collections::BTreeMap;
   use std::path::PathBuf;
-  use self::testutil::{as_byte_owned_vec, as_bytes, owned_string_vec};
+  use self::testutil::{as_bytes, owned_string_vec};
 
   #[test]
   #[cfg(unix)]
@@ -56,7 +56,7 @@ mod tests {
       result.unwrap(),
       ExecuteProcessResult {
         stdout: as_bytes("foo"),
-        stderr: as_byte_owned_vec(""),
+        stderr: as_bytes(""),
         exit_code: 0,
       }
     )
@@ -78,7 +78,7 @@ mod tests {
       result.unwrap(),
       ExecuteProcessResult {
         stdout: as_bytes("foo"),
-        stderr: as_byte_owned_vec("bar"),
+        stderr: as_bytes("bar"),
         exit_code: 1,
       }
     )

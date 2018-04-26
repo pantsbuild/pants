@@ -7,11 +7,11 @@ use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
 use fs::Store;
 use futures::{future, Future};
+use futures_timer::Delay;
 use hashing::{Digest, Fingerprint};
 use grpcio;
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
-use futures_timer::Delay;
 
 use super::{ExecuteProcessRequest, ExecuteProcessResult};
 use std::cmp::min;
@@ -222,36 +222,15 @@ impl CommandRunner {
     );
     // TODO: Log less verbosely
     debug!("Got (nested) execute response: {:?}", execute_response);
-    let stdout = if execute_response.get_result().has_stdout_digest() {
-      let digest = execute_response.get_result().get_stdout_digest().into();
-      self
-        .store
-        .load_file_bytes_with(digest, |v| v)
-        .map_err(move |error| {
-          ExecutionError::Fatal(format!(
-            "Error fetching stdout digest ({:?}): {:?}",
-            digest, error
-          ))
-        })
-        .and_then(move |maybe_value| match maybe_value {
-          Some(value) => return Ok(value),
-          None => {
-            return Err(ExecutionError::Fatal(format!(
-              "Couldn't find stdout digest ({:?}), when fetching.",
-              digest
-            )))
-          }
-        })
-        .to_boxed()
-    } else {
-      future::ok(execute_response.take_result().take_stdout_raw()).to_boxed() as BoxFuture<_, _>
-    };
-    stdout
-      .and_then(move |stdout| {
+
+    self
+      .extract_stdout(&execute_response)
+      .join(self.extract_stderr(&execute_response))
+      .and_then(move |(stdout, stderr)| {
         match grpcio::RpcStatusCode::from(execute_response.get_status().get_code()) {
           grpcio::RpcStatusCode::Ok => future::ok(ExecuteProcessResult {
             stdout: stdout,
-            stderr: execute_response.get_result().get_stderr_raw().to_vec(),
+            stderr: stderr,
             exit_code: execute_response.get_result().get_exit_code(),
           }).to_boxed() as BoxFuture<_, _>,
           grpcio::RpcStatusCode::FailedPrecondition => {
@@ -338,6 +317,70 @@ impl CommandRunner {
       })
       .to_boxed()
   }
+
+  fn extract_stdout(
+    &self,
+    execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+  ) -> BoxFuture<Bytes, ExecutionError> {
+    let stdout = if execute_response.get_result().has_stdout_digest() {
+      let stdout_digest = execute_response.get_result().get_stdout_digest().into();
+      self
+        .store
+        .load_file_bytes_with(stdout_digest, |v| v)
+        .map_err(move |error| {
+          ExecutionError::Fatal(format!(
+            "Error fetching stdout digest ({:?}): {:?}",
+            stdout_digest, error
+          ))
+        })
+        .and_then(move |maybe_value| match maybe_value {
+          Some(value) => return Ok(value),
+          None => {
+            return Err(ExecutionError::Fatal(format!(
+              "Couldn't find stdout digest ({:?}), when fetching.",
+              stdout_digest
+            )))
+          }
+        })
+        .to_boxed()
+    } else {
+      future::ok(Bytes::from(execute_response.get_result().get_stdout_raw())).to_boxed()
+        as BoxFuture<_, _>
+    };
+    return stdout;
+  }
+
+  fn extract_stderr(
+    &self,
+    execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+  ) -> BoxFuture<Bytes, ExecutionError> {
+    let stderr = if execute_response.get_result().has_stderr_digest() {
+      let stderr_digest = execute_response.get_result().get_stderr_digest().into();
+      self
+        .store
+        .load_file_bytes_with(stderr_digest, |v| v)
+        .map_err(move |error| {
+          ExecutionError::Fatal(format!(
+            "Error fetching stderr digest ({:?}): {:?}",
+            stderr_digest, error
+          ))
+        })
+        .and_then(move |maybe_value| match maybe_value {
+          Some(value) => return Ok(value),
+          None => {
+            return Err(ExecutionError::Fatal(format!(
+              "Couldn't find stderr digest ({:?}), when fetching.",
+              stderr_digest
+            )))
+          }
+        })
+        .to_boxed()
+    } else {
+      future::ok(Bytes::from(execute_response.get_result().get_stderr_raw())).to_boxed()
+        as BoxFuture<_, _>
+    };
+    return stderr;
+  }
 }
 
 fn make_execute_request(
@@ -416,8 +459,8 @@ mod tests {
   use protobuf::{self, Message, ProtobufEnum};
   use mock;
   use tempdir::TempDir;
-  use testutil::{as_byte_owned_vec, as_bytes, owned_string_vec};
   use testutil::data::{TestData, TestDirectory};
+  use testutil::{as_bytes, owned_string_vec};
 
   use super::{CommandRunner, ExecuteProcessRequest, ExecuteProcessResult, ExecutionError};
   use std::collections::BTreeMap;
@@ -431,6 +474,13 @@ mod tests {
     Raw(String),
     Digest(Digest),
   }
+
+  #[derive(Debug, PartialEq)]
+  enum StderrType {
+    Raw(String),
+    Digest(Digest),
+  }
+
   #[test]
   fn server_rejecting_execute_request_gives_error() {
     let execute_request = echo_foo_request();
@@ -467,7 +517,12 @@ mod tests {
         super::make_execute_request(&execute_request).unwrap().1,
         vec![
           make_incomplete_operation(&op_name),
-          make_successful_operation(&op_name, StdoutType::Raw("foo".to_owned()), "", 0),
+          make_successful_operation(
+            &op_name,
+            StdoutType::Raw("foo".to_owned()),
+            StderrType::Raw("".to_owned()),
+            0,
+          ),
         ],
       ))
     };
@@ -478,7 +533,7 @@ mod tests {
       result,
       ExecuteProcessResult {
         stdout: as_bytes("foo"),
-        stderr: as_byte_owned_vec(""),
+        stderr: as_bytes(""),
         exit_code: 0,
       }
     );
@@ -488,16 +543,37 @@ mod tests {
   fn extract_response_with_digest_stdout() {
     let op_name = "gimme-foo".to_string();
     let testdata = TestData::roland();
+    let testdata_empty = TestData::empty();
     assert_eq!(
       extract_execute_response(make_successful_operation(
         &op_name,
         StdoutType::Digest(testdata.digest()),
-        "",
+        StderrType::Raw(testdata_empty.string()),
         0,
       )),
       Ok(ExecuteProcessResult {
         stdout: testdata.bytes(),
-        stderr: as_byte_owned_vec(""),
+        stderr: testdata_empty.bytes(),
+        exit_code: 0,
+      })
+    );
+  }
+
+  #[test]
+  fn extract_response_with_digest_stderr() {
+    let op_name = "gimme-foo".to_string();
+    let testdata = TestData::roland();
+    let testdata_empty = TestData::empty();
+    assert_eq!(
+      extract_execute_response(make_successful_operation(
+        &op_name,
+        StdoutType::Raw(testdata_empty.string()),
+        StderrType::Digest(testdata.digest()),
+        0,
+      )),
+      Ok(ExecuteProcessResult {
+        stdout: testdata_empty.bytes(),
+        stderr: testdata.bytes(),
         exit_code: 0,
       })
     );
@@ -519,7 +595,7 @@ mod tests {
             .chain(iter::once(make_successful_operation(
               &op_name,
               StdoutType::Raw("foo".to_owned()),
-              "",
+              StderrType::Raw("".to_owned()),
               0,
             ))),
         ),
@@ -532,7 +608,7 @@ mod tests {
       result,
       ExecuteProcessResult {
         stdout: as_bytes("foo"),
-        stderr: as_byte_owned_vec(""),
+        stderr: as_bytes(""),
         exit_code: 0,
       }
     );
@@ -709,7 +785,12 @@ mod tests {
           make_precondition_failure_operation(vec![
             missing_preconditionfailure_violation(&roland.digest()),
           ]),
-          make_successful_operation("cat2", StdoutType::Raw(roland.string()), "", 0),
+          make_successful_operation(
+            "cat2",
+            StdoutType::Raw(roland.string()),
+            StderrType::Raw("".to_owned()),
+            0,
+          ),
         ],
       ))
     };
@@ -736,7 +817,7 @@ mod tests {
       result,
       Ok(ExecuteProcessResult {
         stdout: roland.bytes(),
-        stderr: "".as_bytes().to_vec(),
+        stderr: Bytes::from(""),
         exit_code: 0,
       })
     );
@@ -807,10 +888,11 @@ mod tests {
     );
   }
 
+  #[test]
   fn extract_execute_response_success() {
     let want_result = ExecuteProcessResult {
       stdout: as_bytes("roland"),
-      stderr: "simba".as_bytes().to_owned(),
+      stderr: Bytes::from("simba"),
       exit_code: 17,
     };
 
@@ -973,7 +1055,12 @@ mod tests {
           super::make_execute_request(&execute_request).unwrap().1,
           vec![
             make_incomplete_operation(&op_name),
-            make_successful_operation(&op_name, StdoutType::Raw("foo".to_owned()), "", 0),
+            make_successful_operation(
+              &op_name,
+              StdoutType::Raw("foo".to_owned()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
           ],
         ))
       };
@@ -996,7 +1083,12 @@ mod tests {
             make_incomplete_operation(&op_name),
             make_incomplete_operation(&op_name),
             make_incomplete_operation(&op_name),
-            make_successful_operation(&op_name, StdoutType::Raw("foo".to_owned()), "", 0),
+            make_successful_operation(
+              &op_name,
+              StdoutType::Raw("foo".to_owned()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
           ],
         ))
       };
@@ -1024,7 +1116,7 @@ mod tests {
   fn make_successful_operation(
     operation_name: &str,
     stdout: StdoutType,
-    stderr: &str,
+    stderr: StderrType,
     exit_code: i32,
   ) -> bazel_protos::operations::Operation {
     let mut op = bazel_protos::operations::Operation::new();
@@ -1042,7 +1134,14 @@ mod tests {
             action_result.set_stdout_digest((&stdout_digest).into());
           }
         }
-        action_result.set_stderr_raw(Bytes::from(stderr));
+        match stderr {
+          StderrType::Raw(stderr_raw) => {
+            action_result.set_stderr_raw(Bytes::from(stderr_raw));
+          }
+          StderrType::Digest(stderr_digest) => {
+            action_result.set_stderr_digest((&stderr_digest).into());
+          }
+        }
         action_result.set_exit_code(exit_code);
         action_result
       });
@@ -1108,7 +1207,7 @@ mod tests {
   }
 
   fn extract_execute_response(
-    mut operation: bazel_protos::operations::Operation,
+    operation: bazel_protos::operations::Operation,
   ) -> Result<ExecuteProcessResult, ExecutionError> {
     let cas = mock::StubCAS::with_roland_and_directory(1024);
     let command_runner = create_command_runner("", &cas);
