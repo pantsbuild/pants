@@ -73,7 +73,7 @@ def nested_raise(x):
   fn_raises(x)
 
 
-class Fib(datatype('Fib', 'val')): pass
+class Fib(datatype([('val', int)])): pass
 
 
 @rule(Fib, [Select(int)])
