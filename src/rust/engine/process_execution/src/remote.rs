@@ -320,7 +320,7 @@ impl CommandRunner {
 
   fn extract_stdout(
     &self,
-    execute_response: &bazel_protos::remote_execution::ExecuteResponse
+    execute_response: &bazel_protos::remote_execution::ExecuteResponse,
   ) -> BoxFuture<Bytes, ExecutionError> {
     let stdout = if execute_response.get_result().has_stdout_digest() {
       let stdout_digest = execute_response.get_result().get_stdout_digest().into();
@@ -352,7 +352,7 @@ impl CommandRunner {
 
   fn extract_stderr(
     &self,
-    execute_response: &bazel_protos::remote_execution::ExecuteResponse
+    execute_response: &bazel_protos::remote_execution::ExecuteResponse,
   ) -> BoxFuture<Bytes, ExecutionError> {
     let stderr = if execute_response.get_result().has_stderr_digest() {
       let stderr_digest = execute_response.get_result().get_stderr_digest().into();
@@ -1055,7 +1055,12 @@ mod tests {
           super::make_execute_request(&execute_request).unwrap().1,
           vec![
             make_incomplete_operation(&op_name),
-            make_successful_operation(&op_name, StdoutType::Raw("foo".to_owned()), "", 0),
+            make_successful_operation(
+              &op_name,
+              StdoutType::Raw("foo".to_owned()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
           ],
         ))
       };
@@ -1078,7 +1083,12 @@ mod tests {
             make_incomplete_operation(&op_name),
             make_incomplete_operation(&op_name),
             make_incomplete_operation(&op_name),
-            make_successful_operation(&op_name, StdoutType::Raw("foo".to_owned()), "", 0),
+            make_successful_operation(
+              &op_name,
+              StdoutType::Raw("foo".to_owned()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
           ],
         ))
       };
