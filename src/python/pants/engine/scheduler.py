@@ -31,8 +31,7 @@ logger = logging.getLogger(__name__)
 class ExecutionRequest(datatype(['roots', 'native'])):
   """Holds the roots for an execution, which might have been requested by a user.
 
-  To create an ExecutionRequest, see `LocalScheduler.build_request` (which performs goal
-  translation) or `LocalScheduler.execution_request`.
+  To create an ExecutionRequest, see `SchedulerSession.execution_request`.
 
   :param roots: Roots for this request.
   :type roots: list of tuples of subject and product.
@@ -71,26 +70,43 @@ class ExecutionError(Exception):
   pass
 
 
-class WrappedNativeScheduler(object):
-  def __init__(self, native, build_root, work_dir, ignore_patterns, rule_index):
+class Scheduler(object):
+  def __init__(self, native, project_tree, work_dir, rules, include_trace_on_error=True):
+    """
+    :param native: An instance of engine.native.Native.
+    :param project_tree: An instance of ProjectTree for the current build root.
+    :param work_dir: The pants work dir.
+    :param rules: A set of Rules which is used to compute values in the graph.
+    :param include_trace_on_error: Include the trace through the graph upon encountering errors.
+    :type include_trace_on_error: bool
+    """
     self._native = native
+    self.include_trace_on_error = include_trace_on_error
+
     # TODO: The only (?) case where we use inheritance rather than exact type unions.
     has_products_constraint = SubclassesOf(HasProducts)
+
+    # Validate and register all provided and intrinsic tasks.
+    rule_index = RuleIndex.create(list(rules))
     self._root_subject_types = sorted(rule_index.roots)
+
+    # If configured, visualize the rule graph before asserting that it is valid.
+    if self.visualize_to_dir() is not None:
+      rule_graph_name = 'rule_graph.dot'
+      self.visualize_rule_graph_to_file(os.path.join(self.visualize_to_dir(), rule_graph_name))
 
     # Create the native Scheduler and Session.
     # TODO: This `_tasks` reference could be a local variable, since it is not used
     # after construction.
     self._tasks = native.new_tasks()
     self._register_rules(rule_index)
-    self.reset_session()
 
     self._scheduler = native.new_scheduler(
       self._tasks,
       self._root_subject_types,
-      build_root,
+      project_tree.build_root,
       work_dir,
-      ignore_patterns,
+      project_tree.ignore_patterns,
       Snapshot,
       FileContent,
       FilesContent,
@@ -112,6 +128,8 @@ class WrappedNativeScheduler(object):
       constraint_for(ExecuteProcessResult),
       constraint_for(GeneratorType),
     )
+
+    self.assert_ruleset_valid()
 
   def _root_type_ids(self):
     return self._to_ids_buf(sorted(self._root_subject_types))
@@ -252,9 +270,6 @@ class WrappedNativeScheduler(object):
   def graph_len(self):
     return self._native.lib.graph_len(self._scheduler)
 
-  def exec_reset(self):
-    self._native.lib.execution_reset(self._scheduler)
-
   def add_root_selection(self, execution_request, subject, product):
     res = self._native.lib.execution_add_root_select(self._scheduler,
                                                      execution_request,
@@ -272,15 +287,8 @@ class WrappedNativeScheduler(object):
   def pre_fork(self):
     self._native.lib.scheduler_pre_fork(self._scheduler)
 
-  def reset_session(self):
-    """Resets the Session for this Scheduler.
-
-    This has the effect of clearing metrics, but no other memoized data (ie, not the Graph).
-    """
-    self._session = self._native.new_session()
-
-  def run_and_return_roots(self, execution_request):
-    raw_roots = self._native.lib.scheduler_execute(self._scheduler, execution_request, self._session)
+  def run_and_return_roots(self, session, execution_request):
+    raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
     try:
       roots = []
       for raw_root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
@@ -302,50 +310,22 @@ class WrappedNativeScheduler(object):
   def garbage_collect_store(self):
     self._native.lib.garbage_collect_store(self._scheduler)
 
+  def new_session(self):
+    """Creates a new SchedulerSession for this Scheduler."""
+    return SchedulerSession(self, self._native.new_session())
 
-class LocalScheduler(object):
-  """A scheduler that expands a product Graph by executing user defined Rules."""
 
-  def __init__(self,
-               work_dir,
-               goals,
-               rules,
-               project_tree,
-               native,
-               include_trace_on_error=True):
-    """
-    :param goals: A dict from a goal name to a product type. A goal is just an alias for a
-           particular (possibly synthetic) product.
-    :param rules: A set of Rules which is used to compute values in the product graph.
-    :param project_tree: An instance of ProjectTree for the current build root.
-    :param work_dir: The pants work dir.
-    :param native: An instance of engine.native.Native.
-    :param include_trace_on_error: Include the trace through the graph upon encountering errors.
-    :type include_trace_on_error: bool
-    """
-    self._products_by_goal = goals
-    self._project_tree = project_tree
-    self._include_trace_on_error = include_trace_on_error
+class SchedulerSession(object):
+  """A handle to a shared underlying Scheduler and a unique Session.
+
+  Generally a Session corresponds to a single run of pants: some metrics are specific to
+  a Session.
+  """
+
+  def __init__(self, scheduler, session):
+    self._scheduler = scheduler
+    self._session = session
     self._run_count = 0
-
-    # Create the ExternContext, and the native Scheduler.
-    self._execution_request = None
-
-    # Validate and register all provided and intrinsic tasks.
-    rules = list(rules)
-    rule_index = RuleIndex.create(rules)
-    self._scheduler = WrappedNativeScheduler(native,
-                                             project_tree.build_root,
-                                             work_dir,
-                                             project_tree.ignore_patterns,
-                                             rule_index)
-
-    # If configured, visualize the rule graph before asserting that it is valid.
-    if self._scheduler.visualize_to_dir() is not None:
-      rule_graph_name = 'rule_graph.dot'
-      self.visualize_rule_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), rule_graph_name))
-
-    self._scheduler.assert_ruleset_valid()
 
   def graph_len(self):
     return self._scheduler.graph_len()
@@ -365,19 +345,6 @@ class LocalScheduler(object):
 
   def visualize_rule_graph_to_file(self, filename):
     self._scheduler.visualize_rule_graph_to_file(filename)
-
-  def build_request(self, goals, subjects):
-    """Translate the given goal names into product types, and return an ExecutionRequest.
-
-    :param goals: The list of goal names supplied on the command line.
-    :type goals: list of string
-    :param subjects: A list of Spec and/or PathGlobs objects.
-    :type subject: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
-      :class:`pants.engine.fs.PathGlobs` objects.
-    :returns: An ExecutionRequest for the given goals and subjects.
-    """
-    return self.execution_request([self._products_by_goal[goal_name] for goal_name in goals],
-                                  subjects)
 
   def execution_request(self, products, subjects):
     """Create and return an ExecutionRequest for the given products and subjects.
@@ -415,9 +382,6 @@ class LocalScheduler(object):
   def node_count(self):
     return self._scheduler.graph_len()
 
-  def reset_session(self):
-    self._scheduler.reset_session()
-
   def pre_fork(self):
     self._scheduler.pre_fork()
 
@@ -430,7 +394,7 @@ class LocalScheduler(object):
     """
     start_time = time.time()
     roots = zip(execution_request.roots,
-                self._scheduler.run_and_return_roots(execution_request.native))
+                self._scheduler.run_and_return_roots(self._session, execution_request.native))
 
     if self._scheduler.visualize_to_dir() is not None:
       name = 'run.{}.dot'.format(self._run_count)
@@ -486,7 +450,7 @@ class LocalScheduler(object):
     # TODO: See https://github.com/pantsbuild/pants/issues/3912
     throw_root_states = tuple(state for root, state in result.root_products if type(state) is Throw)
     if throw_root_states:
-      if self._include_trace_on_error:
+      if self._scheduler.include_trace_on_error:
         cumulative_trace = '\n'.join(self.trace(request))
         raise ExecutionError('Received unexpected Throw state(s):\n{}'.format(cumulative_trace))
 

@@ -24,10 +24,9 @@ from pants.engine.legacy.structs import (AppAdaptor, GoTargetAdaptor, JavaLibrar
 from pants.engine.mapper import AddressMapper
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
-from pants.engine.scheduler import LocalScheduler
+from pants.engine.scheduler import Scheduler
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.scm.change_calculator import EngineChangeCalculator
 
 
 logger = logging.getLogger(__name__)
@@ -71,8 +70,7 @@ class LegacySymbolTable(SymbolTable):
     return self._table
 
 
-class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_table',
-                                                         'change_calculator'])):
+class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_table', 'scm'])):
   """A container for the components necessary to construct a legacy BuildGraph facade."""
 
   def warm_product_graph(self, target_roots):
@@ -82,26 +80,28 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
     """
     logger.debug('warming target_roots for: %r', target_roots)
     subjects = [Specs(tuple(target_roots.specs))]
-    request = self.scheduler.execution_request([TransitiveHydratedTargets], subjects)
-    result = self.scheduler.execute(request)
+    scheduler_session = self.scheduler.new_session()
+    request = scheduler_session.execution_request([TransitiveHydratedTargets], subjects)
+    result = scheduler_session.execute(request)
     if result.error:
       raise result.error
 
-  def create_build_graph(self, target_roots, build_root=None):
+  def create_build_graph(self, scheduler_session, target_roots, build_root=None):
     """Construct and return a `BuildGraph` given a set of input specs.
 
+    :param SchedulerSession scheduler_session: A SchedulerSession to warm the graph in.
     :param TargetRoots target_roots: The targets root of the request.
     :param string build_root: The build root.
     :returns: A tuple of (BuildGraph, AddressMapper).
     """
     logger.debug('target_roots are: %r', target_roots)
-    graph = LegacyBuildGraph.create(self.scheduler, self.symbol_table)
+    graph = LegacyBuildGraph.create(scheduler_session, self.symbol_table)
     logger.debug('build_graph is: %s', graph)
     # Ensure the entire generator is unrolled.
     for _ in graph.inject_roots_closure(target_roots):
       pass
 
-    address_mapper = LegacyAddressMapper(self.scheduler, build_root or get_buildroot())
+    address_mapper = LegacyAddressMapper(scheduler_session, build_root or get_buildroot())
     logger.debug('address_mapper is: %s', address_mapper)
     return graph, address_mapper
 
@@ -145,7 +145,7 @@ class EngineInitializer(object):
                                   under the current build root.
     :param bool include_trace_on_error: If True, when an error occurs, the error message will
                 include the graph trace.
-    :returns: A tuple of (scheduler, engine, symbol_table, build_graph_cls).
+    :returns: A LegacyGraphHelper.
     """
 
     build_root = build_root or get_buildroot()
@@ -161,7 +161,7 @@ class EngineInitializer(object):
 
     project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
 
-    # Register "literal" subjects required for these tasks.
+    # Register "literal" subjects required for these rules.
     parser = LegacyPythonCallbacksParser(
       symbol_table,
       build_file_aliases,
@@ -175,16 +175,21 @@ class EngineInitializer(object):
     # Load the native backend.
     native = native or Native.create()
 
-    # Create a Scheduler containing graph and filesystem tasks, with no installed goals. The
+    # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.
-    tasks = (
+    rules = (
       create_legacy_graph_tasks(symbol_table) +
       create_fs_rules() +
       create_graph_rules(address_mapper, symbol_table) +
       rules
     )
 
-    scheduler = LocalScheduler(workdir, dict(), tasks, project_tree, native, include_trace_on_error=include_trace_on_error)
-    change_calculator = EngineChangeCalculator(scheduler, symbol_table, scm) if scm else None
+    scheduler = Scheduler(
+      native,
+      project_tree,
+      workdir,
+      rules,
+      include_trace_on_error=include_trace_on_error,
+    )
 
-    return LegacyGraphHelper(scheduler, symbol_table, change_calculator)
+    return LegacyGraphHelper(scheduler, symbol_table, scm)

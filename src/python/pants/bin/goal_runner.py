@@ -25,6 +25,7 @@ from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting import Reporting
+from pants.scm.change_calculator import EngineChangeCalculator
 from pants.scm.subsystems.changed import Changed
 from pants.source.source_root import SourceRootConfig
 from pants.task.task import QuietTaskMixin
@@ -95,7 +96,7 @@ class GoalRunnerFactory(object):
     :param TargetRoots target_roots: The existing `TargetRoots` object, if any.
     :param LegacyGraphHelper graph_helper: A LegacyGraphHelper to use for graph construction,
                                            if available. This would usually come from the daemon.
-    :returns: A tuple of (BuildGraph, AddressMapper, opt Scheduler, TargetRoots).
+    :returns: A tuple of (BuildGraph, AddressMapper, SchedulerSession, TargetRoots).
     """
     # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
     if not graph_helper:
@@ -114,13 +115,18 @@ class GoalRunnerFactory(object):
         include_trace_on_error=self._options.for_global_scope().print_exception_stacktrace
       )
 
+    scheduler_session = graph_helper.scheduler.new_session()
     target_roots = target_roots or TargetRootsCalculator.create(
       options=self._options,
       build_root=self._root_dir,
-      change_calculator=graph_helper.change_calculator
+      change_calculator=EngineChangeCalculator(scheduler_session,
+                                               graph_helper.symbol_table,
+                                               graph_helper.scm)
     )
-    graph, address_mapper = graph_helper.create_build_graph(target_roots, self._root_dir)
-    return graph, address_mapper, graph_helper.scheduler, target_roots
+    graph, address_mapper = graph_helper.create_build_graph(scheduler_session,
+                                                            target_roots,
+                                                            self._root_dir)
+    return graph, address_mapper, scheduler_session, target_roots
 
   def _determine_goals(self, requested_goals):
     """Check and populate the requested goals for a given run."""
