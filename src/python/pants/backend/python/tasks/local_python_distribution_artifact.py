@@ -1,3 +1,7 @@
+# coding=utf-8
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
@@ -23,12 +27,12 @@ class LocalPythonDistributionArtifact(Task):
   def execute(self):
     dist_targets = self.context.targets(is_local_python_dist)
 
+    local_wheels_product = self.context.products.get('local_wheels')
+    if not local_wheels_product:
+        return
+    safe_mkdir(self.dist_dir)  # Make sure dist dir is present.
     for t in dist_targets:
       # Copy generated wheel files to dist folder
-      safe_mkdir(self.dist_dir)  # Make sure dist dir is present.
-      local_wheels_product = self.context.products.get('local_wheels')
-      if not local_wheels_product:
-        continue
       target_local_wheels = local_wheels_product.get(t)
       if not target_local_wheels:
         continue
@@ -36,7 +40,7 @@ class LocalPythonDistributionArtifact(Task):
         for base_name in base_names:
           wheel_output = os.path.join(output_dir, base_name)
           self.context.log.debug('found local built wheels {}'.format(wheel_output))
-          # Create a copy for wheel in dist dir..
+          # Create a copy for wheel in dist dir.
           wheel_copy = os.path.join(self.dist_dir, base_name)
           atomic_copy(wheel_output, wheel_copy)
           self.context.log.info(

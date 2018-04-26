@@ -65,5 +65,5 @@ def register_goals():
   task(name='py', action=PythonRepl).install('repl')
   task(name='setup-py', action=SetupPy).install()
   task(name='py', action=PythonBinaryCreate).install('binary')
-  task(name='py-local-wheels', action=LocalPythonDistributionArtifact).install('binary')
+  task(name='py-wheels', action=LocalPythonDistributionArtifact).install('binary')
   task(name='isort', action=IsortPythonTask).install('fmt')
