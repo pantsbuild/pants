@@ -16,11 +16,15 @@ from pants.util.meta import AbstractClass
 def datatype(field_decls, superclass_name=None, **kwargs):
   """A wrapper for `namedtuple` that accounts for the type of the object in equality.
 
-  FIXME:
-  A wrapper over namedtuple which accepts a dict of field names and types.
+  Field declarations can be a string, which declares a field with that name and
+  no type checking. Field declarations can also be a tuple `('field_name',
+  field_type)`, which declares a field named `field_name` which is type-checked
+  at construction. If a type is given, the value provided to the constructor for
+  that field must be exactly that type (i.e. `type(x) == field_type`), and not
+  e.g. a subclass.
 
-  This can be used to very concisely define classes which have fields that are
-  type-checked at construction.
+  :param field_decls: Iterable of field declarations.
+  :return: A type object which can then be subclassed.
   """
   field_names = []
   fields_with_constraints = OrderedDict()
@@ -37,12 +41,11 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
   if not superclass_name:
     superclass_name = '_anonymous_namedtuple_subclass'
+  superclass_name = str(superclass_name)
+
   namedtuple_cls = namedtuple(superclass_name, field_names, **kwargs)
 
   class DataType(namedtuple_cls):
-    # TODO: remove this? namedtuple already does this
-    __slots__ = ()
-
     @classmethod
     def make_type_error(cls, msg):
       return TypeCheckError(cls.__name__, msg)
@@ -130,9 +133,9 @@ def datatype(field_decls, superclass_name=None, **kwargs):
         class_name=type(self).__name__,
         typed_tagged_elements=', '.join(elements_formatted))
 
-  DataType.__name__ = str(superclass_name)
-
-  return DataType
+  # Return a new type with the given name, inheriting from the DataType class
+  # just defined, with an empty class body.
+  return type(superclass_name, (DataType,), {})
 
 
 class TypedDatatypeClassConstructionError(Exception):
