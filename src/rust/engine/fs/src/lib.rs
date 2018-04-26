@@ -97,14 +97,14 @@ pub enum PathStat {
 }
 
 impl PathStat {
-  fn dir(path: PathBuf, stat: Dir) -> PathStat {
+  pub fn dir(path: PathBuf, stat: Dir) -> PathStat {
     PathStat::Dir {
       path: path,
       stat: stat,
     }
   }
 
-  fn file(path: PathBuf, stat: File) -> PathStat {
+  pub fn file(path: PathBuf, stat: File) -> PathStat {
     PathStat::File {
       path: path,
       stat: stat,
