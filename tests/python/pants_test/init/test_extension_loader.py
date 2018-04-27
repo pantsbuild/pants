@@ -83,11 +83,11 @@ class DummyTask(Task):
   def execute(self): return 42
 
 
-class RootType(datatype('RootType', ['value'])):
+class RootType(datatype(['value'])):
   pass
 
 
-class WrapperType(datatype('WrapperType', ['value'])):
+class WrapperType(datatype(['value'])):
   pass
 
 
