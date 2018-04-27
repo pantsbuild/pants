@@ -15,6 +15,8 @@ from pants_test.option.util.fakes import create_options
 from pants.contrib.python.checks.tasks.checkstyle.common import Nit, PythonFile
 
 
+# TODO: Refactor this test suite to leverage the ConsoleTaskTestBase class
+# for proper integration testing (i.e. any test that runs task.execute()).
 class CheckstylePluginTestBase(unittest.TestCase):
   plugin_type = None   # Subclasses must override.
 
