@@ -14,12 +14,11 @@ from pants.base.exceptions import TaskError
 from pants.option.custom_types import file_option
 from pants.task.lint_task_mixin import LintTaskMixin
 from pants.task.task import Task
+from pex.interpreter import PythonInterpreter
 
 from pants.contrib.python.checks.tasks.checkstyle.common import CheckSyntaxError, Nit, PythonFile
 from pants.contrib.python.checks.tasks.checkstyle.file_excluder import FileExcluder
 from pants.contrib.python.checks.tasks.checkstyle.register_plugins import register_plugins
-
-from pex.interpreter import PythonInterpreter
 
 
 _NOQA_LINE_SEARCH = re.compile(r'# noqa\b').search
@@ -56,6 +55,10 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
   @classmethod
   def subsystem_dependencies(cls):
     return super(Task, cls).subsystem_dependencies() + cls._subsystems
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    round_manager.require_data(PythonInterpreter)
 
   @classmethod
   def register_options(cls, register):
@@ -173,8 +176,8 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
     # If we are linting for Python 3, skip lint altogether. 
     # Long-term Python 3 linting solution tracked by:
     # https://github.com/pantsbuild/pants/issues/5764
-    intepreter = self.context.products.get_data(PythonInterpreter)
-    if intepreter and intepreter.version > (3, 0 ,0):
+    interpreter = self.context.products.get_data(PythonInterpreter)
+    if interpreter and intepreter.version > (3, 0 ,0):
       self.context.log.info('Linting is currently disabled for Python 3 targets.\n '
                             'See https://github.com/pantsbuild/pants/issues/5764 for '
                             'long-term solution tracking.')
