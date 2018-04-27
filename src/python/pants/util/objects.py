@@ -56,8 +56,8 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
   class DataType(namedtuple_cls):
     @classmethod
-    def make_type_error(cls, msg):
-      return TypeCheckError(cls.__name__, msg)
+    def make_type_error(cls, msg, *args, **kwargs):
+      return TypeCheckError(cls.__name__, msg, *args, **kwargs)
 
     def __new__(cls, *args, **kwargs):
       this_object = super(DataType, cls).__new__(cls, *args, **kwargs)
