@@ -178,7 +178,7 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
       self.context.log.info('Linting is currently disabled for Python 3 targets.\n '
                             'See https://github.com/pantsbuild/pants/issues/5764 for '
                             'long-term solution tracking.')
-      return 0
+      return
 
     with self.invalidated(self.get_targets(self._is_checked)) as invalidation_check:
       sources = self.calculate_sources([vt.target for vt in invalidation_check.invalid_vts])
