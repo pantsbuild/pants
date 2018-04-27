@@ -164,6 +164,18 @@ The initial Nodes are [launched by the engine](https://github.com/pantsbuild/pan
 but the rest of execution is driven by Nodes recursively calling `Context.get` to request their
 dependencies.
 
+### Registering Rules
+
+Currently, it is only possible to load rules into the pants scheduler in two ways: by importing and using them in `src/python/pants/bin/engine_initializer.py`, or by adding them to the list returned by a `rules()` method defined in `src/python/backend/<backend_name>/register.py`. Plugins cannot add new rules yet. Unit tests, however, can mix in `SchedulerTestBase` from `tests/python/pants_test/engine/scheduler_test_base.py` to generate and execute a scheduler from a given set of rules.
+
+In general, there are three types of rules you can define:
+
+1. an `@rule`, which has a single product type and selects its inputs as described above.
+2. a `SingletonRule`, which matches a product type with a value so the type can then be `Select`ed in an `@rule`.
+3. a `RootRule`, which declares a type that can be used as a *subject*, which means it can be provided as an input to a `product_request()` or a `Get` statement.
+
+This interface is being actively developed at this time and this documentation may be out of date.
+
 ## Execution
 
 The engine executes work concurrently wherever possible; to help visualize executions, a visualization
