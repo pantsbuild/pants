@@ -73,7 +73,8 @@ where
 /// #
 /// # fn main() {
 /// execute!("ls");
-/// execute!("ls", "-l", "--all");
+/// execute!("ls", "-la");
+/// execute!("ls", "-l", "-a");
 /// # }
 #[macro_export]
 macro_rules! execute {
