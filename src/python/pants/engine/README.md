@@ -52,7 +52,7 @@ def int_to_str(an_int):
 ```
 
 The first argument to the `@rule` decorator is the Product (ie, return) type for the `@rule`. The
-second argument is a list of `Selectors` that declare the types of the input arguments to the
+second argument is a list of `Selector`s that declare the types of the input arguments to the
 `@rule`. In this case, because the Product type is `StringType` and there is one `Selector`
 (`Select(IntType)`), this `@rule` represents a conversion from `IntType` to `StrType`, with no
 other inputs.
@@ -62,10 +62,12 @@ Subject, it will first see whether there are any ways to get an IntType for that
 the subject is already of `type(subject) == IntType`, then the `@rule` will be satisfiable without
 any other dependencies. On the other hand, if the type _doesn't_ match, the engine doesn't give up:
 it will next look for any other registered `@rule`s that can compute an IntType Product for the
-Subject (and so on, recursively.)
+Subject (and so on, recursively).
+
+### Datatypes
 
 In practical use, using basic types like `StringType` or `IntType` does not provide enough
-information to disambiguate between various types of data: So declaring small `datatype`
+information to disambiguate between various types of data. So declaring small `datatype`
 definitions to provide a unique and descriptive type is strongly recommended:
 
 ```python
