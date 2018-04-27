@@ -45,6 +45,7 @@ files=(
   $(find "${NATIVE_ROOT}" \
       -name '*.rs' -not -wholename '*/bazel_protos/*' -not -wholename '*/target/*')
   "${NATIVE_ROOT}/process_execution/bazel_protos/src/verification.rs"
+  "${NATIVE_ROOT}/process_execution/bazel_protos/build.rs"
 )
 
 bad_files=(
