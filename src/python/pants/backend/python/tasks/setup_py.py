@@ -83,17 +83,14 @@ class SetupPyInvocationEnvironment(datatype(['joined_path'])):
 
   def as_env_dict(self):
     return {
-      'ARCHFLAGS': '-arch x86_64',
-      'CC': 'clang',
-      'CXX': 'clang++',
-      'LDSHARED': 'clang',
       'PATH': self.joined_path,
     }
 
 
 @rule(SetupPyInvocationEnvironment, [Select(NativeToolchain)])
 def get_setup_py_env(native_toolchain):
-  joined_path = get_joined_path(native_toolchain.path_entries())
+  joined_path = get_joined_path(
+    native_toolchain.path_entries(), os.environ.copy())
   return SetupPyInvocationEnvironment(joined_path)
 
 
