@@ -85,9 +85,9 @@ class SetupPyInvocationEnvironment(datatype('SetupPyInvocationEnvironment', [
 
   def as_env_dict(self):
     return {
-      'CC': 'clang',
-      'CXX': 'clang++',
-      'LDSHARED': 'clang',
+      'CC': 'gcc',
+      'CXX': 'g++',
+      'LDSHARED': 'gcc',
       'PATH': self.joined_path,
     }
 
