@@ -553,16 +553,16 @@ function build_pex() {
   case "${mode}" in
     build)
       case "$(uname)" in
-        Darwin)
-          local platform="${osx_platform}"
-          ;;
-        Linux)
-          local platform="${linux_platform}"
-          ;;
-        *)
-          echo >&2 "Unknown uname"
-          exit 1
-          ;;
+	Darwin)
+	  local platform="${osx_platform}"
+	  ;;
+	Linux)
+	  local platform="${linux_platform}"
+	  ;;
+	*)
+	  echo >&2 "Unknown uname"
+	  exit 1
+	  ;;
       esac
       local platforms=("${platform}")
       local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.pex"
