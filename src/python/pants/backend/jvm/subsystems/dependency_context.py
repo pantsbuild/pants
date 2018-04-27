@@ -17,6 +17,7 @@ from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.build_graph.aliased_target import AliasTarget
+from pants.build_graph.dependency_context import DependencyContext as DependencyContextBase
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
@@ -27,7 +28,7 @@ class SyntheticTargetNotFound(Exception):
   """Exports were resolved for a thrift target which hasn't had a synthetic target generated yet."""
 
 
-class DependencyContext(Subsystem):
+class DependencyContext(Subsystem, DependencyContextBase):
   """Implements calculating `exports` and exception (compiler-plugin) aware dependencies.
 
   This is a subsystem because in future the compiler plugin types should be injected
@@ -36,9 +37,8 @@ class DependencyContext(Subsystem):
 
   options_scope = 'jvm-dependency-context'
 
+  types_with_closure = (AnnotationProcessor, JavacPlugin, ScalacPlugin)
   target_closure_kwargs = dict(include_scopes=Scopes.JVM_COMPILE_SCOPES, respect_intransitive=True)
-  compiler_plugin_types = (AnnotationProcessor, JavacPlugin, ScalacPlugin)
-  alias_types = (AliasTarget, Target)
   codegen_types = (JavaThriftLibrary, JavaProtobufLibrary)
 
   @classmethod

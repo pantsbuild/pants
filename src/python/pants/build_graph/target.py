@@ -28,6 +28,7 @@ from pants.fs.fs import safe_filename
 from pants.source.payload_fields import SourcesField
 from pants.source.wrapped_globs import Files, FilesetWithSpec, Globs
 from pants.subsystem.subsystem import Subsystem
+from pants.util.dirutil import narrow_relative_paths
 from pants.util.memo import memoized_property
 
 
@@ -218,7 +219,9 @@ class Target(AbstractTarget):
   @classmethod
   def _closure_dep_predicate(cls, roots, include_scopes=None, exclude_scopes=None, respect_intransitive=False):
     if not respect_intransitive and include_scopes is None and exclude_scopes is None:
-      return None
+      def trivial_predicate(*args, **kwargs):
+        return True
+      return trivial_predicate
 
     root_lookup = set(roots)
     def predicate(target, dep_target):
@@ -518,20 +521,15 @@ class Target(AbstractTarget):
     """
     :API: public
     """
-    if self.has_sources():
-      return self._sources_field.relative_to_buildroot()
-    else:
-      return []
+    return self._sources_field.relative_to_buildroot()
 
   def sources_relative_to_source_root(self):
     """
     :API: public
     """
-    if self.has_sources():
-      abs_source_root = os.path.join(get_buildroot(), self.target_base)
-      for source in self.sources_relative_to_buildroot():
-        abs_source = os.path.join(get_buildroot(), source)
-        yield os.path.relpath(abs_source, abs_source_root)
+    buildroot = get_buildroot()
+    abs_source_root = os.path.join(get_buildroot(), self.target_base)
+    return narrow_relative_paths(buildroot, abs_source_root, self.sources_relative_to_buildroot())
 
   def globs_relative_to_buildroot(self):
     """
@@ -707,7 +705,7 @@ class Target(AbstractTarget):
       for declared in result:
         if type(declared) in dep_context.alias_types:
           continue
-        if isinstance(declared, dep_context.compiler_plugin_types):
+        if isinstance(declared, dep_context.types_with_closure):
           strict_deps.update(declared.closure(
             bfs=True,
             **dep_context.target_closure_kwargs))

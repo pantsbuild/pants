@@ -21,6 +21,7 @@ from twitter.common.dirutil.chroot import Chroot
 
 from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
+from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -39,6 +40,7 @@ from pants.util.dirutil import is_executable, safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
+from pants.util.strutil import safe_shlex_split
 
 
 SETUP_BOILERPLATE = """
@@ -56,8 +58,24 @@ setup(**
 class SetupPyRunner(InstallerBase):
   _EXTRAS = ('setuptools', 'wheel')
 
+  _PLATFORM_NAMES = {
+    # TODO: note the version 10.10 thing
+    'darwin': lambda: 'macosx_10_10_x86_64',
+    'linux': lambda: 'linux_x86_64',
+  }
+
+  @classmethod
+  def for_bdist_wheel(cls, source_dir, platform=None, **kw):
+    cmd = ['bdist_wheel']
+    if platform:
+      plat_name = platform.resolve_platform_specific(cls._PLATFORM_NAMES)
+      cmd.extend(['--plat-name', plat_name])
+    else:
+      cmd.append('--universal')
+    return cls(source_dir, cmd, **kw)
+
   def __init__(self, source_dir, setup_command, **kw):
-    self.__setup_command = setup_command.split()
+    self.__setup_command = setup_command
     super(SetupPyRunner, self).__init__(source_dir, **kw)
 
   def mixins(self):
@@ -91,7 +109,7 @@ _XCODE_TOOL_LOCATIONS = {
 }
 
 
-def _detect_xcode_tools():
+def _detect_xcode_tools(platform):
   for tool_name, tool_location in _XCODE_TOOL_LOCATIONS.items():
     if not is_executable(tool_location):
       raise XCodeToolsUnavailable(
@@ -103,13 +121,16 @@ def _detect_xcode_tools():
   return SetupPyExecutionEnvironment(
     exec_path='/usr/bin',
     c_compiler_name='clang',
-    cpp_compiler_name='clang++')
+    cpp_compiler_name='clang++',
+    platform=platform)
 
 
 class SetupPyExecutionEnvironment(datatype([
     'exec_path',
     'c_compiler_name',
     'cpp_compiler_name',
+    'linker_name',
+    ('platform', Platform),
 ])):
 
   def as_environment(self):
@@ -127,20 +148,17 @@ class SetupPyExecutionEnvironment(datatype([
 def get_setup_py_environment(platform, native_toolchain):
   # TODO(cosmicexplorer): make it possible to yield Get with a non-static
   # subject type and use `platform.resolve_platform_specific()`.
-  if platform.normalized_os_name == 'darwin':
-    yield _detect_xcode_tools()
-  else:
-    c_compiler = yield Get(CCompiler, NativeToolchain, native_toolchain)
-    cpp_compiler = yield Get(CppCompiler, NativeToolchain, native_toolchain)
-    linker = yield Get(Linker, NativeToolchain, native_toolchain)
-    joined_path = get_joined_path(
-      linker.path_entries +
-      c_compiler.path_entries +
-      cpp_compiler.path_entries)
-    yield SetupPyExecutionEnvironment(
-      exec_path=joined_path,
-      c_compiler_name=c_compiler.exe_filename,
-      cpp_compiler_name=cpp_compiler.exe_filename)
+  c_compiler = yield Get(CCompiler, NativeToolchain, native_toolchain)
+  cpp_compiler = yield Get(CppCompiler, NativeToolchain, native_toolchain)
+  linker = yield Get(Linker, NativeToolchain, native_toolchain)
+  all_path_entries = linker.path_entries + c_compiler.path_entries + cpp_compiler.path_entries
+  joined_path = get_joined_path(all_path_entries, os.environ.copy())
+  yield SetupPyExecutionEnvironment(
+    exec_path=joined_path,
+    c_compiler_name=c_compiler.exe_filename,
+    cpp_compiler_name=cpp_compiler.exe_filename,
+    linker_name=linker.exe_filename,
+    platform=platform)
 
 
 class TargetAncestorIterator(object):
@@ -706,7 +724,8 @@ class SetupPy(Task):
           python_dists[exported_python_target] = sdist_path
         else:
           self.context.log.info('Running {} against {}'.format(self._run, setup_dir))
-          setup_runner = SetupPyRunner(setup_dir, self._run, interpreter=interpreter)
+          split_command = safe_shlex_split(self._run)
+          setup_runner = SetupPyRunner(setup_dir, split_command, interpreter=interpreter)
           setup_runner.run()
           python_dists[exported_python_target] = setup_dir
 

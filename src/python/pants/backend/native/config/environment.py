@@ -29,12 +29,12 @@ class Platform(datatype(['normalized_os_name'])):
 
   def resolve_platform_specific(self, platform_specific_funs):
     arg_keys = frozenset(platform_specific_funs.keys())
-    unknown_plats = self._NORMED_OS_NAMES - arg_keys
+    unknown_plats = self._NORMALIZED_OS_NAMES - arg_keys
     if unknown_plats:
       raise UnsupportedPlatformError(
         "platform_specific_funs {} must support platforms {}"
         .format(platform_specific_funs, list(unknown_plats)))
-    extra_plats = arg_keys - self._NORMED_OS_NAMES
+    extra_plats = arg_keys - self._NORMALIZED_OS_NAMES
     if extra_plats:
       raise UnsupportedPlatformError(
         "platform_specific_funs {} has unrecognized platforms {}"
@@ -58,6 +58,7 @@ class Executable(object):
 class Linker(datatype([
     'path_entries',
     'exe_filename',
+    ('platform', Platform),
 ]), Executable):
   pass
 
@@ -65,6 +66,7 @@ class Linker(datatype([
 class CCompiler(datatype([
     'path_entries',
     'exe_filename',
+    ('platform', Platform),
 ]), Executable):
   pass
 
@@ -72,6 +74,7 @@ class CCompiler(datatype([
 class CppCompiler(datatype([
     'path_entries',
     'exe_filename',
+    ('platform', Platform),
 ]), Executable):
   pass
 

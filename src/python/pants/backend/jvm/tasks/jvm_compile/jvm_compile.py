@@ -132,7 +132,7 @@ class JvmCompile(NailgunTaskBase):
     register('--suggest-missing-deps', type=bool,
              help='Suggest missing dependencies on a best-effort basis from target\'s transitive'
                   'deps for compilation failures that are due to class not found.')
-    
+
     register('--buildozer',
              help='Path to buildozer for suggest-missing-deps command lines. '
                   'If absent, no command line will be suggested to fix missing deps.')
@@ -587,7 +587,7 @@ class JvmCompile(NailgunTaskBase):
   def _find_missing_deps(self, compile_logs, target):
     with self.context.new_workunit('missing-deps-suggest', labels=[WorkUnitLabel.COMPILER]):
       compile_failure_log = '\n'.join(read_file(log).decode('utf-8') for log in compile_logs)
-      
+
       missing_dep_suggestions, no_suggestions = self._missing_deps_finder.find(
         compile_failure_log, target)
 

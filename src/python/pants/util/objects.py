@@ -109,14 +109,17 @@ def datatype(field_decls, superclass_name=None, **kwargs):
         raise ValueError('Got unexpected field names: %r' % kwds.keys())
       return result
 
-    # TODO(cosmicexplorer): would we want to expose a self.as_tuple() method so we can tuple assign?
+    # TODO: would we want to expose a self.as_tuple() method so we can tuple assign?
     # class A(datatype(['field'])): pass
     # x = A(field='asdf')
     # field_value, = x.as_tuple()
     # print(field_value) # => 'asdf'
+    def as_tuple(self):
+      return tuple(self._super_iter())
+
     def __getnewargs__(self):
       '''Return self as a plain tuple.  Used by copy and pickle.'''
-      return tuple(self._super_iter())
+      return self.as_tuple()
 
     def __repr__(self):
       args_formatted = []

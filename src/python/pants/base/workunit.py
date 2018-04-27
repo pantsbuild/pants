@@ -36,6 +36,7 @@ class WorkUnitLabel(object):
   TOOL = 'TOOL'           # Single invocations of a tool.
   MULTITOOL = 'MULTITOOL' # Multiple consecutive invocations of the same tool.
   COMPILER = 'COMPILER'   # Invocation of a compiler.
+  LINKER = 'LINKER'
 
   TEST = 'TEST'           # Running a test.
   JVM = 'JVM'             # Running a tool via the JVM.

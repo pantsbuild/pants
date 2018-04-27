@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.native.config.environment import CCompiler, CppCompiler
+from pants.backend.native.config.environment import CCompiler, CppCompiler, Platform
 from pants.binaries.binary_tool import NativeTool
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
@@ -21,25 +21,26 @@ class GCC(NativeTool):
   def path_entries(self):
     return [os.path.join(self.select(), 'bin')]
 
-  def c_compiler(self):
+  def c_compiler(self, platform):
     return CCompiler(
       path_entries=self.path_entries(),
-      exe_filename='gcc')
+      exe_filename='gcc',
+      platform=platform)
 
-  def cpp_compiler(self):
+  def cpp_compiler(self, platform):
     return CppCompiler(
       path_entries=self.path_entries(),
-      exe_filename='g++')
+      exe_filename='g++',
+      platform=platform)
 
 
-@rule(CCompiler, [Select(GCC)])
-def get_gcc(gcc):
-  return gcc.c_compiler()
+@rule(CCompiler, [Select(Platform), Select(GCC)])
+def get_gcc(platform, gcc):
+  yield gcc.c_compiler(platform)
 
-
-@rule(CppCompiler, [Select(GCC)])
-def get_gplusplus(gcc):
-  return gcc.cpp_compiler()
+@rule(CppCompiler, [Select(Platform), Select(GCC)])
+def get_gplusplus(platform, gcc):
+  yield gcc.cpp_compiler(platform)
 
 
 def create_gcc_rules():
