@@ -79,9 +79,7 @@ class SetupPyRunner(InstallerBase):
     return self.__setup_command
 
 
-class SetupPyInvocationEnvironment(datatype('SetupPyInvocationEnvironment', [
-    'joined_path',
-])):
+class SetupPyInvocationEnvironment(datatype(['joined_path'])):
 
   def as_env_dict(self):
     return {

@@ -11,7 +11,7 @@ from pants.util.objects import datatype
 from pants.util.osutil import get_normalized_os_name
 
 
-class Platform(datatype('Platform', ['normalized_os_name'])):
+class Platform(datatype(['normalized_os_name'])):
 
   def __new__(cls):
     return super(Platform, cls).__new__(cls, get_normalized_os_name())
