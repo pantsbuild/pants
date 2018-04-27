@@ -31,6 +31,7 @@ dependencies = [
  "bytes 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "grpcio 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hashing 0.0.1",
  "protobuf 1.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -364,7 +365,6 @@ dependencies = [
 name = "hashing"
 version = "0.0.1"
 dependencies = [
- "bazel_protos 0.0.1",
  "digest 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "sha2 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
