@@ -211,10 +211,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
     self.assertEqual(len(remaining_dirs), 1)
     return list(remaining_dirs)[0]
 
-  def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
-                             build_root=None, tee_output=False, print_exception_stacktrace=True,
-                             **kwargs):
-
+  def run_pants_with_workdir_without_waiting(self, command, workdir, config=None, extra_env=None,
+                                             build_root=None, print_exception_stacktrace=True,
+                                             **kwargs):
     args = [
       '--no-pantsrc',
       '--pants-workdir={}'.format(workdir),
@@ -275,8 +274,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
       with open('{}.cmd'.format(prof), 'w') as fp:
         fp.write(b' '.join(pants_command))
 
-    proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+    return pants_command, subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
+      stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+
+  def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, tee_output=False, **kwargs):
+    if config:
+      kwargs["config"] = config
+    pants_command, proc = self.run_pants_with_workdir_without_waiting(command, workdir, **kwargs)
+
     communicate_fn = proc.communicate
     if tee_output:
       communicate_fn = SubprocessProcessHandler(proc).communicate_teeing_stdout_and_stderr
@@ -295,7 +300,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :returns a PantsResult instance.
     """
     with self.temporary_workdir() as workdir:
-      return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
+      return self.run_pants_with_workdir(
+        command,
+        workdir,
+        config,
+        stdin_data=stdin_data,
+        extra_env=extra_env,
+        **kwargs
+      )
 
   @contextmanager
   def pants_results(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
@@ -309,7 +321,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :returns a PantsResult instance.
     """
     with self.temporary_workdir() as workdir:
-      yield self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
+      yield self.run_pants_with_workdir(
+        command,
+        workdir,
+        config,
+        stdin_data=stdin_data,
+        extra_env=extra_env,
+        **kwargs
+      )
 
   def bundle_and_run(self, target, bundle_name, bundle_jar_name=None, bundle_options=None,
                      args=None,
