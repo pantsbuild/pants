@@ -19,6 +19,8 @@ from pants.contrib.python.checks.tasks.checkstyle.common import CheckSyntaxError
 from pants.contrib.python.checks.tasks.checkstyle.file_excluder import FileExcluder
 from pants.contrib.python.checks.tasks.checkstyle.register_plugins import register_plugins
 
+from pex.interpreter import PythonInterpreter
+
 
 _NOQA_LINE_SEARCH = re.compile(r'# noqa\b').search
 _NOQA_FILE_SEARCH = re.compile(r'# (flake8|checkstyle): noqa$').search
@@ -167,6 +169,17 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
 
   def execute(self):
     """Run Checkstyle on all found non-synthetic source files."""
+
+    # If we are linting for Python 3, skip lint altogether. 
+    # Long-term Python 3 linting solution tracked by:
+    # https://github.com/pantsbuild/pants/issues/5764
+    intepreter = self.context.products.get_data(PythonInterpreter)
+    if intepreter and intepreter.version > (3, 0 ,0):
+      self.context.log.info('Linting is currently disabled for Python 3 targets.\n '
+                            'See https://github.com/pantsbuild/pants/issues/5764 for '
+                            'long-term solution tracking.')
+      return 0
+
     with self.invalidated(self.get_targets(self._is_checked)) as invalidation_check:
       sources = self.calculate_sources([vt.target for vt in invalidation_check.invalid_vts])
       if sources:
