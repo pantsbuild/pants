@@ -177,7 +177,7 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
     # Long-term Python 3 linting solution tracked by:
     # https://github.com/pantsbuild/pants/issues/5764
     interpreter = self.context.products.get_data(PythonInterpreter)
-    if interpreter and intepreter.version > (3, 0 ,0):
+    if interpreter and interpreter.version > (3, 0 ,0):
       self.context.log.info('Linting is currently disabled for Python 3 targets.\n '
                             'See https://github.com/pantsbuild/pants/issues/5764 for '
                             'long-term solution tracking.')
