@@ -62,8 +62,7 @@ done
 
 set -x
 
-${PANTS_EXE} --pants-config-files=pants.publish.ini \
-             sitegen --config-path='src/docs/docsite.json' \
+${PANTS_EXE} sitegen \
              src:: examples:: contrib::  \
              testprojects/src/java/org/pantsbuild/testproject/page:readme \
   || die "Failed to generate doc site'."

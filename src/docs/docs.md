@@ -50,7 +50,7 @@ To see http://www.pantsbuild.org/ site's content as it would be generated based 
 copy of the pants repo, enter the command:
 
     :::bash
-    # This publishes the docs in dist/docsite and opens (-o) them in your browser for review
+    # This generates the site html in dist/docsite and opens (-o) index.html in your browser for review.
     ./build-support/bin/publish_docs.sh -o
 
 The `-l <dir>` option will copy the site over to the existing local directory
