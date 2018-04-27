@@ -15,7 +15,7 @@ from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.project_tree import Dir
 from pants.build_graph.address import Address
-from pants.engine.addressable import BuildFileAddresses, SubclassesOf, addressable_list
+from pants.engine.addressable import BuildFileAddresses, addressable_list
 from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import FilesContent, PathGlobs, Snapshot, create_fs_rules
 from pants.engine.mapper import AddressFamily, AddressMapper
@@ -25,7 +25,7 @@ from pants.engine.scheduler import LocalScheduler
 from pants.engine.selectors import Get, Select, SelectDependencies, SelectVariant
 from pants.engine.struct import HasProducts, Struct, StructWithDeps, Variants
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
+from pants.util.objects import SubclassesOf, datatype
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.sources import Sources
 
@@ -92,12 +92,12 @@ class ScalaInferredDepsSources(Sources):
   extensions = ('.scala',)
 
 
-class JVMPackageName(datatype('JVMPackageName', ['name'])):
+class JVMPackageName(datatype(['name'])):
   """A typedef to represent a fully qualified JVM package name."""
   pass
 
 
-class SourceRoots(datatype('SourceRoots', ['srcroots'])):
+class SourceRoots(datatype(['srcroots'])):
   """Placeholder for the SourceRoot subsystem."""
 
 
@@ -283,7 +283,7 @@ def write_name_file(name):
   return Classpath(creator='write_name_file')
 
 
-class Scrooge(datatype('Scrooge', ['tool_address'])):
+class Scrooge(datatype(['tool_address'])):
   """Placeholder for a Scrooge subsystem."""
 
 

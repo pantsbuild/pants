@@ -26,7 +26,7 @@ class Spec(AbstractClass):
     """Returns the normalized string representation of this spec."""
 
 
-class SingleAddress(datatype('SingleAddress', ['directory', 'name']), Spec):
+class SingleAddress(datatype(['directory', 'name']), Spec):
   """A Spec for a single address."""
 
   def __new__(cls, directory, name):
@@ -39,21 +39,21 @@ class SingleAddress(datatype('SingleAddress', ['directory', 'name']), Spec):
     return '{}:{}'.format(self.directory, self.name)
 
 
-class SiblingAddresses(datatype('SiblingAddresses', ['directory']), Spec):
+class SiblingAddresses(datatype(['directory']), Spec):
   """A Spec representing all addresses located directly within the given directory."""
 
   def to_spec_string(self):
     return '{}:'.format(self.directory)
 
 
-class DescendantAddresses(datatype('DescendantAddresses', ['directory']), Spec):
+class DescendantAddresses(datatype(['directory']), Spec):
   """A Spec representing all addresses located recursively under the given directory."""
 
   def to_spec_string(self):
     return '{}::'.format(self.directory)
 
 
-class AscendantAddresses(datatype('AscendantAddresses', ['directory']), Spec):
+class AscendantAddresses(datatype(['directory']), Spec):
   """A Spec representing all addresses located recursively _above_ the given directory."""
 
   def to_spec_string(self):

@@ -10,19 +10,34 @@ import tarfile
 import unittest
 
 from pants.engine.fs import PathGlobs, Snapshot, create_fs_rules
-from pants.engine.isolated_process import (
-  ExecuteProcessRequest, ExecuteProcessResult, create_process_rules)
+from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
+                                           create_process_rules)
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
-from pants.util.objects import datatype
+from pants.util.objects import TypeCheckError, datatype
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
-class Concatted(datatype('Concatted', ['value'])):
+class Concatted(datatype([('value', str)])):
   pass
 
 
-class ShellCat(datatype('ShellCat', ['bin_path'])):
+class BinaryLocation(datatype([('bin_path', str)])):
+
+  def __new__(cls, *args, **kwargs):
+    this_object = super(BinaryLocation, cls).__new__(cls, *args, **kwargs)
+
+    bin_path = this_object.bin_path
+
+    if os.path.isfile(bin_path) and os.access(bin_path, os.X_OK):
+      return this_object
+
+    raise TypeCheckError(
+      cls.__name__,
+      "path {} does not name an existing executable file.".format(bin_path))
+
+
+class ShellCat(datatype([('binary_location', BinaryLocation)])):
   """Wrapper class to show an example of using an auxiliary class (which wraps
   an executable) to generate an argv instead of doing it all in
   CatExecutionRequest. This can be used to encapsulate operations such as
@@ -31,38 +46,33 @@ class ShellCat(datatype('ShellCat', ['bin_path'])):
   executable is used in different ways across multiple different types of
   process execution requests."""
 
+  @property
+  def bin_path(self):
+    return self.binary_location.bin_path
+
   def argv_from_snapshot(self, snapshot):
     cat_file_paths = [f.path for f in snapshot.files]
 
     option_like_files = [p for p in cat_file_paths if p.startswith('-')]
     if option_like_files:
-      raise Exception(
+      raise ValueError(
         "invalid file names: '{}' look like command-line options"
         .format(option_like_files))
 
     return (self.bin_path,) + tuple(cat_file_paths)
 
 
-class CatExecutionRequest(datatype('CatExecutionRequest', [
-    'shell_cat_binary',
-    'input_file_globs',
+class CatExecutionRequest(datatype([
+    ('shell_cat', ShellCat),
+    ('path_globs', PathGlobs),
 ])):
-
-  def __new__(cls, shell_cat_binary, input_file_globs):
-    if not isinstance(shell_cat_binary, ShellCat):
-      raise ValueError('shell_cat_binary should be an instance of ShellCat')
-    if not isinstance(input_file_globs, PathGlobs):
-      raise ValueError(
-        'input_file_globs should be an instance of PathGlobs')
-
-    return super(CatExecutionRequest, cls).__new__(
-      cls, shell_cat_binary, input_file_globs)
+  pass
 
 
 @rule(ExecuteProcessRequest, [Select(CatExecutionRequest)])
 def cat_files_process_request_input_snapshot(cat_exe_req):
-  cat_bin = cat_exe_req.shell_cat_binary
-  cat_files_snapshot = yield Get(Snapshot, PathGlobs, cat_exe_req.input_file_globs)
+  cat_bin = cat_exe_req.shell_cat
+  cat_files_snapshot = yield Get(Snapshot, PathGlobs, cat_exe_req.path_globs)
   yield ExecuteProcessRequest.create_from_snapshot(
     argv=cat_bin.argv_from_snapshot(cat_files_snapshot),
     env=tuple(),
@@ -78,7 +88,7 @@ def cat_files_process_result_concatted(cat_exe_req):
   # probably some work required in isolated_process.py to fix this (see #5718).
   cat_proc_req = yield Get(ExecuteProcessRequest, CatExecutionRequest, cat_exe_req)
   cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, cat_proc_req)
-  yield Concatted(value=cat_process_result.stdout)
+  yield Concatted(str(cat_process_result.stdout))
 
 
 def create_cat_stdout_rules():
@@ -89,20 +99,26 @@ def create_cat_stdout_rules():
   ]
 
 
-class JavacVersionExecutionRequest(datatype('JavacVersionExecutionRequest', ['bin_path'])):
+class JavacVersionExecutionRequest(datatype([
+    ('binary_location', BinaryLocation),
+])):
+
+  @property
+  def bin_path(self):
+    return self.binary_location.bin_path
 
   def gen_argv(self):
     return (self.bin_path, '-version',)
 
 
 @rule(ExecuteProcessRequest, [Select(JavacVersionExecutionRequest)])
-def process_request_from_javac_version(javac_version_command):
+def process_request_from_javac_version(javac_version_exe_req):
   yield ExecuteProcessRequest.create_with_empty_snapshot(
-    argv=javac_version_command.gen_argv(),
+    argv=javac_version_exe_req.gen_argv(),
     env=tuple())
 
 
-class JavacVersionOutput(datatype('JavacVersionOutput', ['version_output'])):
+class JavacVersionOutput(datatype([('value', str)])):
   pass
 
 
@@ -147,12 +163,10 @@ def get_javac_version_output(javac_version_command):
     raise ProcessExecutionFailure(
       exit_code, stdout, stderr, 'obtaining javac version')
 
-  yield JavacVersionOutput(
-    version_output=javac_version_proc_result.stderr,
-  )
+  yield JavacVersionOutput(str(javac_version_proc_result.stderr))
 
 
-class JavacSources(datatype('JavacSources', ['globs'])):
+class JavacSources(datatype([('path_globs', PathGlobs)])):
   """PathGlobs wrapper for Java source files to show an example of making a
   custom type to wrap generic types such as PathGlobs to add usage context.
 
@@ -160,36 +174,15 @@ class JavacSources(datatype('JavacSources', ['globs'])):
   which does not introduce this additional layer of indirection.
   """
 
-  def __new__(cls, globs):
 
-    if not isinstance(globs, PathGlobs):
-      raise ValueError('globs should be an instance of PathGlobs')
-
-    return super(JavacSources, cls).__new__(cls, globs)
-
-
-@rule(PathGlobs, [Select(JavacSources)])
-def javac_sources_to_globs(javac_sources):
-  yield javac_sources.globs
-
-
-class JavacCompileRequest(datatype('JavacCompileRequest', [
-    'bin_path',
-    'javac_sources',
+class JavacCompileRequest(datatype([
+    ('binary_location', BinaryLocation),
+    ('javac_sources', JavacSources),
 ])):
 
-  def __new__(cls, bin_path, javac_sources):
-
-    # TODO(cosmicexplorer): This may be an instance of unicode, so convert to
-    # str. In general, there should be a more fluent way to check types in
-    # datatype constructors and perform simple conversions such as this.
-    bin_path = str(bin_path)
-    if not isinstance(javac_sources, JavacSources):
-      raise ValueError(
-        'javac_sources should be an instance of JavacSources')
-
-    return super(JavacCompileRequest, cls).__new__(
-      cls, bin_path, javac_sources)
+  @property
+  def bin_path(self):
+    return self.binary_location.bin_path
 
   def argv_from_source_snapshot(self, snapshot):
     snapshot_file_paths = [f.path for f in snapshot.files]
@@ -200,7 +193,7 @@ class JavacCompileRequest(datatype('JavacCompileRequest', [
 @rule(ExecuteProcessRequest, [Select(JavacCompileRequest)])
 def javac_compile_sources_execute_process_request(javac_compile_req):
   sources_snapshot = yield Get(
-    Snapshot, JavacSources, javac_compile_req.javac_sources)
+    Snapshot, PathGlobs, javac_compile_req.javac_sources.path_globs)
   yield ExecuteProcessRequest.create_from_snapshot(
     argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
     env=tuple(),
@@ -211,8 +204,7 @@ def javac_compile_sources_execute_process_request(javac_compile_req):
 # TODO: make this contain the snapshot(s?) of the output files (or contain
 # something that contains it) once we've made it so processes can make snapshots
 # of the files they produce.
-class JavacCompileResult(datatype('JavacCompileResult', [])):
-  pass
+class JavacCompileResult(object): pass
 
 
 @rule(JavacCompileResult, [Select(JavacCompileRequest)])
@@ -234,7 +226,6 @@ def javac_compile_process_result(javac_compile_req):
 
 def create_javac_compile_rules():
   return [
-    javac_sources_to_globs,
     javac_compile_sources_execute_process_request,
     javac_compile_process_result,
     RootRule(JavacCompileRequest),
@@ -275,14 +266,17 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs(create_cat_stdout_rules())
 
     cat_exe_req = CatExecutionRequest(
-      shell_cat_binary=ShellCat(bin_path='/bin/cat'),
-      input_file_globs=PathGlobs.create('', include=['fs_test/a/b/*']),
-    )
+      ShellCat(BinaryLocation(str('/bin/cat'))),
+      PathGlobs.create('', include=[u'fs_test/a/b/*']))
+
+    self.assertEqual(
+      repr(cat_exe_req),
+      str("CatExecutionRequest(shell_cat=ShellCat(binary_location=BinaryLocation(bin_path='/bin/cat')), path_globs=PathGlobs(include=(u'fs_test/a/b/*',), exclude=()))"))
 
     results = self.execute(scheduler, Concatted, cat_exe_req)
-    self.assertEquals(1, len(results))
+    self.assertEqual(1, len(results))
     concatted = results[0]
-    self.assertEqual(Concatted('one\ntwo\n'), concatted)
+    self.assertEqual(Concatted(str('one\ntwo\n')), concatted)
 
   def test_javac_version_example(self):
     scheduler = self.mk_scheduler_in_example_fs([
@@ -290,49 +284,54 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       process_request_from_javac_version,
       get_javac_version_output,
     ])
-    results = self.execute(
-      scheduler, JavacVersionOutput,
-      JavacVersionExecutionRequest(bin_path='/usr/bin/javac'))
-    self.assertEquals(1, len(results))
+
+    request = JavacVersionExecutionRequest(BinaryLocation(str('/usr/bin/javac')))
+
+    self.assertEqual(
+      repr(request),
+      "JavacVersionExecutionRequest(binary_location=BinaryLocation(bin_path='/usr/bin/javac'))")
+
+    results = self.execute(scheduler, JavacVersionOutput, request)
+    self.assertEqual(1, len(results))
     javac_version_output = results[0]
-    self.assertIn('javac', javac_version_output.version_output)
+    self.assertIn('javac', javac_version_output.value)
 
   def test_javac_compilation_example_success(self):
-    javac_sources = JavacSources(PathGlobs.create('', include=[
-      'scheduler_inputs/src/java/simple/Simple.java',
-    ]))
-
     scheduler = self.mk_scheduler_in_example_fs(create_javac_compile_rules())
 
     request = JavacCompileRequest(
-      bin_path='/usr/bin/javac',
-      javac_sources=javac_sources,
-    )
+      BinaryLocation(str('/usr/bin/javac')),
+      JavacSources(PathGlobs.create('', include=[
+        u'scheduler_inputs/src/java/simple/Simple.java',
+      ])))
+
+    self.assertEqual(
+      repr(request),
+      "JavacCompileRequest(binary_location=BinaryLocation(bin_path='/usr/bin/javac'), javac_sources=JavacSources(path_globs=PathGlobs(include=(u'scheduler_inputs/src/java/simple/Simple.java',), exclude=())))")
 
     results = self.execute(scheduler, JavacCompileResult, request)
-    self.assertEquals(1, len(results))
+    self.assertEqual(1, len(results))
     # TODO: Test that the output snapshot contains Simple.class at the correct
     # path
 
   def test_javac_compilation_example_failure(self):
-    javac_sources = JavacSources(PathGlobs.create('', include=[
-      'scheduler_inputs/src/java/simple/Broken.java',
-    ]))
-
     scheduler = self.mk_scheduler_in_example_fs(create_javac_compile_rules())
 
     request = JavacCompileRequest(
-      bin_path='/usr/bin/javac',
-      javac_sources=javac_sources,
-    )
+      BinaryLocation(str('/usr/bin/javac')),
+      JavacSources(PathGlobs.create('', include=[
+        'scheduler_inputs/src/java/simple/Broken.java',
+      ])))
 
-    try:
-      result = self.execute_raising_throw(scheduler, JavacCompileResult, request)
-      raise Exception("error: should have thrown (result: '{}')"
-                      .format(repr(result)))
-    except ProcessExecutionFailure as e:
-      self.assertEqual(1, e.exit_code)
-      self.assertIn("NOT VALID JAVA", e.stderr)
+    self.assertEqual(
+      repr(request),
+      "JavacCompileRequest(binary_location=BinaryLocation(bin_path='/usr/bin/javac'), javac_sources=JavacSources(path_globs=PathGlobs(include=(u'scheduler_inputs/src/java/simple/Broken.java',), exclude=())))")
+
+    with self.assertRaises(ProcessExecutionFailure) as cm:
+      self.execute_raising_throw(scheduler, JavacCompileResult, request)
+    e = cm.exception
+    self.assertEqual(1, e.exit_code)
+    self.assertIn("NOT VALID JAVA", e.stderr)
 
   def mk_example_fs_tree(self):
     fs_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))

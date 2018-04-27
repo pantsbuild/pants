@@ -69,7 +69,7 @@ information to disambiguate between various types of data: So declaring small `d
 definitions to provide a unique and descriptive type is strongly recommended:
 
 ```python
-class FormattedInt(datatype('FormattedInt', ['content'])): pass
+class FormattedInt(datatype(['content'])): pass
 
 @rule(FormattedInt, [Select(IntType)])
 def int_to_str(an_int):

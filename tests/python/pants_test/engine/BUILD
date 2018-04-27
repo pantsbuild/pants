@@ -12,6 +12,7 @@ python_library(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:scheduler',
     'src/python/pants/engine:struct',
+    'src/python/pants/util:objects',
     'tests/python/pants_test/option/util',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ],
@@ -54,7 +55,9 @@ python_tests(
   sources=['test_addressable.py'],
   dependencies=[
     'src/python/pants/engine:addressable',
-  ]
+    'src/python/pants/util:objects',
+    'tests/python/pants_test:base_test',
+  ],
 )
 
 python_tests(
@@ -138,6 +141,7 @@ python_tests(
     'src/python/pants/engine:parser',
     'src/python/pants/engine:scheduler',
     'src/python/pants/engine:struct',
+    'src/python/pants/util:objects',
     'tests/python/pants_test/engine/examples:graph_test',
     'tests/python/pants_test/engine/examples:parsers',
   ]
@@ -179,6 +183,7 @@ python_tests(
     'src/python/pants/engine:build_files',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
+    'src/python/pants/util:objects',
     'tests/python/pants_test/engine/examples:parsers',
     'tests/python/pants_test/engine/examples:planners',
     'tests/python/pants_test/subsystem:subsystem_utils',

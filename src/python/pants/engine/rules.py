@@ -14,10 +14,9 @@ from types import TypeType
 
 from twitter.common.collections import OrderedSet
 
-from pants.engine.addressable import Exactly
 from pants.engine.selectors import Get, type_or_constraint_repr
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
+from pants.util.objects import Exactly, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -53,6 +52,7 @@ def rule(output_type, input_selectors):
     def resolve_type(name):
       resolved = caller_frame.f_globals.get(name) or caller_frame.f_builtins.get(name)
       if not isinstance(resolved, (TypeType, Exactly)):
+        # TODO(cosmicexplorer): should this say "...or Exactly instance;"?
         raise ValueError('Expected either a `type` constructor or TypeConstraint instance; '
                          'got: {}'.format(name))
       return resolved
@@ -85,9 +85,9 @@ class Rule(AbstractClass):
     """Collection of input selectors."""
 
 
-class TaskRule(datatype('TaskRule', ['output_constraint', 'input_selectors', 'input_gets', 'func']), Rule):
+class TaskRule(datatype(['output_constraint', 'input_selectors', 'input_gets', 'func']), Rule):
   """A Rule that runs a task function when all of its input selectors are satisfied.
-  
+
   TODO: Make input_gets non-optional when more/all rules are using them.
   """
 
@@ -121,7 +121,7 @@ class TaskRule(datatype('TaskRule', ['output_constraint', 'input_selectors', 'in
                                    self.func.__name__)
 
 
-class SingletonRule(datatype('SingletonRule', ['output_constraint', 'value']), Rule):
+class SingletonRule(datatype(['output_constraint', 'value']), Rule):
   """A default rule for a product, which is thus a singleton for that product."""
 
   def __new__(cls, output_type, value):
@@ -144,9 +144,9 @@ class SingletonRule(datatype('SingletonRule', ['output_constraint', 'value']), R
     return '{}({}, {})'.format(type(self).__name__, type_or_constraint_repr(self.output_constraint), self.value)
 
 
-class RootRule(datatype('RootRule', ['output_constraint']), Rule):
+class RootRule(datatype(['output_constraint']), Rule):
   """Represents a root input to an execution of a rule graph.
-  
+
   Roots act roughly like parameters, in that in some cases the only source of a
   particular type might be when a value is provided as a root subject at the beginning
   of an execution.
@@ -156,7 +156,7 @@ class RootRule(datatype('RootRule', ['output_constraint']), Rule):
     return []
 
 
-class RuleIndex(datatype('RuleIndex', ['rules', 'roots'])):
+class RuleIndex(datatype(['rules', 'roots'])):
   """Holds an index of Tasks and Singletons used to instantiate Nodes."""
 
   @classmethod

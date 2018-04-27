@@ -9,8 +9,7 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.objects import datatype
 
 
-class ChangedRequest(datatype('ChangedRequest',
-                              ['changes_since', 'diffspec', 'include_dependees', 'fast'])):
+class ChangedRequest(datatype(['changes_since', 'diffspec', 'include_dependees', 'fast'])):
   """Parameters required to compute a changed file/target set."""
 
   @classmethod

@@ -146,7 +146,7 @@ class ReportTestSuite(object):
     return d
 
 
-class ReportTestCase(datatype('ReportTestCase', ['name', 'time', 'failure', 'error', 'skipped'])):
+class ReportTestCase(datatype(['name', 'time', 'failure', 'error', 'skipped'])):
   """Data object for a JUnit test case"""
 
   def __new__(cls, name, time, failure=None, error=None, skipped=False):

@@ -15,7 +15,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
                               SingleAddress, Specs)
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.engine.addressable import AddressableDescriptor, BuildFileAddresses, TypeConstraintError
+from pants.engine.addressable import AddressableDescriptor, BuildFileAddresses
 from pants.engine.fs import FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
@@ -23,7 +23,7 @@ from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Get, Select, SelectDependencies
 from pants.engine.struct import Struct
 from pants.util.dirutil import fast_relpath_optional
-from pants.util.objects import datatype
+from pants.util.objects import TypeConstraintError, datatype
 
 
 class ResolvedTypeMismatchError(ResolveError):
@@ -57,7 +57,7 @@ def parse_address_family(address_mapper, directory):
   yield AddressFamily.create(directory.path, address_maps)
 
 
-class UnhydratedStruct(datatype('UnhydratedStruct', ['address', 'struct', 'dependencies'])):
+class UnhydratedStruct(datatype(['address', 'struct', 'dependencies'])):
   """A product type that holds a Struct which has not yet been hydrated.
 
   A Struct counts as "hydrated" when all of its members (which are not themselves dependencies
