@@ -92,7 +92,7 @@ class SetupPyInvocationEnvironment(datatype(['joined_path'])):
 
 
 @rule(SetupPyInvocationEnvironment, [Select(NativeToolchain)])
-def get_setup_py_env(platform, native_toolchain):
+def get_setup_py_env(native_toolchain):
   joined_path = get_joined_path(native_toolchain.path_entries())
   return SetupPyInvocationEnvironment(joined_path)
 
