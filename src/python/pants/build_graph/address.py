@@ -5,11 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 from collections import namedtuple
 
 from pants.util.dirutil import longest_dir_prefix
 from pants.util.strutil import strip_prefix
+
+
+logger = logging.getLogger(__name__)
 
 
 # @ is reserved for configuring variant, see `addressable.parse_variants`
@@ -79,6 +83,9 @@ def parse_spec(spec, relative_to=None, subproject_roots=None):
     spec_path, target_name = spec_parts
     if not spec_path and not subproject and relative_to:
       spec_path = relative_to
+      if not target_name:
+        target_name = os.path.basename(spec_path)
+        logger.debug("':' expanded to ':{}' in {}".format(target_name, spec_path))
     spec_path = prefix_subproject(normalize_absolute_refs(spec_path))
 
   return spec_path, target_name
