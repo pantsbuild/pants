@@ -6,15 +6,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import collections
-import datetime
 import json
 import os
 import re
 import shutil
+from datetime import datetime
 
-import pystache
+from pystache import Renderer
 from six.moves import range
 
+from pants.backend.docgen.tasks.generate_pants_reference import GeneratePantsReference
+from pants.backend.docgen.tasks.markdown_to_html import MarkdownToHtml
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
 
@@ -44,6 +46,15 @@ class SiteGen(Task):
   def register_options(cls, register):
     super(SiteGen, cls).register_options(register)
     register('--config-path', type=list, help='Path to .json file describing site structure.')
+
+  # FIXME(cosmicexplorer): requiring these products ensures that the markdown
+  # and reference tasks run before this one, but we don't use those
+  # products.
+  @classmethod
+  def prepare(cls, options, round_manager):
+    round_manager.require(MarkdownToHtml.MARKDOWN_HTML_PRODUCT)
+    round_manager.require_data(GeneratePantsReference.PANTS_REFERENCE_PRODUCT)
+    round_manager.require_data(GeneratePantsReference.BUILD_DICTIONARY_PRODUCT)
 
   def execute(self):
     if not self.get_options().config_path:
@@ -201,20 +212,24 @@ def ensure_headings_linkable(soups):
   Enables tables of contents.
   """
   for soup in soups.values():
-    # To avoid re-assigning an existing id, note 'em down.
-    # Case-insensitve because distinguishing links #Foo and #foo would be weird.
-    existing_anchors = find_existing_anchors(soup)
-    count = 100
-    for tag in soup.find_all(_heading_re):
-      if not (tag.has_attr('id') or tag.has_attr('name')):
-        snippet = ''.join([c for c in tag.text if c.isalpha()])[:20]
-        while True:
-          count += 1
-          candidate_id = 'heading_{0}_{1}'.format(snippet, count).lower()
-          if not candidate_id in existing_anchors:
-            existing_anchors.add(candidate_id)
-            tag['id'] = candidate_id
-            break
+    ensure_page_headings_linkable(soup)
+
+
+def ensure_page_headings_linkable(soup):
+  # To avoid re-assigning an existing id, note 'em down.
+  # Case-insensitve because distinguishing links #Foo and #foo would be weird.
+  existing_anchors = find_existing_anchors(soup)
+  count = 100
+  for tag in soup.find_all(_heading_re):
+    if not (tag.has_attr('id') or tag.has_attr('name')):
+      snippet = ''.join([c for c in tag.text if c.isalpha()])[:20]
+      while True:
+        count += 1
+        candidate_id = 'heading_{0}_{1}'.format(snippet, count).lower()
+        if not candidate_id in existing_anchors:
+          existing_anchors.add(candidate_id)
+          tag['id'] = candidate_id
+          break
 
 
 def link_pantsrefs(soups, precomputed):
@@ -320,12 +335,12 @@ def generate_page_toc(soup):
 
 def generate_generated(config, here):
   return('{0} {1}'.format(config['sources'][here],
-                          datetime.datetime.now().isoformat()))
+                          datetime.now().isoformat()))
 
 
 def render_html(dst, config, soups, precomputed, template):
   soup = soups[dst]
-  renderer = pystache.Renderer()
+  renderer = Renderer()
   title = precomputed.page[dst].title
   topdots = ('../' * dst.count('/'))
   if soup.body:

@@ -9,6 +9,7 @@ import os
 import textwrap
 
 from pants.backend.docgen.targets.doc import Page
+from pants.backend.docgen.tasks.markdown_to_html import MarkdownToHtml
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
 from pants.util import desktop
@@ -39,7 +40,7 @@ class ConfluencePublish(Task):
   
   @classmethod
   def prepare(cls, options, round_manager):
-    round_manager.require('wiki_html')
+    round_manager.require(MarkdownToHtml.WIKI_HTML_PRODUCT)
   
   def __init__(self, *args, **kwargs):
     super(ConfluencePublish, self).__init__(*args, **kwargs)
@@ -69,7 +70,7 @@ class ConfluencePublish(Task):
     
     urls = list()
     
-    genmap = self.context.products.get('wiki_html')
+    genmap = self.context.products.get(MarkdownToHtml.WIKI_HTML_PRODUCT)
     for page, wiki_artifact in pages:
       html_info = genmap.get((wiki_artifact, page))
       if len(html_info) > 1:

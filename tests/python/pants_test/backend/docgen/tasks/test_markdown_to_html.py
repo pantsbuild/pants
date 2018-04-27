@@ -123,7 +123,7 @@ class MarkdownToHtmlTest(TaskTestBase):
       task.execute()
 
   def get_rendered_page(self, context, page, rendered_basename):
-    pages = context.products.get('markdown_html').get(page)
+    pages = context.products.get(MarkdownToHtml.MARKDOWN_HTML_PRODUCT).get(page)
     self.assertIsNotNone(pages)
 
     pages_by_name = {os.path.basename(f): os.path.join(outdir, f)
