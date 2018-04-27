@@ -87,6 +87,7 @@ class SetupPyInvocationEnvironment(datatype('SetupPyInvocationEnvironment', [
     return {
       'CC': 'clang',
       'CXX': 'clang++',
+      'LDSHARED': 'clang',
       'PATH': self.joined_path,
     }
 
