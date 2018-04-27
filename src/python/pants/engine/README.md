@@ -76,7 +76,34 @@ class FormattedInt(datatype(['content'])): pass
 @rule(FormattedInt, [Select(IntType)])
 def int_to_str(an_int):
   return FormattedInt('{}'.format(an_int))
+
+# Field values can be specified with positional and/or keyword arguments in the constructor:
+x = FormattedInt('a string')
+x = FormattedInt(content='a string')
+
+# Field values can be accessed after construction by name or index:
+print(x.content)    # 'a string'
+print(x[0])         # 'a string'
+
+# The object is also a tuple, and can be destructured:
+some_content, = x
+print(some_content) # 'a string'
+
+# datatype objects can be easily inspected:
+print(x)            # 'FormattedInt(content=a string)'
 ```
+
+#### Types of Fields
+
+`datatype()` accepts a list of *field declarations*, and returns a type which can
+be subclassed. A *field declaration* can just be a string (e.g. `'field_name'`),
+which is then used as the field name, as with `FormattedInt` above. A field can
+also be declared with a tuple of two elements: the field name string, and a type
+for the field (e.g. `('field_name', FieldType)`). If the tuple form is used, the
+constructor will create your object, then raise an error if
+`type(self.field_name) != FieldType`. Note that this means providing an instance
+of a *subclass* of a field's declared type will **fail** this type check in the
+constructor!
 
 ### Selectors and Gets
 
