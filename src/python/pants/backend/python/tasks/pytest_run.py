@@ -486,6 +486,9 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       pythonpath = env.pop('PYTHONPATH', None)
       if pythonpath:
         self.context.log.warn('scrubbed PYTHONPATH={} from py.test environment'.format(pythonpath))
+      # But allow this back door for users who do want to force something onto the test pythonpath,
+      # e.g., modules required during a debugging session.
+      env['PYTHONPATH'] = env.get('PANTS_PYTEST_RUN_EXTRA_PYTHONPATH')
 
       # The pytest runner we use accepts a --pdb argument that will launch an interactive pdb
       # session on any test failure.  In order to support use of this pass-through flag we must
