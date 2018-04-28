@@ -19,6 +19,7 @@ from pex.interpreter import PythonInterpreter
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
+from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -29,10 +30,14 @@ from pants.base.specs import SiblingAddresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
+from pants.engine.rules import rule
+from pants.engine.selectors import Select
 from pants.task.task import Task
+from pants.util.contextutil import get_joined_path
 from pants.util.dirutil import safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
+from pants.util.objects import datatype
 
 
 SETUP_BOILERPLATE = """
@@ -72,6 +77,21 @@ class SetupPyRunner(InstallerBase):
 
   def _setup_command(self):
     return self.__setup_command
+
+
+class SetupPyInvocationEnvironment(datatype(['joined_path'])):
+
+  def as_env_dict(self):
+    return {
+      'PATH': self.joined_path,
+    }
+
+
+@rule(SetupPyInvocationEnvironment, [Select(NativeToolchain)])
+def get_setup_py_env(native_toolchain):
+  joined_path = get_joined_path(
+    native_toolchain.path_entries(), os.environ.copy())
+  return SetupPyInvocationEnvironment(joined_path)
 
 
 class TargetAncestorIterator(object):
@@ -640,3 +660,9 @@ class SetupPy(Task):
           setup_runner = SetupPyRunner(setup_dir, self._run, interpreter=interpreter)
           setup_runner.run()
           python_dists[exported_python_target] = setup_dir
+
+
+def create_setup_py_rules():
+  return [
+    get_setup_py_env,
+  ]

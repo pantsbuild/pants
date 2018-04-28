@@ -110,12 +110,18 @@ class EngineInitializer(object):
   """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
 
   @staticmethod
+  def get_default_build_file_aliases():
+    _, build_config = OptionsInitializer(OptionsBootstrapper()).setup(init_logging=False)
+    return build_config.registered_aliases()
+
+  @staticmethod
   def setup_legacy_graph(pants_ignore_patterns,
                          workdir,
                          build_file_imports_behavior,
                          build_root=None,
                          native=None,
                          build_file_aliases=None,
+                         rules=None,
                          build_ignore_patterns=None,
                          exclude_target_regexps=None,
                          subproject_roots=None,
@@ -146,8 +152,10 @@ class EngineInitializer(object):
     scm = get_scm()
 
     if not build_file_aliases:
-      _, build_config = OptionsInitializer(OptionsBootstrapper()).setup(init_logging=False)
-      build_file_aliases = build_config.registered_aliases()
+      build_file_aliases = EngineInitializer.get_default_build_file_aliases()
+
+    if not rules:
+      rules = []
 
     symbol_table = LegacySymbolTable(build_file_aliases)
 
@@ -173,7 +181,8 @@ class EngineInitializer(object):
       create_legacy_graph_tasks(symbol_table) +
       create_fs_rules() +
       create_graph_rules(address_mapper, symbol_table) +
-      create_process_rules()
+      create_process_rules() +
+      rules
     )
 
     scheduler = LocalScheduler(workdir, dict(), tasks, project_tree, native, include_trace_on_error=include_trace_on_error)

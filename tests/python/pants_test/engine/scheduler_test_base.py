@@ -60,6 +60,9 @@ class SchedulerTestBase(object):
                           self._native,
                           include_trace_on_error=include_trace_on_error)
 
+  def context_with_scheduler(self, scheduler, *args, **kwargs):
+    return self.context(*args, scheduler=scheduler, **kwargs)
+
   def execute(self, scheduler, product, *subjects):
     """Runs an ExecutionRequest for the given product and subjects, and returns the result value."""
     request = scheduler.execution_request([product], subjects)

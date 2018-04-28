@@ -7,13 +7,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
+from pants.backend.native.register import rules as native_backend_rules
+from pants.backend.python.register import rules as python_backend_rules
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
+from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
-class TestBuildLocalPythonDistributions(PythonTaskTestBase):
+class TestBuildLocalPythonDistributions(PythonTaskTestBase, SchedulerTestBase):
   @classmethod
   def task_type(cls):
     return BuildLocalPythonDistributions
@@ -43,9 +46,18 @@ class TestBuildLocalPythonDistributions(PythonTaskTestBase):
                                             target_type=PythonDistribution,
                                             sources=sources)
 
+  def _scheduling_context(self, **kwargs):
+    rules = (
+      native_backend_rules() +
+      python_backend_rules()
+    )
+    scheduler = self.mk_scheduler(rules=rules)
+    return self.context(scheduler=scheduler, **kwargs)
+
   def test_python_create_distributions(self):
-    context = self.context(target_roots=[self.python_dist_tgt],
-                           for_task_types=[BuildLocalPythonDistributions])
+    context = self._scheduling_context(
+      target_roots=[self.python_dist_tgt],
+      for_task_types=[BuildLocalPythonDistributions])
     self.assertEquals([self.python_dist_tgt], context.build_graph.targets())
     python_create_distributions_task = self.create_task(context)
     python_create_distributions_task.execute()
