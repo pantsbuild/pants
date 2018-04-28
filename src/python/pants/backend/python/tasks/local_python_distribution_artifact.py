@@ -30,7 +30,7 @@ class LocalPythonDistributionArtifact(Task):
 
     local_wheels_product = self.context.products.get('local_wheels')
     if not local_wheels_product:
-        return
+      return
     safe_mkdir(self.dist_dir)  # Make sure dist dir is present.
     for t in dist_targets:
       # Copy generated wheel files to dist folder
