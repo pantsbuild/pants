@@ -67,14 +67,6 @@ class ArtifactCache(object):
     """
     self.artifact_root = artifact_root
 
-  def prune(self):
-    """Prune stale cache files
-
-    Remove old unused cache files
-    :return:
-    """
-    pass
-
   def insert(self, cache_key, paths, overwrite=False):
     """Cache the output of a build.
 
@@ -132,6 +124,8 @@ class ArtifactCache(object):
     differently, as these are unexpected, unlike normal cache misses.
 
     :param CacheKey cache_key: A CacheKey object.
+    :param str results_dir: The path to the expected destination of the artifact extraction: will
+      be cleared before extraction.
     """
     pass
 

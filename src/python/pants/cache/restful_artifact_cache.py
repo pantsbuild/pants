@@ -44,7 +44,7 @@ class RESTfulArtifactCache(ArtifactCache):
     :param BestUrlSelector best_url_selector: Url selector that supports fail-over. Each returned
       url represents prefix for some RESTful service. We must be able to PUT and GET to any path
       under this base.
-    :param BaseLocalArtifactCache local: local cache instance for storing and creating artifacts
+    :param LocalArtifactCacheBase local: local cache instance for storing and creating artifacts
     """
     super(RESTfulArtifactCache, self).__init__(artifact_root)
 
@@ -77,11 +77,12 @@ class RESTfulArtifactCache(ArtifactCache):
           target=_log_if_no_response,
           args=(
             60,
-            "Still downloading artifacts (either they're very large or the connection to the cache is slow)",
+            "Still downloading artifacts (either they're very large "
+            "or the connection to the cache is slow)",
             queue.get,
           )
         ).start()
-        # Delegate storage and extraction to local cache
+        # Delegate storage and extraction to local cache.
         byte_iter = response.iter_content(self.READ_SIZE_BYTES)
         res = self._localcache.store_and_use_artifact(cache_key, byte_iter, results_dir)
         queue.put(None)

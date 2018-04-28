@@ -59,12 +59,12 @@ def environment_as(**kwargs):
   new_environment = kwargs
   old_environment = {}
 
-  def setenv(key, val):
-    if val is not None:
-      os.environ[key] = val
+  def setenv(k, v):
+    if v is not None:
+      os.environ[k] = v
     else:
-      if key in os.environ:
-        del os.environ[key]
+      if k in os.environ:
+        del os.environ[k]
 
   for key, val in new_environment.items():
     old_environment[key] = os.environ.get(key)
@@ -146,7 +146,8 @@ def signal_handler_as(sig, handler):
 
 
 @contextmanager
-def temporary_dir(root_dir=None, cleanup=True, suffix=str(), permissions=None, prefix=tempfile.template):
+def temporary_dir(root_dir=None, cleanup=True, suffix='', permissions=None,
+                  prefix=tempfile.template):
   """
     A with-context that creates a temporary directory.
 
@@ -155,7 +156,10 @@ def temporary_dir(root_dir=None, cleanup=True, suffix=str(), permissions=None, p
     You may specify the following keyword args:
     :param string root_dir: The parent directory to create the temporary directory.
     :param bool cleanup: Whether or not to clean up the temporary directory.
+    :param str suffix: Optional suffix for the file's name.
+                       Does not add a dot between the file name and the suffix.
     :param int permissions: If provided, sets the directory permissions to this mode.
+    :param str prefix: Optional prefix template for the path.
   """
   path = tempfile.mkdtemp(dir=root_dir, suffix=suffix, prefix=prefix)
 
@@ -178,6 +182,9 @@ def temporary_file_path(root_dir=None, cleanup=True, suffix='', permissions=None
     You may specify the following keyword args:
     :param str root_dir: The parent directory to create the temporary file.
     :param bool cleanup: Whether or not to clean up the temporary file.
+    :param str suffix: Optional suffix for the file's name.
+                       Does not add a dot between the file name and the suffix.
+    :param int permissions: Set the file to have these permissions.
   """
   with temporary_file(root_dir, cleanup=cleanup, suffix=suffix, permissions=permissions) as fd:
     fd.close()
@@ -192,12 +199,9 @@ def temporary_file(root_dir=None, cleanup=True, suffix='', permissions=None):
     You may specify the following keyword args:
     :param str root_dir: The parent directory to create the temporary file.
     :param bool cleanup: Whether or not to clean up the temporary file.
-    :param str suffix: If suffix is specified, the file name will end with that suffix.
-                       Otherwise there will be no suffix.
-                       mkstemp() does not put a dot between the file name and the suffix;
-                       if you need one, put it at the beginning of suffix.
-                       See :py:class:`tempfile.NamedTemporaryFile`.
-    :param int permissions: If provided, sets the file to use these permissions.
+    :param str suffix: Optional suffix for the file's name.
+                       Does not add a dot between the file name and the suffix.
+    :param int permissions: Set the file to have these permissions.
   """
   with tempfile.NamedTemporaryFile(suffix=suffix, dir=root_dir, delete=False) as fd:
     try:
@@ -215,6 +219,7 @@ def safe_file(path, suffix=None, cleanup=True):
 
   This is useful for doing work on a file but only changing its state on success.
 
+  :param str path: The file to copy.
   :param str suffix: Use this suffix to create the copy. Otherwise use a random string.
   :param bool cleanup: Whether or not to clean up the copy.
   """
@@ -262,9 +267,9 @@ def open_zip(path_or_file, *args, **kwargs):
   """
   if not path_or_file:
     raise InvalidZipPath('Invalid zip location: {}'.format(path_or_file))
-  allowZip64 = kwargs.pop('allowZip64', True)
+  allow_zip64 = kwargs.pop(b'allowZip64', True)
   try:
-    zf = zipfile.ZipFile(path_or_file, *args, allowZip64=allowZip64, **kwargs)
+    zf = zipfile.ZipFile(path_or_file, *args, allowZip64=allow_zip64, **kwargs)
   except zipfile.BadZipfile as bze:
     # Use the realpath in order to follow symlinks back to the problem source file.
     raise zipfile.BadZipfile("Bad Zipfile {0}: {1}".format(os.path.realpath(path_or_file), bze))
