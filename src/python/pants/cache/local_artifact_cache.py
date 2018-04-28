@@ -143,10 +143,7 @@ class LocalArtifactCache(LocalArtifactCacheBase):
       safe_rm_oldest_items_in_dir(root, max_entries_per_target)
 
   def has(self, cache_key):
-    return self._artifact_for(cache_key).exists()
-
-  def _artifact_for(self, cache_key):
-    return self._artifact(self._cache_file_for_key(cache_key))
+    return self._artifact(self._cache_file_for_key(cache_key)).exists()
 
   def use_cached_files(self, cache_key, results_dir=None):
     tarball = self._cache_file_for_key(cache_key)
