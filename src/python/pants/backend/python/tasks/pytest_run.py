@@ -478,6 +478,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         yield pytest_binary, [conftest] + coverage_args, get_pytest_rootdir
 
   def _do_run_tests_with_args(self, pex, args):
+    python_path_backdoor = 'PANTS_PYTEST_RUN_EXTRA_PYTHONPATH'
     try:
       env = dict(os.environ)
 
@@ -488,7 +489,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         self.context.log.warn('scrubbed PYTHONPATH={} from py.test environment'.format(pythonpath))
       # But allow this back door for users who do want to force something onto the test pythonpath,
       # e.g., modules required during a debugging session.
-      env['PYTHONPATH'] = env.get('PANTS_PYTEST_RUN_EXTRA_PYTHONPATH')
+      if python_path_backdoor in env:
+        env['PYTHONPATH'] = env.get(python_path_backdoor)
 
       # The pytest runner we use accepts a --pdb argument that will launch an interactive pdb
       # session on any test failure.  In order to support use of this pass-through flag we must
