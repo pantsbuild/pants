@@ -7,6 +7,7 @@ python_library(
   dependencies=[
     '3rdparty/python:pep8',
     '3rdparty/python:pyflakes',
+    '3rdparty/python:pex',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:exceptions',
     'src/python/pants/option',
