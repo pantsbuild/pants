@@ -146,12 +146,12 @@ class BundleAdaptor(Struct):
   """
 
 
-class JvmAppAdaptor(TargetAdaptor):
+class AppAdaptor(TargetAdaptor):
   def __init__(self, bundles=None, **kwargs):
     """
     :param list bundles: A list of `BundleAdaptor` objects
     """
-    super(JvmAppAdaptor, self).__init__(**kwargs)
+    super(AppAdaptor, self).__init__(**kwargs)
     self.bundles = bundles
 
   @addressable_list(Exactly(BundleAdaptor))
@@ -162,7 +162,7 @@ class JvmAppAdaptor(TargetAdaptor):
   @property
   def field_adaptors(self):
     with exception_logging(logger, 'Exception in `field_adaptors` property'):
-      field_adaptors = super(JvmAppAdaptor, self).field_adaptors
+      field_adaptors = super(AppAdaptor, self).field_adaptors
       if getattr(self, 'bundles', None) is None:
         return field_adaptors
 

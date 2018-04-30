@@ -18,10 +18,10 @@ from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTargets,
                                        create_legacy_graph_tasks)
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
-from pants.engine.legacy.structs import (GoTargetAdaptor, JavaLibraryAdaptor, JunitTestsAdaptor,
-                                         JvmAppAdaptor, PythonLibraryAdaptor, PythonTargetAdaptor,
-                                         PythonTestsAdaptor, RemoteSourcesAdaptor,
-                                         ScalaLibraryAdaptor, TargetAdaptor)
+from pants.engine.legacy.structs import (AppAdaptor, GoTargetAdaptor, JavaLibraryAdaptor,
+                                         JunitTestsAdaptor, PythonLibraryAdaptor,
+                                         PythonTargetAdaptor, PythonTestsAdaptor,
+                                         RemoteSourcesAdaptor, ScalaLibraryAdaptor, TargetAdaptor)
 from pants.engine.mapper import AddressMapper
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
@@ -59,7 +59,7 @@ class LegacySymbolTable(SymbolTable):
       self._table[alias] = GoTargetAdaptor
 
     self._table['junit_tests'] = JunitTestsAdaptor
-    self._table['jvm_app'] = JvmAppAdaptor
+    self._table['jvm_app'] = AppAdaptor
     self._table['python_tests'] = PythonTestsAdaptor
     self._table['python_binary'] = PythonTargetAdaptor
     self._table['remote_sources'] = RemoteSourcesAdaptor

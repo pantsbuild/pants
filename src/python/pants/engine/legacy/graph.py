@@ -11,12 +11,13 @@ from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
+from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.base.specs import SingleAddress, Specs
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.build_graph.app_base import Bundle
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
@@ -153,7 +154,7 @@ class LegacyBuildGraph(BuildGraph):
 
       # Instantiate.
       if target_cls is JvmApp:
-        return self._instantiate_jvm_app(kwargs)
+        return self._instantiate_app(target_cls, kwargs)
       elif target_cls is RemoteSources:
         return self._instantiate_remote_sources(kwargs)
       return target_cls(build_graph=self, **kwargs)
@@ -164,8 +165,8 @@ class LegacyBuildGraph(BuildGraph):
           target_adaptor.address,
           'Failed to instantiate Target with type {}: {}'.format(target_cls, e))
 
-  def _instantiate_jvm_app(self, kwargs):
-    """For JvmApp target, convert BundleAdaptor to BundleProps."""
+  def _instantiate_app(self, target_cls, kwargs):
+    """For App targets, convert BundleAdaptor to BundleProps."""
     parse_context = ParseContext(kwargs['address'].spec_path, dict())
     bundleprops_factory = Bundle(parse_context)
     kwargs['bundles'] = [
@@ -173,7 +174,7 @@ class LegacyBuildGraph(BuildGraph):
       for bundle in kwargs['bundles']
     ]
 
-    return JvmApp(build_graph=self, **kwargs)
+    return target_cls(build_graph=self, **kwargs)
 
   def _instantiate_remote_sources(self, kwargs):
     """For RemoteSources target, convert "dest" field to its real target type."""
