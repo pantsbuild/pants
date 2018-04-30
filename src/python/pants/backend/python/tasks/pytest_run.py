@@ -125,6 +125,11 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
              help='Subset of tests to run, in the form M/N, 0 <= M < N. For example, 1/3 means '
                   'run tests number 2, 5, 8, 11, ...')
 
+    register('--extra-pythonpath', type=list, fingerprint=True, advanced=True,
+             help='Add these entries to the PYTHONPATH when running the tests. '
+                  'Useful for attaching to debuggers in test code.'
+                  '')
+
   @classmethod
   def supports_passthru_args(cls):
     return True
@@ -478,7 +483,6 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         yield pytest_binary, [conftest] + coverage_args, get_pytest_rootdir
 
   def _do_run_tests_with_args(self, pex, args):
-    python_path_backdoor = 'PANTS_PYTEST_RUN_EXTRA_PYTHONPATH'
     try:
       env = dict(os.environ)
 
@@ -489,8 +493,9 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         self.context.log.warn('scrubbed PYTHONPATH={} from py.test environment'.format(pythonpath))
       # But allow this back door for users who do want to force something onto the test pythonpath,
       # e.g., modules required during a debugging session.
-      if python_path_backdoor in env:
-        env['PYTHONPATH'] = env.get(python_path_backdoor)
+      extra_pythonpath = self.get_options().extra_pythonpath
+      if extra_pythonpath:
+        env['PYTHONPATH'] = os.pathsep.join(extra_pythonpath)
 
       # The pytest runner we use accepts a --pdb argument that will launch an interactive pdb
       # session on any test failure.  In order to support use of this pass-through flag we must
