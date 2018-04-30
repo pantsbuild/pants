@@ -166,7 +166,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         Store::with_remote(
           store_dir,
           pool.clone(),
-          cas_address,
+          cas_address.to_owned(),
           1,
           10 * 1024 * 1024,
           Duration::from_secs(30),

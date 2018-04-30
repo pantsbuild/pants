@@ -30,6 +30,7 @@ extern crate log;
 extern crate mock;
 extern crate ordermap;
 extern crate protobuf;
+extern crate resettable;
 extern crate sha2;
 extern crate tempdir;
 #[cfg(test)]

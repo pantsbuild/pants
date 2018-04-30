@@ -104,7 +104,7 @@ fn main() {
     (Some(_server), Some(cas_server)) => fs::Store::with_remote(
       local_store_path,
       pool.clone(),
-      cas_server,
+      cas_server.to_owned(),
       1,
       10 * 1024 * 1024,
       Duration::from_secs(30),
