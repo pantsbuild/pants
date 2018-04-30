@@ -127,8 +127,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
     register('--extra-pythonpath', type=list, fingerprint=True, advanced=True,
              help='Add these entries to the PYTHONPATH when running the tests. '
-                  'Useful for attaching to debuggers in test code.'
-                  '')
+                  'Useful for attaching to debuggers in test code.')
 
   @classmethod
   def supports_passthru_args(cls):
