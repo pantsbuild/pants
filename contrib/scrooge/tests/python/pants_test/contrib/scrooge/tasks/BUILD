@@ -5,7 +5,7 @@ python_tests(
   name='java_thrift_library_fingerprint_strategy',
   sources=['test_java_thrift_library_fingerprint_strategy.py'],
   dependencies=[
-    'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:java_thrift_library_fingerprint_strategy',
+    'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:scrooge_gen',
     'src/python/pants/backend/codegen/thrift/java',
     'tests/python/pants_test/tasks:task_test_base',
   ]
