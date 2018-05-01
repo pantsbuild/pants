@@ -494,3 +494,10 @@ field 'an_int' was invalid: value 'asdf' (with type 'str') must satisfy this typ
       """error: in constructor of type NonNegativeInt: type check error:
 value is negative: -3.""")
     self.assertEqual(str(cm.exception), str(expected_msg))
+
+    with self.assertRaises(TypeCheckError) as cm:
+      WithSubclassTypeConstraint(3)
+    expected_msg = (
+      """error: in constructor of type WithSubclassTypeConstraint: type check error:
+field 'some_value' was invalid: value 3 (with type 'int') must satisfy this type constraint: SubclassesOf(SomeBaseClass).""")
+    self.assertEqual(str(cm.exception), str(expected_msg))
