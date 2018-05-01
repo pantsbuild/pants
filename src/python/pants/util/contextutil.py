@@ -146,7 +146,7 @@ def signal_handler_as(sig, handler):
 
 
 @contextmanager
-def temporary_dir(root_dir=None, cleanup=True, suffix='', permissions=None,
+def temporary_dir(root_dir=None, cleanup=True, suffix=b'', permissions=None,
                   prefix=tempfile.template):
   """
     A with-context that creates a temporary directory.
@@ -272,7 +272,7 @@ def open_zip(path_or_file, *args, **kwargs):
     zf = zipfile.ZipFile(path_or_file, *args, allowZip64=allow_zip64, **kwargs)
   except zipfile.BadZipfile as bze:
     # Use the realpath in order to follow symlinks back to the problem source file.
-    raise zipfile.BadZipfile("Bad Zipfile {0}: {1}".format(os.path.realpath(path_or_file), bze))
+    raise zipfile.BadZipfile('Bad Zipfile {0}: {1}'.format(os.path.realpath(path_or_file), bze))
   try:
     yield zf
   finally:

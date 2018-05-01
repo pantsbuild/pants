@@ -83,6 +83,8 @@ class DirectoryArtifact(Artifact):
 class TarballArtifact(Artifact):
   """An artifact stored in a tarball."""
 
+  # TODO: Expose `dereference` for tasks.
+  # https://github.com/pantsbuild/pants/issues/3961
   def __init__(self, artifact_root, tarfile_, compression=9, dereference=True):
     super(TarballArtifact, self).__init__(artifact_root)
     self._tarfile = tarfile_

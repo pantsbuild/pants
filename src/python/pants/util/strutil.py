@@ -22,7 +22,7 @@ def ensure_binary(text_or_binary):
 
 def ensure_text(text_or_binary):
   if isinstance(text_or_binary, six.binary_type):
-    return text_or_binary.decode('utf-8')
+    return text_or_binary.decode('utf8')
   elif isinstance(text_or_binary, six.text_type):
     return text_or_binary
   else:
