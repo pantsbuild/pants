@@ -12,7 +12,8 @@ from contextlib import contextmanager
 from pants.cache.artifact import TarballArtifact
 from pants.cache.artifact_cache import ArtifactCache, UnreadableArtifact
 from pants.util.contextutil import temporary_file
-from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for, safe_rm_oldest_items_in_dir
+from pants.util.dirutil import (safe_delete, safe_mkdir, safe_mkdir_for,
+                                safe_rm_oldest_items_in_dir, safe_rmtree)
 
 
 logger = logging.getLogger(__name__)
@@ -71,21 +72,20 @@ class LocalArtifactCacheBase(ArtifactCache):
     """Extract an artifact from a given tarball.
 
     :param tarball: Path to the tarball to extract.
-    :param results_dir: The path to the expected destination of the artifact extraction: will
-      be cleared both before extraction, and after a failure to extract.
+    :param str results_dir: The path to the expected destination of the artifact extraction,
+      which will be cleared before extraction. This path must be under artifact_root, and all
+      paths in the artifact must be under this results_dir.
     :return: True iff the extraction succeeded.
     :rtype: bool
     """
-    # NOTE(mateo): The two clean=True args passed in this method are likely safe, since the cache
-    # will by definition be dealing with unique results_dir, as opposed to the stable
-    # vt.results_dir (aka 'current').  But if by chance it's passed the stable results_dir,
-    # safe_makedir(clean=True) will silently convert it from a symlink to a real dir and cause
-    # mysterious 'Operation not permitted' errors until the workdir is cleaned.
+    # Note: If results_dir is a symlink we operate on the underlying dir it references.
+    # Otherwise, safe_makedir(clean=True) will silently convert it from a symlink to a real dir.
+    results_dir = os.path.realpath(results_dir)
     artifact = self._artifact(tarball)
     if artifact.exists():
       try:
         if results_dir is not None:
-          safe_mkdir(results_dir, clean=True)
+          safe_rmtree(results_dir)
         artifact.extract()
         return True
       except Exception as e:
@@ -94,7 +94,7 @@ class LocalArtifactCacheBase(ArtifactCache):
         # specified, it is "expected" to represent the output destination of the extracted
         # artifact, and so removing it should clear any partially extracted state.
         if results_dir is not None:
-          safe_mkdir(results_dir, clean=True)
+          safe_rmtree(results_dir)
         safe_delete(tarball)
         raise
     return False
