@@ -47,7 +47,7 @@ class PackageManager(object):
     :param production_only: True to only install production dependencies, i.e.
       ignore devDependencies.
     :param force: True to force re-download dependencies.
-    :param frozen_lockfile: True to disallow True to disallow automatically update lock files.
+    :param frozen_lockfile: True to disallow automatically update lock files.
     :rtype: list of strings
     """
     raise NotImplementedError
@@ -211,7 +211,7 @@ class PackageManagerNpm(PackageManager):
       return_args.append('--production')
     if force:
       return_args.append('--force')
-    if frozen_lockfile:
+    if frozen_lockfile is not None:
       LOG.warning('{} does not support frozen lockfile option. Ignored.'.format(self.name))
     return return_args
 
