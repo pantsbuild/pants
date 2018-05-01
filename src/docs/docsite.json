@@ -154,8 +154,8 @@
                 ]
        },
        {"pages" : ["go_readme"]},
-       {"collapsible_heading": "Code & Doc Gen"},
-       {"pages" : [
+       {"collapsible_heading": "Code & Doc Gen",
+        "pages" : [
                     "thrift_deps",
                     "page"
                 ]
