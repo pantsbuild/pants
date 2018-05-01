@@ -5,10 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 import shutil
 
 from pants.util.contextutil import temporary_dir
+
+
+logger = logging.getLogger(__name__)
 
 
 class AnalysisTools(object):
@@ -27,6 +31,9 @@ class AnalysisTools(object):
     self.localize_mappings = {v:k for k, v in self.rebase_mappings.items()}
 
   def relativize(self, src_analysis, relativized_analysis):
+    if not os.path.isfile(src_analysis):
+      logger.debug("AnalysisTools: src_analysis file {} does not exist, skipping relativize".format(src_analysis))
+      return
     with temporary_dir() as tmp_analysis_dir:
       tmp_analysis_file = os.path.join(tmp_analysis_dir, 'analysis.relativized')
 
@@ -43,6 +50,9 @@ class AnalysisTools(object):
       shutil.move(tmp_analysis_file, relativized_analysis)
 
   def localize(self, src_analysis, localized_analysis):
+    if not os.path.isfile(src_analysis):
+      logger.debug("AnalysisTools: src_analysis file {} does not exist, skipping localize".format(src_analysis))
+      return
     with temporary_dir() as tmp_analysis_dir:
       tmp_analysis_file = os.path.join(tmp_analysis_dir, 'analysis')
 
