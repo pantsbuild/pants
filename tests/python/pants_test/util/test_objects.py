@@ -9,7 +9,7 @@ import copy
 import pickle
 from abc import abstractmethod
 
-from pants.util.objects import (Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
+from pants.util.objects import (DatatypeHelperConstructionError, Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
                                 TypedDatatypeInstanceConstructionError, datatype)
 from pants_test.base_test import BaseTest
 
@@ -149,9 +149,9 @@ class AnotherTypedDatatype(datatype([
   pass
 
 
-class YetAnotherNamedTypedDatatype(datatype([
+class WithExplicitTypeConstraint(datatype([
     ('a_string', str),
-    ('an_int', int),
+    ('an_int', Exactly(int)),
 ])):
   pass
 
@@ -160,6 +160,23 @@ class MixedTyping(datatype([
     'value',
     ('name', str),
 ])):
+  pass
+
+
+class SomeBaseClass(object):
+  @abstractmethod
+  def something(self): pass
+
+
+class SomeDatatypeClass(SomeBaseClass):
+  def something(self):
+    return 'asdf'
+
+  def __repr__(self):
+    return 'SomeDatatypeClass()'
+
+
+class WithSubclassTypeConstraint(datatype([('some_value', SubclassesOf(SomeBaseClass))])):
   pass
 
 
@@ -328,11 +345,6 @@ class TypedDatatypeTest(BaseTest):
     expected_msg = "Type names and field names cannot start with a number: '32'"
     self.assertEqual(str(cm.exception), str(expected_msg))
 
-    with self.assertRaises(TypeError) as cm:
-      class NonTypeTypes(datatype([('field', 4)])): pass
-    expected_msg = "Supplied types must be types. (4,)"
-    self.assertEqual(str(cm.exception), str(expected_msg))
-
     with self.assertRaises(ValueError) as cm:
       class MultipleSameName(datatype([
           'field_a',
@@ -352,20 +364,27 @@ class TypedDatatypeTest(BaseTest):
     expected_msg = "Encountered duplicate field name: 'field_a'"
     self.assertEqual(str(cm.exception), str(expected_msg))
 
+    with self.assertRaises(DatatypeHelperConstructionError) as cm:
+      class InvalidTypeSpec(datatype([('a_field', 2)])): pass
+    expected_msg = (
+      "type spec for field 'a_field' was not a type or TypeConstraint: "
+      "was 2 (type 'int').")
+    self.assertEqual(str(cm.exception), str(expected_msg))
+
   def test_instance_construction_by_repr(self):
     some_val = SomeTypedDatatype(3)
     self.assertEqual(3, some_val.val)
     self.assertEqual(repr(some_val), "SomeTypedDatatype(val=3)")
     self.assertEqual(str(some_val), "SomeTypedDatatype(val<=int>=3)")
 
-    some_object = YetAnotherNamedTypedDatatype(str('asdf'), 45)
+    some_object = WithExplicitTypeConstraint(str('asdf'), 45)
     self.assertEqual(some_object.a_string, 'asdf')
     self.assertEqual(some_object.an_int, 45)
     self.assertEqual(repr(some_object),
-                     "YetAnotherNamedTypedDatatype(a_string='asdf', an_int=45)")
+                     "WithExplicitTypeConstraint(a_string='asdf', an_int=45)")
     self.assertEqual(
       str(some_object),
-      str("YetAnotherNamedTypedDatatype(a_string<=str>=asdf, an_int<=int>=45)"))
+      str("WithExplicitTypeConstraint(a_string<=str>=asdf, an_int<=int>=45)"))
 
     some_nonneg_int = NonNegativeInt(an_int=3)
     self.assertEqual(3, some_nonneg_int.an_int)
@@ -388,6 +407,14 @@ class TypedDatatypeTest(BaseTest):
                      str("MixedTyping(value=3, name='asdf')"))
     self.assertEqual(str(mixed_type_obj),
                      str("MixedTyping(value=3, name<=str>=asdf)"))
+
+    subclass_constraint_obj = WithSubclassTypeConstraint(SomeDatatypeClass())
+    self.assertEqual('asdf', subclass_constraint_obj.some_value.something())
+    self.assertEqual(repr(subclass_constraint_obj),
+                     str("WithSubclassTypeConstraint(some_value=SomeDatatypeClass())"))
+    self.assertEqual(
+      str(subclass_constraint_obj),
+      str("WithSubclassTypeConstraint(some_value<+SomeBaseClass>=SomeDatatypeClass())"))
 
   def test_mixin_type_construction(self):
     obj_with_mixin = TypedWithMixin(str(' asdf '))
