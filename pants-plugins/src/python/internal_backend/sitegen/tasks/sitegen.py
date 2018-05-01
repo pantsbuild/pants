@@ -251,46 +251,36 @@ def generate_site_toc(config, precomputed, here):
 
   def recurse(tree, depth_so_far):
     for node in tree:
-      if 'heading' in node and 'pages' in node:
-        heading = node['heading']
+      if 'collapsible_heading' in node and 'pages' in node:
+        heading = node['collapsible_heading']
         pages = node['pages']
         links = []
-        for i in pages:
-          if i == here:
-            link = here +'.html'
+        collapse_open = False
+        for cur_page in pages:
+          html_filename = '{}.html'.format(cur_page)
+          page_is_here = cur_page == here
+          if page_is_here:
+            link = html_filename
+            collapse_open = True
           else:
-            link = os.path.relpath(i + '.html', os.path.dirname(here))
-          links.append(dict(link=link, 
-                            text=precomputed.page[i].title,
-                            here=(i == here)))
-        site_toc.append(dict(depth=depth_so_far,
-                             links=links,
-                             dropdown=True,
-                             heading=heading,
-                             id=heading.replace(' ','-')))
-      if 'heading' in node and 'pages' not in node:
+            link = os.path.relpath(html_filename, os.path.dirname(here))
+          links.append(dict(link=link, text=precomputed.page[cur_page].title, here = page_is_here))
+        site_toc.append(dict(depth = depth_so_far, links = links, dropdown = True, heading = heading, id = heading.replace(' ','-'), open = collapse_open))
+      if 'heading' in node:
         heading = node['heading']
-        site_toc.append(dict(depth=depth_so_far,
-                             links=None,
-                             dropdown=False,
-                             heading=heading,
-                             id=heading.replace(' ','-')))
-      if 'pages' in node and 'heading' not in node:
+        site_toc.append(dict(depth=depth_so_far, links=None, dropdown=False, heading=heading, id=heading.replace(' ','-')))
+      if 'pages' in node and not 'collapsible_heading' in node:
         pages = node['pages']
         links = []
-        for i in pages:
-          if i == here:
-            link = here +'.html'
+        for cur_page in pages:
+          html_filename = '{}.html'.format(cur_page)
+          page_is_here = cur_page == here
+          if page_is_here:
+            link = html_filename
           else:
-            link = os.path.relpath(i + '.html', os.path.dirname(here))
-          links.append(dict(link=link, 
-                            text=precomputed.page[i].title,
-                            here=(i == here)))
-        site_toc.append(dict(depth=depth_so_far,
-                             links=links,
-                             dropdown=False,
-                             heading=None,
-                             id=heading.replace(' ','-')))
+            link = os.path.relpath(html_filename, os.path.dirname(here))
+          links.append(dict(link=link, text=precomputed.page[cur_page].title, here=page_is_here))
+        site_toc.append(dict(depth=depth_so_far, links=links, dropdown=False, heading=None, id=heading.replace(' ','-')))
       if 'children' in node:
         recurse(node['children'], depth_so_far + 1)
   if 'tree' in config:

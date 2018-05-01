@@ -138,7 +138,7 @@
                     "ide_support"
                 ]
        },
-       {"heading": "JVM Support",
+       {"collapsible_heading": "JVM Support",
         "pages" : [
                     "jvm_projects",
                     "3rdparty_jvm",
@@ -147,14 +147,14 @@
                     "from_maven"
                 ]
        },
-       {"heading": "Python Support",
+       {"collapsible_heading": "Python Support",
         "pages" : [
                     "python_readme",
                     "3rdparty_py"
                 ]
        },
        {"pages" : ["go_readme"]},
-       {"heading": "Code & Doc Gen"},
+       {"collapsible_heading": "Code & Doc Gen"},
        {"pages" : [
                     "thrift_deps",
                     "page"
@@ -172,7 +172,7 @@
                     "options_reference"
                 ]
        },
-       {"heading": "Release Notes",
+       {"collapsible_heading": "Release Notes",
         "pages" : [
                     "notes-1.6.x",
                     "notes-1.5.x",
