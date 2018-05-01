@@ -151,6 +151,31 @@ Use `test` to run the tests. This uses `pytest`:
                    SUCCESS
     $
 
+Debugging Tests
+---------------
+Pants scrubs the environment's `PYTHONPATH` when running tests, to ensure a hermetic, repeatable test run.
+
+However some Python debuggers require you to add the debugger's code to the `PYTHONPATH`.
+To do so, set the `extra_pythonpath` option on the `test.pytest` scope.
+
+You can do so with the `--test-pytest-extra-pythonpath` flag, but it may be more convenient to 
+set this permanently in your personal environment using the `PANTS_TEST_PYTEST_EXTRA_PYTHONPATH` 
+environment variable.
+
+So, for example, to use PyCharm's interactive debugger:
+ 
+- Find the [pycharm-debug.egg](https://www.jetbrains.com/help/pycharm/remote-debugging.html) 
+  in your PyCharm installation.
+- Set the environment variable to point to it:  
+  `PANTS_TEST_PYTEST_EXTRA_PYTHONPATH=/path/to/pycharm-debug.egg`.
+- Start the debug server in PyCharm (this assumes you have previously set it up to listen on port 5000).
+- Set a breakpoint in your code by adding this line where you wish to break:    
+  `import pydevd;pydevd.settrace('localhost', port=5000, stdoutToServer=True, stderrToServer=True)`
+- Run your `./pants test` command.
+
+When your code hits the breakpoint, you'll enter an interactive debugging session in PyCharm!
+
+
 Handling `python_requirement`
 -----------------------------
 
