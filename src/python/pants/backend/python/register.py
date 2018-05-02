@@ -36,7 +36,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 def build_file_aliases():
   return BuildFileAliases(
     targets={
-      PythonApp.alias():PythonApp,
+      PythonApp.alias(): PythonApp,
       PythonBinary.alias(): PythonBinary,
       PythonLibrary.alias(): PythonLibrary,
       PythonTests.alias(): PythonTests,

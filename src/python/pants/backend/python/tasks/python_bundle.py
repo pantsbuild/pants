@@ -9,6 +9,7 @@ import os
 
 from pants.backend.python.targets.python_app import PythonApp
 from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
 from pants.build_graph.bundle_mixin import BundleMixin
 from pants.fs import archive
 from pants.task.task import Task
@@ -90,6 +91,10 @@ class PythonBundle(BundleMixin, Task):
 
   def _get_binary_path(self, target):
     pex_archives = self.context.products.get(self._PEX_ARCHIVES)
+    paths = []
     for basedir, filenames in pex_archives.get(target.binary).items():
       for filename in filenames:
-        return os.path.join(basedir, filename)
+        paths.append(os.path.join(basedir, filename))
+    if len(paths) != 1:
+      raise TaskError('Expected one binary but found: {}'.format(', '.join(sorted(paths))))
+    return paths[0]

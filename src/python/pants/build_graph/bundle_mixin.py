@@ -19,6 +19,11 @@ class BundleMixin(object):
 
   @staticmethod
   def register_common_options(register):
+    """Register options common to all bundles.
+
+    Bundle tasks must call this method from their `register_options` even if they do not
+    specify additional options.
+    """
     register('--archive', choices=list(archive.TYPE_NAMES),
              fingerprint=True,
              help='Create an archive of this type from the bundle. '
