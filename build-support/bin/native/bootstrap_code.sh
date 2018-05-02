@@ -7,8 +7,6 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 # + fingerprint_data: Fingerprints the data on stdin.
 source ${REPO_ROOT}/build-support/common.sh
 
-source ${REPO_ROOT}/build-support/bin/native/bootstrap_rust.sh
-
 readonly KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "${KERNEL}" in
   linux)
