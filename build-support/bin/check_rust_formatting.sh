@@ -41,10 +41,13 @@ cmd=(
 
 bad_files=(
   $(
-    if [[ -z "${CHECK_RUST_FORMATTING_DEBUG}" ]]; then
-      exec 2>/dev/null
-    fi
     cd "${NATIVE_ROOT}"
+
+    # Ensure generated code is present since `cargo fmt` needs to do enough parsing to follow use's
+    # and these will land in generated code.
+    echo >&2 "Ensuring generated code is present for downstream formatting checks..."
+    ${REPO_ROOT}/build-support/bin/native/cargo check -p bazel_protos
+
     ${cmd[*]} --write-mode=${write_mode} | \
       awk '$0 ~ /^Diff in/ {print $3}' | \
       sort -u
@@ -52,25 +55,12 @@ bad_files=(
   )
 )
 case $? in
-  2)
-    # NB: This will happen when running rustfmt against a clean repo where generated modules that
-    # are referenced by checked in code will not exist yet (rustfmt does not execute the build).
-    # This is also fine since any real syntax errors will be caught by compile checks!
-    echo >&2 "NB: Skipped formatting some files due to syntax errors."
-    if [[ -z "${CHECK_RUST_FORMATTING_DEBUG}" ]]; then
-    echo >&2 "To see the errors, run:"
-    echo >&2 "CHECK_RUST_FORMATTING_DEBUG=1 $0"
-    echo >&2
-    fi
-    ;& # Fallthrough
   4)
-    if (( ${#bad_files[@]} > 0 )); then
-      echo >&2 "The following rust files were incorrectly formatted, run \`$0 -f\` to reformat them:"
-      for bad_file in ${bad_files[*]}; do
-        echo >&2 ${bad_file}
-      done
-      exit 1
-    fi
+    echo >&2 "The following rust files were incorrectly formatted, run \`$0 -f\` to reformat them:"
+    for bad_file in ${bad_files[*]}; do
+      echo >&2 ${bad_file}
+    done
+    exit 1
     ;;
   0)
     exit 0

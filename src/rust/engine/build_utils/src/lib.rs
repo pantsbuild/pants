@@ -1,86 +1,7 @@
 use std::env;
-use std::ffi::OsStr;
 use std::io;
 use std::ops::Deref;
 use std::path::PathBuf;
-use std::process::{Command, Output};
-
-#[derive(Clone, Debug)]
-pub struct ExecutionError {
-  status: Option<i32>,
-  stdout: String,
-  stderr: String,
-}
-
-fn to_string(data: Vec<u8>) -> String {
-  String::from_utf8(data).unwrap()
-}
-
-impl ExecutionError {
-  fn from(output: Output) -> ExecutionError {
-    ExecutionError {
-      status: output.status.code(),
-      stdout: to_string(output.stdout),
-      stderr: to_string(output.stderr),
-    }
-  }
-}
-
-pub type ExecutionResult<T> = Result<T, ExecutionError>;
-
-/// Executes a command returning its trimmed standard output.
-///
-/// # Errors
-///
-/// If command execution fails, execution succeeds but the underlying command has a non-successful
-/// exit status or conversion of successful command output to a UTF-8 string fails then an error is
-/// returned.
-///
-/// # Examples
-///
-/// ```
-/// use build_utils::execute;
-/// use std::path::PathBuf;
-///
-/// let root_dir: PathBuf = execute("git", &["rev-parse", "--show-toplevel"]).unwrap();
-/// ```
-pub fn execute<C, A, R>(command: C, args: A) -> ExecutionResult<R>
-where
-  C: AsRef<OsStr>,
-  A: IntoIterator,
-  A::Item: AsRef<OsStr>,
-  R: From<String>,
-{
-  let output = Command::new(command).args(args).output().unwrap();
-  if output.status.success() {
-    Ok(R::from(to_string(output.stdout).trim().to_owned()))
-  } else {
-    Err(ExecutionError::from(output))
-  }
-}
-
-/// Executes a command with optional arguments returning its trimmed standard output as a `String`.
-///
-/// # Panics
-///
-/// Panics if the command execution fails or has a non-successful exit status.
-///
-/// # Examples
-///
-/// ```
-/// # #[macro_use(execute)]
-/// # extern crate build_utils;
-/// #
-/// # fn main() {
-/// execute!("ls");
-/// execute!("ls", "-la");
-/// execute!("ls", "-l", "-a");
-/// # }
-#[macro_export]
-macro_rules! execute {
-  ($c: expr) => { $crate::execute::<_, Vec<String>, String>($c, vec![]).unwrap() };
-  ($c: expr, $($a: expr),*) => { $crate::execute::<_, _, String>($c, vec![$($a),*]).unwrap() };
-}
 
 pub struct BuildRoot(PathBuf);
 
@@ -131,13 +52,23 @@ impl BuildRoot {
 
 #[cfg(test)]
 mod build_utils_test {
-  use super::{execute, BuildRoot};
+  use super::BuildRoot;
 
   use std::path::PathBuf;
+  use std::process::Command;
 
   #[test]
   fn find() {
-    let root_dir: PathBuf = execute("git", &["rev-parse", "--show-toplevel"]).unwrap();
+    let result = Command::new("git")
+      .args(&["rev-parse", "--show-toplevel"])
+      .output()
+      .expect("Expected `git` to be on the `PATH` and this test to be run in a git repository.");
+
+    let root_dir: PathBuf = String::from_utf8(result.stdout)
+      .expect("The Pants build root is not a valid UTF-8 path.")
+      .trim()
+      .into();
+
     assert_eq!(*BuildRoot::find().unwrap(), root_dir)
   }
 }

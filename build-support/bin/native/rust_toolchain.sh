@@ -2,7 +2,7 @@
 
 set -e
 
-REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 
 # Defines:
 # + CARGO_HOME: The CARGO_HOME of the Pants-controlled rust toolchain.
@@ -18,7 +18,7 @@ of the \$CARGO_HOME binary to run.
 EOF
   exit 1
 fi
-readonly binary=$(basename $0)
+readonly binary="$(basename "$0")"
 
 ensure_native_build_prerequisites >&2
 exec "${CARGO_HOME}/bin/${binary}" "$@"

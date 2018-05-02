@@ -2,7 +2,7 @@
 
 set -e
 
-REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 
 source "${REPO_ROOT}/build-support/pants_venv"
 

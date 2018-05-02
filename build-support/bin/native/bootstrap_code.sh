@@ -1,4 +1,4 @@
-REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 
 # Defines:
 # + CACHE_ROOT: The pants cache directory, ie: ~/.cache/pants.
@@ -26,7 +26,7 @@ readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
 readonly NATIVE_ENGINE_BINARY="native_engine.so"
 readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/${NATIVE_ENGINE_BINARY}"
 
-# N.B. Set $MODE to "debug" to generate a binary with debugging symbols.
+# N.B. Set $MODE to "debug" for faster builds.
 readonly MODE="${MODE:-release}"
 case "$MODE" in
   debug) MODE_FLAG="" ;;
@@ -64,7 +64,7 @@ function _build_native_code() {
 function bootstrap_native_code() {
   # Bootstraps the native code only if needed.
   local native_engine_version="$(calculate_current_hash)"
-  local engine_version_header="engine_version: ${native_engine_version}"
+  local engine_version_hdr="engine_version: ${native_engine_version}"
   local target_binary="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
   local target_binary_metadata="${target_binary}.metadata"
   if [[ ! -f "${target_binary}" || ! -f "${target_binary_metadata}" ]]
@@ -80,7 +80,7 @@ function bootstrap_native_code() {
 
     # Pick up Cargo.lock changes if any caused by the `cargo build`.
     native_engine_version="$(calculate_current_hash)"
-    engine_version_header="engine_version: ${native_engine_version}"
+    engine_version_hdr="engine_version: ${native_engine_version}"
     target_binary="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
     target_binary_metadata="${target_binary}.metadata"
 
@@ -88,7 +88,7 @@ function bootstrap_native_code() {
     cp "${native_binary}" "${target_binary}"
 
     local -r metadata_file=$(mktemp -t pants.native_engine.metadata.XXXXXX)
-    echo "${engine_version_header}" > "${metadata_file}"
+    echo "${engine_version_hdr}" > "${metadata_file}"
     echo "repo_version: $(git describe --dirty)" >> "${metadata_file}"
     mv "${metadata_file}" "${target_binary_metadata}"
   fi
@@ -98,7 +98,7 @@ function bootstrap_native_code() {
   #     the Native.binary method in src/python/pants/engine/native.py.
   if [[
     ! -f "${NATIVE_ENGINE_RESOURCE}" ||
-    "$(head -1 "${NATIVE_ENGINE_RESOURCE}" | tr '\0' '\n')" != "${engine_version_header}"
+    "$(head -1 "${NATIVE_ENGINE_RESOURCE}" | tr '\0' '\n' 2>/dev/null)" != "${engine_version_hdr}"
   ]]
   then
     cat "${target_binary_metadata}" "${target_binary}" > "${NATIVE_ENGINE_RESOURCE}"

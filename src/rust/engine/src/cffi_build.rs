@@ -1,4 +1,3 @@
-#[macro_use(execute)]
 extern crate build_utils;
 extern crate cc;
 
@@ -23,6 +22,7 @@ native engine binary, allowing us to address it both as an importable python mod
 use std::fs;
 use std::io::{Read, Result};
 use std::path::{Path, PathBuf};
+use std::process::{exit, Command};
 
 use build_utils::BuildRoot;
 
@@ -64,7 +64,18 @@ fn main() {
   let c_path = mark_for_change_detection(cffi_dir.join("native_engine.c"));
   let env_script_path = mark_for_change_detection(cffi_dir.join("native_engine.cflags"));
 
-  execute!(cffi_bootstrapper, cffi_dir);
+  let result = Command::new(&cffi_bootstrapper)
+    .arg(cffi_dir)
+    .status()
+    .expect(&format!("Failed to execute {:?}", &cffi_bootstrapper));
+  if !result.success() {
+    let exit_code = result.code();
+    eprintln!(
+      "Execution of {:?} failed with exit code {:?}",
+      cffi_bootstrapper, exit_code
+    );
+    exit(exit_code.unwrap_or(1));
+  }
 
   // Now compile the cffi c sources.
   let mut config = cc::Build::new();

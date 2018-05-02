@@ -1,46 +1,11 @@
 extern crate build_utils;
 extern crate protoc_grpcio;
 
-use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
-use build_utils::{BuildRoot, ExecutionResult};
-
-struct BinarySpec<'a> {
-  util_name: &'a str,
-  version: &'a str,
-  filename: &'a str,
-}
-
-struct DownloadBinary<'a> {
-  download_binary: PathBuf,
-  host: &'a str,
-}
-
-impl<'a> DownloadBinary<'a> {
-  fn from<'f>(build_root: BuildRoot, host: &'f str) -> DownloadBinary<'f> {
-    DownloadBinary {
-      download_binary: build_root.join("build-support/bin/download_binary.sh"),
-      host,
-    }
-  }
-
-  fn fetch(&self, binary: &BinarySpec) -> ExecutionResult<PathBuf> {
-    let binary_path: PathBuf = build_utils::execute(
-      &self.download_binary,
-      &[self.host, binary.util_name, binary.version, binary.filename],
-    )?;
-    Ok(binary_path)
-  }
-}
-
-static PROTOC: BinarySpec = BinarySpec {
-  util_name: "protobuf",
-  version: "3.4.1",
-  filename: "protoc",
-};
+use build_utils::BuildRoot;
 
 fn main() {
   let build_root = BuildRoot::find().unwrap();
@@ -52,9 +17,9 @@ fn main() {
 
   let gen_dir = PathBuf::from("src/gen");
 
-  let download_binary = DownloadBinary::from(build_root, "binaries.pantsbuild.org");
-  let protoc = download_binary.fetch(&PROTOC).unwrap();
-  env::set_var("PATH", protoc.parent().unwrap());
+  // Re-gen if, say, someone does a git clean on the gen dir but not the target dir. This ensures
+  // generated sources are available for reading by programmers and tools like rustfmt alike.
+  println!("cargo:rerun-if-changed={}", gen_dir.to_str().unwrap());
 
   protoc_grpcio::compile_grpc_protos(
     &[
