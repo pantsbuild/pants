@@ -16,11 +16,11 @@ grpcio = { version = "0.2.0", features = ["secure"] }
 hashing = { path = "../hashing" }
 hex = "0.3.1"
 ignore = "0.3.1"
+indexmap = "1"
 itertools = "0.7.2"
 lazy_static = "0.2.2"
 lmdb = "0.7.2"
 log = "0.4"
-ordermap = "0.2.8"
 protobuf = { version = "1.4.1", features = ["with-bytes"] }
 sha2 = "0.6.0"
 tempdir = "0.3.5"

@@ -26,7 +26,6 @@ extern crate hashing;
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
-extern crate ordermap;
 extern crate petgraph;
 extern crate process_execution;
 extern crate tempdir;
