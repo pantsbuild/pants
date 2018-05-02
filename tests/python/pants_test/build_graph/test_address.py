@@ -75,6 +75,7 @@ class ParseSpecTest(unittest.TestCase):
 
   def test_parse_bad_spec_bad_name(self):
     self.do_test_bad_target_name('a:')
+    self.do_test_bad_target_name('a/b:')
     self.do_test_bad_target_name('a::')
     self.do_test_bad_target_name('//')
 
@@ -159,6 +160,7 @@ class AddressTest(BaseAddressTest):
     self.assert_address('', 'target', Address.parse('//:target', relative_to='a/b'))
     self.assert_address('', 'target', Address.parse(':target'))
     self.assert_address('a/b', 'target', Address.parse(':target', relative_to='a/b'))
+    self.assert_address('a/b', 'b', Address.parse(':', relative_to='a/b'))
 
 
 class BuildFileAddressTest(BaseAddressTest):
