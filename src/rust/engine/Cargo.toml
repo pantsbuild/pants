@@ -32,6 +32,7 @@ members = [
   "process_execution",
   "process_execution/bazel_protos",
   "process_executor",
+  "resettable",
   "testutil",
   "testutil/mock",
 ]
@@ -53,6 +54,7 @@ default-members = [
   "process_execution",
   "process_execution/bazel_protos",
   "process_executor",
+  "resettable",
   "testutil",
   "testutil/mock",
 ]

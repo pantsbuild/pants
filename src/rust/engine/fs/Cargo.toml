@@ -22,6 +22,7 @@ lazy_static = "0.2.2"
 lmdb = "0.7.2"
 log = "0.4"
 protobuf = { version = "1.4.1", features = ["with-bytes"] }
+resettable = { path = "../resettable" }
 sha2 = "0.6.0"
 tempdir = "0.3.5"
 

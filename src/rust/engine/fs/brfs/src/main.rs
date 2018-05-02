@@ -612,7 +612,7 @@ fn main() {
     Some(address) => fs::Store::with_remote(
       &store_path,
       pool,
-      address,
+      address.to_owned(),
       1,
       4 * 1024 * 1024,
       std::time::Duration::from_secs(5 * 60),

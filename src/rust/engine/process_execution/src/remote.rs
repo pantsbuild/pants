@@ -795,7 +795,7 @@ mod tests {
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
-      &cas.address(),
+      cas.address(),
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
@@ -848,7 +848,7 @@ mod tests {
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
-      &cas.address(),
+      cas.address(),
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
@@ -1192,7 +1192,7 @@ mod tests {
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
-      &cas.address(),
+      cas.address(),
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
