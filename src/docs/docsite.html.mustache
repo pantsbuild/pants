@@ -69,16 +69,30 @@
         <div class="site-toc">
           <ul>
             {{#site_toc}}
-              {{#link}}
-                <li class="toc-h{{depth}} toc-link {{#here}}toc-here{{/here}}">
-                  {{^here}}<a href="{{link}}">{{/here}}{{text}}{{^here}}</a>{{/here}}
+              {{#dropdown}}
+                <li class="toc-h{{depth}}">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#{{id}}" aria-expanded="false" aria-controls="{{id}}">{{heading}}<span class="caret"></span></a>
+                    <ul class="{{^open}}collapse sidebar-nav sidebar-submenu{{/open}}" id="{{id}}">
+                        {{#links}}
+                        <li class="toc-h{{depth}} toc-link {{#here}}toc-here{{/here}}">
+                          {{^here}}<a href="{{link}}">{{/here}}{{text}}{{^here}}</a>{{/here}}
+                        </li>
+                        {{/links}}
+                    </ul>
                 </li>
-              {{/link}}
-              {{^link}}
-                <li class="toc-h{{depth}} toc-heading">
-                  {{text}}
-                </li>
-              {{/link}}
+              {{/dropdown}}
+              {{^dropdown}}
+                {{#links}}
+                  <li class="toc-h{{depth}} toc-link {{#here}}toc-here{{/here}}">
+                    {{^here}}<a href="{{link}}">{{/here}}{{text}}{{^here}}</a>{{/here}}
+                  </li>
+                {{/links}}
+                {{^links}}
+                  <li class="toc-h{{depth}} toc-heading">
+                    {{heading}}
+                  </li>
+                {{/links}}
+              {{/dropdown}}
             {{/site_toc}}
           </ul>
         </div> <!-- site-toc -->
