@@ -13,9 +13,6 @@ from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
 
 
-class DatatypeConstructionError(TypeError): pass
-
-
 def datatype(field_decls, superclass_name=None, **kwargs):
   """A wrapper for `namedtuple` that accounts for the type of the object in equality.
 
@@ -28,7 +25,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
   :param field_decls: Iterable of field declarations.
   :return: A type object which can then be subclassed.
-  :raises: :class:`pants.util.objects.DatatypeConstructionError`
+  :raises: :class:`TypeError`
   """
   field_names = []
   fields_with_constraints = OrderedDict()
@@ -41,7 +38,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       elif isinstance(type_spec, TypeConstraint):
         type_constraint = type_spec
       else:
-        raise DatatypeConstructionError(
+        raise TypeError(
           "type spec for field '{}' was not a type or TypeConstraint: was {!r} (type {!r})."
           .format(field_name, type_spec, type(type_spec).__name__))
       fields_with_constraints[field_name] = type_constraint
