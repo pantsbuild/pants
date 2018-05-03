@@ -14,15 +14,14 @@ from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcess
                                            create_process_rules)
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
-from pants.util.objects import Exactly, TypeCheckError, datatype
+from pants.util.objects import TypeCheckError, datatype
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
-class Concatted(datatype([('value', str)])):
-  pass
+class Concatted(datatype([('value', str)])): pass
 
 
-class BinaryLocation(datatype([('bin_path', Exactly(str, unicode))])):
+class BinaryLocation(datatype(['bin_path'])):
 
   def __new__(cls, bin_path):
     this_object = super(BinaryLocation, cls).__new__(cls, str(bin_path))
