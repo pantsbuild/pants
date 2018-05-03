@@ -17,21 +17,21 @@ readonly rust_toolchain_root="${CACHE_ROOT}/rust"
 export CARGO_HOME="${rust_toolchain_root}/cargo"
 export RUSTUP_HOME="${rust_toolchain_root}/rustup"
 
+readonly RUSTUP="${CARGO_HOME}/bin/rustup"
+
 function cargo_bin() {
-  "${CARGO_HOME}/bin/rustup" which cargo
+  "${RUSTUP}" which cargo
 }
 
 function ensure_native_build_prerequisites() {
   # Control a pants-specific rust toolchain.
-  local -r rustup="${CARGO_HOME}/bin/rustup"
-
-  # NB: rustup installs itself into CARGO_HOME, but fetches toolchains into RUSTUP_HOME.
-  if [[ ! -x "${rustup}" ]]
+  if [[ ! -x "${RUSTUP}" ]]
   then
     log "A pants owned rustup installation could not be found, installing via the instructions at" \
         "https://www.rustup.rs ..."
     local -r rustup_tmp=$(mktemp -t pants.rustup.XXXXXX)
     curl https://sh.rustup.rs -sSf > ${rustup_tmp}
+    # NB: rustup installs itself into CARGO_HOME, but fetches toolchains into RUSTUP_HOME.
     sh ${rustup_tmp} -y --no-modify-path --default-toolchain "${RUST_TOOLCHAIN}" 1>&2
     rm -f ${rustup_tmp}
   fi
@@ -43,9 +43,9 @@ function ensure_native_build_prerequisites() {
   then
     (
       cd "${REPO_ROOT}"
-      "${rustup}" override set "${RUST_TOOLCHAIN}" >&2
+      "${RUSTUP}" override set "${RUST_TOOLCHAIN}" >&2
     )
-    "${rustup}" component add ${RUST_COMPONENTS[@]} >&2
+    "${RUSTUP}" component add ${RUST_COMPONENTS[@]} >&2
 
     ln -fs "$(cargo_bin)" "${rust_toolchain_root}/${cargo_versioned}"
   fi
@@ -58,6 +58,7 @@ function ensure_native_build_prerequisites() {
       # Kill potentially stale symlinks generated from an older or newer rust toolchain.
       git clean -fdx .
 
+      ln -fs "${RUSTUP}"
       local -r cargo_bin_dir="$(dirname "$(cargo_bin)")"
       find "${cargo_bin_dir}" -type f | while read executable; do
         if [[ -x "${executable}" ]]; then
