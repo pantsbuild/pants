@@ -18,14 +18,13 @@ from pants.util.objects import TypeCheckError, datatype
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
-class Concatted(datatype([('value', str)])):
-  pass
+class Concatted(datatype([('value', str)])): pass
 
 
-class BinaryLocation(datatype([('bin_path', str)])):
+class BinaryLocation(datatype(['bin_path'])):
 
-  def __new__(cls, *args, **kwargs):
-    this_object = super(BinaryLocation, cls).__new__(cls, *args, **kwargs)
+  def __new__(cls, bin_path):
+    this_object = super(BinaryLocation, cls).__new__(cls, str(bin_path))
 
     bin_path = this_object.bin_path
 
@@ -62,11 +61,7 @@ class ShellCat(datatype([('binary_location', BinaryLocation)])):
     return (self.bin_path,) + tuple(cat_file_paths)
 
 
-class CatExecutionRequest(datatype([
-    ('shell_cat', ShellCat),
-    ('path_globs', PathGlobs),
-])):
-  pass
+class CatExecutionRequest(datatype([('shell_cat', ShellCat), ('path_globs', PathGlobs)])): pass
 
 
 @rule(ExecuteProcessRequest, [Select(CatExecutionRequest)])
@@ -99,9 +94,7 @@ def create_cat_stdout_rules():
   ]
 
 
-class JavacVersionExecutionRequest(datatype([
-    ('binary_location', BinaryLocation),
-])):
+class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)])):
 
   @property
   def bin_path(self):
@@ -118,8 +111,7 @@ def process_request_from_javac_version(javac_version_exe_req):
     env=tuple())
 
 
-class JavacVersionOutput(datatype([('value', str)])):
-  pass
+class JavacVersionOutput(datatype([('value', str)])): pass
 
 
 class ProcessExecutionFailure(Exception):
@@ -266,12 +258,12 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs(create_cat_stdout_rules())
 
     cat_exe_req = CatExecutionRequest(
-      ShellCat(BinaryLocation(str('/bin/cat'))),
-      PathGlobs.create('', include=[u'fs_test/a/b/*']))
+      ShellCat(BinaryLocation('/bin/cat')),
+      PathGlobs.create('', include=['fs_test/a/b/*']))
 
     self.assertEqual(
       repr(cat_exe_req),
-      str("CatExecutionRequest(shell_cat=ShellCat(binary_location=BinaryLocation(bin_path='/bin/cat')), path_globs=PathGlobs(include=(u'fs_test/a/b/*',), exclude=()))"))
+      "CatExecutionRequest(shell_cat=ShellCat(binary_location=BinaryLocation(bin_path='/bin/cat')), path_globs=PathGlobs(include=(u'fs_test/a/b/*',), exclude=()))")
 
     results = self.execute(scheduler, Concatted, cat_exe_req)
     self.assertEqual(1, len(results))
@@ -285,7 +277,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       get_javac_version_output,
     ])
 
-    request = JavacVersionExecutionRequest(BinaryLocation(str('/usr/bin/javac')))
+    request = JavacVersionExecutionRequest(BinaryLocation('/usr/bin/javac'))
 
     self.assertEqual(
       repr(request),
@@ -300,9 +292,9 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs(create_javac_compile_rules())
 
     request = JavacCompileRequest(
-      BinaryLocation(str('/usr/bin/javac')),
+      BinaryLocation('/usr/bin/javac'),
       JavacSources(PathGlobs.create('', include=[
-        u'scheduler_inputs/src/java/simple/Simple.java',
+        'scheduler_inputs/src/java/simple/Simple.java',
       ])))
 
     self.assertEqual(
@@ -318,7 +310,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs(create_javac_compile_rules())
 
     request = JavacCompileRequest(
-      BinaryLocation(str('/usr/bin/javac')),
+      BinaryLocation('/usr/bin/javac'),
       JavacSources(PathGlobs.create('', include=[
         'scheduler_inputs/src/java/simple/Broken.java',
       ])))

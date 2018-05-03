@@ -25,14 +25,23 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
   :param field_decls: Iterable of field declarations.
   :return: A type object which can then be subclassed.
+  :raises: :class:`TypeError`
   """
   field_names = []
   fields_with_constraints = OrderedDict()
   for maybe_decl in field_decls:
     # ('field_name', type)
     if isinstance(maybe_decl, tuple):
-      field_name, field_type = maybe_decl
-      fields_with_constraints[field_name] = Exactly(field_type)
+      field_name, type_spec = maybe_decl
+      if isinstance(type_spec, type):
+        type_constraint = Exactly(type_spec)
+      elif isinstance(type_spec, TypeConstraint):
+        type_constraint = type_spec
+      else:
+        raise TypeError(
+          "type spec for field '{}' was not a type or TypeConstraint: was {!r} (type {!r})."
+          .format(field_name, type_spec, type(type_spec).__name__))
+      fields_with_constraints[field_name] = type_constraint
     else:
       # interpret it as a field name without a type to check
       field_name = maybe_decl
