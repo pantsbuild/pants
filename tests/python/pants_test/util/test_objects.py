@@ -366,7 +366,7 @@ class TypedDatatypeTest(BaseTest):
                      "WithExplicitTypeConstraint(a_string='asdf', an_int=45)")
     self.assertEqual(
       str(some_object),
-      str("WithExplicitTypeConstraint(a_string<=str>=asdf, an_int<=int>=45)"))
+      "WithExplicitTypeConstraint(a_string<=str>=asdf, an_int<=int>=45)")
 
     some_nonneg_int = NonNegativeInt(an_int=3)
     self.assertEqual(3, some_nonneg_int.an_int)
@@ -381,7 +381,7 @@ class TypedDatatypeTest(BaseTest):
                      "CamelCaseWrapper(nonneg_int=NonNegativeInt(an_int=45))")
     self.assertEqual(
       str(wrapped_nonneg_int),
-      str("CamelCaseWrapper(nonneg_int<=NonNegativeInt>=NonNegativeInt(an_int<=int>=45))"))
+      "CamelCaseWrapper(nonneg_int<=NonNegativeInt>=NonNegativeInt(an_int<=int>=45))")
 
     mixed_type_obj = MixedTyping(value=3, name=str('asdf'))
     self.assertEqual(3, mixed_type_obj.value)
