@@ -19,7 +19,8 @@ extern crate tempdir;
 extern crate testutil;
 
 use bytes::Bytes;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::PathBuf;
 
 pub mod local;
 pub mod remote;
@@ -47,6 +48,8 @@ pub struct ExecuteProcessRequest {
   pub env: BTreeMap<String, String>,
 
   pub input_files: hashing::Digest,
+
+  pub output_files: BTreeSet<PathBuf>,
 }
 
 ///
@@ -57,4 +60,6 @@ pub struct ExecuteProcessResult {
   pub stdout: Bytes,
   pub stderr: Bytes,
   pub exit_code: i32,
+
+  pub output_directory: hashing::Digest,
 }

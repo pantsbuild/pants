@@ -5,7 +5,7 @@ extern crate bazel_protos;
 extern crate tempdir;
 
 use std::error::Error;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -541,6 +541,8 @@ impl ExecuteProcess {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
       input_files: digest,
+      // TODO: Specify output files
+      output_files: BTreeSet::new(),
     })
   }
 }
@@ -556,20 +558,23 @@ impl Node for ExecuteProcess {
     let context2 = context.clone();
     // TODO: Process pool management should likely move into the `process_execution` crate, which
     // will have different strategies depending on remote/local execution.
+
+    let command_runner = process_execution::local::CommandRunner {
+      store: context.core.store.clone(),
+      fs_pool: context.core.fs_pool.clone(),
+    };
+
     context
       .core
-      .pool
+      .fs_pool
       .spawn_fn(move || {
         let tmpdir = TempDir::new("process-execution").unwrap();
         context2
           .core
           .store
           .materialize_directory(tmpdir.path().to_owned(), request.input_files)
-          .map(move |_| {
-            ProcessResult(
-              process_execution::local::run_command_locally(request, tmpdir.path()).unwrap(),
-            )
-          })
+          .and_then(move |()| command_runner.run(request, tmpdir.path()))
+          .map(|result| ProcessResult(result))
           .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
       })
       .to_boxed()
