@@ -118,6 +118,22 @@ python_library(
 )
 
 python_library(
+  name = 's3_log_aggregator',
+  sources = ['s3_log_aggregator.py'],
+  dependencies = [
+    '3rdparty/python:s3logparse'
+  ]
+)
+
+python_binary(
+  name = 's3_log_aggregator_bin',
+  entry_point = 'pants.util.s3_log_aggregator',
+  dependencies = [
+    ':s3_log_aggregator'
+  ]
+)
+
+python_library(
   name = 'socket',
   sources = ['socket.py']
 )

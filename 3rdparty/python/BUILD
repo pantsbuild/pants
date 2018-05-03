@@ -4,7 +4,7 @@
 # see/edit requirements.txt in this directory to change deps.
 python_requirements()
 
-# Only used by tests so we lift this library out of the requirements.txt
+# Only used by tests, so we lift this library out of the requirements.txt
 # file used to bootstrap pants itself.
 python_requirement_library(
   name='antlr-3.1.3',
@@ -14,6 +14,15 @@ python_requirement_library(
     # repository arg can be removed.
     python_requirement('antlr_python_runtime==3.1.3',
                        repository='http://www.antlr3.org/download/Python/')
+  ]
+)
+
+# Only used by a maintenance tool, so we lift this library out of the requirements.txt
+# file used to bootstrap pants itself.
+python_requirement_library(
+  name='s3logparse',
+  requirements=[
+    python_requirement('s3-log-parse==0.1.1')
   ]
 )
 
