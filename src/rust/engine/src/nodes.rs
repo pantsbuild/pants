@@ -5,7 +5,7 @@ extern crate bazel_protos;
 extern crate tempdir;
 
 use std::error::Error;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -323,6 +323,7 @@ impl Select {
                 externs::store_bytes(&result.0.stdout),
                 externs::store_bytes(&result.0.stderr),
                 externs::store_i32(result.0.exit_code),
+                Snapshot::store_snapshot(&context2, &result.0.output_snapshot),
               ],
             )
           })
@@ -537,12 +538,16 @@ impl ExecuteProcess {
       digest_length_as_usize,
     );
 
+    let output_files = externs::project_multi_strs(&value, "output_files")
+      .into_iter()
+      .map(|path: String| PathBuf::from(path))
+      .collect();
+
     ExecuteProcess(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
       input_files: digest,
-      // TODO: Specify output files
-      output_files: BTreeSet::new(),
+      output_files: output_files,
     })
   }
 }
@@ -569,12 +574,16 @@ impl Node for ExecuteProcess {
       .fs_pool
       .spawn_fn(move || {
         let tmpdir = TempDir::new("process-execution").unwrap();
+        let dir = tmpdir.path().to_owned();
         context2
           .core
           .store
-          .materialize_directory(tmpdir.path().to_owned(), request.input_files)
-          .and_then(move |()| command_runner.run(request, tmpdir.path()))
-          .map(|result| ProcessResult(result))
+          .materialize_directory(dir.clone(), request.input_files)
+          .and_then(move |()| command_runner.run(request, &dir))
+          // Force tmpdir not to get dropped until the command is finished being run, because it's
+          // deleted on drop.
+          .join(future::ok(tmpdir))
+          .map(|(result, _tmpdir)| result).map(|result| ProcessResult(result))
           .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
       })
       .to_boxed()

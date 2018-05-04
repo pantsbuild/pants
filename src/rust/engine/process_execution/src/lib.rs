@@ -61,5 +61,5 @@ pub struct ExecuteProcessResult {
   pub stderr: Bytes,
   pub exit_code: i32,
 
-  pub output_directory: hashing::Digest,
+  pub output_snapshot: fs::Snapshot,
 }

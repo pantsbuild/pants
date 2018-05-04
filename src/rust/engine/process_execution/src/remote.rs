@@ -231,7 +231,7 @@ impl CommandRunner {
             stderr: stderr,
             exit_code: execute_response.get_result().get_exit_code(),
             // TODO: Populate output directory
-            output_directory: fs::EMPTY_DIGEST,
+            output_snapshot: fs::Snapshot::empty(),
           }).to_boxed(),
           grpcio::RpcStatusCode::FailedPrecondition => {
             if execute_response.get_status().get_details().len() != 1 {
@@ -533,7 +533,7 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_snapshot: fs::Snapshot::empty(),
       }
     );
   }
@@ -554,7 +554,7 @@ mod tests {
         stdout: testdata.bytes(),
         stderr: testdata_empty.bytes(),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_snapshot: fs::Snapshot::empty(),
       })
     );
   }
@@ -575,7 +575,7 @@ mod tests {
         stdout: testdata_empty.bytes(),
         stderr: testdata.bytes(),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_snapshot: fs::Snapshot::empty(),
       })
     );
   }
@@ -611,7 +611,7 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_snapshot: fs::Snapshot::empty(),
       }
     );
   }
@@ -821,7 +821,7 @@ mod tests {
         stdout: roland.bytes(),
         stderr: Bytes::from(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_snapshot: fs::Snapshot::empty(),
       })
     );
     {
@@ -897,7 +897,7 @@ mod tests {
       stdout: as_bytes("roland"),
       stderr: Bytes::from("simba"),
       exit_code: 17,
-      output_directory: fs::EMPTY_DIGEST,
+      output_snapshot: fs::Snapshot::empty(),
     };
 
     let mut operation = bazel_protos::operations::Operation::new();

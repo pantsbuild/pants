@@ -51,8 +51,8 @@ impl CommandRunner {
         .output().map_err(|e| format!("Error executing process: {:?}", e))
     );
 
-    let output_directory_digest = if req.output_files.is_empty() {
-      future::ok(fs::EMPTY_DIGEST).to_boxed()
+    let output_snapshot = if req.output_files.is_empty() {
+      future::ok(fs::Snapshot::empty()).to_boxed()
     } else {
       // TODO: Extract the commonality between this and fs_util into... Somewhere.
       let posix_fs = Arc::new(fs::PosixFS::new(workdir, self.fs_pool.clone(), vec![]).unwrap());
@@ -71,16 +71,15 @@ impl CommandRunner {
         .and_then(move |paths| {
           fs::Snapshot::from_path_stats(store.clone(), FileSaver { store, posix_fs }, paths)
         })
-        .map(|snapshot| snapshot.digest)
         .to_boxed()
     };
 
-    output_directory_digest
-      .map(|digest| ExecuteProcessResult {
+    output_snapshot
+      .map(|snapshot| ExecuteProcessResult {
         stdout: Bytes::from(output.stdout),
         stderr: Bytes::from(output.stderr),
         exit_code: output.status.code().unwrap(),
-        output_directory: digest,
+        output_snapshot: snapshot,
       })
       .to_boxed()
   }
@@ -139,7 +138,7 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_snapshot: fs::Snapshot::empty(),
       }
     )
   }
@@ -160,7 +159,7 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes("bar"),
         exit_code: 1,
-        output_directory: fs::EMPTY_DIGEST,
+        output_snapshot: fs::Snapshot::empty(),
       }
     )
   }
@@ -246,7 +245,7 @@ mod tests {
         stdout: as_bytes(""),
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_snapshot: fs::Snapshot::empty(),
       }
     )
   }
@@ -257,6 +256,7 @@ mod tests {
 
     let content = TestData::roland();
     let directory = TestDirectory::containing_roland();
+    let output_file_path = PathBuf::from("roland");
 
     let result = run_command_locally_in_dir(
       ExecuteProcessRequest {
@@ -267,17 +267,31 @@ mod tests {
         ],
         env: BTreeMap::new(),
         input_files: fs::EMPTY_DIGEST,
-        output_files: vec![PathBuf::from("roland")].into_iter().collect(),
+        output_files: vec![output_file_path.clone()].into_iter().collect(),
       },
       working_dir.path(),
     );
+
+    let want_snapshot = fs::Snapshot {
+      digest: directory.digest(),
+      path_stats: vec![
+        fs::PathStat::file(
+          output_file_path.clone(),
+          fs::File {
+            path: output_file_path,
+            is_executable: false,
+          },
+        ),
+      ],
+    };
+
     assert_eq!(
       result.unwrap(),
       ExecuteProcessResult {
         stdout: as_bytes(""),
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: directory.digest(),
+        output_snapshot: want_snapshot,
       }
     )
   }
