@@ -28,6 +28,7 @@ class PythonDistribution(Target):
                payload=None,
                sources=None,
                compatibility=None,
+               setup_requires=None,
                **kwargs):
     """
     :param address: The Address that maps to this Target in the BuildGraph.
@@ -46,7 +47,8 @@ class PythonDistribution(Target):
     payload = payload or Payload()
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
-      'compatibility': PrimitiveField(maybe_list(compatibility or ()))
+      'compatibility': PrimitiveField(maybe_list(compatibility or ())),
+      'setup_requires': PrimitiveField(maybe_list(setup_requires or ()))
     })
     super(PythonDistribution, self).__init__(address=address, payload=payload, **kwargs)
 
@@ -67,5 +69,5 @@ class PythonDistribution(Target):
     return self.has_sources(extension=('.c', '.cpp', '.cc'))
 
   @property
-  def platforms(self):
-    return ['current']
+  def setup_requires(self):
+    return self.payload.setup_requires
