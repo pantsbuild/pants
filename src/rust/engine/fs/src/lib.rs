@@ -522,10 +522,12 @@ impl PosixFS {
   }
 
   pub fn stat(&self, relative_path: PathBuf) -> Result<Stat, io::Error> {
-    let metadata = fs::symlink_metadata(self.root.0.join(&relative_path))?;
-    PosixFS::stat_internal(relative_path, metadata.file_type(), &self.root.0, || {
-      Ok(metadata)
-    })
+    PosixFS::stat_path(relative_path, &self.root.0)
+  }
+
+  fn stat_path(relative_path: PathBuf, root: &Path) -> Result<Stat, io::Error> {
+    let metadata = fs::symlink_metadata(root.join(&relative_path))?;
+    PosixFS::stat_internal(relative_path, metadata.file_type(), &root, || Ok(metadata))
   }
 
   pub fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
@@ -556,6 +558,47 @@ impl VFS<io::Error> for Arc<PosixFS> {
   }
 }
 
+pub trait PathStatGetter<E> {
+  fn path_stats(&self, paths: Vec<PathBuf>) -> BoxFuture<Vec<Option<PathStat>>, E>;
+}
+
+impl PathStatGetter<io::Error> for Arc<PosixFS> {
+  fn path_stats(&self, paths: Vec<PathBuf>) -> BoxFuture<Vec<Option<PathStat>>, io::Error> {
+    future::join_all(
+      paths
+        .into_iter()
+        .map(|path| {
+          let root = self.root.0.clone();
+          let fs = self.clone();
+          self
+            .pool
+            .spawn_fn(move || PosixFS::stat_path(path, &root))
+            .then(|stat_result| match stat_result {
+              Ok(v) => Ok(Some(v)),
+              Err(err) => match err.kind() {
+                io::ErrorKind::NotFound => Ok(None),
+                _ => Err(err),
+              },
+            })
+            .and_then(move |maybe_stat| {
+              match maybe_stat {
+                // Note: This will drop PathStats for symlinks which don't point anywhere.
+                Some(Stat::Link(link)) => fs.canonicalize(link),
+                Some(Stat::Dir(dir)) => {
+                  future::ok(Some(PathStat::dir(dir.0.clone(), dir))).to_boxed()
+                }
+                Some(Stat::File(file)) => {
+                  future::ok(Some(PathStat::file(file.path.clone(), file))).to_boxed()
+                }
+                None => future::ok(None).to_boxed(),
+              }
+            })
+        })
+        .collect::<Vec<_>>(),
+    ).to_boxed()
+  }
+}
+
 ///
 /// A context for filesystem operations parameterized on an error type 'E'.
 ///
@@ -573,9 +616,10 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
   ///
   /// TODO: Should handle symlink loops (which would exhibit as an infinite loop in expand).
   ///
-  fn canonicalize(&self, symbolic_path: PathBuf, link: Link) -> BoxFuture<Option<PathStat>, E> {
+  fn canonicalize(&self, link: Link) -> BoxFuture<Option<PathStat>, E> {
     // Read the link, which may result in PathGlob(s) that match 0 or 1 Path.
     let context = self.clone();
+    let symbolic_path = link.0.clone();
     self
       .read_link(link)
       .map(|dest_path| {
@@ -642,7 +686,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
                 future::ok(None).to_boxed()
               } else {
                 match stat {
-                  Stat::Link(l) => context.canonicalize(stat_symbolic_path, l),
+                  Stat::Link(l) => context.canonicalize(l),
                   Stat::Dir(d) => {
                     future::ok(Some(PathStat::dir(stat_symbolic_path.to_owned(), d))).to_boxed()
                   }
