@@ -13,6 +13,7 @@ from zipfile import ZIP_DEFLATED
 from pants.util.contextutil import open_tar, open_zip, temporary_dir
 from pants.util.dirutil import safe_concurrent_rename, safe_walk
 from pants.util.meta import AbstractClass
+from pants.util.objects import datatype
 from pants.util.strutil import ensure_text
 
 
@@ -134,14 +135,23 @@ class ZipArchiver(Archiver):
           zip.write(full_path, relpath)
     return zippath
 
-archive_extensions = dict(tar='tar', tgz='tar.gz', tbz2='tar.bz2', zip='zip')
+def _make_tar_archiver(compression_type):
+  compression_spec = 'w:{}'.format(compression_type)
+  extension = 'tar.{}'.format(compression_type)
+  return TarArchiver(compression_spec, extension)
 
-TAR = TarArchiver('w:', archive_extensions['tar'])
-TGZ = TarArchiver('w:gz', archive_extensions['tgz'])
-TBZ2 = TarArchiver('w:bz2', archive_extensions['tbz2'])
-ZIP = ZipArchiver(ZIP_DEFLATED, archive_extensions['zip'])
+TAR = _make_tar_archiver('')
+TGZ = _make_tar_archiver('gz')
+TBZ2 = _make_tar_archiver('bz2')
+TXZ = _make_tar_archiver('xz')
+ZIP = ZipArchiver(ZIP_DEFLATED, 'zip')
 
-_ARCHIVER_BY_TYPE = OrderedDict(tar=TAR, tgz=TGZ, tbz2=TBZ2, zip=ZIP)
+_ARCHIVER_BY_TYPE = OrderedDict(
+  tar=TAR,
+  tgz=TGZ,
+  tbz2=TBZ2,
+  txz=TXZ,
+  zip=ZIP)
 
 TYPE_NAMES = frozenset(_ARCHIVER_BY_TYPE.keys())
 TYPE_NAMES_NO_PRESERVE_SYMLINKS = frozenset(['zip'])

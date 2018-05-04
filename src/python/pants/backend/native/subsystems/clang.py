@@ -15,5 +15,10 @@ class Clang(NativeTool, ExecutablePathProvider):
   default_version = '6.0.0'
   archive_type = 'tgz'
 
+  _OSX_URL_FMT = 'https://releases.llvm.org/{version}/clang+llvm-{version}-x86_64-apple-darwin.tar.xz'
+
+  # def urls(self):
+
+
   def path_entries(self):
     return [os.path.join(self.select(), 'bin')]
