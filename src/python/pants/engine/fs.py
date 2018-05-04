@@ -106,11 +106,13 @@ FilesContent = Collection.of(FileContent)
 _EMPTY_FINGERPRINT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
 
 
+EMPTY_DIRECTORY_DIGEST = DirectoryDigest(
+  fingerprint=str(_EMPTY_FINGERPRINT),
+  serialized_bytes_length=0
+)
+
 EMPTY_SNAPSHOT = Snapshot(
-  directory_digest=DirectoryDigest(
-    fingerprint=str(_EMPTY_FINGERPRINT),
-    serialized_bytes_length=0
-  ),
+  directory_digest=EMPTY_DIRECTORY_DIGEST,
   path_stats=(),
 )
 
@@ -120,4 +122,5 @@ def create_fs_rules():
   return [
     RootRule(DirectoryDigest),
     RootRule(PathGlobs),
+    RootRule(Snapshot),
   ]

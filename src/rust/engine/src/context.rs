@@ -24,7 +24,7 @@ pub struct Core {
   pub tasks: Tasks,
   pub rule_graph: RuleGraph,
   pub types: Types,
-  pub pool: Arc<ResettablePool>,
+  pub fs_pool: Arc<ResettablePool>,
   pub store: Store,
   pub vfs: PosixFS,
 }
@@ -60,7 +60,7 @@ impl Core {
       tasks: tasks,
       rule_graph: rule_graph,
       types: types,
-      pool: pool.clone(),
+      fs_pool: pool.clone(),
       store: store,
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
@@ -71,7 +71,7 @@ impl Core {
   }
 
   pub fn pre_fork(&self) {
-    self.pool.reset();
+    self.fs_pool.reset();
     self.store.reset_prefork();
   }
 }

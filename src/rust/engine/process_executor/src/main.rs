@@ -128,6 +128,7 @@ fn main() {
     argv,
     env,
     input_files,
+    output_files: vec![],
   };
 
   let result = match server_arg {
@@ -141,7 +142,9 @@ fn main() {
         .materialize_directory(dir.path().to_owned(), request.input_files)
         .wait()
         .expect("Error materializing directory");
-      process_execution::local::run_command_locally(request, dir.path())
+      process_execution::local::CommandRunner::new(store, pool)
+        .run(request, dir)
+        .wait()
         .expect("Error executing locally")
     }
   };
