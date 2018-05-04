@@ -20,7 +20,6 @@ from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_concurrent_creation, safe_open
-from pants.util.objects import datatype
 from pants.util.osutil import get_os_id
 
 
@@ -42,36 +41,6 @@ _DEFAULT_PATH_BY_ID = {
 
 
 logger = logging.getLogger(__name__)
-
-
-class BinarySpec(datatype([
-    'name',
-    'version',
-    'platform_dependent',
-    'archive_type',
-])):
-  pass
-
-
-class BinaryDownloadRelativePath(datatype(['rel_path'])): pass
-
-
-class PantsProvidedBinaryRequest(datatype(['rel_path'])): pass
-
-
-class BinaryFetchRequest(datatype(['download_path', 'urls'])): pass
-
-
-class BinaryFetchResult(datatype(['downloaded_path'])): pass
-
-
-# class ThirdPartyBinaryRequest(datatype([('binary_path', BinaryDownloadPath), ('urls', Collection.of(str))]))
-# =>
-# @rule(ThirdPartyBinaryRequest, [Select(BinaryDownloadPath), Select(Collection.of(str))])
-# def _convert(_arg1, _arg2):
-#   yield ThirdPartyBinaryRequest(_arg1, _arg2)
-# don't even need this because it's just a BinaryFetchRequest
-# class ThirdPartyBinaryRequest(datatype(['binary_path', 'urls'])): pass
 
 
 class BinaryUtilPrivate(object):
@@ -207,6 +176,7 @@ class BinaryUtilPrivate(object):
     # Use filename without rightmost extension as the directory name.
     unpacked_dirname, _ = os.path.splitext(downloaded_file)
     if not os.path.exists(unpacked_dirname):
+      logger.info("Extracting {} to {} .".format(downloaded_file, unpacked_dirname))
       archiver.extract(downloaded_file, unpacked_dirname, concurrency_safe=True)
     return unpacked_dirname
 
