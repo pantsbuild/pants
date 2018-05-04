@@ -8,7 +8,6 @@ extern crate futures;
 extern crate hashing;
 extern crate protobuf;
 
-use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{App, Arg, SubCommand};
 use fs::{ResettablePool, Snapshot, Store, StoreFileByDigest, VFS};
@@ -221,10 +220,8 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
             .unwrap();
           match file {
             fs::Stat::File(f) => {
-              let digest = FileSaver {
-                store: store.clone(),
-                posix_fs: Arc::new(posix_fs),
-              }.store_by_digest(&f)
+              let digest = fs::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs))
+                .store_by_digest(f)
                 .wait()
                 .unwrap();
               if store_has_remote {
@@ -280,10 +277,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
           .and_then(move |paths| {
             Snapshot::from_path_stats(
               store_copy.clone(),
-              FileSaver {
-                store: store_copy,
-                posix_fs: posix_fs,
-              },
+              fs::OneOffStoreFileByDigest::new(store_copy, posix_fs),
               paths,
             )
           })
@@ -370,23 +364,4 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
 
 fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::PosixFS {
   fs::PosixFS::new(&root, pool, vec![]).unwrap()
-}
-
-#[derive(Clone)]
-struct FileSaver {
-  store: Store,
-  posix_fs: Arc<fs::PosixFS>,
-}
-
-impl StoreFileByDigest<String> for FileSaver {
-  fn store_by_digest(&self, file: &fs::File) -> BoxFuture<Digest, String> {
-    let file_copy = file.clone();
-    let store = self.store.clone();
-    self
-      .posix_fs
-      .read_file(&file)
-      .map_err(move |err| format!("Error reading file {:?}: {}", file_copy, err.description()))
-      .and_then(move |content| store.store_file_bytes(content.content, true))
-      .to_boxed()
-  }
 }

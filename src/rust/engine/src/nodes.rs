@@ -72,8 +72,8 @@ impl VFS<Failure> for Context {
 }
 
 impl StoreFileByDigest<Failure> for Context {
-  fn store_by_digest(&self, file: &File) -> BoxFuture<hashing::Digest, Failure> {
-    self.get(DigestFile(file.clone()))
+  fn store_by_digest(&self, file: File) -> BoxFuture<hashing::Digest, Failure> {
+    self.get(DigestFile(file))
   }
 }
 

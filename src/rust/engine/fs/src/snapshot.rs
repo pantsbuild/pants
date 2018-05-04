@@ -11,7 +11,7 @@ use futures::future::{self, join_all};
 use hashing::{Digest, Fingerprint};
 use indexmap::{self, IndexMap};
 use itertools::Itertools;
-use {File, FileContent, PathStat, Store};
+use {File, FileContent, PathStat, PosixFS, Store};
 use protobuf;
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -29,14 +29,6 @@ pub const EMPTY_DIGEST: Digest = Digest(EMPTY_FINGERPRINT, 0);
 pub struct Snapshot {
   pub digest: Digest,
   pub path_stats: Vec<PathStat>,
-}
-
-// StoreFileByDigest allows a File to be saved to an underlying Store, in such a way that it can be
-// looked up by the Digest produced by the store_by_digest method.
-// It is a separate trait so that caching implementations can be written which wrap the Store (used
-// to store the bytes) and VFS (used to read the files off disk if needed).
-pub trait StoreFileByDigest<Error> {
-  fn store_by_digest(&self, file: &File) -> BoxFuture<Digest, Error>;
 }
 
 impl Snapshot {
@@ -94,7 +86,7 @@ impl Snapshot {
             file_futures.push(
               file_digester
                 .clone()
-                .store_by_digest(&stat)
+                .store_by_digest(stat.clone())
                 .map_err(|e| format!("{:?}", e))
                 .and_then(move |digest| {
                   let mut file_node = bazel_protos::remote_execution::FileNode::new();
@@ -392,23 +384,57 @@ fn osstring_as_utf8(path: OsString) -> Result<String, String> {
     .map_err(|p| format!("{:?}'s file_name is not representable in UTF8", p))
 }
 
+// StoreFileByDigest allows a File to be saved to an underlying Store, in such a way that it can be
+// looked up by the Digest produced by the store_by_digest method.
+// It is a separate trait so that caching implementations can be written which wrap the Store (used
+// to store the bytes) and VFS (used to read the files off disk if needed).
+pub trait StoreFileByDigest<Error> {
+  fn store_by_digest(&self, file: File) -> BoxFuture<Digest, Error>;
+}
+
+///
+/// A StoreFileByDigest which reads with a PosixFS and writes to a Store, with no caching.
+///
+#[derive(Clone)]
+pub struct OneOffStoreFileByDigest {
+  store: Store,
+  posix_fs: Arc<PosixFS>,
+}
+
+impl OneOffStoreFileByDigest {
+  pub fn new(store: Store, posix_fs: Arc<PosixFS>) -> OneOffStoreFileByDigest {
+    OneOffStoreFileByDigest { store, posix_fs }
+  }
+}
+
+impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
+  fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
+    let store = self.store.clone();
+    self
+      .posix_fs
+      .read_file(&file)
+      .map_err(move |err| format!("Error reading file {:?}: {:?}", file, err))
+      .and_then(move |content| store.store_file_bytes(content.content, true))
+      .to_boxed()
+  }
+}
+
 #[cfg(test)]
 mod tests {
   extern crate tempdir;
   extern crate testutil;
 
-  use boxfuture::{BoxFuture, Boxable};
   use bytes::Bytes;
   use futures::future::Future;
   use hashing::{Digest, Fingerprint};
   use tempdir::TempDir;
   use self::testutil::make_file;
 
+  use super::OneOffStoreFileByDigest;
   use super::super::{Dir, File, FileContent, Path, PathGlobs, PathStat, PosixFS, ResettablePool,
-                     Snapshot, Store, StoreFileByDigest, VFS};
+                     Snapshot, Store, VFS};
 
   use std;
-  use std::error::Error;
   use std::path::PathBuf;
   use std::sync::Arc;
 
@@ -416,13 +442,13 @@ mod tests {
   const LATIN: &str = "Chaetophractus villosus";
   const STR: &str = "European Burmese";
 
-  fn setup() -> (Store, TempDir, Arc<PosixFS>, FileSaver) {
+  fn setup() -> (Store, TempDir, Arc<PosixFS>, OneOffStoreFileByDigest) {
     let pool = Arc::new(ResettablePool::new("test-pool-".to_string()));
     // TODO: Pass a remote CAS address through.
     let store = Store::local_only(TempDir::new("lmdb_store").unwrap(), pool.clone()).unwrap();
     let dir = TempDir::new("root").unwrap();
     let posix_fs = Arc::new(PosixFS::new(dir.path(), pool, vec![]).unwrap());
-    let file_saver = FileSaver(store.clone(), posix_fs.clone());
+    let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone());
     (store, dir, posix_fs, file_saver)
   }
 
@@ -661,9 +687,6 @@ mod tests {
     }
   }
 
-  #[derive(Clone)]
-  struct FileSaver(Store, Arc<PosixFS>);
-
   fn make_dir_stat(root: &Path, relpath: &Path) -> PathStat {
     std::fs::create_dir(root.join(relpath)).unwrap();
     PathStat::dir(relpath.to_owned(), Dir(relpath.to_owned()))
@@ -682,20 +705,6 @@ mod tests {
         is_executable,
       },
     )
-  }
-
-  impl StoreFileByDigest<String> for FileSaver {
-    fn store_by_digest(&self, file: &File) -> BoxFuture<Digest, String> {
-      let file_copy = file.clone();
-      let store = self.0.clone();
-      self
-        .1
-        .clone()
-        .read_file(&file)
-        .map_err(move |err| format!("Error reading file {:?}: {}", file_copy, err.description()))
-        .and_then(move |content| store.store_file_bytes(content.content, true))
-        .to_boxed()
-    }
   }
 
   fn expand_all_sorted(posix_fs: Arc<PosixFS>) -> Vec<PathStat> {
