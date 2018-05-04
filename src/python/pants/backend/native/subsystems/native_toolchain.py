@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.native.subsystems.gcc import GCC
 from pants.backend.native.subsystems.llvm import LLVM
 from pants.backend.native.subsystems.platform_specific.darwin.xcode_cli_tools import XCodeCLITools
 from pants.backend.native.subsystems.platform_specific.linux.binutils import Binutils
@@ -41,7 +40,7 @@ class NativeToolchain(Subsystem, ExecutablePathProvider):
 
   # This is a list of subsystems which implement `ExecutablePathProvider` and
   # can be provided for all supported platforms.
-  _CROSS_PLATFORM_SUBSYSTEMS = [LLVM, GCC]
+  _CROSS_PLATFORM_SUBSYSTEMS = [LLVM]
 
   # This is a map of {<platform> -> [<subsystem_cls>, ...]}; the key is the
   # normalized OS name, and the value is a list of subsystem class objects that
