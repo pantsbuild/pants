@@ -179,6 +179,7 @@ class ZipArchiver(Archiver):
           zip.write(full_path, relpath)
     return zippath
 
+
 def _make_tar_archiver(compression_type):
   compression_spec = 'w:{}'.format(compression_type)
   extension = 'tar.{}'.format(compression_type)
