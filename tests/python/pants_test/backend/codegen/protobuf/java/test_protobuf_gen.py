@@ -22,8 +22,8 @@ class ProtobufGenTest(TaskTestBase):
     super(ProtobufGenTest, self).setUp()
     self.set_options(pants_bootstrapdir='~/.cache/pants',
                      max_subprocess_args=100,
-                     pants_support_fetch_timeout_secs=1,
-                     pants_support_baseurls=['http://example.com/dummy_base_url'])
+                     binaries_fetch_timeout_secs=1,
+                     binaries_baseurls=['http://example.com/dummy_base_url'])
 
   @classmethod
   def task_type(cls):

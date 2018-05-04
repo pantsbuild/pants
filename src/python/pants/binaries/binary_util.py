@@ -195,7 +195,7 @@ class BinaryUtilPrivate(object):
   def pants_provided_binary_urls(self, binary_path):
     if not self._baseurls:
       raise self.NoBaseUrlsError(
-          'No urls are defined for the --pants-support-baseurls option.')
+          'No urls are defined for the --binaries-baseurls option.')
     all_urls = []
     for baseurl in OrderedSet(self._baseurls):  # De-dup URLS: we only want to try each URL once.
       all_urls.append(posixpath.join(baseurl, binary_path))

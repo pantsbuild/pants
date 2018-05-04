@@ -18,7 +18,7 @@ from pants_test.base_test import BaseTest
 
 
 class BinaryUtilTest(BaseTest):
-  """Tests binary_util's pants_support_baseurls handling."""
+  """Tests binary_util's binaries_baseurls handling."""
 
   class MapFetcher(object):
     """Class which pretends to be a pants.net.http.Fetcher, but is actually a dictionary."""
