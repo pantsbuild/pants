@@ -17,17 +17,17 @@ class LLVM(NativeTool, ExecutablePathProvider):
   default_version = '6.0.0'
   archive_type = 'txz'
 
-  _ARCHIVE_BASE_FMT = 'clang+llvm-{version}-x86_64-{system_id}'
-  _DIST_URL_FMT = 'http://releases.llvm.org/{version}/{base}.tar.xz'
-
-  _PLATFORM_FMT = {
+  _SYSTEM_ID = {
     'darwin': 'apple-darwin',
     'linux': 'linux-gnu-ubuntu-16.04',
   }
 
+  _ARCHIVE_BASE_FMT = 'clang+llvm-{version}-x86_64-{system_id}'
+  _DIST_URL_FMT = 'http://releases.llvm.org/{version}/{base}.tar.xz'
+
   @memoized_property
   def _archive_basename(self):
-    system_id = self._PLATFORM_FMT[get_normalized_os_name()]
+    system_id = self._SYSTEM_ID[get_normalized_os_name()]
     return self._ARCHIVE_BASE_FMT.format(version=self.version(), system_id=system_id)
 
   def urls(self):
