@@ -11,6 +11,7 @@ import re
 import shutil
 from abc import abstractmethod
 from collections import OrderedDict
+from contextlib import contextmanager
 from zipfile import ZIP_DEFLATED
 
 import lzma
@@ -120,12 +121,22 @@ class XZCompressedTarArchiver(TarArchiver):
     return cls._TAR_GZ_PATTERN.sub('.tar.xz', path)
 
   @classmethod
+  @contextmanager
+  def _xz_file(cls, path):
+    xz_file = lzma.LZMAFile(path)
+    try:
+      yield xz_file
+    finally:
+      xz_file.close()
+
+  @classmethod
   def _extract(cls, path, outdir, **kwargs):
     xz_path = cls._get_xz_file_path(path)
     shutil.move(path, xz_path)
-    with lzma.LZMAFile(xz_path) as xz_infile, open(path, 'wb') as gz_out_raw:
-      with gzip.GzipFile('wb', fileobj=gz_out_raw) as gz_outfile:
-        shutil.copyfileobj(xz_infile, gz_outfile)
+    with cls._xz_file(xz_path) as xz_infile:
+      with open(path, 'wb') as gz_out_raw:
+        with gzip.GzipFile('wb', fileobj=gz_out_raw) as gz_outfile:
+          shutil.copyfileobj(xz_infile, gz_outfile)
     return super(XZCompressedTarArchiver, cls)._extract(path, outdir, **kwargs)
 
   def create(self, *args, **kwargs):

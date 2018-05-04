@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.binaries.binary_tool import ExecutablePathProvider, NativeTool
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 from pants.util.osutil import get_normalized_os_name
 
 
@@ -33,6 +33,7 @@ class LLVM(NativeTool, ExecutablePathProvider):
   def urls(self):
     return [self._DIST_URL_FMT.format(version=self.version(), base=self._archive_basename)]
 
+  @memoized_method
   def select(self):
     unpacked_path = super(LLVM, self).select()
     return os.path.join(unpacked_path, self._archive_basename)
