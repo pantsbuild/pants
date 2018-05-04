@@ -115,7 +115,6 @@ class BinaryToolBase(Subsystem):
   def urls(self):
     return None
 
-  @memoized_method
   def _select_for_version(self, version):
     return self._binary_util.select(
       supportdir=self.get_support_dir(),

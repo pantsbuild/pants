@@ -11,6 +11,7 @@ from collections import OrderedDict, namedtuple
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.binaries.binary_tool import NativeTool
 from pants.util.memo import memoized_property
+from pants.util.osutil import get_normalized_os_name
 from pants.util.process_handler import subprocess
 
 
@@ -21,6 +22,13 @@ class GoDistribution(NativeTool):
   name = 'go'
   default_version = '1.8.3'
   archive_type = 'tgz'
+
+  _DIST_URL_FMT = 'https://storage.googleapis.com/golang/go{version}.{system_id}.tar.gz'
+
+  def urls(self):
+    # NB: This will download a 64-bit go distribution on a 32-bit host (which won't work).
+    system_id = '{}-amd64'.format(get_normalized_os_name())
+    return [self._DIST_URL_FMT.format(version=self.version(), system_id=system_id)]
 
   @memoized_property
   def goroot(self):
