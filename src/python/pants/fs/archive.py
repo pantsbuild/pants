@@ -115,7 +115,7 @@ class XZCompressedTarArchiver(TarArchiver):
   @classmethod
   def _get_xz_file_path(cls, path):
     if not cls._TAR_GZ_PATTERN.search(path):
-      # TODO: test this! fix this message!
+      # TODO(cosmicexplorer): test this?
       raise ValueError("path {!r} must end in .tar.gz.".format(path))
     return cls._TAR_GZ_PATTERN.sub('.tar.xz', path)
 
