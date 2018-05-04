@@ -98,9 +98,13 @@ class TarArchiver(Archiver):
 class XZCompressedTarArchiver(TarArchiver):
   """A workaround for the lack of xz support in Python 2.7.
 
-  Upon receiving a request to extract a file located at <base>.tar.gz, this class will instead
-  decompress the file <base>.tar.xz, then re-compress it with gzip to write into the adjacent
-  <base>.tar.gz. <base>.tar.gz will then be extracted as usual.
+  NB: This class will raise an error if used to create an archive!
+
+  Upon receiving a request to extract an (existing) file located at <base>.tar.gz, this class will:
+  1. Rename the file to <base>.tar.xz.
+  2. Decompress the file <base>.tar.xz, then re-compress it with gzip.
+  3. Write the gzip-compressed stream into the new file <base>.tar.gz.
+  4. <base>.tar.gz will then be extracted as usual.
   """
 
   def __init__(self):
@@ -123,6 +127,12 @@ class XZCompressedTarArchiver(TarArchiver):
       with gzip.GzipFile('wb', fileobj=gz_out_raw) as gz_outfile:
         shutil.copyfileobj(xz_infile, gz_outfile)
     return super(XZCompressedTarArchiver, cls)._extract(path, outdir, **kwargs)
+
+  def create(self, *args, **kwargs):
+    """
+    :raises: :class:`NotImplementedError`
+    """
+    raise NotImplementedError("XZCompressedTarArchiver can only extract, not create archives!")
 
 
 class ZipArchiver(Archiver):
