@@ -24,12 +24,13 @@ class DependeesIntegrationTest(PantsRunIntegrationTest):
 
   def test_dependees_basic(self):
     pants_stdout = self.run_dependees()
-    self.assertEqual(
-      {'examples/src/scala/org/pantsbuild/example:jvm-run-example-lib',
-       'examples/src/scala/org/pantsbuild/example/hello/exe:exe',
-       'examples/tests/scala/org/pantsbuild/example/hello/welcome:welcome'},
-      set(pants_stdout.split())
-    )
+    expected = {
+      'examples/src/scala/org/pantsbuild/example:jvm-run-example-lib',
+      'examples/src/scala/org/pantsbuild/example/hello/exe:exe',
+      'examples/tests/scala/org/pantsbuild/example/hello/welcome:welcome'
+    }
+    actual = set(pants_stdout.split())
+    self.assertEqual(expected, actual)
 
   def test_dependees_transitive(self):
     pants_stdout = self.run_dependees('--dependees-transitive')

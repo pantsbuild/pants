@@ -230,7 +230,7 @@ def addresses_from_address_families(address_mapper, specs):
   def exclude_address(address):
     if specs.exclude_patterns:
       address_str = address.spec
-      return any(p.search(address_str) is not None for p in specs.exclude_patterns)
+      return any(pattern.search(address_str) is not None for pattern in specs._exclude_patterns)
     return False
 
   def filter_for_tag(tag):

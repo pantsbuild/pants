@@ -28,11 +28,6 @@ from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.engine.util import Target, run_rule
 
 
-<<<<<<< HEAD
-=======
->>>>>>> fa72104... Resolved conflicts
-
-
 class ParseAddressFamilyTest(unittest.TestCase):
   def test_empty(self):
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
@@ -61,24 +56,45 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     self.assertEquals(bfas.dependencies[0].spec, 'a:a')
 
   def test_tag_filter(self):
-    """Test that matching the same Spec twice succeeds."""
-    spec = SiblingAddresses('a')
+    """Test that targets are filtered based on `tags`."""
+    spec = SiblingAddresses('root')
     address_mapper = AddressMapper(JsonParser(TestTable()))
-    snapshot = Snapshot('xx', 2, [Path('a/BUILD', File('a/BUILD'))])
-    address_family = AddressFamily('a',
-      {'a': ('a/BUILD', TargetAdaptor()),
-       'b': ('a/BUILD', TargetAdaptor(tags={'ntegration'})),
-       'c': ('a/BUILD', TargetAdaptor(tags={'intgration'}))
+    snapshot = Snapshot('xx', 2, [Path('root/BUILD', File('root/BUILD'))])
+    address_family = AddressFamily('root',
+      {'a': ('root/BUILD', TargetAdaptor()),
+       'b': ('root/BUILD', TargetAdaptor(tags={'integration'})),
+       'c': ('root/BUILD', TargetAdaptor(tags={'not_integration'}))
       }
     )
 
-    bfas = run_rule(addresses_from_address_families, address_mapper, Specs([spec], tags=['+integration']), {
+    targets = run_rule(
+      addresses_from_address_families, address_mapper, Specs([spec], tags=['+integration']), {
       (Snapshot, PathGlobs): lambda _: snapshot,
       (AddressFamily, Dir): lambda _: address_family,
     })
 
-    self.assertEquals(len(bfas.dependencies), 1)
-    self.assertEquals(bfas.dependencies[0].spec, 'a:b')
+    self.assertEquals(len(targets.dependencies), 1)
+    self.assertEquals(targets.dependencies[0].spec, 'root:b')
+
+  def test_exclude_pattern(self):
+    """Test that targets are filtered based on exclude patterns."""
+    spec = SiblingAddresses('root')
+    address_mapper = AddressMapper(JsonParser(TestTable()))
+    snapshot = Snapshot('xx', 2, [Path('root/BUILD', File('root/BUILD'))])
+    address_family = AddressFamily('root',
+      {'exclude_me': ('root/BUILD', TargetAdaptor()),
+       'not_me': ('root/BUILD', TargetAdaptor()),
+      }
+    )
+
+    targets = run_rule(
+      addresses_from_address_families, address_mapper, Specs([spec], exclude_patterns=['exclude.']),{
+      (Snapshot, PathGlobs): lambda _: snapshot,
+      (AddressFamily, Dir): lambda _: address_family,
+    })
+
+    self.assertEquals(len(targets.dependencies), 1)
+    self.assertEquals(targets.dependencies[0].spec, 'root:not_me')
 
 
 class ApacheThriftConfiguration(StructWithDeps):

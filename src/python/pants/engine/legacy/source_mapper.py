@@ -83,7 +83,7 @@ class EngineSourceMapper(SourceMapper):
 
     # Uniqify all transitive hydrated targets.
     hydrated_target_to_address = {}
-    hydrated_targets, = self._scheduler.product_request(HydratedTargets, [Specs(specs)])
+    hydrated_targets, = self._scheduler.product_request(HydratedTargets, [Specs(tuple(specs))])
     for hydrated_target in hydrated_targets.dependencies:
       if hydrated_target not in hydrated_target_to_address:
         hydrated_target_to_address[hydrated_target] = hydrated_target.adaptor.address

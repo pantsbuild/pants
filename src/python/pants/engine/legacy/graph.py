@@ -211,6 +211,7 @@ class LegacyBuildGraph(BuildGraph):
       yield address
 
   def inject_specs_closure(self, specs, fail_fast=None):
+    logger.debug('Injecting specs closure to %s: %s', self, specs)
     # Request loading of these specs.
     for address in self._inject_specs(specs):
       yield address
@@ -248,19 +249,17 @@ class LegacyBuildGraph(BuildGraph):
         yielded_addresses.add(address)
         yield address
 
-  def _inject_specs(self, subjects):
+  def _inject_specs(self, specs):
     """Injects targets into the graph for each of the given `Spec` objects.
 
     Yields the resulting addresses.
     """
-    if not subjects:
+    if not specs:
       return
 
-    logger.debug('Injecting specs to %s: %s', self, subjects)
+    logger.debug('Injecting specs to %s: %s', self, specs)
     with self._resolve_context():
-      specs = tuple(subjects)
-      thts, = self._scheduler.product_request(TransitiveHydratedTargets,
-                                              [Specs(specs)])
+      thts, = self._scheduler.product_request(TransitiveHydratedTargets, [Specs(tuple(specs))])
 
     self._index(thts.closure)
 

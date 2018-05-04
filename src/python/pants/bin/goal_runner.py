@@ -22,7 +22,6 @@ from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.option.ranked_value import RankedValue
 from pants.task.task import QuietTaskMixin
-from pants.util.filtering import create_filters, wrap_filters
 
 
 logger = logging.getLogger(__name__)
@@ -112,16 +111,9 @@ class GoalRunnerFactory(object):
   def _roots_to_targets(self, target_roots):
     """Populate the BuildGraph and target list from a set of input TargetRoots."""
     with self._run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
-      def filter_for_tag(tag):
-        return lambda target: tag in map(str, target.tags)
-
-      tag_filter = wrap_filters(create_filters(self._tag, filter_for_tag))
-
       def generate_targets():
         for address in self._build_graph.inject_roots_closure(target_roots, self._fail_fast):
-          target = self._build_graph.get_target(address)
-          if tag_filter(target):
-            yield target
+          yield self._build_graph.get_target(address)
 
       return list(generate_targets())
 

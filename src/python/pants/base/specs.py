@@ -5,8 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import re
 from abc import abstractmethod
 
+from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -61,7 +63,11 @@ class AscendantAddresses(datatype(['directory']), Spec):
 
 
 class Specs(datatype(['dependencies', 'tags', 'exclude_patterns'])):
-  """A collection of Spec subclasses and tag and name-regex filters."""
+  """A collection of Specs representing Spec subclasses, tags and regex filters."""
 
   def __new__(cls, dependencies, tags=tuple(), exclude_patterns=tuple()):
     return super(Specs, cls).__new__(cls, dependencies, tags, exclude_patterns)
+
+  @memoized_property
+  def _exclude_patterns(self):
+    return [re.compile(pattern) for pattern in set(self.exclude_patterns or [])]

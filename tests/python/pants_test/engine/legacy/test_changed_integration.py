@@ -14,7 +14,7 @@ from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
 from pants_test.base_test import TestGenerator
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.git_util import initialize_repo
 
 
@@ -285,13 +285,13 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
     pants_run = self.do_command(*list_args, success=success)
     return pants_run.stdout_data
 
-  def test_test_changed_exclude_target(self):
+  def test_changed_exclude_root_targets_only(self):
     changed_src = 'src/python/python_targets/test_library.py'
-    exclude_target_regexp = r'_[0-9]'
-    excluded_set = {'src/python/python_targets:test_library_transitive_dependee_2',
-                    'src/python/python_targets:test_library_transitive_dependee_3',
-                    'src/python/python_targets:test_library_transitive_dependee_4'}
-    expected_set = set(self.TEST_MAPPING[changed_src]['transitive']) - excluded_set
+    exclude_target_regexp = r'dependee'
+    excluded_set = {'src/python/python_targets:test_library_direct_dependee'}
+    expected_set = set(self.TEST_MAPPING[changed_src]['direct']) +\
+                   set(self.TEST_MAPPING[changed_src]['transitive']) -\
+                   excluded_set
 
     with create_isolated_git_repo() as worktree:
       with mutated_working_copy([os.path.join(worktree, changed_src)]):
@@ -337,30 +337,81 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       ]
       self.assertEqual(pants_run.stdout_data.strip(),
                        '\n'.join(changed_targets))
+  def test_changed_not_exclude_inner_targets(self):
+    changed_src = 'src/python/python_targets/test_library.py'
+    exclude_target_regexp = r'_[0-9]'
+    included_set = {'src/python/python_targets:test_library_transitive_dependee_2',
+                    'src/python/python_targets:test_library_transitive_dependee_3',
+                    'src/python/python_targets:test_library_transitive_dependee_4'}
+    expected_set = set(self.TEST_MAPPING[changed_src]['transitive']) - included_set
 
-  def test_changed_with_deleted_target_transitive(self):
     with create_isolated_git_repo() as worktree:
-      safe_delete(os.path.join(worktree, 'src/resources/org/pantsbuild/resourceonly/BUILD'))
-      pants_run = self.run_pants(['list', '--changed-parent=HEAD', '--changed-include-dependees=transitive'])
-      self.assert_failure(pants_run)
-      self.assertIn('src/resources/org/pantsbuild/resourceonly', pants_run.stderr_data)
+      with mutated_working_copy([os.path.join(worktree, changed_src)]):
+        pants_run = self.run_pants([
+          '-ldebug',   # This ensures the changed target names show up in the pants output.
+          '--exclude-target-regexp={}'.format(exclude_target_regexp),
+          '--changed-parent=HEAD',
+          '--changed-include-dependees=transitive',
+          'test',
+        ])
 
-  def test_changed_in_directory_without_build_file(self):
-    with create_isolated_git_repo() as worktree:
-      create_file_in(worktree, 'new-project/README.txt', 'This is important.')
-      pants_run = self.run_pants(['list', '--changed-parent=HEAD'])
       self.assert_success(pants_run)
-      self.assertEqual(pants_run.stdout_data.strip(), '')
+      for expected_item in expected_set:
+        self.assertIn(expected_item, pants_run.stdout_data)
 
-  @ensure_daemon
-  def test_list_changed(self):
-    deleted_file = 'src/python/sources/sources.py'
+      for included_item in included_set:
+        self.assertIn(included_item, pants_run.stdout_data)
 
-    with create_isolated_git_repo() as worktree:
-      safe_delete(os.path.join(worktree, deleted_file))
-      pants_run = self.run_pants(['--changed-parent=HEAD', 'list'])
-      self.assert_success(pants_run)
-      self.assertEqual(pants_run.stdout_data.strip(), 'src/python/sources:sources')
+def test_changed_with_multiple_build_files(self):
+  new_build_file = 'src/python/python_targets/BUILD.new'
+
+  with create_isolated_git_repo() as worktree:
+    touch(os.path.join(worktree, new_build_file))
+    stdout_data = self.run_list([])
+    self.assertEqual(stdout_data.strip(), '')
+
+def test_changed_with_deleted_source(self):
+  with create_isolated_git_repo() as worktree:
+    safe_delete(os.path.join(worktree, 'src/python/sources/sources.py'))
+    pants_run = self.run_pants(['list', '--changed-parent=HEAD'])
+    self.assert_success(pants_run)
+    self.assertEqual(pants_run.stdout_data.strip(), 'src/python/sources:sources')
+
+def test_changed_with_deleted_resource(self):
+  with create_isolated_git_repo() as worktree:
+    safe_delete(os.path.join(worktree, 'src/python/sources/sources.txt'))
+    pants_run = self.run_pants(['list', '--changed-parent=HEAD'])
+    self.assert_success(pants_run)
+    changed_targets = [
+      'src/python/sources:overlapping-globs',
+      'src/python/sources:some-missing-some-not',
+      'src/python/sources:text',
+    ]
+    self.assertEqual(pants_run.stdout_data.strip(),
+      '\n'.join(changed_targets))
+
+def test_changed_with_deleted_target_transitive(self):
+  with create_isolated_git_repo() as worktree:
+    safe_delete(os.path.join(worktree, 'src/resources/org/pantsbuild/resourceonly/BUILD'))
+    pants_run = self.run_pants(['list', '--changed-parent=HEAD', '--changed-include-dependees=transitive'])
+    self.assert_failure(pants_run)
+    self.assertIn('src/resources/org/pantsbuild/resourceonly', pants_run.stderr_data)
+
+def test_changed_in_directory_without_build_file(self):
+  with create_isolated_git_repo() as worktree:
+    create_file_in(worktree, 'new-project/README.txt', 'This is important.')
+    pants_run = self.run_pants(['list', '--changed-parent=HEAD'])
+    self.assert_success(pants_run)
+    self.assertEqual(pants_run.stdout_data.strip(), '')
+
+def test_list_changed(self):
+  deleted_file = 'src/python/sources/sources.py'
+
+  with create_isolated_git_repo() as worktree:
+    safe_delete(os.path.join(worktree, deleted_file))
+    pants_run = self.run_pants(['--changed-parent=HEAD', 'list'])
+    self.assert_success(pants_run)
+    self.assertEqual(pants_run.stdout_data.strip(), 'src/python/sources:sources')
 
 
 ChangedIntegrationTest.generate_tests()
