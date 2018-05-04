@@ -23,11 +23,6 @@ class PythonBundle(BundleMixin, Task):
   _PEX_ARCHIVES = 'pex_archives'
 
   @classmethod
-  def register_options(cls, register):
-    super(PythonBundle, cls).register_options(register)
-    cls.register_common_options(register)
-
-  @classmethod
   def product_types(cls):
     return [cls._DEPLOYABLE_ARCHIVES]
 

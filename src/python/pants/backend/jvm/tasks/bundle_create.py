@@ -41,7 +41,6 @@ class BundleCreate(BundleMixin, JvmBinaryTask):
                   "directory, the root will only contain a synthetic jar with its manifest's "
                   "Class-Path set to those jars. This option is also defined in jvm_app target. "
                   "Precedence is CLI option > target option > pants.ini option.")
-    cls.register_common_options(register)
 
   @classmethod
   def implementation_version(cls):

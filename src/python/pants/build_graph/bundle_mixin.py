@@ -11,19 +11,17 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.app_base import AppBase
 from pants.fs import archive
+from pants.task.task import TaskBase
 from pants.util.dirutil import absolute_symlink, safe_mkdir, safe_mkdir_for
 from pants.util.fileutil import atomic_copy
 
 
-class BundleMixin(object):
+class BundleMixin(TaskBase):
 
-  @staticmethod
-  def register_common_options(register):
-    """Register options common to all bundles.
-
-    Bundle tasks must call this method from their `register_options` even if they do not
-    specify additional options.
-    """
+  @classmethod
+  def register_options(cls, register):
+    """Register options common to all bundle tasks."""
+    super(BundleMixin, cls).register_options(register)
     register('--archive', choices=list(archive.TYPE_NAMES),
              fingerprint=True,
              help='Create an archive of this type from the bundle. '
