@@ -19,6 +19,7 @@ from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.pex_build_util import _resolve_multi
 from pants.backend.python.tasks.setup_py import SetupPyInvocationEnvironment, SetupPyRunner
+from pants.backend.python.tasks.pex_build_util import _resolve_multi
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -101,6 +102,49 @@ class BuildLocalPythonDistributions(Task):
     dist_targets = self.context.targets(self.filter_target)
 
     if dist_targets:
+
+      def setup_requires_prep(build_graph, dist_targets, dest_dir=None):
+        python_req_objects_to_resolve = []
+
+        for dtgt in dist_targets:
+          #import pdb; pdb.set_trace()
+          for setup_req in dtgt.setup_requires:
+            for req in self.context.build_graph.resolve(setup_req):
+              for re in req.requirements:
+                #for re3 in re:
+                python_req_objects_to_resolve.append(re)
+
+        interpreter = self.context.products.get_data(PythonInterpreter)
+        setup_requires_dists = _resolve_multi(interpreter, python_req_objects_to_resolve, None, None)
+
+        #base = '/Users/clivingston/temp-test2'
+        if not dest_dir:
+          dest_dir = safe_mkdtemp()
+        #safe_mkdir(dest_dir)
+        #from pip._internal import main as pipmain
+        #import pdb;pdb.set_trace()
+        #for obj in setup_requires_dists['current']:
+        #pipmain(['install', '--prefix={}'.format(prefix), obj.location])
+        from wheel.install import WheelFile
+
+        overrides = {
+          'purelib': dest_dir,
+          'headers': os.path.join(dest_dir, 'headers'),
+          'scripts': os.path.join(dest_dir, 'bin'),
+          'platlib': dest_dir,
+          'data': dest_dir
+        }
+
+
+
+        for obj in setup_requires_dists['current']:
+          wf = WheelFile(obj.location)
+          wf.install(overrides=overrides, force=True)
+
+        return dest_dir
+
+
+
       with self.invalidated(dist_targets,
                             fingerprint_strategy=DefaultFingerprintStrategy(),
                             invalidate_dependents=True) as invalidation_check:
@@ -114,8 +158,8 @@ class BuildLocalPythonDistributions(Task):
                          'of your setup function.'
             )
           setup_req_dir = os.path.join(vt.results_dir, 'setup_requires_site')
-          pythonpath = self._ensure_setup_requires_site_dir(dist_targets, interpreter, setup_req_dir)
-          self._create_dist(vt.target, vt.results_dir, interpreter, pythonpath)
+          pythonpath = setup_requires_prep(self.context.build_graph, dist_targets, setup_req_dir)
+          self._create_dist(vt.target, vt.results_dir, interpreter, pythonpath=pythonpath)
 
         local_wheel_products = self.context.products.get('local_wheels')
         for vt in invalidation_check.all_vts:
@@ -153,6 +197,7 @@ class BuildLocalPythonDistributions(Task):
   # setup.py to be able to invoke our toolchain on hosts that already have a
   # compiler installed. Right now we just put our tools at the end of the PATH.
   @contextmanager
+<<<<<<< HEAD
   def _setup_py_invocation_environment(self, pythonpath):
     setup_py_env = self._request_single(
       SetupPyInvocationEnvironment, self._native_toolchain_instance())
@@ -162,6 +207,15 @@ class BuildLocalPythonDistributions(Task):
                              .format(pythonpath))
       env['PYTHONPATH'] = pythonpath
     with environment_as(**env):
+=======
+  def _setup_py_invocation_environment(self, pythonpath=None):
+    setup_py_env = self._request_single(
+      SetupPyInvocationEnvironment, self._native_toolchain_instance())
+    env = setup_py_env.as_env_dict()
+    pp = pythonpath or ''
+    env['PYTHONPATH'] = pp
+    with environment_as(**setup_py_env.as_env_dict()):
+>>>>>>> e3f4c3b... Setup requires with PYTHONPATH
       yield
 
   def _create_dist(self, dist_tgt, dist_target_dir, interpreter, pythonpath):
