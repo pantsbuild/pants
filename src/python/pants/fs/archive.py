@@ -5,10 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import gzip
 import os
+import re
+import shutil
 from abc import abstractmethod
 from collections import OrderedDict
 from zipfile import ZIP_DEFLATED
+
+import lzma
 
 from pants.util.contextutil import open_tar, open_zip, temporary_dir
 from pants.util.dirutil import safe_concurrent_rename, safe_walk
@@ -91,6 +96,36 @@ class TarArchiver(Archiver):
     return tarpath
 
 
+class XZCompressedTarArchiver(TarArchiver):
+  """A workaround for the lack of xz support in Python 2.7.
+
+  Upon receiving a request to extract a file located at <base>.tar.gz, this class will instead
+  decompress the file <base>.tar.xz, then re-compress it with gzip to write into the adjacent
+  <base>.tar.gz. <base>.tar.gz will then be extracted as usual.
+  """
+
+  def __init__(self):
+    super(XZCompressedTarArchiver, self).__init__('w:gz', 'tar.gz')
+
+  _TAR_GZ_PATTERN = re.compile('\.tar\.gz\Z')
+
+  @classmethod
+  def _get_xz_file_path(cls, path):
+    if not cls._TAR_GZ_PATTERN.search(path):
+      # TODO: test this! fix this message!
+      raise ValueError("path {!r} must end in .tar.gz.".format(path))
+    return cls._TAR_GZ_PATTERN.sub('.tar.xz', path)
+
+  @classmethod
+  def _extract(cls, path, outdir, **kwargs):
+    xz_path = cls._get_xz_file_path(path)
+    shutil.move(path, xz_path)
+    with lzma.LZMAFile(xz_path) as xz_infile, open(path, 'wb') as gz_out_raw:
+      with gzip.GzipFile('wb', fileobj=gz_out_raw) as gz_outfile:
+        shutil.copyfileobj(xz_infile, gz_outfile)
+    return super(XZCompressedTarArchiver, cls)._extract(path, outdir, **kwargs)
+
+
 class ZipArchiver(Archiver):
   """An archiver that stores files in a zip file with optional compression.
 
@@ -143,7 +178,7 @@ def _make_tar_archiver(compression_type):
 TAR = _make_tar_archiver('')
 TGZ = _make_tar_archiver('gz')
 TBZ2 = _make_tar_archiver('bz2')
-TXZ = _make_tar_archiver('xz')
+TXZ = XZCompressedTarArchiver()
 ZIP = ZipArchiver(ZIP_DEFLATED, 'zip')
 
 _ARCHIVER_BY_TYPE = OrderedDict(
