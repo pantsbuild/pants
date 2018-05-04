@@ -40,6 +40,7 @@ class S3LogAccumulator(object):
 
   ./pants run src/python/pants/util/:s3_log_aggregator_bin -- /tmp/s3logs
   """
+
   def __init__(self):
     self._path_to_measure = defaultdict(Measure)
     self._ip_to_measure = defaultdict(Measure)
