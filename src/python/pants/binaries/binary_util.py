@@ -130,9 +130,7 @@ class BinaryUtilPrivate(object):
       self._path_by_id.update((tuple(k), tuple(v)) for k, v in path_by_id.items())
 
   # TODO: Deprecate passing in an explicit supportdir? Seems like we should be able to
-  # organize our binary hosting so that it's not needed. The supportdir is also used to construct
-  # the path where the binary is downloaded to on the local disk, so it might be better phrased as
-  # (???)
+  # organize our binary hosting so that it's not needed.
   def select(self, supportdir, version, name, platform_dependent, archive_type, urls=None):
     """Fetches a file, unpacking it if necessary."""
     if archive_type is None:
