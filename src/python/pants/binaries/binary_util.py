@@ -164,14 +164,14 @@ class BinaryUtilPrivate(object):
   # organize our binary hosting so that it's not needed. The supportdir is also used to construct
   # the path where the binary is downloaded to on the local disk, so it might be better phrased as
   # (???)
-  def select(self, supportdir, version, name, platform_dependent, archive_type):
+  def select(self, supportdir, version, name, platform_dependent, archive_type, urls=None):
     """Fetches a file, unpacking it if necessary."""
     if archive_type is None:
-      return self._select_file(supportdir, version, name, platform_dependent)
+      return self._select_file(supportdir, version, name, platform_dependent, urls=urls)
     archiver = create_archiver(archive_type)
-    return self._select_archive(supportdir, version, name, platform_dependent, archiver)
+    return self._select_archive(supportdir, version, name, platform_dependent, archiver, urls=urls)
 
-  def _select_file(self, supportdir, version, name, platform_dependent):
+  def _select_file(self, supportdir, version, name, platform_dependent, urls=None):
     """Generates a path to request a file and fetches the file located at that path.
 
     :param string supportdir: The path the `name` binaries are stored under.
@@ -183,10 +183,11 @@ class BinaryUtilPrivate(object):
       and name could be found for the current platform.
     """
     binary_path = self._binary_path_to_fetch(supportdir, version, name, platform_dependent)
-    urls = self._pants_provided_binary_urls(binary_path)
+    if not urls:
+      urls = self.pants_provided_binary_urls(binary_path)
     return self._fetch_binary(name, binary_path, urls)
 
-  def _select_archive(self, supportdir, version, name, platform_dependent, archiver):
+  def _select_archive(self, supportdir, version, name, platform_dependent, archiver, urls=None):
     """Generates a path to fetch, fetches the archive file, and unpacks the archive.
 
     :param string supportdir: The path the `name` binaries are stored under.
@@ -201,7 +202,8 @@ class BinaryUtilPrivate(object):
       and name could be found for the current platform.
     """
     full_name = '{}.{}'.format(name, archiver.extension)
-    downloaded_file = self._select_file(supportdir, version, full_name, platform_dependent)
+    downloaded_file = self._select_file(
+      supportdir, version, full_name, platform_dependent, urls=urls)
     # Use filename without rightmost extension as the directory name.
     unpacked_dirname, _ = os.path.splitext(downloaded_file)
     if not os.path.exists(unpacked_dirname):
@@ -222,7 +224,7 @@ class BinaryUtilPrivate(object):
     return self._select_file(
       supportdir, version, name, platform_dependent=False)
 
-  def _pants_provided_binary_urls(self, binary_path):
+  def pants_provided_binary_urls(self, binary_path):
     if not self._baseurls:
       raise self.NoBaseUrlsError(
           'No urls are defined for the --pants-support-baseurls option.')

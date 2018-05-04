@@ -62,7 +62,7 @@ class BinaryUtilTest(BaseTest):
     self.assertFalse(fetcher.download.called)
 
     binary_path = 'a-binary/v1.2/a-binary'
-    urls = binary_util._pants_provided_binary_urls(binary_path)
+    urls = binary_util.pants_provided_binary_urls(binary_path)
     with binary_util._select_binary_stream('a-binary', binary_path, urls, fetcher=fetcher):
       fetcher.download.assert_called_once_with('http://binaries.example.com/a-binary/v1.2/a-binary',
                                                listener=mock.ANY,
@@ -76,7 +76,7 @@ class BinaryUtilTest(BaseTest):
       binary_path = binary_util._select_binary_base_path(supportdir='bin/protobuf',
                                                          version='2.4.1',
                                                          name='protoc')
-      urls = binary_util._pants_provided_binary_urls(binary_path)
+      urls = binary_util.pants_provided_binary_urls(binary_path)
       with binary_util._select_binary_stream(name='protoc', binary_path=binary_path, urls=urls):
         self.fail('Expected acquisition of the stream to raise.')
 
@@ -102,7 +102,7 @@ class BinaryUtilTest(BaseTest):
       with safe_open(os.path.join(valid_local_files, binary_path), 'wb') as fp:
         fp.write(contents)
 
-      urls = binary_util._pants_provided_binary_urls(binary_path)
+      urls = binary_util.pants_provided_binary_urls(binary_path)
       with binary_util._select_binary_stream(
           name='protoc', binary_path=binary_path, urls=urls) as stream:
         self.assertEqual(contents, stream())
@@ -134,7 +134,7 @@ class BinaryUtilTest(BaseTest):
       binary_path = binary_util._select_binary_base_path(supportdir=supportdir,
                                                          version=version,
                                                          name=name)
-      urls = binary_util._pants_provided_binary_urls(binary_path)
+      urls = binary_util.pants_provided_binary_urls(binary_path)
       with binary_util._select_binary_stream(name=name,
                                              binary_path=binary_path,
                                              urls=urls,

@@ -15,6 +15,7 @@ from pants.util.memo import memoized_method, memoized_property
 logger = logging.getLogger(__name__)
 
 
+# TODO(cosmicexplorer): Add integration tests for this file.
 class BinaryToolBase(Subsystem):
   """Base class for subsytems that configure binary tools.
 
@@ -111,6 +112,9 @@ class BinaryToolBase(Subsystem):
   def get_support_dir(cls):
     return 'bin/{}'.format(cls._get_name())
 
+  def urls(self):
+    return None
+
   @memoized_method
   def _select_for_version(self, version):
     return self._binary_util.select(
@@ -118,7 +122,8 @@ class BinaryToolBase(Subsystem):
       version=version,
       name='{}{}'.format(self._get_name(), self.suffix),
       platform_dependent=self.platform_dependent,
-      archive_type=self.archive_type)
+      archive_type=self.archive_type,
+      urls=self.urls())
 
   @classmethod
   def _get_name(cls):
