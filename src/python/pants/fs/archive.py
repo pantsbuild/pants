@@ -18,7 +18,6 @@ import lzma
 from pants.util.contextutil import open_tar, open_zip, temporary_dir
 from pants.util.dirutil import safe_concurrent_rename, safe_walk
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
 from pants.util.strutil import ensure_text
 
 
