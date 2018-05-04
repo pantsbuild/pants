@@ -20,6 +20,7 @@ from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_concurrent_creation, safe_open
+from pants.util.objects import datatype
 from pants.util.osutil import get_os_id
 
 
@@ -41,6 +42,36 @@ _DEFAULT_PATH_BY_ID = {
 
 
 logger = logging.getLogger(__name__)
+
+
+class BinarySpec(datatype([
+    'name',
+    'version',
+    'platform_dependent',
+    'archive_type',
+])):
+  pass
+
+
+class BinaryDownloadRelativePath(datatype(['rel_path'])): pass
+
+
+class PantsProvidedBinaryRequest(datatype(['rel_path'])): pass
+
+
+class BinaryFetchRequest(datatype(['download_path', 'urls'])): pass
+
+
+class BinaryFetchResult(datatype(['downloaded_path'])): pass
+
+
+# class ThirdPartyBinaryRequest(datatype([('binary_path', BinaryDownloadPath), ('urls', Collection.of(str))]))
+# =>
+# @rule(ThirdPartyBinaryRequest, [Select(BinaryDownloadPath), Select(Collection.of(str))])
+# def _convert(_arg1, _arg2):
+#   yield ThirdPartyBinaryRequest(_arg1, _arg2)
+# don't even need this because it's just a BinaryFetchRequest
+# class ThirdPartyBinaryRequest(datatype(['binary_path', 'urls'])): pass
 
 
 class BinaryUtilPrivate(object):
@@ -130,7 +161,9 @@ class BinaryUtilPrivate(object):
       self._path_by_id.update((tuple(k), tuple(v)) for k, v in path_by_id.items())
 
   # TODO: Deprecate passing in an explicit supportdir? Seems like we should be able to
-  # organize our binary hosting so that it's not needed.
+  # organize our binary hosting so that it's not needed. The supportdir is also used to construct
+  # the path where the binary is downloaded to on the local disk, so it might be better phrased as
+  # (???)
   def select(self, supportdir, version, name, platform_dependent, archive_type):
     """Fetches a file, unpacking it if necessary."""
     if archive_type is None:
@@ -150,7 +183,8 @@ class BinaryUtilPrivate(object):
       and name could be found for the current platform.
     """
     binary_path = self._binary_path_to_fetch(supportdir, version, name, platform_dependent)
-    return self._fetch_binary(name=name, binary_path=binary_path)
+    urls = self._pants_provided_binary_urls(binary_path)
+    return self._fetch_binary(name, binary_path, urls)
 
   def _select_archive(self, supportdir, version, name, platform_dependent, archiver):
     """Generates a path to fetch, fetches the archive file, and unpacks the archive.
@@ -188,8 +222,17 @@ class BinaryUtilPrivate(object):
     return self._select_file(
       supportdir, version, name, platform_dependent=False)
 
+  def _pants_provided_binary_urls(self, binary_path):
+    if not self._baseurls:
+      raise self.NoBaseUrlsError(
+          'No urls are defined for the --pants-support-baseurls option.')
+    all_urls = []
+    for baseurl in OrderedSet(self._baseurls):  # De-dup URLS: we only want to try each URL once.
+      all_urls.append(posixpath.join(baseurl, binary_path))
+    return all_urls
+
   @contextmanager
-  def _select_binary_stream(self, name, binary_path, fetcher=None):
+  def _select_binary_stream(self, name, binary_path, urls, fetcher=None):
     """Select a binary located at a given path.
 
     :param string binary_path: The path to the binary to fetch.
@@ -199,14 +242,9 @@ class BinaryUtilPrivate(object):
     :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no binary of the given version
       and name could be found for the current platform.
     """
-
-    if not self._baseurls:
-      raise self.NoBaseUrlsError(
-          'No urls are defined for the --pants-support-baseurls option.')
     downloaded_successfully = False
     accumulated_errors = []
-    for baseurl in OrderedSet(self._baseurls):  # De-dup URLS: we only want to try each URL once.
-      url = posixpath.join(baseurl, binary_path)
+    for url in urls:  # De-dup URLS: we only want to try each URL once.
       logger.info('Attempting to fetch {name} binary from: {url} ...'.format(name=name, url=url))
       try:
         with temporary_file() as dest:
@@ -226,12 +264,12 @@ class BinaryUtilPrivate(object):
     if not downloaded_successfully:
       raise self.BinaryNotFound(binary_path, accumulated_errors)
 
-  def _fetch_binary(self, name, binary_path):
+  def _fetch_binary(self, name, binary_path, urls):
     bootstrap_dir = os.path.realpath(os.path.expanduser(self._pants_bootstrapdir))
     bootstrapped_binary_path = os.path.join(bootstrap_dir, binary_path)
     if not os.path.exists(bootstrapped_binary_path):
       with safe_concurrent_creation(bootstrapped_binary_path) as downloadpath:
-        with self._select_binary_stream(name, binary_path) as stream:
+        with self._select_binary_stream(name, binary_path, urls) as stream:
           with safe_open(downloadpath, 'wb') as bootstrapped_binary:
             bootstrapped_binary.write(stream())
           os.rename(downloadpath, bootstrapped_binary_path)
