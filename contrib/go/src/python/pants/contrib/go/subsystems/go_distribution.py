@@ -25,9 +25,14 @@ class GoDistribution(NativeTool):
 
   _DIST_URL_FMT = 'https://storage.googleapis.com/golang/go{version}.{system_id}.tar.gz'
 
+  # NB: This will download a 64-bit go distribution on a 32-bit host (which won't work)!
+  _PLATFORM_FMT = {
+    'darwin': 'darwin-amd64',
+    'linux': 'linux-amd64',
+  }
+
   def urls(self):
-    # NB: This will download a 64-bit go distribution on a 32-bit host (which won't work).
-    system_id = '{}-amd64'.format(get_normalized_os_name())
+    system_id = self._PLATFORM_FMT[get_normalized_os_name()]
     return [self._DIST_URL_FMT.format(version=self.version(), system_id=system_id)]
 
   @memoized_property
