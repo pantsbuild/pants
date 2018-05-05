@@ -11,9 +11,9 @@ import sys
 import urllib2
 from ConfigParser import ConfigParser
 
-from pants.util.process_handler import subprocess
-
 from bs4 import BeautifulSoup
+
+from pants.util.process_handler import subprocess
 
 
 COLOR_BLUE = "\x1b[34m"
