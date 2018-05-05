@@ -2,8 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name='binary_util',
-  sources=['test_binary_util.py'],
   dependencies=[
     '3rdparty/python:mock',
     'src/python/pants/binaries',

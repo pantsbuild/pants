@@ -8,8 +8,33 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
+from pants.util.memo import memoized_method
+from pants.util.objects import datatype
+
 
 logger = logging.getLogger(__name__)
+
+
+class OsId(datatype(['os_name', 'os_arch'])):
+
+  @classmethod
+  def from_uname(cls, uname_result):
+    sysname, _, release, _, machine = uname_result
+    os_id = _ID_BY_OS.get(sysname.lower())
+
+    if os_id:
+      return cls(*os_id(release, machine))
+
+    raise cls.MissingMachineInfo(
+      "Pants could not recognize this platform: {}".format(uname_result))
+
+  class MissingMachineInfo(Exception):
+    """???/change the name to be different than in BinaryUtil"""
+
+  @classmethod
+  @memoized_method
+  def for_current_platform(cls):
+    return cls.from_uname(os.uname())
 
 
 _ID_BY_OS = {
@@ -39,11 +64,10 @@ def get_os_id(uname_func=None):
   :rtype: tuple of string, string
   """
   uname_func = uname_func or os.uname
-  sysname, _, release, _, machine = uname_func()
-  os_id = _ID_BY_OS.get(sysname.lower())
-  if os_id:
-    return os_id(release, machine)
-  return None
+  try:
+    return OsId.from_uname(uname_func()).__getnewargs__()
+  except OsId.MissingMachineInfo:
+    return None
 
 
 def normalize_os_name(os_name):

@@ -92,6 +92,10 @@ python_library(
 python_library(
   name = 'osutil',
   sources = ['osutil.py'],
+  dependencies = [
+    ':memo',
+    ':objects',
+  ],
 )
 
 python_library(

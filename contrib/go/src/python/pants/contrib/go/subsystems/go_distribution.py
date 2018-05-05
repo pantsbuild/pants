@@ -23,6 +23,8 @@ class GoDistribution(NativeTool):
   default_version = '1.8.3'
   archive_type = 'tgz'
 
+  dist_url_versions = ['1.8.3']
+
   _DIST_URL_FMT = 'https://storage.googleapis.com/golang/go{version}.{system_id}.tar.gz'
 
   # NB: This will download a 64-bit go distribution on a 32-bit host (which won't work)!
@@ -31,15 +33,13 @@ class GoDistribution(NativeTool):
     'linux': 'linux-amd64',
   }
 
-  _DIST_URL_VERSIONS = ['1.8.3']
-
   @classmethod
-  def default_urls(cls):
-    system_id = cls._SYSTEM_ID[get_normalized_os_name()]
-    return {
-      version:[cls._DIST_URL_FMT.format(version=version, system_id=system_id)]
-      for version in cls._DIST_URL_VERSIONS
-    }
+  def make_dist_urls(cls, version, os_name):
+    return [
+      cls._DIST_URL_FMT.format(
+        version=version,
+        system_id=cls._SYSTEM_ID[os_name]),
+    ]
 
   @memoized_property
   def goroot(self):

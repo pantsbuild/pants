@@ -7,9 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
+from abc import abstractmethod
+
 from pants.binaries.binary_util import BinaryUtilPrivate
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.objects import datatype
+from pants.util.osutil import OsId
 
 
 logger = logging.getLogger(__name__)
@@ -45,13 +49,26 @@ class BinaryToolBase(Subsystem):
   # Subclasses may set this to provide extra register() kwargs for the --version option.
   extra_version_option_kwargs = None
 
+  # TODO: ???
+  dist_url_versions = []
+
   @classmethod
   def subsystem_dependencies(cls):
     return super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtilPrivate.Factory,)
 
   @classmethod
-  def default_urls(cls):
-    return {}
+  @abstractmethod
+  def make_dist_urls(cls, version, os_name):
+    """???"""
+
+  @classmethod
+  def _default_urls(cls):
+    """Generate a default value for this subsystem's --urls option."""
+    os_id = OsId.for_current_platform()
+    return {
+      version: cls.make_dist_urls(version, os_id.os_name)
+      for version in cls.dist_url_versions
+    }
 
   @classmethod
   def register_options(cls, register):
@@ -76,10 +93,11 @@ class BinaryToolBase(Subsystem):
 
     register('--version', **version_registration_kwargs)
 
-    register('--urls', type=dict, default=cls.default_urls(), advanced=True,
+    register('--urls', type=dict, default=cls._default_urls(), advanced=True,
              help=(
-               "Dict of (version -> [URL]) to fetch the {} {} from. If None, pants will fetch "
-               "the tool from a path under --binaries-baseurls."
+               "Dict of (version -> [URL]) to fetch the {} {} from. If no URLs were provided for "
+               "the selected version, pants will fetch the tool from a URL under "
+               "--binaries-baseurls."
                .format(cls_name, binary_description)))
 
   @memoized_method

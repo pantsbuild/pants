@@ -17,6 +17,8 @@ class LLVM(NativeTool, ExecutablePathProvider):
   default_version = '6.0.0'
   archive_type = 'txz'
 
+  dist_url_versions = ['6.0.0']
+
   _ARCHIVE_BASE_FMT = 'clang+llvm-{version}-x86_64-{system_id}'
   _DIST_URL_FMT = 'http://releases.llvm.org/{version}/{base}.tar.xz'
 
@@ -25,26 +27,23 @@ class LLVM(NativeTool, ExecutablePathProvider):
     'linux': 'linux-gnu-ubuntu-16.04',
   }
 
-  _DIST_URL_VERSIONS = ['6.0.0']
+  @classmethod
+  def make_dist_urls(cls, version, os_name):
+    return [
+      cls._DIST_URL_FMT.format(version=version, base=cls._archive_basename(version, os_name)),
+    ]
 
   @classmethod
-  def default_urls(cls):
-    return {version:[cls._dist_url(version)] for version in cls._DIST_URL_VERSIONS}
-
-  @classmethod
-  def _archive_basename(cls, version):
-    system_id = cls._SYSTEM_ID[get_normalized_os_name()]
+  def _archive_basename(cls, version, os_name):
+    system_id = cls._SYSTEM_ID[os_name]
     return cls._ARCHIVE_BASE_FMT.format(version=version, system_id=system_id)
-
-  @classmethod
-  def _dist_url(cls, version):
-    base = cls._archive_basename(version)
-    return cls._DIST_URL_FMT.format(version=version, base=base)
 
   @memoized_method
   def select(self):
     unpacked_path = super(LLVM, self).select()
-    return os.path.join(unpacked_path, self._archive_basename(self.version()))
+    children = os.listdir(unpacked_path)
+    assert(len(children) == 1)
+    return os.path.join(unpacked_path, children[0])
 
   def path_entries(self):
     return [os.path.join(self.select(), 'bin')]
