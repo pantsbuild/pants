@@ -13,6 +13,7 @@ python_binary(
   name = 'packages',
   source = 'packages.py',
   dependencies = [
+    '3rdparty/python:beautifulsoup4',
     'src/python/pants/util:process_handler',
   ],
 )
