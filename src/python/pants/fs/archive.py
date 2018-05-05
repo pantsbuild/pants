@@ -209,6 +209,10 @@ _ARCHIVER_BY_TYPE = OrderedDict(
   txz=TXZ,
   zip=ZIP)
 
+archive_extensions = {
+  name:archiver.extension for name, archiver in _ARCHIVER_BY_TYPE.items()
+}
+
 TYPE_NAMES = frozenset(_ARCHIVER_BY_TYPE.keys())
 TYPE_NAMES_NO_PRESERVE_SYMLINKS = frozenset(['zip'])
 TYPE_NAMES_PRESERVE_SYMLINKS = TYPE_NAMES - TYPE_NAMES_NO_PRESERVE_SYMLINKS
