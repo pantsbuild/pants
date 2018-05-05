@@ -59,12 +59,15 @@ class BinaryToolBase(Subsystem):
   @classmethod
   @abstractmethod
   def make_dist_urls(cls, version, os_name):
-    """???"""
+    """???/Generate a default value for this subsystem's --urls option."""
+
+  @classmethod
+  def _os_id(cls):
+    return OsId.for_current_platform()
 
   @classmethod
   def _default_urls(cls):
-    """Generate a default value for this subsystem's --urls option."""
-    os_id = OsId.for_current_platform()
+    os_id = cls._os_id()
     return {
       version: cls.make_dist_urls(version, os_id.os_name)
       for version in cls.dist_url_versions
@@ -93,12 +96,10 @@ class BinaryToolBase(Subsystem):
 
     register('--version', **version_registration_kwargs)
 
-    register('--urls', type=dict, default=cls._default_urls(), advanced=True,
-             help=(
-               "Dict of (version -> [URL]) to fetch the {} {} from. If no URLs were provided for "
-               "the selected version, pants will fetch the tool from a URL under "
-               "--binaries-baseurls."
-               .format(cls_name, binary_description)))
+    register('--urls', type=dict, default=cls._default_urls(), help=(
+      "Dict of (version -> [URL]) to fetch the {} {} from. If no URLs were provided for the "
+      "selected version, pants will fetch the tool from a URL under --binaries-baseurls."
+      .format(cls_name, binary_description)))
 
   @memoized_method
   def select(self, context=None):

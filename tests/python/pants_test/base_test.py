@@ -28,6 +28,7 @@ from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.build_graph.target import Target
 from pants.init.util import clean_global_runtime_state
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.scope import GLOBAL_SCOPE
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin
@@ -228,7 +229,7 @@ class BaseTest(unittest.TestCase):
     safe_mkdir(self.pants_workdir)
 
     self.options = defaultdict(dict)  # scope -> key-value mapping.
-    self.options[''] = {
+    self.options[GLOBAL_SCOPE] = {
       'pants_workdir': self.pants_workdir,
       'pants_supportdir': os.path.join(self.build_root, 'build-support'),
       'pants_distdir': os.path.join(self.build_root, 'dist'),
