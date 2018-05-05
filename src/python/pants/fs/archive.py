@@ -192,14 +192,9 @@ class ZipArchiver(Archiver):
     return zippath
 
 
-def _make_tar_archiver(compression_type):
-  compression_spec = 'w:{}'.format(compression_type)
-  extension = 'tar.{}'.format(compression_type)
-  return TarArchiver(compression_spec, extension)
-
-TAR = _make_tar_archiver('')
-TGZ = _make_tar_archiver('gz')
-TBZ2 = _make_tar_archiver('bz2')
+TAR = TarArchiver('w:', 'tar')
+TGZ = TarArchiver('w:gz', 'tar.gz')
+TBZ2 = TarArchiver('w:bz2', 'tar.bz2')
 TXZ = XZCompressedTarArchiver()
 ZIP = ZipArchiver(ZIP_DEFLATED, 'zip')
 
