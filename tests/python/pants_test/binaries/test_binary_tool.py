@@ -5,11 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import mock
-
-from pants.binaries.binary_tool import BinaryToolBase, NativeTool, Script
+from pants.binaries.binary_tool import BinaryToolBase
 from pants.binaries.binary_util import BinaryUtilPrivate
-from pants.net.http.fetcher import Fetcher
 from pants.option.scope import GLOBAL_SCOPE
 from pants.util.osutil import OsId
 from pants_test.base_test import BaseTest
@@ -32,6 +29,16 @@ class AnotherTool(BinaryToolTestBase):
   options_scope = 'another-tool'
   name = 'another_tool'
   default_version = '0.0.1'
+
+
+class ReplacingLegacyOptionsTool(BinaryToolTestBase):
+  # TODO: check scope?
+  options_scope = 'replacing-legacy-options-tool'
+  name = 'replacing_legacy_options_tool'
+  default_version = 'a2f4ab23a4c'
+
+  replaces_scope = 'old_tool_scope'
+  replaces_name = 'old_tool_version'
 
 
 class CustomUrls(BinaryToolTestBase):
@@ -63,7 +70,7 @@ class BinaryToolBaseTest(BaseTest):
   def setUp(self):
     super(BinaryToolBaseTest, self).setUp()
     self._context = self.context(
-      for_subsystems=[DefaultVersion, AnotherTool, CustomUrls],
+      for_subsystems=[DefaultVersion, AnotherTool, ReplacingLegacyOptionsTool, CustomUrls],
       options={
         GLOBAL_SCOPE: {
           'binaries_baseurls': ['https://binaries.example.org'],
@@ -77,6 +84,9 @@ class BinaryToolBaseTest(BaseTest):
         'custom-urls': {
           'version': 'v2.3',
         },
+        'old_tool_scope': {
+          'old_tool_version': '3',
+        },
       })
 
   def test_base_options(self):
@@ -89,6 +99,11 @@ class BinaryToolBaseTest(BaseTest):
 
     another_default_version_tool = DefaultVersion.scoped_instance(AnotherTool)
     self.assertEqual(another_default_version_tool.version(), 'YYY')
+
+  def test_replacing_legacy_options(self):
+    replacing_legacy_options_tool = ReplacingLegacyOptionsTool.global_instance()
+    self.assertEqual(replacing_legacy_options_tool.version(), 'a2f4ab23a4c')
+    self.assertEqual(replacing_legacy_options_tool.version(self._context), '3')
 
   def test_urls(self):
     default_version_tool = DefaultVersion.global_instance()

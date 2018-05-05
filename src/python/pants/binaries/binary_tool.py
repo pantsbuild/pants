@@ -6,13 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-
 from abc import abstractmethod
 
 from pants.binaries.binary_util import BinaryUtilPrivate
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.objects import datatype
 from pants.util.osutil import OsId
 
 

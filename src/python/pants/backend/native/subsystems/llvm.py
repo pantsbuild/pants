@@ -8,8 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.binaries.binary_tool import ExecutablePathProvider, NativeTool
-from pants.util.memo import memoized_method, memoized_property
-from pants.util.osutil import get_normalized_os_name
+from pants.util.memo import memoized_method
 
 
 class LLVM(NativeTool, ExecutablePathProvider):

@@ -11,7 +11,6 @@ from collections import OrderedDict, namedtuple
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.binaries.binary_tool import NativeTool
 from pants.util.memo import memoized_property
-from pants.util.osutil import get_normalized_os_name
 from pants.util.process_handler import subprocess
 
 
