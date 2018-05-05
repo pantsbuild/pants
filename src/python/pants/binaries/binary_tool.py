@@ -50,8 +50,15 @@ class BinaryToolBase(Subsystem):
     return super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtilPrivate.Factory,)
 
   @classmethod
+  def default_urls(cls):
+    return {}
+
+  @classmethod
   def register_options(cls, register):
     super(BinaryToolBase, cls).register_options(register)
+
+    cls_name = cls._get_name()
+    binary_description = 'binary' if cls.platform_dependent else 'script'
 
     version_registration_kwargs = {
       'type': str,
@@ -61,13 +68,19 @@ class BinaryToolBase(Subsystem):
       version_registration_kwargs.update(cls.extra_version_option_kwargs)
     version_registration_kwargs['help'] = (
       version_registration_kwargs.get('help') or
-      'Version of the {} {} to use'.format(cls._get_name(),
-                                           'binary' if cls.platform_dependent else 'script')
+      'Version of the {} {} to use'.format(cls_name, binary_description)
     )
     # The default for fingerprint in register() is False, but we want to default to True.
     if 'fingerprint' not in version_registration_kwargs:
       version_registration_kwargs['fingerprint'] = True
+
     register('--version', **version_registration_kwargs)
+
+    register('--urls', type=dict, default=cls.default_urls(), advanced=True,
+             help=(
+               "Dict of (version -> [URL]) to fetch the {} {} from. If None, pants will fetch "
+               "the tool from a path under --binaries-baseurls."
+               .format(cls_name, binary_description)))
 
   @memoized_method
   def select(self, context=None):
@@ -112,9 +125,6 @@ class BinaryToolBase(Subsystem):
   def get_support_dir(cls):
     return 'bin/{}'.format(cls._get_name())
 
-  def urls(self):
-    return None
-
   def _select_for_version(self, version):
     return self._binary_util.select(
       supportdir=self.get_support_dir(),
@@ -122,7 +132,7 @@ class BinaryToolBase(Subsystem):
       name='{}{}'.format(self._get_name(), self.suffix),
       platform_dependent=self.platform_dependent,
       archive_type=self.archive_type,
-      urls=self.urls())
+      urls=self.get_options().urls.get(version, None))
 
   @classmethod
   def _get_name(cls):
