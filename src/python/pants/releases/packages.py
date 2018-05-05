@@ -10,6 +10,9 @@ import os
 import sys
 import urllib2
 from ConfigParser import ConfigParser
+
+from bs4 import BeautifulSoup
+
 from pants.util.process_handler import subprocess
 
 
@@ -47,18 +50,19 @@ class Package(object):
     j = json.load(f)
     return j["info"]["version"]
 
-  def owners(self):
+  def owners(self,
+             html_node_type='a',
+             html_node_class='sidebar-section__user-gravatar',
+             html_node_attr='aria-label'):
     url = "https://pypi.python.org/pypi/{}/{}".format(self.name, self.latest_version())
-    f = urllib2.urlopen(url)
-    return_next_line = False
-    for line in f.readlines():
-      line = line.decode("utf-8")
-      if return_next_line:
-        owners = line.strip().replace("<span>", "").replace("</span>", "").split(", ")
-        return set(owner.lower() for owner in owners)
-      elif "Package Index Owner:" in line:
-        return_next_line = True
-    raise ValueError("Didn't find package owners in HTML output from {}".format(url))
+    url_content = urllib2.urlopen(url).read()
+    parser = BeautifulSoup(url_content, 'html.parser')
+    owners = [
+      item.attrs[html_node_attr]
+      for item
+      in parser.find_all(html_node_type, class_=html_node_class)
+    ]
+    return set(owner.lower() for owner in owners)
 
 
 core_packages = set([
