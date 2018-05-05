@@ -62,7 +62,7 @@ class Package(object):
       for item
       in parser.find_all(html_node_type, class_=html_node_class)
     ]
-    return [owner.lower() for owner in owners]
+    return set(owner.lower() for owner in owners)
 
 
 core_packages = set([
