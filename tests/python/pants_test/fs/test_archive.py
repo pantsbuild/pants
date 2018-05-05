@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 
-from pants.fs.archive import archiver
+from pants.fs.archive import create_archiver
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import relative_symlink, safe_mkdir, safe_walk, touch
 
@@ -53,12 +53,12 @@ class ArchiveTest(unittest.TestCase):
     test_round_trip(concurrency_safe=True)
 
   def test_tar(self):
-    self.round_trip(archiver('tar'), expected_ext='tar', empty_dirs=True)
-    self.round_trip(archiver('tgz'), expected_ext='tar.gz', empty_dirs=True)
-    self.round_trip(archiver('tbz2'), expected_ext='tar.bz2', empty_dirs=True)
+    self.round_trip(create_archiver('tar'), expected_ext='tar', empty_dirs=True)
+    self.round_trip(create_archiver('tgz'), expected_ext='tar.gz', empty_dirs=True)
+    self.round_trip(create_archiver('tbz2'), expected_ext='tar.bz2', empty_dirs=True)
 
   def test_zip(self):
-    self.round_trip(archiver('zip'), expected_ext='zip', empty_dirs=False)
+    self.round_trip(create_archiver('zip'), expected_ext='zip', empty_dirs=False)
 
   def test_zip_filter(self):
     def do_filter(path):
@@ -69,9 +69,9 @@ class ArchiveTest(unittest.TestCase):
       touch(os.path.join(fromdir, 'disallowed.txt'))
 
       with temporary_dir() as archivedir:
-        archive = archiver('zip').create(fromdir, archivedir, 'archive')
+        archive = create_archiver('zip').create(fromdir, archivedir, 'archive')
         with temporary_dir() as todir:
-          archiver('zip').extract(archive, todir, filter_func=do_filter)
+          create_archiver('zip').extract(archive, todir, filter_func=do_filter)
           self.assertEquals(set(['allowed.txt']), self._listtree(todir, empty_dirs=False))
 
   def test_tar_dereference(self):
@@ -84,9 +84,9 @@ class ArchiveTest(unittest.TestCase):
         relative_symlink(filename, linkname)
 
         with temporary_dir() as archivedir:
-          archive = archiver(archive_format).create(fromdir, archivedir, 'archive', dereference=dereference)
+          archive = create_archiver(archive_format).create(fromdir, archivedir, 'archive', dereference=dereference)
           with temporary_dir() as todir:
-            archiver(archive_format).extract(archive, todir)
+            create_archiver(archive_format).extract(archive, todir)
             extracted_linkname = os.path.join(todir, 'link_to_a')
             assertion = self.assertFalse if dereference else self.assertTrue
             assertion(os.path.islink(extracted_linkname))

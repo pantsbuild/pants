@@ -15,7 +15,7 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
-from pants.fs.archive import archiver as create_archiver
+from pants.fs.archive import create_archiver
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
