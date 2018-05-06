@@ -85,7 +85,6 @@ class SetupPyInvocationEnvironment(datatype(['joined_path'])):
     return {
       'CC': 'gcc',
       'CXX': 'g++',
-      'LDSHARED': 'gcc',
       'PATH': self.joined_path,
     }
 
