@@ -69,5 +69,9 @@ class PythonDistribution(Target):
     return self.has_sources(extension=('.c', '.cpp', '.cc'))
 
   @property
+  def platforms(self):
+    return ['current']
+
+  @property
   def setup_requires(self):
     return self.payload.setup_requires
