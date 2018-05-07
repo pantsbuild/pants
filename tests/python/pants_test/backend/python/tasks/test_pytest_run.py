@@ -777,3 +777,21 @@ class PytestTest(PytestTestBase):
       assert_test_not_run('test_three')
       assert_test_run('test_four')
       assert_test_not_run('test_five')
+
+  def test_passthrough_added_after_options(self):
+    with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
+      self.run_tests([target], '-m', 'purple or red', options=['-k', 'two'])
+      assert_test_not_run('test_one')
+      assert_test_run('test_two')
+      assert_test_not_run('test_three')
+      assert_test_not_run('test_four')
+      assert_test_not_run('test_five')
+
+  def test_options_shlexed(self):
+    with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
+      self.run_tests([target], options=["-m 'purple or red'"])
+      assert_test_not_run('test_one')
+      assert_test_run('test_two')
+      assert_test_not_run('test_three')
+      assert_test_run('test_four')
+      assert_test_not_run('test_five')
