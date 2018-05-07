@@ -13,6 +13,7 @@ import re
 
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
+from pants.build_graph.target_scopes import Scopes
 from pants.task.target_restriction_mixins import (HasSkipAndTransitiveOptionsMixin,
                                                   SkipAndTransitiveOptionsRegistrar)
 from pants.util import desktop
@@ -134,7 +135,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
   def _generate_combined(self, targets, create_jvmdoc_command):
     gendir = os.path.join(self.workdir, 'combined')
     if targets:
-      classpath = self.classpath(targets)
+      classpath = self.classpath(targets, include_scopes=Scopes.JVM_COMPILE_SCOPES)
       safe_mkdir(gendir, clean=True)
       command = create_jvmdoc_command(classpath, gendir, *targets)
       if command:
@@ -151,7 +152,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
     jobs = {}
     for target in targets:
       gendir = self._gendir(target)
-      classpath = self.classpath([target])
+      classpath = self.classpath([target], include_scopes=Scopes.JVM_COMPILE_SCOPES)
       command = create_jvmdoc_command(classpath, gendir, target)
       if command:
         jobs[gendir] = (target, command)
