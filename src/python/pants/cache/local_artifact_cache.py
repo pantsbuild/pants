@@ -19,28 +19,29 @@ from pants.util.dirutil import (safe_delete, safe_mkdir, safe_mkdir_for,
 logger = logging.getLogger(__name__)
 
 
-class BaseLocalArtifactCache(ArtifactCache):
+class LocalArtifactCacheBase(ArtifactCache):
 
   def __init__(self, artifact_root, compression, permissions=None, dereference=True):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param int compression: The gzip compression level for created artifacts.
                             Valid values are 0-9.
-    :param str permissions: File permissions to use when creating artifact files.
+    :param int permissions: File permissions to use when creating artifact files.
     :param bool dereference: Dereference symlinks when creating the cache tarball.
     """
-    super(BaseLocalArtifactCache, self).__init__(artifact_root)
+    super(LocalArtifactCacheBase, self).__init__(artifact_root)
     self._compression = compression
     self._cache_root = None
     self._permissions = permissions
     self._dereference = dereference
 
   def _artifact(self, path):
-    return TarballArtifact(self.artifact_root, path, self._compression, dereference=self._dereference)
+    return TarballArtifact(self.artifact_root, path, self._compression,
+                           dereference=self._dereference)
 
   @contextmanager
   def _tmpfile(self, cache_key, use):
-    """Allocate tempfile on same device as cache with a suffix chosen to prevent collisions"""
+    """Allocate tempfile on same device as cache, with a suffix chosen to prevent collisions."""
     with temporary_file(suffix=cache_key.id + use, root_dir=self._cache_root,
                         permissions=self._permissions) as tmpfile:
       yield tmpfile
@@ -65,34 +66,45 @@ class BaseLocalArtifactCache(ArtifactCache):
         tmp.write(chunk)
       tmp.close()
       tarball = self._store_tarball(cache_key, tmp.name)
-      artifact = self._artifact(tarball)
+      return self.extract_artifact_from_tarball(tarball, results_dir)
 
-      # NOTE(mateo): The two clean=True args passed in this method are likely safe, since the cache will by
-      # definition be dealing with unique results_dir, as opposed to the stable vt.results_dir (aka 'current').
-      # But if by chance it's passed the stable results_dir, safe_makedir(clean=True) will silently convert it
-      # from a symlink to a real dir and cause mysterious 'Operation not permitted' errors until the workdir is cleaned.
-      if results_dir is not None:
-        safe_mkdir(results_dir, clean=True)
+  def extract_artifact_from_tarball(self, tarball, results_dir=None):
+    """Extract an artifact from a given tarball.
 
+    :param tarball: Path to the tarball to extract.
+    :param str results_dir: The path to the expected destination of the artifact extraction,
+      which will be cleared before extraction. This path must be under artifact_root, and all
+      paths in the artifact must be under this results_dir.
+    :return: True iff the extraction succeeded.
+    :rtype: bool
+    """
+    # Note: If results_dir is a symlink we operate on the underlying dir it references.
+    # Otherwise, safe_makedir(clean=True) will silently convert it from a symlink to a real dir.
+    results_dir = os.path.realpath(results_dir)
+    artifact = self._artifact(tarball)
+    if artifact.exists():
       try:
+        if results_dir is not None:
+          safe_rmtree(results_dir)
         artifact.extract()
-      except Exception:
+        return True
+      except Exception as e:
+        logger.warn('Error while reading {0} from local artifact cache: {1}'.format(tarball, e))
         # Do our best to clean up after a failed artifact extraction. If a results_dir has been
         # specified, it is "expected" to represent the output destination of the extracted
         # artifact, and so removing it should clear any partially extracted state.
         if results_dir is not None:
-          safe_mkdir(results_dir, clean=True)
+          safe_rmtree(results_dir)
         safe_delete(tarball)
         raise
-
-      return True
+    return False
 
   def _store_tarball(self, cache_key, src):
     """Given a src path to an artifact tarball, store it and return stored artifact's path."""
     pass
 
 
-class LocalArtifactCache(BaseLocalArtifactCache):
+class LocalArtifactCache(LocalArtifactCacheBase):
   """An artifact cache that stores the artifacts in local files."""
 
   def __init__(self, artifact_root, cache_root, compression, max_entries_per_target=None,
@@ -101,7 +113,8 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param str cache_root: The locally cached files are stored under this directory.
     :param int compression: The gzip compression level for created artifacts (1-9 or false-y).
-    :param int max_entries_per_target: The maximum number of old cache files to leave behind on a cache miss.
+    :param int max_entries_per_target: The maximum number of old cache files to leave behind on a
+      cache miss.
     :param str permissions: File permissions to use when creating artifact files.
     :param bool dereference: Dereference symlinks when creating the cache tarball.
     """
@@ -115,7 +128,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     self._max_entries_per_target = max_entries_per_target
     safe_mkdir(self._cache_root)
 
-  def prune(self, root):
+  def _prune(self, root):
     """Prune stale cache files
 
     If the option --cache-target-max-entry is greater than zero, then prune will remove all but n
@@ -129,27 +142,14 @@ class LocalArtifactCache(BaseLocalArtifactCache):
       safe_rm_oldest_items_in_dir(root, max_entries_per_target)
 
   def has(self, cache_key):
-    return self._artifact_for(cache_key).exists()
-
-  def _artifact_for(self, cache_key):
-    return self._artifact(self._cache_file_for_key(cache_key))
+    return self._artifact(self._cache_file_for_key(cache_key)).exists()
 
   def use_cached_files(self, cache_key, results_dir=None):
-    tarfile = self._cache_file_for_key(cache_key)
+    tarball = self._cache_file_for_key(cache_key)
     try:
-      artifact = self._artifact_for(cache_key)
-      if artifact.exists():
-        if results_dir is not None:
-          safe_rmtree(results_dir)
-        artifact.extract()
-        return True
-    except Exception as e:
-      # TODO(davidt): Consider being more granular in what is caught.
-      logger.warn('Error while reading {0} from local artifact cache: {1}'.format(tarfile, e))
-      safe_delete(tarfile)
+      return self.extract_artifact_from_tarball(tarball, results_dir)
+    except Exception as e:  # TODO: Consider being more granular in what is caught.
       return UnreadableArtifact(cache_key, e)
-
-    return False
 
   def try_insert(self, cache_key, paths):
     with self.insert_paths(cache_key, paths):
@@ -164,7 +164,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     os.rename(src, dest)
     if self._permissions:
       os.chmod(dest, self._permissions)
-    self.prune(os.path.dirname(dest))  # Remove old cache files.
+    self._prune(os.path.dirname(dest))  # Remove old cache files.
     return dest
 
   def _cache_file_for_key(self, cache_key):
@@ -173,7 +173,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     return os.path.join(self._cache_root, cache_key.id, cache_key.hash) + '.tgz'
 
 
-class TempLocalArtifactCache(BaseLocalArtifactCache):
+class TempLocalArtifactCache(LocalArtifactCacheBase):
   """A local cache that does not actually store any files between calls.
 
   This implementation does not have a backing _cache_root, and never

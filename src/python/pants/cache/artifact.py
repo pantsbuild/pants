@@ -99,7 +99,8 @@ class TarballArtifact(Artifact):
     # but decompression times are much faster.
     mode = 'w:gz'
 
-    tar_kwargs = {'dereference': self._dereference, 'errorlevel': 2, 'compresslevel': self._compression}
+    tar_kwargs = {'dereference': self._dereference, 'errorlevel': 2,
+                  'compresslevel': self._compression}
 
     with open_tar(self._tarfile, mode, **tar_kwargs) as tarout:
       for path in paths or ():
@@ -112,10 +113,10 @@ class TarballArtifact(Artifact):
     try:
       with open_tar(self._tarfile, 'r', errorlevel=2) as tarin:
         # Note: We create all needed paths proactively, even though extractall() can do this for us.
-        # This is because we may be called concurrently on multiple artifacts that share directories,
-        # and there will be a race condition inside extractall(): task T1 A) sees that a directory
-        # doesn't exist and B) tries to create it. But in the gap between A) and B) task T2 creates
-        # the same directory, so T1 throws "File exists" in B).
+        # This is because we may be called concurrently on multiple artifacts that share
+        # directories,  and there will be a race condition inside extractall(): task T1 A) sees
+        # that a directory doesn't exist and B) tries to create it. But in the gap between A)
+        # and B) task T2 creates the same directory, so T1 throws "File exists" in B).
         # This actually happened, and was very hard to debug.
         # Creating the paths here up front allows us to squelch that "File exists" error.
         paths = []
