@@ -47,6 +47,7 @@ from pants.backend.jvm.tasks.jar_create import JarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun
+from pants.backend.jvm.tasks.jvm_compile.javac.javac_compile import JavacCompile
 from pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher import RuntimeClasspathPublisher
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.backend.jvm.tasks.jvm_dependency_check import JvmDependencyCheck
@@ -158,6 +159,7 @@ def register_goals():
 
   # Compile
   task(name='zinc', action=ZincCompile).install('compile')
+  task(name='javac', action=JavacCompile).install('compile')
 
   # Dependency resolution.
   task(name='ivy', action=IvyResolve).install('resolve', first=True)

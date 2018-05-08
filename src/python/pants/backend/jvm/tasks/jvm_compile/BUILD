@@ -8,6 +8,7 @@ target(
     ':analysis_parser',
     ':analysis_tools',
     ':anonymizer',
+    ':javac',
     ':jvm_classpath_publisher',
     ':jvm_compile',
     ':zinc',
@@ -102,6 +103,31 @@ python_library(
 )
 
 python_library(
+  name = 'javac',
+  sources = globs('javac/*.py'),
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:six',
+    ':analysis',
+    ':analysis_parser',
+    ':analysis_tools',
+    ':jvm_compile',
+    'src/python/pants/backend/jvm/subsystems:compile_subsystem',
+    'src/python/pants/backend/jvm/subsystems:java',
+    'src/python/pants/backend/jvm/subsystems:shader',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:hash_utils',
+    'src/python/pants/base:workunit',
+    'src/python/pants/java/distribution',
+    'src/python/pants/option',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
+  ],
+)
+
+python_library(
   name = 'zinc',
   sources = globs('zinc/*.py'),
   dependencies = [
@@ -112,6 +138,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
     'src/python/pants/java/jar',
+    'src/python/pants/backend/jvm/subsystems:compile_subsystem',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/subsystems:shader',
