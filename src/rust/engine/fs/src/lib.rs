@@ -851,7 +851,7 @@ mod posixfs_test {
   extern crate tempdir;
   extern crate testutil;
 
-  use super::{Dir, File, Link, PosixFS, ResettablePool, Stat};
+  use super::{Dir, File, Link, PathStat, PathStatGetter, PosixFS, ResettablePool, Stat};
   use futures::Future;
   use self::testutil::make_file;
   use std;
@@ -1044,6 +1044,88 @@ mod posixfs_test {
       .scandir(&Dir(PathBuf::from("no_marmosets_here")))
       .wait()
       .expect_err("Want error");
+  }
+
+  #[test]
+  fn path_stats_for_paths() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let root_path = dir.path();
+
+    // File tree:
+    // dir
+    // dir/recursive_symlink -> ../symlink -> executable_file
+    // dir_symlink -> dir
+    // executable_file
+    // regular_file
+    // symlink -> executable_file
+    // symlink_to_nothing -> doesnotexist
+
+    make_file(&root_path.join("executable_file"), &[], 0o700);
+    make_file(&root_path.join("regular_file"), &[], 0o600);
+    std::fs::create_dir(&root_path.join("dir")).unwrap();
+    std::os::unix::fs::symlink("executable_file", &root_path.join("symlink")).unwrap();
+    std::os::unix::fs::symlink(
+      "../symlink",
+      &root_path.join("dir").join("recursive_symlink"),
+    ).unwrap();
+    std::os::unix::fs::symlink("dir", &root_path.join("dir_symlink")).unwrap();
+    std::os::unix::fs::symlink("doesnotexist", &root_path.join("symlink_to_nothing")).unwrap();
+
+    let posix_fs = Arc::new(new_posixfs(&root_path));
+    let path_stats = posix_fs
+      .path_stats(vec![
+        PathBuf::from("executable_file"),
+        PathBuf::from("regular_file"),
+        PathBuf::from("dir"),
+        PathBuf::from("symlink"),
+        PathBuf::from("dir").join("recursive_symlink"),
+        PathBuf::from("dir_symlink"),
+        PathBuf::from("symlink_to_nothing"),
+        PathBuf::from("doesnotexist"),
+      ])
+      .wait()
+      .unwrap();
+    let v: Vec<Option<PathStat>> = vec![
+      Some(PathStat::file(
+        PathBuf::from("executable_file"),
+        File {
+          path: PathBuf::from("executable_file"),
+          is_executable: true,
+        },
+      )),
+      Some(PathStat::file(
+        PathBuf::from("regular_file"),
+        File {
+          path: PathBuf::from("regular_file"),
+          is_executable: false,
+        },
+      )),
+      Some(PathStat::dir(
+        PathBuf::from("dir"),
+        Dir(PathBuf::from("dir")),
+      )),
+      Some(PathStat::file(
+        PathBuf::from("symlink"),
+        File {
+          path: PathBuf::from("executable_file"),
+          is_executable: true,
+        },
+      )),
+      Some(PathStat::file(
+        PathBuf::from("dir").join("recursive_symlink"),
+        File {
+          path: PathBuf::from("executable_file"),
+          is_executable: true,
+        },
+      )),
+      Some(PathStat::dir(
+        PathBuf::from("dir_symlink"),
+        Dir(PathBuf::from("dir")),
+      )),
+      None,
+      None,
+    ];
+    assert_eq!(v, path_stats);
   }
 
   fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
