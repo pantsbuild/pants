@@ -74,6 +74,10 @@ class CacheSetup(Subsystem):
                   'a RESTful cache, a path of a filesystem cache, or a pipe-separated list of '
                   'alternate caches to choose from. This list is also used as input to '
                   'the resolver. When resolver is \'none\' list is used as is.')
+    register('--read-timeout', advanced=True, type=float, default=4.0,
+             help='The read timeout for any remote caches in use, in seconds.')
+    register('--write-timeout', advanced=True, type=float, default=4.0,
+             help='The write timeout for any remote caches in use, in seconds.')
     register('--compression-level', advanced=True, type=int, default=5,
              help='The gzip compression level (0-9) for created artifacts.')
     register('--dereference-symlinks', type=bool, default=True, fingerprint=True,
@@ -288,7 +292,13 @@ class CacheFactory(object):
           ['{}/{}'.format(url.rstrip('/'), self._cache_dirname) for url in urls]
         )
         local_cache = local_cache or TempLocalArtifactCache(artifact_root, compression)
-        return RESTfulArtifactCache(artifact_root, best_url_selector, local_cache)
+        return RESTfulArtifactCache(
+          artifact_root,
+          best_url_selector,
+          local_cache,
+          read_timeout=self._options.read_timeout,
+          write_timeout=self._options.write_timeout,
+        )
 
     local_cache = create_local_cache(spec.local) if spec.local else None
     remote_cache = create_remote_cache(spec.remote, local_cache) if spec.remote else None
