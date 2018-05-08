@@ -4,10 +4,6 @@
 target(
   name = 'all',
   dependencies = [
-    ':analysis',
-    ':analysis_parser',
-    ':analysis_tools',
-    ':anonymizer',
     ':jvm_classpath_publisher',
     ':jvm_compile',
     'src/python/pants/backend/jvm/tasks/jvm_compile/javac',
@@ -16,34 +12,9 @@ target(
 )
 
 python_library(
-  name = 'analysis',
-  sources = ['analysis.py'],
-)
-
-python_library(
-  name = 'analysis_parser',
-  sources = ['analysis_parser.py'],
-  dependencies = [
-    'src/python/pants/base:exceptions',
-  ]
-)
-
-python_library(
-  name = 'analysis_tools',
-  sources = ['analysis_tools.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'src/python/pants/util:contextutil',
-  ]
-)
-
-python_library(
   name = 'compile_context',
   sources = ['compile_context.py'],
   dependencies = [
-    'src/python/pants/backend/codegen/protobuf/java',
-    'src/python/pants/backend/codegen/thrift/java',
-    'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
   ]
 )
@@ -67,6 +38,7 @@ python_library(
     ':compile_context',
     ':execution_graph',
     ':missing_dependency_finder',
+    'src/python/pants/backend/jvm/subsystems:dependency_context',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
@@ -94,21 +66,6 @@ python_library(
   sources = ['execution_graph.py'],
   dependencies = [
     'src/python/pants/base:worker_pool',
-  ],
-)
-
-python_library(
-  name = 'anonymizer',
-  sources = ['anonymizer.py'],
-)
-
-python_binary(
-  name = 'anonymize_zinc_analysis',
-  source = 'zinc/bin/anonymize_analysis.py',
-  dependencies = [
-    ':anonymizer',
-    'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
-    'src/python/pants/util:dirutil',
   ],
 )
 

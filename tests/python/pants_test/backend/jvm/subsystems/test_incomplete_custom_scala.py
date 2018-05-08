@@ -81,38 +81,6 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       assert re.search('bootstrap-scalastyle_2_12', pants_run.stdout_data), pants_run.stdout_data
 
-  def test_working_custom_210(self):
-    with self.tmp_custom_scala('custom_210_scalatools.build') as scalastyle_config_option:
-      pants_run = self.pants_run(
-        options=[
-          '--scala-platform-version=custom',
-          '--scala-platform-suffix-version=2.10',
-          scalastyle_config_option,
-        ]
-      )
-      self.assert_success(pants_run)
-      assert not re.search('bootstrap-scalastyle_2_10', pants_run.stdout_data)
-      assert not re.search('bootstrap-scalastyle_2_11', pants_run.stdout_data)
-
-  def test_repl_working_custom_210(self):
-    with self.tmp_custom_scala('custom_210_scalatools.build') as scalastyle_config_option:
-      pants_run = self.run_repl(
-        'testprojects/src/scala/org/pantsbuild/testproject/custom_scala_platform',
-        dedent("""
-            import org.pantsbuild.testproject.custom_scala_platform
-            Hello.main(Seq("World").toArray))
-          """),
-        options=[
-          '--scala-platform-version=custom',
-          '--scala-platform-suffix-version=2.10',
-          scalastyle_config_option,
-        ]
-      )
-
-      # Make sure this didn't happen:
-      # FAILURE: No bootstrap callback registered for //:scala-repl in scala-platform
-      self.assert_success(pants_run)
-
   def test_repl_working_custom_211(self):
     with self.tmp_custom_scala('custom_211_scalatools.build') as scalastyle_config_option:
       pants_run = self.run_repl(
@@ -123,7 +91,7 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
           """),
         options=[
           '--scala-platform-version=custom',
-          '--scala-platform-suffix-version=2.10',
+          '--scala-platform-suffix-version=2.11',
           scalastyle_config_option,
         ]
       )
@@ -144,6 +112,19 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       assert not re.search('bootstrap-scalastyle_2_10', pants_run.stdout_data)
       assert not re.search('bootstrap-scalastyle_2_11', pants_run.stdout_data)
+
+  def test_working_custom_212(self):
+    with self.tmp_custom_scala('custom_212_scalatools.build') as scalastyle_config_option:
+      pants_run = self.pants_run(
+        options=[
+          '--scala-platform-version=custom',
+          '--scala-platform-suffix-version=2.12',
+          scalastyle_config_option,
+        ]
+      )
+      self.assert_success(pants_run)
+      assert not re.search('bootstrap-scalastyle_2_11', pants_run.stdout_data)
+      assert not re.search('bootstrap-scalastyle_2_12', pants_run.stdout_data)
 
   def test_missing_compiler(self):
     with self.tmp_custom_scala('custom_211_missing_compiler.build') as scalastyle_config_option:

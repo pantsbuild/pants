@@ -157,7 +157,7 @@ class JvmDependencyUsage(Task):
     `classes_by_source`, `runtime_classpath`, `product_deps_by_src` parameters and
     stores the result to the build cache.
     """
-    analyzer = JvmDependencyAnalyzer(get_buildroot(), runtime_classpath, product_deps_by_src)
+    analyzer = JvmDependencyAnalyzer(get_buildroot(), runtime_classpath)
     targets = self.context.targets()
     targets_by_file = analyzer.targets_by_file(targets)
     transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(targets)
@@ -165,6 +165,7 @@ class JvmDependencyUsage(Task):
       transitive_deps = set(transitive_deps_by_target.get(target))
       node = self.create_dep_usage_node(target,
                                         analyzer,
+                                        product_deps_by_src,
                                         classes_by_source,
                                         targets_by_file,
                                         transitive_deps)
@@ -221,8 +222,13 @@ class JvmDependencyUsage(Task):
   def cache_target_dirs(self):
     return True
 
-  def create_dep_usage_node(self, target, analyzer, classes_by_source, targets_by_file, transitive_deps):
-    product_deps_by_src = analyzer.product_deps_by_src
+  def create_dep_usage_node(self,
+                            target,
+                            analyzer,
+                            product_deps_by_src,
+                            classes_by_source,
+                            targets_by_file,
+                            transitive_deps):
     declared_deps_with_aliases = set(analyzer.resolve_aliases(target))
     eligible_unused_deps = set(d for d, _ in analyzer.resolve_aliases(target, scope=Scopes.DEFAULT))
     concrete_target = target.concrete_derived_from

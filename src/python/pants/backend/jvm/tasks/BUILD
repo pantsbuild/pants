@@ -4,6 +4,7 @@
 target(
   name = 'all',
   dependencies = [
+    ':analysis_extraction',
     ':benchmark_run',
     ':binary_create',
     ':bootstrap_jvm_tools',
@@ -45,6 +46,19 @@ target(
     ':scalastyle',
     ':unpack_jars',
     'src/python/pants/backend/jvm/tasks/jvm_compile:all',
+  ],
+)
+
+python_library(
+  name = 'analysis_extraction',
+  sources = ['analysis_extraction.py'],
+  dependencies = [
+    ':nailgun_task',
+    'src/python/pants/backend/jvm/subsystems:dependency_context',
+    'src/python/pants/backend/jvm/subsystems:zinc',
+    'src/python/pants/goal:products',
+    'src/python/pants/task',
+    'src/python/pants/util:memo',
   ],
 )
 
@@ -496,7 +510,6 @@ python_library(
   dependencies = [
     'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/base:exceptions',
-    'src/python/pants/java/distribution',
     'src/python/pants/task',
   ],
 )
