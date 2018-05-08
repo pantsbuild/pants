@@ -11,13 +11,12 @@ from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.base.specs import SingleAddress, Specs
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.build_graph.app_base import Bundle
+from pants.build_graph.app_base import AppBase, Bundle
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
@@ -153,7 +152,7 @@ class LegacyBuildGraph(BuildGraph):
       kwargs.pop('dependencies')
 
       # Instantiate.
-      if target_cls is JvmApp:
+      if issubclass(target_cls, AppBase):
         return self._instantiate_app(target_cls, kwargs)
       elif target_cls is RemoteSources:
         return self._instantiate_remote_sources(kwargs)
