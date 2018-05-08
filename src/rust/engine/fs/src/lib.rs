@@ -583,7 +583,7 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
             .and_then(move |maybe_stat| {
               match maybe_stat {
                 // Note: This will drop PathStats for symlinks which don't point anywhere.
-                Some(Stat::Link(link)) => fs.canonicalize(link),
+                Some(Stat::Link(link)) => fs.canonicalize(link.0.clone(), link),
                 Some(Stat::Dir(dir)) => {
                   future::ok(Some(PathStat::dir(dir.0.clone(), dir))).to_boxed()
                 }
@@ -616,10 +616,9 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
   ///
   /// TODO: Should handle symlink loops (which would exhibit as an infinite loop in expand).
   ///
-  fn canonicalize(&self, link: Link) -> BoxFuture<Option<PathStat>, E> {
+  fn canonicalize(&self, symbolic_path: PathBuf, link: Link) -> BoxFuture<Option<PathStat>, E> {
     // Read the link, which may result in PathGlob(s) that match 0 or 1 Path.
     let context = self.clone();
-    let symbolic_path = link.0.clone();
     self
       .read_link(link)
       .map(|dest_path| {
@@ -686,7 +685,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
                 future::ok(None).to_boxed()
               } else {
                 match stat {
-                  Stat::Link(l) => context.canonicalize(l),
+                  Stat::Link(l) => context.canonicalize(stat_symbolic_path, l),
                   Stat::Dir(d) => {
                     future::ok(Some(PathStat::dir(stat_symbolic_path.to_owned(), d))).to_boxed()
                   }
