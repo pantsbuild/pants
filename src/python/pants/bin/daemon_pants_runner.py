@@ -81,9 +81,9 @@ class DaemonPantsRunner(ProcessManager):
     :param list args: The arguments (i.e. sys.argv) for this run.
     :param dict env: The environment (i.e. os.environ) for this run.
     :param TargetRoots target_roots: The `TargetRoots` for this run.
-    :param LegacyGraphHelper graph_helper: The LegacyGraphHelper instance to use for BuildGraph
-                                           construction. In the event of an exception, this will be
-                                           None.
+    :param LegacyGraphSession graph_helper: The LegacyGraphSession instance to use for BuildGraph
+                                            construction. In the event of an exception, this will be
+                                            None.
     :param threading.RLock fork_lock: A lock to use during forking for thread safety.
     :param int preceding_graph_size: The size of the graph pre-warming, for stats.
     :param Exception deferred_exception: A deferred exception from the daemon's graph construction.
@@ -202,7 +202,7 @@ class DaemonPantsRunner(ProcessManager):
     in that child process.
     """
     if self._graph_helper:
-      self._graph_helper.scheduler.pre_fork()
+      self._graph_helper.scheduler_session.pre_fork()
 
   def post_fork_child(self):
     """Post-fork child process callback executed via ProcessManager.daemonize()."""

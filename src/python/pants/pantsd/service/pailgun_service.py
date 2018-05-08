@@ -64,16 +64,15 @@ class PailgunService(PantsService):
 
       self._logger.debug('execution commandline: %s', arguments)
       options, _ = OptionsInitializer(OptionsBootstrapper(args=arguments)).setup(init_logging=False)
-      target_roots = self._target_roots_calculator.create(
-        options,
-        change_calculator=self._scheduler_service.change_calculator
-      )
 
       try:
         self._logger.debug('warming the product graph via %s', self._scheduler_service)
         # N.B. This call is made in the pre-fork daemon context for reach and reuse of the
         # resident scheduler.
-        graph_helper = self._scheduler_service.warm_product_graph(target_roots)
+        graph_helper, target_roots = self._scheduler_service.warm_product_graph(
+          options,
+          self._target_roots_calculator
+        )
       except Exception:
         deferred_exc = sys.exc_info()
         self._logger.warning(

@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-from collections import namedtuple
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.file_system_project_tree import FileSystemProjectTree
@@ -27,6 +26,8 @@ from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import Scheduler
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.scm.change_calculator import EngineChangeCalculator
+from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
@@ -70,8 +71,17 @@ class LegacySymbolTable(SymbolTable):
     return self._table
 
 
-class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_table', 'scm'])):
-  """A container for the components necessary to construct a legacy BuildGraph facade."""
+class LegacyGraphScheduler(datatype(['scheduler', 'symbol_table'])):
+  """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
+
+  def new_session(self):
+    session = self.scheduler.new_session()
+    change_calculator = EngineChangeCalculator(session, self.symbol_table, get_scm())
+    return LegacyGraphSession(session, self.symbol_table, change_calculator)
+
+
+class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'change_calculator'])):
+  """A thin wrapper around a SchedulerSession configured with @rules for a symbol table."""
 
   def warm_product_graph(self, target_roots):
     """Warm the scheduler's `ProductGraph` with `TransitiveHydratedTargets` products.
@@ -80,28 +90,26 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
     """
     logger.debug('warming target_roots for: %r', target_roots)
     subjects = [Specs(tuple(target_roots.specs))]
-    scheduler_session = self.scheduler.new_session()
-    request = scheduler_session.execution_request([TransitiveHydratedTargets], subjects)
-    result = scheduler_session.execute(request)
+    request = self.scheduler_session.execution_request([TransitiveHydratedTargets], subjects)
+    result = self.scheduler_session.execute(request)
     if result.error:
       raise result.error
 
-  def create_build_graph(self, scheduler_session, target_roots, build_root=None):
+  def create_build_graph(self, target_roots, build_root=None):
     """Construct and return a `BuildGraph` given a set of input specs.
 
-    :param SchedulerSession scheduler_session: A SchedulerSession to warm the graph in.
     :param TargetRoots target_roots: The targets root of the request.
     :param string build_root: The build root.
     :returns: A tuple of (BuildGraph, AddressMapper).
     """
     logger.debug('target_roots are: %r', target_roots)
-    graph = LegacyBuildGraph.create(scheduler_session, self.symbol_table)
+    graph = LegacyBuildGraph.create(self.scheduler_session, self.symbol_table)
     logger.debug('build_graph is: %s', graph)
     # Ensure the entire generator is unrolled.
     for _ in graph.inject_roots_closure(target_roots):
       pass
 
-    address_mapper = LegacyAddressMapper(scheduler_session, build_root or get_buildroot())
+    address_mapper = LegacyAddressMapper(self.scheduler_session, build_root or get_buildroot())
     logger.debug('address_mapper is: %s', address_mapper)
     return graph, address_mapper
 
@@ -145,11 +153,10 @@ class EngineInitializer(object):
                                   under the current build root.
     :param bool include_trace_on_error: If True, when an error occurs, the error message will
                 include the graph trace.
-    :returns: A LegacyGraphHelper.
+    :returns: A LegacyGraphScheduler.
     """
 
     build_root = build_root or get_buildroot()
-    scm = get_scm()
 
     if not build_file_aliases:
       build_file_aliases = EngineInitializer.get_default_build_file_aliases()
@@ -192,4 +199,4 @@ class EngineInitializer(object):
       include_trace_on_error=include_trace_on_error,
     )
 
-    return LegacyGraphHelper(scheduler, symbol_table, scm)
+    return LegacyGraphScheduler(scheduler, symbol_table)

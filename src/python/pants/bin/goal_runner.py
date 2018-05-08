@@ -25,7 +25,6 @@ from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting import Reporting
-from pants.scm.change_calculator import EngineChangeCalculator
 from pants.scm.subsystems.changed import Changed
 from pants.source.source_root import SourceRootConfig
 from pants.task.task import QuietTaskMixin
@@ -45,7 +44,8 @@ class GoalRunnerFactory(object):
     :param Runtracker run_tracker: The global, pre-initialized/running RunTracker instance.
     :param Reporting reporting: The global, pre-initialized Reporting instance.
     :param TargetRoots target_roots: A pre-existing `TargetRoots` object, if available.
-    :param LegacyGraphHelper daemon_graph_helper: A LegacyGraphHelper instance for graph reuse. (Optional)
+    :param LegacyGraphSession daemon_graph_helper: A LegacyGraphSession instance for graph
+                                                   reuse. (Optional)
     :param func exiter: A function that accepts an exit code value and exits. (for tests, Optional)
     """
     self._root_dir = root_dir
@@ -94,8 +94,8 @@ class GoalRunnerFactory(object):
     :param list exclude_target_regexps: Regular expressions for targets to be excluded.
     :param list target_specs: The original target specs.
     :param TargetRoots target_roots: The existing `TargetRoots` object, if any.
-    :param LegacyGraphHelper graph_helper: A LegacyGraphHelper to use for graph construction,
-                                           if available. This would usually come from the daemon.
+    :param LegacyGraphSession graph_helper: A LegacyGraphSession to use for graph construction,
+                                            if available. This would usually come from the daemon.
     :returns: A tuple of (BuildGraph, AddressMapper, SchedulerSession, TargetRoots).
     """
     # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
@@ -113,20 +113,16 @@ class GoalRunnerFactory(object):
         exclude_target_regexps=exclude_target_regexps,
         subproject_roots=subproject_build_roots,
         include_trace_on_error=self._options.for_global_scope().print_exception_stacktrace
-      )
+      ).new_session()
 
-    scheduler_session = graph_helper.scheduler.new_session()
     target_roots = target_roots or TargetRootsCalculator.create(
       options=self._options,
       build_root=self._root_dir,
-      change_calculator=EngineChangeCalculator(scheduler_session,
-                                               graph_helper.symbol_table,
-                                               graph_helper.scm)
+      change_calculator=graph_helper.change_calculator
     )
-    graph, address_mapper = graph_helper.create_build_graph(scheduler_session,
-                                                            target_roots,
+    graph, address_mapper = graph_helper.create_build_graph(target_roots,
                                                             self._root_dir)
-    return graph, address_mapper, scheduler_session, target_roots
+    return graph, address_mapper, graph_helper.scheduler_session, target_roots
 
   def _determine_goals(self, requested_goals):
     """Check and populate the requested goals for a given run."""
