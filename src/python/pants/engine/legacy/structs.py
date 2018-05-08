@@ -298,7 +298,7 @@ class BaseGlobs(Locatable, AbstractClass):
     if kwargs.pop('follow_links', None) is not None:
       deprecated_conditional(
         lambda: True,
-        '1.6.0.dev0',
+        '1.10.0.dev0',
         'Ignoring `follow_links` kwarg on glob in `{}`. Default behavior is to follow all links.'
           .format(self._spec_path)
       )
