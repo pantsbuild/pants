@@ -16,13 +16,13 @@ from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.setup_py import SetupPyRunner
+from pants.backend.python.tasks.setup_py import SetupPyInvocationEnvironment, SetupPyRunner
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.build_graph.address import Address
 from pants.task.task import Task
-from pants.util.contextutil import environment_as, get_joined_path
+from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_method
 
@@ -37,7 +37,7 @@ class BuildLocalPythonDistributions(Task):
     # Note that we don't actually place the products in the product map. We stitch
     # them into the build graph instead.  This is just to force the round engine
     # to run this task when dists need to be built.
-    return [PythonRequirementLibrary]
+    return [PythonRequirementLibrary, 'local_wheels']
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -81,6 +81,7 @@ class BuildLocalPythonDistributions(Task):
             )
           self._create_dist(vt.target, vt.results_dir, interpreter)
 
+        local_wheel_products = self.context.products.get('local_wheels')
         for vt in invalidation_check.all_vts:
           dist = self._get_whl_from_dir(os.path.join(vt.results_dir, 'dist'))
           req_lib_addr = Address.parse('{}__req_lib'.format(vt.target.address.spec))
@@ -89,6 +90,7 @@ class BuildLocalPythonDistributions(Task):
           # for downstream consumption.
           for dependent in self.context.build_graph.dependents_of(vt.target.address):
             self.context.build_graph.inject_dependency(dependent, req_lib_addr)
+          local_wheel_products.add(vt.target, os.path.dirname(dist)).append(os.path.basename(dist))
 
   def _copy_sources(self, dist_tgt, dist_target_dir):
     # Copy sources and setup.py over to vt results directory for packaging.
@@ -103,6 +105,11 @@ class BuildLocalPythonDistributions(Task):
                                   src_relative_to_target_base)
       shutil.copyfile(abs_src_path, src_rel_to_results_dir)
 
+  def _request_single(self, product, subject):
+    # This is not supposed to be exposed to Tasks yet -- see #4769 to track the
+    # status of exposing v2 products in v1 tasks.
+    return self.context._scheduler.product_request(product, [subject])[0]
+
   # FIXME(cosmicexplorer): We should be isolating the path to just our provided
   # toolchain, but this causes errors in Travis because distutils looks for
   # "x86_64-linux-gnu-gcc" when linking native extensions. We almost definitely
@@ -111,11 +118,9 @@ class BuildLocalPythonDistributions(Task):
   # compiler installed. Right now we just put our tools at the end of the PATH.
   @contextmanager
   def _setup_py_invocation_environment(self):
-    native_toolchain = self._native_toolchain_instance()
-    native_toolchain_path_entries = native_toolchain.path_entries()
-    appended_native_toolchain_path = get_joined_path(
-      native_toolchain_path_entries, os.environ.copy())
-    with environment_as(PATH=appended_native_toolchain_path):
+    setup_py_env = self._request_single(
+      SetupPyInvocationEnvironment, self._native_toolchain_instance())
+    with environment_as(**setup_py_env.as_env_dict()):
       yield
 
   def _create_dist(self, dist_tgt, dist_target_dir, interpreter):

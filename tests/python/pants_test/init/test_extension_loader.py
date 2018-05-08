@@ -18,12 +18,15 @@ from pants.base.exceptions import BuildConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
+from pants.engine.rules import RootRule, rule
+from pants.engine.selectors import Select
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
 from pants.init.extension_loader import (PluginLoadOrderError, PluginNotFound, load_backend,
                                          load_backends_and_plugins, load_plugins)
 from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
+from pants.util.objects import datatype
 
 
 class MockMetadata(EmptyProvider):
@@ -80,6 +83,19 @@ class DummyTask(Task):
   def execute(self): return 42
 
 
+class RootType(datatype(['value'])):
+  pass
+
+
+class WrapperType(datatype(['value'])):
+  pass
+
+
+@rule(WrapperType, [Select(RootType)])
+def example_rule(root_type):
+  yield WrapperType(root_type.value)
+
+
 class LoaderTest(unittest.TestCase):
 
   def setUp(self):
@@ -93,7 +109,7 @@ class LoaderTest(unittest.TestCase):
 
   @contextmanager
   def create_register(self, build_file_aliases=None, register_goals=None, global_subsystems=None,
-                      module_name='register'):
+                      rules=None, module_name='register'):
 
     package_name = b'__test_package_{0}'.format(uuid.uuid4().hex)
     self.assertFalse(package_name in sys.modules)
@@ -113,6 +129,7 @@ class LoaderTest(unittest.TestCase):
       register_entrypoint('build_file_aliases', build_file_aliases)
       register_entrypoint('global_subsystems', global_subsystems)
       register_entrypoint('register_goals', register_goals)
+      register_entrypoint('rules', rules)
 
       yield package_name
     finally:
@@ -125,6 +142,7 @@ class LoaderTest(unittest.TestCase):
     self.assertEqual(0, len(registered_aliases.objects))
     self.assertEqual(0, len(registered_aliases.context_aware_object_factories))
     self.assertEqual(self.build_configuration.subsystems(), set())
+    self.assertEqual(0, len(self.build_configuration.rules()))
 
   def test_load_valid_empty(self):
     with self.create_register() as backend_package:
@@ -291,6 +309,14 @@ class LoaderTest(unittest.TestCase):
       load_backend(self.build_configuration, backend_package)
       self.assertEqual(self.build_configuration.subsystems(),
                        {DummySubsystem1, DummySubsystem2})
+
+  def test_rules(self):
+    def rules():
+      return [example_rule, RootRule(RootType)]
+    with self.create_register(rules=rules) as backend_package:
+      load_backend(self.build_configuration, backend_package)
+      self.assertEqual(self.build_configuration.rules(),
+                       [example_rule, RootRule(RootType)])
 
   def test_backend_plugin_ordering(self):
     def reg_alias():

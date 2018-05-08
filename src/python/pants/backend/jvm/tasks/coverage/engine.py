@@ -31,7 +31,7 @@ class CoverageEngine(AbstractClass):
   is instantiated and used exactly once per `JUnitRun` task execution.
   """
 
-  class RunModifications(datatype('RunModifications', ['classpath_prepend', 'extra_jvm_options'])):
+  class RunModifications(datatype(['classpath_prepend', 'extra_jvm_options'])):
     """Modifications that should be made to the java command where code coverage is collected.
 
     The `classpath_prepend` field should be an iterable of classpath elements to prepend to java

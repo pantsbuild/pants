@@ -8,11 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
+from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.build_graph.address import Address
+from pants.build_graph.app_base import Bundle, DirectoryReMapper
 from pants.source.wrapped_globs import Globs
 from pants_test.base_test import BaseTest
 
@@ -78,7 +79,7 @@ class JvmAppTest(BaseTest):
     app = self.create_app('src/java/org/archimedes/buoyancy')
     with self.assertRaisesRegexp(TargetDefinitionException,
                                  r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy:app\).*'
-                                 r' A JvmApp must define exactly one'):
+                                 r' An app must define exactly one'):
       app.binary
 
   def test_too_many_binaries_mixed(self):
@@ -87,7 +88,7 @@ class JvmAppTest(BaseTest):
     app = self.create_app('src/java/org/archimedes/buoyancy', binary=':bin', dependencies=[bin2])
     with self.assertRaisesRegexp(TargetDefinitionException,
                                  r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy:app\).*'
-                                 r' A JvmApp must define exactly one'):
+                                 r' An app must define exactly one'):
       app.binary
 
   def test_too_many_binaries_via_deps(self):
@@ -96,7 +97,7 @@ class JvmAppTest(BaseTest):
     app = self.create_app('src/java/org/archimedes/buoyancy', dependencies=[bin, bin2])
     with self.assertRaisesRegexp(TargetDefinitionException,
                                  r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy:app\).*'
-                                 r' A JvmApp must define exactly one'):
+                                 r' An app must define exactly one'):
       app.binary
 
   def test_not_a_binary(self):
@@ -105,7 +106,7 @@ class JvmAppTest(BaseTest):
     app = self.create_app('src/java/org/archimedes/buoyancy', name='app2', binary=':app')
     with self.assertRaisesRegexp(TargetDefinitionException,
                                  r'Invalid target JvmApp.*src/java/org/archimedes/buoyancy:app2\).*'
-                                 r' Expected JvmApp binary dependency'):
+                                 r' Expected binary dependency'):
       app.binary
 
 

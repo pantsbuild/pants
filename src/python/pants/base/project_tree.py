@@ -211,21 +211,21 @@ class Stat(AbstractClass):
     """:returns: The string path for this Stat."""
 
 
-class File(datatype('File', ['path']), Stat):
+class File(datatype(['path']), Stat):
   """A file."""
 
   def __new__(cls, path):
     return super(File, cls).__new__(cls, six.binary_type(path))
 
 
-class Dir(datatype('Dir', ['path']), Stat):
+class Dir(datatype(['path']), Stat):
   """A directory."""
 
   def __new__(cls, path):
     return super(Dir, cls).__new__(cls, six.binary_type(path))
 
 
-class Link(datatype('Link', ['path']), Stat):
+class Link(datatype(['path']), Stat):
   """A symbolic link."""
 
   def __new__(cls, path):

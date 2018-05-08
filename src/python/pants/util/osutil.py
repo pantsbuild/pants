@@ -59,5 +59,13 @@ def normalize_os_name(os_name):
   return os_name
 
 
+def get_normalized_os_name():
+  return normalize_os_name(get_os_name())
+
+
+def all_normalized_os_names():
+  return OS_ALIASES.keys()
+
+
 def known_os_names():
   return reduce(set.union, OS_ALIASES.values())

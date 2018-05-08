@@ -18,6 +18,8 @@ python_library(
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:specs',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:selectors',
     'src/python/pants/build_graph',
     'src/python/pants/invalidation',
     'src/python/pants/python',

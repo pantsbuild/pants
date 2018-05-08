@@ -10,14 +10,14 @@ from abc import abstractproperty
 
 from six import string_types
 
-from pants.engine.addressable import Exactly, addressable_list
+from pants.engine.addressable import addressable_list
 from pants.engine.fs import PathGlobs
 from pants.engine.objects import Locatable
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.contextutil import exception_logging
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
+from pants.util.objects import Exactly, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ class Field(object):
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
 
 
-class SourcesField(datatype('SourcesField', ['address', 'arg', 'filespecs', 'path_globs']), Field):
+class SourcesField(datatype(['address', 'arg', 'filespecs', 'path_globs']), Field):
   """Represents the `sources` argument for a particular Target.
 
   Sources are currently eagerly computed in-engine in order to provide the `BuildGraph`
@@ -123,7 +123,7 @@ class JunitTestsAdaptor(TargetAdaptor):
     return self.java_test_globs + self.scala_test_globs
 
 
-class BundlesField(datatype('BundlesField', ['address', 'bundles', 'filespecs_list', 'path_globs_list']), Field):
+class BundlesField(datatype(['address', 'bundles', 'filespecs_list', 'path_globs_list']), Field):
   """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
 
   def __eq__(self, other):
@@ -146,12 +146,12 @@ class BundleAdaptor(Struct):
   """
 
 
-class JvmAppAdaptor(TargetAdaptor):
+class AppAdaptor(TargetAdaptor):
   def __init__(self, bundles=None, **kwargs):
     """
     :param list bundles: A list of `BundleAdaptor` objects
     """
-    super(JvmAppAdaptor, self).__init__(**kwargs)
+    super(AppAdaptor, self).__init__(**kwargs)
     self.bundles = bundles
 
   @addressable_list(Exactly(BundleAdaptor))
@@ -162,7 +162,7 @@ class JvmAppAdaptor(TargetAdaptor):
   @property
   def field_adaptors(self):
     with exception_logging(logger, 'Exception in `field_adaptors` property'):
-      field_adaptors = super(JvmAppAdaptor, self).field_adaptors
+      field_adaptors = super(AppAdaptor, self).field_adaptors
       if getattr(self, 'bundles', None) is None:
         return field_adaptors
 

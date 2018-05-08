@@ -1,4 +1,4 @@
-Created by running `build-support/bin/contributors.sh`.
+Created by running `./build-support/bin/contributors.sh`.
 
 + Aaron Mitchell
 + Adam Chainz
@@ -8,6 +8,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Andrew Hamilton
 + Andy Reitz
 + Antoine Tollenaere
++ Bardur Arantsson
 + Benjy Weinberger
 + Bill Farner
 + Brandon Milton
@@ -105,6 +106,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Luc Cary
 + Luca Clementi
 + Marc Abramowitz
++ Marilyn Cruz
 + Marius Eriksen
 + Mark Chu-Carroll
 + Mark Davis
@@ -124,9 +126,9 @@ Created by running `build-support/bin/contributors.sh`.
 + Nadav Samet
 + Neil Sanchala
 + Nicholas Santos
-+ Nora Howard
 + Nik Shkrob
 + Nitay Joffe
++ Nora Howard
 + Ny Saechao
 + Oliver Gould
 + Oliver Seemann

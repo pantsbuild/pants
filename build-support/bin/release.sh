@@ -128,6 +128,7 @@ function execute_packaged_pants_with_internal_backends() {
         'pants.backend.docgen',\
         'pants.backend.graph_info',\
         'pants.backend.jvm',\
+        'pants.backend.native',\
         'pants.backend.project_info',\
         'pants.backend.python',\
         'internal_backend.repositories',\

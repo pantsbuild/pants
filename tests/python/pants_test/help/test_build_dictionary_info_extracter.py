@@ -235,7 +235,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
                       extracter.get_object_factory_info())
 
   def test_get_object_info_datatype(self):
-    class FooDatatype(datatype('FooDatatype', ['bar', 'baz'])):
+    class FooDatatype(datatype(['bar', 'baz'])):
       """Foo docstring."""
 
       def __new__(cls, bar, baz=42):

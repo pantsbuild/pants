@@ -72,8 +72,8 @@ impl VFS<Failure> for Context {
 }
 
 impl StoreFileByDigest<Failure> for Context {
-  fn store_by_digest(&self, file: &File) -> BoxFuture<hashing::Digest, Failure> {
-    self.get(DigestFile(file.clone()))
+  fn store_by_digest(&self, file: File) -> BoxFuture<hashing::Digest, Failure> {
+    self.get(DigestFile(file))
   }
 }
 
@@ -492,7 +492,7 @@ impl SelectDependencies {
               .then(move |dep_values_res| {
                 // Finally, store the resulting values.
                 match dep_values_res {
-                  Ok(dep_values) => Ok(externs::store_list(dep_values.iter().collect(), false)),
+                  Ok(dep_values) => Ok(externs::store_tuple(&dep_values)),
                   Err(failure) => Err(was_required(failure)),
                 }
               })
@@ -736,7 +736,7 @@ impl Snapshot {
       &[
         externs::store_bytes(&(item.digest.0).to_hex().as_bytes()),
         externs::store_i32(item.digest.1 as i32),
-        externs::store_list(path_stats.iter().collect(), false),
+        externs::store_tuple(&path_stats),
       ],
     )
   }
@@ -784,7 +784,7 @@ impl Snapshot {
       .collect();
     externs::unsafe_call(
       &context.core.types.construct_files_content,
-      &[externs::store_list(entries.iter().collect(), false)],
+      &[externs::store_tuple(&entries)],
     )
   }
 }
@@ -892,13 +892,11 @@ impl Task {
         match response {
           externs::GeneratorResponse::Get(get) => Self::gen_get(&context, entry, vec![get])
             .map(|vs| future::Loop::Continue(vs.into_iter().next().unwrap()))
-            .to_boxed() as BoxFuture<_, _>,
+            .to_boxed(),
           externs::GeneratorResponse::GetMulti(gets) => Self::gen_get(&context, entry, gets)
-            .map(|vs| future::Loop::Continue(externs::store_list(vs.iter().collect(), false)))
-            .to_boxed() as BoxFuture<_, _>,
-          externs::GeneratorResponse::Break(val) => {
-            future::ok(future::Loop::Break(val)).to_boxed() as BoxFuture<_, _>
-          }
+            .map(|vs| future::Loop::Continue(externs::store_tuple(&vs)))
+            .to_boxed(),
+          externs::GeneratorResponse::Break(val) => future::ok(future::Loop::Break(val)).to_boxed(),
         }
       })
     }).to_boxed()

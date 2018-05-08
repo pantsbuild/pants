@@ -8,12 +8,14 @@ use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
 use fs::Store;
 use futures::{future, Future};
+use futures_timer::Delay;
 use hashing::{Digest, Fingerprint};
 use grpcio;
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
 
 use super::{ExecuteProcessRequest, ExecuteProcessResult};
+use std::cmp::min;
 
 #[derive(Clone)]
 pub struct CommandRunner {
@@ -37,13 +39,16 @@ macro_rules! try_future {
     {
         match $x {
             Ok(value) => {value}
-            Err(error) => {return future::err(error).to_boxed() as BoxFuture<_, _>;}
+            Err(error) => {return future::err(error).to_boxed();}
         }
     }
 };
 }
 
 impl CommandRunner {
+  const BACKOFF_INCR_WAIT_MILLIS: u64 = 500;
+  const BACKOFF_MAX_WAIT_MILLIS: u64 = 5000;
+
   pub fn new(address: &str, thread_count: usize, store: Store) -> CommandRunner {
     let env = Arc::new(grpcio::Environment::new(thread_count));
     let channel = grpcio::ChannelBuilder::new(env.clone()).connect(address);
@@ -92,42 +97,45 @@ impl CommandRunner {
     match execute_request_result {
       Ok((command, execute_request)) => {
         let command_runner = self.clone();
-        self.upload_command(&command, execute_request.get_action().get_command_digest().into())
+        self
+          .upload_command(
+            &command,
+            execute_request.get_action().get_command_digest().into(),
+          )
           .and_then(move |_| {
-            debug!("Executing remotely request: {:?} (command: {:?})", execute_request, command);
+            debug!(
+              "Executing remotely request: {:?} (command: {:?})",
+              execute_request, command
+            );
 
             map_grpc_result(execution_client.execute(&execute_request))
-                .map(|result| (Arc::new(execute_request), result))
+              .map(|result| (Arc::new(execute_request), result))
           })
-
-          // TODO: Use some better looping-frequency strategy than a tight-loop:
-          // https://github.com/pantsbuild/pants/issues/5503
-
           .and_then(move |(execute_request, operation)| {
             let start_time = SystemTime::now();
             // TODO the timeout should be injected rather than local to here.
             let timeout: Duration = Duration::new(4, 0);
 
-            future::loop_fn(operation, move |operation| {
+            future::loop_fn((operation, 0), move |(operation, iter_num)| {
+              //XXX future::loop_fn(operation, move |operation| {
               let execute_request = execute_request.clone();
               let execution_client2 = execution_client2.clone();
               let store = store.clone();
               let operations_client = operations_client.clone();
-              command_runner.extract_execute_response(operation)
-                  .map(|value|  future::Loop::Break(value))
-                  .or_else(move |value| {
-                    match value {
-                      ExecutionError::Fatal(err) => {
-                        future::err(err).to_boxed() as BoxFuture<_, _>
-                      },
-                      ExecutionError::MissingDigests(missing_digests) => {
-                        debug!(
+              command_runner
+                .extract_execute_response(operation)
+                .map(|value| future::Loop::Break(value))
+                .or_else(move |value| {
+                  match value {
+                    ExecutionError::Fatal(err) => future::err(err).to_boxed(),
+                    ExecutionError::MissingDigests(missing_digests) => {
+                      debug!(
                         "Server reported missing digests; trying to upload: {:?}",
                         missing_digests
-                        );
-                        let execute_request = execute_request.clone();
-                        let execution_client2 = execution_client2.clone();
-                        store.ensure_remote_has_recursive(missing_digests)
+                      );
+                      let execute_request = execute_request.clone();
+                      let execution_client2 = execution_client2.clone();
+                      store.ensure_remote_has_recursive(missing_digests)
                             .and_then(move |()| {
                               map_grpc_result(
                                 execution_client2.execute(
@@ -135,44 +143,65 @@ impl CommandRunner {
                                 )
                               )
                             })
-                            .map(|operation| future::Loop::Continue(operation))
+                            // Reset `iter_num` on `MissingDigests`
+                            .map(|operation| future::Loop::Continue((operation, 0)))
                             .to_boxed()
-                      },
-                      ExecutionError::NotFinished(operation_name) => {
-                        let mut operation_request =
-                          bazel_protos::operations::GetOperationRequest::new();
-                        operation_request.set_name(operation_name);
-                        let grpc_result = map_grpc_result(
-                          operations_client.get_operation(&operation_request)
-                        );
-                        match grpc_result {
-                          Ok(operation) => {
-                            match start_time.elapsed() {
-                              Ok(elapsed) => {
-                                if elapsed > timeout {
+                    }
+                    ExecutionError::NotFinished(operation_name) => {
+                      let mut operation_request =
+                        bazel_protos::operations::GetOperationRequest::new();
+                      operation_request.set_name(operation_name.clone());
+
+                      let backoff_period = min(
+                        CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
+                        (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS,
+                      );
+
+                      let grpc_result =
+                        map_grpc_result(operations_client.get_operation(&operation_request));
+
+                      // take the grpc result and cancel the op if too much time has passed.
+                      match grpc_result {
+                        Ok(operation) => {
+                          match start_time.elapsed() {
+                            Ok(elapsed) => {
+                              if elapsed > timeout {
                                 // TODO: note what timed out. Options might include
                                 // the op name, exec digest and a friendly name like zinc-compile
-                                  future::err(
+                                future::err(format!(
+                                  "Exceeded time out of {:?} with {:?} for {}",
+                                  timeout, elapsed, operation_name
+                                )).to_boxed() as BoxFuture<_, _>
+                              } else {
+                                // maybe the delay here should be the min of remaining time and the backoff period
+                                Delay::new(Duration::from_millis(backoff_period))
+                                  .map_err(move |e| {
                                     format!(
-                                      "Exceeded time out of {:?} with {:?}",
-                                      timeout,
-                                      elapsed)).to_boxed() as BoxFuture<_, _>
-                                } else {
-                                  future::ok(future::Loop::Continue(operation)).to_boxed()
-                                }
-                              },
-                              Err(err) => future::err(
-                                  format!("Something weird happened with time {:?}", err)
-                                ).to_boxed() as BoxFuture<_, _>,
+                                      // could this message be better?
+                                      "Future-Delay errored at operation result polling for {}: {}",
+                                        operation_name, e)
+                                  })
+                                  .and_then(move |_| {
+                                    future::ok(future::Loop::Continue((operation, iter_num + 1)))
+                                      .to_boxed()
+                                  })
+                                  .to_boxed()
+                              }
                             }
-                          },
-                          Err(err) => future::err(err).to_boxed() as BoxFuture<_, _>,
+                            Err(err) => {
+                              future::err(format!("Something weird happened with time {:?}", err))
+                                .to_boxed() as BoxFuture<_, _>
+                            }
+                          }
                         }
-                      },
+                        Err(err) => future::err(err).to_boxed() as BoxFuture<_, _>,
+                      }
                     }
-                  })
-              })
-            }).to_boxed()
+                  }
+                })
+            })
+          })
+          .to_boxed()
       }
       Err(err) => future::err(err).to_boxed(),
     }
@@ -208,17 +237,15 @@ impl CommandRunner {
     // TODO: Log less verbosely
     debug!("Got operation response: {:?}", operation);
     if !operation.get_done() {
-      return future::err(ExecutionError::NotFinished(operation.take_name())).to_boxed()
-        as BoxFuture<_, _>;
+      return future::err(ExecutionError::NotFinished(operation.take_name())).to_boxed();
     }
     if operation.has_error() {
-      return future::err(ExecutionError::Fatal(format_error(&operation.get_error()))).to_boxed()
-        as BoxFuture<_, _>;
+      return future::err(ExecutionError::Fatal(format_error(&operation.get_error()))).to_boxed();
     }
     if !operation.has_response() {
       return future::err(ExecutionError::Fatal(
         "Operation finished but no response supplied".to_string(),
-      )).to_boxed() as BoxFuture<_, _>;
+      )).to_boxed();
     }
     let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
     try_future!(
@@ -228,44 +255,23 @@ impl CommandRunner {
     );
     // TODO: Log less verbosely
     debug!("Got (nested) execute response: {:?}", execute_response);
-    let stdout = if execute_response.get_result().has_stdout_digest() {
-      let digest = execute_response.get_result().get_stdout_digest().into();
-      self
-        .store
-        .load_file_bytes_with(digest, |v| v)
-        .map_err(move |error| {
-          ExecutionError::Fatal(format!(
-            "Error fetching stdout digest ({:?}): {:?}",
-            digest, error
-          ))
-        })
-        .and_then(move |maybe_value| match maybe_value {
-          Some(value) => return Ok(value),
-          None => {
-            return Err(ExecutionError::Fatal(format!(
-              "Couldn't find stdout digest ({:?}), when fetching.",
-              digest
-            )))
-          }
-        })
-        .to_boxed()
-    } else {
-      future::ok(execute_response.take_result().take_stdout_raw()).to_boxed() as BoxFuture<_, _>
-    };
-    stdout
-      .and_then(move |stdout| {
+
+    self
+      .extract_stdout(&execute_response)
+      .join(self.extract_stderr(&execute_response))
+      .and_then(move |(stdout, stderr)| {
         match grpcio::RpcStatusCode::from(execute_response.get_status().get_code()) {
           grpcio::RpcStatusCode::Ok => future::ok(ExecuteProcessResult {
             stdout: stdout,
-            stderr: execute_response.get_result().get_stderr_raw().to_vec(),
+            stderr: stderr,
             exit_code: execute_response.get_result().get_exit_code(),
-          }).to_boxed() as BoxFuture<_, _>,
+          }).to_boxed(),
           grpcio::RpcStatusCode::FailedPrecondition => {
             if execute_response.get_status().get_details().len() != 1 {
               return future::err(ExecutionError::Fatal(format!(
               "Received multiple details in FailedPrecondition ExecuteResponse's status field: {:?}",
               execute_response.get_status().get_details()
-            ))).to_boxed() as BoxFuture<_, _>;
+            ))).to_boxed();
             }
             let details = execute_response.get_status().get_details().get(0).unwrap();
             let mut precondition_failure = bazel_protos::error_details::PreconditionFailure::new();
@@ -279,7 +285,7 @@ impl CommandRunner {
                  protobuf type {}",
                 execute_response.get_status().get_message(),
                 details.get_type_url()
-              ))).to_boxed() as BoxFuture<_, _>;
+              ))).to_boxed();
             }
             try_future!(
               precondition_failure
@@ -298,14 +304,14 @@ impl CommandRunner {
                 return future::err(ExecutionError::Fatal(format!(
                   "Didn't know how to process PreconditionFailure violation: {:?}",
                   violation
-                ))).to_boxed() as BoxFuture<_, _>;
+                ))).to_boxed();
               }
               let parts: Vec<_> = violation.get_subject().split("/").collect();
               if parts.len() != 3 || parts.get(0).unwrap() != &"blobs" {
                 return future::err(ExecutionError::Fatal(format!(
                   "Received FailedPrecondition MISSING but didn't recognize subject {}",
                   violation.get_subject()
-                ))).to_boxed() as BoxFuture<_, _>;
+                ))).to_boxed();
               }
               let digest = Digest(
                 try_future!(
@@ -330,19 +336,80 @@ impl CommandRunner {
             if missing_digests.len() == 0 {
               return future::err(ExecutionError::Fatal(
                 "Error from remote execution: FailedPrecondition, but no details".to_owned(),
-              )).to_boxed() as BoxFuture<_, _>;;
+              )).to_boxed();
             }
-            return future::err(ExecutionError::MissingDigests(missing_digests)).to_boxed()
-              as BoxFuture<_, _>;
+            return future::err(ExecutionError::MissingDigests(missing_digests)).to_boxed();
           }
           code => future::err(ExecutionError::Fatal(format!(
             "Error from remote execution: {:?}: {:?}",
             code,
             execute_response.get_status().get_message()
-          ))).to_boxed() as BoxFuture<_, _>,
+          ))).to_boxed(),
         }
       })
       .to_boxed()
+  }
+
+  fn extract_stdout(
+    &self,
+    execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+  ) -> BoxFuture<Bytes, ExecutionError> {
+    let stdout = if execute_response.get_result().has_stdout_digest() {
+      let stdout_digest = execute_response.get_result().get_stdout_digest().into();
+      self
+        .store
+        .load_file_bytes_with(stdout_digest, |v| v)
+        .map_err(move |error| {
+          ExecutionError::Fatal(format!(
+            "Error fetching stdout digest ({:?}): {:?}",
+            stdout_digest, error
+          ))
+        })
+        .and_then(move |maybe_value| match maybe_value {
+          Some(value) => return Ok(value),
+          None => {
+            return Err(ExecutionError::Fatal(format!(
+              "Couldn't find stdout digest ({:?}), when fetching.",
+              stdout_digest
+            )))
+          }
+        })
+        .to_boxed()
+    } else {
+      future::ok(Bytes::from(execute_response.get_result().get_stdout_raw())).to_boxed()
+    };
+    return stdout;
+  }
+
+  fn extract_stderr(
+    &self,
+    execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+  ) -> BoxFuture<Bytes, ExecutionError> {
+    let stderr = if execute_response.get_result().has_stderr_digest() {
+      let stderr_digest = execute_response.get_result().get_stderr_digest().into();
+      self
+        .store
+        .load_file_bytes_with(stderr_digest, |v| v)
+        .map_err(move |error| {
+          ExecutionError::Fatal(format!(
+            "Error fetching stderr digest ({:?}): {:?}",
+            stderr_digest, error
+          ))
+        })
+        .and_then(move |maybe_value| match maybe_value {
+          Some(value) => return Ok(value),
+          None => {
+            return Err(ExecutionError::Fatal(format!(
+              "Couldn't find stderr digest ({:?}), when fetching.",
+              stderr_digest
+            )))
+          }
+        })
+        .to_boxed()
+    } else {
+      future::ok(Bytes::from(execute_response.get_result().get_stderr_raw())).to_boxed()
+    };
+    return stderr;
   }
 }
 
@@ -422,20 +489,27 @@ mod tests {
   use protobuf::{self, Message, ProtobufEnum};
   use mock;
   use tempdir::TempDir;
-  use testutil::{as_byte_owned_vec, as_bytes, owned_string_vec};
   use testutil::data::{TestData, TestDirectory};
+  use testutil::{as_bytes, owned_string_vec};
 
   use super::{CommandRunner, ExecuteProcessRequest, ExecuteProcessResult, ExecutionError};
   use std::collections::BTreeMap;
   use std::iter::{self, FromIterator};
   use std::sync::Arc;
-  use std::time::Duration;
+  use std::time::{Duration, SystemTime};
 
   #[derive(Debug, PartialEq)]
   enum StdoutType {
     Raw(String),
     Digest(Digest),
   }
+
+  #[derive(Debug, PartialEq)]
+  enum StderrType {
+    Raw(String),
+    Digest(Digest),
+  }
+
   #[test]
   fn server_rejecting_execute_request_gives_error() {
     let execute_request = echo_foo_request();
@@ -472,7 +546,12 @@ mod tests {
         super::make_execute_request(&execute_request).unwrap().1,
         vec![
           make_incomplete_operation(&op_name),
-          make_successful_operation(&op_name, StdoutType::Raw("foo".to_owned()), "", 0),
+          make_successful_operation(
+            &op_name,
+            StdoutType::Raw("foo".to_owned()),
+            StderrType::Raw("".to_owned()),
+            0,
+          ),
         ],
       ))
     };
@@ -483,7 +562,7 @@ mod tests {
       result,
       ExecuteProcessResult {
         stdout: as_bytes("foo"),
-        stderr: as_byte_owned_vec(""),
+        stderr: as_bytes(""),
         exit_code: 0,
       }
     );
@@ -493,23 +572,48 @@ mod tests {
   fn extract_response_with_digest_stdout() {
     let op_name = "gimme-foo".to_string();
     let testdata = TestData::roland();
+    let testdata_empty = TestData::empty();
     assert_eq!(
-      extract_execute_response(make_successful_operation(
-        &op_name,
-        StdoutType::Digest(testdata.digest()),
-        "",
-        0,
-      )),
+      extract_execute_response(
+        make_successful_operation(
+          &op_name,
+          StdoutType::Digest(testdata.digest()),
+          StderrType::Raw(testdata_empty.string()),
+          0,
+        ).0
+      ),
       Ok(ExecuteProcessResult {
         stdout: testdata.bytes(),
-        stderr: as_byte_owned_vec(""),
+        stderr: testdata_empty.bytes(),
         exit_code: 0,
       })
     );
   }
 
   #[test]
-  fn successful_execution_after_ten_getoperations() {
+  fn extract_response_with_digest_stderr() {
+    let op_name = "gimme-foo".to_string();
+    let testdata = TestData::roland();
+    let testdata_empty = TestData::empty();
+    assert_eq!(
+      extract_execute_response(
+        make_successful_operation(
+          &op_name,
+          StdoutType::Raw(testdata_empty.string()),
+          StderrType::Digest(testdata.digest()),
+          0,
+        ).0
+      ),
+      Ok(ExecuteProcessResult {
+        stdout: testdata_empty.bytes(),
+        stderr: testdata.bytes(),
+        exit_code: 0,
+      })
+    );
+  }
+
+  #[test]
+  fn successful_execution_after_four_getoperations() {
     let execute_request = echo_foo_request();
 
     let mock_server = {
@@ -520,11 +624,11 @@ mod tests {
         super::make_execute_request(&execute_request).unwrap().1,
         Vec::from_iter(
           iter::repeat(make_incomplete_operation(&op_name))
-            .take(10)
+            .take(4)
             .chain(iter::once(make_successful_operation(
               &op_name,
               StdoutType::Raw("foo".to_owned()),
-              "",
+              StderrType::Raw("".to_owned()),
               0,
             ))),
         ),
@@ -537,7 +641,7 @@ mod tests {
       result,
       ExecuteProcessResult {
         stdout: as_bytes("foo"),
-        stderr: as_byte_owned_vec(""),
+        stderr: as_bytes(""),
         exit_code: 0,
       }
     );
@@ -736,7 +840,12 @@ mod tests {
           make_precondition_failure_operation(vec![
             missing_preconditionfailure_violation(&roland.digest()),
           ]),
-          make_successful_operation("cat2", StdoutType::Raw(roland.string()), "", 0),
+          make_successful_operation(
+            "cat2",
+            StdoutType::Raw(roland.string()),
+            StderrType::Raw("".to_owned()),
+            0,
+          ),
         ],
       ))
     };
@@ -746,7 +855,7 @@ mod tests {
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
-      &cas.address(),
+      cas.address(),
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
@@ -763,7 +872,7 @@ mod tests {
       result,
       Ok(ExecuteProcessResult {
         stdout: roland.bytes(),
-        stderr: "".as_bytes().to_vec(),
+        stderr: Bytes::from(""),
         exit_code: 0,
       })
     );
@@ -799,7 +908,7 @@ mod tests {
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
-      &cas.address(),
+      cas.address(),
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
@@ -834,10 +943,11 @@ mod tests {
     );
   }
 
+  #[test]
   fn extract_execute_response_success() {
     let want_result = ExecuteProcessResult {
       stdout: as_bytes("roland"),
-      stderr: "simba".as_bytes().to_owned(),
+      stderr: Bytes::from("simba"),
       exit_code: 17,
     };
 
@@ -988,6 +1098,61 @@ mod tests {
     assert_eq!(digest.get_size_bytes(), 32)
   }
 
+  #[test]
+  fn wait_between_request_1_retry() {
+    // wait at least 500 milli for one retry
+    {
+      let execute_request = echo_foo_request();
+      let mock_server = {
+        let op_name = "gimme-foo".to_string();
+        mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request).unwrap().1,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_successful_operation(
+              &op_name,
+              StdoutType::Raw("foo".to_owned()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
+          ],
+        ))
+      };
+      let start_time = SystemTime::now();
+      run_command_remote(&mock_server.address(), execute_request).unwrap();
+      assert!(start_time.elapsed().unwrap() >= Duration::from_millis(500));
+    }
+  }
+  #[test]
+  fn wait_between_request_3_retry() {
+    // wait at least 500 + 1000 + 1500 = 3000 milli for 3 retries.
+    {
+      let execute_request = echo_foo_request();
+      let mock_server = {
+        let op_name = "gimme-foo".to_string();
+        mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request).unwrap().1,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_incomplete_operation(&op_name),
+            make_incomplete_operation(&op_name),
+            make_successful_operation(
+              &op_name,
+              StdoutType::Raw("foo".to_owned()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
+          ],
+        ))
+      };
+      let start_time = SystemTime::now();
+      run_command_remote(&mock_server.address(), execute_request).unwrap();
+      assert!(start_time.elapsed().unwrap() >= Duration::from_millis(3000));
+    }
+  }
+
   fn echo_foo_request() -> ExecuteProcessRequest {
     ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
@@ -1018,7 +1183,7 @@ mod tests {
   fn make_successful_operation(
     operation_name: &str,
     stdout: StdoutType,
-    stderr: &str,
+    stderr: StderrType,
     exit_code: i32,
   ) -> (bazel_protos::operations::Operation, Option<Duration>) {
     let mut op = bazel_protos::operations::Operation::new();
@@ -1036,7 +1201,14 @@ mod tests {
             action_result.set_stdout_digest((&stdout_digest).into());
           }
         }
-        action_result.set_stderr_raw(Bytes::from(stderr));
+        match stderr {
+          StderrType::Raw(stderr_raw) => {
+            action_result.set_stderr_raw(Bytes::from(stderr_raw));
+          }
+          StderrType::Digest(stderr_digest) => {
+            action_result.set_stderr_digest((&stderr_digest).into());
+          }
+        }
         action_result.set_exit_code(exit_code);
         action_result
       });
@@ -1092,7 +1264,7 @@ mod tests {
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
-      &cas.address(),
+      cas.address(),
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
@@ -1102,7 +1274,7 @@ mod tests {
   }
 
   fn extract_execute_response(
-    mut operation: bazel_protos::operations::Operation,
+    operation: bazel_protos::operations::Operation,
   ) -> Result<ExecuteProcessResult, ExecutionError> {
     let cas = mock::StubCAS::with_roland_and_directory(1024);
     let command_runner = create_command_runner("", &cas);

@@ -38,7 +38,7 @@ from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.xml_parser import XmlParser
 
 
-class _Workdirs(datatype('_Workdirs', ['root_dir', 'partition'])):
+class _Workdirs(datatype(['root_dir', 'partition'])):
   @classmethod
   def for_partition(cls, work_dir, partition):
     root_dir = os.path.join(work_dir, Target.maybe_readable_identify(partition))
@@ -124,6 +124,10 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     register('--test-shard', fingerprint=True,
              help='Subset of tests to run, in the form M/N, 0 <= M < N. For example, 1/3 means '
                   'run tests number 2, 5, 8, 11, ...')
+
+    register('--extra-pythonpath', type=list, fingerprint=True, advanced=True,
+             help='Add these entries to the PYTHONPATH when running the tests. '
+                  'Useful for attaching to debuggers in test code.')
 
   @classmethod
   def supports_passthru_args(cls):
@@ -486,6 +490,11 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       pythonpath = env.pop('PYTHONPATH', None)
       if pythonpath:
         self.context.log.warn('scrubbed PYTHONPATH={} from py.test environment'.format(pythonpath))
+      # But allow this back door for users who do want to force something onto the test pythonpath,
+      # e.g., modules required during a debugging session.
+      extra_pythonpath = self.get_options().extra_pythonpath
+      if extra_pythonpath:
+        env['PYTHONPATH'] = os.pathsep.join(extra_pythonpath)
 
       # The pytest runner we use accepts a --pdb argument that will launch an interactive pdb
       # session on any test failure.  In order to support use of this pass-through flag we must

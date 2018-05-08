@@ -7,15 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import collections
 import inspect
-from abc import abstractmethod
 from functools import update_wrapper
 
 import six
 
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Resolvable, Serializable
-from pants.util.meta import AbstractClass
-from pants.util.objects import Collection
+from pants.util.objects import Collection, TypeConstraintError
 
 
 Addresses = Collection.of(Address)
@@ -28,114 +26,6 @@ class BuildFileAddresses(Collection.of(BuildFileAddress)):
     return [bfa.to_address() for bfa in self.dependencies]
 
 
-class TypeConstraint(AbstractClass):
-  """Represents a type constraint.
-
-  Not intended for direct use; instead, use one of :class:`SuperclassesOf`, :class:`Exact` or
-  :class:`SubclassesOf`.
-  """
-
-  def __init__(self, *types, **kwargs):
-    """Creates a type constraint centered around the given types.
-
-    The type constraint is satisfied as a whole if satisfied for at least one of the given types.
-
-    :param type *types: The focus of this type constraint.
-    :param str description: A description for this constraint if the list of types is too long.
-    """
-    if not types:
-      raise ValueError('Must supply at least one type')
-    if any(not isinstance(t, type) for t in types):
-      raise TypeError('Supplied types must be types. {!r}'.format(types))
-
-    self._types = types
-    self._desc = kwargs.get('description', None)
-
-  @property
-  def types(self):
-    """Return the subject types of this type constraint.
-
-    :type: tuple of type
-    """
-    return self._types
-
-  def satisfied_by(self, obj):
-    """Return `True` if the given object satisfies this type constraint.
-
-    :rtype: bool
-    """
-    return self.satisfied_by_type(type(obj))
-
-  @abstractmethod
-  def satisfied_by_type(self, obj_type):
-    """Return `True` if the given object satisfies this type constraint.
-
-    :rtype: bool
-    """
-
-  def __hash__(self):
-    return hash((type(self), self._types))
-
-  def __eq__(self, other):
-    return type(self) == type(other) and self._types == other._types
-
-  def __ne__(self, other):
-    return not (self == other)
-
-  def __str__(self):
-    if self._desc:
-      constrained_type = '({})'.format(self._desc)
-    else:
-      if len(self._types) == 1:
-        constrained_type = self._types[0].__name__
-      else:
-        constrained_type = '({})'.format(', '.join(t.__name__ for t in self._types))
-    return '{variance_symbol}{constrained_type}'.format(variance_symbol=self._variance_symbol,
-                                                        constrained_type=constrained_type)
-
-  def __repr__(self):
-    if self._desc:
-      constrained_type = self._desc
-    else:
-      constrained_type = ', '.join(t.__name__ for t in self._types)
-    return ('{type_constraint_type}({constrained_type})'
-      .format(type_constraint_type=type(self).__name__,
-                    constrained_type=constrained_type))
-
-
-class SuperclassesOf(TypeConstraint):
-  """Objects of the exact type as well as any super-types are allowed."""
-
-  _variance_symbol = '-'
-
-  def satisfied_by_type(self, obj_type):
-    return any(issubclass(t, obj_type) for t in self._types)
-
-
-class Exactly(TypeConstraint):
-  """Only objects of the exact type are allowed."""
-
-  _variance_symbol = '='
-
-  def satisfied_by_type(self, obj_type):
-    return obj_type in self._types
-
-  def graph_str(self):
-    if len(self.types) == 1:
-      return self.types[0].__name__
-    else:
-      return repr(self)
-
-
-class SubclassesOf(TypeConstraint):
-  """Objects of the exact type as well as any sub-types are allowed."""
-
-  _variance_symbol = '+'
-
-  def satisfied_by_type(self, obj_type):
-    return issubclass(obj_type, self._types)
-
-
 class NotSerializableError(TypeError):
   """Indicates an addressable descriptor is illegally installed in a non-Serializable type."""
 
@@ -144,8 +34,8 @@ class MutationError(AttributeError):
   """Indicates an illegal attempt to mutate an addressable attribute that already has a value."""
 
 
-class TypeConstraintError(TypeError):
-  """Indicates a :class:`TypeConstraint` violation."""
+class AddressableTypeValidationError(TypeConstraintError):
+  """Indicates a value provided to an `AddressableDescriptor` failed to satisfy a type constraint."""
 
 
 class AddressableDescriptor(object):
@@ -282,13 +172,14 @@ class AddressableDescriptor(object):
         serializable_type = type_constraint.types[0]
         return serializable_type(**value)
 
-    if not type_constraint.satisfied_by(value):
-      raise TypeConstraintError('Got {} of type {} for {} attribute of {} but expected {!r}'
-                                .format(value,
-                                        type(value).__name__,
-                                        self._name,
-                                        instance,
-                                        type_constraint))
+    try:
+      return type_constraint.validate_satisfied_by(value)
+    except TypeConstraintError as e:
+      raise AddressableTypeValidationError(
+        "The value for the {} attribute of {} was invalid"
+        .format(self._name, instance),
+        e)
+
     return value
 
   def _resolve_value(self, instance, value):
@@ -299,14 +190,15 @@ class AddressableDescriptor(object):
     else:
       resolved_value = value.resolve()
       type_constraint = self._get_type_constraint(instance)
-      if not type_constraint.satisfied_by(resolved_value):
-        raise TypeConstraintError('The value resolved from {} did not meet the type constraint of '
-                                  '{!r} for the {} property of {}: {}'
-                                  .format(value.address,
-                                          type_constraint,
-                                          self._name,
-                                          instance,
-                                          resolved_value))
+
+      try:
+        return type_constraint.validate_satisfied_by(resolved_value)
+      except TypeConstraintError as e:
+        raise AddressableTypeValidationError(
+          "The value resolved from {} for the {} property of {} was invalid"
+          .format(value.address, self._name, instance),
+          e)
+
       return resolved_value
 
 

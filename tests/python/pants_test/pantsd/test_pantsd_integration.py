@@ -20,7 +20,7 @@ from pants.pantsd.process_manager import ProcessManager
 from pants.util.collections import combined_dict
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsResult, PantsRunIntegrationTest
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
 
 
@@ -89,7 +89,7 @@ def launch_file_toucher(f):
 
 class TestPantsDaemonIntegration(PantsRunIntegrationTest):
   @contextmanager
-  def pantsd_test_context(self, log_level='info', extra_config=None):
+  def pantsd_test_context(self, log_level='info', extra_config=None, expected_runs=1):
     with no_lingering_process_by_command('pantsd-runner'):
       with self.temporary_workdir() as workdir_base:
         pid_dir = os.path.join(workdir_base, '.pids')
@@ -114,7 +114,12 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
           for line in read_pantsd_log(workdir):
             print(line)
           banner('END pantsd.log')
-          self.assert_success_runner(workdir, pantsd_config, ['kill-pantsd'])
+          self.assert_success_runner(
+            workdir,
+            pantsd_config,
+            ['kill-pantsd'],
+            expected_runs=expected_runs,
+          )
           checker.assert_stopped()
 
   @contextmanager
@@ -137,7 +142,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
     else:
       return 0
 
-  def assert_success_runner(self, workdir, config, cmd, extra_config={}):
+  def assert_success_runner(self, workdir, config, cmd, extra_config={}, expected_runs=1):
     combined_config = combined_dict(config, extra_config)
     print(bold(cyan('\nrunning: ./pants {} (config={})'
                     .format(' '.join(cmd), combined_config))))
@@ -156,8 +161,11 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
     runs_created = self._run_count(workdir) - run_count
     self.assertEquals(
         runs_created,
-        1,
-        'Expected one RunTracker run to be created per pantsd run: was {}'.format(runs_created)
+        expected_runs,
+        'Expected {} RunTracker run to be created per pantsd run: was {}'.format(
+          expected_runs,
+          runs_created,
+        )
     )
     self.assert_success(run)
     return run
@@ -441,3 +449,33 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         self.assertRegexpMatches(result.stdout_data, has_source_root_regex)
     finally:
       rm_rf(test_path)
+
+  def test_pantsd_multiple_parallel_runs(self):
+    with self.pantsd_test_context() as (workdir, config, checker):
+      file_to_make = os.path.join(workdir, 'some_magic_file')
+      waiter_pants_command, waiter_pants_process = self.run_pants_with_workdir_without_waiting(
+        ['run', 'testprojects/src/python/coordinated_runs:waiter', '--', file_to_make],
+        workdir,
+        config,
+      )
+
+      # Wait for the python run to be running
+      time.sleep(15)
+
+      checker.assert_started()
+
+      creator_pants_command, creator_pants_process = self.run_pants_with_workdir_without_waiting(
+        ['run', 'testprojects/src/python/coordinated_runs:creator', '--', file_to_make],
+        workdir,
+        config,
+      )
+
+      (creator_stdout_data, creator_stderr_data) = creator_pants_process.communicate()
+      creator_result = PantsResult(creator_pants_command, creator_pants_process.returncode, creator_stdout_data.decode("utf-8"),
+        creator_stderr_data.decode("utf-8"), workdir)
+      self.assert_success(creator_result)
+
+      (waiter_stdout_data, waiter_stderr_data) = waiter_pants_process.communicate()
+      waiter_result = PantsResult(waiter_pants_command, waiter_pants_process.returncode, waiter_stdout_data.decode("utf-8"),
+        waiter_stderr_data.decode("utf-8"), workdir)
+      self.assert_success(waiter_result)

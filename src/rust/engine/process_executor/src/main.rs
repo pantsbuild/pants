@@ -104,7 +104,7 @@ fn main() {
     (Some(_server), Some(cas_server)) => fs::Store::with_remote(
       local_store_path,
       pool.clone(),
-      cas_server,
+      cas_server.to_owned(),
       1,
       10 * 1024 * 1024,
       Duration::from_secs(30),
@@ -146,6 +146,6 @@ fn main() {
     }
   };
   print!("{}", String::from_utf8(result.stdout.to_vec()).unwrap());
-  eprint!("{}", String::from_utf8(result.stderr).unwrap());
+  eprint!("{}", String::from_utf8(result.stderr.to_vec()).unwrap());
   exit(result.exit_code);
 }

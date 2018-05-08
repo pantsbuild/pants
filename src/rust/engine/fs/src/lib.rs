@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 mod snapshot;
-pub use snapshot::{Snapshot, StoreFileByDigest, EMPTY_DIGEST};
+pub use snapshot::{OneOffStoreFileByDigest, Snapshot, StoreFileByDigest, EMPTY_DIGEST};
 mod store;
 pub use store::Store;
 mod pool;
@@ -20,6 +20,7 @@ extern crate grpcio;
 extern crate hashing;
 extern crate hex;
 extern crate ignore;
+extern crate indexmap;
 extern crate itertools;
 #[macro_use]
 extern crate lazy_static;
@@ -28,8 +29,8 @@ extern crate lmdb;
 extern crate log;
 #[cfg(test)]
 extern crate mock;
-extern crate ordermap;
 extern crate protobuf;
+extern crate resettable;
 extern crate sha2;
 extern crate tempdir;
 #[cfg(test)]
@@ -47,7 +48,7 @@ use bytes::Bytes;
 use futures::future::{self, Future};
 use glob::Pattern;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
-use ordermap::OrderMap;
+use indexmap::IndexMap;
 
 use boxfuture::{BoxFuture, Boxable};
 
@@ -97,14 +98,14 @@ pub enum PathStat {
 }
 
 impl PathStat {
-  fn dir(path: PathBuf, stat: Dir) -> PathStat {
+  pub fn dir(path: PathBuf, stat: Dir) -> PathStat {
     PathStat::Dir {
       path: path,
       stat: stat,
     }
   }
 
-  fn file(path: PathBuf, stat: File) -> PathStat {
+  pub fn file(path: PathBuf, stat: File) -> PathStat {
     PathStat::File {
       path: path,
       stat: stat,
@@ -333,7 +334,7 @@ struct PathGlobsExpansion<T: Sized> {
   // Globs that have already been expanded.
   completed: HashSet<PathGlob>,
   // Unique Paths that have been matched, in order.
-  outputs: OrderMap<PathStat, ()>,
+  outputs: IndexMap<PathStat, ()>,
 }
 
 fn create_ignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {
@@ -674,7 +675,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
       todo: path_globs.include,
       exclude: path_globs.exclude,
       completed: HashSet::default(),
-      outputs: OrderMap::default(),
+      outputs: IndexMap::default(),
     };
     future::loop_fn(init, |mut expansion| {
       // Request the expansion of all outstanding PathGlobs as a batch.

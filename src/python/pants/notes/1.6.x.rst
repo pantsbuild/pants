@@ -3,6 +3,28 @@
 
 This document describes releases leading up to the ``1.6.x`` ``stable`` series.
 
+1.6.0rc3 (04/26/2018)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Break a Core / Node cycle  (#5733)
+  `PR #5733 <https://github.com/pantsbuild/pants/pull/5733>`_
+
+* Bump max local store size (#5728)
+  `PR #5728 <https://github.com/pantsbuild/pants/pull/5728>`_
+
+* Add interpreter identity check for non-blacklisted interpreters (#5724)
+  `PR #5724 <https://github.com/pantsbuild/pants/pull/5724>`_
+
+* Ensure test goal implicitly targets current platform when using python_dist targets (#5720)
+  `PR #5720 <https://github.com/pantsbuild/pants/pull/5720>`_
+  `PR #5618 <https://github.com/pantsbuild/pants/pull/5618>`_
+
+* Plumb requirement blacklist through to the pex resolver (#5697)
+  `PR #5697 <https://github.com/pantsbuild/pants/pull/5697>`_
+
 1.6.0rc2 (04/12/2018)
 ---------------------
 

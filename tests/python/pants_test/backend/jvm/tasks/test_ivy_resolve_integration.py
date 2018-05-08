@@ -42,10 +42,10 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
       command,
       workdir,
       config,
-      stdin_data,
-      extra_env,
-      build_root,
-      tee_output,
+      stdin_data=stdin_data,
+      extra_env=extra_env,
+      build_root=build_root,
+      tee_output=tee_output,
       **kwargs
     )
 

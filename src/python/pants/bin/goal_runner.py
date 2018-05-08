@@ -107,6 +107,7 @@ class GoalRunnerFactory(object):
         self._global_options.build_file_imports,
         native=native,
         build_file_aliases=self._build_config.registered_aliases(),
+        rules=self._build_config.rules(),
         build_ignore_patterns=build_ignore_patterns,
         exclude_target_regexps=exclude_target_regexps,
         subproject_roots=subproject_build_roots,

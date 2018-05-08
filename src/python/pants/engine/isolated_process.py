@@ -16,7 +16,7 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
-class ExecuteProcessRequest(datatype('ExecuteProcessRequest', ['argv', 'env', 'input_files_digest', 'digest_length'])):
+class ExecuteProcessRequest(datatype(['argv', 'env', 'input_files_digest', 'digest_length'])):
   """Request for execution with args and snapshots to extract."""
 
   @classmethod
@@ -55,7 +55,7 @@ class ExecuteProcessRequest(datatype('ExecuteProcessRequest', ['argv', 'env', 'i
     return super(ExecuteProcessRequest, cls).__new__(cls, argv, env, input_files_digest, digest_length)
 
 
-class ExecuteProcessResult(datatype('ExecuteProcessResult', ['stdout', 'stderr', 'exit_code'])):
+class ExecuteProcessResult(datatype(['stdout', 'stderr', 'exit_code'])):
   pass
 
 

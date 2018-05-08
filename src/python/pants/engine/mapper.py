@@ -26,7 +26,7 @@ class DuplicateNameError(MappingError):
   """Indicates more than one top-level object was found with the same name."""
 
 
-class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
+class AddressMap(datatype(['path', 'objects_by_name'])):
   """Maps addressable Serializable objects from a byte source.
 
   To construct an AddressMap, use `parse`.
@@ -75,7 +75,7 @@ class DifferingFamiliesError(MappingError):
   """Indicates an attempt was made to merge address maps from different families together."""
 
 
-class AddressFamily(datatype('AddressFamily', ['namespace', 'objects_by_name'])):
+class AddressFamily(datatype(['namespace', 'objects_by_name'])):
   """Represents the family of addressed objects in a namespace.
 
   To create an AddressFamily, use `create`.

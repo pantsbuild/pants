@@ -40,21 +40,35 @@ is derived from the docstrings of the classes implementing those symbols.
 Generating the site
 -------------------
 
-To see http://www.pantsbuild.org/ site's content as it would be generated based on your local
-copy of the pants repo, enter the command
+The site is generated with a script at `build-support/bin/publish_docs.sh`. To
+see the options available for this script, run:
 
     :::bash
-    # This publishes the docs **locally** and opens (-o) them in your browser for review
+    ./build-support/bin/publish_docs.sh -h
+
+To see http://www.pantsbuild.org/ site's content as it would be generated based on your local
+copy of the pants repo, enter the command:
+
+    :::bash
+    # This generates the site html in dist/docsite and opens (-o) index.html in your browser for review.
     ./build-support/bin/publish_docs.sh -o
+
+The `-l <dir>` option will copy the site over to the existing local directory
+`<dir>` after generation, which can be used to publish the site into a non-git
+repo, for example. If this option is specified along with `-o`, the script will
+open the version of the site in `<dir>` instead of in `dist/docsite`.
 
 Publishing the site
 -------------------
 
-We publish the site via [Github Pages](https://pages.github.com/). You need `pantsbuild` commit
-privilege to publish the site.
+We publish the site via [Github Pages](https://pages.github.com/). You need
+`pantsbuild` commit privilege to publish to the site at
+https://www.pantsbuild.org, but you can also publish to any repo you own by
+setting the `GIT_URL` environment variable.
 
-Use the same script as for generating the site, but request it also be published. Don't
-worry—you'll get a chance to abort the publish just before it's committed remotely:
+Use the same script as for generating the site, but request it also be published
+with `-p`. Don't worry—you'll get a chance to abort the publish just before it's
+committed remotely:
 
     :::bash
     # This publishes the docs locally and opens (-o) them in your browser for review
@@ -62,8 +76,11 @@ worry—you'll get a chance to abort the publish just before it's committed remo
     # proceeding to publish to http://www.pantsbuild.org
     ./build-support/bin/publish_docs.sh -op
 
-If you'd like to publish remotely for others to preview your changes easily, the `-d` option creates
-a copy of the site in a subdir of <http://www.pantsbuild.org/>:
+If you'd like to test remote publishing or preview an alternate version of the
+site without modifying the main site, the `-d` option creates a copy of the site
+in a subdir of the `VIEW_PUBLISH_URL` environment variable. This variable defaults to
+<https://www.pantsbuild.org/>, but publishing to the main site requires
+`pantsbuild` commit privilege.
 
     :::bash
     # This publishes the docs locally and opens (-o) them in your browser for review

@@ -4,6 +4,7 @@ extern crate bytes;
 extern crate digest;
 extern crate fs;
 extern crate futures;
+extern crate futures_timer;
 extern crate grpcio;
 extern crate hashing;
 #[macro_use]
@@ -54,6 +55,6 @@ pub struct ExecuteProcessRequest {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExecuteProcessResult {
   pub stdout: Bytes,
-  pub stderr: Vec<u8>,
+  pub stderr: Bytes,
   pub exit_code: i32,
 }

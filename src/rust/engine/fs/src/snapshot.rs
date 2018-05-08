@@ -7,10 +7,11 @@ use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use futures::Future;
-use futures::future::join_all;
+use futures::future::{self, join_all};
 use hashing::{Digest, Fingerprint};
+use indexmap::{self, IndexMap};
 use itertools::Itertools;
-use {File, FileContent, PathStat, Store};
+use {File, FileContent, PathStat, PosixFS, Store};
 use protobuf;
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -28,14 +29,6 @@ pub const EMPTY_DIGEST: Digest = Digest(EMPTY_FINGERPRINT, 0);
 pub struct Snapshot {
   pub digest: Digest,
   pub path_stats: Vec<PathStat>,
-}
-
-// StoreFileByDigest allows a File to be saved to an underlying Store, in such a way that it can be
-// looked up by the Digest produced by the store_by_digest method.
-// It is a separate trait so that caching implementations can be written which wrap the Store (used
-// to store the bytes) and VFS (used to read the files off disk if needed).
-pub trait StoreFileByDigest<Error> {
-  fn store_by_digest(&self, file: &File) -> BoxFuture<Digest, Error>;
 }
 
 impl Snapshot {
@@ -93,7 +86,7 @@ impl Snapshot {
             file_futures.push(
               file_digester
                 .clone()
-                .store_by_digest(&stat)
+                .store_by_digest(stat.clone())
                 .map_err(|e| format!("{:?}", e))
                 .and_then(move |digest| {
                   let mut file_node = bazel_protos::remote_execution::FileNode::new();
@@ -144,6 +137,125 @@ impl Snapshot {
         directory.set_directories(protobuf::RepeatedField::from_vec(dirs));
         directory.set_files(protobuf::RepeatedField::from_vec(files));
         store.record_directory(&directory, true)
+      })
+      .to_boxed()
+  }
+
+  ///
+  /// Given N Snapshots, returns a new Snapshot that merges them.
+  ///
+  /// Any files that exist in multiple Snapshots will cause this method to fail: the assumption
+  /// behind this behaviour is that almost any colliding file would represent a Rule implementation
+  /// error, and in cases where overwriting a file is desirable, explicitly removing a duplicated
+  /// copy should be straightforward.
+  ///
+  pub fn merge(store: Store, snapshots: &[Snapshot]) -> BoxFuture<Snapshot, String> {
+    // We dedupe PathStats by their symbolic names, as those will be their names within the
+    // `Directory` structure. Only `Dir+Dir` collisions are legal.
+    let path_stats = {
+      let mut uniq_paths: IndexMap<PathBuf, PathStat> = IndexMap::new();
+      for path_stat in snapshots
+        .iter()
+        .map(|s| s.path_stats.iter().cloned())
+        .flatten()
+      {
+        match uniq_paths.entry(path_stat.path().to_owned()) {
+          indexmap::map::Entry::Occupied(e) => match (&path_stat, e.get()) {
+            (&PathStat::Dir { .. }, &PathStat::Dir { .. }) => (),
+            (x, y) => {
+              return future::err(format!(
+                "Snapshots contained duplicate path: {:?} vs {:?}",
+                x, y
+              )).to_boxed()
+            }
+          },
+          indexmap::map::Entry::Vacant(v) => {
+            v.insert(path_stat);
+          }
+        }
+      }
+      uniq_paths.into_iter().map(|(_, v)| v).collect()
+    };
+    // Recursively merge the Digests in the Snapshots.
+    Self::merge_helper(store, snapshots.iter().map(|s| s.digest).collect())
+      .map(move |root_digest| Snapshot {
+        digest: root_digest,
+        path_stats: path_stats,
+      })
+      .to_boxed()
+  }
+
+  ///
+  /// Given Digest(s) representing Directory instances, merge them recursively into a single
+  /// output Directory Digest. Fails for collisions.
+  ///
+  fn merge_helper(store: Store, dir_digests: Vec<Digest>) -> BoxFuture<Digest, String> {
+    if dir_digests.is_empty() {
+      // TODO: This will not have been stored... we'll need to explicitly store it.
+      return future::ok(EMPTY_DIGEST).to_boxed();
+    } else if dir_digests.len() == 1 {
+      let mut dir_digests = dir_digests;
+      return future::ok(dir_digests.pop().unwrap()).to_boxed();
+    }
+
+    let directories = dir_digests
+      .into_iter()
+      .map(|digest| {
+        store
+          .load_directory(digest)
+          .and_then(move |maybe_directory| {
+            maybe_directory
+              .ok_or_else(|| format!("Digest {:?} did not exist in the Store.", digest))
+          })
+      })
+      .collect::<Vec<_>>();
+    join_all(directories)
+      .and_then(move |mut directories| {
+        let mut out_dir = bazel_protos::remote_execution::Directory::new();
+
+        // Merge FileNodes.
+        out_dir.set_files(protobuf::RepeatedField::from_vec(
+          directories
+            .iter_mut()
+            .map(|directory| directory.take_files().into_iter())
+            .flatten()
+            .collect(),
+        ));
+        out_dir.mut_files().sort_by(|a, b| a.name.cmp(&b.name));
+
+        // Group and recurse for DirectoryNodes.
+        let sorted_child_directories = {
+          let mut merged_directories = directories
+            .iter_mut()
+            .map(|directory| directory.take_directories().into_iter())
+            .flatten()
+            .collect::<Vec<_>>();
+          merged_directories.sort_by(|a, b| a.name.cmp(&b.name));
+          merged_directories
+        };
+        let store2 = store.clone();
+        join_all(
+          sorted_child_directories
+            .into_iter()
+            .group_by(|d| d.name.clone())
+            .into_iter()
+            .map(move |(child_name, group)| {
+              Self::merge_helper(
+                store2.clone(),
+                group.map(|d| d.get_digest().into()).collect(),
+              ).map(move |merged_digest| {
+                let mut child_dir = bazel_protos::remote_execution::DirectoryNode::new();
+                child_dir.set_name(child_name);
+                child_dir.set_digest((&merged_digest).into());
+                child_dir
+              })
+            })
+            .collect::<Vec<_>>(),
+        ).and_then(move |child_directories| {
+          out_dir.set_directories(protobuf::RepeatedField::from_vec(child_directories));
+          store.record_directory(&out_dir, true)
+        })
+          .to_boxed() as BoxFuture<_, _>
       })
       .to_boxed()
   }
@@ -272,23 +384,57 @@ fn osstring_as_utf8(path: OsString) -> Result<String, String> {
     .map_err(|p| format!("{:?}'s file_name is not representable in UTF8", p))
 }
 
+// StoreFileByDigest allows a File to be saved to an underlying Store, in such a way that it can be
+// looked up by the Digest produced by the store_by_digest method.
+// It is a separate trait so that caching implementations can be written which wrap the Store (used
+// to store the bytes) and VFS (used to read the files off disk if needed).
+pub trait StoreFileByDigest<Error> {
+  fn store_by_digest(&self, file: File) -> BoxFuture<Digest, Error>;
+}
+
+///
+/// A StoreFileByDigest which reads with a PosixFS and writes to a Store, with no caching.
+///
+#[derive(Clone)]
+pub struct OneOffStoreFileByDigest {
+  store: Store,
+  posix_fs: Arc<PosixFS>,
+}
+
+impl OneOffStoreFileByDigest {
+  pub fn new(store: Store, posix_fs: Arc<PosixFS>) -> OneOffStoreFileByDigest {
+    OneOffStoreFileByDigest { store, posix_fs }
+  }
+}
+
+impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
+  fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
+    let store = self.store.clone();
+    self
+      .posix_fs
+      .read_file(&file)
+      .map_err(move |err| format!("Error reading file {:?}: {:?}", file, err))
+      .and_then(move |content| store.store_file_bytes(content.content, true))
+      .to_boxed()
+  }
+}
+
 #[cfg(test)]
 mod tests {
   extern crate tempdir;
   extern crate testutil;
 
-  use boxfuture::{BoxFuture, Boxable};
   use bytes::Bytes;
   use futures::future::Future;
   use hashing::{Digest, Fingerprint};
   use tempdir::TempDir;
   use self::testutil::make_file;
 
-  use super::super::{File, FileContent, Path, PathGlobs, PathStat, PosixFS, ResettablePool,
-                     Snapshot, Store, StoreFileByDigest, VFS};
+  use super::OneOffStoreFileByDigest;
+  use super::super::{Dir, File, FileContent, Path, PathGlobs, PathStat, PosixFS, ResettablePool,
+                     Snapshot, Store, VFS};
 
   use std;
-  use std::error::Error;
   use std::path::PathBuf;
   use std::sync::Arc;
 
@@ -296,13 +442,13 @@ mod tests {
   const LATIN: &str = "Chaetophractus villosus";
   const STR: &str = "European Burmese";
 
-  fn setup() -> (Store, TempDir, Arc<PosixFS>, FileSaver) {
+  fn setup() -> (Store, TempDir, Arc<PosixFS>, OneOffStoreFileByDigest) {
     let pool = Arc::new(ResettablePool::new("test-pool-".to_string()));
     // TODO: Pass a remote CAS address through.
     let store = Store::local_only(TempDir::new("lmdb_store").unwrap(), pool.clone()).unwrap();
     let dir = TempDir::new("root").unwrap();
     let posix_fs = Arc::new(PosixFS::new(dir.path(), pool, vec![]).unwrap());
-    let file_saver = FileSaver(store.clone(), posix_fs.clone());
+    let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone());
     (store, dir, posix_fs, file_saver)
   }
 
@@ -389,6 +535,93 @@ mod tests {
   }
 
   #[test]
+  fn snapshot_merge_two_files() {
+    let (store, tempdir, _, digester) = setup();
+
+    let common_dir_name = "tower";
+    let common_dir = PathBuf::from(common_dir_name);
+
+    let dir = make_dir_stat(tempdir.path(), &common_dir);
+    let file1 = make_file_stat(
+      tempdir.path(),
+      &common_dir.join("roland"),
+      STR.as_bytes(),
+      false,
+    );
+    let file2 = make_file_stat(
+      tempdir.path(),
+      &common_dir.join("susannah"),
+      STR.as_bytes(),
+      true,
+    );
+
+    let merged = {
+      let snapshot1 = Snapshot::from_path_stats(
+        store.clone(),
+        digester.clone(),
+        vec![dir.clone(), file1.clone()],
+      ).wait()
+        .unwrap();
+      let snapshot2 =
+        Snapshot::from_path_stats(store.clone(), digester, vec![dir.clone(), file2.clone()])
+          .wait()
+          .unwrap();
+      Snapshot::merge(store.clone(), &[snapshot1, snapshot2])
+        .wait()
+        .unwrap()
+    };
+    let merged_root_directory = store.load_directory(merged.digest).wait().unwrap().unwrap();
+
+    assert_eq!(merged.path_stats, vec![dir, file1, file2]);
+    assert_eq!(merged_root_directory.files.len(), 0);
+    assert_eq!(merged_root_directory.directories.len(), 1);
+
+    let merged_child_dirnode = merged_root_directory.directories[0].clone();
+    let merged_child_directory = store
+      .load_directory(merged_child_dirnode.get_digest().into())
+      .wait()
+      .unwrap()
+      .unwrap();
+
+    assert_eq!(merged_child_dirnode.name, common_dir_name);
+    assert_eq!(
+      merged_child_directory
+        .files
+        .iter()
+        .map(|filenode| filenode.name.clone())
+        .collect::<Vec<_>>(),
+      vec!["roland".to_string(), "susannah".to_string()],
+    );
+  }
+
+  #[test]
+  fn snapshot_merge_colliding() {
+    let (store, tempdir, _, digester) = setup();
+
+    let file = make_file_stat(
+      tempdir.path(),
+      &PathBuf::from("roland"),
+      STR.as_bytes(),
+      false,
+    );
+
+    let merged_res = {
+      let snapshot = Snapshot::from_path_stats(store.clone(), digester.clone(), vec![file])
+        .wait()
+        .unwrap();
+      Snapshot::merge(store.clone(), &[snapshot.clone(), snapshot]).wait()
+    };
+
+    match merged_res {
+      Err(ref msg) if msg.contains("contained duplicate path") && msg.contains("roland") => (),
+      x => panic!(
+        "Snapshot::merge should have failed with a useful message; got: {:?}",
+        x
+      ),
+    }
+  }
+
+  #[test]
   fn contents_for_one_file() {
     let (store, dir, posix_fs, digester) = setup();
 
@@ -454,21 +687,24 @@ mod tests {
     }
   }
 
-  #[derive(Clone)]
-  struct FileSaver(Store, Arc<PosixFS>);
+  fn make_dir_stat(root: &Path, relpath: &Path) -> PathStat {
+    std::fs::create_dir(root.join(relpath)).unwrap();
+    PathStat::dir(relpath.to_owned(), Dir(relpath.to_owned()))
+  }
 
-  impl StoreFileByDigest<String> for FileSaver {
-    fn store_by_digest(&self, file: &File) -> BoxFuture<Digest, String> {
-      let file_copy = file.clone();
-      let store = self.0.clone();
-      self
-        .1
-        .clone()
-        .read_file(&file)
-        .map_err(move |err| format!("Error reading file {:?}: {}", file_copy, err.description()))
-        .and_then(move |content| store.store_file_bytes(content.content, true))
-        .to_boxed()
-    }
+  fn make_file_stat(root: &Path, relpath: &Path, contents: &[u8], is_executable: bool) -> PathStat {
+    make_file(
+      &root.join(relpath),
+      contents,
+      if is_executable { 0o555 } else { 0o444 },
+    );
+    PathStat::file(
+      relpath.to_owned(),
+      File {
+        path: relpath.to_owned(),
+        is_executable,
+      },
+    )
   }
 
   fn expand_all_sorted(posix_fs: Arc<PosixFS>) -> Vec<PathStat> {

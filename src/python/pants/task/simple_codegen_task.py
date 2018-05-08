@@ -203,7 +203,11 @@ class SimpleCodegenTask(Task):
     return synthetic_address
 
   def execute(self):
-    with self.invalidated(self.codegen_targets(),
+    codegen_targets = self.codegen_targets()
+    if not codegen_targets:
+      return
+
+    with self.invalidated(codegen_targets,
                           invalidate_dependents=True,
                           topological_order=True,
                           fingerprint_strategy=self.get_fingerprint_strategy()) as invalidation_check:

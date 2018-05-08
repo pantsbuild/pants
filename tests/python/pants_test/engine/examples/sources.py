@@ -8,11 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from abc import abstractproperty
 
-from pants.engine.addressable import Exactly, addressable
+from pants.engine.addressable import addressable
 from pants.engine.fs import PathGlobs
 from pants.engine.objects import Locatable
 from pants.engine.struct import Struct
 from pants.source import wrapped_globs
+from pants.util.objects import Exactly
 
 
 class Sources(Struct, Locatable):

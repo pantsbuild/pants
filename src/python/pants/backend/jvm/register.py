@@ -21,7 +21,7 @@ from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.junit_tests import JUnitTests
-from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
+from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
 from pants.backend.jvm.targets.managed_jar_dependencies import (ManagedJarDependencies,
@@ -67,6 +67,7 @@ from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
 from pants.backend.jvm.tasks.scalastyle import Scalastyle
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
 from pants.base.deprecated import warn_or_error
+from pants.build_graph.app_base import Bundle, DirectoryReMapper
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task

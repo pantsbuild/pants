@@ -109,7 +109,7 @@ typedef Buffer              (*extern_ptr_type_to_str)(ExternContext*, TypeId);
 typedef Buffer              (*extern_ptr_val_to_str)(ExternContext*, Value*);
 typedef _Bool               (*extern_ptr_satisfied_by)(ExternContext*, Value*, Value*);
 typedef _Bool               (*extern_ptr_satisfied_by_type)(ExternContext*, Value*, TypeId*);
-typedef Value               (*extern_ptr_store_list)(ExternContext*, Value**, uint64_t, _Bool);
+typedef Value               (*extern_ptr_store_tuple)(ExternContext*, Value*, uint64_t);
 typedef Value               (*extern_ptr_store_bytes)(ExternContext*, uint8_t*, uint64_t);
 typedef Value               (*extern_ptr_store_i32)(ExternContext*, int32_t);
 typedef ValueBuffer         (*extern_ptr_project_multi)(ExternContext*, Value*, uint8_t*, uint64_t);
@@ -153,7 +153,7 @@ void externs_set(ExternContext*,
                  extern_ptr_val_to_str,
                  extern_ptr_satisfied_by,
                  extern_ptr_satisfied_by_type,
-                 extern_ptr_store_list,
+                 extern_ptr_store_tuple,
                  extern_ptr_store_bytes,
                  extern_ptr_store_i32,
                  extern_ptr_project_ignoring_type,
@@ -244,7 +244,7 @@ extern "Python" {
   Buffer              extern_val_to_str(ExternContext*, Value*);
   _Bool               extern_satisfied_by(ExternContext*, Value*, Value*);
   _Bool               extern_satisfied_by_type(ExternContext*, Value*, TypeId*);
-  Value               extern_store_list(ExternContext*, Value**, uint64_t, _Bool);
+  Value               extern_store_tuple(ExternContext*, Value*, uint64_t);
   Value               extern_store_bytes(ExternContext*, uint8_t*, uint64_t);
   Value               extern_store_i32(ExternContext*, int32_t);
   Value               extern_project_ignoring_type(ExternContext*, Value*, uint8_t*, uint64_t);
@@ -396,22 +396,10 @@ def _initialize_externs(ffi):
     return constraint.satisfied_by_type(c.from_id(cls_id.id_))
 
   @ffi.def_extern()
-  def extern_store_list(context_handle, vals_ptr_ptr, vals_len, merge):
+  def extern_store_tuple(context_handle, vals_ptr, vals_len):
     """Given storage and an array of Values, return a new Value to represent the list."""
     c = ffi.from_handle(context_handle)
-    vals = tuple(c.from_value(val) for val in ffi.unpack(vals_ptr_ptr, vals_len))
-    if merge:
-      # Expect each obj to represent a list, and do a de-duping merge.
-      merged_set = set()
-      def merged():
-        for outer_val in vals:
-          for inner_val in outer_val:
-            if inner_val in merged_set:
-              continue
-            merged_set.add(inner_val)
-            yield inner_val
-      vals = tuple(merged())
-    return c.to_value(vals)
+    return c.to_value(tuple(c.from_value(val) for val in ffi.unpack(vals_ptr, vals_len)))
 
   @ffi.def_extern()
   def extern_store_bytes(context_handle, bytes_ptr, bytes_len):
@@ -501,27 +489,27 @@ def _initialize_externs(ffi):
     return call(c, eval, [to_py_str(python_code_str_ptr, python_code_str_len)])
 
 
-class Value(datatype('Value', ['handle'])):
+class Value(datatype(['handle'])):
   """Corresponds to the native object of the same name."""
 
 
-class Key(datatype('Key', ['id_', 'type_id'])):
+class Key(datatype(['id_', 'type_id'])):
   """Corresponds to the native object of the same name."""
 
 
-class Function(datatype('Function', ['key'])):
+class Function(datatype(['key'])):
   """Corresponds to the native object of the same name."""
 
 
-class TypeConstraint(datatype('TypeConstraint', ['key'])):
+class TypeConstraint(datatype(['key'])):
   """Corresponds to the native object of the same name."""
 
 
-class TypeId(datatype('TypeId', ['id_'])):
+class TypeId(datatype(['id_'])):
   """Corresponds to the native object of the same name."""
 
 
-class PyResult(datatype('PyResult', ['is_throw', 'value'])):
+class PyResult(datatype(['is_throw', 'value'])):
   """Corresponds to the native object of the same name."""
 
 
@@ -674,7 +662,7 @@ class Native(object):
                            self.ffi_lib.extern_val_to_str,
                            self.ffi_lib.extern_satisfied_by,
                            self.ffi_lib.extern_satisfied_by_type,
-                           self.ffi_lib.extern_store_list,
+                           self.ffi_lib.extern_store_tuple,
                            self.ffi_lib.extern_store_bytes,
                            self.ffi_lib.extern_store_i32,
                            self.ffi_lib.extern_project_ignoring_type,
