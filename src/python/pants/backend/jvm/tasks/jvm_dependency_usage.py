@@ -405,7 +405,7 @@ class DependencyUsageGraph(object):
     scores = []
     for target, max_usage in max_target_usage.items():
       cost_transitive = self._trans_cost(target)
-      score = int(cost_transitive / (max_usage if max_usage > 0.0 else 1.0))
+      score = int(max(cost_transitive, 1) / (max_usage if max_usage > 0.0 else 1.0))
       scores.append(Score(score, max_usage, cost_transitive, target.address.spec))
 
     # Output in order by score.
