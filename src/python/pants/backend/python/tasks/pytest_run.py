@@ -110,7 +110,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
                   "emitted to that file (prefix). Note that tests may run in a different cwd, so "
                   "it's best to use an absolute path to make it easy to find the subprocess "
                   "profiles later.")
-    register('--options', type=list, fingerprint=True, help='Pass these options to pytest.')
+    register('--options', type=list, fingerprint=True,
+             help='Pass these options to pytest. You can also use pass-through args.')
     register('--coverage', fingerprint=True,
              help='Emit coverage information for specified packages or directories (absolute or '
                   'relative to the build root).  The special value "auto" indicates that Pants '
