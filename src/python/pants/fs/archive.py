@@ -70,8 +70,8 @@ class TarArchiver(Archiver):
   :API: public
   """
 
-  def _extract(self, path, outdir):
-    with open_tar(path, errorlevel=1) as tar:
+  def _extract(self, path_or_file, outdir, **kwargs):
+    with open_tar(path_or_file, errorlevel=1, **kwargs) as tar:
       tar.extractall(outdir)
 
   def __init__(self, mode, extension):
@@ -119,16 +119,7 @@ class XZCompressedTarArchiver(TarArchiver):
 
     self._xz_binary_path = xz_binary_path
 
-    super(XZCompressedTarArchiver, self).__init__('w:gz', 'tar.gz')
-
-  _TAR_GZ_PATTERN = re.compile('\.tar\.gz\Z')
-
-  @classmethod
-  def _get_xz_file_path(cls, path):
-    if not cls._TAR_GZ_PATTERN.search(path):
-      # TODO(cosmicexplorer): test this?
-      raise ValueError("path {!r} must end in .tar.gz.".format(path))
-    return cls._TAR_GZ_PATTERN.sub('.tar.xz', path)
+    super(XZCompressedTarArchiver, self).__init__('r|', 'tar.xz')
 
   @contextmanager
   def _invoke_xz(self, xz_input_file):
@@ -156,14 +147,10 @@ class XZCompressedTarArchiver(TarArchiver):
         "Error decompressing xz input with command {} for input file {}. Exit code was: {}"
         .format(cmd, xz_input_file, rc))
 
-  def _extract(self, path, outdir, **kwargs):
-    xz_path = self._get_xz_file_path(path)
-    shutil.move(path, xz_path)
-    with self._invoke_xz(xz_path) as xz_infile:
-      with open(path, 'wb') as gz_out_raw:
-        with gzip.GzipFile('wb', fileobj=gz_out_raw) as gz_outfile:
-          shutil.copyfileobj(xz_infile, gz_outfile)
-    return super(XZCompressedTarArchiver, self)._extract(path, outdir, **kwargs)
+  def _extract(self, path, outdir):
+    with self._invoke_xz(path) as xz_decompressed_tar_stream:
+      return super(XZCompressedTarArchiver, self)._extract(
+        xz_decompressed_tar_stream, outdir, mode=self.mode)
 
   def create(self, *args, **kwargs):
     """
@@ -178,7 +165,7 @@ class ZipArchiver(Archiver):
   :API: public
   """
 
-  def _extract(self, path, outdir, filter_func=None, **kwargs):
+  def _extract(self, path, outdir, filter_func=None):
     """Extract from a zip file, with an optional filter."""
     with open_zip(path) as archive_file:
       for name in archive_file.namelist():
