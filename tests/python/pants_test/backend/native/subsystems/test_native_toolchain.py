@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import unittest
+
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.util.contextutil import environment_as, get_joined_path
 from pants.util.process_handler import subprocess
@@ -17,6 +19,7 @@ from pants_test.subsystem.subsystem_util import global_subsystem_instance
 # FIXME(cosmicexplorer): We need to test gcc as well, but the gcc driver can't
 # find the right include directories for system headers in Travis. We need to
 # use the clang driver to find library paths, then use those when invoking gcc.
+@unittest.skip('Skipped because this entire backend is about to get redone, see #5780.')
 class TestNativeToolchain(BaseTest):
 
   def setUp(self):
