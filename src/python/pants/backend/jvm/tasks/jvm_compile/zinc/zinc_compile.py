@@ -149,7 +149,6 @@ class BaseZincCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(BaseZincCompile, cls).register_options(register)
-    # TODO: Sort out JVM compile config model: https://github.com/pantsbuild/pants/issues/4483.
     register('--whitelisted-args', advanced=True, type=dict,
              default={
                '-S.*': False,
@@ -247,9 +246,8 @@ class BaseZincCompile(JvmCompile):
     than compiling it.
     """
     hasher = sha1()
-    for tool_classpath in self._zinc.zinc + [self._zinc.compiler_interface, self._zinc.compiler_bridge]:
-      for entry in tool_classpath:
-        hasher.update(os.path.relpath(entry, self.get_options().pants_workdir))
+    for cp_entry in self._zinc.zinc + [self._zinc.compiler_interface, self._zinc.compiler_bridge]:
+      hasher.update(os.path.relpath(cp_entry, self.get_options().pants_workdir))
     key = hasher.hexdigest()[:12]
     return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
 
@@ -484,6 +482,37 @@ class BaseZincCompile(JvmCompile):
 
 class ZincCompile(BaseZincCompile):
   """Compile Scala and Java code to classfiles using Zinc."""
+
+  @classmethod
+  def register_options(cls, register):
+    super(ZincCompile, cls).register_options(register)
+    register('--javac-plugins', advanced=True, type=list, fingerprint=True,
+             removal_version='1.9.0.dev0',
+             removal_hint='Use `--java-javac-plugins` instead.',
+             help='Use these javac plugins.')
+    register('--javac-plugin-args', advanced=True, type=dict, default={}, fingerprint=True,
+             removal_version='1.9.0.dev0',
+             removal_hint='Use `--java-javac-plugin-args` instead.',
+             help='Map from javac plugin name to list of arguments for that plugin.')
+    cls.register_jvm_tool(register, 'javac-plugin-dep', classpath=[],
+                          removal_version='1.9.0.dev0',
+                          removal_hint='Use `--java-javac-plugin-dep` instead.',
+                          help='Search for javac plugins here, as well as in any '
+                               'explicit dependencies.')
+
+    register('--scalac-plugins', advanced=True, type=list, fingerprint=True,
+             removal_version='1.9.0.dev0',
+             removal_hint='Use `--scala-scalac-plugins` instead.',
+             help='Use these scalac plugins.')
+    register('--scalac-plugin-args', advanced=True, type=dict, default={}, fingerprint=True,
+             removal_version='1.9.0.dev0',
+             removal_hint='Use `--scala-scalac-plugin-args` instead.',
+             help='Map from scalac plugin name to list of arguments for that plugin.')
+    cls.register_jvm_tool(register, 'scalac-plugin-dep', classpath=[],
+                          removal_version='1.9.0.dev0',
+                          removal_hint='Use `--scala-scalac-plugin-dep` instead.',
+                          help='Search for scalac plugins here, as well as in any '
+                               'explicit dependencies.')
 
   @classmethod
   def product_types(cls):

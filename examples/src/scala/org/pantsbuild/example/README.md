@@ -56,11 +56,11 @@ Scala Version
 -------------
 
 You can override the default version of the entire Scala toolchain with the single
-`--scala-platform-version` option. You can set that option to one of the supported Scala versions
+`--scala-version` option. You can set that option to one of the supported Scala versions
 (currently "2.10" or "2.11"), or to the special value "custom".
 
-If you choose a custom version, you must use the `--scala-platform-runtime-spec`,
-`--scala-platform-repl-spec` and `--scala-platform-suffix-version` options to provide
+If you choose a custom version, you must use the `--scala-runtime-spec`,
+`--scala-repl-spec` and `--scala-suffix-version` options to provide
 information about your custom Scala version.  The first two of these default to the target
 addresses `//:scala-library` and `//:scala-repl` respectively, so you can simply define those
 targets (in the root `BUILD.tools` file by convention) to point to the relevant JARs.

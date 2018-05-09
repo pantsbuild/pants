@@ -707,7 +707,8 @@ class JvmCompile(NailgunTaskBase):
         cp_entries = [ctx.classes_dir]
         cp_entries.extend(self._zinc.compile_classpath(classpath_product_key,
                                                        ctx.target,
-                                                       extra_cp_entries=self._extra_compile_time_classpath))
+                                                       extra_cp_entries=self._extra_compile_time_classpath,
+                                                       zinc_compile_instance=self))
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
         is_incremental = should_compile_incrementally(vts, ctx)

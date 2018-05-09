@@ -6,14 +6,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
+from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.base.build_environment import get_buildroot
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 
 
 class Zinc(object):
@@ -30,27 +32,11 @@ class Zinc(object):
 
     @classmethod
     def subsystem_dependencies(cls):
-      return super(Zinc.Factory, cls).subsystem_dependencies() + (DependencyContext,)
+      return super(Zinc.Factory, cls).subsystem_dependencies() + (DependencyContext, Java, ScalaPlatform)
 
     @classmethod
     def register_options(cls, register):
       super(Zinc.Factory, cls).register_options(register)
-
-      register('--javac-plugins', advanced=True, type=list, fingerprint=True,
-              help='Use these javac plugins.')
-      register('--javac-plugin-args', advanced=True, type=dict, default={}, fingerprint=True,
-              help='Map from javac plugin name to list of arguments for that plugin.')
-      cls.register_jvm_tool(register, 'javac-plugin-dep', classpath=[],
-                            help='Search for javac plugins here, as well as in any '
-                                 'explicit dependencies.')
-
-      register('--scalac-plugins', advanced=True, type=list, fingerprint=True,
-              help='Use these scalac plugins.')
-      register('--scalac-plugin-args', advanced=True, type=dict, default={}, fingerprint=True,
-              help='Map from scalac plugin name to list of arguments for that plugin.')
-      cls.register_jvm_tool(register, 'scalac-plugin-dep', classpath=[],
-                            help='Search for scalac plugins here, as well as in any '
-                                 'explicit dependencies.')
 
       zinc_rev = '1.0.3'
 
@@ -167,19 +153,32 @@ class Zinc(object):
         ','.join('{}:{}'.format(src, dst) for src, dst in rebases.items())
       )
 
-  @classmethod
-  def _compiler_plugins_cp_entries(cls, jvm_tool_mixin_instance, products):
-    """Any additional global compiletime classpath entries.
+  @memoized_method
+  def _compiler_plugins_cp_entries(self, zinc_compile_instance=None):
+    """Any additional global compiletime classpath entries for compiler plugins.
 
-    TODO: Switch to instance memoized_property after 1.6.0.dev0.
+    TODO: Remove parameter once the deprecation of `(scalac|javac)_plugins` on Zinc has
+    completed in `1.9.0.dev0`.
     """
-    def cp(toolname):
-      scope = jvm_tool_mixin_instance.options_scope
-      return jvm_tool_mixin_instance.tool_classpath_from_products(products,
-                                                                  toolname,
-                                                                  scope=scope)
-    classpaths = cp('javac-plugin-dep') + cp('scalac-plugin-dep')
-    return [(conf, jar) for conf in cls.DEFAULT_CONFS for jar in classpaths]
+    java_options_src = Java.global_instance()
+    scala_options_src = ScalaPlatform.global_instance()
+    # If any relevant options were defined/set on the zinc instance, use them. This
+    # will no longer be true after the deprecation.
+    if zinc_compile_instance is not None:
+      def defines_any_opt(options):
+        return any(not zinc_compile_instance.get_options().is_default(opt)
+                   for opt in options
+                   if getattr(zinc_compile_instance.get_options(), opt, None) is not None)
+      if defines_any_opt(['javac_plugins', 'javac_plugin_args', 'javac_plugin_dep']):
+        java_options_src = zinc_compile_instance
+      if defines_any_opt(['scalac_plugins', 'scalac_plugin_args', 'scalac_plugin_dep']):
+        scala_options_src = zinc_compile_instance
+
+    def cp(instance, toolname):
+      scope = instance.options_scope
+      return instance.tool_classpath_from_products(self._products, toolname, scope=scope)
+    classpaths = cp(java_options_src, 'javac-plugin-dep') + cp(scala_options_src, 'scalac-plugin-dep')
+    return [(conf, jar) for conf in self.DEFAULT_CONFS for jar in classpaths]
 
   @memoized_property
   def extractor(self):
@@ -187,34 +186,16 @@ class Zinc(object):
                                                            self.ZINC_EXTRACTOR_TOOL_NAME,
                                                            scope=self._zinc_factory.options_scope)
 
-  def compile_classpath(self, classpath_product_key, target, extra_cp_entries=None):
+  def compile_classpath(self, classpath_product_key, target, extra_cp_entries=None, zinc_compile_instance=None):
     """Compute the compile classpath for the given target."""
-    return Zinc._compile_classpath_for(self._zinc_factory,
-                                       self._products,
-                                       classpath_product_key,
-                                       target,
-                                       extra_cp_entries=extra_cp_entries)
-
-  @classmethod
-  def _compile_classpath_for(cls,
-                             jvm_tool_mixin_instance,
-                             products,
-                             classpath_product_key,
-                             target,
-                             extra_cp_entries=None):
-    """Compute the compile classpath for the given target.
-
-    TODO: Merge with `compile_classpath` after 1.6.0.dev0.
-    """
-    classpath_product = products.get_data(classpath_product_key)
+    classpath_product = self._products.get_data(classpath_product_key)
 
     if DependencyContext.global_instance().defaulted_property(target, lambda x: x.strict_deps):
       dependencies = target.strict_dependencies(DependencyContext.global_instance())
     else:
       dependencies = DependencyContext.global_instance().all_dependencies(target)
 
-    all_extra_cp_entries = list(cls._compiler_plugins_cp_entries(jvm_tool_mixin_instance,
-                                                                 products))
+    all_extra_cp_entries = list(self._compiler_plugins_cp_entries(zinc_compile_instance))
     if extra_cp_entries:
       all_extra_cp_entries.extend(extra_cp_entries)
 
@@ -226,4 +207,4 @@ class Zinc(object):
     return ClasspathUtil.compute_classpath(iter(dependencies),
                                            classpath_product,
                                            all_extra_cp_entries,
-                                           cls.DEFAULT_CONFS)
+                                           self.DEFAULT_CONFS)

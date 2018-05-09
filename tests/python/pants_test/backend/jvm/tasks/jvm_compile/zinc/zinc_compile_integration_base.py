@@ -116,9 +116,9 @@ class BaseZincCompileIntegrationTest(object):
       with self.temporary_workdir() as workdir:
         with self.temporary_cachedir() as cachedir:
           if default_fatal_warnings:
-            arg = '--scala-platform-fatal-warnings'
+            arg = '--scala-fatal-warnings'
           else:
-            arg = '--no-scala-platform-fatal-warnings'
+            arg = '--no-scala-fatal-warnings'
           pants_run = self.run_test_compile(
               workdir,
               cachedir,

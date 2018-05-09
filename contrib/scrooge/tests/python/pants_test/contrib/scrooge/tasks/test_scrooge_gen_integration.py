@@ -20,7 +20,7 @@ class ScroogeGenTest(PantsRunIntegrationTest):
         'pythonpath': ["%(buildroot)s/contrib/scrooge/src/python"],
         'backend_packages': ["pants.backend.codegen", "pants.backend.jvm", "pants.contrib.scrooge"]
       },
-      'scala-platform': { 'version': '2.11' },
+      'scala': { 'version': '2.11' },
       'gen.scrooge': {
         'service_deps': {
             'java': [
