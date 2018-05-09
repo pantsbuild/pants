@@ -58,7 +58,7 @@ matrix:
       osx_image: xcode6.4
       language: generic
       before_install:
-        - brew tap caskroom/cask && brew update && brew cask install xz
+        - brew install xz
       env:
         - SHARD="OSX Native Engine Binary Builder"
         - PREPARE_DEPLOY=1
