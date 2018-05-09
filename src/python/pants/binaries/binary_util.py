@@ -216,7 +216,7 @@ class BinaryUtilPrivate(object):
     """
     downloaded_successfully = False
     accumulated_errors = []
-    for url in urls:  # De-dup URLS: we only want to try each URL once.
+    for url in OrderedSet(urls):  # De-dup URLS: we only want to try each URL once.
       logger.info('Attempting to fetch {name} binary from: {url} ...'.format(name=name, url=url))
       try:
         with temporary_file() as dest:
