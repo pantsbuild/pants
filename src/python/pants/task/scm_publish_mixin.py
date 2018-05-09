@@ -158,7 +158,7 @@ class ScmPublishMixin(object):
              help='Allow pushes only from one of these branches.')
     register('--restrict-push-urls', advanced=True, type=list,
              help='Allow pushes to only one of these urls.')
-    register('--verify-commit', advanced=True, type=bool, default=False,
+    register('--verify-commit', advanced=True, type=bool, default=True,
              help='Whether or not to "verify" commits made using SCM publishing. For git, this '
                   'means running commit hooks.')
 
