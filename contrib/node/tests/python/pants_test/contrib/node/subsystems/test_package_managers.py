@@ -43,18 +43,22 @@ class TestYarnpkg(unittest.TestCase):
 
   def test_install_module_options_off(self, mock_command_gen):
     self.yarnpkg.install_module(
-      install_optional=False, production_only=False, force=False)
+      install_optional=False, production_only=False, force=False, frozen_lockfile=True)
     mock_command_gen.assert_called_once_with(
-      [fake_install], 'yarnpkg',
-      args=['--non-interactive', '--ignore-optional'], node_paths=None
+      [fake_install],
+      'yarnpkg',
+      args=['--non-interactive', '--ignore-optional', '--frozen-lockfile'],
+      node_paths=None
     )
 
   def test_install_module_options_on(self, mock_command_gen):
     self.yarnpkg.install_module(
-      install_optional=True, production_only=True, force=True)
+      install_optional=True, production_only=True, force=True, frozen_lockfile=True)
     mock_command_gen.assert_called_once_with(
-      [fake_install], 'yarnpkg',
-      args=['--non-interactive', '--production=true', '--force'], node_paths=None
+      [fake_install],
+      'yarnpkg',
+      args=['--non-interactive', '--production=true', '--force', '--frozen-lockfile'],
+      node_paths=None
     )
 
   def test_add_package_default(self, mock_command_gen):
