@@ -16,23 +16,24 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
-class ExecuteProcessRequest(datatype(['argv', 'env', 'input_files_digest', 'digest_length'])):
+class ExecuteProcessRequest(datatype(['argv', 'env', 'input_files_digest', 'digest_length', 'output_files'])):
   """Request for execution with args and snapshots to extract."""
 
   @classmethod
-  def create_from_snapshot(cls, argv, env, snapshot):
+  def create_from_snapshot(cls, argv, env, snapshot, output_files):
     return ExecuteProcessRequest(
       argv=argv,
       env=env,
       input_files_digest=snapshot.fingerprint,
       digest_length=snapshot.digest_length,
+      output_files=output_files,
     )
 
   @classmethod
-  def create_with_empty_snapshot(cls, argv, env):
-    return cls.create_from_snapshot(argv, env, EMPTY_SNAPSHOT)
+  def create_with_empty_snapshot(cls, argv, env, output_files):
+    return cls.create_from_snapshot(argv, env, EMPTY_SNAPSHOT, output_files)
 
-  def __new__(cls, argv, env, input_files_digest, digest_length):
+  def __new__(cls, argv, env, input_files_digest, digest_length, output_files):
     """
 
     :param args: Arguments to the process being run.
@@ -52,10 +53,13 @@ class ExecuteProcessRequest(datatype(['argv', 'env', 'input_files_digest', 'dige
     if digest_length < 0:
       raise ValueError('digest_length must be >= 0.')
 
-    return super(ExecuteProcessRequest, cls).__new__(cls, argv, env, input_files_digest, digest_length)
+    if not isinstance(output_files, tuple):
+      raise ValueError('output_files must be a tuple.')
+
+    return super(ExecuteProcessRequest, cls).__new__(cls, argv, env, input_files_digest, digest_length, output_files)
 
 
-class ExecuteProcessResult(datatype(['stdout', 'stderr', 'exit_code'])):
+class ExecuteProcessResult(datatype(['stdout', 'stderr', 'exit_code', 'snapshot'])):
   pass
 
 

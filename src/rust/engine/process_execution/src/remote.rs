@@ -5,7 +5,7 @@ use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
-use fs::Store;
+use fs::{self, Store};
 use futures::{future, Future};
 use futures_timer::Delay;
 use hashing::{Digest, Fingerprint};
@@ -230,6 +230,8 @@ impl CommandRunner {
             stdout: stdout,
             stderr: stderr,
             exit_code: execute_response.get_result().get_exit_code(),
+            // TODO: Populate output directory
+            output_snapshot: fs::Snapshot::empty(),
           }).to_boxed(),
           grpcio::RpcStatusCode::FailedPrecondition => {
             if execute_response.get_status().get_details().len() != 1 {
@@ -458,7 +460,7 @@ mod tests {
   use testutil::{as_bytes, owned_string_vec};
 
   use super::{CommandRunner, ExecuteProcessRequest, ExecuteProcessResult, ExecutionError};
-  use std::collections::BTreeMap;
+  use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
   use std::sync::Arc;
   use std::time::Duration;
@@ -487,6 +489,7 @@ mod tests {
           argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
           env: BTreeMap::new(),
           input_files: fs::EMPTY_DIGEST,
+          output_files: BTreeSet::new(),
         }).unwrap()
           .1,
         vec![],
@@ -530,6 +533,7 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
+        output_snapshot: fs::Snapshot::empty(),
       }
     );
   }
@@ -550,6 +554,7 @@ mod tests {
         stdout: testdata.bytes(),
         stderr: testdata_empty.bytes(),
         exit_code: 0,
+        output_snapshot: fs::Snapshot::empty(),
       })
     );
   }
@@ -570,6 +575,7 @@ mod tests {
         stdout: testdata_empty.bytes(),
         stderr: testdata.bytes(),
         exit_code: 0,
+        output_snapshot: fs::Snapshot::empty(),
       })
     );
   }
@@ -605,6 +611,7 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
+        output_snapshot: fs::Snapshot::empty(),
       }
     );
   }
@@ -814,6 +821,7 @@ mod tests {
         stdout: roland.bytes(),
         stderr: Bytes::from(""),
         exit_code: 0,
+        output_snapshot: fs::Snapshot::empty(),
       })
     );
     {
@@ -889,6 +897,7 @@ mod tests {
       stdout: as_bytes("roland"),
       stderr: Bytes::from("simba"),
       exit_code: 17,
+      output_snapshot: fs::Snapshot::empty(),
     };
 
     let mut operation = bazel_protos::operations::Operation::new();
@@ -1098,6 +1107,7 @@ mod tests {
       argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
+      output_files: BTreeSet::new(),
     }
   }
 
@@ -1244,6 +1254,7 @@ mod tests {
       argv: owned_string_vec(&["/bin/cat", "roland"]),
       env: BTreeMap::new(),
       input_files: TestDirectory::containing_roland().digest(),
+      output_files: BTreeSet::new(),
     }
   }
 }

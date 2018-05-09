@@ -323,6 +323,7 @@ impl Select {
                 externs::store_bytes(&result.0.stdout),
                 externs::store_bytes(&result.0.stderr),
                 externs::store_i32(result.0.exit_code),
+                Snapshot::store_snapshot(&context2, &result.0.output_snapshot),
               ],
             )
           })
@@ -537,10 +538,16 @@ impl ExecuteProcess {
       digest_length_as_usize,
     );
 
+    let output_files = externs::project_multi_strs(&value, "output_files")
+      .into_iter()
+      .map(|path: String| PathBuf::from(path))
+      .collect();
+
     ExecuteProcess(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
       input_files: digest,
+      output_files: output_files,
     })
   }
 }
@@ -556,20 +563,27 @@ impl Node for ExecuteProcess {
     let context2 = context.clone();
     // TODO: Process pool management should likely move into the `process_execution` crate, which
     // will have different strategies depending on remote/local execution.
+
+    let command_runner = process_execution::local::CommandRunner {
+      store: context.core.store.clone(),
+      fs_pool: context.core.fs_pool.clone(),
+    };
+
     context
       .core
-      .pool
+      .fs_pool
       .spawn_fn(move || {
         let tmpdir = TempDir::new("process-execution").unwrap();
+        let dir = tmpdir.path().to_owned();
         context2
           .core
           .store
-          .materialize_directory(tmpdir.path().to_owned(), request.input_files)
-          .map(move |_| {
-            ProcessResult(
-              process_execution::local::run_command_locally(request, tmpdir.path()).unwrap(),
-            )
-          })
+          .materialize_directory(dir.clone(), request.input_files)
+          .and_then(move |()| command_runner.run(request, &dir))
+          // Force tmpdir not to get dropped until the command is finished being run, because it's
+          // deleted on drop.
+          .join(future::ok(tmpdir))
+          .map(|(result, _tmpdir)| result).map(|result| ProcessResult(result))
           .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
       })
       .to_boxed()

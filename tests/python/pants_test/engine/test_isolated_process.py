@@ -72,6 +72,7 @@ def cat_files_process_request_input_snapshot(cat_exe_req):
     argv=cat_bin.argv_from_snapshot(cat_files_snapshot),
     env=tuple(),
     snapshot=cat_files_snapshot,
+    output_files=(),
   )
 
 
@@ -108,7 +109,8 @@ class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)
 def process_request_from_javac_version(javac_version_exe_req):
   yield ExecuteProcessRequest.create_with_empty_snapshot(
     argv=javac_version_exe_req.gen_argv(),
-    env=tuple())
+    env=tuple(),
+    output_files=())
 
 
 class JavacVersionOutput(datatype([('value', str)])): pass
@@ -158,7 +160,8 @@ def get_javac_version_output(javac_version_command):
   yield JavacVersionOutput(str(javac_version_proc_result.stderr))
 
 
-class JavacSources(datatype([('path_globs', PathGlobs)])):
+class JavacSources(datatype([('path_glob_includes', tuple)])):
+  # TODO: Rewrite this pydoc
   """PathGlobs wrapper for Java source files to show an example of making a
   custom type to wrap generic types such as PathGlobs to add usage context.
 
@@ -184,19 +187,30 @@ class JavacCompileRequest(datatype([
 
 @rule(ExecuteProcessRequest, [Select(JavacCompileRequest)])
 def javac_compile_sources_execute_process_request(javac_compile_req):
-  sources_snapshot = yield Get(
-    Snapshot, PathGlobs, javac_compile_req.javac_sources.path_globs)
+  files_to_compile = javac_compile_req.javac_sources.path_glob_includes
+
+  path_globs = PathGlobs.create('', include=files_to_compile)
+  sources_snapshot = yield Get(Snapshot, PathGlobs, path_globs)
+
+  output_files = tuple(
+    file[:-5] + ".class" for file in files_to_compile if file.endswith(".java")
+  )
+  if len(output_files) != len(files_to_compile):
+    raise ValueError("blah")
+
   yield ExecuteProcessRequest.create_from_snapshot(
     argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
     env=tuple(),
     snapshot=sources_snapshot,
+    output_files=output_files,
   )
 
 
-# TODO: make this contain the snapshot(s?) of the output files (or contain
-# something that contains it) once we've made it so processes can make snapshots
-# of the files they produce.
-class JavacCompileResult(object): pass
+class JavacCompileResult(datatype([
+  ('stdout', str),
+  ('stderr', str),
+  ('snapshot', Snapshot),
+])): pass
 
 
 @rule(JavacCompileResult, [Select(JavacCompileRequest)])
@@ -207,13 +221,18 @@ def javac_compile_process_result(javac_compile_req):
     ExecuteProcessResult, ExecuteProcessRequest, javac_proc_req)
 
   exit_code = javac_proc_result.exit_code
+  stdout = javac_proc_result.stdout
+  stderr = javac_proc_result.stderr
   if exit_code != 0:
-    stdout = javac_proc_result.stdout
-    stderr = javac_proc_result.stderr
     raise ProcessExecutionFailure(
       exit_code, stdout, stderr, 'javac compilation')
 
-  yield JavacCompileResult()
+  yield JavacCompileResult(
+    stdout,
+    stderr,
+    # None,
+    javac_proc_result.snapshot,
+  )
 
 
 def create_javac_compile_rules():
@@ -229,6 +248,7 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
     return ExecuteProcessRequest.create_with_empty_snapshot(
       argv=argv,
       env=env,
+      output_files=(),
     )
 
   def test_blows_up_on_invalid_args(self):
@@ -245,11 +265,13 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
     # TODO(cosmicexplorer): we should probably check that the digest info in
     # ExecuteProcessRequest is valid, beyond just checking if it's a string.
     with self.assertRaises(ValueError):
-      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest='', digest_length='')
+      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest='', digest_length='', output_files=())
     with self.assertRaises(ValueError):
-      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest=3, digest_length=0)
+      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest=3, digest_length=0, output_files=())
     with self.assertRaises(ValueError):
-      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest='', digest_length=-1)
+      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest='', digest_length=-1, output_files=())
+    with self.assertRaises(ValueError):
+      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest='', digest_length=1, output_files=["blah"])
 
 
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
@@ -288,36 +310,61 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     javac_version_output = results[0]
     self.assertIn('javac', javac_version_output.value)
 
+  def test_write_file(self):
+    scheduler = self.mk_scheduler_in_example_fs(())
+
+    request = ExecuteProcessRequest.create_with_empty_snapshot(
+      ("/bin/bash", "-c", "echo -n 'European Burmese' > roland"),
+      (),
+      ("roland",)
+    )
+
+    execute_process_result = self.execute_expecting_one_result(scheduler, ExecuteProcessResult, request).value
+
+    self.assertEquals(
+      "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
+      execute_process_result.snapshot.fingerprint
+    )
+
+    self.assertEquals(
+      80,
+      execute_process_result.snapshot.digest_length
+    )
+
+    self.assertEquals(
+      ("roland",),
+      tuple(file.path for file in execute_process_result.snapshot.files),
+    )
+    # TODO: Work out why this can't be satisified by the engine
+    # files_content_result = self.execute_expecting_one_result(scheduler, FilesContent, execute_process_result.snapshot).value
+    #
+    # self.assertEquals(
+    #   tuple(files_content_result.dependencies),
+    #   tuple(FileContent("roland", "European Burmese"))
+    # )
+
   def test_javac_compilation_example_success(self):
     scheduler = self.mk_scheduler_in_example_fs(create_javac_compile_rules())
 
     request = JavacCompileRequest(
       BinaryLocation('/usr/bin/javac'),
-      JavacSources(PathGlobs.create('', include=[
-        'scheduler_inputs/src/java/simple/Simple.java',
-      ])))
+      JavacSources((u'scheduler_inputs/src/java/simple/Simple.java',)),
+    )
 
-    self.assertEqual(
-      repr(request),
-      "JavacCompileRequest(binary_location=BinaryLocation(bin_path='/usr/bin/javac'), javac_sources=JavacSources(path_globs=PathGlobs(include=(u'scheduler_inputs/src/java/simple/Simple.java',), exclude=())))")
+    result = self.execute_expecting_one_result(scheduler, JavacCompileResult, request).value
 
-    results = self.execute(scheduler, JavacCompileResult, request)
-    self.assertEqual(1, len(results))
-    # TODO: Test that the output snapshot contains Simple.class at the correct
-    # path
+    self.assertEquals(
+      ("scheduler_inputs/src/java/simple/Simple.class",),
+      tuple(file.path for file in result.snapshot.files),
+    )
 
   def test_javac_compilation_example_failure(self):
     scheduler = self.mk_scheduler_in_example_fs(create_javac_compile_rules())
 
     request = JavacCompileRequest(
       BinaryLocation('/usr/bin/javac'),
-      JavacSources(PathGlobs.create('', include=[
-        'scheduler_inputs/src/java/simple/Broken.java',
-      ])))
-
-    self.assertEqual(
-      repr(request),
-      "JavacCompileRequest(binary_location=BinaryLocation(bin_path='/usr/bin/javac'), javac_sources=JavacSources(path_globs=PathGlobs(include=(u'scheduler_inputs/src/java/simple/Broken.java',), exclude=())))")
+      JavacSources(('scheduler_inputs/src/java/simple/Broken.java',))
+    )
 
     with self.assertRaises(ProcessExecutionFailure) as cm:
       self.execute_raising_throw(scheduler, JavacCompileResult, request)
