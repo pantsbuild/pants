@@ -237,8 +237,11 @@ class Git(Scm):
                      raise_type=Scm.LocalException)
     self.push('refs/tags/' + name)
 
-  def commit(self, message):
-    self._check_call(['commit', '--all', '--message=' + message], raise_type=Scm.LocalException)
+  def commit(self, message, verify=True):
+    cmd = ['commit', '--all', '--message=' + message]
+    if not verify:
+      cmd.append('--no-verify')
+    self._check_call(cmd, raise_type=Scm.LocalException)
 
   def add(self, *paths):
     self._check_call(['add'] + list(paths), raise_type=Scm.LocalException)

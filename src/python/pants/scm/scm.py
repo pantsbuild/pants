@@ -133,7 +133,7 @@ class Scm(AbstractClass):
     """
 
   @abstractmethod
-  def commit(self, message):
+  def commit(self, message, verify=True):
     """Commits all the changes for tracked files in the local workspace.
 
     Subclasses should raise LocalException if there is a problem making the commit.
