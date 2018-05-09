@@ -53,7 +53,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             'zinc',
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.4'),
+                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.5'),
                             ])
 
       cls.register_jvm_tool(register,
@@ -79,7 +79,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_EXTRACTOR_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.3')
+                              JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.4')
                             ])
 
     @classmethod
