@@ -8,9 +8,10 @@ jvm_binary(
   ],
 )
 
+# DOCSTART: This target is included in documentation.
 java_library(name='autovalue-lib',
-  sources = globs('*'),
   dependencies = [
     '3rdparty/jvm/com/google/auto/value',
   ],
 )
+# DOCEND

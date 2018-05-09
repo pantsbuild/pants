@@ -21,7 +21,7 @@ may make sense to organize them in multiple subdirectories, say by category or b
 In the appropriate `BUILD` file, you create a <a pantsref="bdict_jar_library">`jar_library`</a>
 referencing the <a pantsref="bdict_jar">`jar`</a>s you want:
 
-!inc[start-at=junit&end-before=scalatest](../../../../../../3rdparty/BUILD)
+!inc[start-after=DOCSTART&end-before=DOCEND](../../../../../../3rdparty/jvm/com/google/auto/value/BUILD)
 
 Here, the <a pantsref="bdict_jar_library">`jar_library`</a>'s name
 defines a target address that other build targets can refer to. The
@@ -37,12 +37,13 @@ statements in your Java code.
 
 For example, your `BUILD` file might have
 
-!inc[start-after=junit_tests&end-before=src/java](../../../../../tests/java/org/pantsbuild/example/hello/greet/BUILD)
+!inc[start-after=DOCSTART&end-before=DOCEND](../../../../../src/java/org/pantsbuild/example/autovalue/BUILD)
 
 And your Java code might have:
 
     :::java
-    import org.junit.Test;
+    import com.google.auto.value.AutoValue;
+
 
 "Round Trip" Dependencies
 -------------------------
