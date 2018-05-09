@@ -196,9 +196,6 @@ impl Tasks {
   }
 }
 
-// TODO: This definition of `Intrinsic` is broken. Like `Tasks`, Intrinsics may have zero or more
-// input type requirements. As an example, `Snapshot` should have zero inputs, but currently it
-// "depends on" the subgraph that instantiates its PathGlobs object.
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub struct Intrinsic {
   pub kind: IntrinsicKind,

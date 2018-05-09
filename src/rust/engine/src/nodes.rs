@@ -261,6 +261,33 @@ impl Select {
   }
 
   ///
+  /// Computes PathGlobs in the context of this Node, and then creates a new Snapshot with the
+  /// result. The result is that the Snapshot does not depend on the computation of the PathGlobs:
+  /// only on the matched files in the filesystem.
+  ///
+  fn snapshot(&self, context: &Context, entry: &rule_graph::Entry) -> NodeFuture<fs::Snapshot> {
+    let ref edges = context
+      .core
+      .rule_graph
+      .edges_for_inner(entry)
+      .expect("edges for snapshot exist.");
+    // Compute PathGlobs for the subject.
+    let context = context.clone();
+    Select::new(
+      context.core.types.path_globs.clone(),
+      self.subject.clone(),
+      self.variants.clone(),
+      edges,
+    ).run(context.clone())
+      .and_then(move |path_globs_val| {
+        context.get(Snapshot {
+          subject: externs::key_for(path_globs_val),
+        })
+      })
+      .to_boxed()
+  }
+
+  ///
   /// Return Futures for each Task/Node that might be able to compute the given product for the
   /// given subject and variants.
   ///
@@ -284,14 +311,9 @@ impl Select {
               kind: IntrinsicKind::Snapshot,
               ..
             }) => {
-              // TODO: Select the input product type first.
               let context = context.clone();
-              context
-                .get(Snapshot {
-                  subject: self.subject.clone(),
-                  variants: self.variants.clone(),
-                  entry: entry.clone(),
-                })
+              self
+                .snapshot(&context, &entry)
                 .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
                 .to_boxed()
             }
@@ -299,14 +321,9 @@ impl Select {
               kind: IntrinsicKind::FilesContent,
               ..
             }) => {
-              // TODO: Select the input product type first.
               let context = context.clone();
-              context
-                .get(Snapshot {
-                  subject: self.subject.clone(),
-                  variants: self.variants.clone(),
-                  entry: entry.clone(),
-                })
+              self
+                .snapshot(&context, &entry)
                 .and_then(move |snapshot| {
                   // Request the file contents of the Snapshot, and then store them.
                   snapshot
@@ -680,16 +697,11 @@ impl From<Scandir> for NodeKey {
 }
 
 ///
-/// A Node that captures an fs::Snapshot for the given subject.
-///
-/// Begins by selecting PathGlobs for the subject, and then computes a Snapshot for the
-/// PathStats matched by the PathGlobs.
+/// A Node that captures an fs::Snapshot for a PathGlobs subject.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Snapshot {
   subject: Key,
-  variants: Variants,
-  entry: rule_graph::Entry,
 }
 
 impl Snapshot {
@@ -787,26 +799,10 @@ impl Node for Snapshot {
   type Output = fs::Snapshot;
 
   fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
-    let ref edges = context
-      .core
-      .rule_graph
-      .edges_for_inner(&self.entry)
-      .expect("edges for snapshot exist.");
-    // Compute and parse PathGlobs for the subject.
-    Select::new(
-      context.core.types.path_globs.clone(),
-      self.subject.clone(),
-      self.variants.clone(),
-      edges,
-    ).run(context.clone())
-      .then(move |path_globs_res| match path_globs_res {
-        Ok(path_globs_val) => match Self::lift_path_globs(&path_globs_val) {
-          Ok(pgs) => Snapshot::create(context, pgs),
-          Err(e) => err(throw(&format!("Failed to parse PathGlobs: {}", e))),
-        },
-        Err(failure) => err(failure),
-      })
-      .to_boxed()
+    match Self::lift_path_globs(&externs::val_for(&self.subject)) {
+      Ok(pgs) => Self::create(context, pgs),
+      Err(e) => err(throw(&format!("Failed to parse PathGlobs: {}", e))),
+    }
   }
 }
 
