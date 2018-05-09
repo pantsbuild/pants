@@ -153,6 +153,38 @@ class Zinc(object):
         ','.join('{}:{}'.format(src, dst) for src, dst in rebases.items())
       )
 
+  @staticmethod
+  def _select_jvm_tool_mixin(left, right, options):
+    if left is None:
+      return right
+    if any(not left.get_options().is_default(opt)
+           for opt in options
+           if getattr(left.get_options(), opt, None) is not None):
+      return left
+    return right
+
+  @memoized_method
+  def javac_compiler_plugins_src(self, zinc_compile_instance=None):
+    """Returns an instance of JvmToolMixin that should provide javac compiler plugins.
+
+    TODO: Remove this method once the deprecation of `(scalac|javac)_plugins` on Zinc has
+    completed in `1.9.0.dev0`.
+    """
+    return Zinc._select_jvm_tool_mixin(zinc_compile_instance,
+                                       Java.global_instance(),
+                                       ['javac_plugins', 'javac_plugin_args', 'javac_plugin_dep'])
+
+  @memoized_method
+  def scalac_compiler_plugins_src(self, zinc_compile_instance=None):
+    """Returns an instance of JvmToolMixin that should provide scalac compiler plugins.
+
+    TODO: Remove this method once the deprecation of `(scalac|javac)_plugins` on Zinc has
+    completed in `1.9.0.dev0`.
+    """
+    return Zinc._select_jvm_tool_mixin(zinc_compile_instance,
+                                       ScalaPlatform.global_instance(),
+                                       ['scalac_plugins', 'scalac_plugin_args', 'scalac_plugin_dep'])
+
   @memoized_method
   def _compiler_plugins_cp_entries(self, zinc_compile_instance=None):
     """Any additional global compiletime classpath entries for compiler plugins.
@@ -160,19 +192,8 @@ class Zinc(object):
     TODO: Remove parameter once the deprecation of `(scalac|javac)_plugins` on Zinc has
     completed in `1.9.0.dev0`.
     """
-    java_options_src = Java.global_instance()
-    scala_options_src = ScalaPlatform.global_instance()
-    # If any relevant options were defined/set on the zinc instance, use them. This
-    # will no longer be true after the deprecation.
-    if zinc_compile_instance is not None:
-      def defines_any_opt(options):
-        return any(not zinc_compile_instance.get_options().is_default(opt)
-                   for opt in options
-                   if getattr(zinc_compile_instance.get_options(), opt, None) is not None)
-      if defines_any_opt(['javac_plugins', 'javac_plugin_args', 'javac_plugin_dep']):
-        java_options_src = zinc_compile_instance
-      if defines_any_opt(['scalac_plugins', 'scalac_plugin_args', 'scalac_plugin_dep']):
-        scala_options_src = zinc_compile_instance
+    java_options_src = self.javac_compiler_plugins_src(zinc_compile_instance)
+    scala_options_src = self.scalac_compiler_plugins_src(zinc_compile_instance)
 
     def cp(instance, toolname):
       scope = instance.options_scope

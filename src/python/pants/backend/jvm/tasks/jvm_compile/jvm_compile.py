@@ -496,10 +496,21 @@ class JvmCompile(NailgunTaskBase):
           self._record_compile_classpath(classpath, vts.targets, outdir)
 
         try:
-          self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
-                       log_file, zinc_args_file, settings, fatal_warnings, zinc_file_manager,
-                       self._get_plugin_map('javac', target),
-                       self._get_plugin_map('scalac', target))
+          self.compile(
+            self._args,
+            classpath,
+            sources,
+            outdir,
+            upstream_analysis,
+            analysis_file,
+            log_file,
+            zinc_args_file,
+            settings,
+            fatal_warnings,
+            zinc_file_manager,
+            self._get_plugin_map('javac', self._zinc.javac_compiler_plugins_src(self), target),
+            self._get_plugin_map('scalac', self._zinc.scalac_compiler_plugins_src(self), target),
+          )
         except TaskError:
           if self.get_options().suggest_missing_deps:
             logs = self._find_failed_compile_logs(compile_workunit)
@@ -507,7 +518,7 @@ class JvmCompile(NailgunTaskBase):
               self._find_missing_deps('\n'.join([read_file(log).decode('utf-8') for log in logs]), target)
           raise
 
-  def _get_plugin_map(self, compiler, target):
+  def _get_plugin_map(self, compiler, options_src, target):
     """Returns a map of plugin to args, for the given compiler.
 
     Only plugins that must actually be activated will be present as keys in the map.
@@ -526,6 +537,7 @@ class JvmCompile(NailgunTaskBase):
     - examples/src/scala/org/pantsbuild/example/scalac/plugin/README.md
 
     :param compiler: one of 'javac', 'scalac'.
+    :param options_src: A JvmToolMixin instance providing plugin options.
     :param target: The target whose plugins we compute.
     """
     # Note that we get() options and getattr() target fields and task methods,
@@ -533,7 +545,7 @@ class JvmCompile(NailgunTaskBase):
     plugins_key = '{}_plugins'.format(compiler)
     requested_plugins = (
       tuple(getattr(self, plugins_key, []) or []) +
-      tuple(self.get_options().get(plugins_key, []) or []) +
+      tuple(options_src.get_options().get(plugins_key, []) or []) +
       tuple((getattr(target, plugins_key, []) or []))
     )
     # Allow multiple flags and also comma-separated values in a single flag.
@@ -542,7 +554,7 @@ class JvmCompile(NailgunTaskBase):
     plugin_args_key = '{}_plugin_args'.format(compiler)
     available_plugin_args = {}
     available_plugin_args.update(getattr(self, plugin_args_key, {}) or {})
-    available_plugin_args.update(self.get_options().get(plugin_args_key, {}) or {})
+    available_plugin_args.update(options_src.get_options().get(plugin_args_key, {}) or {})
     available_plugin_args.update(getattr(target, plugin_args_key, {}) or {})
 
     # From all available args, pluck just the ones for the selected plugins.
