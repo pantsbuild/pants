@@ -58,6 +58,7 @@ impl Tasks {
       .singletons
       .keys()
       .chain(self.tasks.keys())
+      .chain(self.intrinsics.keys())
       .cloned()
       .collect::<HashSet<_>>()
   }

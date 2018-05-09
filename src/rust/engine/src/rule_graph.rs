@@ -616,11 +616,11 @@ impl<'t> GraphMaker<'t> {
     subject_type: &TypeId,
     product_type: &TypeConstraint,
   ) -> Option<RootEntry> {
-    self
-      .tasks
-      .gen_tasks(product_type)
-      .and_then(|tasks| if !tasks.is_empty() { Some(tasks) } else { None })
-      .map(|_| RootEntry {
+    let candidates = rhs(&self.tasks, subject_type.clone(), product_type);
+    if candidates.is_empty() {
+      None
+    } else {
+      Some(RootEntry {
         subject_type: subject_type.clone(),
         clause: vec![
           Selector::Select(Select {
@@ -630,6 +630,7 @@ impl<'t> GraphMaker<'t> {
         ],
         gets: vec![],
       })
+    }
   }
 }
 
