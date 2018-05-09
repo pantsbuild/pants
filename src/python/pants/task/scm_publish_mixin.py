@@ -205,7 +205,8 @@ class ScmPublishMixin(object):
   def commit_pushdb(self, coordinates, postscript=None):
     """Commit changes to the pushdb with a message containing the provided coordinates."""
     self.scm.commit('pants build committing publish data for push of {coordinates}'
-                    '{postscript}'.format(coordinates=coordinates, postscript=postscript or ''))
+                    '{postscript}'.format(coordinates=coordinates, postscript=postscript or ''),
+                    verify=False)
 
   def publish_pushdb_changes_to_remote_scm(self, pushdb_file, coordinate, tag_name, tag_message,
                                            postscript=None):
