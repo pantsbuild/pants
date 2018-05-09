@@ -265,26 +265,7 @@ impl Select {
   /// given subject and variants.
   ///
   fn gen_nodes(&self, context: &Context) -> Vec<NodeFuture<Value>> {
-    // TODO: These `product==` hooks are hacky.
-    if self.product() == &context.core.types.process_result {
-      let context2 = context.clone();
-      let execute_process_node = ExecuteProcess::lift(&self.subject);
-      vec![
-        context
-          .get(execute_process_node)
-          .map(move |result| {
-            externs::unsafe_call(
-              &context2.core.types.construct_process_result,
-              &[
-                externs::store_bytes(&result.0.stdout),
-                externs::store_bytes(&result.0.stderr),
-                externs::store_i32(result.0.exit_code),
-              ],
-            )
-          })
-          .to_boxed(),
-      ]
-    } else if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
+    if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
       vec![future::ok(value.clone()).to_boxed()]
     } else {
       self
@@ -301,7 +282,6 @@ impl Select {
             }),
             &rule_graph::Rule::Intrinsic(Intrinsic {
               kind: IntrinsicKind::Snapshot,
-              input,
               ..
             }) => {
               // TODO: Select the input product type first.
@@ -317,7 +297,6 @@ impl Select {
             }
             &rule_graph::Rule::Intrinsic(Intrinsic {
               kind: IntrinsicKind::FilesContent,
-              input,
               ..
             }) => {
               // TODO: Select the input product type first.
@@ -336,6 +315,25 @@ impl Select {
                     .map(move |files_content| {
                       Snapshot::store_files_content(&context, &files_content)
                     })
+                })
+                .to_boxed()
+            }
+            &rule_graph::Rule::Intrinsic(Intrinsic {
+              kind: IntrinsicKind::ProcessExecution,
+              ..
+            }) => {
+              let context = context.clone();
+              context
+                .get(ExecuteProcess::lift(&self.subject))
+                .map(move |result| {
+                  externs::unsafe_call(
+                    &context.core.types.construct_process_result,
+                    &[
+                      externs::store_bytes(&result.0.stdout),
+                      externs::store_bytes(&result.0.stderr),
+                      externs::store_i32(result.0.exit_code),
+                    ],
+                  )
                 })
                 .to_boxed()
             }

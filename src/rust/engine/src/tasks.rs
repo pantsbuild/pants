@@ -90,6 +90,11 @@ impl Tasks {
         product: types.files_content,
         input: types.snapshot,
       },
+      Intrinsic {
+        kind: IntrinsicKind::ProcessExecution,
+        product: types.process_result,
+        input: types.process_request,
+      },
     ].into_iter()
       .map(|i| (i.product.clone(), i))
       .collect();
@@ -205,4 +210,5 @@ pub struct Intrinsic {
 pub enum IntrinsicKind {
   Snapshot,
   FilesContent,
+  ProcessExecution,
 }
