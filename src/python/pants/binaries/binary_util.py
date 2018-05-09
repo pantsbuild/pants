@@ -15,7 +15,6 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
-from pants.fs.archive import create_archiver
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
@@ -133,11 +132,10 @@ class BinaryUtilPrivate(object):
 
   # TODO: Deprecate passing in an explicit supportdir? Seems like we should be able to
   # organize our binary hosting so that it's not needed.
-  def select(self, supportdir, version, name, platform_dependent, archive_type, urls=None):
+  def select(self, supportdir, version, name, platform_dependent, archiver=None, urls=None):
     """Fetches a file, unpacking it if necessary."""
-    if archive_type is None:
+    if archiver is None:
       return self._select_file(supportdir, version, name, platform_dependent, urls=urls)
-    archiver = create_archiver(archive_type)
     return self._select_archive(supportdir, version, name, platform_dependent, archiver, urls=urls)
 
   def _select_file(self, supportdir, version, name, platform_dependent, urls=None):

@@ -6,9 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import os
 from abc import abstractmethod
 
 from pants.binaries.binary_util import BinaryUtilPrivate
+from pants.fs.archive import XZCompressedTarArchiver, create_archiver
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.osutil import OsId
@@ -52,7 +54,12 @@ class BinaryToolBase(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtilPrivate.Factory,)
+    sub_deps = super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtilPrivate.Factory,)
+
+    if cls.archive_type == 'txz':
+      sub_deps = sub_deps + (XZ.scoped(cls),)
+
+    return sub_deps
 
   @classmethod
   @abstractmethod
@@ -142,13 +149,24 @@ class BinaryToolBase(Subsystem):
   def get_support_dir(cls):
     return 'bin/{}'.format(cls._get_name())
 
+  @memoized_method
+  def _make_archiver(self):
+    if not self.archive_type:
+      return None
+
+    if self.archive_type == 'txz':
+      xz_location = XZ.scoped_instance(self).binary_location()
+      return XZCompressedTarArchiver(xz_location)
+
+    return create_archiver(self.archive_type)
+
   def _select_for_version(self, version):
     return self._binary_util.select(
       supportdir=self.get_support_dir(),
       version=version,
       name='{}{}'.format(self._get_name(), self.suffix),
       platform_dependent=self.platform_dependent,
-      archive_type=self.archive_type,
+      archiver=self._make_archiver(),
       urls=self.get_options().urls.get(version, None))
 
   @classmethod
@@ -182,3 +200,12 @@ class ExecutablePathProvider(object):
 
   def path_entries(self):
     return []
+
+
+class XZ(NativeTool):
+  options_scope = 'xz'
+  default_version = '5.2.4'
+  archive_type = 'tgz'
+
+  def binary_location(self):
+    return os.path.join(self.select(), 'bin', 'xz')

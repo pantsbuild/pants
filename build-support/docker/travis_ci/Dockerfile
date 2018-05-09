@@ -4,8 +4,6 @@
 # Use our custom Centos6 image for binary compatibility with old linux distros.
 FROM pantsbuild/centos6:latest
 
-RUN yum install -y xz-devel
-
 # Setup mount points for the travis ci user & workdir.
 VOLUME /travis/home
 VOLUME /travis/workdir

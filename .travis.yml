@@ -57,8 +57,6 @@ matrix:
       # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
       osx_image: xcode6.4
       language: generic
-      before_install:
-        - brew install xz
       env:
         - SHARD="OSX Native Engine Binary Builder"
         - PREPARE_DEPLOY=1
@@ -424,7 +422,7 @@ matrix:
       env:
         - SHARD="Rust Tests OSX"
       before_install:
-        - brew tap caskroom/cask && brew update && brew cask install osxfuse xz
+        - brew tap caskroom/cask && brew update && brew cask install osxfuse
       script:
         - ./build-support/bin/ci.sh -bcfjklmnprtx
 

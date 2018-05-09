@@ -9,17 +9,17 @@ import gzip
 import os
 import re
 import shutil
+import sys
 from abc import abstractmethod
 from collections import OrderedDict
 from contextlib import contextmanager
 from zipfile import ZIP_DEFLATED
 
-import lzma
-
 from pants.base.deprecated import deprecated
 from pants.util.contextutil import open_tar, open_zip, temporary_dir
-from pants.util.dirutil import safe_concurrent_rename, safe_walk
+from pants.util.dirutil import is_executable, safe_concurrent_rename, safe_walk, split_basename_and_dirname
 from pants.util.meta import AbstractClass
+from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_text
 
 
@@ -28,15 +28,14 @@ from pants.util.strutil import ensure_text
 
 class Archiver(AbstractClass):
 
-  @classmethod
-  def extract(cls, path, outdir, filter_func=None, concurrency_safe=False):
+  def extract(self, path, outdir, concurrency_safe=False, **kwargs):
     """Extracts an archive's contents to the specified outdir with an optional filter.
 
     :API: public
 
     :param string path: path to the zipfile to extract from
     :param string outdir: directory to extract files into
-    :param function filter_func: optional filter with the filename as the parameter.  Returns True
+    TODO: FIX THIS!! :param function filter_func: optional filter with the filename as the parameter.  Returns True
       if the file should be extracted.  Note that filter_func is ignored for non-zip archives.
     :param bool concurrency_safe: True to use concurrency safe method.  Concurrency safe extraction
       will be performed on a temporary directory and the extacted directory will then be renamed
@@ -45,14 +44,13 @@ class Archiver(AbstractClass):
     """
     if concurrency_safe:
       with temporary_dir() as temp_dir:
-        cls._extract(path, temp_dir, filter_func=filter_func)
+        self._extract(path, temp_dir, **kwargs)
         safe_concurrent_rename(temp_dir, outdir)
     else:
       # Leave the existing default behavior unchanged and allows overlay of contents.
-      cls._extract(path, outdir, filter_func=filter_func)
+      self._extract(path, outdir, **kwargs)
 
-  @classmethod
-  def _extract(cls, path, outdir):
+  def _extract(self, path, outdir):
     raise NotImplementedError()
 
   @abstractmethod
@@ -72,8 +70,7 @@ class TarArchiver(Archiver):
   :API: public
   """
 
-  @classmethod
-  def _extract(cls, path, outdir, **kwargs):
+  def _extract(self, path, outdir):
     with open_tar(path, errorlevel=1) as tar:
       tar.extractall(outdir)
 
@@ -109,7 +106,19 @@ class XZCompressedTarArchiver(TarArchiver):
   4. <base>.tar.gz will then be extracted as usual.
   """
 
-  def __init__(self):
+  class XZArchiverError(Exception):
+    """???"""
+
+  def __init__(self, xz_binary_path):
+
+    if not is_executable(xz_binary_path):
+      raise self.XZArchiverError(
+        "The path {} does not name an existing executable file. An xz executable must be provided "
+        "to decompress xz archives."
+        .format(xz_binary_path))
+
+    self._xz_binary_path = xz_binary_path
+
     super(XZCompressedTarArchiver, self).__init__('w:gz', 'tar.gz')
 
   _TAR_GZ_PATTERN = re.compile('\.tar\.gz\Z')
@@ -121,24 +130,40 @@ class XZCompressedTarArchiver(TarArchiver):
       raise ValueError("path {!r} must end in .tar.gz.".format(path))
     return cls._TAR_GZ_PATTERN.sub('.tar.xz', path)
 
-  @classmethod
   @contextmanager
-  def _xz_file(cls, path):
-    xz_file = lzma.LZMAFile(path)
+  def _invoke_xz(self, xz_input_file):
+    (xz_bin_dir, xz_filename) = split_basename_and_dirname(self._xz_binary_path)
+    cmd = [xz_filename, '--decompress', '--stdout', '--keep', '--threads=0', xz_input_file]
     try:
-      yield xz_file
-    finally:
-      xz_file.close()
+      process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        # TODO: is this the right way to do this?
+        stderr=sys.stderr,
+        # Isolate the path so we know we're using our provided version of xz.
+        env={'PATH': xz_bin_dir})
+    except OSError as e:
+      raise self.XZArchiverError(
+        "Error invoking xz with command {} for input file {}: {}"
+        .format(cmd, xz_input_file, e),
+        e)
 
-  @classmethod
-  def _extract(cls, path, outdir, **kwargs):
-    xz_path = cls._get_xz_file_path(path)
+    yield process.stdout
+
+    rc = process.wait()
+    if rc != 0:
+      raise self.XZArchiverError(
+        "Error decompressing xz input with command {} for input file {}. Exit code was: {}"
+        .format(cmd, xz_input_file, rc))
+
+  def _extract(self, path, outdir, **kwargs):
+    xz_path = self._get_xz_file_path(path)
     shutil.move(path, xz_path)
-    with cls._xz_file(xz_path) as xz_infile:
+    with self._invoke_xz(xz_path) as xz_infile:
       with open(path, 'wb') as gz_out_raw:
         with gzip.GzipFile('wb', fileobj=gz_out_raw) as gz_outfile:
           shutil.copyfileobj(xz_infile, gz_outfile)
-    return super(XZCompressedTarArchiver, cls)._extract(path, outdir, **kwargs)
+    return super(XZCompressedTarArchiver, self)._extract(path, outdir, **kwargs)
 
   def create(self, *args, **kwargs):
     """
@@ -153,8 +178,7 @@ class ZipArchiver(Archiver):
   :API: public
   """
 
-  @classmethod
-  def _extract(cls, path, outdir, filter_func=None, **kwargs):
+  def _extract(self, path, outdir, filter_func=None, **kwargs):
     """Extract from a zip file, with an optional filter."""
     with open_zip(path) as archive_file:
       for name in archive_file.namelist():
@@ -195,14 +219,12 @@ class ZipArchiver(Archiver):
 TAR = TarArchiver('w:', 'tar')
 TGZ = TarArchiver('w:gz', 'tar.gz')
 TBZ2 = TarArchiver('w:bz2', 'tar.bz2')
-TXZ = XZCompressedTarArchiver()
 ZIP = ZipArchiver(ZIP_DEFLATED, 'zip')
 
 _ARCHIVER_BY_TYPE = OrderedDict(
   tar=TAR,
   tgz=TGZ,
   tbz2=TBZ2,
-  txz=TXZ,
   zip=ZIP)
 
 archive_extensions = {
