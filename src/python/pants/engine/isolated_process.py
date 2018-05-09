@@ -8,8 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 
 from pants.engine.fs import EMPTY_SNAPSHOT
-from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Select
+from pants.engine.rules import RootRule
 from pants.util.objects import datatype
 
 
@@ -61,9 +60,6 @@ class ExecuteProcessResult(datatype(['stdout', 'stderr', 'exit_code'])):
 
 def create_process_rules():
   """Intrinsically replaced on the rust side."""
-  return [execute_process_noop, RootRule(ExecuteProcessRequest)]
-
-
-@rule(ExecuteProcessResult, [Select(ExecuteProcessRequest)])
-def execute_process_noop(*args):
-  raise Exception('This task is replaced intrinsically, and should never run.')
+  return [
+      RootRule(ExecuteProcessRequest),
+    ]

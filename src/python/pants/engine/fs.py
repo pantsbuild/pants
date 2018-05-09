@@ -9,8 +9,7 @@ from binascii import hexlify
 from os.path import join
 
 from pants.base.project_tree import Dir, File
-from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Select
+from pants.engine.rules import RootRule
 from pants.util.objects import Collection, datatype
 
 
@@ -102,20 +101,8 @@ EMPTY_SNAPSHOT = Snapshot(
 )
 
 
-@rule(Snapshot, [Select(PathGlobs)])
-def snapshot_noop(*args):
-  raise Exception('This task is replaced intrinsically, and should never run.')
-
-
-@rule(FilesContent, [Select(Snapshot)])
-def files_content_noop(*args):
-  raise Exception('This task is replaced intrinsically, and should never run.')
-
-
 def create_fs_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
-    files_content_noop,
-    snapshot_noop,
     RootRule(PathGlobs),
   ]

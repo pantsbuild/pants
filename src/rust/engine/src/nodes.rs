@@ -23,7 +23,7 @@ use process_execution;
 use hashing;
 use rule_graph;
 use selectors::{self, Selector};
-use tasks;
+use tasks::{self, Intrinsic, IntrinsicKind};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -260,26 +260,48 @@ impl Select {
     }
   }
 
-  ///
-  /// Gets a Snapshot for the current subject.
-  ///
-  fn get_snapshot(&self, context: &Context) -> NodeFuture<fs::Snapshot> {
-    // TODO: Hacky... should have an intermediate Node to Select PathGlobs for the subject
-    // before executing, and then treat this as an intrinsic. Otherwise, Snapshots for
-    // different subjects but identical PathGlobs will cause redundant work.
-    if self.entries.len() > 1 {
-      // TODO do something better than this.
-      panic!("we're supposed to get a snapshot, but there's more than one entry!");
-    } else if self.entries.is_empty() {
-      panic!("we're supposed to get a snapshot, but there are no matching rule entries!");
-    }
+  fn snapshot(&self, context: &Context, entry: &rule_graph::Entry) -> NodeFuture<fs::Snapshot> {
+    let ref edges = context
+      .core
+      .rule_graph
+      .edges_for_inner(entry)
+      .expect("edges for Snapshot exist.");
+    // Compute PathGlobs for the subject.
+    let context = context.clone();
+    Select::new(
+      context.core.types.path_globs.clone(),
+      self.subject.clone(),
+      self.variants.clone(),
+      edges,
+    ).run(context.clone())
+      .and_then(move |path_globs_val| {
+        context.get(Snapshot {
+          subject: externs::key_for(path_globs_val),
+        })
+      })
+      .to_boxed()
+  }
 
-    context.get(Snapshot {
-      subject: self.subject.clone(),
-      product: self.product().clone(),
-      variants: self.variants.clone(),
-      entry: self.entries[0].clone(),
-    })
+  fn execute_process(
+    &self,
+    context: &Context,
+    entry: &rule_graph::Entry,
+  ) -> NodeFuture<ProcessResult> {
+    let ref edges = context
+      .core
+      .rule_graph
+      .edges_for_inner(entry)
+      .expect("edges for ExecuteProcessResult exist.");
+    // Compute an ExecuteProcessRequest for the subject.
+    let context = context.clone();
+    Select::new(
+      context.core.types.process_request.clone(),
+      self.subject.clone(),
+      self.variants.clone(),
+      edges,
+    ).run(context.clone())
+      .and_then(move |process_request_val| context.get(ExecuteProcess::lift(&process_request_val)))
+      .to_boxed()
   }
 
   ///
@@ -287,65 +309,70 @@ impl Select {
   /// given subject and variants.
   ///
   fn gen_nodes(&self, context: &Context) -> Vec<NodeFuture<Value>> {
-    // TODO: These `product==` hooks are hacky.
-    if self.product() == &context.core.types.snapshot {
-      // If the requested product is a Snapshot, execute a Snapshot Node and then lower to a Value
-      // for this caller.
-      let context = context.clone();
-      vec![
-        self
-          .get_snapshot(&context)
-          .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
-          .to_boxed(),
-      ]
-    } else if self.product() == &context.core.types.files_content {
-      // If the requested product is FilesContent, request a Snapshot and lower it as FilesContent.
-      let context = context.clone();
-      vec![
-        self
-          .get_snapshot(&context)
-          .and_then(move |snapshot|
-            // Request the file contents of the Snapshot, and then store them.
-            snapshot.contents(context.core.store.clone()).map_err(|e| throw(&e))
-              .map(move |files_content| Snapshot::store_files_content(&context, &files_content)))
-          .to_boxed(),
-      ]
-    } else if self.product() == &context.core.types.process_result {
-      let context2 = context.clone();
-      let execute_process_node = ExecuteProcess::lift(&self.subject);
-      vec![
-        context
-          .get(execute_process_node)
-          .map(move |result| {
-            externs::unsafe_call(
-              &context2.core.types.construct_process_result,
-              &[
-                externs::store_bytes(&result.0.stdout),
-                externs::store_bytes(&result.0.stderr),
-                externs::store_i32(result.0.exit_code),
-              ],
-            )
-          })
-          .to_boxed(),
-      ]
-    } else if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
-      vec![future::ok(value.clone()).to_boxed()]
-    } else {
-      self
-        .entries
-        .iter()
-        .map(|entry| {
-          let task = context.core.rule_graph.task_for_inner(entry);
-          context.get(Task {
+    if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
+      return vec![future::ok(value.clone()).to_boxed()];
+    }
+
+    self
+      .entries
+      .iter()
+      .map(
+        |entry| match context.core.rule_graph.rule_for_inner(entry) {
+          &rule_graph::Rule::Task(ref task) => context.get(Task {
             subject: self.subject.clone(),
             product: self.product().clone(),
             variants: self.variants.clone(),
-            task: task,
+            task: task.clone(),
             entry: Arc::new(entry.clone()),
-          })
-        })
-        .collect::<Vec<NodeFuture<Value>>>()
-    }
+          }),
+          &rule_graph::Rule::Intrinsic(Intrinsic {
+            kind: IntrinsicKind::Snapshot,
+            ..
+          }) => {
+            let context = context.clone();
+            self
+              .snapshot(&context, &entry)
+              .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
+              .to_boxed()
+          }
+          &rule_graph::Rule::Intrinsic(Intrinsic {
+            kind: IntrinsicKind::FilesContent,
+            ..
+          }) => {
+            let context = context.clone();
+            self
+              .snapshot(&context, &entry)
+              .and_then(move |snapshot| {
+                // Request the file contents of the Snapshot, and then store them.
+                snapshot
+                  .contents(context.core.store.clone())
+                  .map_err(|e| throw(&e))
+                  .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
+              })
+              .to_boxed()
+          }
+          &rule_graph::Rule::Intrinsic(Intrinsic {
+            kind: IntrinsicKind::ProcessExecution,
+            ..
+          }) => {
+            let context = context.clone();
+            self
+              .execute_process(&context, &entry)
+              .map(move |result| {
+                externs::unsafe_call(
+                  &context.core.types.construct_process_result,
+                  &[
+                    externs::store_bytes(&result.0.stdout),
+                    externs::store_bytes(&result.0.stderr),
+                    externs::store_i32(result.0.exit_code),
+                  ],
+                )
+              })
+              .to_boxed()
+          }
+        },
+      )
+      .collect::<Vec<NodeFuture<Value>>>()
   }
 }
 
@@ -515,9 +542,7 @@ impl ExecuteProcess {
   ///
   /// Lifts a Key representing a python ExecuteProcessRequest value into a ExecuteProcess Node.
   ///
-  fn lift(subject: &Key) -> ExecuteProcess {
-    let value = externs::val_for(subject);
-
+  fn lift(value: &Value) -> ExecuteProcess {
     let mut env: BTreeMap<String, String> = BTreeMap::new();
     let env_var_parts = externs::project_multi_strs(&value, "env");
     // TODO: Error if env_var_parts.len() % 2 != 0
@@ -685,17 +710,11 @@ impl From<Scandir> for NodeKey {
 }
 
 ///
-/// A Node that captures an fs::Snapshot for the given subject.
-///
-/// Begins by selecting PathGlobs for the subject, and then computes a Snapshot for the
-/// PathStats matched by the PathGlobs.
+/// A Node that captures an fs::Snapshot for a PathGlobs subject.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Snapshot {
   subject: Key,
-  product: TypeConstraint,
-  variants: Variants,
-  entry: rule_graph::Entry,
 }
 
 impl Snapshot {
@@ -705,7 +724,7 @@ impl Snapshot {
     // and fs::Snapshot::from_path_stats tracking dependencies for file digests.
     context
       .expand(path_globs)
-      .map_err(|e| format!("PlatGlobs expansion failed: {:?}", e))
+      .map_err(|e| format!("PathGlobs expansion failed: {:?}", e))
       .and_then(move |path_stats| {
         fs::Snapshot::from_path_stats(context.core.store.clone(), context.clone(), path_stats)
           .map_err(move |e| format!("Snapshot failed: {}", e))
@@ -793,26 +812,10 @@ impl Node for Snapshot {
   type Output = fs::Snapshot;
 
   fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
-    let ref edges = context
-      .core
-      .rule_graph
-      .edges_for_inner(&self.entry)
-      .expect("edges for snapshot exist.");
-    // Compute and parse PathGlobs for the subject.
-    Select::new(
-      context.core.types.path_globs.clone(),
-      self.subject.clone(),
-      self.variants.clone(),
-      edges,
-    ).run(context.clone())
-      .then(move |path_globs_res| match path_globs_res {
-        Ok(path_globs_val) => match Self::lift_path_globs(&path_globs_val) {
-          Ok(pgs) => Snapshot::create(context, pgs),
-          Err(e) => err(throw(&format!("Failed to parse PathGlobs: {}", e))),
-        },
-        Err(failure) => err(failure),
-      })
-      .to_boxed()
+    match Self::lift_path_globs(&externs::val_for(&self.subject)) {
+      Ok(pgs) => Self::create(context, pgs),
+      Err(e) => err(throw(&format!("Failed to parse PathGlobs: {}", e))),
+    }
   }
 }
 

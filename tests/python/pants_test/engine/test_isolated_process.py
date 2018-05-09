@@ -77,12 +77,7 @@ def cat_files_process_request_input_snapshot(cat_exe_req):
 
 @rule(Concatted, [Select(CatExecutionRequest)])
 def cat_files_process_result_concatted(cat_exe_req):
-  # FIXME(cosmicexplorer): we should only have to run Get once here. this: yield
-  # Get(ExecuteProcessResult, CatExecutionRequest, cat_exe_req) fails because
-  # ExecuteProcessRequest is a RootRule (which shouldn't be true), but there's
-  # probably some work required in isolated_process.py to fix this (see #5718).
-  cat_proc_req = yield Get(ExecuteProcessRequest, CatExecutionRequest, cat_exe_req)
-  cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, cat_proc_req)
+  cat_process_result = yield Get(ExecuteProcessResult, CatExecutionRequest, cat_exe_req)
   yield Concatted(str(cat_process_result.stdout))
 
 
