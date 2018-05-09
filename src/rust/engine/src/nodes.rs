@@ -260,17 +260,12 @@ impl Select {
     }
   }
 
-  ///
-  /// Computes PathGlobs in the context of this Node, and then creates a new Snapshot with the
-  /// result. The result is that the Snapshot does not depend on the computation of the PathGlobs:
-  /// only on the matched files in the filesystem.
-  ///
   fn snapshot(&self, context: &Context, entry: &rule_graph::Entry) -> NodeFuture<fs::Snapshot> {
     let ref edges = context
       .core
       .rule_graph
       .edges_for_inner(entry)
-      .expect("edges for snapshot exist.");
+      .expect("edges for Snapshot exist.");
     // Compute PathGlobs for the subject.
     let context = context.clone();
     Select::new(
@@ -287,77 +282,97 @@ impl Select {
       .to_boxed()
   }
 
+  fn execute_process(
+    &self,
+    context: &Context,
+    entry: &rule_graph::Entry,
+  ) -> NodeFuture<ProcessResult> {
+    let ref edges = context
+      .core
+      .rule_graph
+      .edges_for_inner(entry)
+      .expect("edges for ExecuteProcessResult exist.");
+    // Compute an ExecuteProcessRequest for the subject.
+    let context = context.clone();
+    Select::new(
+      context.core.types.process_request.clone(),
+      self.subject.clone(),
+      self.variants.clone(),
+      edges,
+    ).run(context.clone())
+      .and_then(move |process_request_val| context.get(ExecuteProcess::lift(&process_request_val)))
+      .to_boxed()
+  }
+
   ///
   /// Return Futures for each Task/Node that might be able to compute the given product for the
   /// given subject and variants.
   ///
   fn gen_nodes(&self, context: &Context) -> Vec<NodeFuture<Value>> {
     if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
-      vec![future::ok(value.clone()).to_boxed()]
-    } else {
-      self
-        .entries
-        .iter()
-        .map(
-          |entry| match context.core.rule_graph.rule_for_inner(entry) {
-            &rule_graph::Rule::Task(ref task) => context.get(Task {
-              subject: self.subject.clone(),
-              product: self.product().clone(),
-              variants: self.variants.clone(),
-              task: task.clone(),
-              entry: Arc::new(entry.clone()),
-            }),
-            &rule_graph::Rule::Intrinsic(Intrinsic {
-              kind: IntrinsicKind::Snapshot,
-              ..
-            }) => {
-              let context = context.clone();
-              self
-                .snapshot(&context, &entry)
-                .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
-                .to_boxed()
-            }
-            &rule_graph::Rule::Intrinsic(Intrinsic {
-              kind: IntrinsicKind::FilesContent,
-              ..
-            }) => {
-              let context = context.clone();
-              self
-                .snapshot(&context, &entry)
-                .and_then(move |snapshot| {
-                  // Request the file contents of the Snapshot, and then store them.
-                  snapshot
-                    .contents(context.core.store.clone())
-                    .map_err(|e| throw(&e))
-                    .map(move |files_content| {
-                      Snapshot::store_files_content(&context, &files_content)
-                    })
-                })
-                .to_boxed()
-            }
-            &rule_graph::Rule::Intrinsic(Intrinsic {
-              kind: IntrinsicKind::ProcessExecution,
-              ..
-            }) => {
-              let context = context.clone();
-              context
-                .get(ExecuteProcess::lift(&self.subject))
-                .map(move |result| {
-                  externs::unsafe_call(
-                    &context.core.types.construct_process_result,
-                    &[
-                      externs::store_bytes(&result.0.stdout),
-                      externs::store_bytes(&result.0.stderr),
-                      externs::store_i32(result.0.exit_code),
-                    ],
-                  )
-                })
-                .to_boxed()
-            }
-          },
-        )
-        .collect::<Vec<NodeFuture<Value>>>()
+      return vec![future::ok(value.clone()).to_boxed()];
     }
+
+    self
+      .entries
+      .iter()
+      .map(
+        |entry| match context.core.rule_graph.rule_for_inner(entry) {
+          &rule_graph::Rule::Task(ref task) => context.get(Task {
+            subject: self.subject.clone(),
+            product: self.product().clone(),
+            variants: self.variants.clone(),
+            task: task.clone(),
+            entry: Arc::new(entry.clone()),
+          }),
+          &rule_graph::Rule::Intrinsic(Intrinsic {
+            kind: IntrinsicKind::Snapshot,
+            ..
+          }) => {
+            let context = context.clone();
+            self
+              .snapshot(&context, &entry)
+              .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
+              .to_boxed()
+          }
+          &rule_graph::Rule::Intrinsic(Intrinsic {
+            kind: IntrinsicKind::FilesContent,
+            ..
+          }) => {
+            let context = context.clone();
+            self
+              .snapshot(&context, &entry)
+              .and_then(move |snapshot| {
+                // Request the file contents of the Snapshot, and then store them.
+                snapshot
+                  .contents(context.core.store.clone())
+                  .map_err(|e| throw(&e))
+                  .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
+              })
+              .to_boxed()
+          }
+          &rule_graph::Rule::Intrinsic(Intrinsic {
+            kind: IntrinsicKind::ProcessExecution,
+            ..
+          }) => {
+            let context = context.clone();
+            self
+              .execute_process(&context, &entry)
+              .map(move |result| {
+                externs::unsafe_call(
+                  &context.core.types.construct_process_result,
+                  &[
+                    externs::store_bytes(&result.0.stdout),
+                    externs::store_bytes(&result.0.stderr),
+                    externs::store_i32(result.0.exit_code),
+                  ],
+                )
+              })
+              .to_boxed()
+          }
+        },
+      )
+      .collect::<Vec<NodeFuture<Value>>>()
   }
 }
 
@@ -527,9 +542,7 @@ impl ExecuteProcess {
   ///
   /// Lifts a Key representing a python ExecuteProcessRequest value into a ExecuteProcess Node.
   ///
-  fn lift(subject: &Key) -> ExecuteProcess {
-    let value = externs::val_for(subject);
-
+  fn lift(value: &Value) -> ExecuteProcess {
     let mut env: BTreeMap<String, String> = BTreeMap::new();
     let env_var_parts = externs::project_multi_strs(&value, "env");
     // TODO: Error if env_var_parts.len() % 2 != 0
