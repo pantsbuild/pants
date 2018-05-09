@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 
 from pants.engine.fs import EMPTY_SNAPSHOT
-from pants.engine.rules import RootRule
 from pants.util.objects import datatype
 
 
@@ -56,10 +55,3 @@ class ExecuteProcessRequest(datatype(['argv', 'env', 'input_files_digest', 'dige
 
 class ExecuteProcessResult(datatype(['stdout', 'stderr', 'exit_code'])):
   pass
-
-
-def create_process_rules():
-  """Intrinsically replaced on the rust side."""
-  return [
-      RootRule(ExecuteProcessRequest),
-    ]

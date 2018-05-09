@@ -265,7 +265,7 @@ impl Select {
       .core
       .rule_graph
       .edges_for_inner(entry)
-      .expect("edges for Snapshot exist.");
+      .expect("Expected edges to exist for Snapshot intrinsic.");
     // Compute PathGlobs for the subject.
     let context = context.clone();
     Select::new(
@@ -274,11 +274,7 @@ impl Select {
       self.variants.clone(),
       edges,
     ).run(context.clone())
-      .and_then(move |path_globs_val| {
-        context.get(Snapshot {
-          subject: externs::key_for(path_globs_val),
-        })
-      })
+      .and_then(move |path_globs_val| context.get(Snapshot(externs::key_for(path_globs_val))))
       .to_boxed()
   }
 
@@ -291,7 +287,7 @@ impl Select {
       .core
       .rule_graph
       .edges_for_inner(entry)
-      .expect("edges for ExecuteProcessResult exist.");
+      .expect("Expected edges to exist for ExecuteProcess intrinsic.");
     // Compute an ExecuteProcessRequest for the subject.
     let context = context.clone();
     Select::new(
@@ -713,9 +709,7 @@ impl From<Scandir> for NodeKey {
 /// A Node that captures an fs::Snapshot for a PathGlobs subject.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Snapshot {
-  subject: Key,
-}
+pub struct Snapshot(Key);
 
 impl Snapshot {
   fn create(context: Context, path_globs: PathGlobs) -> NodeFuture<fs::Snapshot> {
@@ -812,7 +806,7 @@ impl Node for Snapshot {
   type Output = fs::Snapshot;
 
   fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
-    match Self::lift_path_globs(&externs::val_for(&self.subject)) {
+    match Self::lift_path_globs(&externs::val_for(&self.0)) {
       Ok(pgs) => Self::create(context, pgs),
       Err(e) => err(throw(&format!("Failed to parse PathGlobs: {}", e))),
     }
@@ -981,7 +975,7 @@ impl NodeKey {
         keystr(&s.subject),
         typstr(&s.product)
       ),
-      &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.subject)),
+      &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.0)),
     }
   }
 

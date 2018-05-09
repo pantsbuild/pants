@@ -64,7 +64,9 @@ impl From<RootEntry> for Entry {
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Rule {
+  // Intrinsic rules are implemented in rust.
   Intrinsic(Intrinsic),
+  // Task rules are implemented in python.
   Task(Task),
 }
 
