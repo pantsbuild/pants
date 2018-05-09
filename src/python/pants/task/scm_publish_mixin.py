@@ -158,6 +158,9 @@ class ScmPublishMixin(object):
              help='Allow pushes only from one of these branches.')
     register('--restrict-push-urls', advanced=True, type=list,
              help='Allow pushes to only one of these urls.')
+    register('--verify-commit', advanced=True, type=bool, default=False,
+             help='Whether or not to "verify" commits made using SCM publishing. For git, this '
+                  'means running commit hooks.')
 
   @property
   def restrict_push_branches(self):
@@ -206,7 +209,7 @@ class ScmPublishMixin(object):
     """Commit changes to the pushdb with a message containing the provided coordinates."""
     self.scm.commit('pants build committing publish data for push of {coordinates}'
                     '{postscript}'.format(coordinates=coordinates, postscript=postscript or ''),
-                    verify=False)
+                    verify=self.get_options().verify_commit)
 
   def publish_pushdb_changes_to_remote_scm(self, pushdb_file, coordinate, tag_name, tag_message,
                                            postscript=None):
