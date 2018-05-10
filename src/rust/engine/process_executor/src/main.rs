@@ -10,12 +10,12 @@ extern crate tempdir;
 use clap::{App, AppSettings, Arg};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
-use tempdir::TempDir;
 use std::collections::BTreeMap;
 use std::iter::Iterator;
 use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
+use tempdir::TempDir;
 
 /// A binary which takes args of format:
 ///  process_executor --env=FOO=bar --env=SOME=value --input-digest=abc123 --input-digest-length=80

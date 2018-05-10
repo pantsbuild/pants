@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
-use std::hash::Hash;
 use std::fmt;
+use std::hash::Hash;
 use std::io;
 
 use core::{Function, Key, TypeConstraint, TypeId, Value, ANY_TYPE};

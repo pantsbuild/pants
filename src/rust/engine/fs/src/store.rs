@@ -488,9 +488,9 @@ mod local {
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
   use hashing::{Digest, Fingerprint};
+  use lmdb::Error::{KeyExist, NotFound};
   use lmdb::{self, Cursor, Database, DatabaseFlags, Environment, RwTransaction, Transaction,
              WriteFlags, NO_OVERWRITE, NO_SYNC, NO_TLS};
-  use lmdb::Error::{KeyExist, NotFound};
   use resettable::Resettable;
   use sha2::Sha256;
   use std::collections::{BinaryHeap, HashMap};
@@ -499,8 +499,8 @@ mod local {
   use std::sync::Arc;
   use std::time;
 
-  use pool::ResettablePool;
   use super::MAX_LOCAL_STORE_SIZE_BYTES;
+  use pool::ResettablePool;
 
   #[derive(Clone)]
   pub struct ByteStore {
@@ -910,11 +910,11 @@ mod local {
 
   #[cfg(test)]
   pub mod tests {
+    use super::super::super::safe_create_dir_all;
+    use super::{ByteStore, EntryType, ResettablePool};
     use bytes::Bytes;
     use futures::Future;
     use hashing::{Digest, Fingerprint};
-    use super::{ByteStore, EntryType, ResettablePool};
-    use super::super::super::safe_create_dir_all;
     use lmdb::{DatabaseFlags, Environment, Transaction, WriteFlags};
     use std::path::Path;
     use std::sync::Arc;
@@ -1412,8 +1412,8 @@ mod remote {
   use bytes::{Bytes, BytesMut};
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::{self, future, Future, Sink, Stream};
-  use hashing::{Digest, Fingerprint};
   use grpcio;
+  use hashing::{Digest, Fingerprint};
   use resettable::Resettable;
   use sha2::Sha256;
   use std::cmp::min;
@@ -1629,8 +1629,8 @@ mod remote {
 
     extern crate tempdir;
 
-    use super::ByteStore;
     use super::super::EntryType;
+    use super::ByteStore;
     use bytes::Bytes;
     use futures::Future;
     use hashing::Digest;

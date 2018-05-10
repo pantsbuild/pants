@@ -36,13 +36,13 @@ extern crate tempdir;
 #[cfg(test)]
 extern crate testutil;
 
+use std::cmp::min;
 use std::collections::HashSet;
+use std::io::{self, Read};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::{fmt, fs};
-use std::io::{self, Read};
-use std::cmp::min;
 
 use bytes::Bytes;
 use futures::future::{self, Future};
@@ -122,12 +122,9 @@ impl PathStat {
 
 lazy_static! {
   static ref PARENT_DIR: &'static str = "..";
-
   static ref SINGLE_STAR_GLOB: Pattern = Pattern::new("*").unwrap();
-
   static ref DOUBLE_STAR: &'static str = "**";
   static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new("**").unwrap();
-
   static ref EMPTY_IGNORE: Arc<Gitignore> = Arc::new(Gitignore::empty());
 }
 
@@ -851,9 +848,9 @@ mod posixfs_test {
   extern crate tempdir;
   extern crate testutil;
 
+  use self::testutil::make_file;
   use super::{Dir, File, Link, PathStat, PathStatGetter, PosixFS, ResettablePool, Stat};
   use futures::Future;
-  use self::testutil::make_file;
   use std;
   use std::path::{Path, PathBuf};
   use std::sync::Arc;

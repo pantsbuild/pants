@@ -4,8 +4,8 @@
 use fnv::FnvHasher;
 
 use std::collections::HashMap;
-use std::{fmt, hash};
 use std::ops::Drop;
+use std::{fmt, hash};
 
 use externs;
 use handles::{enqueue_drop_handle, Handle};

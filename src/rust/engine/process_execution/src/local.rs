@@ -34,11 +34,11 @@ pub fn run_command_locally(
 mod tests {
   extern crate testutil;
 
+  use self::testutil::{as_bytes, owned_string_vec};
   use super::{run_command_locally, ExecuteProcessRequest, ExecuteProcessResult};
   use fs;
   use std::collections::BTreeMap;
   use std::path::PathBuf;
-  use self::testutil::{as_bytes, owned_string_vec};
 
   #[test]
   #[cfg(unix)]
