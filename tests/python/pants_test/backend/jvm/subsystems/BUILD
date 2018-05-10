@@ -23,7 +23,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:scalastyle',
-    'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',
+    'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
