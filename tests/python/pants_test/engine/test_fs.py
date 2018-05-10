@@ -11,7 +11,8 @@ import unittest
 from contextlib import contextmanager
 
 from pants.base.project_tree import Dir, Link
-from pants.engine.fs import FilesContent, PathGlobs, Snapshot, create_fs_rules
+from pants.engine.fs import DirectoryDigest, FilesContent, PathGlobs, Snapshot, create_fs_rules
+from pants.util.contextutil import temporary_dir
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
@@ -259,3 +260,27 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
         (Dir('a'), DirectoryListing),
         (Dir('a/b'), DirectoryListing),
       ])
+
+  def test_snapshot_from_outside_buildroot(self):
+    with temporary_dir() as temp_dir:
+      with open(os.path.join(temp_dir, "roland"), "w") as f:
+        f.write("European Burmese")
+      scheduler = self.mk_scheduler(rules=create_fs_rules())
+      globs = PathGlobs(("*",), ())
+      snapshot = scheduler.capture_snapshot(temp_dir, globs)
+      self.assertEquals([file.path for file in snapshot.files], ["roland"])
+      self.assertEquals(
+        snapshot.directory_digest,
+        DirectoryDigest(
+          str("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+          80
+        )
+      )
+
+  def test_snapshot_from_outside_buildroot_failure(self):
+    with temporary_dir() as temp_dir:
+      scheduler = self.mk_scheduler(rules=create_fs_rules())
+      globs = PathGlobs(("*",), ())
+      with self.assertRaises(Exception) as cm:
+        scheduler.capture_snapshot(str(os.path.join(temp_dir, "doesnotexist")), globs)
+      self.assertIn("doesnotexist", str(cm.exception))

@@ -309,6 +309,14 @@ class Scheduler(object):
       self._native.lib.nodes_destroy(raw_roots)
     return roots
 
+  def capture_snapshot(self, root_path, path_globs):
+    result = self._native.lib.capture_snapshot(self._scheduler, root_path, self._to_value(path_globs))
+    value = self._from_value(result.value)
+    if result.is_throw:
+      raise value
+    else:
+      return value
+
   def lease_files_in_graph(self):
     self._native.lib.lease_files_in_graph(self._scheduler)
 
@@ -480,6 +488,9 @@ class SchedulerSession(object):
     :returns: A list of the requested products, with length match len(subjects).
     """
     return self.products_request([product], subjects)[product]
+
+  def capture_snapshot(self, root_path, path_globs):
+    return self._scheduler.capture_snapshot(root_path, path_globs)
 
   def lease_files_in_graph(self):
     self._scheduler.lease_files_in_graph()

@@ -281,18 +281,24 @@ impl From<PyResult> for Result<Value, Failure> {
   }
 }
 
-impl From<Result<(), String>> for PyResult {
-  fn from(res: Result<(), String>) -> Self {
+impl From<Result<Value, String>> for PyResult {
+  fn from(res: Result<Value, String>) -> Self {
     match res {
-      Ok(()) => PyResult {
+      Ok(v) => PyResult {
         is_throw: false,
-        value: eval("None").unwrap(),
+        value: v,
       },
       Err(msg) => PyResult {
         is_throw: true,
         value: create_exception(&msg),
       },
     }
+  }
+}
+
+impl From<Result<(), String>> for PyResult {
+  fn from(res: Result<(), String>) -> Self {
+    PyResult::from(res.map(|()| eval("None").unwrap()))
   }
 }
 

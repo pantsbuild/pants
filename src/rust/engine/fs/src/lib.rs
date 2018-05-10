@@ -371,8 +371,30 @@ impl PosixFS {
     pool: Arc<ResettablePool>,
     ignore_patterns: Vec<String>,
   ) -> Result<PosixFS, String> {
-    let root: &Path = root.as_ref();
-    let canonical_root = root
+    let ignore = create_ignore(&ignore_patterns).map_err(|e| {
+      format!(
+        "Could not parse build ignore inputs {:?}: {:?}",
+        ignore_patterns, e
+      )
+    })?;
+    Ok(PosixFS {
+      root: Self::canonicalize(root)?,
+      pool: pool,
+      ignore: ignore,
+    })
+  }
+
+  pub fn clone_with_root<P: AsRef<Path>>(&self, root: P) -> Result<PosixFS, String> {
+    Ok(PosixFS {
+      root: Self::canonicalize(root)?,
+      pool: self.pool.clone(),
+      ignore: self.ignore.clone(),
+    })
+  }
+
+  fn canonicalize<P: AsRef<Path>>(path: P) -> Result<Dir, String> {
+    let path: &Path = path.as_ref();
+    path
       .canonicalize()
       .and_then(|canonical| {
         canonical.metadata().and_then(|metadata| {
@@ -386,19 +408,7 @@ impl PosixFS {
           }
         })
       })
-      .map_err(|e| format!("Could not canonicalize root {:?}: {:?}", root, e))?;
-
-    let ignore = create_ignore(&ignore_patterns).map_err(|e| {
-      format!(
-        "Could not parse build ignore inputs {:?}: {:?}",
-        ignore_patterns, e
-      )
-    })?;
-    Ok(PosixFS {
-      root: canonical_root,
-      pool: pool,
-      ignore: ignore,
-    })
+      .map_err(|e| format!("Could not canonicalize root {:?}: {:?}", path, e))
   }
 
   fn scandir_sync(root: PathBuf, dir_relative_to_root: Dir) -> Result<Vec<Stat>, io::Error> {
