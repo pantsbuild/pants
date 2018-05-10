@@ -12,8 +12,8 @@ Deciding the "who", "what", and "when" of releasing is described on the
 lucky release managers, this may result in two or more releases in a particular week.
 
 A release is always prepared for each pantsbuild/pants branch by a green Travis CI run; ie: master,
-1.0.x, 1.1.x, etc. branches on https://github.com/pantsbuild/pants will have wheels created, tested
-and deployed to https://binaries.pantsbuild.org ready for use in a release.
+1.0.x, 1.1.x, etc. branches on [github.com/pantsbuild/pants](https://github.com/pantsbuild/pants) will have wheels created, tested
+and deployed to [binaries.pantsbuild.org](https://binaries.pantsbuild.org) ready for use in a release.
  
 Once you know what to release, releasing pants involves:
 
@@ -31,33 +31,31 @@ these steps have been performed in one way or another, but you might
 like to go through this list ahead of time rather than have the release
 script fail:
 
-  - Create a pgp signing key if you don't already have one.
+  - **Create a pgp signing key** if you don't already have one.
 
-    You might use the gpg implemntation of pgp and start here:
-    https://www.gnupg.org/gph/en/manual/c14.html
+    You might use the gpg implementation of pgp and start here:
+    [www.gnupg.org/gph/en/manual/c14.html](https://www.gnupg.org/gph/en/manual/c14.html)
 
-  - If using gpg, ensure that the gpg-agent is running (for OS X, see
+  - If using gpg, **ensure that the gpg-agent is running** (for OS X, see
     instructions [here](https://blog.chendry.org/2015/03/13/starting-gpg-agent-in-osx.html)),
     and ensure that gpg is set up to use it (e.g., set `use-agent` in `~/.gnupg/gpg.conf`).
 
-  - Configure git to use your pgp key for signing release tags.
+  - **Configure git to use your pgp key** for signing release tags.
 
     A description of the configuration can be found here:
-    https://git-scm.com/book/tr/v2/Git-Tools-Signing-Your-Work#GPG-Introduction
+    [help.github.com/articles/telling-git-about-your-gpg-key/](https://help.github.com/articles/telling-git-about-your-gpg-key/)
 
-  - Create a pypi account if you don't already have one.
+  - **Create a pypi account** if you don't already have one.
 
-    You can register here: https://pypi.python.org/pypi?%3Aaction=register_form
-    Don't forget to include your pgp key id even though pypi considers
-    this step optional.
+    You can register here: [pypi.org/account/register](https://pypi.org/account/register/)
 
-  - Get your pypi account added as an `owner` for all pantsbuild.pants packages.
+  - **Get your pypi account added as an `owner` for all pantsbuild.pants packages.**
 
     You can ask any one of the [Owners](#owners) listed below to do this.
     Once this is done and you've performed your 1st release, add yourself to
     the [Owners](#owners) section below.
 
-  - Configure your pypi credentials locally in `~/.pypirc`
+  - **Configure your pypi credentials locally in `~/.pypirc`**
 
     For some versions of python it's necessary to use both a `server-login` and
     `pypi` section containing the same info. This will do it:
