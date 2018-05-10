@@ -7,9 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
+
 from abc import abstractmethod
 
-from pants.binaries.binary_util import BinaryUtilPrivate
+from pants.binaries.binary_util import BinaryRequest, BinaryUtilPrivate
 from pants.fs.archive import XZCompressedTarArchiver, create_archiver
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
@@ -49,9 +50,8 @@ class BinaryToolBase(Subsystem):
   # Subclasses may set this to provide extra register() kwargs for the --version option.
   extra_version_option_kwargs = None
 
-  # TODO: ???
-  dist_url_versions = []
-
+  # TODO(cosmicexplorer): there should be a cleaner way to map a conditional subsystem dependency to
+  # an instance of the subsystem, as we do with `XZ` here and `NativeToolchain` elsewhere.
   @classmethod
   def subsystem_dependencies(cls):
     sub_deps = super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtilPrivate.Factory,)
@@ -61,22 +61,22 @@ class BinaryToolBase(Subsystem):
 
     return sub_deps
 
-  @classmethod
-  @abstractmethod
-  def make_dist_urls(cls, version, os_name):
-    """???/Generate a default value for this subsystem's --urls option."""
+  @memoized_method
+  def _get_archiver(self):
+    if not self.archive_type:
+      return None
 
-  @classmethod
-  def _os_id(cls):
-    return OsId.for_current_platform()
+    # FIXME: see above TODO -- we should be able to ensure that we have declared the correct
+    # subsystem dependency when we try to instantiate it here.
+    if self.archive_type == 'txz':
+      xz_location = XZ.scoped_instance(self).binary_location()
+      return XZCompressedTarArchiver(xz_location)
 
-  @classmethod
-  def _default_urls(cls):
-    os_id = cls._os_id()
-    return {
-      version: cls.make_dist_urls(version, os_id.os_name)
-      for version in cls.dist_url_versions
-    }
+    return create_archiver(self.archive_type)
+
+  # TODO: ???
+  def url_generator(self):
+    return None
 
   @classmethod
   def register_options(cls, register):
@@ -100,11 +100,6 @@ class BinaryToolBase(Subsystem):
       version_registration_kwargs['fingerprint'] = True
 
     register('--version', **version_registration_kwargs)
-
-    register('--urls', type=dict, default=cls._default_urls(), help=(
-      "Dict of (version -> [URL]) to fetch the {} {} from. If no URLs were provided for the "
-      "selected version, pants will fetch the tool from a URL under --binaries-baseurls."
-      .format(cls_name, binary_description)))
 
   @memoized_method
   def select(self, context=None):
@@ -149,25 +144,21 @@ class BinaryToolBase(Subsystem):
   def get_support_dir(cls):
     return 'bin/{}'.format(cls._get_name())
 
-  @memoized_method
-  def _make_archiver(self):
-    if not self.archive_type:
-      return None
+  def _name_to_fetch(self):
+    return '{}{}'.format(self._get_name(), self.suffix)
 
-    if self.archive_type == 'txz':
-      xz_location = XZ.scoped_instance(self).binary_location()
-      return XZCompressedTarArchiver(xz_location)
-
-    return create_archiver(self.archive_type)
-
-  def _select_for_version(self, version):
-    return self._binary_util.select(
+  def _make_binary_request(self, version):
+    return BinaryRequest(
       supportdir=self.get_support_dir(),
       version=version,
-      name='{}{}'.format(self._get_name(), self.suffix),
+      name=self._name_to_fetch(),
       platform_dependent=self.platform_dependent,
-      archiver=self._make_archiver(),
-      urls=self.get_options().urls.get(version, None))
+      url_generator=self.url_generator(),
+      archiver=self._get_archiver())
+
+  def _select_for_version(self, version):
+    binary_request = self._make_binary_request(version)
+    return self._binary_util.select(binary_request)
 
   @classmethod
   def _get_name(cls):

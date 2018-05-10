@@ -8,7 +8,26 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.binaries.binary_tool import ExecutablePathProvider, NativeTool
+from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.util.memo import memoized_method
+
+
+class LLVMReleaseUrlGenerator(BinaryToolUrlGenerator):
+
+  _ARCHIVE_BASE_FMT = 'clang+llvm-{version}-x86_64-{system_id}'
+
+  _DIST_URL_FMT = 'http://releases.llvm.org/{version}/{base}.tar.xz'
+
+  # TODO: do exhaustiveness checking? would that be useful or desired?
+  _SYSTEM_ID = {
+    'darwin': 'apple-darwin',
+    'linux': 'linux-gnu-ubuntu-16.04',
+  }
+
+  def generate_urls(self, version, host_platform):
+    system_id = self._SYSTEM_ID[host_platform.os_name]
+    archive_basename = self._ARCHIVE_BASE_FMT.format(version=version, system_id=system_id)
+    return [self._DIST_URL_FMT.format(version=version, base=archive_basename)]
 
 
 class LLVM(NativeTool, ExecutablePathProvider):
@@ -16,26 +35,8 @@ class LLVM(NativeTool, ExecutablePathProvider):
   default_version = '6.0.0'
   archive_type = 'txz'
 
-  dist_url_versions = ['6.0.0']
-
-  _ARCHIVE_BASE_FMT = 'clang+llvm-{version}-x86_64-{system_id}'
-  _DIST_URL_FMT = 'http://releases.llvm.org/{version}/{base}.tar.xz'
-
-  _SYSTEM_ID = {
-    'darwin': 'apple-darwin',
-    'linux': 'linux-gnu-ubuntu-16.04',
-  }
-
-  @classmethod
-  def make_dist_urls(cls, version, os_name):
-    return [
-      cls._DIST_URL_FMT.format(version=version, base=cls._archive_basename(version, os_name)),
-    ]
-
-  @classmethod
-  def _archive_basename(cls, version, os_name):
-    system_id = cls._SYSTEM_ID[os_name]
-    return cls._ARCHIVE_BASE_FMT.format(version=version, system_id=system_id)
+  def url_generator(self):
+    return LLVMReleaseUrlGenerator()
 
   @memoized_method
   def select(self):

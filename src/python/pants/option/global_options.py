@@ -16,6 +16,7 @@ from pants.option.custom_types import dir_option
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
+from pants.util.osutil import SUPPORTED_PLATFORM_NORMALIZED_NAMES
 
 
 class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
@@ -160,10 +161,11 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--binaries-fetch-timeout-secs', type=int, default=30, advanced=True, daemon=False,
              help='Timeout in seconds for URL reads when fetching binary tools from the '
                   'repos specified by --baseurls.')
-    register('--binaries-path-by-id', type=dict, advanced=True,
-             help=('Maps output of uname for a machine to a binary search path. e.g. '
-                   '{("darwin", "15"): ["mac", "10.11"]), ("linux", "arm32"): ["linux"'
-                   ', "arm32"]}'))
+
+    register('--binaries-path-by-id', type=dict, default=SUPPORTED_PLATFORM_NORMALIZED_NAMES,
+             advanced=True,
+             help=('Maps output of uname for a machine to a binary search path: '
+                   '(sysname, id) -> (os, arch).'))
 
     # Pants Daemon options.
     register('--pantsd-pailgun-host', advanced=True, default='127.0.0.1',

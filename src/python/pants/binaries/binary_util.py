@@ -8,8 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import posixpath
+import shutil
 from contextlib import contextmanager
 
+from abc import abstractmethod
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
@@ -19,27 +21,179 @@ from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_concurrent_creation, safe_open
-from pants.util.osutil import get_os_id
-
-
-_DEFAULT_PATH_BY_ID = {
-  ('linux', 'x86_64'): ('linux', 'x86_64'),
-  ('linux', 'amd64'): ('linux', 'x86_64'),
-  ('linux', 'i386'): ('linux', 'i386'),
-  ('linux', 'i686'): ('linux', 'i386'),
-  ('darwin', '9'): ('mac', '10.5'),
-  ('darwin', '10'): ('mac', '10.6'),
-  ('darwin', '11'): ('mac', '10.7'),
-  ('darwin', '12'): ('mac', '10.8'),
-  ('darwin', '13'): ('mac', '10.9'),
-  ('darwin', '14'): ('mac', '10.10'),
-  ('darwin', '15'): ('mac', '10.11'),
-  ('darwin', '16'): ('mac', '10.12'),
-  ('darwin', '17'): ('mac', '10.13'),
-}
+from pants.util.memo import memoized_method, memoized_property
+from pants.util.objects import datatype
+from pants.util.osutil import SUPPORTED_PLATFORM_NORMALIZED_NAMES, OsId
 
 
 logger = logging.getLogger(__name__)
+
+
+class HostPlatform(datatype(['os_name', 'arch_or_version'])):
+  """???"""
+
+  def binary_path_components(self):
+    return [self.os_name, self.arch_or_version]
+
+  class MissingMachineInfo(Exception):
+    """???"""
+    pass
+
+  @classmethod
+  def from_os_id(cls, os_id, path_by_id):
+    os_id_tuple = (os_id.name, os_id.arch)
+    try:
+      os_name, arch_or_version = path_by_id[os_id_tuple]
+    except KeyError:
+      raise cls.MissingMachineInfo(
+        "Could not identify os_id tuple {!r} within path_by_id {!r}."
+        .format(os_id_tuple, path_by_id))
+
+    return cls(os_name=os_name, arch_or_version=arch_or_version)
+
+
+class BinaryToolUrlGenerator(object):
+
+  @abstractmethod
+  def generate_urls(self, version, host_platform):
+    """???"""
+    pass
+
+
+class PantsHosted(BinaryToolUrlGenerator):
+  """
+  TODO: ???
+
+  Note that "pants-hosted" is referring to the organization of the urls being specific to pants. It
+  also happens that most binaries are downloaded from S3 hosting at binaries.pantsbuild.org for now.
+  """
+
+  class NoBaseUrlsError(ValueError):
+    """???"""
+    pass
+
+  def __init__(self, binary_request, baseurls):
+    self._binary_request = binary_request
+
+    if not baseurls:
+      raise self.NoBaseUrlsError(
+        "Error constructing pants-hosted urls for the {} binary: no baseurls were provided."
+        .format(binary_request.name))
+    self._baseurls = baseurls
+
+  def generate_urls(self, _version, host_platform):
+    """???"""
+    binary_path = self._binary_request.get_download_path(host_platform)
+    return [posixpath.join(baseurl, binary_path) for baseurl in self._baseurls]
+
+
+# TODO: Deprecate passing in an explicit supportdir? Seems like we should be able to
+# organize our binary hosting so that it's not needed. It's also used to calculate the binary
+# download location, though.
+class BinaryRequest(datatype([
+    'supportdir',
+    'version',
+    'name',
+    'platform_dependent',
+    # NB: this can be None!
+    'url_generator',
+    'archiver',
+])):
+  """???"""
+
+  def _full_name(self):
+    if self.archiver:
+      return '{}.{}'.format(self.name, self.archiver.extension)
+    return self.name
+
+  def get_download_path(self, host_platform):
+    binary_path_components = [self.supportdir]
+    if self.platform_dependent:
+      # TODO(John Sirois): finish doc of the path structure expected under base_path.
+      binary_path_components.extend(host_platform.binary_path_components())
+    binary_path_components.extend([self.version, self._full_name()])
+    return os.path.join(*binary_path_components)
+
+
+class BinaryFetchRequest(datatype(['download_path', 'urls'])):
+  """???"""
+
+  @memoized_property
+  def file_name(self):
+    return os.path.basename(self.download_path)
+
+  class NoDownloadUrlsError(ValueError):
+    """???"""
+    pass
+
+  def __new__(cls, *args, **kwargs):
+    this_object = super(BinaryFetchRequest, cls).__new__(cls, *args, **kwargs)
+
+    if not this_object.urls:
+      raise cls.NoDownloadUrlsError(
+        "No urls were provided to {cls_name}: {obj!r}."
+        .format(cls_name=cls.__name__, obj=this_object))
+
+    return this_object
+
+
+class BinaryToolFetcher(object):
+
+  @classmethod
+  def _default_http_fetcher(cls):
+    return Fetcher(get_buildroot())
+
+  def __init__(self, base_dir, timeout_secs, fetcher=None):
+    self._base_dir = base_dir
+    self._timeout_secs = timeout_secs
+    self._fetcher = fetcher or self._default_http_fetcher()
+
+  class BinaryNotFound(TaskError):
+
+    def __init__(self, name, accumulated_errors):
+      super(BinaryToolFetcher.BinaryNotFound, self).__init__(
+        'Failed to fetch {name} binary from any source: ({error_msgs})'
+        .format(name=name, error_msgs=', '.join(accumulated_errors)))
+
+  @contextmanager
+  def _select_binary_stream(name, urls):
+    """???"""
+    downloaded_successfully = False
+    accumulated_errors = []
+    for url in OrderedSet(urls):  # De-dup URLS: we only want to try each URL once.
+      logger.info('Attempting to fetch {name} binary from: {url} ...'.format(name=name, url=url))
+      try:
+        with temporary_file() as dest:
+          self._fetcher.download(url,
+                                 listener=Fetcher.ProgressListener(),
+                                 path_or_fd=dest,
+                                 timeout_secs=self._timeout_secs)
+          logger.info('Fetched {name} binary from: {url} .'.format(name=name, url=url))
+          downloaded_successfully = True
+          dest.seek(0)
+          yield dest
+          break
+      except (IOError, Fetcher.Error, ValueError) as e:
+        accumulated_errors.append('Failed to fetch binary from {url}: {error}'
+                                  .format(url=url, error=e))
+    if not downloaded_successfully:
+      raise self.BinaryNotFound(name, accumulated_errors)
+
+  def fetch_binary(self, fetch_request):
+    bootstrap_dir = os.path.realpath(os.path.expanduser(self._base_dir))
+    bootstrapped_binary_path = os.path.join(bootstrap_dir, fetch_request.download_path)
+    file_name = fetch_request.file_name
+    urls = fetch_request.urls
+
+    if not os.path.exists(bootstrapped_binary_path):
+      with safe_concurrent_creation(bootstrapped_binary_path) as downloadpath:
+        with self._select_binary_stream(file_name, urls) as binary_tool_stream:
+          with safe_open(downloadpath, 'wb') as bootstrapped_binary:
+            shutil.copyfileobj(binary_tool_stream, bootstrapped_binary)
+
+    logger.debug('Selected {binary} binary bootstrapped to: {path}'
+                 .format(binary=name, path=bootstrapped_binary_path))
+    return bootstrapped_binary_path
 
 
 class BinaryUtilPrivate(object):
@@ -66,50 +220,17 @@ class BinaryUtilPrivate(object):
         options.binaries_baseurls,
         options.binaries_fetch_timeout_secs,
         options.pants_bootstrapdir,
-        options.binaries_path_by_id
-      )
+        options.binaries_path_by_id)
 
   class MissingMachineInfo(TaskError):
     """Indicates that pants was unable to map this machine's OS to a binary path prefix."""
     pass
 
-  class BinaryNotFound(TaskError):
-
-    def __init__(self, binary, accumulated_errors):
-      super(BinaryUtil.BinaryNotFound, self).__init__(
-          'Failed to fetch binary {binary} from any source: ({sources})'
-          .format(binary=binary, sources=', '.join(accumulated_errors)))
-
   class NoBaseUrlsError(TaskError):
     """Indicates that no urls were specified in pants.ini."""
     pass
 
-  def _select_binary_base_path(self, supportdir, version, name, uname_func=None):
-    """Calculate the base path.
-
-    Exposed for associated unit tests.
-    :param supportdir: the path used to make a path under --pants_bootstrapdir.
-    :param version: the version number of the tool used to make a path under --pants-bootstrapdir.
-    :param name: name of the binary to search for. (e.g 'protoc')
-    :param uname_func: method to use to emulate os.uname() in testing
-    :returns: Base path used to select the binary file.
-    """
-    uname_func = uname_func or os.uname
-    os_id = get_os_id(uname_func=uname_func)
-    if not os_id:
-      raise self.MissingMachineInfo('Pants has no binaries for {}'.format(' '.join(uname_func())))
-
-    try:
-      middle_path = self._path_by_id[os_id]
-    except KeyError:
-      raise self.MissingMachineInfo('Unable to find binary {name} version {version}. '
-                                    'Update --binaries-path-by-id to find binaries for {os_id!r} '
-                                    'was: {paths_by_id}'
-                                    .format(name=name, version=version, os_id=os_id,
-                                            paths_by_id=self._path_by_id))
-    return os.path.join(supportdir, *(middle_path + (version, name)))
-
-  def __init__(self, baseurls, timeout_secs, bootstrapdir, path_by_id=None):
+  def __init__(self, baseurls, binary_tool_fetcher, path_by_id=None):
     """Creates a BinaryUtil with the given settings to define binary lookup behavior.
 
     This constructor is primarily used for testing.  Production code will usually initialize
@@ -124,130 +245,84 @@ class BinaryUtilPrivate(object):
       directory naming
     """
     self._baseurls = baseurls
-    self._timeout_secs = timeout_secs
-    self._pants_bootstrapdir = bootstrapdir
-    self._path_by_id = _DEFAULT_PATH_BY_ID.copy()
+    self._binary_tool_fetcher = binary_tool_fetcher
+
+    # FIXME: do we need to keep this here now that we use SUPPORTED_PLATFORM_NORMALIZED_NAMES for
+    # the global option? (as opposed to just setting self._path_by_id = path_by_id)
+    self._path_by_id = SUPPORTED_PLATFORM_NORMALIZED_NAMES.copy()
     if path_by_id:
       self._path_by_id.update((tuple(k), tuple(v)) for k, v in path_by_id.items())
 
-  # TODO: Deprecate passing in an explicit supportdir? Seems like we should be able to
-  # organize our binary hosting so that it's not needed.
-  def select(self, supportdir, version, name, platform_dependent, archiver=None, urls=None):
+  def _get_url_generator(self, binary_request):
+    url_generator = binary_request.url_generator
+
+    if not url_generator:
+      try:
+        url_generator = PantsHosted(binary_request=binary_request, baseurls=self._baseurls)
+      except PantsHosted.NoBaseUrlsError as e:
+        raise self.NoBaseUrlsError(
+          "Error: --binaries-baseurls is empty: {}".format(e),
+          e)
+
+    return url_generator
+
+  @memoized_method
+  def _host_platform(self):
+    os_id = OsId.for_current_platform()
+    try:
+      return HostPlatform.from_os_id(os_id, self._path_by_id)
+    except HostPlatform.MissingMachineInfo as e:
+      # We fail early here because we use the host_platform to identify where to download binaries
+      # to.
+      raise cls.MissingMachineInfo(
+        "Host platform {!r} was not recognized. Update --binaries-path-by-id to "
+        "find binaries for the current host platform: {}"
+        .format(os_id, e),
+        e)
+
+  def select(self, binary_request):
     """Fetches a file, unpacking it if necessary."""
+
+    host_platform = self._host_platform()
+    url_generator = self._get_url_generator(binary_request)
+
+    fetch_request = BinaryFetchRequest(
+      download_path=binary_request.get_download_path(host_platform),
+      urls=url_generator.generate_urls(binary_request.version, host_platform))
+
+    dl_path = self._binary_tool_fetcher.fetch_binary(fetch_request)
+
+    # NB: we mark the downloaded file executable if it is not an archive.
     if archiver is None:
-      return self._select_file(supportdir, version, name, platform_dependent, urls=urls)
-    return self._select_archive(supportdir, version, name, platform_dependent, archiver, urls=urls)
+      chmod_plus_x(dl_path)
+      return dl_path
 
-  def _select_file(self, supportdir, version, name, platform_dependent, urls=None):
-    """Generates a path to request a file and fetches the file located at that path.
-
-    :param string supportdir: The path the `name` binaries are stored under.
-    :param string version: The version number of the binary to select.
-    :param string name: The name of the file to fetch.
-    :param bool platform_dependent: Whether the file content differs depending
-      on the current platform.
-    :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no file of the given version
-      and name could be found for the current platform.
-    """
-    binary_path = self._binary_path_to_fetch(supportdir, version, name, platform_dependent)
-    if not urls:
-      urls = self.pants_provided_binary_urls(binary_path)
-    return self._fetch_binary(name, binary_path, urls)
-
-  def _select_archive(self, supportdir, version, name, platform_dependent, archiver, urls=None):
-    """Generates a path to fetch, fetches the archive file, and unpacks the archive.
-
-    :param string supportdir: The path the `name` binaries are stored under.
-    :param string version: The version number of the binary to select.
-    :param string name: The name of the file to fetch.
-    :param bool platform_dependent: Whether the file content differs depending
-      on the current platform.
-    :param archiver: The archiver object which provides the file extension and
-      unpacks the archive.
-    :type: :class:`pants.fs.archive.Archiver`
-    :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no file of the given version
-      and name could be found for the current platform.
-    """
-    full_name = '{}.{}'.format(name, archiver.extension)
-    downloaded_file = self._select_file(
-      supportdir, version, full_name, platform_dependent, urls=urls)
-    # Use filename without rightmost extension as the directory name.
-    unpacked_dirname, _ = os.path.splitext(downloaded_file)
-    if not os.path.exists(unpacked_dirname):
+    # Use filename without archive extension as the directory name to extract to.
+    unpacked_dirname = binary_request.name
+    if not os.path.isdir(unpacked_dirname):
       logger.info("Extracting {} to {} .".format(downloaded_file, unpacked_dirname))
       archiver.extract(downloaded_file, unpacked_dirname, concurrency_safe=True)
     return unpacked_dirname
 
-  def _binary_path_to_fetch(self, supportdir, version, name, platform_dependent):
-    if platform_dependent:
-      # TODO(John Sirois): finish doc of the path structure expected under base_path.
-      return self._select_binary_base_path(supportdir, version, name)
-    return os.path.join(supportdir, version, name)
-
   def select_binary(self, supportdir, version, name):
-    return self._select_file(
-      supportdir, version, name, platform_dependent=True)
+    binary_request = BinaryRequest(
+      supportdir=supportdir,
+      version=version,
+      name=name,
+      platform_dependent=True,
+      url_generator=None,
+      archiver=None)
+    return self.select(binary_request)
 
   def select_script(self, supportdir, version, name):
-    return self._select_file(
-      supportdir, version, name, platform_dependent=False)
-
-  def pants_provided_binary_urls(self, binary_path):
-    if not self._baseurls:
-      raise self.NoBaseUrlsError(
-          'No urls are defined for the --binaries-baseurls option.')
-    all_urls = []
-    for baseurl in OrderedSet(self._baseurls):  # De-dup URLS: we only want to try each URL once.
-      all_urls.append(posixpath.join(baseurl, binary_path))
-    return all_urls
-
-  @contextmanager
-  def _select_binary_stream(self, name, binary_path, urls, fetcher=None):
-    """Select a binary located at a given path.
-
-    :param string binary_path: The path to the binary to fetch.
-    :param fetcher: Optional argument used only for testing, to 'pretend' to open urls.
-    :returns: a 'stream' to download it from a support directory. The returned 'stream' is actually
-      a lambda function which returns the files binary contents.
-    :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no binary of the given version
-      and name could be found for the current platform.
-    """
-    downloaded_successfully = False
-    accumulated_errors = []
-    for url in OrderedSet(urls):  # De-dup URLS: we only want to try each URL once.
-      logger.info('Attempting to fetch {name} binary from: {url} ...'.format(name=name, url=url))
-      try:
-        with temporary_file() as dest:
-          fetcher = fetcher or Fetcher(get_buildroot())
-          fetcher.download(url,
-                           listener=Fetcher.ProgressListener(),
-                           path_or_fd=dest,
-                           timeout_secs=self._timeout_secs)
-          logger.info('Fetched {name} binary from: {url} .'.format(name=name, url=url))
-          downloaded_successfully = True
-          dest.seek(0)
-          yield lambda: dest.read()
-          break
-      except (IOError, Fetcher.Error, ValueError) as e:
-        accumulated_errors.append('Failed to fetch binary from {url}: {error}'
-                                  .format(url=url, error=e))
-    if not downloaded_successfully:
-      raise self.BinaryNotFound(binary_path, accumulated_errors)
-
-  def _fetch_binary(self, name, binary_path, urls):
-    bootstrap_dir = os.path.realpath(os.path.expanduser(self._pants_bootstrapdir))
-    bootstrapped_binary_path = os.path.join(bootstrap_dir, binary_path)
-    if not os.path.exists(bootstrapped_binary_path):
-      with safe_concurrent_creation(bootstrapped_binary_path) as downloadpath:
-        with self._select_binary_stream(name, binary_path, urls) as stream:
-          with safe_open(downloadpath, 'wb') as bootstrapped_binary:
-            bootstrapped_binary.write(stream())
-          os.rename(downloadpath, bootstrapped_binary_path)
-          chmod_plus_x(bootstrapped_binary_path)
-
-    logger.debug('Selected {binary} binary bootstrapped to: {path}'
-                 .format(binary=name, path=bootstrapped_binary_path))
-    return bootstrapped_binary_path
+    binary_request = BinaryRequest(
+      supportdir=supportdir,
+      version=version,
+      name=name,
+      platform_dependent=False,
+      url_generator=None,
+      archiver=None)
+    return self.select(binary_request)
 
 
 class BinaryUtil(BinaryUtilPrivate):
