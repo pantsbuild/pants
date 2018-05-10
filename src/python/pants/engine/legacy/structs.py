@@ -259,10 +259,11 @@ class BaseGlobs(Locatable, AbstractClass):
       return sources
     elif isinstance(sources, string_types):
       return Files(sources, spec_path=spec_path)
-    elif isinstance(sources, (set, list, tuple)):
+    elif isinstance(sources, (set, list, tuple)) and \
+         all(isinstance(s, string_types) for s in sources):
       return Files(*sources, spec_path=spec_path)
     else:
-      raise AssertionError('Could not construct PathGlobs from {}'.format(sources))
+      raise ValueError('Expected either a glob or list of literal sources: got: {}'.format(sources))
 
   @staticmethod
   def _filespec_for_exclude(raw_exclude, spec_path):

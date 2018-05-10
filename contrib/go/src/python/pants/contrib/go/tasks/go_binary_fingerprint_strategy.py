@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import hashlib
 
 from pants.base.fingerprint_strategy import FingerprintStrategy
+
 from pants.contrib.go.targets.go_binary import GoBinary
 
 

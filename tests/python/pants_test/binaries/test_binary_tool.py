@@ -6,8 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.binaries.binary_tool import BinaryToolBase
-from pants.binaries.binary_util import (BinaryToolFetcher, BinaryToolUrlGenerator,
-                                        BinaryUtil, HostPlatform)
+from pants.binaries.binary_util import (BinaryToolFetcher, BinaryToolUrlGenerator, BinaryUtil,
+                                        HostPlatform)
 from pants.option.scope import GLOBAL_SCOPE
 from pants_test.base_test import BaseTest
 

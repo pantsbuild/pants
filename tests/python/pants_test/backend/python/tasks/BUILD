@@ -48,7 +48,7 @@ python_tests(
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/tasks:task_test_base',
   ],
-  timeout=300
+  timeout=600
 )
 
 

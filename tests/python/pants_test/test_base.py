@@ -363,7 +363,7 @@ class TestBase(unittest.TestCase):
 
   def context(self, for_task_types=None, for_subsystems=None, options=None,
               target_roots=None, console_outstream=None, workspace=None,
-              **kwargs):
+              scheduler=None, **kwargs):
     """
     :API: public
 
@@ -417,7 +417,8 @@ class TestBase(unittest.TestCase):
                                           build_file_parser=self._build_file_parser,
                                           address_mapper=self.address_mapper,
                                           console_outstream=console_outstream,
-                                          workspace=workspace)
+                                          workspace=workspace,
+                                          scheduler=scheduler)
     return context
 
   def tearDown(self):
