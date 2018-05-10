@@ -10,12 +10,12 @@ use futures::future::{self, join_all};
 use hashing::{Digest, Fingerprint};
 use indexmap::{self, IndexMap};
 use itertools::Itertools;
-use {File, PathStat, PosixFS, Store};
 use protobuf;
 use std::ffi::OsString;
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::Arc;
+use {File, PathStat, PosixFS, Store};
 
 pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
   0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
@@ -152,11 +152,7 @@ impl Snapshot {
     // `Directory` structure. Only `Dir+Dir` collisions are legal.
     let path_stats = {
       let mut uniq_paths: IndexMap<PathBuf, PathStat> = IndexMap::new();
-      for path_stat in snapshots
-        .iter()
-        .map(|s| s.path_stats.iter().cloned())
-        .flatten()
-      {
+      for path_stat in Itertools::flatten(snapshots.iter().map(|s| s.path_stats.iter().cloned())) {
         match uniq_paths.entry(path_stat.path().to_owned()) {
           indexmap::map::Entry::Occupied(e) => match (&path_stat, e.get()) {
             (&PathStat::Dir { .. }, &PathStat::Dir { .. }) => (),
@@ -212,11 +208,11 @@ impl Snapshot {
 
         // Merge FileNodes.
         out_dir.set_files(protobuf::RepeatedField::from_vec(
-          directories
-            .iter_mut()
-            .map(|directory| directory.take_files().into_iter())
-            .flatten()
-            .collect(),
+          Itertools::flatten(
+            directories
+              .iter_mut()
+              .map(|directory| directory.take_files().into_iter()),
+          ).collect(),
         ));
         out_dir.mut_files().sort_by(|a, b| a.name.cmp(&b.name));
         let unique_count = out_dir
@@ -242,11 +238,11 @@ impl Snapshot {
 
         // Group and recurse for DirectoryNodes.
         let sorted_child_directories = {
-          let mut merged_directories = directories
-            .iter_mut()
-            .map(|directory| directory.take_directories().into_iter())
-            .flatten()
-            .collect::<Vec<_>>();
+          let mut merged_directories = Itertools::flatten(
+            directories
+              .iter_mut()
+              .map(|directory| directory.take_directories().into_iter()),
+          ).collect::<Vec<_>>();
           merged_directories.sort_by(|a, b| a.name.cmp(&b.name));
           merged_directories
         };
@@ -356,15 +352,15 @@ mod tests {
   extern crate tempdir;
   extern crate testutil;
 
+  use self::testutil::data::TestDirectory;
+  use self::testutil::make_file;
   use futures::future::Future;
   use hashing::{Digest, Fingerprint};
   use tempdir::TempDir;
-  use self::testutil::make_file;
-  use self::testutil::data::TestDirectory;
 
-  use super::OneOffStoreFileByDigest;
   use super::super::{Dir, File, Path, PathGlobs, PathStat, PosixFS, ResettablePool, Snapshot,
                      Store, VFS};
+  use super::OneOffStoreFileByDigest;
 
   use std;
   use std::path::PathBuf;

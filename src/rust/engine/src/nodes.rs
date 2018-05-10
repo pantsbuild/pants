@@ -4,8 +4,8 @@
 extern crate bazel_protos;
 extern crate tempdir;
 
-use std::error::Error;
 use std::collections::BTreeMap;
+use std::error::Error;
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -18,8 +18,8 @@ use context::{Context, Core};
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
 use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDigest, VFS};
-use process_execution::{self, CommandRunner};
 use hashing;
+use process_execution::{self, CommandRunner};
 use rule_graph;
 use selectors;
 use tasks::{self, Intrinsic, IntrinsicKind};
