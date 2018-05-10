@@ -25,6 +25,7 @@ class Zinc(object):
   ZINC_EXTRACT_MAIN = 'org.pantsbuild.zinc.extractor.Main'
   DEFAULT_CONFS = ['default']
 
+  ZINC_COMPILER_TOOL_NAME = 'zinc'
   ZINC_EXTRACTOR_TOOL_NAME = 'zinc-extractor'
 
   class Factory(Subsystem, JvmToolMixin):
@@ -51,7 +52,7 @@ class Zinc(object):
         ]
 
       cls.register_jvm_tool(register,
-                            'zinc',
+                            Zinc.ZINC_COMPILER_TOOL_NAME,
                             classpath=[
                               JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.5'),
                             ])
@@ -84,7 +85,7 @@ class Zinc(object):
 
     @classmethod
     def _zinc(cls, products):
-      return cls.tool_classpath_from_products(products, 'zinc', cls.options_scope)
+      return cls.tool_classpath_from_products(products, Zinc.ZINC_COMPILER_TOOL_NAME, cls.options_scope)
 
     @classmethod
     def _compiler_bridge(cls, products):
