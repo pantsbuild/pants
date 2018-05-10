@@ -253,7 +253,7 @@ class BaseZincCompile(JvmCompile):
       return super(BaseZincCompile, self).execute()
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, zinc_args_file, settings, fatal_warnings, zinc_file_manager,
+              zinc_args_file, settings, fatal_warnings, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     self._verify_zinc_classpath(classpath)
     self._verify_zinc_classpath(upstream_analysis.keys())
@@ -268,8 +268,6 @@ class BaseZincCompile(JvmCompile):
     ])
     if not self.get_options().colors:
       zinc_args.append('-no-color')
-    if log_file:
-      zinc_args.extend(['-capture-log', log_file])
 
     zinc_args.extend(['-compiler-interface', self._zinc.compiler_interface])
     zinc_args.extend(['-compiler-bridge', self._zinc.compiler_bridge])
