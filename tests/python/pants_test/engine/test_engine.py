@@ -30,12 +30,11 @@ class EngineExamplesTest(unittest.TestCase):
 
     self.java = Address.parse('src/java/simple')
 
-  def request(self, goals, *addresses):
-    return self.scheduler.build_request(goals=goals,
-                                        subjects=addresses)
+  def request(self, products, *addresses):
+    return self.scheduler.execution_request(products, addresses)
 
   def test_serial_execution_simple(self):
-    request = self.request(['compile'], self.java)
+    request = self.request([Classpath], self.java)
     result = self.scheduler.execute(request)
     self.scheduler.visualize_graph_to_file(request, 'blah/run.0.dot')
     self.assertEqual(Return(Classpath(creator='javac')), result.root_products[0][1])

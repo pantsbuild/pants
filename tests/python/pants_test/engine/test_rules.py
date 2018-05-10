@@ -332,7 +332,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       SingletonRule(B, B()),
     ]
 
-    subgraph = self.create_subgraph(A, rules, SubA())
+    subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
 
     self.assert_equal_with_printing(dedent("""
                      digraph {
@@ -351,7 +351,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       TaskRule(Exactly(A), [], noop),
     ]
 
-    fullgraph = self.create_full_graph(rules)
+    fullgraph = self.create_full_graph(rules, validate=False)
 
     self.assert_equal_with_printing(dedent("""
                      digraph {
@@ -372,7 +372,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       TaskRule(Exactly(B), [Select(D), Select(A)], noop),
     ]
 
-    fullgraph = self.create_full_graph(rules)
+    fullgraph = self.create_full_graph(rules, validate=False)
 
     self.assert_equal_with_printing(dedent("""
                      digraph {
@@ -393,7 +393,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       TaskRule(Exactly(A), [Select(B)], noop),
       TaskRule(Exactly(A), [], noop),
     ]
-    subgraph = self.create_subgraph(A, rules, SubA())
+    subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
 
     self.assert_equal_with_printing(dedent("""
                      digraph {
@@ -525,7 +525,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       TaskRule(Exactly(A), [SelectDependencies(B, SubA, field_types=(D,))], noop),
       SingletonRule(C, C()),
     ]
-    subgraph = self.create_subgraph(A, rules, SubA())
+    subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
 
     self.assert_equal_with_printing(dedent("""
                      digraph {
@@ -565,7 +565,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       TaskRule(A, [Select(SubA)], noop)
     ]
 
-    subgraph = self.create_subgraph(B, rules, SubA())
+    subgraph = self.create_subgraph(B, rules, SubA(), validate=False)
 
     self.assert_equal_with_printing(dedent("""
                      digraph {
@@ -646,18 +646,12 @@ class RuleGraphMakerTest(unittest.TestCase):
                      }""").strip(),
       subgraph)
 
-  def create_full_graph(self, rules):
-    scheduler = create_scheduler(rules)
-
+  def create_full_graph(self, rules, validate=True):
+    scheduler = create_scheduler(rules, validate=validate)
     return "\n".join(scheduler.rule_graph_visualization())
 
-  def create_real_subgraph(self, rules, root_subject, product_type):
-    scheduler = create_scheduler(rules)
-
-    return "\n".join(scheduler.rule_subgraph_visualization(root_subject, product_type))
-
-  def create_subgraph(self, requested_product, rules, subject):
-    rules = rules + _suba_root_rules
-    return self.create_real_subgraph(rules, type(subject), requested_product)
+  def create_subgraph(self, requested_product, rules, subject, validate=True):
+    scheduler = create_scheduler(rules + _suba_root_rules, validate=validate)
+    return "\n".join(scheduler.rule_subgraph_visualization(type(subject), requested_product))
 
   assert_equal_with_printing = assert_equal_with_printing

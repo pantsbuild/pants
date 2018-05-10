@@ -71,7 +71,7 @@ class ExecutionError(Exception):
 
 
 class Scheduler(object):
-  def __init__(self, native, project_tree, work_dir, rules, include_trace_on_error=True):
+  def __init__(self, native, project_tree, work_dir, rules, include_trace_on_error=True, validate=True):
     """
     :param native: An instance of engine.native.Native.
     :param project_tree: An instance of ProjectTree for the current build root.
@@ -79,6 +79,7 @@ class Scheduler(object):
     :param rules: A set of Rules which is used to compute values in the graph.
     :param include_trace_on_error: Include the trace through the graph upon encountering errors.
     :type include_trace_on_error: bool
+    :param validate: True to assert that the ruleset is valid.
     """
     self._native = native
     self.include_trace_on_error = include_trace_on_error
@@ -129,7 +130,8 @@ class Scheduler(object):
       constraint_for(GeneratorType),
     )
 
-    self._assert_ruleset_valid()
+    if validate:
+      self._assert_ruleset_valid()
 
   def _root_type_ids(self):
     return self._to_ids_buf(sorted(self._root_subject_types))
@@ -287,7 +289,7 @@ class Scheduler(object):
   def pre_fork(self):
     self._native.lib.scheduler_pre_fork(self._scheduler)
 
-  def run_and_return_roots(self, session, execution_request):
+  def _run_and_return_roots(self, session, execution_request):
     raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
     try:
       roots = []
@@ -394,7 +396,7 @@ class SchedulerSession(object):
     """
     start_time = time.time()
     roots = zip(execution_request.roots,
-                self._scheduler.run_and_return_roots(self._session, execution_request.native))
+                self._scheduler._run_and_return_roots(self._session, execution_request.native))
 
     if self._scheduler.visualize_to_dir() is not None:
       name = 'run.{}.dot'.format(self._run_count)

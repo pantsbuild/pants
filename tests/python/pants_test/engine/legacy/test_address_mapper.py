@@ -57,13 +57,13 @@ class LegacyAddressMapperTest(unittest.TestCase):
 
   def create_address_mapper(self, build_root):
     work_dir = os.path.join(build_root, '.pants.d')
-    scheduler, _, _ = EngineInitializer.setup_legacy_graph(
+    scheduler = EngineInitializer.setup_legacy_graph(
       [],
       work_dir,
       build_file_imports_behavior='allow',
       build_root=build_root,
       native=self._native
-    )
+    ).scheduler
     return LegacyAddressMapper(scheduler.new_session(), build_root)
 
   def test_is_valid_single_address(self):

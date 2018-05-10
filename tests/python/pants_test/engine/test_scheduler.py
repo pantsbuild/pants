@@ -63,14 +63,14 @@ class SchedulerTest(unittest.TestCase):
   def assert_select_for_subjects(self, walk, selector, subjects, variants=None):
     raise ValueError(walk)
 
-  def build(self, build_request):
+  def build(self, execution_request):
     """Execute the given request and return roots as a list of ((subject, product), value) tuples."""
-    result = self.scheduler.execute(build_request)
+    result = self.scheduler.execute(execution_request)
     self.assertIsNone(result.error)
     return result.root_products
 
-  def request(self, goals, *subjects):
-    return self.scheduler.build_request(goals=goals, subjects=subjects)
+  def request(self, products, *subjects):
+    return self.scheduler.execution_request(products, subjects)
 
   def assert_root(self, root, subject, return_value):
     """Asserts that the given root has the given result."""
@@ -84,13 +84,13 @@ class SchedulerTest(unittest.TestCase):
     self.assertIn(msg_str, str(root[1].exc))
 
   def test_compile_only_3rdparty(self):
-    build_request = self.request(['compile'], self.guava)
+    build_request = self.request([Classpath], self.guava)
     root, = self.build(build_request)
     self.assert_root(root, self.guava, Classpath(creator='ivy_resolve'))
 
   @unittest.skip('Skipped to expedite landing #3821; see: #4027.')
   def test_compile_only_3rdparty_internal(self):
-    build_request = self.request(['compile'], '3rdparty/jvm:guava')
+    build_request = self.request([Classpath], '3rdparty/jvm:guava')
     root, = self.build(build_request)
 
     # Expect a SelectNode for each of the Jar/Classpath.
@@ -99,7 +99,7 @@ class SchedulerTest(unittest.TestCase):
 
   @unittest.skip('Skipped to expedite landing #3821; see: #4020.')
   def test_gen(self):
-    build_request = self.request(['gen'], self.thrift)
+    build_request = self.request([GenGoal], self.thrift)
     root, = self.build(build_request)
 
     # Root: expect the synthetic GenGoal product.
@@ -116,7 +116,7 @@ class SchedulerTest(unittest.TestCase):
 
   @unittest.skip('Skipped to expedite landing #3821; see: #4020.')
   def test_codegen_simple(self):
-    build_request = self.request(['compile'], self.java)
+    build_request = self.request([Classpath], self.java)
     root, = self.build(build_request)
 
     # The subgraph below 'src/thrift/codegen/simple' will be affected by its default variants.
@@ -135,13 +135,13 @@ class SchedulerTest(unittest.TestCase):
                                     variants={'thrift': 'apache_java'})
 
   def test_consumes_resources(self):
-    build_request = self.request(['compile'], self.consumes_resources)
+    build_request = self.request([Classpath], self.consumes_resources)
     root, = self.build(build_request)
     self.assert_root(root, self.consumes_resources, Classpath(creator='javac'))
 
   @unittest.skip('Skipped to expedite landing #3821; see: #4027.')
   def test_consumes_resources_internal(self):
-    build_request = self.request(['compile'], self.consumes_resources)
+    build_request = self.request([Classpath], self.consumes_resources)
     root, = self.build(build_request)
 
     # Confirm a classpath for the resources target and other subjects. We know that they are
@@ -154,7 +154,7 @@ class SchedulerTest(unittest.TestCase):
   @unittest.skip('Skipped to expedite landing #3821; see: #4020.')
   def test_managed_resolve(self):
     """A managed resolve should consume a ManagedResolve and ManagedJars to produce Jars."""
-    build_request = self.request(['compile'], self.consumes_managed_thirdparty)
+    build_request = self.request([Classpath], self.consumes_managed_thirdparty)
     root, = self.build(build_request)
 
     # Validate the root.
@@ -174,14 +174,14 @@ class SchedulerTest(unittest.TestCase):
 
   def test_dependency_inference(self):
     """Scala dependency inference introduces dependencies that do not exist in BUILD files."""
-    build_request = self.request(['compile'], self.inferred_deps)
+    build_request = self.request([Classpath], self.inferred_deps)
     root, = self.build(build_request)
     self.assert_root(root, self.inferred_deps, Classpath(creator='scalac'))
 
   @unittest.skip('Skipped to expedite landing #3821; see: #4027.')
   def test_dependency_inference_internal(self):
     """Scala dependency inference introduces dependencies that do not exist in BUILD files."""
-    build_request = self.request(['compile'], self.inferred_deps)
+    build_request = self.request([Classpath], self.inferred_deps)
     root, = self.build(build_request)
 
     # Confirm that we requested a classpath for the root and inferred targets.
@@ -189,7 +189,7 @@ class SchedulerTest(unittest.TestCase):
 
   def test_multiple_classpath_entries(self):
     """Multiple Classpath products for a single subject currently cause a failure."""
-    build_request = self.request(['compile'], self.java_multi)
+    build_request = self.request([Classpath], self.java_multi)
     root, = self.build(build_request)
 
     # Validate that the root failed.
@@ -227,7 +227,7 @@ class SchedulerTest(unittest.TestCase):
 
   def test_scheduler_visualize(self):
     specs = self.parse_specs('3rdparty/jvm::')
-    build_request = self.request(['list'], specs)
+    build_request = self.request([BuildFileAddresses], specs)
     self.build(build_request)
 
     with temporary_dir() as td:
@@ -269,7 +269,8 @@ class SchedulerTraceTest(unittest.TestCase):
     request = scheduler._native.new_execution_request()
     subject = B()
     scheduler.add_root_selection(request, subject, A)
-    scheduler.new_session().run_and_return_roots(request)
+    session = scheduler.new_session()
+    scheduler._run_and_return_roots(session._session, request)
 
     trace = '\n'.join(scheduler.graph_trace(request))
     # NB removing location info to make trace repeatable

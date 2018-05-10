@@ -89,10 +89,10 @@ def init_native():
   return Native.create(opts.for_global_scope())
 
 
-def create_scheduler(rules):
+def create_scheduler(rules, validate=True):
   """Create a Scheduler."""
   native = init_native()
-  return Scheduler(native, FileSystemProjectTree(os.getcwd()), './.pants.d', rules)
+  return Scheduler(native, FileSystemProjectTree(os.getcwd()), './.pants.d', rules, validate=validate)
 
 
 class Target(Struct, HasProducts):
