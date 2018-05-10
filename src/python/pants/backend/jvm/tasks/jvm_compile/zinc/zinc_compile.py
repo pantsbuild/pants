@@ -48,10 +48,7 @@ logger = logging.getLogger(__name__)
 
 
 class BaseZincCompile(JvmCompile):
-  """An abstract base class for zinc compilation tasks.
-
-  TODO: Merge with JvmCompile.
-  """
+  """An abstract base class for zinc compilation tasks."""
 
   _name = 'zinc'
 

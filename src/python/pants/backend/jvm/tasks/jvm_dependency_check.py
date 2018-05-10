@@ -35,7 +35,7 @@ class JvmDependencyCheck(Task):
     super(JvmDependencyCheck, cls).register_options(register)
     register('--missing-deps', choices=['off', 'warn', 'fatal'], default='off',
              fingerprint=True,
-             removal_version='1.6.0.dev0',
+             removal_version='1.9.0.dev0',
              removal_hint='Undeclared transitive dependencies are no longer possible.',
              help='Check for missing dependencies in compiled code. Reports actual '
                   'dependencies A -> B where there is no transitive BUILD file dependency path '

@@ -62,7 +62,7 @@ class JvmCompile(NailgunTaskBase):
              help='Pass these extra args to the compiler.')
 
     register('--confs', advanced=True, type=list, default=Zinc.DEFAULT_CONFS,
-             removal_version='1.6.0.dev0',
+             removal_version='1.9.0.dev0',
              removal_hint='Compiling for confs other than `default` is no longer supported.',
              help='Compile for these Ivy confs.')
 
@@ -122,7 +122,7 @@ class JvmCompile(NailgunTaskBase):
 
     register('--unused-deps', choices=['ignore', 'warn', 'fatal'], default='ignore',
              fingerprint=True,
-             removal_version='1.6.0.dev0',
+             removal_version='1.9.0.dev0',
              removal_hint='Option has moved to `--lint-jvm-dep-check-unnecessary-deps` and is '
                           'ignored in this location.',
              help='Controls whether unused deps are checked, and whether they cause warnings or '
