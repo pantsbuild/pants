@@ -8,7 +8,7 @@ use std::io;
 
 use core::{Function, Key, TypeConstraint, TypeId, Value, ANY_TYPE};
 use externs;
-use selectors::{Get, Select, SelectDependencies, Selector};
+use selectors::{Get, Select, Selector};
 use tasks::{Intrinsic, Task, Tasks};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -158,12 +158,6 @@ pub enum SelectKey {
   JustGet(Get),
   // A bare select with no projection.
   JustSelect(Select),
-  // The initial select of a multi-select operator, eg SelectDependencies.
-  NestedSelect(Selector, Select),
-  // The projected select of a multi-select operator when there can be only be one projected type.
-  ProjectedNestedSelect(Selector, TypeId, Select),
-  // The projected select of a multi-select operator when there can be multiple projected types.
-  ProjectedMultipleNestedSelect(Selector, Vec<TypeId>, Select),
   // No selector. Used for tasks with no dependencies.
   Nothing,
 }
@@ -378,84 +372,6 @@ impl<'t> GraphMaker<'t> {
                   &entry,
                   SelectKey::JustSelect(select.clone()),
                   rules_or_literals_for_selector,
-                );
-              }
-              &Selector::SelectDependencies(SelectDependencies {
-                ref product,
-                ref dep_product,
-                ref field_types,
-                ..
-              }) => {
-                let initial_selector = *dep_product;
-                let initial_rules_or_literals = rhs_for_select(
-                  &self.tasks,
-                  entry.subject_type(),
-                  &Select::without_variant(initial_selector),
-                );
-                if initial_rules_or_literals.is_empty() {
-                  mark_unfulfillable(
-                    &mut unfulfillable_rules,
-                    &entry,
-                    entry.subject_type(),
-                    format!(
-                      "no matches for {} when resolving {}",
-                      selector_str(&Selector::Select(Select::without_variant(initial_selector))),
-                      selector_str(selector)
-                    ),
-                  );
-                  was_unfulfillable = true;
-                  continue;
-                }
-                let mut rules_for_dependencies = vec![];
-                for field_type in field_types {
-                  let rules_for_field_subjects = rhs_for_select(
-                    &self.tasks,
-                    field_type.clone(),
-                    &Select {
-                      product: *product,
-                      variant_key: None,
-                    },
-                  );
-                  rules_for_dependencies.extend(rules_for_field_subjects);
-                }
-                if rules_for_dependencies.is_empty() {
-                  for t in field_types {
-                    mark_unfulfillable(
-                      &mut unfulfillable_rules,
-                      &entry,
-                      t.clone(),
-                      format!(
-                        "no matches for {} when resolving {}",
-                        selector_str(&Selector::Select(Select::without_variant(*product))),
-                        selector_str(selector)
-                      ),
-                    );
-                  }
-                  was_unfulfillable = true;
-                  continue;
-                }
-                add_rules_to_graph(
-                  &mut rules_to_traverse,
-                  &mut rule_dependency_edges,
-                  &mut unfulfillable_rules,
-                  &mut root_rule_dependency_edges,
-                  &entry,
-                  SelectKey::NestedSelect(selector.clone(), Select::without_variant(*dep_product)),
-                  initial_rules_or_literals,
-                );
-
-                add_rules_to_graph(
-                  &mut rules_to_traverse,
-                  &mut rule_dependency_edges,
-                  &mut unfulfillable_rules,
-                  &mut root_rule_dependency_edges,
-                  &entry,
-                  SelectKey::ProjectedMultipleNestedSelect(
-                    selector.clone(),
-                    field_types.clone(),
-                    Select::without_variant(*product),
-                  ),
-                  rules_for_dependencies,
                 );
               }
             }
@@ -696,22 +612,6 @@ pub fn selector_str(selector: &Selector) -> String {
     &Selector::Select(ref s) => {
       format!("Select({})", type_constraint_str(s.product)).to_string() // TODO variant key
     }
-    &Selector::SelectDependencies(ref s) => format!(
-      "{}({}, {}, {}field_types=({},))",
-      "SelectDependencies",
-      type_constraint_str(s.product),
-      type_constraint_str(s.dep_product),
-      if s.field == "dependencies" {
-        "".to_string()
-      } else {
-        format!("'{}', ", s.field)
-      },
-      s.field_types
-        .iter()
-        .map(|&f| type_str(f))
-        .collect::<Vec<String>>()
-        .join(", ")
-    ),
   }
 }
 

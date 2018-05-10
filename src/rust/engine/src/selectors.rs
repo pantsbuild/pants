@@ -1,7 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use core::{Field, TypeConstraint, TypeId};
+use core::{TypeConstraint, TypeId};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Get {
@@ -24,16 +24,8 @@ impl Select {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectDependencies {
-  pub product: TypeConstraint,
-  pub dep_product: TypeConstraint,
-  pub field: Field,
-  pub field_types: Vec<TypeId>,
-}
-
+// TODO: Remove.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Selector {
   Select(Select),
-  SelectDependencies(SelectDependencies),
 }

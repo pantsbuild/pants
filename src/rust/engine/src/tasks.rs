@@ -3,9 +3,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use core::{Field, Function, Key, TypeConstraint, TypeId, Value, FNV};
+use core::{Function, Key, TypeConstraint, TypeId, Value, FNV};
 use externs;
-use selectors::{Get, Select, SelectDependencies, Selector};
+use selectors::{Get, Select, Selector};
 use types::Types;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -147,21 +147,6 @@ impl Tasks {
     self.clause(Selector::Select(Select {
       product: product,
       variant_key: variant_key,
-    }));
-  }
-
-  pub fn add_select_dependencies(
-    &mut self,
-    product: TypeConstraint,
-    dep_product: TypeConstraint,
-    field: Field,
-    field_types: Vec<TypeId>,
-  ) {
-    self.clause(Selector::SelectDependencies(SelectDependencies {
-      product: product,
-      dep_product: dep_product,
-      field: field,
-      field_types: field_types,
     }));
   }
 
