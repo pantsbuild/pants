@@ -22,7 +22,7 @@ use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDig
 use process_execution;
 use hashing;
 use rule_graph;
-use selectors::{self, Selector};
+use selectors;
 use tasks::{self, Intrinsic, IntrinsicKind};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
@@ -727,20 +727,6 @@ pub struct Task {
 }
 
 impl Task {
-  fn get(&self, context: &Context, selector: Selector) -> NodeFuture<Value> {
-    let ref edges = context
-      .core
-      .rule_graph
-      .edges_for_inner(&self.entry)
-      .expect("edges for task exist.");
-    match selector {
-      Selector::Select(s) => {
-        Select::new_with_selector(s, self.subject.clone(), self.variants.clone(), edges)
-          .run(context.clone())
-      }
-    }
-  }
-
   fn gen_get(
     context: &Context,
     entry: Arc<rule_graph::Entry>,
@@ -798,17 +784,29 @@ impl Node for Task {
   type Output = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
-    let deps = future::join_all(
-      self
-        .task
-        .clause
-        .iter()
-        .map(|selector| self.get(&context, selector.clone()))
-        .collect::<Vec<_>>(),
-    );
+    let deps = {
+      let ref edges = context
+        .core
+        .rule_graph
+        .edges_for_inner(&self.entry)
+        .expect("edges for task exist.");
+      let subject = self.subject;
+      let variants = self.variants;
+      future::join_all(
+        self
+          .task
+          .clause
+          .into_iter()
+          .map(|s| {
+            Select::new_with_selector(s, subject.clone(), variants.clone(), edges)
+              .run(context.clone())
+          })
+          .collect::<Vec<_>>(),
+      )
+    };
 
-    let func = self.task.func.clone();
-    let entry = self.entry.clone();
+    let func = self.task.func;
+    let entry = self.entry;
     deps
       .then(move |deps_result| match deps_result {
         Ok(deps) => externs::call(&externs::val_for(&func.0), &deps),

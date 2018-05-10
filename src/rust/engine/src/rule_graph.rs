@@ -8,7 +8,7 @@ use std::io;
 
 use core::{Function, Key, TypeConstraint, TypeId, Value, ANY_TYPE};
 use externs;
-use selectors::{Get, Select, Selector};
+use selectors::{Get, Select};
 use tasks::{Intrinsic, Task, Tasks};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -49,10 +49,10 @@ impl Entry {
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct RootEntry {
   subject_type: TypeId,
-  // TODO: A RootEntry can only have one declared `Selector`, and no declared `Get`s, but these
+  // TODO: A RootEntry can only have one declared `Select`, and no declared `Get`s, but these
   // are shaped as Vecs to temporarily minimize the re-shuffling in `_construct_graph`. Remove in
   // a future commit.
-  clause: Vec<Selector>,
+  clause: Vec<Select>,
   gets: Vec<Get>,
 }
 
@@ -348,33 +348,29 @@ impl<'t> GraphMaker<'t> {
           ref gets,
           ..
         }) => {
-          for selector in clause {
-            match selector {
-              &Selector::Select(ref select) => {
-                // TODO, handle the Addresses / Variants case
-                let rules_or_literals_for_selector =
-                  rhs_for_select(&self.tasks, entry.subject_type(), &select);
-                if rules_or_literals_for_selector.is_empty() {
-                  mark_unfulfillable(
-                    &mut unfulfillable_rules,
-                    &entry,
-                    entry.subject_type(),
-                    format!("no matches for {}", selector_str(selector)),
-                  );
-                  was_unfulfillable = true;
-                  continue;
-                }
-                add_rules_to_graph(
-                  &mut rules_to_traverse,
-                  &mut rule_dependency_edges,
-                  &mut unfulfillable_rules,
-                  &mut root_rule_dependency_edges,
-                  &entry,
-                  SelectKey::JustSelect(select.clone()),
-                  rules_or_literals_for_selector,
-                );
-              }
+          for select in clause {
+            // TODO, handle the Addresses / Variants case
+            let rules_or_literals_for_selector =
+              rhs_for_select(&self.tasks, entry.subject_type(), &select);
+            if rules_or_literals_for_selector.is_empty() {
+              mark_unfulfillable(
+                &mut unfulfillable_rules,
+                &entry,
+                entry.subject_type(),
+                format!("no matches for {}", select_str(select)),
+              );
+              was_unfulfillable = true;
+              continue;
             }
+            add_rules_to_graph(
+              &mut rules_to_traverse,
+              &mut rule_dependency_edges,
+              &mut unfulfillable_rules,
+              &mut root_rule_dependency_edges,
+              &entry,
+              SelectKey::JustSelect(select.clone()),
+              rules_or_literals_for_selector,
+            );
           }
           for get in gets {
             match get {
@@ -541,10 +537,10 @@ impl<'t> GraphMaker<'t> {
       Some(RootEntry {
         subject_type: subject_type.clone(),
         clause: vec![
-          Selector::Select(Select {
+          Select {
             product: product_type.clone(),
             variant_key: None,
-          }),
+          },
         ],
         gets: vec![],
       })
@@ -607,12 +603,8 @@ fn val_name(val: &Value) -> String {
   externs::project_str(val, "__name__")
 }
 
-pub fn selector_str(selector: &Selector) -> String {
-  match selector {
-    &Selector::Select(ref s) => {
-      format!("Select({})", type_constraint_str(s.product)).to_string() // TODO variant key
-    }
-  }
+pub fn select_str(select: &Select) -> String {
+  format!("Select({})", type_constraint_str(select.product)).to_string() // TODO variant key
 }
 
 fn get_str(get: &Get) -> String {
@@ -644,7 +636,7 @@ fn entry_str(entry: &Entry) -> String {
       root
         .clause
         .iter()
-        .map(|s| selector_str(s))
+        .map(|s| select_str(s))
         .collect::<Vec<_>>()
         .join(", "),
       type_str(root.subject_type)
@@ -669,7 +661,7 @@ fn task_display(task: &Task) -> String {
   let mut clause_portion = task
     .clause
     .iter()
-    .map(|c| selector_str(c))
+    .map(|c| select_str(c))
     .collect::<Vec<_>>()
     .join(", ");
   clause_portion = if task.clause.len() <= 1 {
@@ -700,11 +692,11 @@ impl RuleGraph {
     GraphMaker::new(tasks, root_subject_types).full_graph()
   }
 
-  pub fn find_root_edges(&self, subject_type: TypeId, selector: Selector) -> Option<RuleEdges> {
+  pub fn find_root_edges(&self, subject_type: TypeId, select: Select) -> Option<RuleEdges> {
     // TODO return Result instead
     let root = RootEntry {
       subject_type: subject_type,
-      clause: vec![selector],
+      clause: vec![select],
       gets: vec![],
     };
     self.root_dependencies.get(&root).map(|e| e.clone())

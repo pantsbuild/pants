@@ -5,13 +5,13 @@ use std::collections::{HashMap, HashSet};
 
 use core::{Function, Key, TypeConstraint, TypeId, Value, FNV};
 use externs;
-use selectors::{Get, Select, Selector};
+use selectors::{Get, Select};
 use types::Types;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
   pub product: TypeConstraint,
-  pub clause: Vec<Selector>,
+  pub clause: Vec<Select>,
   pub gets: Vec<Get>,
   pub func: Function,
   pub cacheable: bool,
@@ -38,7 +38,7 @@ pub struct Tasks {
 ///   2. add_*() - zero or more times per task to add input clauses
 ///   3. task_end() - once per task
 ///
-/// Also has a one-shot method for adding a singleton (which has no Selectors):
+/// Also has a one-shot method for adding a singleton (which has no Selects):
 ///   1. singleton_add()
 ///
 /// (This protocol was original defined in a Builder, but that complicated the C lifecycle.)
@@ -144,19 +144,15 @@ impl Tasks {
   }
 
   pub fn add_select(&mut self, product: TypeConstraint, variant_key: Option<String>) {
-    self.clause(Selector::Select(Select {
-      product: product,
-      variant_key: variant_key,
-    }));
-  }
-
-  fn clause(&mut self, selector: Selector) {
     self
       .preparing
       .as_mut()
       .expect("Must `begin()` a task creation before adding clauses!")
       .clause
-      .push(selector);
+      .push(Select {
+        product: product,
+        variant_key: variant_key,
+      });
   }
 
   pub fn task_end(&mut self) {

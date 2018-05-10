@@ -23,9 +23,3 @@ impl Select {
     }
   }
 }
-
-// TODO: Remove.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum Selector {
-  Select(Select),
-}
