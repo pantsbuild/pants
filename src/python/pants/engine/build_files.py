@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import collections
+import functools
 from os.path import dirname, join
 
 import six
@@ -20,7 +21,7 @@ from pants.engine.fs import FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
-from pants.engine.selectors import Get, Select, SelectDependencies
+from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
 from pants.util.dirutil import fast_relpath_optional
 from pants.util.objects import TypeConstraintError, datatype
@@ -130,12 +131,13 @@ def resolve_unhydrated_struct(address_mapper, address):
     filter(lambda build_address: build_address == address, addresses)[0], struct, dependencies)
 
 
-def hydrate_struct(address_mapper, unhydrated_struct, dependencies):
+def hydrate_struct(symbol_table_constraint, address_mapper, unhydrated_struct):
   """Hydrates a Struct from an UnhydratedStruct and its satisfied embedded addressable deps.
 
   Note that this relies on the guarantee that DependenciesNode provides dependencies in the
   order they were requested.
   """
+  dependencies = yield [Get(symbol_table_constraint, Address, a) for a in unhydrated_struct.dependencies]
   address = unhydrated_struct.address
   struct = unhydrated_struct.struct
 
@@ -176,7 +178,7 @@ def hydrate_struct(address_mapper, unhydrated_struct, dependencies):
         hydrated_args[key] = maybe_consume(key, value)
     return _hydrate(type(item), address.spec_path, **hydrated_args)
 
-  return consume_dependencies(struct, args={'address': address})
+  yield consume_dependencies(struct, args={'address': address})
 
 
 def _hydrate(item_type, spec_path, **kwargs):
@@ -316,6 +318,10 @@ def create_graph_rules(address_mapper, symbol_table):
   :param symbol_table: A SymbolTable instance to provide symbols for Address lookups.
   """
   symbol_table_constraint = symbol_table.constraint()
+
+  partial_hydrate_struct = functools.partial(hydrate_struct, symbol_table_constraint)
+  partial_hydrate_struct.__name__ = 'hydrate_struct'
+
   return [
     # A singleton to provide the AddressMapper.
     SingletonRule(AddressMapper, address_mapper),
@@ -323,9 +329,9 @@ def create_graph_rules(address_mapper, symbol_table):
     TaskRule(
       symbol_table_constraint,
       [Select(AddressMapper),
-       Select(UnhydratedStruct),
-       SelectDependencies(symbol_table_constraint, UnhydratedStruct, field_types=(Address,))],
-      hydrate_struct
+       Select(UnhydratedStruct)],
+      partial_hydrate_struct,
+      input_gets=[Get(symbol_table_constraint, Address)],
     ),
     resolve_unhydrated_struct,
     # BUILD file parsing.
