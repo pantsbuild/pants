@@ -9,7 +9,6 @@ import logging
 import os
 
 from pants.backend.jvm import argfile
-from pants.backend.jvm.subsystems.compile_subsystem import JvmCompileSubsystem
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
@@ -79,7 +78,7 @@ class JavacCompile(JvmCompile):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JavacCompile, cls).subsystem_dependencies() + (JvmCompileSubsystem,)
+    return super(JavacCompile, cls).subsystem_dependencies() + (JvmPlatform,)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -128,7 +127,7 @@ class JavacCompile(JvmCompile):
         f.write('{}\n'.format(processor.strip()))
 
   def execute(self):
-    if JvmCompileSubsystem.global_instance().get_options().compiler == 'javac':
+    if JvmPlatform.global_instance().get_options().compiler == 'javac':
       return super(JavacCompile, self).execute()
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
