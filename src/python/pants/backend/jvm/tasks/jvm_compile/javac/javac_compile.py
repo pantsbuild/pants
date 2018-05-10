@@ -115,7 +115,7 @@ class JavacCompile(JvmCompile):
       return super(JavacCompile, self).execute()
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, zinc_args_file, settings, fatal_warnings, zinc_file_manager,
+              zinc_args_file, settings, fatal_warnings, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     try:
       distribution = JvmPlatform.preferred_jvm_distribution([settings], strict=True)
