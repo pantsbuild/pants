@@ -12,9 +12,6 @@ python_dist(
     'hello_package/hello.py',
     'hello_package/__init__.py',
     'setup.py'
-  ],
-  setup_requires=[
-    '3rdparty/python:tensorflow'
   ]
 )
 
