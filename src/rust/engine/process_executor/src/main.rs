@@ -131,7 +131,7 @@ fn main() {
   };
 
   let result = match server_arg {
-    Some(address) => process_execution::remote::CommandRunner::new(address, 1, store)
+    Some(address) => process_execution::remote::CommandRunner::new(address.to_owned(), 1, store)
       .run_command_remote(request)
       .wait()
       .expect("Error executing remotely"),

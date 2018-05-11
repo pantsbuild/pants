@@ -287,10 +287,10 @@ class NodeResolveTest(TaskTestBase):
     self._test_resolve_optional_install_helper(
       install_optional=False,
       package_manager='yarnpkg',
-      expected_params=['--non-interactive', '--ignore-optional'])
+      expected_params=['--non-interactive', '--ignore-optional', '--frozen-lockfile'])
 
   def test_resolve_optional_install_yarn(self):
     self._test_resolve_optional_install_helper(
       install_optional=True,
       package_manager='yarnpkg',
-      expected_params=['--non-interactive'])
+      expected_params=['--non-interactive', '--frozen-lockfile'])

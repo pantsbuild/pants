@@ -10,5 +10,5 @@ from pants_test.backend.jvm.tasks.jvm_compile.zinc.zinc_compile_integration_base
   BaseZincCompileIntegrationTest
 
 
-class ZincCompileIntegrationWithZjars(BaseCompileIT, BaseZincCompileIntegrationTest):
+class ZincCompileIntegration(BaseCompileIT, BaseZincCompileIntegrationTest):
   _EXTRA_TASK_ARGS = []

@@ -9,7 +9,7 @@ use std::io;
 use core::{Function, Key, TypeConstraint, TypeId, Value, ANY_TYPE};
 use externs;
 use selectors::{Get, Select, SelectDependencies, Selector};
-use tasks::{Task, Tasks};
+use tasks::{Intrinsic, Task, Tasks};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Entry {
@@ -29,7 +29,7 @@ pub enum Entry {
   Unreachable {
     // NB: unreachable is an error type, it might be better to name it error, but currently
     //     unreachable is the only error entry type.
-    rule: Task,
+    task_rule: Task,
     reason: Diagnostic,
   },
 }
@@ -63,9 +63,17 @@ impl From<RootEntry> for Entry {
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
+pub enum Rule {
+  // Intrinsic rules are implemented in rust.
+  Intrinsic(Intrinsic),
+  // Task rules are implemented in python.
+  Task(Task),
+}
+
+#[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct InnerEntry {
   subject_type: TypeId,
-  rule: Task,
+  rule: Rule,
 }
 
 impl From<InnerEntry> for Entry {
@@ -75,22 +83,15 @@ impl From<InnerEntry> for Entry {
 }
 
 impl Entry {
-  fn new_inner(subject_type: TypeId, rule: &Task) -> Entry {
-    Entry::InnerEntry(InnerEntry {
-      subject_type: subject_type,
-      rule: rule.clone(),
-    })
-  }
-
   fn new_subject_is_product(subject_type: TypeId) -> Entry {
     Entry::SubjectIsProduct {
       subject_type: subject_type,
     }
   }
 
-  fn new_unreachable(rule: &Task) -> Entry {
+  fn new_unreachable(task_rule: &Task) -> Entry {
     Entry::Unreachable {
-      rule: rule.clone(),
+      task_rule: task_rule.clone(),
       reason: Diagnostic {
         subject_type: ANY_TYPE,
         reason: "".to_string(),
@@ -134,11 +135,14 @@ impl Entry {
     }
   }
 
-  fn rule(&self) -> &Task {
+  fn task_rule(&self) -> Option<&Task> {
     match self {
-      &Entry::InnerEntry(ref inner) => &inner.rule,
-      &Entry::Unreachable { ref rule, .. } => rule,
-      _ => panic!("no rule"),
+      &Entry::InnerEntry(InnerEntry {
+        rule: Rule::Task(ref task_rule),
+        ..
+      }) => Some(task_rule),
+      &Entry::Unreachable { ref task_rule, .. } => Some(task_rule),
+      _ => None,
     }
   }
 }
@@ -273,11 +277,18 @@ impl<'t> GraphMaker<'t> {
   ) {
     let rules_in_graph: HashSet<_> = full_dependency_edges
       .keys()
-      .map(|f| f.rule.clone())
+      .filter_map(|entry| match entry {
+        &InnerEntry {
+          rule: Rule::Task(ref task_rule),
+          ..
+        } => Some(task_rule.clone()),
+        _ => None,
+      })
       .collect();
     let unfulfillable_discovered_during_construction: HashSet<_> = full_unfulfillable_rules
       .keys()
-      .map(|f| f.rule().clone())
+      .filter_map(|f| f.task_rule())
+      .cloned()
       .collect();
     let unreachable_rules: HashSet<_> = self
       .tasks
@@ -309,12 +320,13 @@ impl<'t> GraphMaker<'t> {
     let mut rules_to_traverse: VecDeque<Entry> = VecDeque::new();
     rules_to_traverse.push_back(Entry::from(beginning_rule));
     while let Some(entry) = rules_to_traverse.pop_front() {
+      // TODO: Drop both of these methods, and just noop for irrelevant entries in the match.
       if entry.can_be_dependency() && !entry.can_have_dependencies() {
         continue;
       }
       if !entry.can_have_dependencies() {
         panic!(
-          "Cannot determine dependencies of entry not of type CanHaveDependencies: {:?}",
+          "Cannot determine deps of entry that can be neither a dependency or dependent: {:?}",
           entry
         )
       }
@@ -329,11 +341,12 @@ impl<'t> GraphMaker<'t> {
       let mut was_unfulfillable = false;
       match entry {
         Entry::InnerEntry(InnerEntry {
-          rule: Task {
-            ref clause,
-            ref gets,
-            ..
-          },
+          rule:
+            Rule::Task(Task {
+              ref clause,
+              ref gets,
+              ..
+            }),
           ..
         })
         | Entry::Root(RootEntry {
@@ -481,8 +494,37 @@ impl<'t> GraphMaker<'t> {
             }
           }
         }
+        Entry::InnerEntry(InnerEntry {
+          rule: Rule::Intrinsic(Intrinsic { ref input, .. }),
+          ref subject_type,
+        }) => {
+          let rules_or_literals_for_selector = rhs(&self.tasks, subject_type.clone(), input);
+          if rules_or_literals_for_selector.is_empty() {
+            mark_unfulfillable(
+              &mut unfulfillable_rules,
+              &entry,
+              subject_type.clone(),
+              format!(
+                "no rule was available to compute {} for {}",
+                type_constraint_str(input.clone()),
+                type_str(subject_type.clone())
+              ),
+            );
+            was_unfulfillable = true;
+          } else {
+            add_rules_to_graph(
+              &mut rules_to_traverse,
+              &mut rule_dependency_edges,
+              &mut unfulfillable_rules,
+              &mut root_rule_dependency_edges,
+              &entry,
+              SelectKey::JustSelect(Select::without_variant(*input)),
+              rules_or_literals_for_selector,
+            );
+          }
+        }
         _ => panic!(
-          "Entry type that cannot dependencies was not filtered out {:?}",
+          "Entry type that cannot have dependencies was not filtered out {:?}",
           entry
         ),
       }
@@ -576,11 +618,11 @@ impl<'t> GraphMaker<'t> {
     subject_type: &TypeId,
     product_type: &TypeConstraint,
   ) -> Option<RootEntry> {
-    self
-      .tasks
-      .gen_tasks(product_type)
-      .and_then(|tasks| if !tasks.is_empty() { Some(tasks) } else { None })
-      .map(|_| RootEntry {
+    let candidates = rhs(&self.tasks, subject_type.clone(), product_type);
+    if candidates.is_empty() {
+      None
+    } else {
+      Some(RootEntry {
         subject_type: subject_type.clone(),
         clause: vec![
           Selector::Select(Select {
@@ -590,6 +632,7 @@ impl<'t> GraphMaker<'t> {
         ],
         gets: vec![],
       })
+    }
   }
 }
 
@@ -682,10 +725,19 @@ fn get_str(get: &Get) -> String {
 
 fn entry_str(entry: &Entry) -> String {
   match entry {
-    &Entry::InnerEntry(ref inner) => format!(
-      "{} of {}",
-      task_display(&inner.rule),
-      type_str(inner.subject_type)
+    &Entry::InnerEntry(InnerEntry {
+      rule: Rule::Task(ref task_rule),
+      subject_type,
+    }) => format!("{} of {}", task_display(task_rule), type_str(subject_type)),
+    &Entry::InnerEntry(InnerEntry {
+      rule: Rule::Intrinsic(ref intrinsic),
+      subject_type,
+    }) => format!(
+      "({}, ({},), {:?}) for {}",
+      type_constraint_str(intrinsic.product),
+      type_constraint_str(intrinsic.input),
+      intrinsic.kind,
+      type_str(subject_type)
     ),
     &Entry::Root(ref root) => format!(
       "{} for {}",
@@ -706,9 +758,9 @@ fn entry_str(entry: &Entry) -> String {
       type_constraint_str(product)
     ),
     &Entry::Unreachable {
-      ref rule,
+      ref task_rule,
       ref reason,
-    } => format!("Unreachable({}, {:?})", task_display(rule), reason),
+    } => format!("Unreachable({}, {:?})", task_display(task_rule), reason),
   }
 }
 
@@ -745,9 +797,7 @@ fn task_display(task: &Task) -> String {
 
 impl RuleGraph {
   pub fn new(tasks: &Tasks, root_subject_types: Vec<TypeId>) -> RuleGraph {
-    let maker = GraphMaker::new(tasks, root_subject_types);
-
-    maker.full_graph()
+    GraphMaker::new(tasks, root_subject_types).full_graph()
   }
 
   pub fn find_root_edges(&self, subject_type: TypeId, selector: Selector) -> Option<RuleEdges> {
@@ -760,9 +810,9 @@ impl RuleGraph {
     self.root_dependencies.get(&root).map(|e| e.clone())
   }
 
-  pub fn task_for_inner(&self, entry: &Entry) -> Task {
+  pub fn rule_for_inner<'a>(&self, entry: &'a Entry) -> &'a Rule {
     if let &Entry::InnerEntry(ref inner) = entry {
-      inner.rule.clone()
+      &inner.rule
     } else {
       panic!("not an inner entry! {:?}", entry)
     }
@@ -784,31 +834,34 @@ impl RuleGraph {
   }
 
   pub fn validate(&self) -> Result<(), String> {
-    if self.has_errors() {
-      Result::Err(self.build_error_msg())
-    } else {
-      Result::Ok(())
-    }
-  }
-
-  fn build_error_msg(&self) -> String {
     // TODO the rule display is really unfriendly right now. Next up should be to improve it.
     let mut collated_errors: HashMap<Task, HashMap<String, HashSet<TypeId>>> = HashMap::new();
 
     let used_rules: HashSet<_> = self
       .rule_dependency_edges
       .keys()
-      .map(|entry| &entry.rule)
+      .filter_map(|entry| match entry {
+        &InnerEntry {
+          rule: Rule::Task(ref task_rule),
+          ..
+        } => Some(task_rule),
+        _ => None,
+      })
       .collect();
+
     for (rule_entry, diagnostics) in &self.unfulfillable_rules {
       match rule_entry {
-        &Entry::InnerEntry(InnerEntry { ref rule, .. }) | &Entry::Unreachable { ref rule, .. } => {
-          if used_rules.contains(&rule) {
+        &Entry::InnerEntry(InnerEntry {
+          rule: Rule::Task(ref task_rule),
+          ..
+        })
+        | &Entry::Unreachable { ref task_rule, .. } => {
+          if used_rules.contains(&task_rule) {
             continue;
           }
           for d in diagnostics {
             let msg_to_type = collated_errors
-              .entry(rule.clone())
+              .entry(task_rule.clone())
               .or_insert(HashMap::new());
             let subject_set = msg_to_type
               .entry(d.reason.clone())
@@ -820,31 +873,18 @@ impl RuleGraph {
                 // So we ignore entries that do not have rules.
       }
     }
+
+    if collated_errors.is_empty() {
+      return Ok(());
+    }
+
     let mut msgs: Vec<String> = collated_errors
       .into_iter()
       .map(|(ref rule, ref subject_types_by_reasons)| format_msgs(rule, subject_types_by_reasons))
       .collect();
     msgs.sort();
 
-    format!("Rules with errors: {}\n  {}", msgs.len(), msgs.join("\n  ")).to_string()
-  }
-
-  fn has_errors(&self) -> bool {
-    let used_rules: HashSet<_> = self
-      .rule_dependency_edges
-      .keys()
-      .map(|entry| &entry.rule)
-      .collect();
-    self
-      .unfulfillable_rules
-      .iter()
-      .any(|(&ref entry, &ref diagnostics)| match entry {
-        &Entry::InnerEntry(ref inner) => {
-          !used_rules.contains(&inner.rule) && !diagnostics.is_empty()
-        }
-        &Entry::Unreachable { .. } => true,
-        _ => false,
-      })
+    Err(format!("Rules with errors: {}\n  {}", msgs.len(), msgs.join("\n  ")).to_string())
   }
 
   pub fn visualize(&self, f: &mut io::Write) -> io::Result<()> {
@@ -1033,13 +1073,22 @@ fn rhs(tasks: &Tasks, subject_type: TypeId, product_type: &TypeConstraint) -> En
   } else if let Some(&(ref key, _)) = tasks.gen_singleton(product_type) {
     vec![Entry::new_singleton(key.clone(), product_type.clone())]
   } else {
-    match tasks.gen_tasks(product_type) {
-      Some(ref matching_tasks) => matching_tasks
-        .iter()
-        .map(|t| Entry::new_inner(subject_type, t))
-        .collect(),
-      None => vec![],
+    let mut entries = Vec::new();
+    if let Some(matching_intrinsic) = tasks.gen_intrinsic(product_type) {
+      entries.push(Entry::InnerEntry(InnerEntry {
+        subject_type: subject_type,
+        rule: Rule::Intrinsic(matching_intrinsic.clone()),
+      }));
     }
+    if let Some(matching_tasks) = tasks.gen_tasks(product_type) {
+      entries.extend(matching_tasks.iter().map(|task_rule| {
+        Entry::InnerEntry(InnerEntry {
+          subject_type: subject_type,
+          rule: Rule::Task(task_rule.clone()),
+        })
+      }));
+    }
+    entries
   }
 }
 

@@ -14,7 +14,6 @@ from contextlib import closing
 from hashlib import sha1
 from xml.etree import ElementTree
 
-from pants.backend.jvm.subsystems.compile_subsystem import JvmCompileSubsystem
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -180,7 +179,7 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BaseZincCompile, cls).subsystem_dependencies() + (Zinc.Factory, JvmCompileSubsystem,)
+    return super(BaseZincCompile, cls).subsystem_dependencies() + (Zinc.Factory, JvmPlatform,)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -265,7 +264,7 @@ class BaseZincCompile(JvmCompile):
     return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
 
   def execute(self):
-    if JvmCompileSubsystem.global_instance().get_options().compiler == 'zinc':
+    if JvmPlatform.global_instance().get_options().compiler == 'zinc':
       return super(BaseZincCompile, self).execute()
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,

@@ -135,7 +135,7 @@ Enabling `scalafix` semantic rewrites involves using a compiler plugin, and pass
 In a `BUILD` file at the root of the repo, define the `semanticdb` compiler plugin:
 
     :::python
-    SCALA_REV=2.11.11
+    SCALA_REV=2.11.12
     jar_library(
       name = 'scalac-plugin-dep',
       jars = [jar(org='org.scalameta', name='semanticdb-scalac_{}'.format(SCALA_REV), rev='2.0.1')],

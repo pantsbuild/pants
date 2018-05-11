@@ -10,8 +10,7 @@ import tarfile
 import unittest
 
 from pants.engine.fs import PathGlobs, Snapshot, create_fs_rules
-from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
-                                           create_process_rules)
+from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
 from pants.util.objects import TypeCheckError, datatype
@@ -64,31 +63,21 @@ class ShellCat(datatype([('binary_location', BinaryLocation)])):
 class CatExecutionRequest(datatype([('shell_cat', ShellCat), ('path_globs', PathGlobs)])): pass
 
 
-@rule(ExecuteProcessRequest, [Select(CatExecutionRequest)])
-def cat_files_process_request_input_snapshot(cat_exe_req):
+@rule(Concatted, [Select(CatExecutionRequest)])
+def cat_files_process_result_concatted(cat_exe_req):
   cat_bin = cat_exe_req.shell_cat
   cat_files_snapshot = yield Get(Snapshot, PathGlobs, cat_exe_req.path_globs)
-  yield ExecuteProcessRequest.create_from_snapshot(
+  process_request = ExecuteProcessRequest.create_from_snapshot(
     argv=cat_bin.argv_from_snapshot(cat_files_snapshot),
     env=tuple(),
     snapshot=cat_files_snapshot,
   )
-
-
-@rule(Concatted, [Select(CatExecutionRequest)])
-def cat_files_process_result_concatted(cat_exe_req):
-  # FIXME(cosmicexplorer): we should only have to run Get once here. this: yield
-  # Get(ExecuteProcessResult, CatExecutionRequest, cat_exe_req) fails because
-  # ExecuteProcessRequest is a RootRule (which shouldn't be true), but there's
-  # probably some work required in isolated_process.py to fix this (see #5718).
-  cat_proc_req = yield Get(ExecuteProcessRequest, CatExecutionRequest, cat_exe_req)
-  cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, cat_proc_req)
+  cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
   yield Concatted(str(cat_process_result.stdout))
 
 
 def create_cat_stdout_rules():
   return [
-    cat_files_process_request_input_snapshot,
     cat_files_process_result_concatted,
     RootRule(CatExecutionRequest),
   ]
@@ -182,17 +171,6 @@ class JavacCompileRequest(datatype([
     return (self.bin_path,) + tuple(snapshot_file_paths)
 
 
-@rule(ExecuteProcessRequest, [Select(JavacCompileRequest)])
-def javac_compile_sources_execute_process_request(javac_compile_req):
-  sources_snapshot = yield Get(
-    Snapshot, PathGlobs, javac_compile_req.javac_sources.path_globs)
-  yield ExecuteProcessRequest.create_from_snapshot(
-    argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
-    env=tuple(),
-    snapshot=sources_snapshot,
-  )
-
-
 # TODO: make this contain the snapshot(s?) of the output files (or contain
 # something that contains it) once we've made it so processes can make snapshots
 # of the files they produce.
@@ -201,10 +179,13 @@ class JavacCompileResult(object): pass
 
 @rule(JavacCompileResult, [Select(JavacCompileRequest)])
 def javac_compile_process_result(javac_compile_req):
-  javac_proc_req = yield Get(
-    ExecuteProcessRequest, JavacCompileRequest, javac_compile_req)
-  javac_proc_result = yield Get(
-    ExecuteProcessResult, ExecuteProcessRequest, javac_proc_req)
+  sources_snapshot = yield Get(Snapshot, PathGlobs, javac_compile_req.javac_sources.path_globs)
+  process_request = ExecuteProcessRequest.create_from_snapshot(
+    argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
+    env=tuple(),
+    snapshot=sources_snapshot,
+  )
+  javac_proc_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
 
   exit_code = javac_proc_result.exit_code
   if exit_code != 0:
@@ -218,7 +199,6 @@ def javac_compile_process_result(javac_compile_req):
 
 def create_javac_compile_rules():
   return [
-    javac_compile_sources_execute_process_request,
     javac_compile_process_result,
     RootRule(JavacCompileRequest),
   ]
@@ -333,5 +313,5 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     return fs_tree
 
   def mk_scheduler_in_example_fs(self, rules):
-    rules = list(rules) + create_fs_rules() + create_process_rules()
+    rules = list(rules) + create_fs_rules()
     return self.mk_scheduler(rules=rules, project_tree=self.mk_example_fs_tree())

@@ -3,6 +3,20 @@
 
 This document describes releases leading up to the ``1.6.x`` ``stable`` series.
 
+1.6.0 (05/10/2018)
+------------------
+
+The ``1.6.0`` stable release.
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Disable lint for Python 3 targets (#5765)
+  `PR #5765 <https://github.com/pantsbuild/pants/pull/5765>`_
+
+* Address @jsirois final comments that were not addressed on PR #5765 (#5773)
+  `PR #5773 <https://github.com/pantsbuild/pants/pull/5773>`_
+
 1.6.0rc3 (04/26/2018)
 ---------------------
 

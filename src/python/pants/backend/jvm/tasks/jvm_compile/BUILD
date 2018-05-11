@@ -8,10 +8,10 @@ target(
     ':analysis_parser',
     ':analysis_tools',
     ':anonymizer',
-    ':javac',
     ':jvm_classpath_publisher',
     ':jvm_compile',
-    ':zinc',
+    'src/python/pants/backend/jvm/tasks/jvm_compile/javac',
+    'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
   ],
 )
 
@@ -102,67 +102,12 @@ python_library(
   sources = ['anonymizer.py'],
 )
 
-python_library(
-  name = 'javac',
-  sources = globs('javac/*.py'),
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:six',
-    ':analysis',
-    ':analysis_parser',
-    ':analysis_tools',
-    ':jvm_compile',
-    'src/python/pants/backend/jvm/subsystems:compile_subsystem',
-    'src/python/pants/backend/jvm/subsystems:java',
-    'src/python/pants/backend/jvm/subsystems:shader',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:hash_utils',
-    'src/python/pants/base:workunit',
-    'src/python/pants/java/distribution',
-    'src/python/pants/option',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:memo',
-  ],
-)
-
-python_library(
-  name = 'zinc',
-  sources = globs('zinc/*.py'),
-  dependencies = [
-    ':analysis',
-    ':analysis_parser',
-    ':analysis_tools',
-    ':jvm_compile',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:six',
-    'src/python/pants/java/jar',
-    'src/python/pants/backend/jvm/subsystems:compile_subsystem',
-    'src/python/pants/backend/jvm/subsystems:java',
-    'src/python/pants/backend/jvm/subsystems:scala_platform',
-    'src/python/pants/backend/jvm/subsystems:shader',
-    'src/python/pants/backend/jvm/subsystems:zinc',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/jvm/zinc',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:hash_utils',
-    'src/python/pants/base:workunit',
-    'src/python/pants/java/distribution',
-    'src/python/pants/option',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:memo',
-  ],
-)
-
 python_binary(
   name = 'anonymize_zinc_analysis',
   source = 'zinc/bin/anonymize_analysis.py',
   dependencies = [
     ':anonymizer',
-    ':zinc',
+    'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'src/python/pants/util:dirutil',
   ],
 )
