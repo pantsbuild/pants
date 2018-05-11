@@ -365,7 +365,7 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
   return EagerFilesetWithSpec(spec_path,
                               relpath_adjusted_filespec,
                               files=files,
-                              files_hash=snapshot.fingerprint)
+                              files_hash=snapshot.directory_digest.fingerprint)
 
 
 @rule(HydratedField, [Select(SourcesField)])

@@ -7,50 +7,39 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from pants.engine.fs import EMPTY_SNAPSHOT
-from pants.util.objects import datatype
+from pants.engine.fs import EMPTY_SNAPSHOT, DirectoryDigest
+from pants.util.objects import TypeCheckError, datatype
 
 
 logger = logging.getLogger(__name__)
 
 
-class ExecuteProcessRequest(datatype(['argv', 'env', 'input_files_digest', 'digest_length'])):
+class ExecuteProcessRequest(datatype([('argv', tuple), ('env', tuple), ('input_files', DirectoryDigest)])):
   """Request for execution with args and snapshots to extract."""
 
   @classmethod
   def create_from_snapshot(cls, argv, env, snapshot):
+    cls._verify_env_is_dict(env)
     return ExecuteProcessRequest(
       argv=argv,
-      env=env,
-      input_files_digest=snapshot.fingerprint,
-      digest_length=snapshot.digest_length,
+      env=tuple(env.items()),
+      input_files=snapshot.directory_digest,
     )
 
   @classmethod
   def create_with_empty_snapshot(cls, argv, env):
     return cls.create_from_snapshot(argv, env, EMPTY_SNAPSHOT)
 
-  def __new__(cls, argv, env, input_files_digest, digest_length):
-    """
-
-    :param args: Arguments to the process being run.
-    :param env: A tuple of environment variables and values.
-    """
-    if not isinstance(argv, tuple):
-      raise ValueError('argv must be a tuple.')
-
-    if not isinstance(env, tuple):
-      raise ValueError('env must be a tuple.')
-
-    if not isinstance(input_files_digest, str):
-      raise ValueError('input_files_digest must be a str.')
-
-    if not isinstance(digest_length, int):
-      raise ValueError('digest_length must be an int.')
-    if digest_length < 0:
-      raise ValueError('digest_length must be >= 0.')
-
-    return super(ExecuteProcessRequest, cls).__new__(cls, argv, env, input_files_digest, digest_length)
+  @classmethod
+  def _verify_env_is_dict(cls, env):
+    if not isinstance(env, dict):
+      raise TypeCheckError(
+        cls.__name__,
+        "arg 'env' was invalid: value {} (with type {}) must be a dict".format(
+          env,
+          type(env)
+        )
+      )
 
 
 class ExecuteProcessResult(datatype(['stdout', 'stderr', 'exit_code'])):

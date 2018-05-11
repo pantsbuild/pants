@@ -185,6 +185,7 @@ pub extern "C" fn externs_val_for(key: Key) -> Value {
 #[no_mangle]
 pub extern "C" fn scheduler_create(
   tasks_ptr: *mut Tasks,
+  construct_directory_digest: Function,
   construct_snapshot: Function,
   construct_file_content: Function,
   construct_files_content: Function,
@@ -197,6 +198,7 @@ pub extern "C" fn scheduler_create(
   type_has_products: TypeConstraint,
   type_has_variants: TypeConstraint,
   type_path_globs: TypeConstraint,
+  type_directory_digest: TypeConstraint,
   type_snapshot: TypeConstraint,
   type_files_content: TypeConstraint,
   type_dir: TypeConstraint,
@@ -217,6 +219,7 @@ pub extern "C" fn scheduler_create(
     .to_strings()
     .unwrap_or_else(|e| panic!("Failed to decode ignore patterns as UTF8: {:?}", e));
   let types = Types {
+    construct_directory_digest: construct_directory_digest,
     construct_snapshot: construct_snapshot,
     construct_file_content: construct_file_content,
     construct_files_content: construct_files_content,
@@ -229,6 +232,7 @@ pub extern "C" fn scheduler_create(
     has_products: type_has_products,
     has_variants: type_has_variants,
     path_globs: type_path_globs,
+    directory_digest: type_directory_digest,
     snapshot: type_snapshot,
     files_content: type_files_content,
     dir: type_dir,
