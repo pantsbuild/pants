@@ -58,16 +58,22 @@ class BinaryToolBase(Subsystem):
 
     return sub_deps
 
+  @memoized_property
+  def _xz(self):
+    # TODO(cosmicexplorer): should this raise instead of returning None?
+    if self.archive_type != 'txz':
+      return None
+    return XZ.scoped_instance(self)
+
   @memoized_method
   def _get_archiver(self):
     if not self.archive_type:
       return None
 
-    # FIXME: see above TODO -- we should be able to ensure that we have declared the correct
+    # FIXME: see above TODOs -- we should be able to ensure that we have declared the correct
     # subsystem dependency when we try to instantiate it here.
     if self.archive_type == 'txz':
-      xz_location = XZ.scoped_instance(self).binary_location()
-      return XZCompressedTarArchiver(xz_location)
+      return XZCompressedTarArchiver(self._xz.binary_location(), self._xz.lib_dir())
 
     return create_archiver(self.archive_type)
 
@@ -197,3 +203,6 @@ class XZ(NativeTool):
 
   def binary_location(self):
     return os.path.join(self.select(), 'bin', 'xz')
+
+  def lib_dir(self):
+    return os.path.join(self.select(), 'lib')

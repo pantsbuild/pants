@@ -107,7 +107,7 @@ class XZCompressedTarArchiver(TarArchiver):
   class XZArchiverError(Exception):
     """???"""
 
-  def __init__(self, xz_binary_path):
+  def __init__(self, xz_binary_path, xz_library_path):
 
     if not is_executable(xz_binary_path):
       raise self.XZArchiverError(
@@ -117,11 +117,28 @@ class XZCompressedTarArchiver(TarArchiver):
 
     self._xz_binary_path = xz_binary_path
 
+    if not os.path.isdir(xz_library_path):
+      raise self.XZArchiverError(
+        "The path {} does not name an existing directory. A directory containing liblzma.so must "
+        "be provided to decompress xz archives."
+        .format(xz_library_path))
+
+    lib_lzma_dylib = os.path.join(xz_library_path, 'liblzma.so')
+    if not os.path.isfile(lib_lzma_dylib):
+      raise self.XZArchiverError(
+        "The path {} names an existing directory, but it does not contain liblzma.so. A directory "
+        "containing liblzma.so must be provided to decompress xz archives."
+        .format(xz_library_path))
+
+    self._xz_library_path = xz_library_path
+
     super(XZCompressedTarArchiver, self).__init__('r|', 'tar.xz')
 
   @contextmanager
   def _invoke_xz(self, xz_input_file):
     (xz_bin_dir, xz_filename) = split_basename_and_dirname(self._xz_binary_path)
+    # TODO: --threads=0 is supposed to use "the number of processor cores on the machine", but I see
+    # no more than 100% cpu used at any point. This seems like it could be a bug?
     cmd = [xz_filename, '--decompress', '--stdout', '--keep', '--threads=0', xz_input_file]
     try:
       process = subprocess.Popen(
@@ -129,8 +146,12 @@ class XZCompressedTarArchiver(TarArchiver):
         stdout=subprocess.PIPE,
         # TODO: is this the right way to do this?
         stderr=sys.stderr,
-        # Isolate the path so we know we're using our provided version of xz.
-        env={'PATH': xz_bin_dir})
+        env={
+          # Isolate the path so we know we're using our provided version of xz.
+          'PATH': xz_bin_dir,
+          # Only allow our xz's lib directory to resolve the liblzma.so dependency at runtime.
+          'LD_LIBRARY_PATH': self._xz_library_path,
+        })
     except OSError as e:
       raise self.XZArchiverError(
         "Error invoking xz with command {} for input file {}: {}"
