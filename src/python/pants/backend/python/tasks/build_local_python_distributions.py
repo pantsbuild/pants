@@ -67,19 +67,19 @@ class BuildLocalPythonDistributions(Task):
     return type(tgt) is PythonDistribution
 
   @staticmethod
-  def setup_requires_prep(build_graph, dist_targets, interpreter, site_dir=None):
+  def _ensure_setup_requires_site_dir(build_graph, dist_targets, interpreter, site_dir):
     reqs_to_resolve = []
 
     for tgt in dist_targets:
-      for setup_req in tgt.setup_requires:
-        for req in build_graph.resolve(setup_req):
-          for re in req.requirements:
-            reqs_to_resolve.append(re)
+      for setup_req_lib in tgt.setup_requires:
+        for req_lib in build_graph.resolve(setup_req_lib):
+          for req in req_lib.requirements:
+            reqs_to_resolve.append(req)
 
-    setup_requires_dists = _resolve_multi(interpreter, reqs_to_resolve, None, None)
+    if not reqs_to_resolve:
+      return None
 
-    if not site_dir:
-      site_dir = safe_mkdtemp()
+    setup_requires_dists = _resolve_multi(interpreter, reqs_to_resolve, ['current'], None)
 
     overrides = {
       'purelib': site_dir,
@@ -89,6 +89,7 @@ class BuildLocalPythonDistributions(Task):
       'data': site_dir
     }
 
+    # The `python_dist` target is built for the current platform only.
     for obj in setup_requires_dists['current']:
       wf = WheelFile(obj.location)
       wf.install(overrides=overrides, force=True)
@@ -112,8 +113,8 @@ class BuildLocalPythonDistributions(Task):
                          'of your setup function.'
             )
           setup_req_dir = os.path.join(vt.results_dir, 'setup_requires_site')
-          pythonpath = self.setup_requires_prep(self.context.build_graph,
-              interpreter, dist_targets, setup_req_dir)
+          pythonpath = self._ensure_setup_requires_site_dir(self.context.build_graph,
+              dist_targets, interpreter, setup_req_dir)
           self._create_dist(vt.target, vt.results_dir, interpreter, pythonpath=pythonpath)
 
         local_wheel_products = self.context.products.get('local_wheels')
@@ -152,7 +153,7 @@ class BuildLocalPythonDistributions(Task):
   # setup.py to be able to invoke our toolchain on hosts that already have a
   # compiler installed. Right now we just put our tools at the end of the PATH.
   @contextmanager
-  def _setup_py_invocation_environment(self, pythonpath=None):
+  def _setup_py_invocation_environment(self, pythonpath):
     setup_py_env = self._request_single(
       SetupPyInvocationEnvironment, self._native_toolchain_instance())
     env = setup_py_env.as_env_dict()

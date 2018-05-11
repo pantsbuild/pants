@@ -8,9 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from setuptools import setup, find_packages
 from distutils.core import Extension
 
-import tensorflow as tf
-
-raise ValueError(tf.sysconfig.get_include())
 
 c_module = Extension(str('c_greet'), sources=[str('c_greet.c')])
 cpp_module = Extension(str('cpp_greet'), sources=[str('cpp_greet.cpp')])
