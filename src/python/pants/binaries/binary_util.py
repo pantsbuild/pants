@@ -23,7 +23,7 @@ from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_concurrent_creation, safe_open
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
-from pants.util.osutil import SUPPORTED_PLATFORM_NORMALIZED_NAMES, OsId
+from pants.util.osutil import SUPPORTED_PLATFORM_NORMALIZED_NAMES
 
 
 logger = logging.getLogger(__name__)
@@ -34,22 +34,6 @@ class HostPlatform(datatype(['os_name', 'arch_or_version'])):
 
   def binary_path_components(self):
     return [self.os_name, self.arch_or_version]
-
-  class MissingMachineInfo(Exception):
-    """???"""
-    pass
-
-  @classmethod
-  def from_os_id(cls, os_id, path_by_id):
-    os_id_tuple = (os_id.name, os_id.arch)
-    try:
-      os_name, arch_or_version = path_by_id[os_id_tuple]
-    except KeyError:
-      raise cls.MissingMachineInfo(
-        "Could not identify os_id tuple {!r} within path_by_id {!r}."
-        .format(os_id_tuple, path_by_id))
-
-    return cls(os_name=os_name, arch_or_version=arch_or_version)
 
 
 class BinaryToolUrlGenerator(object):
@@ -97,6 +81,7 @@ class BinaryRequest(datatype([
     'platform_dependent',
     # NB: this can be None!
     'url_generator',
+    # NB: this can be None!
     'archiver',
 ])):
   """???"""
@@ -126,8 +111,9 @@ class BinaryFetchRequest(datatype(['download_path', 'urls'])):
     """???"""
     pass
 
-  def __new__(cls, *args, **kwargs):
-    this_object = super(BinaryFetchRequest, cls).__new__(cls, *args, **kwargs)
+  def __new__(cls, download_path, urls):
+    this_object = super(BinaryFetchRequest, cls).__new__(
+      cls, download_path, tuple(urls))
 
     if not this_object.urls:
       raise cls.NoDownloadUrlsError(
@@ -143,10 +129,11 @@ class BinaryToolFetcher(object):
   def _default_http_fetcher(cls):
     return Fetcher(get_buildroot())
 
-  def __init__(self, base_dir, timeout_secs, fetcher=None):
-    self._base_dir = base_dir
+  def __init__(self, bootstrap_dir, timeout_secs, fetcher=None, ignore_cached_download=False):
+    self._bootstrap_dir = bootstrap_dir
     self._timeout_secs = timeout_secs
     self._fetcher = fetcher or self._default_http_fetcher()
+    self._ignore_cached_download = ignore_cached_download
 
   class BinaryNotFound(TaskError):
 
@@ -156,7 +143,7 @@ class BinaryToolFetcher(object):
         .format(name=name, error_msgs=', '.join(accumulated_errors)))
 
   @contextmanager
-  def _select_binary_stream(name, urls):
+  def _select_binary_stream(self, name, urls):
     """???"""
     downloaded_successfully = False
     accumulated_errors = []
@@ -164,6 +151,9 @@ class BinaryToolFetcher(object):
       logger.info('Attempting to fetch {name} binary from: {url} ...'.format(name=name, url=url))
       try:
         with temporary_file() as dest:
+          logger.debug("fetcher: {}".format(self._fetcher))
+          logger.debug("url: {}".format(url))
+          logger.debug("timeout_secs: {}".format(self._timeout_secs))
           self._fetcher.download(url,
                                  listener=Fetcher.ProgressListener(),
                                  path_or_fd=dest,
@@ -179,20 +169,24 @@ class BinaryToolFetcher(object):
     if not downloaded_successfully:
       raise self.BinaryNotFound(name, accumulated_errors)
 
+  def _do_fetch(self, download_path, file_name, urls):
+    with safe_concurrent_creation(download_path) as downloadpath:
+      with self._select_binary_stream(file_name, urls) as binary_tool_stream:
+        with safe_open(downloadpath, 'wb') as bootstrapped_binary:
+          shutil.copyfileobj(binary_tool_stream, bootstrapped_binary)
+
   def fetch_binary(self, fetch_request):
-    bootstrap_dir = os.path.realpath(os.path.expanduser(self._base_dir))
+    bootstrap_dir = os.path.realpath(os.path.expanduser(self._bootstrap_dir))
     bootstrapped_binary_path = os.path.join(bootstrap_dir, fetch_request.download_path)
+    logger.debug("bootstrapped_binary_path: {}".format(bootstrapped_binary_path))
     file_name = fetch_request.file_name
     urls = fetch_request.urls
 
-    if not os.path.exists(bootstrapped_binary_path):
-      with safe_concurrent_creation(bootstrapped_binary_path) as downloadpath:
-        with self._select_binary_stream(file_name, urls) as binary_tool_stream:
-          with safe_open(downloadpath, 'wb') as bootstrapped_binary:
-            shutil.copyfileobj(binary_tool_stream, bootstrapped_binary)
+    if self._ignore_cached_download or not os.path.exists(bootstrapped_binary_path):
+      self._do_fetch(bootstrapped_binary_path, file_name, urls)
 
     logger.debug('Selected {binary} binary bootstrapped to: {path}'
-                 .format(binary=name, path=bootstrapped_binary_path))
+                 .format(binary=file_name, path=bootstrapped_binary_path))
     return bootstrapped_binary_path
 
 
@@ -216,11 +210,13 @@ class BinaryUtilPrivate(object):
     def _create_for_cls(cls, binary_util_cls):
       # NB: create is a class method to ~force binary fetch location to be global.
       options = cls.global_instance().get_options()
+      binary_tool_fetcher = BinaryToolFetcher(
+        bootstrap_dir=options.pants_bootstrapdir,
+        timeout_secs=options.binaries_fetch_timeout_secs)
       return binary_util_cls(
-        options.binaries_baseurls,
-        options.binaries_fetch_timeout_secs,
-        options.pants_bootstrapdir,
-        options.binaries_path_by_id)
+        baseurls=options.binaries_baseurls,
+        binary_tool_fetcher=binary_tool_fetcher,
+        path_by_id=options.binaries_path_by_id)
 
   class MissingMachineInfo(TaskError):
     """Indicates that pants was unable to map this machine's OS to a binary path prefix."""
@@ -230,7 +226,15 @@ class BinaryUtilPrivate(object):
     """Indicates that no urls were specified in pants.ini."""
     pass
 
-  def __init__(self, baseurls, binary_tool_fetcher, path_by_id=None):
+  class BinaryResolutionError(TaskError):
+    """???"""
+
+    def __init__(self, binary_request, base_exception):
+      super(BinaryUtilPrivate.BinaryResolutionError, self).__init__(
+        "Error resolving binary request {}: {}".format(binary_request, base_exception),
+        base_exception)
+
+  def __init__(self, baseurls, binary_tool_fetcher, path_by_id=None, uname_func=None):
     """Creates a BinaryUtil with the given settings to define binary lookup behavior.
 
     This constructor is primarily used for testing.  Production code will usually initialize
@@ -243,6 +247,7 @@ class BinaryUtilPrivate(object):
       search for binaries in, or download binaries to if needed.
     :param dict path_by_id: Additional mapping from (sysname, id) -> (os, arch) for tool
       directory naming
+    # TODO: add back doc for uname_func!
     """
     self._baseurls = baseurls
     self._binary_tool_fetcher = binary_tool_fetcher
@@ -253,49 +258,93 @@ class BinaryUtilPrivate(object):
     if path_by_id:
       self._path_by_id.update((tuple(k), tuple(v)) for k, v in path_by_id.items())
 
+    self._uname_func = uname_func or os.uname
+
+  _ID_BY_OS = {
+    'linux': lambda release, machine: ('linux', machine),
+    'darwin': lambda release, machine: ('darwin', release.split('.')[0]),
+  }
+
+  # FIXME(cosmicexplorer): we create a HostPlatform in this class instead of in the constructor
+  # because we don't want to fail until a binary is requested. The HostPlatform should be a
+  # parameter that gets lazily resolved by the v2 engine.
+  @memoized_method
+  def _host_platform(self):
+    uname_result = self._uname_func()
+    sysname, _, release, _, machine = uname_result
+    os_id_key = sysname.lower()
+    try:
+      os_id_fun = self._ID_BY_OS[os_id_key]
+      os_id_tuple = os_id_fun(release, machine)
+    except KeyError:
+      # TODO: test this!
+      raise self.MissingMachineInfo(
+        "Pants could not resolve binaries for the current host: platform '{}' was not recognized. "
+        "Recognized platforms are: {}."
+        .format(os_id_key, self._ID_BY_OS.keys()))
+    try:
+      os_name, arch_or_version = self._path_by_id[os_id_tuple]
+      host_platform = HostPlatform(os_name, arch_or_version)
+    except KeyError:
+      # We fail early here because we use the host_platform to identify where to download binaries
+      # to.
+      raise self.MissingMachineInfo(
+        "Pants could not resolve binaries for the current host. Update --binaries-path-by-id to "
+        "find binaries for the current host platform {}.\n"
+        "--binaries-path-by-id was: {}."
+        .format(os_id_tuple, self._path_by_id))
+
+    return host_platform
+
+  def _get_download_path(self, binary_request):
+    return binary_request.get_download_path(self._host_platform())
+
   def _get_url_generator(self, binary_request):
     url_generator = binary_request.url_generator
 
     if not url_generator:
-      try:
-        url_generator = PantsHosted(binary_request=binary_request, baseurls=self._baseurls)
-      except PantsHosted.NoBaseUrlsError as e:
-        raise self.NoBaseUrlsError(
-          "Error: --binaries-baseurls is empty: {}".format(e),
-          e)
+      if not self._baseurls:
+        raise self.NoBaseUrlsError("--binaries-baseurls is empty.")
+
+      url_generator = PantsHosted(binary_request=binary_request, baseurls=self._baseurls)
 
     return url_generator
 
-  @memoized_method
-  def _host_platform(self):
-    os_id = OsId.for_current_platform()
-    try:
-      return HostPlatform.from_os_id(os_id, self._path_by_id)
-    except HostPlatform.MissingMachineInfo as e:
-      # We fail early here because we use the host_platform to identify where to download binaries
-      # to.
-      raise cls.MissingMachineInfo(
-        "Host platform {!r} was not recognized. Update --binaries-path-by-id to "
-        "find binaries for the current host platform: {}"
-        .format(os_id, e),
-        e)
+  def _get_urls(self, url_generator, binary_request):
+    return url_generator.generate_urls(binary_request.version, self._host_platform())
 
   def select(self, binary_request):
     """Fetches a file, unpacking it if necessary."""
 
-    host_platform = self._host_platform()
-    url_generator = self._get_url_generator(binary_request)
+    logger.debug("binary_request: {!r}".format(binary_request))
 
+    try:
+      download_path = self._get_download_path(binary_request)
+    except self.MissingMachineInfo as e:
+      raise self.BinaryResolutionError(binary_request, e)
+
+    try:
+      url_generator = self._get_url_generator(binary_request)
+    except self.NoBaseUrlsError as e:
+      raise self.BinaryResolutionError(binary_request, e)
+
+    urls = self._get_urls(url_generator, binary_request)
     fetch_request = BinaryFetchRequest(
-      download_path=binary_request.get_download_path(host_platform),
-      urls=url_generator.generate_urls(binary_request.version, host_platform))
+      download_path=download_path,
+      urls=urls)
 
-    dl_path = self._binary_tool_fetcher.fetch_binary(fetch_request)
+    logger.debug("fetch_request: {!r}".format(fetch_request))
+
+    try:
+      downloaded_file = self._binary_tool_fetcher.fetch_binary(fetch_request)
+    except BinaryToolFetcher.BinaryNotFound as e:
+      raise self.BinaryResolutionError(binary_request, e)
 
     # NB: we mark the downloaded file executable if it is not an archive.
+    archiver = binary_request.archiver
     if archiver is None:
-      chmod_plus_x(dl_path)
-      return dl_path
+      chmod_plus_x(downloaded_file)
+      return downloaded_file
 
     # Use filename without archive extension as the directory name to extract to.
     unpacked_dirname = binary_request.name
@@ -304,24 +353,30 @@ class BinaryUtilPrivate(object):
       archiver.extract(downloaded_file, unpacked_dirname, concurrency_safe=True)
     return unpacked_dirname
 
-  def select_binary(self, supportdir, version, name):
-    binary_request = BinaryRequest(
+  def _make_deprecated_binary_request(self, supportdir, version, name):
+    return BinaryRequest(
       supportdir=supportdir,
       version=version,
       name=name,
       platform_dependent=True,
       url_generator=None,
       archiver=None)
+
+  def select_binary(self, supportdir, version, name):
+    binary_request = self._make_deprecated_binary_request(supportdir, version, name)
     return self.select(binary_request)
 
-  def select_script(self, supportdir, version, name):
-    binary_request = BinaryRequest(
+  def _make_deprecated_script_request(self, supportdir, version, name):
+    return BinaryRequest(
       supportdir=supportdir,
       version=version,
       name=name,
       platform_dependent=False,
       url_generator=None,
       archiver=None)
+
+  def select_script(self, supportdir, version, name):
+    binary_request = self._make_deprecated_script_request(supportdir, version, name)
     return self.select(binary_request)
 
 

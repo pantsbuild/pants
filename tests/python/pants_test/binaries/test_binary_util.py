@@ -5,16 +5,20 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 import re
 
 import mock
 
-from pants.binaries.binary_util import BinaryUtilPrivate
+from pants.binaries.binary_util import BinaryRequest, BinaryToolFetcher, BinaryUtilPrivate
 from pants.net.http.fetcher import Fetcher
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
 from pants_test.base_test import BaseTest
+
+
+logger = logging.getLogger(__name__)
 
 
 class BinaryUtilTest(BaseTest):
@@ -49,42 +53,71 @@ class BinaryUtilTest(BaseTest):
 
   @classmethod
   def _fake_url(cls, binaries, base, binary_key):
-    binary_util = BinaryUtilPrivate([], 0, '/tmp')
+    binary_util = cls._gen_binary_util()
     supportdir, version, name = binaries[binary_key]
-    binary = binary_util._select_binary_base_path(supportdir, version, binary_key)
-    return '{base}/{binary}'.format(base=base, binary=binary)
+    binary_request = binary_util._make_deprecated_binary_request(supportdir, version, name)
+
+    binary_path = binary_request.get_download_path(binary_util._host_platform())
+    return '{base}/{binary}'.format(base=base, binary=binary_path)
+
+  @classmethod
+  def _gen_binary_tool_fetcher(cls, bootstrap_dir='/tmp', timeout_secs=30, fetcher=None,
+                           ignore_cached_download=True):
+    return BinaryToolFetcher(
+      bootstrap_dir=bootstrap_dir,
+      timeout_secs=timeout_secs,
+      fetcher=fetcher,
+      ignore_cached_download=ignore_cached_download)
+
+  @classmethod
+  def _gen_binary_util(cls, baseurls=[], path_by_id=None, uname_func=None, **kwargs):
+    return BinaryUtilPrivate(
+      baseurls=baseurls,
+      binary_tool_fetcher=cls._gen_binary_tool_fetcher(**kwargs),
+      path_by_id=path_by_id,
+      uname_func=uname_func)
+
+  @classmethod
+  def _read_file(cls, file_path):
+    with open(file_path, 'rb') as result_file:
+      return result_file.read()
 
   def test_timeout(self):
     fetcher = mock.create_autospec(Fetcher, spec_set=True)
-    binary_util = BinaryUtilPrivate(baseurls=['http://binaries.example.com'],
-                                    timeout_secs=42,
-                                    bootstrapdir='/tmp')
+    timeout_value = 42
+    binary_util = self._gen_binary_util(baseurls=['http://binaries.example.com'],
+                                        timeout_secs=timeout_value,
+                                        fetcher=fetcher)
     self.assertFalse(fetcher.download.called)
 
     binary_path = 'a-binary/v1.2/a-binary'
-    urls = binary_util.pants_provided_binary_urls(binary_path)
-    with binary_util._select_binary_stream('a-binary', binary_path, urls, fetcher=fetcher):
-      fetcher.download.assert_called_once_with('http://binaries.example.com/a-binary/v1.2/a-binary',
-                                               listener=mock.ANY,
-                                               path_or_fd=mock.ANY,
-                                               timeout_secs=42)
+    fetch_path = binary_util.select_script(supportdir='a-binary', version='v1.2', name='a-binary')
+    logger.debug("fetch_path: {}".format(fetch_path))
+    fetcher.download.assert_called_once_with('http://binaries.example.com/a-binary/v1.2/a-binary',
+                                             listener=mock.ANY,
+                                             path_or_fd=mock.ANY,
+                                             timeout_secs=timeout_value)
 
   def test_nobases(self):
     """Tests exception handling if build support urls are improperly specified."""
-    binary_util = BinaryUtilPrivate(baseurls=[], timeout_secs=30, bootstrapdir='/tmp')
-    with self.assertRaises(binary_util.NoBaseUrlsError):
-      binary_path = binary_util._select_binary_base_path(supportdir='bin/protobuf',
-                                                         version='2.4.1',
-                                                         name='protoc')
-      urls = binary_util.pants_provided_binary_urls(binary_path)
-      with binary_util._select_binary_stream(name='protoc', binary_path=binary_path, urls=urls):
-        self.fail('Expected acquisition of the stream to raise.')
+    binary_util = self._gen_binary_util()
+    # TODO: test error message!
+    with self.assertRaises(binary_util.BinaryResolutionError) as cm:
+      # TODO: test select_binary() producing the right BinaryRequest to fulfill?
+      binary_util.select_binary(supportdir='bin/protobuf',
+                                version='2.4.1',
+                                name='protoc')
+      self.fail('Expected downloading the binary to raise.')
+    expected_msg = "--binaries-baseurls is empty."
+    self.assertIn(expected_msg, str(cm.exception))
 
   def test_support_url_multi(self):
     """Tests to make sure existing base urls function as expected."""
 
+    bootstrap_dir = '/tmp'
+
     with temporary_dir() as invalid_local_files, temporary_dir() as valid_local_files:
-      binary_util = BinaryUtilPrivate(
+      binary_util = self._gen_binary_util(
         baseurls=[
           'BLATANTLY INVALID URL',
           'https://dl.bintray.com/pantsbuild/bin/reasonably-invalid-url',
@@ -92,20 +125,23 @@ class BinaryUtilTest(BaseTest):
           valid_local_files,
           'https://dl.bintray.com/pantsbuild/bin/another-invalid-url',
         ],
-        timeout_secs=30,
-        bootstrapdir='/tmp')
+        bootstrap_dir=bootstrap_dir)
 
-      binary_path = binary_util._select_binary_base_path(supportdir='bin/protobuf',
-                                                         version='2.4.1',
-                                                         name='protoc')
+      binary_request = binary_util._make_deprecated_binary_request(
+        supportdir='bin/protobuf',
+        version='2.4.1',
+        name='protoc')
+
+      binary_path = binary_request.get_download_path(binary_util._host_platform())
       contents = b'proof'
       with safe_open(os.path.join(valid_local_files, binary_path), 'wb') as fp:
         fp.write(contents)
 
-      urls = binary_util.pants_provided_binary_urls(binary_path)
-      with binary_util._select_binary_stream(
-          name='protoc', binary_path=binary_path, urls=urls) as stream:
-        self.assertEqual(contents, stream())
+      binary_path_abs = os.path.join(bootstrap_dir, binary_path)
+
+      self.assertEqual(binary_path_abs, binary_util.select(binary_request))
+
+      self.assertEqual(contents, self._read_file(binary_path_abs))
 
   def test_support_url_fallback(self):
     """Tests fallback behavior with multiple support baseurls.
@@ -115,7 +151,6 @@ class BinaryUtilTest(BaseTest):
     """
     fake_base, fake_url = self._fake_base, self._fake_url
     bases = [fake_base('apple'), fake_base('orange'), fake_base('banana')]
-    binary_util = BinaryUtilPrivate(bases, 30, '/tmp')
 
     binaries = {t[2]: t for t in (('bin/protobuf', '2.4.1', 'protoc'),
                                   ('bin/ivy', '4.3.7', 'ivy'),
@@ -129,70 +164,125 @@ class BinaryUtilTest(BaseTest):
       fake_url(binaries, bases[2], 'ivy'): 'UNSEEN IVY 2',
     })
 
+    binary_util = self._gen_binary_util(
+      baseurls=bases,
+      fetcher=fetcher)
+
     unseen = [item for item in fetcher.values() if item.startswith('SEEN ')]
     for supportdir, version, name in binaries.values():
-      binary_path = binary_util._select_binary_base_path(supportdir=supportdir,
-                                                         version=version,
-                                                         name=name)
-      urls = binary_util.pants_provided_binary_urls(binary_path)
-      with binary_util._select_binary_stream(name=name,
-                                             binary_path=binary_path,
-                                             urls=urls,
-                                             fetcher=fetcher) as stream:
-        result = stream()
-        self.assertEqual(result, 'SEEN ' + name.upper())
-        unseen.remove(result)
+      binary_path_abs = binary_util.select_binary(
+        supportdir=supportdir,
+        version=version,
+        name=name)
+      expected_content = 'SEEN {}'.format(name.upper())
+      self.assertEqual(expected_content, self._read_file(binary_path_abs))
+      unseen.remove(expected_content)
     self.assertEqual(0, len(unseen))  # Make sure we've seen all the SEENs.
 
   def test_select_binary_base_path_linux(self):
-    binary_util = BinaryUtilPrivate([], 0, '/tmp')
-
     def uname_func():
       return "linux", "dontcare1", "dontcare2", "dontcare3", "amd64"
 
+    binary_util = self._gen_binary_util(uname_func=uname_func)
+
+    binary_request = binary_util._make_deprecated_binary_request("supportdir", "version", "name")
+
     self.assertEquals("supportdir/linux/x86_64/version/name",
-                      binary_util._select_binary_base_path("supportdir", "version", "name",
-                                                           uname_func=uname_func))
+                      binary_util._get_download_path(binary_request))
 
   def test_select_binary_base_path_darwin(self):
-    binary_util = BinaryUtilPrivate([], 0, '/tmp')
-
     def uname_func():
       return "darwin", "dontcare1", "14.9", "dontcare2", "dontcare3",
 
+    binary_util = self._gen_binary_util(uname_func=uname_func)
+
+    binary_request = binary_util._make_deprecated_binary_request("supportdir", "version", "name")
+
     self.assertEquals("supportdir/mac/10.10/version/name",
-                      binary_util._select_binary_base_path("supportdir", "version", "name",
-                                                           uname_func=uname_func))
+                      binary_util._get_download_path(binary_request))
 
   def test_select_binary_base_path_missing_os(self):
-    binary_util = BinaryUtilPrivate([], 0, '/tmp')
-
     def uname_func():
-      return "vms", "dontcare1", "999.9", "dontcare2", "VAX9"
+      return "vms", "dontcare1", "999.9", "dontcare2", "VAX9",
 
-    with self.assertRaisesRegexp(BinaryUtilPrivate.MissingMachineInfo,
-                                 r'Pants has no binaries for vms'):
-      binary_util._select_binary_base_path("supportdir", "version", "name", uname_func=uname_func)
+    binary_util = self._gen_binary_util(uname_func=uname_func)
+
+    # TODO: use assertRaisesRegexp() or something similar here?
+    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+      binary_util.select_binary("supportdir", "version", "name")
+
+    the_raised_exception_message = str(cm.exception)
+
+    self.assertIn(BinaryUtilPrivate.MissingMachineInfo.__name__, the_raised_exception_message)
+    expected_msg = (
+      "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
+      "name=name, platform_dependent=True, url_generator=None, archiver=None): "
+      "Pants could not resolve binaries for the current host: platform 'vms' was not recognized. "
+      "Recognized platforms are: [u'darwin', u'linux'].")
+    self.assertIn(expected_msg, the_raised_exception_message)
 
   def test_select_binary_base_path_missing_version(self):
-    binary_util = BinaryUtilPrivate([], 0, '/tmp')
-
     def uname_func():
       return "darwin", "dontcare1", "999.9", "dontcare2", "x86_64"
 
+    binary_util = self._gen_binary_util(uname_func=uname_func)
+
     os_id = ('darwin', '999')
-    with self.assertRaisesRegexp(BinaryUtilPrivate.MissingMachineInfo,
-                                 r'myname.*Update --binaries-path-by-id to find binaries for '
-                                 r'{}'.format(re.escape(repr(os_id)))):
-      binary_util._select_binary_base_path("supportdir", "myversion", "myname", uname_func=uname_func)
+    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+      binary_util.select_binary("mysupportdir", "myversion", "myname")
+    the_raised_exception_message = str(cm.exception)
 
+    self.assertIn(BinaryUtilPrivate.MissingMachineInfo.__name__, the_raised_exception_message)
+    expected_msg = (
+      "Error resolving binary request BinaryRequest(supportdir=mysupportdir, version=myversion, "
+      "name=myname, platform_dependent=True, url_generator=None, archiver=None): Pants could not "
+      "resolve binaries for the current host. Update --binaries-path-by-id to find binaries for "
+      "the current host platform (u\'darwin\', u\'999\').\\n--binaries-path-by-id was:")
+    self.assertIn(expected_msg, the_raised_exception_message)
+
+  def test_select_script_missing_version(self):
+    def uname_func():
+      return "darwin", "dontcare1", "999.9", "dontcare2", "x86_64"
+
+    binary_util = self._gen_binary_util(uname_func=uname_func)
+
+    os_id = ('darwin', '999')
+    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+      binary_util.select_script("mysupportdir", "myversion", "myname")
+    the_raised_exception_message = str(cm.exception)
+
+    self.assertIn(BinaryUtilPrivate.MissingMachineInfo.__name__, the_raised_exception_message)
+    expected_msg = (
+      "Error resolving binary request BinaryRequest(supportdir=mysupportdir, version=myversion, "
+      # platform_dependent=False when doing select_script()
+      "name=myname, platform_dependent=False, url_generator=None, archiver=None): Pants could not "
+      "resolve binaries for the current host. Update --binaries-path-by-id to find binaries for "
+      "the current host platform (u\'darwin\', u\'999\').\\n--binaries-path-by-id was:")
+    self.assertIn(expected_msg, the_raised_exception_message)
+
+  # TODO: test NoBaseUrls!
   def test_select_binary_base_path_override(self):
-    binary_util = BinaryUtilPrivate([], 0, '/tmp',
-                                    {('darwin', '100'): ['skynet', '42']})
-
     def uname_func():
       return "darwin", "dontcare1", "100.99", "dontcare2", "t1000"
 
+    binary_util = self._gen_binary_util(uname_func=uname_func,
+                                        path_by_id={('darwin', '100'): ['skynet', '42']})
+
+    binary_request = binary_util._make_deprecated_binary_request("supportdir", "version", "name")
+
     self.assertEquals("supportdir/skynet/42/version/name",
-                      binary_util._select_binary_base_path("supportdir", "version", "name",
-                                                           uname_func=uname_func))
+                      binary_util._get_download_path(binary_request))
+
+  def test_no_base_urls_error(self):
+    binary_util = self._gen_binary_util()
+
+    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+      binary_util.select_script("supportdir", "version", "name")
+    the_raised_exception_message = str(cm.exception)
+
+    self.assertIn(BinaryUtilPrivate.NoBaseUrlsError.__name__, the_raised_exception_message)
+    expected_msg = (
+      "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
+      "name=name, platform_dependent=False, url_generator=None, archiver=None): "
+      "--binaries-baseurls is empty.")
+    self.assertIn(expected_msg, the_raised_exception_message)

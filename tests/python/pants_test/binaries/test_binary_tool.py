@@ -6,32 +6,24 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.binaries.binary_tool import BinaryToolBase
-from pants.binaries.binary_util import BinaryUtilPrivate
+from pants.binaries.binary_util import BinaryToolUrlGenerator, BinaryToolFetcher, BinaryUtilPrivate, HostPlatform
 from pants.option.scope import GLOBAL_SCOPE
-from pants.util.osutil import OsId
 from pants_test.base_test import BaseTest
 
 
-class BinaryToolTestBase(BinaryToolBase):
-
-  @classmethod
-  def _os_id(cls):
-    return OsId('xxx', 'yyy')
-
-
-class DefaultVersion(BinaryToolTestBase):
+class DefaultVersion(BinaryToolBase):
   options_scope = 'default-version-test'
   name = 'default_version_test_tool'
   default_version = 'XXX'
 
 
-class AnotherTool(BinaryToolTestBase):
+class AnotherTool(BinaryToolBase):
   options_scope = 'another-tool'
   name = 'another_tool'
   default_version = '0.0.1'
 
 
-class ReplacingLegacyOptionsTool(BinaryToolTestBase):
+class ReplacingLegacyOptionsTool(BinaryToolBase):
   # TODO: check scope?
   options_scope = 'replacing-legacy-options-tool'
   name = 'replacing_legacy_options_tool'
@@ -41,28 +33,41 @@ class ReplacingLegacyOptionsTool(BinaryToolTestBase):
   replaces_name = 'old_tool_version'
 
 
-class CustomUrls(BinaryToolTestBase):
-  options_scope = 'custom-urls'
-  name = 'custom_urls_tool'
-  default_version = 'v2.1'
+class BinaryUtilFakeUname(BinaryUtilPrivate):
 
-  dist_url_versions = ['v2.1', 'v2.3']
+  def _host_platform(self):
+    return HostPlatform('xxx', 'yyy')
+
+
+class CustomUrlGenerator(BinaryToolUrlGenerator):
 
   _DIST_URL_FMT = 'https://custom-url.example.org/files/custom_urls_tool-{version}-{system_id}'
 
   _SYSTEM_ID = {
     'xxx': 'zzz',
-    'darwin': 'x86_64-apple-darwin',
-    'linux': 'x86_64-linux-gnu',
   }
 
-  @classmethod
-  def make_dist_urls(cls, version, os_name):
-    base = cls._DIST_URL_FMT.format(version=version, system_id=cls._SYSTEM_ID[os_name])
+  def generate_urls(self, version, host_platform):
+    base = self._DIST_URL_FMT.format(
+      version=version,
+      system_id=self._SYSTEM_ID[host_platform.os_name])
     return [
       base,
       '{}-alternate'.format(base),
     ]
+
+
+class CustomUrls(BinaryToolBase):
+  options_scope = 'custom-urls'
+  name = 'custom_urls_tool'
+  default_version = 'v2.1'
+
+  def url_generator(self):
+    return CustomUrlGenerator()
+
+  def _select_for_version(self, version):
+    binary_request = self._make_binary_request(version)
+    return BinaryUtilFakeUname.Factory._create_for_cls(BinaryUtilFakeUname).select(binary_request)
 
 
 class BinaryToolBaseTest(BaseTest):
@@ -107,41 +112,32 @@ class BinaryToolBaseTest(BaseTest):
 
   def test_urls(self):
     default_version_tool = DefaultVersion.global_instance()
-    self.assertEqual(default_version_tool.get_options().urls, {})
+    self.assertIsNone(default_version_tool.url_generator())
 
-    with self.assertRaises(BinaryUtilPrivate.BinaryNotFound) as cm:
+    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
       default_version_tool.select()
     err_msg = str(cm.exception)
+    self.assertIn(BinaryToolFetcher.BinaryNotFound.__name__, err_msg)
     self.assertIn(
-      "Failed to fetch binary bin/default_version_test_tool/XXX/default_version_test_tool from any source",
+      "Failed to fetch default_version_test_tool binary from any source:",
       err_msg)
     self.assertIn(
-      "Failed to fetch binary from https://binaries.example.org/bin/default_version_test_tool/XXX/default_version_test_tool",
+      "Failed to fetch binary from https://binaries.example.org/bin/default_version_test_tool/XXX/default_version_test_tool:",
       err_msg)
 
     custom_urls_tool = CustomUrls.global_instance()
     self.assertEqual(custom_urls_tool.version(), 'v2.3')
-    custom_urls_urls = custom_urls_tool.get_options().urls
-    self.assertEqual(custom_urls_urls, {
-      'v2.1': [
-        'https://custom-url.example.org/files/custom_urls_tool-v2.1-zzz',
-        'https://custom-url.example.org/files/custom_urls_tool-v2.1-zzz-alternate',
-      ],
-      'v2.3': [
-        'https://custom-url.example.org/files/custom_urls_tool-v2.3-zzz',
-        'https://custom-url.example.org/files/custom_urls_tool-v2.3-zzz-alternate',
-      ],
-    })
 
-    with self.assertRaises(BinaryUtilPrivate.BinaryNotFound) as cm:
+    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
       custom_urls_tool.select()
     err_msg = str(cm.exception)
+    self.assertIn(BinaryToolFetcher.BinaryNotFound.__name__, err_msg)
     self.assertIn(
-      "Failed to fetch binary bin/custom_urls_tool/v2.3/custom_urls_tool from any source",
+      "Failed to fetch custom_urls_tool binary from any source:",
       err_msg)
     self.assertIn(
-      "Failed to fetch binary from https://custom-url.example.org/files/custom_urls_tool-v2.3-zzz",
+      "Failed to fetch binary from https://custom-url.example.org/files/custom_urls_tool-v2.3-zzz:",
       err_msg)
     self.assertIn(
-      "Failed to fetch binary from https://custom-url.example.org/files/custom_urls_tool-v2.3-zzz-alternate",
+      "Failed to fetch binary from https://custom-url.example.org/files/custom_urls_tool-v2.3-zzz-alternate:",
       err_msg)

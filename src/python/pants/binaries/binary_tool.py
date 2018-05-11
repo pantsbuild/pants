@@ -14,7 +14,6 @@ from pants.binaries.binary_util import BinaryRequest, BinaryUtilPrivate
 from pants.fs.archive import XZCompressedTarArchiver, create_archiver
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.osutil import OsId
 
 
 logger = logging.getLogger(__name__)
