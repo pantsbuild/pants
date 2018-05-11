@@ -3,6 +3,11 @@
 
 This document describes releases leading up to the ``1.6.x`` ``stable`` series.
 
+1.6.0 (05/10/2018)
+------------------
+
+The ``1.6.0`` stable release, with no additional changes since the ``rc3`` release.
+
 1.6.0rc3 (04/26/2018)
 ---------------------
 
