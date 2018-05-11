@@ -325,7 +325,6 @@ Refactoring, Improvements, and Tooling
 * Bump max local store size (#5728)
   `PR #5728 <https://github.com/pantsbuild/pants/pull/5728>`_
 
-
 1.7.0.dev1 (04/20/2018)
 -----------------------
 

@@ -22,7 +22,6 @@ Bugfixes
   `PR #5790 <https://github.com/pantsbuild/pants/pull/5790>`_
   `PR #) <https://github.com/pantsbuild/pants/pull/5594/)>`_
 
-
 New features
 ~~~~~~~~~~~~
 
@@ -37,7 +36,6 @@ New features
 
 * Add python_app support (#5704)
   `PR #5704 <https://github.com/pantsbuild/pants/pull/5704>`_
-
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -197,7 +195,6 @@ Refactoring, Improvements, and Tooling
 
 * Bump max local store size (#5728)
   `PR #5728 <https://github.com/pantsbuild/pants/pull/5728>`_
-
 
 1.7.0.dev1 (04/20/2018)
 -----------------------
