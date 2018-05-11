@@ -105,6 +105,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Lex Spoon
 + Luc Cary
 + Luca Clementi
++ Lukasz Jastrzebski
 + Marc Abramowitz
 + Marilyn Cruz
 + Marius Eriksen
