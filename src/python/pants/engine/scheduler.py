@@ -283,8 +283,9 @@ class Scheduler(object):
   def visualize_to_dir(self):
     return self._native.visualize_to_dir
 
-  def to_keys(self, subjects):
-    return list(self._to_key(subject) for subject in subjects)
+  def _metrics(self, session):
+    metrics_val = self._native.lib.scheduler_metrics(self._scheduler, session)
+    return {k: v for k, v in self._from_value(metrics_val)}
 
   def pre_fork(self):
     self._native.lib.scheduler_pre_fork(self._scheduler)
@@ -383,6 +384,10 @@ class SchedulerSession(object):
 
   def node_count(self):
     return self._scheduler.graph_len()
+
+  def metrics(self):
+    """Returns metrics for this SchedulerSession as a dict of metric name to metric value."""
+    return self._scheduler._metrics(self._session)
 
   def pre_fork(self):
     self._scheduler.pre_fork()

@@ -123,7 +123,7 @@ impl Scheduler {
   pub fn metrics(&self, session: &Session) -> HashMap<&str, i32> {
     let mut m = HashMap::new();
     m.insert(
-      "affected_files",
+      "affected_file_count",
       self
         .core
         .graph

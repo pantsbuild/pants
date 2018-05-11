@@ -15,6 +15,10 @@ class PantsDaemonStats(object):
     self.affected_targets_size = 0
     self.affected_targets_file_count = 0
     self.resulting_graph_size = None
+    self.scheduler_metrics = {}
+
+  def set_scheduler_metrics(self, scheduler_metrics):
+    self.scheduler_metrics = scheduler_metrics
 
   def set_preceding_graph_size(self, size):
     self.preceding_graph_size = size
@@ -25,17 +29,15 @@ class PantsDaemonStats(object):
   def set_affected_targets_size(self, size):
     self.affected_targets_size = size
 
-  def set_affected_targets_file_count(self, count):
-    self.affected_targets_file_count = count
-
   def set_resulting_graph_size(self, size):
     self.resulting_graph_size = size
 
   def get_all(self):
-    return {
+    res = dict(self.scheduler_metrics)
+    res.update({
       'preceding_graph_size': self.preceding_graph_size,
       'target_root_size': self.target_root_size,
       'affected_targets_size': self.affected_targets_size,
-      'affected_targets_file_count': self.affected_targets_file_count,
       'resulting_graph_size': self.resulting_graph_size,
-    }
+    })
+    return res
