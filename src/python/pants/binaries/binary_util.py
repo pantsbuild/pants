@@ -328,6 +328,10 @@ class BinaryUtilPrivate(object):
       raise self.BinaryResolutionError(binary_request, e)
 
     urls = self._get_urls(url_generator, binary_request)
+    if not isinstance(urls, list):
+      # TODO: add test for this error!
+      raise self.BinaryResolutionError(binary_request,
+                                       TypeError("urls must be a list: was '{}'.".format(urls)))
     fetch_request = BinaryFetchRequest(
       download_path=download_path,
       urls=urls)

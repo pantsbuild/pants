@@ -10,8 +10,24 @@ from collections import OrderedDict, namedtuple
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.binaries.binary_tool import NativeTool
+from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
+
+
+class GoReleaseUrlGenerator(BinaryToolUrlGenerator):
+
+  _DIST_URL_FMT = 'https://storage.googleapis.com/golang/go{version}.{system_id}.tar.gz'
+
+  # NB: This will download a 64-bit go distribution on a 32-bit host (which won't work)!
+  _SYSTEM_ID = {
+    'darwin': 'darwin-amd64',
+    'linux': 'linux-amd64',
+  }
+
+  def generate_urls(self, version, host_platform):
+    system_id = self._SYSTEM_ID[host_platform.os_name]
+    return [self._DIST_URL_FMT.format(version=version, system_id=system_id)]
 
 
 class GoDistribution(NativeTool):
@@ -22,23 +38,8 @@ class GoDistribution(NativeTool):
   default_version = '1.8.3'
   archive_type = 'tgz'
 
-  dist_url_versions = ['1.8.3']
-
-  _DIST_URL_FMT = 'https://storage.googleapis.com/golang/go{version}.{system_id}.tar.gz'
-
-  # NB: This will download a 64-bit go distribution on a 32-bit host (which won't work)!
-  _SYSTEM_ID = {
-    'darwin': 'darwin-amd64',
-    'linux': 'linux-amd64',
-  }
-
-  @classmethod
-  def make_dist_urls(cls, version, os_name):
-    return [
-      cls._DIST_URL_FMT.format(
-        version=version,
-        system_id=cls._SYSTEM_ID[os_name]),
-    ]
+  def url_generator(self):
+    return GoReleaseUrlGenerator()
 
   @memoized_property
   def goroot(self):

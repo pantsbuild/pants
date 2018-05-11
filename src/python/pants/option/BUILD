@@ -13,7 +13,6 @@ python_library(
     'src/python/pants/util:eval',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
-    'src/python/pants/util:osutil',
     'src/python/pants/util:strutil',
   ]
 )
