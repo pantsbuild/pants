@@ -107,9 +107,9 @@ function ensure_native_build_prerequisites() {
   if [[ ! -x "${CARGO_HOME}/bin/cargo-ensure-installed" ]]; then
     "${CARGO_HOME}/bin/cargo" install cargo-ensure-installed >&2
   fi
-  "${CARGO_HOME}/bin/cargo" ensure-installed --package=cargo-ensure-installed --version=0.1.0 >&2
+  "${CARGO_HOME}/bin/cargo" ensure-installed --package=cargo-ensure-installed --version=0.2.1 >&2
   "${CARGO_HOME}/bin/cargo" ensure-installed --package=protobuf --version=1.4.2 >&2
-  "${CARGO_HOME}/bin/cargo" ensure-installed --package=grpcio-compiler --version=0.2.0 >&2
+  "${CARGO_HOME}/bin/cargo" ensure-installed --package=grpcio-compiler --version=0.2.0 --git-url=https://github.com/illicitonion/grpc-rs.git --git-rev=1147866fda52ca1b53de8d80272a68e3b7bd8b93 >&2
 
   local download_binary="${REPO_ROOT}/build-support/bin/download_binary.sh"
   local -r cmakeroot="$("${download_binary}" "binaries.pantsbuild.org" "cmake" "3.9.5" "cmake.tar.gz")" || die "Failed to fetch cmake"
