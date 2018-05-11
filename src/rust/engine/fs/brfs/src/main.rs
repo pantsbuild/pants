@@ -840,6 +840,7 @@ mod test {
     assert!(!file::is_executable(&roland));
   }
 
+  /* TODO: See https://github.com/pantsbuild/pants/issues/5813.
   #[test]
   fn files_are_correctly_executable() {
     let store_dir = TempDir::new("store").unwrap();
@@ -871,6 +872,7 @@ mod test {
     assert!(file::is_executable(&virtual_dir.join("feed")));
     assert!(!file::is_executable(&virtual_dir.join("food")));
   }
+  */
 
   pub fn digest_to_filepath(digest: &hashing::Digest) -> String {
     format!("{}-{}", digest.0, digest.1)
