@@ -4,6 +4,73 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.7.0.rc0 (05/11/2018)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix a broken 3rdparty example. (#5797)
+  `PR #5797 <https://github.com/pantsbuild/pants/pull/5797>`_
+
+* Adding compile scopes, because thats expected from doc gen (#5789)
+  `PR #5789 <https://github.com/pantsbuild/pants/pull/5789>`_
+
+* Copy locally build .whl files to dist dir when 'binary' goal is invoked. (#5749)
+  `PR #5749 <https://github.com/pantsbuild/pants/pull/5749>`_
+
+* [pytest runner] re-add --options flag as a shlexed list of strings (#5790)
+  `PR #5790 <https://github.com/pantsbuild/pants/pull/5790>`_
+  `PR #) <https://github.com/pantsbuild/pants/pull/5594/)>`_
+
+New features
+~~~~~~~~~~~~
+
+* add --frozen-lockfile option as default for yarn install (#5758)
+  `PR #5758 <https://github.com/pantsbuild/pants/pull/5758>`_
+
+* Remove jvm compile subsystem (#5805)
+  `PR #5805 <https://github.com/pantsbuild/pants/pull/5805>`_
+
+* Add Javac compile option as an alternative to Zinc (#5743)
+  `PR #5743 <https://github.com/pantsbuild/pants/pull/5743>`_
+
+* Add python_app support (#5704)
+  `PR #5704 <https://github.com/pantsbuild/pants/pull/5704>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Bump to scala 2.11.12 by default. (#5804)
+  `PR #5804 <https://github.com/pantsbuild/pants/pull/5804>`_
+
+* Review feedback from #5792. (#5796)
+  `PR #5796 <https://github.com/pantsbuild/pants/pull/5796>`_
+
+* Skip commit hooks during publishing (#5795)
+  `PR #5795 <https://github.com/pantsbuild/pants/pull/5795>`_
+
+* Improve support for intrinsic tasks (#5792)
+  `PR #5792 <https://github.com/pantsbuild/pants/pull/5792>`_
+
+* Remote CommandRunner has reset_prefork method (#5791)
+  `PR #5791 <https://github.com/pantsbuild/pants/pull/5791>`_
+
+* PosixFS can get PathStats for a set of PathBufs (#5783)
+  `PR #5783 <https://github.com/pantsbuild/pants/pull/5783>`_
+
+* Bump to zinc 1.1.7 (#5794)
+  `PR #5794 <https://github.com/pantsbuild/pants/pull/5794>`_
+
+* Add configurable timeouts for reading/writing to the cache. (#5793)
+  `PR #5793 <https://github.com/pantsbuild/pants/pull/5793>`_
+
+* Improve clarity of the "why use pants" page (#5778)
+  `PR #5778 <https://github.com/pantsbuild/pants/pull/5778>`_
+
+* Repair PyPI user checking in release scripts. (#5787)
+  `PR #5787 <https://github.com/pantsbuild/pants/pull/5787>`_
+
 1.7.0.dev2 (05/04/2018)
 -----------------------
 
@@ -129,7 +196,6 @@ Refactoring, Improvements, and Tooling
 
 * Bump max local store size (#5728)
   `PR #5728 <https://github.com/pantsbuild/pants/pull/5728>`_
-
 
 1.7.0.dev1 (04/20/2018)
 -----------------------
