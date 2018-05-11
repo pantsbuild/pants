@@ -29,6 +29,8 @@ from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_method
 
+from wheel.install import WheelFile
+
 
 class BuildLocalPythonDistributions(Task):
   """Create python distributions (.whl) from python_dist targets."""
@@ -66,6 +68,7 @@ class BuildLocalPythonDistributions(Task):
   def filter_target(tgt):
     return type(tgt) is PythonDistribution
 
+<<<<<<< HEAD
   def _ensure_setup_requires_site_dir(self, dist_targets, interpreter, site_dir):
     reqs_to_resolve = set()
 
@@ -116,33 +119,41 @@ class BuildLocalPythonDistributions(Task):
 
         interpreter = self.context.products.get_data(PythonInterpreter)
         setup_requires_dists = _resolve_multi(interpreter, python_req_objects_to_resolve, None, None)
+=======
+  @staticmethod
+  def setup_requires_prep(build_graph, dist_targets, interpreter, site_dir=None):
+    reqs_to_resolve = []
+>>>>>>> 046b873... Cleanup method definitions
 
+    for tgt in dist_targets:
+      for setup_req in tgt.setup_requires:
+        for req in build_graph.resolve(setup_req):
+          for re in req.requirements:
+            reqs_to_resolve.append(re)
 
-        if not dest_dir:
-          dest_dir = safe_mkdtemp()
-        #safe_mkdir(dest_dir)
-        #from pip._internal import main as pipmain
-        #import pdb;pdb.set_trace()
-        #for obj in setup_requires_dists['current']:
-        #pipmain(['install', '--prefix={} {}'.format(dest_dir), obj.location])
-        from wheel.install import WheelFile
+    setup_requires_dists = _resolve_multi(interpreter, reqs_to_resolve, None, None)
 
-        overrides = {
-          'purelib': dest_dir,
-          'headers': os.path.join(dest_dir, 'headers'),
-          'scripts': os.path.join(dest_dir, 'bin'),
-          'platlib': dest_dir,
-          'data': dest_dir
-        }
+    if not site_dir:
+      site_dir = safe_mkdtemp()
 
-        for obj in setup_requires_dists['current']:
-          wf = WheelFile(obj.location)
-          wf.install(overrides=overrides)
+    overrides = {
+      'purelib': site_dir,
+      'headers': os.path.join(site_dir, 'headers'),
+      'scripts': os.path.join(site_dir, 'bin'),
+      'platlib': site_dir,
+      'data': site_dir
+    }
 
-        return dest_dir
+    for obj in setup_requires_dists['current']:
+      wf = WheelFile(obj.location)
+      wf.install(overrides=overrides, force=True)
 
+    return site_dir
 
+  def execute(self):
+    dist_targets = self.context.targets(self.filter_target)
 
+    if dist_targets:
       with self.invalidated(dist_targets,
                             fingerprint_strategy=DefaultFingerprintStrategy(),
                             invalidate_dependents=True) as invalidation_check:
@@ -156,7 +167,8 @@ class BuildLocalPythonDistributions(Task):
                          'of your setup function.'
             )
           setup_req_dir = os.path.join(vt.results_dir, 'setup_requires_site')
-          pythonpath = setup_requires_prep(self.context.build_graph, dist_targets, setup_req_dir)
+          pythonpath = self.setup_requires_prep(self.context.build_graph,
+              interpreter, dist_targets, setup_req_dir)
           self._create_dist(vt.target, vt.results_dir, interpreter, pythonpath=pythonpath)
 
         local_wheel_products = self.context.products.get('local_wheels')
