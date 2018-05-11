@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 from collections import namedtuple
 from textwrap import dedent
 
@@ -25,6 +26,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
     args = ['compile', target_spec]
     pants_run = self.run_pants_with_workdir(args, workdir, config)
     self.assert_success(pants_run)
+    return pants_run
 
   def create_file(self, path, value):
     with safe_open(path, 'w') as f:
@@ -162,6 +164,59 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       # One workdir should contain NotMain, and the other should contain Main.
       self.assertEquals(sorted(classfiles(w) for w in target_workdirs if w != 'current'),
                         sorted([['A.class', 'Main.class'], ['A.class', 'NotMain.class']]))
+
+  def test_analysis_portability(self):
+    # Tests that analysis can be relocated between workdirs and still result in incremental
+    # compile.
+    with temporary_dir() as cache_dir, temporary_dir(root_dir=get_buildroot()) as src_dir:
+
+      config = {
+        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+      }
+
+      dep_src_file = os.path.join(src_dir, 'org', 'pantsbuild', 'dep', 'A.scala')
+      dep_build_file = os.path.join(src_dir, 'org', 'pantsbuild', 'dep', 'BUILD')
+      con_src_file = os.path.join(src_dir, 'org', 'pantsbuild', 'consumer', 'B.scala')
+      con_build_file = os.path.join(src_dir, 'org', 'pantsbuild', 'consumer', 'BUILD')
+
+      dep_spec = os.path.join(os.path.basename(src_dir), 'org', 'pantsbuild', 'dep')
+      con_spec = os.path.join(os.path.basename(src_dir), 'org', 'pantsbuild', 'consumer')
+
+      dep_src = "package org.pantsbuild.dep; class A {}"
+
+      self.create_file(dep_src_file, dep_src)
+      self.create_file(dep_build_file, "scala_library()")
+      self.create_file(con_src_file, dedent(
+        """package org.pantsbuild.consumer
+           import org.pantsbuild.dep.A
+           class B { def mkA: A = new A() }"""))
+      self.create_file(con_build_file, "scala_library(dependencies=['{}'])".format(dep_spec))
+
+      with self.temporary_workdir() as workdir:
+        # 1) Compile in one workdir.
+        self.run_compile(con_spec, config, workdir)
+
+      with self.temporary_workdir() as workdir:
+        # 2) Compile in another workdir and check that we hit the cache.
+        run_two = self.run_compile(con_spec, config, workdir)
+        self.assertTrue(
+            re.search(
+              "\[zinc\][^[]*\[cache\][^[]*Using cached artifacts for 2 targets.",
+              run_two.stdout_data),
+            run_two.stdout_data)
+
+        # 3) Edit the dependency in a way that should trigger an incremental
+        #    compile of the consumer.
+        self.create_file(dep_src_file, dep_src + "; /* this is a comment */")
+
+        # 4) Compile and confirm that the analysis fetched from the cache in
+        #    step 2 causes incrementalism: ie, zinc does not report compiling any files.
+        run_three = self.run_compile(con_spec, config, workdir)
+        self.assertTrue(
+            re.search(
+              r"/org/pantsbuild/consumer:consumer\)[^[]*\[compile\][^[]*\[zinc\]\W*\[info\] Compile success",
+              run_three.stdout_data),
+            run_three.stdout_data)
 
   def test_incremental_caching(self):
     """Tests that with --no-incremental-caching, we don't write incremental artifacts."""

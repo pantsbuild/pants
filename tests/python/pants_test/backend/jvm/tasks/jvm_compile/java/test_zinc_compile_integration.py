@@ -42,6 +42,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           workdir, cachedir, target,
           extra_args=['--no-colors'], clean_all=True
         )
+        self.assert_failure(pants_run)
         self.assertIn('[warn] import sun.security.x509.X500Name;', pants_run.stdout_data)
         self.assertIn('[error]     System2.out.println("Hello World!");', pants_run.stdout_data)
 

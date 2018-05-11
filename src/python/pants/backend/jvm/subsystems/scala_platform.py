@@ -39,7 +39,10 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
 
   :API: public
   """
-  options_scope = 'scala-platform'
+  options_scope = 'scala'
+
+  deprecated_options_scope = 'scala-platform'
+  deprecated_options_scope_removal_version = '1.9.0.dev0'
 
   @classmethod
   def _create_jardep(cls, name, version):
@@ -88,6 +91,15 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
                             classpath=[scala_style_jar])
 
     super(ScalaPlatform, cls).register_options(register)
+
+    register('--scalac-plugins', advanced=True, type=list, fingerprint=True,
+            help='Use these scalac plugins.')
+    register('--scalac-plugin-args', advanced=True, type=dict, default={}, fingerprint=True,
+            help='Map from scalac plugin name to list of arguments for that plugin.')
+    cls.register_jvm_tool(register, 'scalac-plugin-dep', classpath=[],
+                        help='Search for scalac plugins here, as well as in any '
+                                'explicit dependencies.')
+
     register('--version', advanced=True, default='2.12',
              choices=['2.10', '2.11', '2.12', 'custom'], fingerprint=True,
              help='The scala platform version. If --version=custom, the targets '
@@ -153,7 +165,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
         raise RuntimeError('Suffix version must be specified if using a custom scala version. '
                            'Suffix version is used for bootstrapping jars.  If a custom '
                            'scala version is not specified, then the version specified in '
-                           '--scala-platform-suffix-version is used.  For example for Scala '
+                           '--scala-suffix-version is used.  For example for Scala '
                            '2.10.7 you would use the suffix version "2.10".')
 
     elif name.endswith(self.version):

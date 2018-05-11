@@ -502,6 +502,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
+  timeout = 240,
 )
 
 python_tests(
@@ -764,11 +765,12 @@ python_tests(
   sources = ['test_classmap.py'],
   dependencies = [
     ':jvm_binary_task_test_base',
-    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:classmap',
+    'src/python/pants/java/jar',
     'tests/python/pants_test/jvm:jvm_task_test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )

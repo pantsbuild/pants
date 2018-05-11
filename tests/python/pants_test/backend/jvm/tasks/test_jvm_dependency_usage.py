@@ -163,7 +163,7 @@ class TestJvmDependencyUsage(TaskTestBase):
     classes_by_source = task.context.products.get_data('classes_by_source')
     runtime_classpath = task.context.products.get_data('runtime_classpath')
     product_deps_by_src = task.context.products.get_data('product_deps_by_src')
-    analyzer = JvmDependencyAnalyzer('', runtime_classpath, product_deps_by_src)
+    analyzer = JvmDependencyAnalyzer('', runtime_classpath)
     targets_by_file = analyzer.targets_by_file(targets)
     transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(targets)
 
@@ -171,6 +171,7 @@ class TestJvmDependencyUsage(TaskTestBase):
       transitive_deps = set(transitive_deps_by_target.get(target))
       return task.create_dep_usage_node(target,
                                         analyzer,
+                                        product_deps_by_src,
                                         classes_by_source,
                                         targets_by_file,
                                         transitive_deps)
