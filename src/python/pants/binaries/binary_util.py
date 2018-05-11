@@ -9,9 +9,9 @@ import logging
 import os
 import posixpath
 import shutil
+from abc import abstractmethod
 from contextlib import contextmanager
 
-from abc import abstractmethod
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
