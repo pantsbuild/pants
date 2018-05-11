@@ -151,9 +151,8 @@ class BinaryToolFetcher(object):
       logger.info('Attempting to fetch {name} binary from: {url} ...'.format(name=name, url=url))
       try:
         with temporary_file() as dest:
-          logger.debug("fetcher: {}".format(self._fetcher))
-          logger.debug("url: {}".format(url))
-          logger.debug("timeout_secs: {}".format(self._timeout_secs))
+          logger.debug("in BinaryToolFetcher: url={}, timeout_secs={}"
+                       .format(url, self._timeout_secs))
           self._fetcher.download(url,
                                  listener=Fetcher.ProgressListener(),
                                  path_or_fd=dest,
@@ -347,7 +346,8 @@ class BinaryUtilPrivate(object):
       return downloaded_file
 
     # Use filename without archive extension as the directory name to extract to.
-    unpacked_dirname = binary_request.name
+    download_dir = os.path.dirname(downloaded_file)
+    unpacked_dirname = os.path.join(download_dir, binary_request.name)
     if not os.path.isdir(unpacked_dirname):
       logger.info("Extracting {} to {} .".format(downloaded_file, unpacked_dirname))
       archiver.extract(downloaded_file, unpacked_dirname, concurrency_safe=True)
