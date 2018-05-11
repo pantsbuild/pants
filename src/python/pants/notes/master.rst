@@ -23,7 +23,6 @@ Bugfixes
   `PR #5790 <https://github.com/pantsbuild/pants/pull/5790>`_
   `PR #) <https://github.com/pantsbuild/pants/pull/5594/)>`_
 
-
 New features
 ~~~~~~~~~~~~
 
@@ -38,7 +37,6 @@ New features
 
 * Add python_app support (#5704)
   `PR #5704 <https://github.com/pantsbuild/pants/pull/5704>`_
-
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
