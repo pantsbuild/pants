@@ -8,9 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
-from pants.util.memo import memoized_method
-from pants.util.objects import datatype
-
 
 logger = logging.getLogger(__name__)
 

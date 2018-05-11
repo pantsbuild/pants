@@ -7,11 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
-import re
 
 import mock
 
-from pants.binaries.binary_util import BinaryRequest, BinaryToolFetcher, BinaryUtilPrivate
+from pants.binaries.binary_util import BinaryToolFetcher, BinaryUtilPrivate
 from pants.net.http.fetcher import Fetcher
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
@@ -21,6 +20,7 @@ from pants_test.base_test import BaseTest
 logger = logging.getLogger(__name__)
 
 
+# TODO(cosmicexplorer): test requests with an archiver!
 class BinaryUtilTest(BaseTest):
   """Tests binary_util's binaries_baseurls handling."""
 
@@ -90,7 +90,6 @@ class BinaryUtilTest(BaseTest):
                                         fetcher=fetcher)
     self.assertFalse(fetcher.download.called)
 
-    binary_path = 'a-binary/v1.2/a-binary'
     fetch_path = binary_util.select_script(supportdir='a-binary', version='v1.2', name='a-binary')
     logger.debug("fetch_path: {}".format(fetch_path))
     fetcher.download.assert_called_once_with('http://binaries.example.com/a-binary/v1.2/a-binary',
@@ -227,7 +226,6 @@ class BinaryUtilTest(BaseTest):
 
     binary_util = self._gen_binary_util(uname_func=uname_func)
 
-    os_id = ('darwin', '999')
     with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
       binary_util.select_binary("mysupportdir", "myversion", "myname")
     the_raised_exception_message = str(cm.exception)
@@ -246,7 +244,6 @@ class BinaryUtilTest(BaseTest):
 
     binary_util = self._gen_binary_util(uname_func=uname_func)
 
-    os_id = ('darwin', '999')
     with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
       binary_util.select_script("mysupportdir", "myversion", "myname")
     the_raised_exception_message = str(cm.exception)
@@ -260,7 +257,6 @@ class BinaryUtilTest(BaseTest):
       "the current host platform (u\'darwin\', u\'999\').\\n--binaries-path-by-id was:")
     self.assertIn(expected_msg, the_raised_exception_message)
 
-  # TODO: test NoBaseUrls!
   def test_select_binary_base_path_override(self):
     def uname_func():
       return "darwin", "dontcare1", "100.99", "dontcare2", "t1000"
