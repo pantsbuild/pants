@@ -202,11 +202,10 @@ class BinaryUtilTest(BaseTest):
 
   def test_select_binary_base_path_missing_os(self):
     def uname_func():
-      return "vms", "dontcare1", "999.9", "dontcare2", "VAX9",
+      return "vms", "dontcare1", "999.9", "dontcare2", "VAX9"
 
     binary_util = self._gen_binary_util(uname_func=uname_func)
 
-    # TODO: use assertRaisesRegexp() or something similar here?
     with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
       binary_util.select_binary("supportdir", "version", "name")
 

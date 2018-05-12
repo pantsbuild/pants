@@ -53,6 +53,8 @@ class ArchiveTest(unittest.TestCase):
     test_round_trip(concurrency_safe=True)
 
   def test_tar(self):
+    # TODO: test XZCompressedTarArchiver? Needs an xz BinaryTool, so hard to see how to do in a
+    # unit test.
     self.round_trip(create_archiver('tar'), expected_ext='tar', empty_dirs=True)
     self.round_trip(create_archiver('tgz'), expected_ext='tar.gz', empty_dirs=True)
     self.round_trip(create_archiver('tbz2'), expected_ext='tar.bz2', empty_dirs=True)
