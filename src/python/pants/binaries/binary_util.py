@@ -163,6 +163,14 @@ class BinaryToolFetcher(object):
     return Fetcher(get_buildroot())
 
   def __init__(self, bootstrap_dir, timeout_secs, fetcher=None, ignore_cached_download=False):
+    """
+    :param str bootstrap_dir: The root directory where Pants downloads binaries to.
+    :param int timeout_secs: The number of seconds to wait before timing out on a request for some
+                             url.
+    :param fetcher: object to fetch urls with, overridden in testing.
+    :type fetcher: :class:`pants.net.http.fetcher.Fetcher`
+    :param bool ignore_cached_download: whether to fetch a binary even if it already exists on disk.
+    """
     self._bootstrap_dir = bootstrap_dir
     self._timeout_secs = timeout_secs
     self._fetcher = fetcher or self._default_http_fetcher()
@@ -180,7 +188,8 @@ class BinaryToolFetcher(object):
     """Download a file from a list of urls, yielding a stream after downloading the file.
 
     URLs are tried in order until they succeed.
-    :raises: :class:`BinaryToolFetcher.BinaryNotFound`
+
+    :raises: :class:`BinaryToolFetcher.BinaryNotFound` if requests to all the given urls fail.
     """
     downloaded_successfully = False
     accumulated_errors = []
