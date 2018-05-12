@@ -104,8 +104,7 @@ class XZCompressedTarArchiver(TarArchiver):
   4. <base>.tar.gz will then be extracted as usual.
   """
 
-  class XZArchiverError(Exception):
-    """???"""
+  class XZArchiverError(Exception): pass
 
   def __init__(self, xz_binary_path, xz_library_path):
 
@@ -136,15 +135,22 @@ class XZCompressedTarArchiver(TarArchiver):
 
   @contextmanager
   def _invoke_xz(self, xz_input_file):
+    """Run the xz command and yield a file object for its stdout.
+
+    This allows streaming the decompressed tar archive directly into a tar decompression stream,
+    which is significantly faster in practice than making a temporary file.
+    """
     (xz_bin_dir, xz_filename) = split_basename_and_dirname(self._xz_binary_path)
-    # TODO: --threads=0 is supposed to use "the number of processor cores on the machine", but I see
-    # no more than 100% cpu used at any point. This seems like it could be a bug?
+
+    # TODO(cosmicexplorer): --threads=0 is supposed to use "the number of processor cores on the
+    # machine", but I see no more than 100% cpu used at any point. This seems like it could be a
+    # bug? If performance is an issue, investigate further.
     cmd = [xz_filename, '--decompress', '--stdout', '--keep', '--threads=0', xz_input_file]
     try:
+      # Pipe stderr to our own stderr, but leave stdout open so we can yield it.
       process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
-        # TODO: is this the right way to do this?
         stderr=sys.stderr,
         env={
           # Isolate the path so we know we're using our provided version of xz.
@@ -158,6 +164,7 @@ class XZCompressedTarArchiver(TarArchiver):
         .format(cmd, xz_input_file, e),
         e)
 
+    # This is a file object.
     yield process.stdout
 
     rc = process.wait()

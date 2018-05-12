@@ -33,10 +33,14 @@ class HostPlatform(datatype(['os_name', 'arch_or_version'])):
   """???"""
 
   def binary_path_components(self):
+    """These strings are used as consecutive components of the path where a binary is fetched.
+
+    This is also used in generating urls from --binaries-baseurls in PantsHosted."""
     return [self.os_name, self.arch_or_version]
 
 
 class BinaryToolUrlGenerator(object):
+  """???"""
 
   @abstractmethod
   def generate_urls(self, version, host_platform):
@@ -49,7 +53,8 @@ class PantsHosted(BinaryToolUrlGenerator):
   TODO: ???
 
   Note that "pants-hosted" is referring to the organization of the urls being specific to pants. It
-  also happens that most binaries are downloaded from S3 hosting at binaries.pantsbuild.org for now.
+  also happens that most binaries are downloaded from S3 hosting at binaries.pantsbuild.org by
+  default.
   """
 
   class NoBaseUrlsError(ValueError):
@@ -233,7 +238,8 @@ class BinaryUtilPrivate(object):
         "Error resolving binary request {}: {}".format(binary_request, base_exception),
         base_exception)
 
-  def __init__(self, baseurls, binary_tool_fetcher, path_by_id=None, uname_func=None):
+  def __init__(self, baseurls, binary_tool_fetcher, path_by_id=None, force_baseurls=False,
+               uname_func=None):
     """Creates a BinaryUtil with the given settings to define binary lookup behavior.
 
     This constructor is primarily used for testing.  Production code will usually initialize
@@ -257,6 +263,7 @@ class BinaryUtilPrivate(object):
     if path_by_id:
       self._path_by_id.update((tuple(k), tuple(v)) for k, v in path_by_id.items())
 
+    self._force_baseurls = force_baseurls
     self._uname_func = uname_func or os.uname
 
   _ID_BY_OS = {
@@ -301,7 +308,7 @@ class BinaryUtilPrivate(object):
   def _get_url_generator(self, binary_request):
     url_generator = binary_request.url_generator
 
-    if not url_generator:
+    if self._force_baseurls or not url_generator:
       if not self._baseurls:
         raise self.NoBaseUrlsError("--binaries-baseurls is empty.")
 

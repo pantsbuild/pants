@@ -47,12 +47,13 @@ class BinaryToolBase(Subsystem):
   # Subclasses may set this to provide extra register() kwargs for the --version option.
   extra_version_option_kwargs = None
 
-  # TODO(cosmicexplorer): there should be a cleaner way to map a conditional subsystem dependency to
-  # an instance of the subsystem, as we do with `XZ` here and `NativeToolchain` elsewhere.
   @classmethod
   def subsystem_dependencies(cls):
     sub_deps = super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtilPrivate.Factory,)
 
+    # TODO(cosmicexplorer): if we need to do more conditional subsystem dependencies, do it
+    # declaratively with a dict class field so that we only try to create or access it if we
+    # declared a dependency on it.
     if cls.archive_type == 'txz':
       sub_deps = sub_deps + (XZ.scoped(cls),)
 
@@ -60,25 +61,22 @@ class BinaryToolBase(Subsystem):
 
   @memoized_property
   def _xz(self):
-    # TODO(cosmicexplorer): should this raise instead of returning None?
-    if self.archive_type != 'txz':
-      return None
-    return XZ.scoped_instance(self)
+    if self.archive_type == 'txz':
+      return XZ.scoped_instance(self)
+    return None
 
   @memoized_method
   def _get_archiver(self):
     if not self.archive_type:
       return None
 
-    # FIXME: see above TODOs -- we should be able to ensure that we have declared the correct
-    # subsystem dependency when we try to instantiate it here.
     if self.archive_type == 'txz':
-      return XZCompressedTarArchiver(self._xz.binary_location(), self._xz.lib_dir())
+      return self._xz.tar_xz_extractor
 
     return create_archiver(self.archive_type)
 
-  # TODO: ???
   def url_generator(self):
+    """???"""
     return None
 
   @classmethod
@@ -147,8 +145,9 @@ class BinaryToolBase(Subsystem):
   def get_support_dir(cls):
     return 'bin/{}'.format(cls._get_name())
 
-  def _name_to_fetch(self):
-    return '{}{}'.format(self._get_name(), self.suffix)
+  @classmethod
+  def _name_to_fetch(cls):
+    return '{}{}'.format(cls._get_name(), cls.suffix)
 
   def _make_binary_request(self, version):
     return BinaryRequest(
@@ -201,8 +200,12 @@ class XZ(NativeTool):
   default_version = '5.2.4'
   archive_type = 'tgz'
 
-  def binary_location(self):
+  @memoized_property
+  def tar_xz_extractor(self):
+    return XZCompressedTarArchiver(self._executable_location(), self._lib_dir())
+
+  def _executable_location(self):
     return os.path.join(self.select(), 'bin', 'xz')
 
-  def lib_dir(self):
+  def _lib_dir(self):
     return os.path.join(self.select(), 'lib')
