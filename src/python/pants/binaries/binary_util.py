@@ -257,8 +257,6 @@ class BinaryUtilPrivate(object):
     self._baseurls = baseurls
     self._binary_tool_fetcher = binary_tool_fetcher
 
-    # FIXME: do we need to keep this here now that we use SUPPORTED_PLATFORM_NORMALIZED_NAMES for
-    # the global option? (as opposed to just setting self._path_by_id = path_by_id)
     self._path_by_id = SUPPORTED_PLATFORM_NORMALIZED_NAMES.copy()
     if path_by_id:
       self._path_by_id.update((tuple(k), tuple(v)) for k, v in path_by_id.items())
@@ -292,7 +290,7 @@ class BinaryUtilPrivate(object):
       os_name, arch_or_version = self._path_by_id[os_id_tuple]
       host_platform = HostPlatform(os_name, arch_or_version)
     except KeyError:
-      # We fail early here because we use the host_platform to identify where to download binaries
+      # We fail early here because we need the host_platform to identify where to download binaries
       # to.
       raise self.MissingMachineInfo(
         "Pants could not resolve binaries for the current host. Update --binaries-path-by-id to "
@@ -337,8 +335,9 @@ class BinaryUtilPrivate(object):
     urls = self._get_urls(url_generator, binary_request)
     if not isinstance(urls, list):
       # TODO: add test for this error!
-      raise self.BinaryResolutionError(binary_request,
-                                       TypeError("urls must be a list: was '{}'.".format(urls)))
+      raise self.BinaryResolutionError(
+        binary_request,
+        TypeError("urls must be a list: was '{}'.".format(urls)))
     fetch_request = BinaryFetchRequest(
       download_path=download_path,
       urls=urls)
@@ -356,8 +355,8 @@ class BinaryUtilPrivate(object):
       chmod_plus_x(downloaded_file)
       return downloaded_file
 
-    # Use filename without archive extension as the directory name to extract to.
     download_dir = os.path.dirname(downloaded_file)
+    # Use the 'name' given in the request as the directory name to extract to.
     unpacked_dirname = os.path.join(download_dir, binary_request.name)
     if not os.path.isdir(unpacked_dirname):
       logger.info("Extracting {} to {} .".format(downloaded_file, unpacked_dirname))

@@ -146,22 +146,23 @@ class XZCompressedTarArchiver(TarArchiver):
     # machine", but I see no more than 100% cpu used at any point. This seems like it could be a
     # bug? If performance is an issue, investigate further.
     cmd = [xz_filename, '--decompress', '--stdout', '--keep', '--threads=0', xz_input_file]
+    env = {
+      # Isolate the path so we know we're using our provided version of xz.
+      'PATH': xz_bin_dir,
+      # Only allow our xz's lib directory to resolve the liblzma.so dependency at runtime.
+      'LD_LIBRARY_PATH': self._xz_library_path,
+    }
     try:
       # Pipe stderr to our own stderr, but leave stdout open so we can yield it.
       process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=sys.stderr,
-        env={
-          # Isolate the path so we know we're using our provided version of xz.
-          'PATH': xz_bin_dir,
-          # Only allow our xz's lib directory to resolve the liblzma.so dependency at runtime.
-          'LD_LIBRARY_PATH': self._xz_library_path,
-        })
+        env=env)
     except OSError as e:
       raise self.XZArchiverError(
-        "Error invoking xz with command {} for input file {}: {}"
-        .format(cmd, xz_input_file, e),
+        "Error invoking xz with command {} and environment {} for input file {}: {}"
+        .format(cmd, env, xz_input_file, e),
         e)
 
     # This is a file object.
@@ -170,8 +171,9 @@ class XZCompressedTarArchiver(TarArchiver):
     rc = process.wait()
     if rc != 0:
       raise self.XZArchiverError(
-        "Error decompressing xz input with command {} for input file {}. Exit code was: {}"
-        .format(cmd, xz_input_file, rc))
+        "Error decompressing xz input with command {} and environment {} for input file {}. "
+        "Exit code was: {}. "
+        .format(cmd, env, xz_input_file, rc))
 
   def _extract(self, path, outdir):
     with self._invoke_xz(path) as xz_decompressed_tar_stream:
