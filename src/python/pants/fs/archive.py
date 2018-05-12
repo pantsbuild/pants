@@ -95,19 +95,18 @@ class TarArchiver(Archiver):
 class XZCompressedTarArchiver(TarArchiver):
   """A workaround for the lack of xz support in Python 2.7.
 
-  NB: This class will raise an error if used to create an archive!
+  Invokes an xz executable to decompress a .tar.xz into a tar stream, which is piped into the
+  extract() method.
 
-  Upon receiving a request to extract an (existing) file located at <base>.tar.gz, this class will:
-  1. Rename the file to <base>.tar.xz.
-  2. Decompress the file <base>.tar.xz, then re-compress it with gzip.
-  3. Write the gzip-compressed stream into the new file <base>.tar.gz.
-  4. <base>.tar.gz will then be extracted as usual.
+  NB: This class will raise an error if used to create an archive! This class can only currently be
+  used to extract from xz archives.
   """
 
   class XZArchiverError(Exception): pass
 
   def __init__(self, xz_binary_path, xz_library_path):
 
+    # TODO(cosmicexplorer): test these exceptions somewhere!
     if not is_executable(xz_binary_path):
       raise self.XZArchiverError(
         "The path {} does not name an existing executable file. An xz executable must be provided "

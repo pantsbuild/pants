@@ -19,7 +19,6 @@ class GoReleaseUrlGenerator(BinaryToolUrlGenerator):
 
   _DIST_URL_FMT = 'https://storage.googleapis.com/golang/go{version}.{system_id}.tar.gz'
 
-  # NB: This will download a 64-bit go distribution on a 32-bit host (which won't work)!
   _SYSTEM_ID = {
     'darwin': 'darwin-amd64',
     'linux': 'linux-amd64',

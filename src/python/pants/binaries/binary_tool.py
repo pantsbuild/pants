@@ -95,9 +95,6 @@ class BinaryToolBase(Subsystem):
   def register_options(cls, register):
     super(BinaryToolBase, cls).register_options(register)
 
-    cls_name = cls._get_name()
-    binary_description = 'binary' if cls.platform_dependent else 'script'
-
     version_registration_kwargs = {
       'type': str,
       'default': cls.default_version,
@@ -106,12 +103,12 @@ class BinaryToolBase(Subsystem):
       version_registration_kwargs.update(cls.extra_version_option_kwargs)
     version_registration_kwargs['help'] = (
       version_registration_kwargs.get('help') or
-      'Version of the {} {} to use'.format(cls_name, binary_description)
+      'Version of the {} {} to use'.format(cls._get_name(),
+                                           'binary' if cls.platform_dependent else 'script')
     )
     # The default for fingerprint in register() is False, but we want to default to True.
     if 'fingerprint' not in version_registration_kwargs:
       version_registration_kwargs['fingerprint'] = True
-
     register('--version', **version_registration_kwargs)
 
   @memoized_method

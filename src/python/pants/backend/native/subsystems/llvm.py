@@ -18,7 +18,8 @@ class LLVMReleaseUrlGenerator(BinaryToolUrlGenerator):
 
   _ARCHIVE_BASE_FMT = 'clang+llvm-{version}-x86_64-{system_id}'
 
-  # TODO: do exhaustiveness checking? would that be useful or desired?
+  # TODO(cosmicexplorer): Give a more useful error message than KeyError if the host platform was
+  # not recognized (and make it easy for other BinaryTool subclasses to do this as well).
   _SYSTEM_ID = {
     'darwin': 'apple-darwin',
     'linux': 'linux-gnu-ubuntu-16.04',
