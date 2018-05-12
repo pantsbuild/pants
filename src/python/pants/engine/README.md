@@ -85,28 +85,33 @@ x = FormattedInt(content='a string')
 print(x.content)    # 'a string'
 print(x[0])         # 'a string'
 
-# The object is also a tuple, and can be destructured:
-some_content, = x
-print(some_content) # 'a string'
-
 # datatype objects can be easily inspected:
 print(x)            # 'FormattedInt(content=a string)'
 ```
 
 #### Types of Fields
 
-`datatype()` accepts a list of *field declarations*, and returns a type which can
-be subclassed. A *field declaration* can just be a string (e.g. `'field_name'`),
-which is then used as the field name, as with `FormattedInt` above. A field can
-also be declared with a tuple of two elements: the field name string, and a type
-for the field (e.g. `('field_name', FieldType)`). If the tuple form is used, the
-constructor will create your object, then raise an error if
-`type(self.field_name) != FieldType`. Note that this means providing an instance
-of a *subclass* of a field's declared type will **fail** this type check in the
-constructor!
+`datatype()` accepts a list of *field declarations*, and returns a type which can be subclassed. A
+*field declaration* can just be a string (e.g. `'field_name'`), which is then used as the field
+name, as with `FormattedInt` above. A field can also be declared with a tuple of two elements: the
+field name string, and a `TypeConstraint` for the field (e.g. `('field_name',
+Exactly(FieldType))`). The bare type name (e.g. `FieldType`) can also be used as a shorthand for
+`Exactly(FieldType)`. If the tuple form is used, the constructor will create your object, then raise
+an error if the field value does not satisfy the type constraint.
 
-Please see [Datatypes in Depth](#datatypes-in-depth) for further discussion on
-using `datatype` objects with the v2 engine.
+``` python
+class TypedDatatype(datatype([('field_name', Exactly(str, int))])):
+  """Example of a datatype with a more complex field type constraint."""
+```
+
+Assigning a specific type to a field can be somewhat unidiomatic in Python, and may be unexpected or
+unnatural to use. Additionally, the engine already applies a form of implicit type checking by
+ensuring there is a unique path from subject to product when a product request is made. However,
+regardless of whether the object is created directly with type-checked fields or whether it's
+produced from a set of rules by the engine's dependency injection, it is extremely useful to
+formalize the assumptions made about the value of an object into a specific type, even if the type
+just wraps a single field. The `datatype()` function makes it simple and efficient to apply that
+strategy.
 
 ### Selectors and Gets
 
@@ -225,108 +230,3 @@ in the context of scala and mixed scala & java builds.  Twitter spiked on a proj
 a target-level scheduling system scoped to just the jvm compilation tasks.  This bore fruit and
 served as further impetus to get a "tuple-engine" designed and constructed to bring the benefits
 seen in the jvm compilers to the wider pants world of tasks.
-
-## Datatypes in Depth
-
-`datatype` objects can be used to colocate multiple dependencies of an
-`@rule`. For example, to compile C code, you typically require both source code
-and a C compiler:
-
-``` python
-class CCompileRequest(datatype(['c_compiler', 'c_sources'])):
-  pass
-
-class CObjectFiles(datatype(['files_snapshot'])):
-  pass
-
-# The engine ensures this is the only way to get from
-# CCompileRequest -> CObjectFiles.
-@rule(CObjectFiles, [Select(CCompileRequest)])
-def compile_c_sources(c_compile_request):
-  c_compiler, c_sources = c_compile_request
-  compiled_object_files = c_compiler.compile(c_sources)
-  return CObjectFiles(compiled_object_files)
-```
-
-Encoding different stages of a build process into different `datatype`
-subclasses which have all the information they need and no more makes it easier
-to add functionality to the build by consuming and/or producing types from a
-concise shared set of `datatype` definitions. For example:
-
-``` python
-# "Vendoring" refers to checking a source or binary copy of a 3rdparty
-# library into source control. In this case, we assume the snapshot contains
-# _only_ binary object files for the current platform.
-class VendoredLibrary(datatype(['files_snapshot'])):
-  pass
-
-@rule(CObjectFiles, [Select(VendoredLibrary)])
-def get_vendored_object_files(vendored_library):
-  return CObjectFiles(vendored_library.files_snapshot)
-```
-
-We have added the ability to depend on checked-in binary object files with an
-extremely small amount of code, because we can assume that `VendoredLibrary` is
-constructed with a snapshot containing only object files, so we can ensure that
-the `CObjectFiles` we construct also upholds that guarantee. The key to making
-that assumption possible is encoding assumptions about our objects into specific
-types, and letting the engine invoke the correct sequence of rules.
-
-### Encoding Assumptions into Types
-
-Passing around an instance of a primitive type such as `str` or `int` can
-sometimes require significant mental overhead to keep track of assumptions that
-the code makes about the object's value. If the `str` needs to be formatted a
-specific way or the `int` must be within a certain range, using those types
-directly can require repeated validation of the object wherever it's used, for
-example to avoid injection attacks from user-provided strings, or attempting to
-read a negative number of bytes from a file. Outside of the variable name, with
-a `str` object there is no context about what validation or transformations have
-been performed on the object or how it will be used.
-
-One way to keep track of assumptions made about an object's value is to make a
-wrapper type for that object, and then control the ways that instances of the
-wrapper type can be created. One way to implement this is to override the
-wrapper type's constructor and raise an exception if the object's value is
-invalid. Declaring a typed field for a `datatype` takes this approach, but it
-can be extended for arbitrary types of input validation:
-
-``` python
-# Declare a datatype with a single field 'int_value',
-# which must be an int when the datatype is constructed.
-class NonNegativeInt(datatype([('int_value', int)])):
-  def __new__(cls, *args, **kwargs):
-    # Call the superclass constructor first to check the type of `int_value`.
-    this_object = super(NonNegativeInt, cls).__new__(cls, *args, **kwargs)
-
-    if this_object.int_value < 0:
-      raise cls.make_type_error("value is negative: {!r}"
-                                .format(this_object.int_value))
-
-    return this_object
-```
-
-`make_type_error()` creates an exception object which can be raised in a
-`datatype`'s constructor to note a type checking failure, and automatically
-includes the type name in the error message. However, any other exception type
-can be raised as well.
-
-For `NonNegativeInt`, the input is extremely simple (we're not calling any
-methods on the `int`), and the validation is extremely straightforward (can be
-expressed in a single `if`). These characteristics make it natural to declare a
-specific type for the field in the call to `datatype()` and to ensure validity
-with a check in the `__new__()` method. Using type checking in this way makes
-types like `NonNegativeInt` usable in many different scenarios without
-additional boilerplate for the user.
-
-`VendoredLibrary` and `CObjectFile` are the opposite: a synchronous scan of
-every file in a `VendoredLibrary`'s `files_snapshot` to verify that they are all
-indeed object files for the correct platform every time we construct one would
-be difficult to justify, because the inputs are much more complex to construct,
-and the result much more difficult to validate. In this case, making simple,
-focused `datatype` definitions makes it easier to correctly consume, manipulate,
-and produce them to form a common set of `@rule` definitions. The engine ensures
-that there is at most one sequence of rules transforming type A to type B, and
-makes this feasible by automatically linking together the rules to convert type
-A to type B. Making a set of rules maximally composable implicitly helps to
-ensure correctness by reusing logic as much as possible.
