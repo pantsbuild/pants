@@ -76,7 +76,19 @@ class BinaryToolBase(Subsystem):
     return create_archiver(self.archive_type)
 
   def url_generator(self):
-    """???"""
+    """Override and return an instance of BinaryToolUrlGenerator to download from those urls.
+
+    If this method returns None, urls to download the tool will be constructed from
+    --binaries-baseurls. Otherwise, generate_urls() will be invoked on the result with the requested
+    version and host platform.
+
+    If the bootstrap option --force-baseurls is set, the result of this method will be ignored. In
+    general, implementors of BinaryTool subclasses should try to ensure (within reason) that the
+    rest of their code can handle the result of downloading from different urls if url_generator()
+    is overridden yet again by a subclass, or if it is ignored with --force-baseurls.
+
+    See the :class:`LLVM` subsystem for an example of usage.
+    """
     return None
 
   @classmethod
@@ -142,6 +154,10 @@ class BinaryToolBase(Subsystem):
     return BinaryUtilPrivate.Factory.create()
 
   @classmethod
+  def _get_name(cls):
+    return cls.name or cls.options_scope
+
+  @classmethod
   def get_support_dir(cls):
     return 'bin/{}'.format(cls._get_name())
 
@@ -161,10 +177,6 @@ class BinaryToolBase(Subsystem):
   def _select_for_version(self, version):
     binary_request = self._make_binary_request(version)
     return self._binary_util.select(binary_request)
-
-  @classmethod
-  def _get_name(cls):
-    return cls.name or cls.options_scope
 
 
 class NativeTool(BinaryToolBase):
