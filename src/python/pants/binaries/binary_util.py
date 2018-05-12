@@ -288,7 +288,7 @@ class BinaryUtilPrivate(object):
       directory naming
     :param bool force_baseurls: Whether to use --binaries-baseurls to download all binaries
                                 regardless of whether a :class:`BinaryToolUrlGenerator` is provided.
-    :param uname_func: method to use to emulate os.uname() in testing
+    :param function uname_func: method to use to emulate os.uname() in testing
     """
     self._baseurls = baseurls
     self._binary_tool_fetcher = binary_tool_fetcher

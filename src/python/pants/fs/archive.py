@@ -29,12 +29,12 @@ class Archiver(AbstractClass):
   def extract(self, path, outdir, concurrency_safe=False, **kwargs):
     """Extracts an archive's contents to the specified outdir with an optional filter.
 
+    Keyword arguments are forwarded to the instance's self._extract() method.
+
     :API: public
 
     :param string path: path to the zipfile to extract from
     :param string outdir: directory to extract files into
-    TODO: FIX THIS!! :param function filter_func: optional filter with the filename as the parameter.  Returns True
-      if the file should be extracted.  Note that filter_func is ignored for non-zip archives.
     :param bool concurrency_safe: True to use concurrency safe method.  Concurrency safe extraction
       will be performed on a temporary directory and the extacted directory will then be renamed
       atomically to the outdir.  As a side effect, concurrency safe extraction will not allow
@@ -193,7 +193,10 @@ class ZipArchiver(Archiver):
   """
 
   def _extract(self, path, outdir, filter_func=None):
-    """Extract from a zip file, with an optional filter."""
+    """Extract from a zip file, with an optional filter.
+
+    :param function filter_func: optional filter with the filename as the parameter.  Returns True
+                                 if the file should be extracted."""
     with open_zip(path) as archive_file:
       for name in archive_file.namelist():
         # While we're at it, we also perform this safety test.
