@@ -174,15 +174,34 @@ dependencies.
 
 ### Registering Rules
 
-Currently, it is only possible to load rules into the pants scheduler in two ways: by importing and using them in `src/python/pants/bin/engine_initializer.py`, or by adding them to the list returned by a `rules()` method defined in `src/python/backend/<backend_name>/register.py`. Plugins cannot add new rules yet. Unit tests, however, can mix in `SchedulerTestBase` from `tests/python/pants_test/engine/scheduler_test_base.py` to generate and execute a scheduler from a given set of rules.
+Currently, it is only possible to load rules into the pants scheduler in two ways: by importing and
+using them in `src/python/pants/bin/engine_initializer.py`, or by adding them to the list returned
+by a `rules()` method defined in `src/python/backend/<backend_name>/register.py`. Plugins cannot add
+new rules yet. Unit tests, however, can mix in `SchedulerTestBase` from
+`tests/python/pants_test/engine/scheduler_test_base.py` to generate and execute a scheduler from a
+given set of rules.
 
 In general, there are three types of rules you can define:
 
 1. an `@rule`, which has a single product type and selects its inputs as described above.
-2. a `SingletonRule`, which matches a product type with a value so the type can then be `Select`ed in an `@rule`.
-3. a `RootRule`, which declares a type that can be used as a *subject*, which means it can be provided as an input to a `product_request()` or a `Get` statement.
+2. a `SingletonRule`, which matches a product type with a value so the type can then be `Select`ed
+   in an `@rule`.
+3. a `RootRule`, which declares a type that can be used as a *subject*, which means it can be
+   provided as an input to a `product_request()`.
 
-This interface is being actively developed at this time and this documentation may be out of date.
+In more depth, a `RootRule` for some type is required when no other rule provides that type (i.e. it
+is not provided with a `SingletonRule` or as the product of any `@rule`). In the absence of a
+`RootRule`, any subject type involved in a request "at runtime" (i.e. via `product_request()`),
+would show up as an an unused or impossible path in the rule graph. Another potential name for
+`RootRule` might be `ParamRule`, or something similar, as it can be thought of as saying that the
+type represents a sort of "public API entrypoint" via a `product_request()`.
+
+Note that `Get` requests do not require a `RootRule`, as their requests are statically verified when
+the `@rule` definition is parsed, so we know before runtime that they might be requested.
+
+This interface is being actively developed at this time and this documentation may be out of
+date. Please feel free to file an issue or pull request if you notice any outdated or incorrect
+information in this document!
 
 ## Execution
 
