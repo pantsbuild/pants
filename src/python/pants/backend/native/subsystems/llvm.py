@@ -14,9 +14,9 @@ from pants.util.memo import memoized_method
 
 class LLVMReleaseUrlGenerator(BinaryToolUrlGenerator):
 
-  _ARCHIVE_BASE_FMT = 'clang+llvm-{version}-x86_64-{system_id}'
+  _DIST_URL_FMT = 'https://releases.llvm.org/{version}/{base}.tar.xz'
 
-  _DIST_URL_FMT = 'http://releases.llvm.org/{version}/{base}.tar.xz'
+  _ARCHIVE_BASE_FMT = 'clang+llvm-{version}-x86_64-{system_id}'
 
   # TODO: do exhaustiveness checking? would that be useful or desired?
   _SYSTEM_ID = {
@@ -42,8 +42,11 @@ class LLVM(NativeTool, ExecutablePathProvider):
   def select(self):
     unpacked_path = super(LLVM, self).select()
     children = os.listdir(unpacked_path)
-    assert(len(children) == 1)
-    return os.path.join(unpacked_path, children[0])
+    # The archive from releases.llvm.org wraps the extracted content into a directory one level
+    # deeper, but the one from our S3 does not.
+    if len(children) == 1 and os.path.isdir(children[0]):
+      return os.path.join(unpacked_path, children[0])
+    return unpacked_path
 
   def path_entries(self):
     return [os.path.join(self.select(), 'bin')]

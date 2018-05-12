@@ -220,7 +220,8 @@ class BinaryUtilPrivate(object):
       return binary_util_cls(
         baseurls=options.binaries_baseurls,
         binary_tool_fetcher=binary_tool_fetcher,
-        path_by_id=options.binaries_path_by_id)
+        path_by_id=options.binaries_path_by_id,
+        force_baseurls=options.force_baseurls)
 
   class MissingMachineInfo(TaskError):
     """Indicates that pants was unable to map this machine's OS to a binary path prefix."""
@@ -306,6 +307,8 @@ class BinaryUtilPrivate(object):
   def _get_url_generator(self, binary_request):
     url_generator = binary_request.url_generator
 
+    logger.debug("self._force_baseurls: {}".format(self._force_baseurls))
+    logger.debug("url_generator: {}".format(url_generator))
     if self._force_baseurls or not url_generator:
       if not self._baseurls:
         raise self.NoBaseUrlsError("--binaries-baseurls is empty.")
