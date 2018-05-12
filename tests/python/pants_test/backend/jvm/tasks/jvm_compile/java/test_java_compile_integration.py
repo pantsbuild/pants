@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.fs.archive import TarArchiver
+from pants.fs.archive import archiver_for_path
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_walk
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
@@ -114,9 +114,11 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       self.assertTrue(os.path.exists(artifact_dir))
       artifacts = os.listdir(artifact_dir)
       self.assertEqual(len(artifacts), 1)
+      single_artifact = artifacts[0]
 
       with temporary_dir() as extract_dir:
-        TarArchiver.extract(os.path.join(artifact_dir, artifacts[0]), extract_dir)
+        artifact_path = os.path.join(artifact_dir, single_artifact)
+        archiver_for_path(artifact_path).extract(artifact_path, extract_dir)
         all_files = set()
         for dirpath, dirs, files in safe_walk(extract_dir):
           for name in files:
