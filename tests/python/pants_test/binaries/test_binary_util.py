@@ -124,57 +124,6 @@ class BinaryUtilTest(BaseTest):
       "--binaries-baseurls is empty.")
     self.assertIn(expected_msg, the_raised_exception_message)
 
-  def test_external_url_generator(self):
-    binary_util = self._gen_binary_util()
-
-    binary_request = BinaryRequest(
-      supportdir='supportdir',
-      version='version',
-      name='name',
-      platform_dependent=False,
-      external_url_generator=ExternalUrlGenerator(),
-      # TODO: test archiver!
-      archiver=None)
-
-    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
-      binary_util.select(binary_request)
-    the_raised_exception_message = str(cm.exception)
-
-    self.assertIn(BinaryToolFetcher.BinaryNotFound.__name__, the_raised_exception_message)
-    expected_msg = (
-      "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
-      "name=name, platform_dependent=False, "
-      "external_url_generator=ExternalUrlGenerator(<example __str__()>), archiver=None): "
-      "Failed to fetch name binary from any source: (Failed to fetch binary from "
-      "https://example.com/some-binary: Fetch of https://example.com/some-binary failed with "
-      "status code 404, Failed to fetch binary from https://example.com/same-binary: Fetch of "
-      "https://example.com/same-binary failed with status code 404)'")
-    self.assertIn(expected_msg, the_raised_exception_message)
-
-  def test_disallowing_external_urls(self):
-    binary_util = self._gen_binary_util(allow_external_binary_tool_downloads=False)
-
-    binary_request = binary_request = BinaryRequest(
-      supportdir='supportdir',
-      version='version',
-      name='name',
-      platform_dependent=False,
-      external_url_generator=ExternalUrlGenerator(),
-      # TODO: test archiver!
-      archiver=None)
-
-    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
-      binary_util.select(binary_request)
-    the_raised_exception_message = str(cm.exception)
-
-    self.assertIn(BinaryUtilPrivate.NoBaseUrlsError.__name__, the_raised_exception_message)
-    expected_msg = (
-      "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
-      "name=name, platform_dependent=False, "
-      "external_url_generator=ExternalUrlGenerator(<example __str__()>), archiver=None): "
-      "--binaries-baseurls is empty.")
-    self.assertIn(expected_msg, the_raised_exception_message)
-
   def test_support_url_multi(self):
     """Tests to make sure existing base urls function as expected."""
 
@@ -332,3 +281,54 @@ class BinaryUtilTest(BaseTest):
 
     self.assertEquals("supportdir/skynet/42/version/name",
                       binary_util._get_download_path(binary_request))
+
+  def test_external_url_generator(self):
+    binary_util = self._gen_binary_util(baseurls=[])
+
+    binary_request = BinaryRequest(
+      supportdir='supportdir',
+      version='version',
+      name='name',
+      platform_dependent=False,
+      external_url_generator=ExternalUrlGenerator(),
+      # TODO: test archiver!
+      archiver=None)
+
+    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+      binary_util.select(binary_request)
+    the_raised_exception_message = str(cm.exception)
+
+    self.assertIn(BinaryToolFetcher.BinaryNotFound.__name__, the_raised_exception_message)
+    expected_msg = (
+      "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
+      "name=name, platform_dependent=False, "
+      "external_url_generator=ExternalUrlGenerator(<example __str__()>), archiver=None): "
+      "Failed to fetch name binary from any source: (Failed to fetch binary from "
+      "https://example.com/some-binary: Fetch of https://example.com/some-binary failed with "
+      "status code 404, Failed to fetch binary from https://example.com/same-binary: Fetch of "
+      "https://example.com/same-binary failed with status code 404)'")
+    self.assertIn(expected_msg, the_raised_exception_message)
+
+  def test_disallowing_external_urls(self):
+    binary_util = self._gen_binary_util(baseurls=[], allow_external_binary_tool_downloads=False)
+
+    binary_request = binary_request = BinaryRequest(
+      supportdir='supportdir',
+      version='version',
+      name='name',
+      platform_dependent=False,
+      external_url_generator=ExternalUrlGenerator(),
+      # TODO: test archiver!
+      archiver=None)
+
+    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+      binary_util.select(binary_request)
+    the_raised_exception_message = str(cm.exception)
+
+    self.assertIn(BinaryUtilPrivate.NoBaseUrlsError.__name__, the_raised_exception_message)
+    expected_msg = (
+      "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
+      "name=name, platform_dependent=False, "
+      "external_url_generator=ExternalUrlGenerator(<example __str__()>), archiver=None): "
+      "--binaries-baseurls is empty.")
+    self.assertIn(expected_msg, the_raised_exception_message)
