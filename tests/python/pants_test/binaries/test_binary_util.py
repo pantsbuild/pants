@@ -10,7 +10,7 @@ import os
 
 import mock
 
-from pants.binaries.binary_util import BinaryToolFetcher, BinaryUtilPrivate
+from pants.binaries.binary_util import BinaryRequest, BinaryToolFetcher, BinaryToolUrlGenerator, BinaryUtilPrivate
 from pants.net.http.fetcher import Fetcher
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
@@ -18,6 +18,16 @@ from pants_test.base_test import BaseTest
 
 
 logger = logging.getLogger(__name__)
+
+
+class ExternalUrlGenerator(BinaryToolUrlGenerator):
+
+  def generate_urls(self, version, host_platform):
+    return ['https://example.com/some-binary', 'https://example.com/same-binary']
+
+  # Make the __str__ deterministic, for testing exception messages.
+  def __str__(self):
+    return 'ExternalUrlGenerator(<example __str__()>)'
 
 
 # TODO(cosmicexplorer): test requests with an archiver!
@@ -62,7 +72,7 @@ class BinaryUtilTest(BaseTest):
 
   @classmethod
   def _gen_binary_tool_fetcher(cls, bootstrap_dir='/tmp', timeout_secs=30, fetcher=None,
-                           ignore_cached_download=True):
+                               ignore_cached_download=True):
     return BinaryToolFetcher(
       bootstrap_dir=bootstrap_dir,
       timeout_secs=timeout_secs,
@@ -70,11 +80,13 @@ class BinaryUtilTest(BaseTest):
       ignore_cached_download=ignore_cached_download)
 
   @classmethod
-  def _gen_binary_util(cls, baseurls=[], path_by_id=None, uname_func=None, **kwargs):
+  def _gen_binary_util(cls, baseurls=[], path_by_id=None, allow_external_binary_tool_downloads=True,
+                       uname_func=None, **kwargs):
     return BinaryUtilPrivate(
       baseurls=baseurls,
       binary_tool_fetcher=cls._gen_binary_tool_fetcher(**kwargs),
       path_by_id=path_by_id,
+      allow_external_binary_tool_downloads=allow_external_binary_tool_downloads,
       uname_func=uname_func)
 
   @classmethod
@@ -97,18 +109,71 @@ class BinaryUtilTest(BaseTest):
                                              path_or_fd=mock.ANY,
                                              timeout_secs=timeout_value)
 
-  def test_nobases(self):
+  def test_no_base_urls_error(self):
     """Tests exception handling if build support urls are improperly specified."""
     binary_util = self._gen_binary_util()
-    # TODO: test error message!
-    with self.assertRaises(binary_util.BinaryResolutionError) as cm:
-      # TODO: test select_binary() producing the right BinaryRequest to fulfill?
-      binary_util.select_binary(supportdir='bin/protobuf',
-                                version='2.4.1',
-                                name='protoc')
-      self.fail('Expected downloading the binary to raise.')
-    expected_msg = "--binaries-baseurls is empty."
-    self.assertIn(expected_msg, str(cm.exception))
+
+    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+      binary_util.select_script("supportdir", "version", "name")
+    the_raised_exception_message = str(cm.exception)
+
+    self.assertIn(BinaryUtilPrivate.NoBaseUrlsError.__name__, the_raised_exception_message)
+    expected_msg = (
+      "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
+      "name=name, platform_dependent=False, external_url_generator=None, archiver=None): "
+      "--binaries-baseurls is empty.")
+    self.assertIn(expected_msg, the_raised_exception_message)
+
+  def test_external_url_generator(self):
+    binary_util = self._gen_binary_util()
+
+    binary_request = BinaryRequest(
+      supportdir='supportdir',
+      version='version',
+      name='name',
+      platform_dependent=False,
+      external_url_generator=ExternalUrlGenerator(),
+      # TODO: test archiver!
+      archiver=None)
+
+    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+      binary_util.select(binary_request)
+    the_raised_exception_message = str(cm.exception)
+
+    self.assertIn(BinaryToolFetcher.BinaryNotFound.__name__, the_raised_exception_message)
+    expected_msg = (
+      "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
+      "name=name, platform_dependent=False, "
+      "external_url_generator=ExternalUrlGenerator(<example __str__()>), archiver=None): "
+      "Failed to fetch name binary from any source: (Failed to fetch binary from "
+      "https://example.com/some-binary: Fetch of https://example.com/some-binary failed with "
+      "status code 404, Failed to fetch binary from https://example.com/same-binary: Fetch of "
+      "https://example.com/same-binary failed with status code 404)'")
+    self.assertIn(expected_msg, the_raised_exception_message)
+
+  def test_disallowing_external_urls(self):
+    binary_util = self._gen_binary_util(allow_external_binary_tool_downloads=False)
+
+    binary_request = binary_request = BinaryRequest(
+      supportdir='supportdir',
+      version='version',
+      name='name',
+      platform_dependent=False,
+      external_url_generator=ExternalUrlGenerator(),
+      # TODO: test archiver!
+      archiver=None)
+
+    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+      binary_util.select(binary_request)
+    the_raised_exception_message = str(cm.exception)
+
+    self.assertIn(BinaryUtilPrivate.NoBaseUrlsError.__name__, the_raised_exception_message)
+    expected_msg = (
+      "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
+      "name=name, platform_dependent=False, "
+      "external_url_generator=ExternalUrlGenerator(<example __str__()>), archiver=None): "
+      "--binaries-baseurls is empty.")
+    self.assertIn(expected_msg, the_raised_exception_message)
 
   def test_support_url_multi(self):
     """Tests to make sure existing base urls function as expected."""
@@ -214,7 +279,7 @@ class BinaryUtilTest(BaseTest):
     self.assertIn(BinaryUtilPrivate.MissingMachineInfo.__name__, the_raised_exception_message)
     expected_msg = (
       "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
-      "name=name, platform_dependent=True, url_generator=None, archiver=None): "
+      "name=name, platform_dependent=True, external_url_generator=None, archiver=None): "
       "Pants could not resolve binaries for the current host: platform 'vms' was not recognized. "
       "Recognized platforms are: [u'darwin', u'linux'].")
     self.assertIn(expected_msg, the_raised_exception_message)
@@ -232,7 +297,7 @@ class BinaryUtilTest(BaseTest):
     self.assertIn(BinaryUtilPrivate.MissingMachineInfo.__name__, the_raised_exception_message)
     expected_msg = (
       "Error resolving binary request BinaryRequest(supportdir=mysupportdir, version=myversion, "
-      "name=myname, platform_dependent=True, url_generator=None, archiver=None): Pants could not "
+      "name=myname, platform_dependent=True, external_url_generator=None, archiver=None): Pants could not "
       "resolve binaries for the current host. Update --binaries-path-by-id to find binaries for "
       "the current host platform (u\'darwin\', u\'999\').\\n--binaries-path-by-id was:")
     self.assertIn(expected_msg, the_raised_exception_message)
@@ -251,9 +316,9 @@ class BinaryUtilTest(BaseTest):
     expected_msg = (
       "Error resolving binary request BinaryRequest(supportdir=mysupportdir, version=myversion, "
       # platform_dependent=False when doing select_script()
-      "name=myname, platform_dependent=False, url_generator=None, archiver=None): Pants could not "
-      "resolve binaries for the current host. Update --binaries-path-by-id to find binaries for "
-      "the current host platform (u\'darwin\', u\'999\').\\n--binaries-path-by-id was:")
+      "name=myname, platform_dependent=False, external_url_generator=None, archiver=None): Pants "
+      "could not resolve binaries for the current host. Update --binaries-path-by-id to find "
+      "binaries for the current host platform (u\'darwin\', u\'999\').\\n--binaries-path-by-id was:")
     self.assertIn(expected_msg, the_raised_exception_message)
 
   def test_select_binary_base_path_override(self):
@@ -267,17 +332,3 @@ class BinaryUtilTest(BaseTest):
 
     self.assertEquals("supportdir/skynet/42/version/name",
                       binary_util._get_download_path(binary_request))
-
-  def test_no_base_urls_error(self):
-    binary_util = self._gen_binary_util()
-
-    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
-      binary_util.select_script("supportdir", "version", "name")
-    the_raised_exception_message = str(cm.exception)
-
-    self.assertIn(BinaryUtilPrivate.NoBaseUrlsError.__name__, the_raised_exception_message)
-    expected_msg = (
-      "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
-      "name=name, platform_dependent=False, url_generator=None, archiver=None): "
-      "--binaries-baseurls is empty.")
-    self.assertIn(expected_msg, the_raised_exception_message)

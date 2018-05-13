@@ -48,7 +48,8 @@ class BinaryToolUrlGenerator(object):
   :API: public
 
   :class:`BinaryTool` subclasses can return an instance of a class mixing this in to
-  url_generator(self) to download their file or archive from some specified url or set of urls.
+  get_external_url_generator(self) to download their file or archive from some specified url or set
+  of urls.
   """
 
   @abstractmethod
@@ -71,8 +72,8 @@ class BinaryToolUrlGenerator(object):
 class PantsHosted(BinaryToolUrlGenerator):
   """Given a binary request and --binaries-baseurls, generate urls to download the binary from.
 
-  This url generator is used if url_generator(self) is not overridden by a BinaryTool subclass, or
-  if --force-baseurls is set.
+  This url generator is used if get_external_url_generator(self) is not overridden by a BinaryTool
+  subclass, or if --allow-external-binary-tool-downloads is False.
 
   NB: "pants-hosted" is referring to the organization of the urls being specific to pants. It also
   happens that most binaries are downloaded from S3 hosting at binaries.pantsbuild.org by default --
@@ -111,7 +112,7 @@ class BinaryRequest(datatype([
     'name',
     'platform_dependent',
     # NB: this can be None!
-    'url_generator',
+    'external_url_generator',
     # NB: this can be None!
     'archiver',
 ])):
@@ -263,7 +264,7 @@ class BinaryUtilPrivate(object):
         baseurls=options.binaries_baseurls,
         binary_tool_fetcher=binary_tool_fetcher,
         path_by_id=options.binaries_path_by_id,
-        force_baseurls=options.force_baseurls)
+        allow_external_binary_tool_downloads=options.allow_external_binary_tool_downloads)
 
   class MissingMachineInfo(TaskError):
     """Indicates that pants was unable to map this machine's OS to a binary path prefix."""
@@ -281,8 +282,8 @@ class BinaryUtilPrivate(object):
         "Error resolving binary request {}: {}".format(binary_request, base_exception),
         base_exception)
 
-  def __init__(self, baseurls, binary_tool_fetcher, path_by_id=None, force_baseurls=False,
-               uname_func=None):
+  def __init__(self, baseurls, binary_tool_fetcher, path_by_id=None,
+               allow_external_binary_tool_downloads=True, uname_func=None):
     """Creates a BinaryUtil with the given settings to define binary lookup behavior.
 
     This constructor is primarily used for testing.  Production code will usually initialize
@@ -295,8 +296,9 @@ class BinaryUtilPrivate(object):
       search for binaries in, or download binaries to if needed.
     :param dict path_by_id: Additional mapping from (sysname, id) -> (os, arch) for tool
       directory naming
-    :param bool force_baseurls: Whether to use --binaries-baseurls to download all binaries
-                                regardless of whether a :class:`BinaryToolUrlGenerator` is provided.
+    :param bool allow_external_binary_tool_downloads: If False, use --binaries-baseurls to download
+                                                      all binaries, regardless of whether an
+                                                      external_url_generator field is provided.
     :param function uname_func: method to use to emulate os.uname() in testing
     """
     self._baseurls = baseurls
@@ -306,7 +308,7 @@ class BinaryUtilPrivate(object):
     if path_by_id:
       self._path_by_id.update((tuple(k), tuple(v)) for k, v in path_by_id.items())
 
-    self._force_baseurls = force_baseurls
+    self._allow_external_binary_tool_downloads = allow_external_binary_tool_downloads
     self._uname_func = uname_func or os.uname
 
   _ID_BY_OS = {
@@ -349,14 +351,18 @@ class BinaryUtilPrivate(object):
     return binary_request.get_download_path(self._host_platform())
 
   def _get_url_generator(self, binary_request):
-    url_generator = binary_request.url_generator
 
-    logger.debug("self._force_baseurls: {}".format(self._force_baseurls))
-    logger.debug("url_generator: {}".format(url_generator))
-    if self._force_baseurls or not url_generator:
+    external_url_generator = binary_request.external_url_generator
+
+    logger.debug("self._allow_external_binary_tool_downloads: {}"
+                 .format(self._allow_external_binary_tool_downloads))
+    logger.debug("external_url_generator: {}".format(external_url_generator))
+
+    if external_url_generator and self._allow_external_binary_tool_downloads:
+      url_generator = external_url_generator
+    else:
       if not self._baseurls:
         raise self.NoBaseUrlsError("--binaries-baseurls is empty.")
-
       url_generator = PantsHosted(binary_request=binary_request, baseurls=self._baseurls)
 
     return url_generator
@@ -416,7 +422,7 @@ class BinaryUtilPrivate(object):
       version=version,
       name=name,
       platform_dependent=True,
-      url_generator=None,
+      external_url_generator=None,
       archiver=None)
 
   def select_binary(self, supportdir, version, name):
@@ -429,7 +435,7 @@ class BinaryUtilPrivate(object):
       version=version,
       name=name,
       platform_dependent=False,
-      url_generator=None,
+      external_url_generator=None,
       archiver=None)
 
   def select_script(self, supportdir, version, name):

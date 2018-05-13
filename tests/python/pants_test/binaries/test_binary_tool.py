@@ -63,7 +63,7 @@ class CustomUrls(BinaryToolBase):
   name = 'custom_urls_tool'
   default_version = 'v2.1'
 
-  def url_generator(self):
+  def get_external_url_generator(self):
     return CustomUrlGenerator()
 
   def _select_for_version(self, version):
@@ -115,7 +115,7 @@ class BinaryToolBaseTest(BaseTest):
 
   def test_urls(self):
     default_version_tool = DefaultVersion.global_instance()
-    self.assertIsNone(default_version_tool.url_generator())
+    self.assertIsNone(default_version_tool.get_external_url_generator())
 
     with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
       default_version_tool.select()

@@ -164,11 +164,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help=("Maps output of uname for a machine to a binary search path: "
                    "(sysname, id) -> (os, arch), e.g. {('darwin', '15'): ('mac', '10.11'), "
                    "('linux', 'arm32'): ('linux', 'arm32')}."))
-    # BinaryTool options.
-    register('--force-baseurls', type=bool, default=False, advanced=True,
-             help="Force BinaryTool subclasses to download from urls generated from "
-                  "--binaries-baseurls, even if the tool has a custom url generator. "
-                  "This can be necessary if using Pants in an environment which cannot "
+    register('--allow-external-binary-tool-downloads', type=bool, default=True, advanced=True,
+             help="If False, require BinaryTool subclasses to download their contents from urls "
+                  "generated from --binaries-baseurls, even if the tool has an external url "
+                  "generator. This can be necessary if using Pants in an environment which cannot "
                   "contact the wider Internet.")
 
     # Pants Daemon options.

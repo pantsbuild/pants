@@ -28,7 +28,7 @@ class WatchmanLauncher(object):
       binary_tool_fetcher=binary_tool_fetcher,
       path_by_id=bootstrap_options.binaries_path_by_id,
       # TODO(cosmicexplorer): do we need to test this?
-      force_baseurls=bootstrap_options.force_baseurls)
+      allow_external_binary_tool_downloads=bootstrap_options.allow_external_binary_tool_downloads)
 
     return WatchmanLauncher(
       binary_util,

@@ -36,7 +36,7 @@ class LLVM(NativeTool, ExecutablePathProvider):
   default_version = '6.0.0'
   archive_type = 'txz'
 
-  def url_generator(self):
+  def get_external_url_generator(self):
     return LLVMReleaseUrlGenerator()
 
   @memoized_method

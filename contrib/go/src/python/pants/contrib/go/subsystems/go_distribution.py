@@ -37,7 +37,7 @@ class GoDistribution(NativeTool):
   default_version = '1.8.3'
   archive_type = 'tgz'
 
-  def url_generator(self):
+  def get_external_url_generator(self):
     return GoReleaseUrlGenerator()
 
   @memoized_property
