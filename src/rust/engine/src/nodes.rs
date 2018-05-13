@@ -360,7 +360,7 @@ impl Select {
                   &[
                     externs::store_bytes(&result.0.stdout),
                     externs::store_bytes(&result.0.stderr),
-                    externs::store_i32(result.0.exit_code),
+                    externs::store_i64(result.0.exit_code as i64),
                   ],
                 )
               })
@@ -748,7 +748,7 @@ impl Snapshot {
       &context.core.types.construct_snapshot,
       &[
         externs::store_bytes(&(item.digest.0).to_hex().as_bytes()),
-        externs::store_i32(item.digest.1 as i32),
+        externs::store_i64(item.digest.1 as i64),
         externs::store_tuple(&path_stats),
       ],
     )

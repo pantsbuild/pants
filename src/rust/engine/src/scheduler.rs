@@ -16,6 +16,13 @@ use nodes::{NodeKey, Select};
 use rule_graph;
 use selectors;
 
+///
+/// A Session represents a related series of requests (generally: one run of the pants CLI) on an
+/// underlying Scheduler, and is a useful scope for metrics.
+///
+/// Both Scheduler and Session are exposed to python and expected to be used by multiple threads, so
+/// they use internal mutability in order to avoid exposing locks to callers.
+///
 pub struct Session {
   // The set of roots that have been requested within this session.
   roots: Mutex<HashSet<Root>>,
@@ -118,16 +125,16 @@ impl Scheduler {
   }
 
   ///
-  /// TODO: Convert `extern::store_i32` to i64, and expand the range here.
+  /// Return Scheduler and per-Session metrics.
   ///
-  pub fn metrics(&self, session: &Session) -> HashMap<&str, i32> {
+  pub fn metrics(&self, session: &Session) -> HashMap<&str, i64> {
     let mut m = HashMap::new();
     m.insert(
       "affected_file_count",
       self
         .core
         .graph
-        .reachable_digest_count(&session.root_nodes()) as i32,
+        .reachable_digest_count(&session.root_nodes()) as i64,
     );
     m
   }

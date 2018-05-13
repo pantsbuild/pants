@@ -111,7 +111,7 @@ typedef _Bool               (*extern_ptr_satisfied_by)(ExternContext*, Value*, V
 typedef _Bool               (*extern_ptr_satisfied_by_type)(ExternContext*, Value*, TypeId*);
 typedef Value               (*extern_ptr_store_tuple)(ExternContext*, Value*, uint64_t);
 typedef Value               (*extern_ptr_store_bytes)(ExternContext*, uint8_t*, uint64_t);
-typedef Value               (*extern_ptr_store_i32)(ExternContext*, int32_t);
+typedef Value               (*extern_ptr_store_i64)(ExternContext*, int64_t);
 typedef ValueBuffer         (*extern_ptr_project_multi)(ExternContext*, Value*, uint8_t*, uint64_t);
 typedef Value               (*extern_ptr_project_ignoring_type)(ExternContext*, Value*, uint8_t*, uint64_t);
 typedef Value               (*extern_ptr_create_exception)(ExternContext*, uint8_t*, uint64_t);
@@ -156,7 +156,7 @@ void externs_set(ExternContext*,
                  extern_ptr_satisfied_by_type,
                  extern_ptr_store_tuple,
                  extern_ptr_store_bytes,
-                 extern_ptr_store_i32,
+                 extern_ptr_store_i64,
                  extern_ptr_project_ignoring_type,
                  extern_ptr_project_multi,
                  extern_ptr_create_exception,
@@ -250,7 +250,7 @@ extern "Python" {
   _Bool               extern_satisfied_by_type(ExternContext*, Value*, TypeId*);
   Value               extern_store_tuple(ExternContext*, Value*, uint64_t);
   Value               extern_store_bytes(ExternContext*, uint8_t*, uint64_t);
-  Value               extern_store_i32(ExternContext*, int32_t);
+  Value               extern_store_i64(ExternContext*, int64_t);
   Value               extern_project_ignoring_type(ExternContext*, Value*, uint8_t*, uint64_t);
   ValueBuffer         extern_project_multi(ExternContext*, Value*, uint8_t*, uint64_t);
   Value               extern_create_exception(ExternContext*, uint8_t*, uint64_t);
@@ -412,10 +412,10 @@ def _initialize_externs(ffi):
     return c.to_value(bytes(ffi.buffer(bytes_ptr, bytes_len)))
 
   @ffi.def_extern()
-  def extern_store_i32(context_handle, i32):
+  def extern_store_i64(context_handle, i64):
     """Given a context and int32_t, return a new Value to represent the int32_t."""
     c = ffi.from_handle(context_handle)
-    return c.to_value(i32)
+    return c.to_value(i64)
 
   @ffi.def_extern()
   def extern_project_ignoring_type(context_handle, val, field_str_ptr, field_str_len):
@@ -669,7 +669,7 @@ class Native(object):
                            self.ffi_lib.extern_satisfied_by_type,
                            self.ffi_lib.extern_store_tuple,
                            self.ffi_lib.extern_store_bytes,
-                           self.ffi_lib.extern_store_i32,
+                           self.ffi_lib.extern_store_i64,
                            self.ffi_lib.extern_project_ignoring_type,
                            self.ffi_lib.extern_project_multi,
                            self.ffi_lib.extern_create_exception,

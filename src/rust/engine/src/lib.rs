@@ -44,7 +44,7 @@ use externs::{Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionE
               DropHandlesExtern, EqualsExtern, EvalExtern, ExternContext, Externs,
               GeneratorSendExtern, IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern,
               ProjectMultiExtern, PyResult, SatisfiedByExtern, SatisfiedByTypeExtern,
-              StoreBytesExtern, StoreI32Extern, StoreTupleExtern, TypeIdBuffer, TypeToStrExtern,
+              StoreBytesExtern, StoreI64Extern, StoreTupleExtern, TypeIdBuffer, TypeToStrExtern,
               ValToStrExtern};
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
@@ -135,7 +135,7 @@ pub extern "C" fn externs_set(
   satisfied_by_type: SatisfiedByTypeExtern,
   store_tuple: StoreTupleExtern,
   store_bytes: StoreBytesExtern,
-  store_i32: StoreI32Extern,
+  store_i64: StoreI64Extern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
@@ -158,7 +158,7 @@ pub extern "C" fn externs_set(
     satisfied_by_type,
     store_tuple,
     store_bytes,
-    store_i32,
+    store_i64,
     project_ignoring_type,
     project_multi,
     create_exception,
@@ -268,8 +268,8 @@ pub extern "C" fn scheduler_metrics(
         .into_iter()
         .map(|(metric, value)| {
           externs::store_tuple(&[
-            externs::store_bytes(&metric.bytes().collect::<Vec<_>>()),
-            externs::store_i32(value),
+            externs::store_bytes(metric.as_bytes()),
+            externs::store_i64(value),
           ])
         })
         .collect::<Vec<_>>();

@@ -91,11 +91,6 @@ class Scheduler(object):
     rule_index = RuleIndex.create(list(rules))
     self._root_subject_types = sorted(rule_index.roots)
 
-    # If configured, visualize the rule graph before asserting that it is valid.
-    if self.visualize_to_dir() is not None:
-      rule_graph_name = 'rule_graph.dot'
-      self.visualize_rule_graph_to_file(os.path.join(self.visualize_to_dir(), rule_graph_name))
-
     # Create the native Scheduler and Session.
     # TODO: This `_tasks` reference could be a local variable, since it is not used
     # after construction.
@@ -129,6 +124,11 @@ class Scheduler(object):
       constraint_for(ExecuteProcessResult),
       constraint_for(GeneratorType),
     )
+
+    # If configured, visualize the rule graph before asserting that it is valid.
+    if self.visualize_to_dir() is not None:
+      rule_graph_name = 'rule_graph.dot'
+      self.visualize_rule_graph_to_file(os.path.join(self.visualize_to_dir(), rule_graph_name))
 
     if validate:
       self._assert_ruleset_valid()
