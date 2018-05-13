@@ -10,7 +10,8 @@ import os
 
 import mock
 
-from pants.binaries.binary_util import BinaryRequest, BinaryToolFetcher, BinaryToolUrlGenerator, BinaryUtilPrivate
+from pants.binaries.binary_util import (BinaryRequest, BinaryToolFetcher, BinaryToolUrlGenerator,
+                                        BinaryUtilPrivate)
 from pants.net.http.fetcher import Fetcher
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
