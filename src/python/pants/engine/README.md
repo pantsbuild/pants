@@ -52,7 +52,7 @@ def int_to_str(an_int):
 ```
 
 The first argument to the `@rule` decorator is the Product (ie, return) type for the `@rule`. The
-second argument is a list of `Selectors` that declare the types of the input arguments to the
+second argument is a list of `Selector`s that declare the types of the input arguments to the
 `@rule`. In this case, because the Product type is `StringType` and there is one `Selector`
 (`Select(IntType)`), this `@rule` represents a conversion from `IntType` to `StrType`, with no
 other inputs.
@@ -62,10 +62,12 @@ Subject, it will first see whether there are any ways to get an IntType for that
 the subject is already of `type(subject) == IntType`, then the `@rule` will be satisfiable without
 any other dependencies. On the other hand, if the type _doesn't_ match, the engine doesn't give up:
 it will next look for any other registered `@rule`s that can compute an IntType Product for the
-Subject (and so on, recursively.)
+Subject (and so on, recursively).
+
+### Datatypes
 
 In practical use, using basic types like `StringType` or `IntType` does not provide enough
-information to disambiguate between various types of data: So declaring small `datatype`
+information to disambiguate between various types of data. So declaring small `datatype`
 definitions to provide a unique and descriptive type is strongly recommended:
 
 ```python
@@ -74,7 +76,42 @@ class FormattedInt(datatype(['content'])): pass
 @rule(FormattedInt, [Select(IntType)])
 def int_to_str(an_int):
   return FormattedInt('{}'.format(an_int))
+
+# Field values can be specified with positional and/or keyword arguments in the constructor:
+x = FormattedInt('a string')
+x = FormattedInt(content='a string')
+
+# Field values can be accessed after construction by name or index:
+print(x.content)    # 'a string'
+print(x[0])         # 'a string'
+
+# datatype objects can be easily inspected:
+print(x)            # 'FormattedInt(content=a string)'
 ```
+
+#### Types of Fields
+
+`datatype()` accepts a list of *field declarations*, and returns a type which can be subclassed. A
+*field declaration* can just be a string (e.g. `'field_name'`), which is then used as the field
+name, as with `FormattedInt` above. A field can also be declared with a tuple of two elements: the
+field name string, and a `TypeConstraint` for the field (e.g. `('field_name',
+Exactly(FieldType))`). The bare type name (e.g. `FieldType`) can also be used as a shorthand for
+`Exactly(FieldType)`. If the tuple form is used, the constructor will create your object, then raise
+an error if the field value does not satisfy the type constraint.
+
+``` python
+class TypedDatatype(datatype([('field_name', Exactly(str, int))])):
+  """Example of a datatype with a more complex field type constraint."""
+```
+
+Assigning a specific type to a field can be somewhat unidiomatic in Python, and may be unexpected or
+unnatural to use. Additionally, the engine already applies a form of implicit type checking by
+ensuring there is a unique path from subject to product when a product request is made. However,
+regardless of whether the object is created directly with type-checked fields or whether it's
+produced from a set of rules by the engine's dependency injection, it is extremely useful to
+formalize the assumptions made about the value of an object into a specific type, even if the type
+just wraps a single field. The `datatype()` function makes it simple and efficient to apply that
+strategy.
 
 ### Selectors and Gets
 
@@ -134,6 +171,37 @@ dependency, and memoize the computation represented by the requested `Node`.
 The initial Nodes are [launched by the engine](https://github.com/pantsbuild/pants/blob/16d43a06ba3751e22fdc7f69f009faeb59a33930/src/rust/engine/src/scheduler.rs#L116-L126),
 but the rest of execution is driven by Nodes recursively calling `Context.get` to request their
 dependencies.
+
+### Registering Rules
+
+Currently, it is only possible to load rules into the pants scheduler in two ways: by importing and
+using them in `src/python/pants/bin/engine_initializer.py`, or by adding them to the list returned
+by a `rules()` method defined in `src/python/backend/<backend_name>/register.py`. Plugins cannot add
+new rules yet. Unit tests, however, can mix in `SchedulerTestBase` from
+`tests/python/pants_test/engine/scheduler_test_base.py` to generate and execute a scheduler from a
+given set of rules.
+
+In general, there are three types of rules you can define:
+
+1. an `@rule`, which has a single product type and selects its inputs as described above.
+2. a `SingletonRule`, which matches a product type with a value so the type can then be `Select`ed
+   in an `@rule`.
+3. a `RootRule`, which declares a type that can be used as a *subject*, which means it can be
+   provided as an input to a `product_request()`.
+
+In more depth, a `RootRule` for some type is required when no other rule provides that type (i.e. it
+is not provided with a `SingletonRule` or as the product of any `@rule`). In the absence of a
+`RootRule`, any subject type involved in a request "at runtime" (i.e. via `product_request()`),
+would show up as an an unused or impossible path in the rule graph. Another potential name for
+`RootRule` might be `ParamRule`, or something similar, as it can be thought of as saying that the
+type represents a sort of "public API entrypoint" via a `product_request()`.
+
+Note that `Get` requests do not require a `RootRule`, as their requests are statically verified when
+the `@rule` definition is parsed, so we know before runtime that they might be requested.
+
+This interface is being actively developed at this time and this documentation may be out of
+date. Please feel free to file an issue or pull request if you notice any outdated or incorrect
+information in this document!
 
 ## Execution
 
