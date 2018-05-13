@@ -265,9 +265,15 @@ class Scheduler(object):
         for line in fd.readlines():
           yield line.rstrip()
 
-  def invalidate(self, filenames):
+  def invalidate_files(self, direct_filenames):
+    # NB: Watchman no longer triggers events when children are created/deleted under a directory,
+    # so we always need to invalidate the direct parent as well.
+    filenames = set(direct_filenames)
+    filenames.update(os.path.dirname(f) for f in direct_filenames)
     filenames_buf = self._native.context.utf8_buf_buf(filenames)
-    return self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
+    invalidated =  self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
+    logger.info('invalidated %d nodes for: %s', invalidated, filenames)
+    return invalidated
 
   def graph_len(self):
     return self._native.lib.graph_len(self._scheduler)
@@ -374,13 +380,7 @@ class SchedulerSession(object):
 
   def invalidate_files(self, direct_filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
-    # NB: Watchman no longer triggers events when children are created/deleted under a directory,
-    # so we always need to invalidate the direct parent as well.
-    filenames = set(direct_filenames)
-    filenames.update(os.path.dirname(f) for f in direct_filenames)
-    invalidated = self._scheduler.invalidate(filenames)
-    logger.info('invalidated %d nodes for: %s', invalidated, filenames)
-    return invalidated
+    return self._scheduler.invalidate_files(direct_filenames)
 
   def node_count(self):
     return self._scheduler.graph_len()

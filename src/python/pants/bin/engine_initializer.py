@@ -76,7 +76,8 @@ class LegacyGraphScheduler(datatype(['scheduler', 'symbol_table'])):
 
   def new_session(self):
     session = self.scheduler.new_session()
-    change_calculator = EngineChangeCalculator(session, self.symbol_table, get_scm())
+    scm = get_scm()
+    change_calculator = EngineChangeCalculator(session, self.symbol_table, scm) if scm else None
     return LegacyGraphSession(session, self.symbol_table, change_calculator)
 
 
