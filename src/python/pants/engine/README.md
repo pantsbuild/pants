@@ -87,6 +87,7 @@ print(x[0])         # 'a string'
 
 # datatype objects can be easily inspected:
 print(x)            # 'FormattedInt(content=a string)'
+print(repr(x))      # "FormattedInt(content='a string')"
 ```
 
 #### Types of Fields
@@ -101,7 +102,23 @@ an error if the field value does not satisfy the type constraint.
 
 ``` python
 class TypedDatatype(datatype([('field_name', Exactly(str, int))])):
-  """Example of a datatype with a more complex field type constraint."""
+  """Example of a datatype with a more complex field type constraint.
+
+  The __str__ will display information about the type constraint of each field along with its value, while the __repr__ will just show an expression which could be evaluated to produce the instance of the datatype.
+  """
+
+x = TypedDatatype('string argument')
+print(x)       # 'TypedDatatype(field_name<Exactly(str or int)>=string argument)'
+print(repr(x)) # "TypedDatatype(field_name='string argument')"
+
+y = TypedDatatype(3)
+print(y)       # 'TypedDatatype(field_name<Exactly(str or int)>=3)'
+print(repr(y)) # "TypedDatatype(field_name=3)"
+
+# Raises an exception:
+z = TypedDatatype([])
+# pants.util.objects.TypedDatatypeInstanceConstructionError: type check error in class TypedDatatype: errors type checking constructor arguments:
+# field 'field_name' was invalid: value [] (with type 'list') must satisfy this type constraint: Exactly(str or int).
 ```
 
 Assigning a specific type to a field can be somewhat unidiomatic in Python, and may be unexpected or
