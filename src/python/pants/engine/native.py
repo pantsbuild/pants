@@ -207,7 +207,7 @@ Value scheduler_metrics(Scheduler*, Session*);
 RawNodes* scheduler_execute(Scheduler*, Session*, ExecutionRequest*);
 void scheduler_destroy(Scheduler*);
 
-Session* session_create(void);
+Session* session_create(Scheduler*);
 void session_destroy(Session*);
 
 ExecutionRequest* execution_request_create(void);
@@ -704,8 +704,8 @@ class Native(object):
   def new_execution_request(self):
     return self.gc(self.lib.execution_request_create(), self.lib.execution_request_destroy)
 
-  def new_session(self):
-    return self.gc(self.lib.session_create(), self.lib.session_destroy)
+  def new_session(self, scheduler):
+    return self.gc(self.lib.session_create(scheduler), self.lib.session_destroy)
 
   def new_scheduler(self,
                     tasks,

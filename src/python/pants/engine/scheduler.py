@@ -321,7 +321,7 @@ class Scheduler(object):
 
   def new_session(self):
     """Creates a new SchedulerSession for this Scheduler."""
-    return SchedulerSession(self, self._native.new_session())
+    return SchedulerSession(self, self._native.new_session(self._scheduler))
 
 
 class SchedulerSession(object):

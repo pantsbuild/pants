@@ -24,13 +24,16 @@ use selectors;
 /// they use internal mutability in order to avoid exposing locks to callers.
 ///
 pub struct Session {
+  // The total size of the graph at Session-creation time.
+  preceding_graph_size: usize,
   // The set of roots that have been requested within this session.
   roots: Mutex<HashSet<Root>>,
 }
 
 impl Session {
-  pub fn new() -> Session {
+  pub fn new(scheduler: &Scheduler) -> Session {
     Session {
+      preceding_graph_size: scheduler.core.graph.len(),
       roots: Mutex::new(HashSet::new()),
     }
   }
@@ -136,6 +139,8 @@ impl Scheduler {
         .graph
         .reachable_digest_count(&session.root_nodes()) as i64,
     );
+    m.insert("preceding_graph_size", session.preceding_graph_size as i64);
+    m.insert("resulting_graph_size", self.core.graph.len() as i64);
     m
   }
 

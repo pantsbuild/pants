@@ -474,8 +474,10 @@ pub extern "C" fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
 }
 
 #[no_mangle]
-pub extern "C" fn session_create() -> *const Session {
-  Box::into_raw(Box::new(Session::new()))
+pub extern "C" fn session_create(scheduler_ptr: *mut Scheduler) -> *const Session {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    Box::into_raw(Box::new(Session::new(scheduler)))
+  })
 }
 
 #[no_mangle]

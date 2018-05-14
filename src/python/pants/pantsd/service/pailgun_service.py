@@ -58,10 +58,6 @@ class PailgunService(PantsService):
       graph_helper = None
       deferred_exc = None
 
-      # Capture the size of the graph prior to any warming, for stats.
-      preceding_graph_size = self._scheduler_service.product_graph_len()
-      self._logger.debug('resident graph size: %s', preceding_graph_size)
-
       self._logger.debug('execution commandline: %s', arguments)
       options, _ = OptionsInitializer(OptionsBootstrapper(args=arguments)).setup(init_logging=False)
 
@@ -88,7 +84,6 @@ class PailgunService(PantsService):
         target_roots,
         graph_helper,
         self.fork_lock,
-        preceding_graph_size,
         deferred_exc
       )
 

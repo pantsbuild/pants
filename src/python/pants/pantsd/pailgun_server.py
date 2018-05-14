@@ -77,6 +77,10 @@ class PailgunHandler(PailgunHandlerBase):
     with maybe_profiled(environment.get('PANTSD_PROFILE')):
       self._run_pants(self.request, arguments, environment)
 
+    # NB: This represents the end of pantsd's involvement in the request, but the request will
+    # continue to run post-fork.
+    self.logger.info('pailgun request completed: `{}`'.format(' '.join(arguments)))
+
   def handle_error(self, exc=None):
     """Error handler for failed calls to handle()."""
     if exc:
