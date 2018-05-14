@@ -10,6 +10,6 @@ bytes = "0.4.5"
 clap = "2"
 env_logger = "0.5.4"
 fs = { path = ".." }
-futures = "0.1.16"
+futures = "0.1"
 hashing = { path = "../../hashing" }
 protobuf = { version = "1.4.1", features = ["with-bytes"] }

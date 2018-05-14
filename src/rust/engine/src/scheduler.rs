@@ -7,6 +7,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use futures::future::{self, Future};
+use futures::sync::oneshot;
 
 use boxfuture::{BoxFuture, Boxable};
 use context::{Context, ContextFactory, Core};
@@ -158,6 +159,7 @@ impl Scheduler {
     roots: Vec<Root>,
     count: usize,
   ) -> BoxFuture<Vec<Result<Value, Failure>>, ()> {
+    let executor = core.runtime.get().executor();
     // Attempt all roots in parallel, failing fast to retry for `Invalidated`.
     let roots_res = future::join_all(
       roots
@@ -188,9 +190,10 @@ impl Scheduler {
 
     // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry
     // the entire set of roots.
-    roots_res
-      .or_else(move |_| Scheduler::execute_helper(core, roots, count - 1))
-      .to_boxed()
+    oneshot::spawn(
+      roots_res.or_else(move |_| Scheduler::execute_helper(core, roots, count - 1)),
+      &executor,
+    ).to_boxed()
   }
 
   ///

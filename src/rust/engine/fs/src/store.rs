@@ -601,12 +601,10 @@ mod local {
       Ok(ByteStore {
         inner: Arc::new(InnerStore {
           pool: pool,
-          file_dbs: Resettable::new(Arc::new(move || {
-            ShardedLmdb::new(&files_root).map(|db| Arc::new(db))
-          })),
-          directory_dbs: Resettable::new(Arc::new(move || {
+          file_dbs: Resettable::new(move || ShardedLmdb::new(&files_root).map(|db| Arc::new(db))),
+          directory_dbs: Resettable::new(move || {
             ShardedLmdb::new(&directories_root).map(|db| Arc::new(db))
-          })),
+          }),
         }),
       })
     }
@@ -1549,25 +1547,22 @@ mod remote {
       chunk_size_bytes: usize,
       upload_timeout: Duration,
     ) -> ByteStore {
-      let env = Resettable::new(Arc::new(move || {
-        Arc::new(grpcio::Environment::new(thread_count))
-      }));
+      let env = Resettable::new(move || Arc::new(grpcio::Environment::new(thread_count)));
       let env2 = env.clone();
-      let channel = Resettable::new(Arc::new(move || {
-        grpcio::ChannelBuilder::new(env2.get()).connect(&cas_address)
-      }));
+      let channel =
+        Resettable::new(move || grpcio::ChannelBuilder::new(env2.get()).connect(&cas_address));
       let channel2 = channel.clone();
       let channel3 = channel.clone();
-      let byte_stream_client = Resettable::new(Arc::new(move || {
+      let byte_stream_client = Resettable::new(move || {
         Arc::new(bazel_protos::bytestream_grpc::ByteStreamClient::new(
           channel2.get(),
         ))
-      }));
-      let cas_client = Resettable::new(Arc::new(move || {
+      });
+      let cas_client = Resettable::new(move || {
         Arc::new(
           bazel_protos::remote_execution_grpc::ContentAddressableStorageClient::new(channel3.get()),
         )
-      }));
+      });
       ByteStore {
         byte_stream_client,
         cas_client,
