@@ -14,7 +14,8 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import addressable, addressable_dict
 from pants.engine.build_files import (ResolvedTypeMismatchError, addresses_from_address_families,
                                       create_graph_rules, parse_address_family)
-from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot, create_fs_rules
+from pants.engine.fs import (DirectoryDigest, FileContent, FilesContent, Path, PathGlobs, Snapshot,
+                             create_fs_rules)
 from pants.engine.mapper import AddressFamily, AddressMapper, ResolveError
 from pants.engine.nodes import Return, Throw
 from pants.engine.parser import SymbolTable
@@ -41,7 +42,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     """Test that matching the same Spec twice succeeds."""
     address = SingleAddress('a', 'a')
     address_mapper = AddressMapper(JsonParser(TestTable()))
-    snapshot = Snapshot('xx', 2, [Path('a/BUILD', File('a/BUILD'))])
+    snapshot = Snapshot(DirectoryDigest(str('xx'), 2), (Path('a/BUILD', File('a/BUILD')),))
     address_family = AddressFamily('a', {'a': ('a/BUILD', 'this is an object!')})
 
     bfas = run_rule(addresses_from_address_families, address_mapper, Specs([address, address]), {
