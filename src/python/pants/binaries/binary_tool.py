@@ -83,10 +83,8 @@ class BinaryToolBase(Subsystem):
     version and host platform.
 
     If the bootstrap option --allow-external-binary-tool-downloads is False, the result of this
-    method will be ignored. In general, implementors of BinaryTool subclasses should try to ensure
-    (within reason) that the rest of their code can handle the result of downloading from different
-    urls if get_external_url_generator() is overridden yet again by a subclass, or if it is ignored
-    with --no-allow-external-binary-tool-downloads.
+    method will be ignored. Implementations of BinaryTool must be aware of differences (e.g., in
+    archive structure) between the external and internal versions of the downloaded tool, if any.
 
     See the :class:`LLVM` subsystem for an example of usage.
     """
