@@ -96,7 +96,7 @@ class BundleCreate(BundleMixin, JvmBinaryTask):
         app = self.App.create_app(vt.target,
                                   self.resolved_option(self.get_options(), vt.target, 'deployjar'),
                                   self.resolved_option(self.get_options(), vt.target, 'archive'))
-        archiver = archive.archiver(app.archive) if app.archive else None
+        archiver = archive.create_archiver(app.archive) if app.archive else None
 
         bundle_dir = self.get_bundle_dir(app.id, vt.results_dir)
         ext = archive.archive_extensions.get(app.archive, app.archive)

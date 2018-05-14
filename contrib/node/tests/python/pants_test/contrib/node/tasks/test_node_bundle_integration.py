@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from contextlib import contextmanager
 
-from pants.fs.archive import archiver, archiver_for_path
+from pants.fs.archive import archiver_for_path, create_archiver
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -139,7 +139,7 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
       _, extension = os.path.splitext(archive_path)
       print (extension)
       if extension == '.jar':
-        extraction_archiver = archiver('zip')
+        extraction_archiver = create_archiver('zip')
       else:
         extraction_archiver = archiver_for_path(os.path.basename(archive_path))
       extraction_archiver.extract(archive_path, temp_dir)

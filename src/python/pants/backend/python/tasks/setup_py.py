@@ -83,6 +83,8 @@ class SetupPyInvocationEnvironment(datatype(['joined_path'])):
 
   def as_env_dict(self):
     return {
+      'CC': 'gcc',
+      'CXX': 'g++',
       'PATH': self.joined_path,
     }
 

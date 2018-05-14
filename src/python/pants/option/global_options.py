@@ -161,9 +161,14 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Timeout in seconds for URL reads when fetching binary tools from the '
                   'repos specified by --baseurls.')
     register('--binaries-path-by-id', type=dict, advanced=True,
-             help=('Maps output of uname for a machine to a binary search path. e.g. '
-                   '{("darwin", "15"): ["mac", "10.11"]), ("linux", "arm32"): ["linux"'
-                   ', "arm32"]}'))
+             help=("Maps output of uname for a machine to a binary search path: "
+                   "(sysname, id) -> (os, arch), e.g. {('darwin', '15'): ('mac', '10.11'), "
+                   "('linux', 'arm32'): ('linux', 'arm32')}."))
+    register('--allow-external-binary-tool-downloads', type=bool, default=True, advanced=True,
+             help="If False, require BinaryTool subclasses to download their contents from urls "
+                  "generated from --binaries-baseurls, even if the tool has an external url "
+                  "generator. This can be necessary if using Pants in an environment which cannot "
+                  "contact the wider Internet.")
 
     # Pants Daemon options.
     register('--pantsd-pailgun-host', advanced=True, default='127.0.0.1',
@@ -181,7 +186,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--watchman-version', advanced=True, default='4.9.0-pants1', help='Watchman version.')
     register('--watchman-supportdir', advanced=True, default='bin/watchman',
              help='Find watchman binaries under this dir. Used as part of the path to lookup '
-                  'the binary with --binary-util-baseurls and --pants-bootstrapdir.')
+                  'the binary with --binaries-baseurls and --pants-bootstrapdir.')
     register('--watchman-startup-timeout', type=float, advanced=True, default=30.0,
              help='The watchman socket timeout (in seconds) for the initial `watch-project` command. '
                   'This may need to be set higher for larger repos due to watchman startup cost.')
