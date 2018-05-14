@@ -62,8 +62,8 @@ pub fn store_bytes(bytes: &[u8]) -> Value {
   with_externs(|e| (e.store_bytes)(e.context, bytes.as_ptr(), bytes.len() as u64))
 }
 
-pub fn store_i32(val: i32) -> Value {
-  with_externs(|e| (e.store_i32)(e.context, val))
+pub fn store_i64(val: i64) -> Value {
+  with_externs(|e| (e.store_i64)(e.context, val))
 }
 
 pub fn project_ignoring_type(value: &Value, field: &str) -> Value {
@@ -221,7 +221,7 @@ pub struct Externs {
   pub satisfied_by_type: SatisfiedByTypeExtern,
   pub store_tuple: StoreTupleExtern,
   pub store_bytes: StoreBytesExtern,
-  pub store_i32: StoreI32Extern,
+  pub store_i64: StoreI64Extern,
   pub project_ignoring_type: ProjectIgnoringTypeExtern,
   pub project_multi: ProjectMultiExtern,
   pub type_to_str: TypeToStrExtern,
@@ -255,7 +255,7 @@ pub type StoreTupleExtern = extern "C" fn(*const ExternContext, *const Value, u6
 
 pub type StoreBytesExtern = extern "C" fn(*const ExternContext, *const u8, u64) -> Value;
 
-pub type StoreI32Extern = extern "C" fn(*const ExternContext, i32) -> Value;
+pub type StoreI64Extern = extern "C" fn(*const ExternContext, i64) -> Value;
 
 #[repr(C)]
 #[derive(Debug)]

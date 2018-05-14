@@ -160,9 +160,8 @@ class Context(object):
     """A contextmanager that sets metrics in the context of a (v1) engine execution."""
     self._set_target_root_count_in_runtracker()
     yield
+    self.run_tracker.pantsd_stats.set_scheduler_metrics(self._scheduler.metrics())
     self._set_affected_target_count_in_runtracker()
-    self._set_affected_target_files_count_in_runtracker()
-    self._set_resulting_graph_size_in_runtracker()
 
   def _set_target_root_count_in_runtracker(self):
     """Sets the target root count in the run tracker's daemon stats object."""
@@ -177,19 +176,6 @@ class Context(object):
     target_count = len(self.build_graph)
     self.run_tracker.pantsd_stats.set_affected_targets_size(target_count)
     return target_count
-
-  def _set_affected_target_files_count_in_runtracker(self):
-    """Sets the realized target file count in the run tracker's daemon stats object."""
-    # TODO: Move this file counting into the `ProductGraph`.
-    target_file_count = self.build_graph.target_file_count()
-    self.run_tracker.pantsd_stats.set_affected_targets_file_count(target_file_count)
-    return target_file_count
-
-  def _set_resulting_graph_size_in_runtracker(self):
-    """Sets the resulting graph size in the run tracker's daemon stats object."""
-    node_count = self._scheduler.graph_len()
-    self.run_tracker.pantsd_stats.set_resulting_graph_size(node_count)
-    return node_count
 
   def submit_background_work_chain(self, work_chain, parent_workunit_name=None):
     """

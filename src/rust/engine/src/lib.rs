@@ -44,10 +44,10 @@ use externs::{Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionE
               DropHandlesExtern, EqualsExtern, EvalExtern, ExternContext, Externs,
               GeneratorSendExtern, IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern,
               ProjectMultiExtern, PyResult, SatisfiedByExtern, SatisfiedByTypeExtern,
-              StoreBytesExtern, StoreI32Extern, StoreTupleExtern, TypeIdBuffer, TypeToStrExtern,
+              StoreBytesExtern, StoreI64Extern, StoreTupleExtern, TypeIdBuffer, TypeToStrExtern,
               ValToStrExtern};
 use rule_graph::{GraphMaker, RuleGraph};
-use scheduler::{ExecutionRequest, RootResult, Scheduler};
+use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
 use tasks::Tasks;
 use types::Types;
 
@@ -135,7 +135,7 @@ pub extern "C" fn externs_set(
   satisfied_by_type: SatisfiedByTypeExtern,
   store_tuple: StoreTupleExtern,
   store_bytes: StoreBytesExtern,
-  store_i32: StoreI32Extern,
+  store_i64: StoreI64Extern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
@@ -158,7 +158,7 @@ pub extern "C" fn externs_set(
     satisfied_by_type,
     store_tuple,
     store_bytes,
-    store_i32,
+    store_i64,
     project_ignoring_type,
     project_multi,
     create_exception,
@@ -253,10 +253,52 @@ pub extern "C" fn scheduler_create(
   ))))
 }
 
+///
+/// Returns a Value representing a tuple of tuples of metric name string and metric value int.
+///
+#[no_mangle]
+pub extern "C" fn scheduler_metrics(
+  scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
+) -> Value {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    with_session(session_ptr, |session| {
+      let values = scheduler
+        .metrics(session)
+        .into_iter()
+        .map(|(metric, value)| {
+          externs::store_tuple(&[
+            externs::store_bytes(metric.as_bytes()),
+            externs::store_i64(value),
+          ])
+        })
+        .collect::<Vec<_>>();
+      externs::store_tuple(&values)
+    })
+  })
+}
+
 #[no_mangle]
 pub extern "C" fn scheduler_pre_fork(scheduler_ptr: *mut Scheduler) {
   with_scheduler(scheduler_ptr, |scheduler| {
     scheduler.core.pre_fork();
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn scheduler_execute(
+  scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
+  execution_request_ptr: *mut ExecutionRequest,
+) -> *const RawNodes {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    with_execution_request(execution_request_ptr, |execution_request| {
+      with_session(session_ptr, |session| {
+        Box::into_raw(RawNodes::create(
+          scheduler.execute(execution_request, session),
+        ))
+      })
+    })
   })
 }
 
@@ -279,18 +321,6 @@ pub extern "C" fn execution_add_root_select(
       scheduler
         .add_root_select(execution_request, subject, product)
         .into()
-    })
-  })
-}
-
-#[no_mangle]
-pub extern "C" fn execution_execute(
-  scheduler_ptr: *mut Scheduler,
-  execution_request_ptr: *mut ExecutionRequest,
-) -> *const RawNodes {
-  with_scheduler(scheduler_ptr, |scheduler| {
-    with_execution_request(execution_request_ptr, |execution_request| {
-      Box::into_raw(RawNodes::create(scheduler.execute(execution_request)))
     })
   })
 }
@@ -444,6 +474,18 @@ pub extern "C" fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
 }
 
 #[no_mangle]
+pub extern "C" fn session_create(scheduler_ptr: *mut Scheduler) -> *const Session {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    Box::into_raw(Box::new(Session::new(scheduler)))
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn session_destroy(ptr: *mut Session) {
+  let _ = unsafe { Box::from_raw(ptr) };
+}
+
+#[no_mangle]
 pub extern "C" fn execution_request_create() -> *const ExecutionRequest {
   Box::into_raw(Box::new(ExecutionRequest::new()))
 }
@@ -539,13 +581,13 @@ pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler) {
   });
 }
 
-fn graph_full(scheduler: &mut Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
+fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
   let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types);
   graph_maker.full_graph()
 }
 
 fn graph_sub(
-  scheduler: &mut Scheduler,
+  scheduler: &Scheduler,
   subject_type: TypeId,
   product_type: TypeConstraint,
 ) -> RuleGraph {
@@ -559,16 +601,37 @@ fn write_to_file(path: &Path, graph: &RuleGraph) -> io::Result<()> {
   graph.visualize(&mut f)
 }
 
+///
+/// Scheduler and Session are intended to be shared between threads, and so their context
+/// methods provide immutable references. The remaining types are not intended to be shared
+/// between threads, so mutable access is provided.
+///
 fn with_scheduler<F, T>(scheduler_ptr: *mut Scheduler, f: F) -> T
 where
-  F: FnOnce(&mut Scheduler) -> T,
+  F: FnOnce(&Scheduler) -> T,
 {
-  let mut scheduler = unsafe { Box::from_raw(scheduler_ptr) };
-  let t = f(&mut scheduler);
+  let scheduler = unsafe { Box::from_raw(scheduler_ptr) };
+  let t = f(&scheduler);
   mem::forget(scheduler);
   t
 }
 
+///
+/// See `with_scheduler`.
+///
+fn with_session<F, T>(session_ptr: *mut Session, f: F) -> T
+where
+  F: FnOnce(&Session) -> T,
+{
+  let session = unsafe { Box::from_raw(session_ptr) };
+  let t = f(&session);
+  mem::forget(session);
+  t
+}
+
+///
+/// See `with_scheduler`.
+///
 fn with_execution_request<F, T>(execution_request_ptr: *mut ExecutionRequest, f: F) -> T
 where
   F: FnOnce(&mut ExecutionRequest) -> T,
@@ -579,6 +642,9 @@ where
   t
 }
 
+///
+/// See `with_scheduler`.
+///
 fn with_tasks<F, T>(tasks_ptr: *mut Tasks, f: F) -> T
 where
   F: FnOnce(&mut Tasks) -> T,

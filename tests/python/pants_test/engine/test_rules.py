@@ -12,13 +12,11 @@ from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import RootRule, RuleIndex, SingletonRule, TaskRule
-from pants.engine.scheduler import WrappedNativeScheduler
 from pants.engine.selectors import Get, Select, SelectDependencies
 from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.planners import Goal
-from pants_test.engine.util import (TargetTable, assert_equal_with_printing,
-                                    create_native_scheduler, init_native)
+from pants_test.engine.util import TargetTable, assert_equal_with_printing, create_scheduler
 
 
 class AGoal(Goal):
@@ -75,15 +73,11 @@ class RuleIndexTest(unittest.TestCase):
 
 
 class RulesetValidatorTest(unittest.TestCase):
-  def create_validator(self, goal_to_product, rules):
-    return create_native_scheduler(rules)
-
   def test_ruleset_with_missing_product_type(self):
     rules = _suba_root_rules + [TaskRule(A, [Select(B)], noop)]
-    scheduler = create_native_scheduler(rules)
 
     with self.assertRaises(ValueError) as cm:
-      scheduler.assert_ruleset_valid()
+      create_scheduler(rules)
 
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
@@ -94,9 +88,8 @@ class RulesetValidatorTest(unittest.TestCase):
 
   def test_ruleset_with_rule_with_two_missing_selects(self):
     rules = _suba_root_rules + [TaskRule(A, [Select(B), Select(C)], noop)]
-    validator = self.create_validator({}, rules)
     with self.assertRaises(ValueError) as cm:
-      validator.assert_ruleset_valid()
+      create_scheduler(rules)
 
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
@@ -108,9 +101,7 @@ class RulesetValidatorTest(unittest.TestCase):
 
   def test_ruleset_with_selector_only_provided_as_root_subject(self):
     rules = [RootRule(B), TaskRule(A, [Select(B)], noop)]
-    validator = self.create_validator({}, rules)
-
-    validator.assert_ruleset_valid()
+    create_scheduler(rules)
 
   def test_ruleset_with_superclass_of_selected_type_produced_fails(self):
     rules = [
@@ -118,10 +109,9 @@ class RulesetValidatorTest(unittest.TestCase):
       TaskRule(A, [Select(B)], noop),
       TaskRule(B, [Select(SubA)], noop)
     ]
-    validator = self.create_validator({}, rules)
 
     with self.assertRaises(ValueError) as cm:
-      validator.assert_ruleset_valid()
+      create_scheduler(rules)
     self.assert_equal_with_printing(dedent("""
                                       Rules with errors: 2
                                         (A, (Select(B),), noop):
@@ -131,29 +121,12 @@ class RulesetValidatorTest(unittest.TestCase):
                                       """).strip(),
                                     str(cm.exception))
 
-  @unittest.skip('testing api not used by non-example code')
-  def test_ruleset_with_goal_not_produced(self):
-    # The graph is complete, but the goal 'goal-name' requests A,
-    # which is not produced by any rule.
-    rules = _suba_root_rules + [
-      TaskRule(B, [Select(SubA)], noop)
-    ]
-
-    validator = self.create_validator({'goal-name': AGoal}, rules)
-    with self.assertRaises(ValueError) as cm:
-      validator.assert_ruleset_valid()
-
-    self.assert_equal_with_printing("no task for product used by goal \"goal-name\": AGoal",
-                                    str(cm.exception))
-
   def test_ruleset_with_explicit_type_constraint(self):
     rules = _suba_root_rules + [
       TaskRule(Exactly(A), [Select(B)], noop),
       TaskRule(B, [Select(A)], noop)
     ]
-    validator = self.create_validator({}, rules)
-
-    validator.assert_ruleset_valid()
+    create_scheduler(rules)
 
   def test_ruleset_with_failure_due_to_incompatible_subject_for_singleton(self):
     rules = [
@@ -161,10 +134,9 @@ class RulesetValidatorTest(unittest.TestCase):
       TaskRule(D, [Select(C)], noop),
       SingletonRule(B, B()),
     ]
-    validator = self.create_validator({}, rules)
 
     with self.assertRaises(ValueError) as cm:
-      validator.assert_ruleset_valid()
+      create_scheduler(rules)
 
     # This error message could note near matches like the singleton.
     self.assert_equal_with_printing(dedent("""
@@ -179,10 +151,9 @@ class RulesetValidatorTest(unittest.TestCase):
       RootRule(A),
       TaskRule(A, [SelectDependencies(B, SubA, field_types=(D,))], noop),
     ]
-    validator = self.create_validator({}, rules)
 
     with self.assertRaises(ValueError) as cm:
-      validator.assert_ruleset_valid()
+      create_scheduler(rules)
 
     self.assert_equal_with_printing(dedent("""
                              Rules with errors: 1
@@ -199,10 +170,9 @@ class RulesetValidatorTest(unittest.TestCase):
       TaskRule(D, [Select(A), SelectDependencies(A, SubA, field_types=(C,))], noop),
       TaskRule(A, [Select(SubA)], noop)
     ]
-    validator = self.create_validator({}, rules)
 
     with self.assertRaises(ValueError) as cm:
-      validator.assert_ruleset_valid()
+      create_scheduler(rules)
 
     self.assert_equal_with_printing(dedent("""
                       Rules with errors: 2
@@ -225,7 +195,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       RootRule(SubA),
       TaskRule(Exactly(A), [Select(SubA)], noop)
     ]
-    fullgraph = self.create_full_graph(RuleIndex.create(rules))
+    fullgraph = self.create_full_graph(rules)
 
     self.assert_equal_with_printing(dedent("""
                      digraph {
@@ -242,8 +212,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     address_mapper = AddressMapper(JsonParser(symbol_table), '*.BUILD.json')
     rules = create_graph_rules(address_mapper, symbol_table) + create_fs_rules()
 
-    rule_index = RuleIndex.create(rules)
-    fullgraph_str = self.create_full_graph(rule_index)
+    fullgraph_str = self.create_full_graph(rules)
 
     print('---diagnostic------')
     print(fullgraph_str)
@@ -277,7 +246,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       TaskRule(A, [Select(SubA)], noop),
       TaskRule(B, [Select(A)], noop)
     ]
-    fullgraph = self.create_full_graph(RuleIndex.create(rules))
+    fullgraph = self.create_full_graph(rules)
 
     self.assert_equal_with_printing(dedent("""
                      digraph {
@@ -363,7 +332,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       SingletonRule(B, B()),
     ]
 
-    subgraph = self.create_subgraph(A, rules, SubA())
+    subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
 
     self.assert_equal_with_printing(dedent("""
                      digraph {
@@ -382,7 +351,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       TaskRule(Exactly(A), [], noop),
     ]
 
-    fullgraph = self.create_full_graph(RuleIndex.create(rules))
+    fullgraph = self.create_full_graph(rules, validate=False)
 
     self.assert_equal_with_printing(dedent("""
                      digraph {
@@ -403,7 +372,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       TaskRule(Exactly(B), [Select(D), Select(A)], noop),
     ]
 
-    fullgraph = self.create_full_graph(RuleIndex.create(rules))
+    fullgraph = self.create_full_graph(rules, validate=False)
 
     self.assert_equal_with_printing(dedent("""
                      digraph {
@@ -424,7 +393,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       TaskRule(Exactly(A), [Select(B)], noop),
       TaskRule(Exactly(A), [], noop),
     ]
-    subgraph = self.create_subgraph(A, rules, SubA())
+    subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
 
     self.assert_equal_with_printing(dedent("""
                      digraph {
@@ -556,7 +525,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       TaskRule(Exactly(A), [SelectDependencies(B, SubA, field_types=(D,))], noop),
       SingletonRule(C, C()),
     ]
-    subgraph = self.create_subgraph(A, rules, SubA())
+    subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
 
     self.assert_equal_with_printing(dedent("""
                      digraph {
@@ -596,7 +565,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       TaskRule(A, [Select(SubA)], noop)
     ]
 
-    subgraph = self.create_subgraph(B, rules, SubA())
+    subgraph = self.create_subgraph(B, rules, SubA(), validate=False)
 
     self.assert_equal_with_printing(dedent("""
                      digraph {
@@ -617,7 +586,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       TaskRule(A, [Select(SubA)], noop)
     ]
 
-    subgraph = self.create_full_graph(RuleIndex.create(rules))
+    subgraph = self.create_full_graph(rules)
 
     self.assert_equal_with_printing(dedent("""
                      digraph {
@@ -677,29 +646,12 @@ class RuleGraphMakerTest(unittest.TestCase):
                      }""").strip(),
       subgraph)
 
-  def create_scheduler(self, rule_index):
-    native = init_native()
-    scheduler = WrappedNativeScheduler(
-      native=native,
-      build_root='/tmp',
-      work_dir='/tmp/.pants.d',
-      ignore_patterns=tuple(),
-      rule_index=rule_index)
-    return scheduler
-
-  def create_full_graph(self, rule_index):
-    scheduler = self.create_scheduler(rule_index)
-
+  def create_full_graph(self, rules, validate=True):
+    scheduler = create_scheduler(rules, validate=validate)
     return "\n".join(scheduler.rule_graph_visualization())
 
-  def create_real_subgraph(self, rule_index, root_subject, product_type):
-    scheduler = self.create_scheduler(rule_index)
-
-    return "\n".join(scheduler.rule_subgraph_visualization(root_subject, product_type))
-
-  def create_subgraph(self, requested_product, rules, subject):
-    rules = rules + _suba_root_rules
-    rule_index = RuleIndex.create(rules)
-    return self.create_real_subgraph(rule_index, type(subject), requested_product)
+  def create_subgraph(self, requested_product, rules, subject, validate=True):
+    scheduler = create_scheduler(rules + _suba_root_rules, validate=validate)
+    return "\n".join(scheduler.rule_subgraph_visualization(type(subject), requested_product))
 
   assert_equal_with_printing = assert_equal_with_printing

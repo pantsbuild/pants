@@ -24,32 +24,27 @@ class SchedulerService(PantsService):
 
   QUEUE_SIZE = 64
 
-  def __init__(self, fs_event_service, legacy_graph_helper, build_root, invalidation_globs):
+  def __init__(self, fs_event_service, legacy_graph_scheduler, build_root, invalidation_globs):
     """
     :param FSEventService fs_event_service: An unstarted FSEventService instance for setting up
                                             filesystem event handlers.
-    :param LegacyGraphHelper legacy_graph_helper: The LegacyGraphHelper instance for graph
-                                                  construction.
+    :param LegacyGraphScheduler legacy_graph_scheduler: The LegacyGraphScheduler instance for graph
+                                                        construction.
     :param str build_root: The current build root.
     :param list invalidation_globs: A list of `globs` that when encountered in filesystem event
                                     subscriptions will tear down the daemon.
     """
     super(SchedulerService, self).__init__()
     self._fs_event_service = fs_event_service
-    self._graph_helper = legacy_graph_helper
+    self._graph_helper = legacy_graph_scheduler
     self._invalidation_globs = invalidation_globs
     self._build_root = build_root
 
-    self._scheduler = legacy_graph_helper.scheduler
+    self._scheduler = legacy_graph_scheduler.scheduler
     self._logger = logging.getLogger(__name__)
     self._event_queue = Queue.Queue(maxsize=self.QUEUE_SIZE)
     self._watchman_is_running = threading.Event()
     self._invalidating_files = set()
-
-  @property
-  def change_calculator(self):
-    """Surfaces the change calculator."""
-    return self._graph_helper.change_calculator
 
   @staticmethod
   def _combined_invalidating_fileset_from_globs(glob_strs, root):
@@ -125,10 +120,10 @@ class SchedulerService(PantsService):
     """
     return self._scheduler.graph_len()
 
-  def warm_product_graph(self, spec_roots):
+  def warm_product_graph(self, options, target_roots_calculator):
     """Runs an execution request against the captive scheduler given a set of input specs to warm.
 
-    :returns: A `LegacyGraphHelper` instance for graph construction.
+    :returns: `(LegacyGraphSession, TargetRoots)`
     """
     # If any nodes exist in the product graph, wait for the initial watchman event to avoid
     # racing watchman startup vs invalidation events.
@@ -137,9 +132,15 @@ class SchedulerService(PantsService):
       self._logger.debug('graph len was {}, waiting for initial watchman event'.format(graph_len))
       self._watchman_is_running.wait()
 
+    session = self._graph_helper.new_session()
+
     with self.fork_lock:
-      self._graph_helper.warm_product_graph(spec_roots)
-      return self._graph_helper
+      target_roots = target_roots_calculator.create(
+        options,
+        change_calculator=session.change_calculator
+      )
+      session.warm_product_graph(target_roots)
+      return session, target_roots
 
   def run(self):
     """Main service entrypoint."""
