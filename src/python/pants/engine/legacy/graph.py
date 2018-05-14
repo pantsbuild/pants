@@ -23,7 +23,7 @@ from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.rules import TaskRule, rule
-from pants.engine.selectors import Get, Select, SelectDependencies
+from pants.engine.selectors import Get, Select
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import Collection, datatype
@@ -342,13 +342,17 @@ class HydratedField(datatype(['name', 'value'])):
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
 
 
-def hydrate_target(target_adaptor, hydrated_fields):
+def hydrate_target(target_adaptor):
   """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
   # Hydrate the fields of the adaptor and re-construct it.
+  hydrated_fields = yield [(Get(HydratedField, BundlesField, fa)
+                            if type(fa) is BundlesField
+                            else Get(HydratedField, SourcesField, fa))
+                           for fa in target_adaptor.field_adaptors]
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
-  return HydratedTarget(target_adaptor.address,
+  yield HydratedTarget(target_adaptor.address,
                         TargetAdaptor(**kwargs),
                         tuple(target_adaptor.dependencies))
 
@@ -405,18 +409,19 @@ def hydrate_bundles(bundles_field):
 def create_legacy_graph_tasks(symbol_table):
   """Create tasks to recursively parse the legacy graph."""
   symbol_table_constraint = symbol_table.constraint()
+
   return [
     transitive_hydrated_targets,
     transitive_hydrated_target,
     hydrated_targets,
     TaskRule(
       HydratedTarget,
-      [Select(symbol_table_constraint),
-       SelectDependencies(HydratedField,
-                          symbol_table_constraint,
-                          'field_adaptors',
-                          field_types=(SourcesField, BundlesField,))],
-      hydrate_target
+      [Select(symbol_table_constraint)],
+      hydrate_target,
+      input_gets=[
+        Get(HydratedField, SourcesField),
+        Get(HydratedField, BundlesField),
+      ]
     ),
     hydrate_sources,
     hydrate_bundles,

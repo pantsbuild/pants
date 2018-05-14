@@ -19,7 +19,7 @@ from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessR
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
-from pants.engine.selectors import Select, SelectDependencies, SelectVariant, constraint_for
+from pants.engine.selectors import Select, SelectVariant, constraint_for
 from pants.engine.struct import HasProducts, Variants
 from pants.util.contextutil import temporary_file_path
 from pants.util.objects import SubclassesOf, datatype
@@ -221,12 +221,6 @@ class Scheduler(object):
         self._native.lib.tasks_add_select_variant(self._tasks,
                                                   product_constraint,
                                                   key_buf)
-      elif selector_type is SelectDependencies:
-        self._native.lib.tasks_add_select_dependencies(self._tasks,
-                                                       product_constraint,
-                                                       self._to_constraint(selector.dep_product),
-                                                       self._to_utf8_buf(selector.field),
-                                                       self._to_ids_buf(selector.field_types))
       else:
         raise ValueError('Unrecognized Selector type: {}'.format(selector))
     for get in rule.input_gets:

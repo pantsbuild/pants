@@ -22,7 +22,7 @@ use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDig
 use process_execution;
 use hashing;
 use rule_graph;
-use selectors::{self, Selector};
+use selectors;
 use tasks::{self, Intrinsic, IntrinsicKind};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
@@ -427,108 +427,6 @@ impl From<Select> for NodeKey {
 }
 
 ///
-/// A Node that selects the given Product for each of the items in `field` on `dep_product`.
-///
-/// Begins by selecting the `dep_product` for the subject, and then selects a product for each
-/// member of a collection named `field` on the dep_product.
-///
-/// The value produced by this Node guarantees that the order of the provided values matches the
-/// order of declaration in the list `field` of the `dep_product`.
-///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectDependencies {
-  pub subject: Key,
-  pub variants: Variants,
-  pub selector: selectors::SelectDependencies,
-  pub dep_product_entries: rule_graph::Entries,
-  pub product_entries: rule_graph::Entries,
-}
-
-impl SelectDependencies {
-  pub fn new(
-    selector: selectors::SelectDependencies,
-    subject: Key,
-    variants: Variants,
-    edges: &rule_graph::RuleEdges,
-  ) -> SelectDependencies {
-    // filters entries by whether the subject type is the right subject type
-    let dep_p_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
-      Selector::SelectDependencies(selector.clone()),
-      selectors::Select::without_variant(selector.clone().dep_product),
-    ));
-    let p_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedMultipleNestedSelect(
-      Selector::SelectDependencies(selector.clone()),
-      selector.field_types.clone(),
-      selectors::Select::without_variant(selector.product.clone()),
-    ));
-    SelectDependencies {
-      subject: subject,
-      variants: variants,
-      selector: selector.clone(),
-      dep_product_entries: dep_p_entries,
-      product_entries: p_entries,
-    }
-  }
-
-  fn get_dep(&self, context: &Context, dep_subject: Value) -> NodeFuture<Value> {
-    // TODO: This method needs to consider whether the `dep_subject` is an Address,
-    // and if so, attempt to parse Variants there. See:
-    //   https://github.com/pantsbuild/pants/issues/4020
-
-    let dep_subject_key = externs::key_for(dep_subject);
-    Select {
-      selector: selectors::Select::without_variant(self.selector.product),
-      subject: dep_subject_key,
-      variants: self.variants.clone(),
-      // NB: We're filtering out all of the entries for field types other than
-      //    dep_subject's since none of them will match.
-      entries: self
-        .product_entries
-        .clone()
-        .into_iter()
-        .filter(|e| e.matches_subject_type(dep_subject_key.type_id().clone()))
-        .collect(),
-    }.run(context.clone())
-  }
-}
-
-impl SelectDependencies {
-  fn run(self, context: Context) -> NodeFuture<Value> {
-    // Select the product holding the dependency list.
-    Select {
-      selector: selectors::Select::without_variant(self.selector.dep_product),
-      subject: self.subject.clone(),
-      variants: self.variants.clone(),
-      entries: self.dep_product_entries.clone(),
-    }.run(context.clone())
-      .then(move |dep_product_res| {
-        match dep_product_res {
-          Ok(dep_product) => {
-            // The product and its dependency list are available: project them.
-            let deps = future::join_all(
-              externs::project_multi(&dep_product, &self.selector.field)
-                .into_iter()
-                .map(|dep_subject| self.get_dep(&context, dep_subject))
-                .collect::<Vec<_>>(),
-            );
-            deps
-              .then(move |dep_values_res| {
-                // Finally, store the resulting values.
-                match dep_values_res {
-                  Ok(dep_values) => Ok(externs::store_tuple(&dep_values)),
-                  Err(failure) => Err(was_required(failure)),
-                }
-              })
-              .to_boxed()
-          }
-          Err(failure) => err(failure),
-        }
-      })
-      .to_boxed()
-  }
-}
-
-///
 /// A Node that represents executing a process.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -829,24 +727,6 @@ pub struct Task {
 }
 
 impl Task {
-  fn get(&self, context: &Context, selector: Selector) -> NodeFuture<Value> {
-    let ref edges = context
-      .core
-      .rule_graph
-      .edges_for_inner(&self.entry)
-      .expect("edges for task exist.");
-    match selector {
-      Selector::Select(s) => {
-        Select::new_with_selector(s, self.subject.clone(), self.variants.clone(), edges)
-          .run(context.clone())
-      }
-      Selector::SelectDependencies(s) => {
-        SelectDependencies::new(s, self.subject.clone(), self.variants.clone(), edges)
-          .run(context.clone())
-      }
-    }
-  }
-
   fn gen_get(
     context: &Context,
     entry: Arc<rule_graph::Entry>,
@@ -904,17 +784,29 @@ impl Node for Task {
   type Output = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
-    let deps = future::join_all(
-      self
-        .task
-        .clause
-        .iter()
-        .map(|selector| self.get(&context, selector.clone()))
-        .collect::<Vec<_>>(),
-    );
+    let deps = {
+      let ref edges = context
+        .core
+        .rule_graph
+        .edges_for_inner(&self.entry)
+        .expect("edges for task exist.");
+      let subject = self.subject;
+      let variants = self.variants;
+      future::join_all(
+        self
+          .task
+          .clause
+          .into_iter()
+          .map(|s| {
+            Select::new_with_selector(s, subject.clone(), variants.clone(), edges)
+              .run(context.clone())
+          })
+          .collect::<Vec<_>>(),
+      )
+    };
 
-    let func = self.task.func.clone();
-    let entry = self.entry.clone();
+    let func = self.task.func;
+    let entry = self.entry;
     deps
       .then(move |deps_result| match deps_result {
         Ok(deps) => externs::call(&externs::val_for(&func.0), &deps),

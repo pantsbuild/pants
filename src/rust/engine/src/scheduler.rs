@@ -101,7 +101,7 @@ impl Scheduler {
   ) -> Result<(), String> {
     let edges = self.find_root_edges_or_update_rule_graph(
       subject.type_id().clone(),
-      selectors::Selector::Select(selectors::Select::without_variant(product)),
+      selectors::Select::without_variant(product),
     )?;
     request
       .roots
@@ -112,16 +112,16 @@ impl Scheduler {
   fn find_root_edges_or_update_rule_graph(
     &self,
     subject_type: TypeId,
-    selector: selectors::Selector,
+    select: selectors::Select,
   ) -> Result<rule_graph::RuleEdges, String> {
     self
       .core
       .rule_graph
-      .find_root_edges(subject_type.clone(), selector.clone())
+      .find_root_edges(subject_type.clone(), select.clone())
       .ok_or_else(|| {
         format!(
           "No installed rules can satisfy {} for a root subject of type {}.",
-          rule_graph::selector_str(&selector),
+          rule_graph::select_str(&select),
           rule_graph::type_str(subject_type)
         )
       })

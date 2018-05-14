@@ -22,7 +22,7 @@ from pants.engine.mapper import AddressFamily, AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import SingletonRule, TaskRule, rule
 from pants.engine.scheduler import Scheduler
-from pants.engine.selectors import Get, Select, SelectDependencies, SelectVariant
+from pants.engine.selectors import Get, Select, SelectVariant
 from pants.engine.struct import HasProducts, Struct, StructWithDeps, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import SubclassesOf, datatype
@@ -102,11 +102,10 @@ class SourceRoots(datatype(['srcroots'])):
 
 
 @printing_func
-@rule(Address,
-      [Select(JVMPackageName),
-       SelectDependencies(AddressFamily, Snapshot, field='dir_stats', field_types=(Dir,))])
-def select_package_address(jvm_package_name, address_families):
+@rule(Address, [Select(JVMPackageName), Select(Snapshot)])
+def select_package_address(jvm_package_name, snapshot):
   """Return the Address from the given AddressFamilies which provides the given package."""
+  address_families = yield [Get(AddressFamily, Dir, ds) for ds in snapshot.dir_stats]
   addresses = [address for address_family in address_families
                        for address in address_family.addressables.keys()]
   if len(addresses) == 0:
@@ -115,7 +114,7 @@ def select_package_address(jvm_package_name, address_families):
   elif len(addresses) > 1:
     raise ValueError('Multiple targets might be able to provide {}:\n  {}'.format(
       jvm_package_name, '\n  '.join(str(a) for a in addresses)))
-  return addresses[0].to_address()
+  yield addresses[0].to_address()
 
 
 @printing_func
@@ -329,19 +328,21 @@ def gen_scrooge_thrift(sources, config, scrooge_classpath):
 
 
 @printing_func
-@rule(Classpath,
-      [Select(JavaSources),
-       SelectDependencies(Classpath, JavaSources, field_types=(Address, Jar))])
-def javac(sources, classpath):
-  return Classpath(creator='javac')
+@rule(Classpath, [Select(JavaSources)])
+def javac(sources):
+  classpath = yield [(Get(Classpath, Address, d) if type(d) is Address else Get(Classpath, Jar, d))
+                     for d in sources.dependencies]
+  print('compiling {} with {}'.format(sources, classpath))
+  yield Classpath(creator='javac')
 
 
 @printing_func
-@rule(Classpath,
-      [Select(ScalaSources),
-       SelectDependencies(Classpath, ScalaSources, field_types=(Address, Jar))])
-def scalac(sources, classpath):
-  return Classpath(creator='scalac')
+@rule(Classpath, [Select(ScalaSources)])
+def scalac(sources):
+  classpath = yield [(Get(Classpath, Address, d) if type(d) is Address else Get(Classpath, Jar, d))
+                     for d in sources.dependencies]
+  print('compiling {} with {}'.format(sources, classpath))
+  yield Classpath(creator='scalac')
 
 
 class Goal(AbstractClass):

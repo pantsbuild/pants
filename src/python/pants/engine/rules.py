@@ -161,7 +161,7 @@ class RuleIndex(datatype(['rules', 'roots'])):
 
   @classmethod
   def create(cls, rule_entries):
-    """Creates a NodeBuilder with tasks indexed by their output type."""
+    """Creates a RuleIndex with tasks indexed by their output type."""
     # NB make tasks ordered so that gen ordering is deterministic.
     serializable_rules = OrderedDict()
     serializable_roots = set()
@@ -175,11 +175,10 @@ class RuleIndex(datatype(['rules', 'roots'])):
       if isinstance(rule, RootRule):
         serializable_roots.add(rule.output_constraint)
         return
-      # TODO: The heterogenity here has some confusing implications here:
-      # see https://github.com/pantsbuild/pants/issues/4005
+      # TODO: Ensure that interior types work by indexing on the list of types in
+      # the constraint. This heterogenity has some confusing implications:
+      #   see https://github.com/pantsbuild/pants/issues/4005
       for kind in rule.output_constraint.types:
-        # NB Ensure that interior types from SelectDependencies work by
-        # indexing on the list of types in the constraint.
         add_task(kind, rule)
       add_task(rule.output_constraint, rule)
 
