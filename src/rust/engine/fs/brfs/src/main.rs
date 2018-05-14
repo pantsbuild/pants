@@ -560,6 +560,10 @@ pub fn mount<'a, P: AsRef<Path>>(
   debug!("About to spawn_mount with options {:?}", options);
 
   let fs = unsafe { fuse::spawn_mount(BuildResultFS::new(store), &mount_path, &options) };
+  // fuse::spawn_mount doesn't always fully initialise the filesystem before returning.
+  // Bluntly sleep for a bit here. If this poses a problem, we should maybe start doing some polling
+  // stats or something until the filesystem seems to be correct.
+  std::thread::sleep(std::time::Duration::from_secs(1));
   debug!("Did spawn mount");
   fs
 }
@@ -840,7 +844,6 @@ mod test {
     assert!(!file::is_executable(&roland));
   }
 
-  /* TODO: See https://github.com/pantsbuild/pants/issues/5813.
   #[test]
   fn files_are_correctly_executable() {
     let store_dir = TempDir::new("store").unwrap();
@@ -872,7 +875,6 @@ mod test {
     assert!(file::is_executable(&virtual_dir.join("feed")));
     assert!(!file::is_executable(&virtual_dir.join("food")));
   }
-  */
 
   pub fn digest_to_filepath(digest: &hashing::Digest) -> String {
     format!("{}-{}", digest.0, digest.1)
