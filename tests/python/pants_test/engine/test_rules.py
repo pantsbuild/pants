@@ -12,7 +12,7 @@ from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import RootRule, RuleIndex, SingletonRule, TaskRule
-from pants.engine.selectors import Get, Select, SelectDependencies
+from pants.engine.selectors import Get, Select
 from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.planners import Goal
@@ -146,28 +146,12 @@ class RulesetValidatorTest(unittest.TestCase):
                                       """).strip(),
                                     str(cm.exception))
 
-  def test_ruleset_unreachable_due_to_product_of_select_dependencies(self):
-    rules = [
-      RootRule(A),
-      TaskRule(A, [SelectDependencies(B, SubA, field_types=(D,))], noop),
-    ]
-
-    with self.assertRaises(ValueError) as cm:
-      create_scheduler(rules)
-
-    self.assert_equal_with_printing(dedent("""
-                             Rules with errors: 1
-                               (A, (SelectDependencies(B, SubA, field_types=(D,)),), noop):
-                                 Unreachable with subject types: Any
-                             """).strip(),
-                                    str(cm.exception))
-
   def test_not_fulfillable_duplicated_dependency(self):
     # If a rule depends on another rule+subject in two ways, and one of them is unfulfillable
     # Only the unfulfillable one should be in the errors.
     rules = _suba_root_rules + [
       TaskRule(B, [Select(D)], noop),
-      TaskRule(D, [Select(A), SelectDependencies(A, SubA, field_types=(C,))], noop),
+      TaskRule(D, [Select(A), Select(SubA)], noop, input_gets=[Get(A, C)]),
       TaskRule(A, [Select(SubA)], noop)
     ]
 
@@ -177,8 +161,8 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                       Rules with errors: 2
                         (B, (Select(D),), noop):
-                          depends on unfulfillable (D, (Select(A), SelectDependencies(A, SubA, field_types=(C,))), noop) of SubA with subject types: SubA
-                        (D, (Select(A), SelectDependencies(A, SubA, field_types=(C,))), noop):
+                          depends on unfulfillable (D, (Select(A), Select(SubA)), [Get(A, C)], noop) of SubA with subject types: SubA
+                        (D, (Select(A), Select(SubA)), [Get(A, C)], noop):
                           depends on unfulfillable (A, (Select(SubA),), noop) of C with subject types: SubA
                       """).strip(),
         str(cm.exception))
@@ -406,141 +390,9 @@ class RuleGraphMakerTest(unittest.TestCase):
                      }""").strip(),
       subgraph)
 
-  def test_select_dependencies_with_separate_types_for_subselectors(self):
+  def test_get_with_matching_singleton(self):
     rules = [
-      TaskRule(Exactly(A), [SelectDependencies(B, C, field_types=(D,))], noop),
-      TaskRule(B, [Select(D)], noop),
-      TaskRule(C, [Select(SubA)], noop)
-    ]
-
-    subgraph = self.create_subgraph(A, rules, SubA())
-
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, (SelectDependencies(B, C, field_types=(D,)),), noop) of SubA"}
-                       // internal entries
-                         "(A, (SelectDependencies(B, C, field_types=(D,)),), noop) of SubA" -> {"(C, (Select(SubA),), noop) of SubA" "(B, (Select(D),), noop) of D"}
-                         "(B, (Select(D),), noop) of D" -> {"SubjectIsProduct(D)"}
-                         "(C, (Select(SubA),), noop) of SubA" -> {"SubjectIsProduct(SubA)"}
-                     }""").strip(),
-      subgraph)
-
-  def test_select_dependencies_with_subject_as_first_subselector(self):
-    rules = [
-      TaskRule(Exactly(A), [SelectDependencies(B, SubA, field_types=(D,))], noop),
-      TaskRule(B, [Select(D)], noop),
-    ]
-
-    subgraph = self.create_subgraph(A, rules, SubA())
-
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, (SelectDependencies(B, SubA, field_types=(D,)),), noop) of SubA"}
-                       // internal entries
-                         "(A, (SelectDependencies(B, SubA, field_types=(D,)),), noop) of SubA" -> {"SubjectIsProduct(SubA)" "(B, (Select(D),), noop) of D"}
-                         "(B, (Select(D),), noop) of D" -> {"SubjectIsProduct(D)"}
-                     }""").strip(),
-      subgraph)
-
-  def test_select_dependencies_multiple_field_types_all_resolvable(self):
-    rules = [
-      TaskRule(Exactly(A), [SelectDependencies(B, SubA, field_types=(C, D,))], noop),
-      TaskRule(B, [Select(Exactly(C, D))], noop),
-    ]
-
-    subgraph = self.create_subgraph(A, rules, SubA())
-
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA"}
-                       // internal entries
-                         "(A, (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA" -> {"SubjectIsProduct(SubA)" "(B, (Select(Exactly(C, D)),), noop) of C" "(B, (Select(Exactly(C, D)),), noop) of D"}
-                         "(B, (Select(Exactly(C, D)),), noop) of C" -> {"SubjectIsProduct(C)"}
-                         "(B, (Select(Exactly(C, D)),), noop) of D" -> {"SubjectIsProduct(D)"}
-                     }""").strip(),
-      subgraph)
-
-  def test_select_dependencies_multiple_field_types_all_resolvable_with_deps(self):
-    rules = [
-      TaskRule(Exactly(A), [SelectDependencies(B, SubA, field_types=(C, D,))], noop),
-      # for the C type, it'll just be a literal, but for D, it'll traverse one more edge
-      TaskRule(B, [Select(C)], noop),
-      TaskRule(C, [Select(D)], noop),
-    ]
-
-    subgraph = self.create_subgraph(A, rules, SubA())
-
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA"}
-                       // internal entries
-                         "(A, (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA" -> {"SubjectIsProduct(SubA)" "(B, (Select(C),), noop) of C" "(B, (Select(C),), noop) of D"}
-                         "(B, (Select(C),), noop) of C" -> {"SubjectIsProduct(C)"}
-                         "(B, (Select(C),), noop) of D" -> {"(C, (Select(D),), noop) of D"}
-                         "(C, (Select(D),), noop) of D" -> {"SubjectIsProduct(D)"}
-                     }""").strip(),
-      subgraph)
-
-  def test_select_dependencies_recurse_with_different_type(self):
-    rules = [
-      TaskRule(Exactly(A), [SelectDependencies(B, SubA, field_types=(C, D,))], noop),
-      TaskRule(B, [Select(A)], noop),
-      TaskRule(C, [Select(SubA)], noop),
-      TaskRule(SubA, [], noop)
-    ]
-
-    subgraph = self.create_subgraph(A, rules, SubA())
-
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA"}
-                       // internal entries
-                         "(A, (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of C" -> {"(SubA, (,), noop) of C" "(B, (Select(A),), noop) of C" "(B, (Select(A),), noop) of D"}
-                         "(A, (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of D" -> {"(SubA, (,), noop) of D" "(B, (Select(A),), noop) of C" "(B, (Select(A),), noop) of D"}
-                         "(A, (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of SubA" -> {"SubjectIsProduct(SubA)" "(B, (Select(A),), noop) of C" "(B, (Select(A),), noop) of D"}
-                         "(B, (Select(A),), noop) of C" -> {"(A, (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of C"}
-                         "(B, (Select(A),), noop) of D" -> {"(A, (SelectDependencies(B, SubA, field_types=(C, D,)),), noop) of D"}
-                         "(SubA, (,), noop) of C" -> {}
-                         "(SubA, (,), noop) of D" -> {}
-                     }""").strip(),
-      subgraph)
-
-  def test_select_dependencies_non_matching_subselector_because_of_singleton(self):
-    rules = [
-      TaskRule(Exactly(A), [SelectDependencies(B, SubA, field_types=(D,))], noop),
-      SingletonRule(C, C()),
-    ]
-    subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
-
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // empty graph
-                     }""").strip(),
-      subgraph)
-    #self.assert_equal_with_printing(dedent("""
-    #                     Rules with errors: 1
-    #                       (Exactly(A), (SelectDependencies(B, SubA, field_types=(D,)),), noop):
-    #                         no matches for Select(B) when resolving SelectDependencies(B, SubA, field_types=(D,)) with subject types: D""").strip(),
-    #                                subgraph.error_message())
-
-  def test_select_dependencies_with_matching_singleton(self):
-    rules = [
-      TaskRule(Exactly(A), [SelectDependencies(B, SubA, field_types=(C,))], noop),
+      TaskRule(Exactly(A), [Select(SubA)], noop, input_gets=[Get(B, C)]),
       SingletonRule(B, B()),
     ]
 
@@ -552,9 +404,9 @@ class RuleGraphMakerTest(unittest.TestCase):
                        // root subject types: SubA
                        // root entries
                          "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, (SelectDependencies(B, SubA, field_types=(C,)),), noop) of SubA"}
+                         "Select(A) for SubA" -> {"(A, (Select(SubA),), [Get(B, C)], noop) of SubA"}
                        // internal entries
-                         "(A, (SelectDependencies(B, SubA, field_types=(C,)),), noop) of SubA" -> {"SubjectIsProduct(SubA)" "Singleton(B(), B)"}
+                         "(A, (Select(SubA),), [Get(B, C)], noop) of SubA" -> {"SubjectIsProduct(SubA)" "Singleton(B(), B)"}
                      }""").strip(),
       subgraph)
 
@@ -624,27 +476,6 @@ class RuleGraphMakerTest(unittest.TestCase):
                          "(B, (Select(D),), noop) of D" -> {"SubjectIsProduct(D)"}
                      }""").strip(),
                                     subgraph)
-
-  def test_successful_when_one_field_type_is_unfulfillable(self):
-    # NB We may want this to be a warning, since it may not be intentional
-    rules = [
-      TaskRule(B, [Select(SubA)], noop),
-      TaskRule(D, [Select(Exactly(B)), SelectDependencies(B, SubA, field_types=(SubA, C))], noop)
-    ]
-
-    subgraph = self.create_subgraph(D, rules, SubA())
-
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(D) for SubA" [color=blue]
-                         "Select(D) for SubA" -> {"(D, (Select(B), SelectDependencies(B, SubA, field_types=(SubA, C,))), noop) of SubA"}
-                       // internal entries
-                         "(B, (Select(SubA),), noop) of SubA" -> {"SubjectIsProduct(SubA)"}
-                         "(D, (Select(B), SelectDependencies(B, SubA, field_types=(SubA, C,))), noop) of SubA" -> {"(B, (Select(SubA),), noop) of SubA" "SubjectIsProduct(SubA)"}
-                     }""").strip(),
-      subgraph)
 
   def create_full_graph(self, rules, validate=True):
     scheduler = create_scheduler(rules, validate=validate)

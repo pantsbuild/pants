@@ -103,7 +103,7 @@ class SourceRoots(datatype(['srcroots'])):
 
 @printing_func
 @rule(Address, [Select(JVMPackageName), Select(Snapshot)])
-def select_package_address(jvm_package_name, address_families, snapshot):
+def select_package_address(jvm_package_name, snapshot):
   """Return the Address from the given AddressFamilies which provides the given package."""
   address_families = yield [Get(AddressFamily, Dir, ds) for ds in snapshot.dir_stats]
   addresses = [address for address_family in address_families
