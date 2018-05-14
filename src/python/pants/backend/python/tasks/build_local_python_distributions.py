@@ -126,8 +126,8 @@ class BuildLocalPythonDistributions(Task):
 >>>>>>> 046b873... Cleanup method definitions
 
     for tgt in dist_targets:
-      for setup_req_lib in tgt.setup_requires:
-        for req_lib in build_graph.resolve(setup_req_lib):
+      for setup_req_lib_addr in tgt.setup_requires:
+        for req_lib in build_graph.resolve(setup_req_lib_addr):
           for req in req_lib.requirements:
             reqs_to_resolve.append(req)
 
@@ -144,7 +144,7 @@ class BuildLocalPythonDistributions(Task):
       'data': site_dir
     }
 
-    # The `python_dist` target is built for the current platform only.
+    # The `python_dist` target builds for the current platform only.
     for obj in setup_requires_dists['current']:
       wf = WheelFile(obj.location)
       wf.install(overrides=overrides, force=True)
@@ -170,7 +170,7 @@ class BuildLocalPythonDistributions(Task):
           setup_req_dir = os.path.join(vt.results_dir, 'setup_requires_site')
           pythonpath = self._ensure_setup_requires_site_dir(self.context.build_graph,
               dist_targets, interpreter, setup_req_dir)
-          self._create_dist(vt.target, vt.results_dir, interpreter, pythonpath=pythonpath)
+          self._create_dist(vt.target, vt.results_dir, interpreter, pythonpath)
 
         local_wheel_products = self.context.products.get('local_wheels')
         for vt in invalidation_check.all_vts:
