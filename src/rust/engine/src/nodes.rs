@@ -296,7 +296,11 @@ impl Select {
       self.variants.clone(),
       edges,
     ).run(context.clone())
-      .and_then(move |process_request_val| context.get(ExecuteProcess::lift(&process_request_val)))
+      .and_then(|process_request_val| {
+        ExecuteProcess::lift(&process_request_val)
+          .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))
+      })
+      .and_then(move |process_request| context.get(process_request))
       .to_boxed()
   }
 
@@ -433,34 +437,41 @@ impl From<Select> for NodeKey {
 pub struct ExecuteProcess(process_execution::ExecuteProcessRequest);
 
 impl ExecuteProcess {
+  fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
+    let fingerprint = externs::project_str(&digest, "fingerprint");
+    let digest_length = externs::project_str(&digest, "serialized_bytes_length");
+    let digest_length_as_usize = digest_length
+      .parse::<usize>()
+      .map_err(|err| format!("Length was not a usize: {:?}", err))?;
+    Ok(hashing::Digest(
+      hashing::Fingerprint::from_hex_string(&fingerprint)?,
+      digest_length_as_usize,
+    ))
+  }
+
   ///
   /// Lifts a Key representing a python ExecuteProcessRequest value into a ExecuteProcess Node.
   ///
-  fn lift(value: &Value) -> ExecuteProcess {
+  fn lift(value: &Value) -> Result<ExecuteProcess, String> {
     let mut env: BTreeMap<String, String> = BTreeMap::new();
     let env_var_parts = externs::project_multi_strs(&value, "env");
-    // TODO: Error if env_var_parts.len() % 2 != 0
+    if env_var_parts.len() % 2 != 0 {
+      return Err(format!("Error parsing env: odd number of parts"));
+    }
     for i in 0..(env_var_parts.len() / 2) {
       env.insert(
         env_var_parts[2 * i].clone(),
         env_var_parts[2 * i + 1].clone(),
       );
     }
+    let digest = Self::lift_digest(&externs::project_ignoring_type(&value, "input_files"))
+      .map_err(|err| format!("Error parsing digest {}", err))?;
 
-    // TODO: Make this much less unwrap-happy with https://github.com/pantsbuild/pants/issues/5502
-    let fingerprint = externs::project_str(&value, "input_files_digest");
-    let digest_length = externs::project_str(&value, "digest_length");
-    let digest_length_as_usize = digest_length.parse::<usize>().unwrap();
-    let digest = hashing::Digest(
-      hashing::Fingerprint::from_hex_string(&fingerprint).unwrap(),
-      digest_length_as_usize,
-    );
-
-    ExecuteProcess(process_execution::ExecuteProcessRequest {
+    Ok(ExecuteProcess(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
       input_files: digest,
-    })
+    }))
   }
 }
 
@@ -636,6 +647,16 @@ impl Snapshot {
     })
   }
 
+  fn store_directory(context: &Context, item: &hashing::Digest) -> Value {
+    externs::unsafe_call(
+      &context.core.types.construct_directory_digest,
+      &[
+        externs::store_bytes(item.0.to_hex().as_bytes()),
+        externs::store_i64(item.1 as i64),
+      ],
+    )
+  }
+
   fn store_snapshot(context: &Context, item: &fs::Snapshot) -> Value {
     let path_stats: Vec<_> = item
       .path_stats
@@ -645,8 +666,7 @@ impl Snapshot {
     externs::unsafe_call(
       &context.core.types.construct_snapshot,
       &[
-        externs::store_bytes(&(item.digest.0).to_hex().as_bytes()),
-        externs::store_i64(item.digest.1 as i64),
+        Self::store_directory(context, &item.digest),
         externs::store_tuple(&path_stats),
       ],
     )

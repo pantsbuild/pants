@@ -1,6 +1,7 @@
 use core::{Function, TypeConstraint, TypeId};
 
 pub struct Types {
+  pub construct_directory_digest: Function,
   pub construct_snapshot: Function,
   pub construct_file_content: Function,
   pub construct_files_content: Function,
@@ -13,6 +14,7 @@ pub struct Types {
   pub has_products: TypeConstraint,
   pub has_variants: TypeConstraint,
   pub path_globs: TypeConstraint,
+  pub directory_digest: TypeConstraint,
   pub snapshot: TypeConstraint,
   pub files_content: TypeConstraint,
   pub dir: TypeConstraint,

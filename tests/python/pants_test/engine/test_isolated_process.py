@@ -69,7 +69,7 @@ def cat_files_process_result_concatted(cat_exe_req):
   cat_files_snapshot = yield Get(Snapshot, PathGlobs, cat_exe_req.path_globs)
   process_request = ExecuteProcessRequest.create_from_snapshot(
     argv=cat_bin.argv_from_snapshot(cat_files_snapshot),
-    env=tuple(),
+    env=dict(),
     snapshot=cat_files_snapshot,
   )
   cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
@@ -97,7 +97,7 @@ class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)
 def process_request_from_javac_version(javac_version_exe_req):
   yield ExecuteProcessRequest.create_with_empty_snapshot(
     argv=javac_version_exe_req.gen_argv(),
-    env=tuple())
+    env=dict())
 
 
 class JavacVersionOutput(datatype([('value', str)])): pass
@@ -182,7 +182,7 @@ def javac_compile_process_result(javac_compile_req):
   sources_snapshot = yield Get(Snapshot, PathGlobs, javac_compile_req.javac_sources.path_globs)
   process_request = ExecuteProcessRequest.create_from_snapshot(
     argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
-    env=tuple(),
+    env=dict(),
     snapshot=sources_snapshot,
   )
   javac_proc_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
@@ -205,7 +205,8 @@ def create_javac_compile_rules():
 
 
 class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
-  def _default_args_execute_process_request(self, argv=tuple(), env=tuple()):
+  def _default_args_execute_process_request(self, argv=tuple(), env=None):
+    env = env or dict()
     return ExecuteProcessRequest.create_with_empty_snapshot(
       argv=argv,
       env=env,
@@ -217,19 +218,19 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
     except ValueError:
       self.assertTrue(False, "should be able to construct without error")
 
-    with self.assertRaises(ValueError):
+    with self.assertRaises(TypeCheckError):
       self._default_args_execute_process_request(argv=['1'])
-    with self.assertRaises(ValueError):
-      self._default_args_execute_process_request(argv=('1',), env=[])
+    with self.assertRaises(TypeCheckError):
+      self._default_args_execute_process_request(argv=('1',), env=['foo', 'bar'])
 
     # TODO(cosmicexplorer): we should probably check that the digest info in
     # ExecuteProcessRequest is valid, beyond just checking if it's a string.
-    with self.assertRaises(ValueError):
-      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest='', digest_length='')
-    with self.assertRaises(ValueError):
-      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest=3, digest_length=0)
-    with self.assertRaises(ValueError):
-      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files_digest='', digest_length=-1)
+    with self.assertRaises(TypeCheckError):
+      ExecuteProcessRequest(argv=('1',), env=dict(), input_files='')
+    with self.assertRaises(TypeCheckError):
+      ExecuteProcessRequest(argv=('1',), env=dict(), input_files=3)
+    with self.assertRaises(TypeCheckError):
+      ExecuteProcessRequest(argv=('1',), env=dict(), input_files='')
 
 
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):

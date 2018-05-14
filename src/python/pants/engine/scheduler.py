@@ -14,7 +14,7 @@ from types import GeneratorType
 from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
-from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot
+from pants.engine.fs import DirectoryDigest, FileContent, FilesContent, Path, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
@@ -103,6 +103,7 @@ class Scheduler(object):
       project_tree.build_root,
       work_dir,
       project_tree.ignore_patterns,
+      DirectoryDigest,
       Snapshot,
       FileContent,
       FilesContent,
@@ -115,6 +116,7 @@ class Scheduler(object):
       constraint_for(Address),
       constraint_for(Variants),
       constraint_for(PathGlobs),
+      constraint_for(DirectoryDigest),
       constraint_for(Snapshot),
       constraint_for(FilesContent),
       constraint_for(Dir),
