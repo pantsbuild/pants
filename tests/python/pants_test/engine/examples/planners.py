@@ -17,7 +17,7 @@ from pants.base.project_tree import Dir
 from pants.build_graph.address import Address
 from pants.engine.addressable import addressable_list
 from pants.engine.build_files import create_graph_rules
-from pants.engine.fs import FilesContent, PathGlobs, Snapshot, create_fs_rules
+from pants.engine.fs import DirectoryDigest, FilesContent, PathGlobs, Snapshot, create_fs_rules
 from pants.engine.mapper import AddressFamily, AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import SingletonRule, TaskRule, rule
@@ -130,7 +130,8 @@ def calculate_package_search_path(jvm_package_name, source_roots):
 @rule(ScalaSources, [Select(ScalaInferredDepsSources)])
 def reify_scala_sources(sources):
   """Given a ScalaInferredDepsSources object, create ScalaSources."""
-  source_files_content = yield Get(FilesContent, PathGlobs, sources.path_globs)
+  snapshot = yield Get(Snapshot, PathGlobs, sources.path_globs)
+  source_files_content = yield Get(FilesContent, DirectoryDigest, snapshot.directory_digest)
   packages = set()
   import_re = re.compile(r'^import ([^;]*);?$')
   for filecontent in source_files_content.dependencies:

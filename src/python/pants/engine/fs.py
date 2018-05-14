@@ -118,5 +118,6 @@ EMPTY_SNAPSHOT = Snapshot(
 def create_fs_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
+    RootRule(DirectoryDigest),
     RootRule(PathGlobs),
   ]

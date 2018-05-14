@@ -89,7 +89,7 @@ impl Tasks {
       Intrinsic {
         kind: IntrinsicKind::FilesContent,
         product: types.files_content,
-        input: types.snapshot,
+        input: types.directory_digest,
       },
       Intrinsic {
         kind: IntrinsicKind::ProcessExecution,
