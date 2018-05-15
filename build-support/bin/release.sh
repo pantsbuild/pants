@@ -377,13 +377,17 @@ EOM
 )
   get_pgp_keyid &> /dev/null || die "${msg}"
   echo "Found the following key for release signing:"
-  gpg -k $(get_pgp_keyid)
+  $(get_pgp_program) -k $(get_pgp_keyid)
   read -p "Is this the correct key? [Yn]: " answer
   [[ "${answer:-y}" =~ [Yy]([Ee][Ss])? ]] || die "${msg}"
 }
 
 function get_pgp_keyid() {
   git config --get user.signingkey
+}
+
+function get_pgp_program() {
+  git config --get gpg.program || echo "gpg"
 }
 
 function tag_release() {
@@ -640,8 +644,8 @@ function publish_packages() {
   activate_twine
   trap deactivate RETURN
 
-  twine upload --sign --identity=$(get_pgp_keyid) "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"/*.whl
-  twine upload --sign --identity=$(get_pgp_keyid) "${DEPLOY_PANTS_SDIST_DIR}/${PANTS_STABLE_VERSION}"/*.tar.gz
+  twine upload --sign --sign-with=$(get_pgp_program) --identity=$(get_pgp_keyid) "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"/*.whl
+  twine upload --sign --sign-with=$(get_pgp_program) --identity=$(get_pgp_keyid) "${DEPLOY_PANTS_SDIST_DIR}/${PANTS_STABLE_VERSION}"/*.tar.gz
 
   end_travis_section
 }
