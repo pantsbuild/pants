@@ -14,9 +14,9 @@ export PY
 function run_local_pants() {
   ${ROOT}/pants "$@"
   exit_code=$?
-  if [[ exit_code != 0 ]]; then
+  if [[ ${exit_code} != 0 ]]; then
     lldb --core /cores/* --batch --one-line "bt"
-    exit $?
+    exit ${exit_code}
   fi
 }
 
