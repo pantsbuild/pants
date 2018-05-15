@@ -17,9 +17,13 @@ from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
+<<<<<<< HEAD
 from pants.backend.python.tasks.pex_build_util import _resolve_multi
 from pants.backend.python.tasks.setup_py import SetupPyInvocationEnvironment, SetupPyRunner
+=======
+>>>>>>> 3797b24... Add debug logging at setup site dir time
 from pants.backend.python.tasks.pex_build_util import _resolve_multi
+from pants.backend.python.tasks.setup_py import SetupPyInvocationEnvironment, SetupPyRunner
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -28,8 +32,6 @@ from pants.task.task import Task
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_method
-
-from wheel.install import WheelFile
 
 
 class BuildLocalPythonDistributions(Task):
@@ -68,7 +70,6 @@ class BuildLocalPythonDistributions(Task):
   def filter_target(tgt):
     return type(tgt) is PythonDistribution
 
-<<<<<<< HEAD
   def _ensure_setup_requires_site_dir(self, dist_targets, interpreter, site_dir):
     reqs_to_resolve = set()
 
@@ -105,56 +106,6 @@ class BuildLocalPythonDistributions(Task):
     dist_targets = self.context.targets(self.filter_target)
 
     if dist_targets:
-
-      def setup_requires_prep(build_graph, dist_targets, dest_dir=None):
-        python_req_objects_to_resolve = []
-
-        for dtgt in dist_targets:
-          #import pdb; pdb.set_trace()
-          for setup_req in dtgt.setup_requires:
-            for req in self.context.build_graph.resolve(setup_req):
-              for re in req.requirements:
-                #for re3 in re:
-                python_req_objects_to_resolve.append(re)
-
-        interpreter = self.context.products.get_data(PythonInterpreter)
-        setup_requires_dists = _resolve_multi(interpreter, python_req_objects_to_resolve, None, None)
-=======
-  @staticmethod
-  def _ensure_setup_requires_site_dir(build_graph, dist_targets, interpreter, site_dir):
-    reqs_to_resolve = []
->>>>>>> 046b873... Cleanup method definitions
-
-    for tgt in dist_targets:
-      for setup_req_lib_addr in tgt.setup_requires:
-        for req_lib in build_graph.resolve(setup_req_lib_addr):
-          for req in req_lib.requirements:
-            reqs_to_resolve.append(req)
-
-    if not reqs_to_resolve:
-      return None
-
-    setup_requires_dists = _resolve_multi(interpreter, reqs_to_resolve, ['current'], None)
-
-    overrides = {
-      'purelib': site_dir,
-      'headers': os.path.join(site_dir, 'headers'),
-      'scripts': os.path.join(site_dir, 'bin'),
-      'platlib': site_dir,
-      'data': site_dir
-    }
-
-    # The `python_dist` target builds for the current platform only.
-    for obj in setup_requires_dists['current']:
-      wf = WheelFile(obj.location)
-      wf.install(overrides=overrides, force=True)
-
-    return site_dir
-
-  def execute(self):
-    dist_targets = self.context.targets(self.filter_target)
-
-    if dist_targets:
       with self.invalidated(dist_targets,
                             fingerprint_strategy=DefaultFingerprintStrategy(),
                             invalidate_dependents=True) as invalidation_check:
@@ -168,8 +119,7 @@ class BuildLocalPythonDistributions(Task):
                          'of your setup function.'
             )
           setup_req_dir = os.path.join(vt.results_dir, 'setup_requires_site')
-          pythonpath = self._ensure_setup_requires_site_dir(self.context.build_graph,
-              dist_targets, interpreter, setup_req_dir)
+          pythonpath = self._ensure_setup_requires_site_dir(dist_targets, interpreter, setup_req_dir)
           self._create_dist(vt.target, vt.results_dir, interpreter, pythonpath)
 
         local_wheel_products = self.context.products.get('local_wheels')
