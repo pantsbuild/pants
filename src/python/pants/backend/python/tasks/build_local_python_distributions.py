@@ -11,13 +11,14 @@ import shutil
 from contextlib import contextmanager
 
 from pex.interpreter import PythonInterpreter
+from wheel.install import WheelFile
 
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.setup_py import SetupPyInvocationEnvironment, SetupPyRunner
 from pants.backend.python.tasks.pex_build_util import _resolve_multi
+from pants.backend.python.tasks.setup_py import SetupPyInvocationEnvironment, SetupPyRunner
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -26,8 +27,6 @@ from pants.task.task import Task
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_method
-
-from wheel.install import WheelFile
 
 
 class BuildLocalPythonDistributions(Task):
@@ -66,18 +65,20 @@ class BuildLocalPythonDistributions(Task):
   def filter_target(tgt):
     return type(tgt) is PythonDistribution
 
-  @staticmethod
-  def _ensure_setup_requires_site_dir(build_graph, dist_targets, interpreter, site_dir):
+  def _ensure_setup_requires_site_dir(self, dist_targets, interpreter, site_dir):
     reqs_to_resolve = []
 
     for tgt in dist_targets:
       for setup_req_lib_addr in tgt.setup_requires:
-        for req_lib in build_graph.resolve(setup_req_lib_addr):
+        for req_lib in self.context.build_graph.resolve(setup_req_lib_addr):
           for req in req_lib.requirements:
             reqs_to_resolve.append(req)
 
     if not reqs_to_resolve:
       return None
+    self.context.log.debug('python_dist target(s) with setup_requires detected. '
+                           'Installing requirements: {}'
+                           .format([req.key for req in reqs_to_resolve]))
 
     setup_requires_dists = _resolve_multi(interpreter, reqs_to_resolve, ['current'], None)
 
@@ -113,8 +114,7 @@ class BuildLocalPythonDistributions(Task):
                          'of your setup function.'
             )
           setup_req_dir = os.path.join(vt.results_dir, 'setup_requires_site')
-          pythonpath = self._ensure_setup_requires_site_dir(self.context.build_graph,
-              dist_targets, interpreter, setup_req_dir)
+          pythonpath = self._ensure_setup_requires_site_dir(dist_targets, interpreter, setup_req_dir)
           self._create_dist(vt.target, vt.results_dir, interpreter, pythonpath)
 
         local_wheel_products = self.context.products.get('local_wheels')
