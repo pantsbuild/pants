@@ -643,13 +643,13 @@ mod test {
   extern crate tempdir;
   extern crate testutil;
 
+  use self::tempdir::TempDir;
+  use self::testutil::{file, data::{TestData, TestDirectory}};
+  use super::mount;
   use fs;
   use futures::future::Future;
   use hashing;
-  use self::tempdir::TempDir;
   use std::sync::Arc;
-  use super::mount;
-  use self::testutil::{file, data::{TestData, TestDirectory}};
 
   #[test]
   fn missing_digest() {
@@ -888,16 +888,16 @@ mod syscall_tests {
   extern crate tempdir;
   extern crate testutil;
 
+  use self::tempdir::TempDir;
+  use self::testutil::data::TestData;
+  use super::mount;
+  use super::test::digest_to_filepath;
   use fs;
   use futures::Future;
   use libc;
-  use std::sync::Arc;
-  use super::mount;
-  use super::test::digest_to_filepath;
-  use self::tempdir::TempDir;
-  use self::testutil::data::TestData;
   use std::ffi::CString;
   use std::path::Path;
+  use std::sync::Arc;
 
   #[test]
   fn read_file_by_digest_exact_bytes() {

@@ -13,6 +13,11 @@ export PY
 
 function run_local_pants() {
   ${ROOT}/pants "$@"
+  exit_code=$?
+  if [[ ${exit_code} != 0 ]]; then
+    lldb --core /cores/* --batch --one-line "bt"
+    exit ${exit_code}
+  fi
 }
 
 # NB: Pants core does not have the ability to change its own version, so we compute the

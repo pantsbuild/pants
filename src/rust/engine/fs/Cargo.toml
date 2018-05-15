@@ -15,7 +15,7 @@ glob = "0.2.11"
 grpcio = { version = "0.2.0", features = ["secure"] }
 hashing = { path = "../hashing" }
 hex = "0.3.1"
-ignore = "0.3.1"
+ignore = { git = "https://github.com/illicitonion/ripgrep.git", rev = "39325d857ded09403ca2e57bf506f2b81304e243" }
 indexmap = "1"
 itertools = "0.7.2"
 lazy_static = "0.2.2"

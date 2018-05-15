@@ -45,7 +45,7 @@ esac
 readonly CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
 readonly NATIVE_ENGINE_CACHE_DIR=${CACHE_ROOT}/bin/native-engine
 
-readonly RUST_TOOLCHAIN="1.25.0"
+readonly RUST_TOOLCHAIN="1.26.0"
 
 function calculate_current_hash() {
   # Cached and unstaged files, with ignored files excluded.
