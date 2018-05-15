@@ -58,12 +58,13 @@ class GraphTestBase(unittest.TestCase):
     with self.graph_helper(build_file_aliases=build_file_aliases) as graph_helper:
       graph, target_roots = self.create_graph_from_specs(graph_helper, specs)
       addresses = tuple(graph.inject_roots_closure(target_roots))
-      yield graph, addresses, graph_helper.scheduler
+      yield graph, addresses, graph_helper.scheduler.new_session()
 
   def create_graph_from_specs(self, graph_helper, specs):
     Subsystem.reset()
     target_roots = self.create_target_roots(specs)
-    graph = graph_helper.create_build_graph(target_roots)[0]
+    session = graph_helper.new_session()
+    graph = session.create_build_graph(target_roots)[0]
     return graph, target_roots
 
   def create_target_roots(self, specs):

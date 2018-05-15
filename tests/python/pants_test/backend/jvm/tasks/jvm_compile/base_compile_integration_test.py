@@ -73,7 +73,7 @@ class BaseCompileIT(PantsRunIntegrationTest):
       },
     }
     task = 'test' if test else 'compile'
-    args = self._EXTRA_TASK_ARGS + [task, target] + (extra_args if extra_args else [])
+    args = self._EXTRA_TASK_ARGS + [task] + (extra_args if extra_args else []) + [target]
     # Clean-all on the first iteration.
     if clean_all:
       args.insert(0, 'clean-all')

@@ -6,13 +6,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import sys
 from abc import abstractmethod
 from collections import OrderedDict
+from contextlib import contextmanager
 from zipfile import ZIP_DEFLATED
 
+from pants.base.deprecated import deprecated
 from pants.util.contextutil import open_tar, open_zip, temporary_dir
-from pants.util.dirutil import safe_concurrent_rename, safe_walk
+from pants.util.dirutil import (is_executable, safe_concurrent_rename, safe_walk,
+                                split_basename_and_dirname)
 from pants.util.meta import AbstractClass
+from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_text
 
 
@@ -21,16 +26,15 @@ from pants.util.strutil import ensure_text
 
 class Archiver(AbstractClass):
 
-  @classmethod
-  def extract(cls, path, outdir, filter_func=None, concurrency_safe=False):
+  def extract(self, path, outdir, concurrency_safe=False, **kwargs):
     """Extracts an archive's contents to the specified outdir with an optional filter.
+
+    Keyword arguments are forwarded to the instance's self._extract() method.
 
     :API: public
 
     :param string path: path to the zipfile to extract from
     :param string outdir: directory to extract files into
-    :param function filter_func: optional filter with the filename as the parameter.  Returns True
-      if the file should be extracted.  Note that filter_func is ignored for non-zip archives.
     :param bool concurrency_safe: True to use concurrency safe method.  Concurrency safe extraction
       will be performed on a temporary directory and the extacted directory will then be renamed
       atomically to the outdir.  As a side effect, concurrency safe extraction will not allow
@@ -38,14 +42,13 @@ class Archiver(AbstractClass):
     """
     if concurrency_safe:
       with temporary_dir() as temp_dir:
-        cls._extract(path, temp_dir, filter_func=filter_func)
+        self._extract(path, temp_dir, **kwargs)
         safe_concurrent_rename(temp_dir, outdir)
     else:
       # Leave the existing default behavior unchanged and allows overlay of contents.
-      cls._extract(path, outdir, filter_func=filter_func)
+      self._extract(path, outdir, **kwargs)
 
-  @classmethod
-  def _extract(cls, path, outdir):
+  def _extract(self, path, outdir):
     raise NotImplementedError()
 
   @abstractmethod
@@ -65,9 +68,8 @@ class TarArchiver(Archiver):
   :API: public
   """
 
-  @classmethod
-  def _extract(cls, path, outdir, **kwargs):
-    with open_tar(path, errorlevel=1) as tar:
+  def _extract(self, path_or_file, outdir, **kwargs):
+    with open_tar(path_or_file, errorlevel=1, **kwargs) as tar:
       tar.extractall(outdir)
 
   def __init__(self, mode, extension):
@@ -90,15 +92,111 @@ class TarArchiver(Archiver):
     return tarpath
 
 
+class XZCompressedTarArchiver(TarArchiver):
+  """A workaround for the lack of xz support in Python 2.7.
+
+  Invokes an xz executable to decompress a .tar.xz into a tar stream, which is piped into the
+  extract() method.
+
+  NB: This class will raise an error if used to create an archive! This class can only currently be
+  used to extract from xz archives.
+  """
+
+  class XZArchiverError(Exception): pass
+
+  def __init__(self, xz_binary_path, xz_library_path):
+
+    # TODO(cosmicexplorer): test these exceptions somewhere!
+    if not is_executable(xz_binary_path):
+      raise self.XZArchiverError(
+        "The path {} does not name an existing executable file. An xz executable must be provided "
+        "to decompress xz archives."
+        .format(xz_binary_path))
+
+    self._xz_binary_path = xz_binary_path
+
+    if not os.path.isdir(xz_library_path):
+      raise self.XZArchiverError(
+        "The path {} does not name an existing directory. A directory containing liblzma.so must "
+        "be provided to decompress xz archives."
+        .format(xz_library_path))
+
+    lib_lzma_dylib = os.path.join(xz_library_path, 'liblzma.so')
+    if not os.path.isfile(lib_lzma_dylib):
+      raise self.XZArchiverError(
+        "The path {} names an existing directory, but it does not contain liblzma.so. A directory "
+        "containing liblzma.so must be provided to decompress xz archives."
+        .format(xz_library_path))
+
+    self._xz_library_path = xz_library_path
+
+    super(XZCompressedTarArchiver, self).__init__('r|', 'tar.xz')
+
+  @contextmanager
+  def _invoke_xz(self, xz_input_file):
+    """Run the xz command and yield a file object for its stdout.
+
+    This allows streaming the decompressed tar archive directly into a tar decompression stream,
+    which is significantly faster in practice than making a temporary file.
+    """
+    (xz_bin_dir, xz_filename) = split_basename_and_dirname(self._xz_binary_path)
+
+    # TODO(cosmicexplorer): --threads=0 is supposed to use "the number of processor cores on the
+    # machine", but I see no more than 100% cpu used at any point. This seems like it could be a
+    # bug? If performance is an issue, investigate further.
+    cmd = [xz_filename, '--decompress', '--stdout', '--keep', '--threads=0', xz_input_file]
+    env = {
+      # Isolate the path so we know we're using our provided version of xz.
+      'PATH': xz_bin_dir,
+      # Only allow our xz's lib directory to resolve the liblzma.so dependency at runtime.
+      'LD_LIBRARY_PATH': self._xz_library_path,
+    }
+    try:
+      # Pipe stderr to our own stderr, but leave stdout open so we can yield it.
+      process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=sys.stderr,
+        env=env)
+    except OSError as e:
+      raise self.XZArchiverError(
+        "Error invoking xz with command {} and environment {} for input file {}: {}"
+        .format(cmd, env, xz_input_file, e),
+        e)
+
+    # This is a file object.
+    yield process.stdout
+
+    rc = process.wait()
+    if rc != 0:
+      raise self.XZArchiverError(
+        "Error decompressing xz input with command {} and environment {} for input file {}. "
+        "Exit code was: {}. "
+        .format(cmd, env, xz_input_file, rc))
+
+  def _extract(self, path, outdir):
+    with self._invoke_xz(path) as xz_decompressed_tar_stream:
+      return super(XZCompressedTarArchiver, self)._extract(
+        xz_decompressed_tar_stream, outdir, mode=self.mode)
+
+  def create(self, *args, **kwargs):
+    """
+    :raises: :class:`NotImplementedError`
+    """
+    raise NotImplementedError("XZCompressedTarArchiver can only extract, not create archives!")
+
+
 class ZipArchiver(Archiver):
   """An archiver that stores files in a zip file with optional compression.
 
   :API: public
   """
 
-  @classmethod
-  def _extract(cls, path, outdir, filter_func=None, **kwargs):
-    """Extract from a zip file, with an optional filter."""
+  def _extract(self, path, outdir, filter_func=None):
+    """Extract from a zip file, with an optional filter.
+
+    :param function filter_func: optional filter with the filename as the parameter.  Returns True
+                                 if the file should be extracted."""
     with open_zip(path) as archive_file:
       for name in archive_file.namelist():
         # While we're at it, we also perform this safety test.
@@ -134,23 +232,35 @@ class ZipArchiver(Archiver):
           zip.write(full_path, relpath)
     return zippath
 
-archive_extensions = dict(tar='tar', tgz='tar.gz', tbz2='tar.bz2', zip='zip')
 
-TAR = TarArchiver('w:', archive_extensions['tar'])
-TGZ = TarArchiver('w:gz', archive_extensions['tgz'])
-TBZ2 = TarArchiver('w:bz2', archive_extensions['tbz2'])
-ZIP = ZipArchiver(ZIP_DEFLATED, archive_extensions['zip'])
+TAR = TarArchiver('w:', 'tar')
+TGZ = TarArchiver('w:gz', 'tar.gz')
+TBZ2 = TarArchiver('w:bz2', 'tar.bz2')
+ZIP = ZipArchiver(ZIP_DEFLATED, 'zip')
 
-_ARCHIVER_BY_TYPE = OrderedDict(tar=TAR, tgz=TGZ, tbz2=TBZ2, zip=ZIP)
+_ARCHIVER_BY_TYPE = OrderedDict(
+  tar=TAR,
+  tgz=TGZ,
+  tbz2=TBZ2,
+  zip=ZIP)
+
+archive_extensions = {
+  name:archiver.extension for name, archiver in _ARCHIVER_BY_TYPE.items()
+}
 
 TYPE_NAMES = frozenset(_ARCHIVER_BY_TYPE.keys())
 TYPE_NAMES_NO_PRESERVE_SYMLINKS = frozenset(['zip'])
 TYPE_NAMES_PRESERVE_SYMLINKS = TYPE_NAMES - TYPE_NAMES_NO_PRESERVE_SYMLINKS
 
 
-# TODO: Rename to `create_archiver`. Pretty much every caller of this method is going
-# to want to put the return value into a variable named `archiver`.
+# Pretty much every caller of this method is going to want to put the return value into a variable
+# named `archiver`.
+@deprecated(removal_version='1.8.0.dev0', hint_message='Use the create_archiver method instead.')
 def archiver(typename):
+  return create_archiver(typename)
+
+
+def create_archiver(typename):
   """Returns Archivers in common configurations.
 
   :API: public
@@ -190,4 +300,4 @@ def archiver_for_path(path_name):
       ext = ext[1:]  # Trim leading '.'.
     if not ext:
       raise ValueError('Could not determine archive type of path {}'.format(path_name))
-    return archiver(ext)
+    return create_archiver(ext)

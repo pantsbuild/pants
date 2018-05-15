@@ -9,6 +9,7 @@ from collections import namedtuple
 from textwrap import dedent
 
 from pants.base.exceptions import TaskError
+from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import target_option
 
 
@@ -50,6 +51,10 @@ class JvmToolMixin(object):
       return options.for_scope(self.scope).is_default(self.key.replace('-', '_'))
 
   _jvm_tools = []  # List of JvmTool objects.
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(JvmToolMixin, cls).subsystem_dependencies() + (DistributionLocator,)
 
   @classmethod
   def get_jvm_options_default(cls, bootstrap_option_values):
@@ -157,6 +162,20 @@ class JvmToolMixin(object):
   def reset_registered_tools():
     """Needed only for test isolation."""
     JvmToolMixin._jvm_tools = []
+
+  def set_distribution(self, minimum_version=None, maximum_version=None, jdk=False):
+    try:
+      self._dist = DistributionLocator.cached(minimum_version=minimum_version,
+                                              maximum_version=maximum_version, jdk=jdk)
+    except DistributionLocator.Error as e:
+      raise TaskError(e)
+
+  @property
+  def dist(self):
+    if getattr(self, '_dist', None) is None:
+      # Use default until told otherwise.
+      self.set_distribution()
+    return self._dist
 
   @classmethod
   def tool_jar_from_products(cls, products, key, scope):

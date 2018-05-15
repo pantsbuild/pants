@@ -29,7 +29,7 @@ class FileDepsTest(ConsoleTaskTestBase):
   def setUp(self):
     super(FileDepsTest, self).setUp()
     self.context(options={
-      'scala-platform': {
+      'scala': {
         'runtime': ['tools:scala-library']
       }
     })

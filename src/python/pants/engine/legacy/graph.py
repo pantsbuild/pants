@@ -11,20 +11,19 @@ from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.base.specs import SingleAddress, Specs
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.build_graph.app_base import Bundle
+from pants.build_graph.app_base import AppBase, Bundle
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.rules import TaskRule, rule
-from pants.engine.selectors import Get, Select, SelectDependencies
+from pants.engine.selectors import Get, Select
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import Collection, datatype
@@ -153,7 +152,7 @@ class LegacyBuildGraph(BuildGraph):
       kwargs.pop('dependencies')
 
       # Instantiate.
-      if target_cls is JvmApp:
+      if issubclass(target_cls, AppBase):
         return self._instantiate_app(target_cls, kwargs)
       elif target_cls is RemoteSources:
         return self._instantiate_remote_sources(kwargs)
@@ -343,13 +342,17 @@ class HydratedField(datatype(['name', 'value'])):
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
 
 
-def hydrate_target(target_adaptor, hydrated_fields):
+def hydrate_target(target_adaptor):
   """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
   # Hydrate the fields of the adaptor and re-construct it.
+  hydrated_fields = yield [(Get(HydratedField, BundlesField, fa)
+                            if type(fa) is BundlesField
+                            else Get(HydratedField, SourcesField, fa))
+                           for fa in target_adaptor.field_adaptors]
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
-  return HydratedTarget(target_adaptor.address,
+  yield HydratedTarget(target_adaptor.address,
                         TargetAdaptor(**kwargs),
                         tuple(target_adaptor.dependencies))
 
@@ -366,7 +369,7 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
   return EagerFilesetWithSpec(spec_path,
                               relpath_adjusted_filespec,
                               files=files,
-                              files_hash=snapshot.fingerprint)
+                              files_hash=snapshot.directory_digest.fingerprint)
 
 
 @rule(HydratedField, [Select(SourcesField)])
@@ -406,18 +409,19 @@ def hydrate_bundles(bundles_field):
 def create_legacy_graph_tasks(symbol_table):
   """Create tasks to recursively parse the legacy graph."""
   symbol_table_constraint = symbol_table.constraint()
+
   return [
     transitive_hydrated_targets,
     transitive_hydrated_target,
     hydrated_targets,
     TaskRule(
       HydratedTarget,
-      [Select(symbol_table_constraint),
-       SelectDependencies(HydratedField,
-                          symbol_table_constraint,
-                          'field_adaptors',
-                          field_types=(SourcesField, BundlesField,))],
-      hydrate_target
+      [Select(symbol_table_constraint)],
+      hydrate_target,
+      input_gets=[
+        Get(HydratedField, SourcesField),
+        Get(HydratedField, BundlesField),
+      ]
     ),
     hydrate_sources,
     hydrate_bundles,

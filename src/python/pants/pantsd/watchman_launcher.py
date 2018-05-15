@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from pants.binaries.binary_util import BinaryUtilPrivate
+from pants.binaries.binary_util import BinaryToolFetcher, BinaryUtilPrivate
 from pants.pantsd.watchman import Watchman
 from pants.util.memo import testable_memoized_property
 
@@ -20,12 +20,15 @@ class WatchmanLauncher(object):
     """
     :param Options bootstrap_options: The bootstrap options bag.
     """
+    binary_tool_fetcher = BinaryToolFetcher(
+      bootstrap_dir=bootstrap_options.pants_bootstrapdir,
+      timeout_secs=bootstrap_options.binaries_fetch_timeout_secs)
     binary_util = BinaryUtilPrivate(
-      bootstrap_options.binaries_baseurls,
-      bootstrap_options.binaries_fetch_timeout_secs,
-      bootstrap_options.pants_bootstrapdir,
-      bootstrap_options.binaries_path_by_id
-    )
+      baseurls=bootstrap_options.binaries_baseurls,
+      binary_tool_fetcher=binary_tool_fetcher,
+      path_by_id=bootstrap_options.binaries_path_by_id,
+      # TODO(cosmicexplorer): do we need to test this?
+      allow_external_binary_tool_downloads=bootstrap_options.allow_external_binary_tool_downloads)
 
     return WatchmanLauncher(
       binary_util,

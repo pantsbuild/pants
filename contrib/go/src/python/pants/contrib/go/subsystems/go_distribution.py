@@ -10,8 +10,23 @@ from collections import OrderedDict, namedtuple
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.binaries.binary_tool import NativeTool
+from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
+
+
+class GoReleaseUrlGenerator(BinaryToolUrlGenerator):
+
+  _DIST_URL_FMT = 'https://storage.googleapis.com/golang/go{version}.{system_id}.tar.gz'
+
+  _SYSTEM_ID = {
+    'darwin': 'darwin-amd64',
+    'linux': 'linux-amd64',
+  }
+
+  def generate_urls(self, version, host_platform):
+    system_id = self._SYSTEM_ID[host_platform.os_name]
+    return [self._DIST_URL_FMT.format(version=version, system_id=system_id)]
 
 
 class GoDistribution(NativeTool):
@@ -21,6 +36,9 @@ class GoDistribution(NativeTool):
   name = 'go'
   default_version = '1.8.3'
   archive_type = 'tgz'
+
+  def get_external_url_generator(self):
+    return GoReleaseUrlGenerator()
 
   @memoized_property
   def goroot(self):

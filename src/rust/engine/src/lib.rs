@@ -44,10 +44,10 @@ use externs::{Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionE
               DropHandlesExtern, EqualsExtern, EvalExtern, ExternContext, Externs,
               GeneratorSendExtern, IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern,
               ProjectMultiExtern, PyResult, SatisfiedByExtern, SatisfiedByTypeExtern,
-              StoreBytesExtern, StoreI32Extern, StoreTupleExtern, TypeIdBuffer, TypeToStrExtern,
+              StoreBytesExtern, StoreI64Extern, StoreTupleExtern, TypeIdBuffer, TypeToStrExtern,
               ValToStrExtern};
 use rule_graph::{GraphMaker, RuleGraph};
-use scheduler::{ExecutionRequest, RootResult, Scheduler};
+use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
 use tasks::Tasks;
 use types::Types;
 
@@ -135,7 +135,7 @@ pub extern "C" fn externs_set(
   satisfied_by_type: SatisfiedByTypeExtern,
   store_tuple: StoreTupleExtern,
   store_bytes: StoreBytesExtern,
-  store_i32: StoreI32Extern,
+  store_i64: StoreI64Extern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
@@ -158,7 +158,7 @@ pub extern "C" fn externs_set(
     satisfied_by_type,
     store_tuple,
     store_bytes,
-    store_i32,
+    store_i64,
     project_ignoring_type,
     project_multi,
     create_exception,
@@ -185,6 +185,7 @@ pub extern "C" fn externs_val_for(key: Key) -> Value {
 #[no_mangle]
 pub extern "C" fn scheduler_create(
   tasks_ptr: *mut Tasks,
+  construct_directory_digest: Function,
   construct_snapshot: Function,
   construct_file_content: Function,
   construct_files_content: Function,
@@ -197,6 +198,7 @@ pub extern "C" fn scheduler_create(
   type_has_products: TypeConstraint,
   type_has_variants: TypeConstraint,
   type_path_globs: TypeConstraint,
+  type_directory_digest: TypeConstraint,
   type_snapshot: TypeConstraint,
   type_files_content: TypeConstraint,
   type_dir: TypeConstraint,
@@ -216,45 +218,91 @@ pub extern "C" fn scheduler_create(
   let ignore_patterns = ignore_patterns_buf
     .to_strings()
     .unwrap_or_else(|e| panic!("Failed to decode ignore patterns as UTF8: {:?}", e));
-  let tasks = with_tasks(tasks_ptr, |tasks| tasks.clone());
+  let types = Types {
+    construct_directory_digest: construct_directory_digest,
+    construct_snapshot: construct_snapshot,
+    construct_file_content: construct_file_content,
+    construct_files_content: construct_files_content,
+    construct_path_stat: construct_path_stat,
+    construct_dir: construct_dir,
+    construct_file: construct_file,
+    construct_link: construct_link,
+    construct_process_result: construct_process_result,
+    address: type_address,
+    has_products: type_has_products,
+    has_variants: type_has_variants,
+    path_globs: type_path_globs,
+    directory_digest: type_directory_digest,
+    snapshot: type_snapshot,
+    files_content: type_files_content,
+    dir: type_dir,
+    file: type_file,
+    link: type_link,
+    process_request: type_process_request,
+    process_result: type_process_result,
+    generator: type_generator,
+    string: type_string,
+    bytes: type_bytes,
+  };
+  let mut tasks = with_tasks(tasks_ptr, |tasks| tasks.clone());
+  tasks.intrinsics_set(&types);
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(Box::new(Scheduler::new(Core::new(
     root_type_ids.clone(),
     tasks,
-    Types {
-      construct_snapshot: construct_snapshot,
-      construct_file_content: construct_file_content,
-      construct_files_content: construct_files_content,
-      construct_path_stat: construct_path_stat,
-      construct_dir: construct_dir,
-      construct_file: construct_file,
-      construct_link: construct_link,
-      construct_process_result: construct_process_result,
-      address: type_address,
-      has_products: type_has_products,
-      has_variants: type_has_variants,
-      path_globs: type_path_globs,
-      snapshot: type_snapshot,
-      files_content: type_files_content,
-      dir: type_dir,
-      file: type_file,
-      link: type_link,
-      process_request: type_process_request,
-      process_result: type_process_result,
-      generator: type_generator,
-      string: type_string,
-      bytes: type_bytes,
-    },
+    types,
     build_root_buf.to_os_string().as_ref(),
     ignore_patterns,
     work_dir_buf.to_os_string().as_ref(),
   ))))
 }
 
+///
+/// Returns a Value representing a tuple of tuples of metric name string and metric value int.
+///
+#[no_mangle]
+pub extern "C" fn scheduler_metrics(
+  scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
+) -> Value {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    with_session(session_ptr, |session| {
+      let values = scheduler
+        .metrics(session)
+        .into_iter()
+        .map(|(metric, value)| {
+          externs::store_tuple(&[
+            externs::store_bytes(metric.as_bytes()),
+            externs::store_i64(value),
+          ])
+        })
+        .collect::<Vec<_>>();
+      externs::store_tuple(&values)
+    })
+  })
+}
+
 #[no_mangle]
 pub extern "C" fn scheduler_pre_fork(scheduler_ptr: *mut Scheduler) {
   with_scheduler(scheduler_ptr, |scheduler| {
     scheduler.core.pre_fork();
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn scheduler_execute(
+  scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
+  execution_request_ptr: *mut ExecutionRequest,
+) -> *const RawNodes {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    with_execution_request(execution_request_ptr, |execution_request| {
+      with_session(session_ptr, |session| {
+        Box::into_raw(RawNodes::create(
+          scheduler.execute(execution_request, session),
+        ))
+      })
+    })
   })
 }
 
@@ -277,18 +325,6 @@ pub extern "C" fn execution_add_root_select(
       scheduler
         .add_root_select(execution_request, subject, product)
         .into()
-    })
-  })
-}
-
-#[no_mangle]
-pub extern "C" fn execution_execute(
-  scheduler_ptr: *mut Scheduler,
-  execution_request_ptr: *mut ExecutionRequest,
-) -> *const RawNodes {
-  with_scheduler(scheduler_ptr, |scheduler| {
-    with_execution_request(execution_request_ptr, |execution_request| {
-      Box::into_raw(RawNodes::create(scheduler.execute(execution_request)))
     })
   })
 }
@@ -346,24 +382,6 @@ pub extern "C" fn tasks_add_select_variant(
     .expect("Failed to decode key for select_variant");
   with_tasks(tasks_ptr, |tasks| {
     tasks.add_select(product, Some(variant_key));
-  })
-}
-
-#[no_mangle]
-pub extern "C" fn tasks_add_select_dependencies(
-  tasks_ptr: *mut Tasks,
-  product: TypeConstraint,
-  dep_product: TypeConstraint,
-  field: Buffer,
-  field_types: TypeIdBuffer,
-) {
-  with_tasks(tasks_ptr, |tasks| {
-    tasks.add_select_dependencies(
-      product,
-      dep_product,
-      field.to_string().expect("field to be a string"),
-      field_types.to_vec(),
-    );
   })
 }
 
@@ -439,6 +457,18 @@ pub extern "C" fn graph_trace(
 #[no_mangle]
 pub extern "C" fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
   let _ = unsafe { Box::from_raw(raw_nodes_ptr) };
+}
+
+#[no_mangle]
+pub extern "C" fn session_create(scheduler_ptr: *mut Scheduler) -> *const Session {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    Box::into_raw(Box::new(Session::new(scheduler)))
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn session_destroy(ptr: *mut Session) {
+  let _ = unsafe { Box::from_raw(ptr) };
 }
 
 #[no_mangle]
@@ -537,13 +567,13 @@ pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler) {
   });
 }
 
-fn graph_full(scheduler: &mut Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
+fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
   let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types);
   graph_maker.full_graph()
 }
 
 fn graph_sub(
-  scheduler: &mut Scheduler,
+  scheduler: &Scheduler,
   subject_type: TypeId,
   product_type: TypeConstraint,
 ) -> RuleGraph {
@@ -557,16 +587,37 @@ fn write_to_file(path: &Path, graph: &RuleGraph) -> io::Result<()> {
   graph.visualize(&mut f)
 }
 
+///
+/// Scheduler and Session are intended to be shared between threads, and so their context
+/// methods provide immutable references. The remaining types are not intended to be shared
+/// between threads, so mutable access is provided.
+///
 fn with_scheduler<F, T>(scheduler_ptr: *mut Scheduler, f: F) -> T
 where
-  F: FnOnce(&mut Scheduler) -> T,
+  F: FnOnce(&Scheduler) -> T,
 {
-  let mut scheduler = unsafe { Box::from_raw(scheduler_ptr) };
-  let t = f(&mut scheduler);
+  let scheduler = unsafe { Box::from_raw(scheduler_ptr) };
+  let t = f(&scheduler);
   mem::forget(scheduler);
   t
 }
 
+///
+/// See `with_scheduler`.
+///
+fn with_session<F, T>(session_ptr: *mut Session, f: F) -> T
+where
+  F: FnOnce(&Session) -> T,
+{
+  let session = unsafe { Box::from_raw(session_ptr) };
+  let t = f(&session);
+  mem::forget(session);
+  t
+}
+
+///
+/// See `with_scheduler`.
+///
 fn with_execution_request<F, T>(execution_request_ptr: *mut ExecutionRequest, f: F) -> T
 where
   F: FnOnce(&mut ExecutionRequest) -> T,
@@ -577,6 +628,9 @@ where
   t
 }
 
+///
+/// See `with_scheduler`.
+///
 fn with_tasks<F, T>(tasks_ptr: *mut Tasks, f: F) -> T
 where
   F: FnOnce(&mut Tasks) -> T,

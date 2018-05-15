@@ -5,12 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from binascii import hexlify
 from os.path import join
 
 from pants.base.project_tree import Dir, File
-from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Select
+from pants.engine.rules import RootRule
 from pants.util.objects import Collection, datatype
 
 
@@ -51,18 +49,37 @@ class PathGlobs(datatype(['include', 'exclude'])):
                      tuple(join(relative_to, f) for f in exclude))
 
 
-class Snapshot(datatype(['fingerprint', 'digest_length', 'path_stats'])):
+class DirectoryDigest(datatype([('fingerprint', str), ('serialized_bytes_length', int)])):
+  """A DirectoryDigest is an opaque handle to a set of files known about by the engine.
+
+  The contents of files can be inspected by requesting a FilesContent for it.
+
+  In the future, it will be possible to inspect the file metadata by requesting a Snapshot for it,
+  but at the moment we can't install rules which go both:
+   PathGlobs -> DirectoryDigest -> Snapshot
+   PathGlobs -> Snapshot
+  because it would lead to an ambiguity in the engine, and we have existing code which already
+  relies on the latter existing. This can be resolved when ordering is removed from Snapshots. See
+  https://github.com/pantsbuild/pants/issues/5802
+  """
+
+  def __repr__(self):
+    return '''DirectoryDigest(fingerprint={}, serialized_bytes_length={})'''.format(
+      self.fingerprint[:8],
+      self.digest_length
+    )
+
+  def __str__(self):
+    return repr(self)
+
+
+class Snapshot(datatype([('directory_digest', DirectoryDigest), ('path_stats', tuple)])):
   """A Snapshot is a collection of Files and Dirs fingerprinted by their names/content.
 
   Snapshots are used to make it easier to isolate process execution by fixing the contents
   of the files being operated on and easing their movement to and from isolated execution
   sandboxes.
   """
-
-  def __new__(cls, fingerprint, digest_length, path_stats):
-    # We get a unicode instance when this is instantiated, so ensure it is
-    # converted to a str.
-    return super(Snapshot, cls).__new__(cls, str(fingerprint), digest_length, path_stats)
 
   @property
   def dirs(self):
@@ -80,12 +97,6 @@ class Snapshot(datatype(['fingerprint', 'digest_length', 'path_stats'])):
   def file_stats(self):
     return [p.stat for p in self.files]
 
-  def __repr__(self):
-    return '''Snapshot(fingerprint='{}', digest_length='{}', entries={})'''.format(hexlify(self.fingerprint)[:8], self.digest_length, len(self.path_stats))
-
-  def __str__(self):
-    return repr(self)
-
 
 FilesContent = Collection.of(FileContent)
 
@@ -96,26 +107,16 @@ _EMPTY_FINGERPRINT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b78
 
 
 EMPTY_SNAPSHOT = Snapshot(
-  fingerprint=_EMPTY_FINGERPRINT,
-  digest_length=0,
-  path_stats=[],
+  directory_digest=DirectoryDigest(
+    fingerprint=str(_EMPTY_FINGERPRINT),
+    serialized_bytes_length=0
+  ),
+  path_stats=(),
 )
-
-
-@rule(Snapshot, [Select(PathGlobs)])
-def snapshot_noop(*args):
-  raise Exception('This task is replaced intrinsically, and should never run.')
-
-
-@rule(FilesContent, [Select(Snapshot)])
-def files_content_noop(*args):
-  raise Exception('This task is replaced intrinsically, and should never run.')
 
 
 def create_fs_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
-    files_content_noop,
-    snapshot_noop,
     RootRule(PathGlobs),
   ]

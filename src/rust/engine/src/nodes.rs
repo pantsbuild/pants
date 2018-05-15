@@ -22,8 +22,8 @@ use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDig
 use process_execution;
 use hashing;
 use rule_graph;
-use selectors::{self, Selector};
-use tasks;
+use selectors;
+use tasks::{self, Intrinsic, IntrinsicKind};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -260,26 +260,48 @@ impl Select {
     }
   }
 
-  ///
-  /// Gets a Snapshot for the current subject.
-  ///
-  fn get_snapshot(&self, context: &Context) -> NodeFuture<fs::Snapshot> {
-    // TODO: Hacky... should have an intermediate Node to Select PathGlobs for the subject
-    // before executing, and then treat this as an intrinsic. Otherwise, Snapshots for
-    // different subjects but identical PathGlobs will cause redundant work.
-    if self.entries.len() > 1 {
-      // TODO do something better than this.
-      panic!("we're supposed to get a snapshot, but there's more than one entry!");
-    } else if self.entries.is_empty() {
-      panic!("we're supposed to get a snapshot, but there are no matching rule entries!");
-    }
+  fn snapshot(&self, context: &Context, entry: &rule_graph::Entry) -> NodeFuture<fs::Snapshot> {
+    let ref edges = context
+      .core
+      .rule_graph
+      .edges_for_inner(entry)
+      .expect("Expected edges to exist for Snapshot intrinsic.");
+    // Compute PathGlobs for the subject.
+    let context = context.clone();
+    Select::new(
+      context.core.types.path_globs.clone(),
+      self.subject.clone(),
+      self.variants.clone(),
+      edges,
+    ).run(context.clone())
+      .and_then(move |path_globs_val| context.get(Snapshot(externs::key_for(path_globs_val))))
+      .to_boxed()
+  }
 
-    context.get(Snapshot {
-      subject: self.subject.clone(),
-      product: self.product().clone(),
-      variants: self.variants.clone(),
-      entry: self.entries[0].clone(),
-    })
+  fn execute_process(
+    &self,
+    context: &Context,
+    entry: &rule_graph::Entry,
+  ) -> NodeFuture<ProcessResult> {
+    let ref edges = context
+      .core
+      .rule_graph
+      .edges_for_inner(entry)
+      .expect("Expected edges to exist for ExecuteProcess intrinsic.");
+    // Compute an ExecuteProcessRequest for the subject.
+    let context = context.clone();
+    Select::new(
+      context.core.types.process_request.clone(),
+      self.subject.clone(),
+      self.variants.clone(),
+      edges,
+    ).run(context.clone())
+      .and_then(|process_request_val| {
+        ExecuteProcess::lift(&process_request_val)
+          .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))
+      })
+      .and_then(move |process_request| context.get(process_request))
+      .to_boxed()
   }
 
   ///
@@ -287,65 +309,70 @@ impl Select {
   /// given subject and variants.
   ///
   fn gen_nodes(&self, context: &Context) -> Vec<NodeFuture<Value>> {
-    // TODO: These `product==` hooks are hacky.
-    if self.product() == &context.core.types.snapshot {
-      // If the requested product is a Snapshot, execute a Snapshot Node and then lower to a Value
-      // for this caller.
-      let context = context.clone();
-      vec![
-        self
-          .get_snapshot(&context)
-          .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
-          .to_boxed(),
-      ]
-    } else if self.product() == &context.core.types.files_content {
-      // If the requested product is FilesContent, request a Snapshot and lower it as FilesContent.
-      let context = context.clone();
-      vec![
-        self
-          .get_snapshot(&context)
-          .and_then(move |snapshot|
-            // Request the file contents of the Snapshot, and then store them.
-            snapshot.contents(context.core.store.clone()).map_err(|e| throw(&e))
-              .map(move |files_content| Snapshot::store_files_content(&context, &files_content)))
-          .to_boxed(),
-      ]
-    } else if self.product() == &context.core.types.process_result {
-      let context2 = context.clone();
-      let execute_process_node = ExecuteProcess::lift(&self.subject);
-      vec![
-        context
-          .get(execute_process_node)
-          .map(move |result| {
-            externs::unsafe_call(
-              &context2.core.types.construct_process_result,
-              &[
-                externs::store_bytes(&result.0.stdout),
-                externs::store_bytes(&result.0.stderr),
-                externs::store_i32(result.0.exit_code),
-              ],
-            )
-          })
-          .to_boxed(),
-      ]
-    } else if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
-      vec![future::ok(value.clone()).to_boxed()]
-    } else {
-      self
-        .entries
-        .iter()
-        .map(|entry| {
-          let task = context.core.rule_graph.task_for_inner(entry);
-          context.get(Task {
+    if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
+      return vec![future::ok(value.clone()).to_boxed()];
+    }
+
+    self
+      .entries
+      .iter()
+      .map(
+        |entry| match context.core.rule_graph.rule_for_inner(entry) {
+          &rule_graph::Rule::Task(ref task) => context.get(Task {
             subject: self.subject.clone(),
             product: self.product().clone(),
             variants: self.variants.clone(),
-            task: task,
+            task: task.clone(),
             entry: Arc::new(entry.clone()),
-          })
-        })
-        .collect::<Vec<NodeFuture<Value>>>()
-    }
+          }),
+          &rule_graph::Rule::Intrinsic(Intrinsic {
+            kind: IntrinsicKind::Snapshot,
+            ..
+          }) => {
+            let context = context.clone();
+            self
+              .snapshot(&context, &entry)
+              .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
+              .to_boxed()
+          }
+          &rule_graph::Rule::Intrinsic(Intrinsic {
+            kind: IntrinsicKind::FilesContent,
+            ..
+          }) => {
+            let context = context.clone();
+            self
+              .snapshot(&context, &entry)
+              .and_then(move |snapshot| {
+                // Request the file contents of the Snapshot, and then store them.
+                snapshot
+                  .contents(context.core.store.clone())
+                  .map_err(|e| throw(&e))
+                  .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
+              })
+              .to_boxed()
+          }
+          &rule_graph::Rule::Intrinsic(Intrinsic {
+            kind: IntrinsicKind::ProcessExecution,
+            ..
+          }) => {
+            let context = context.clone();
+            self
+              .execute_process(&context, &entry)
+              .map(move |result| {
+                externs::unsafe_call(
+                  &context.core.types.construct_process_result,
+                  &[
+                    externs::store_bytes(&result.0.stdout),
+                    externs::store_bytes(&result.0.stderr),
+                    externs::store_i64(result.0.exit_code as i64),
+                  ],
+                )
+              })
+              .to_boxed()
+          }
+        },
+      )
+      .collect::<Vec<NodeFuture<Value>>>()
   }
 }
 
@@ -404,144 +431,47 @@ impl From<Select> for NodeKey {
 }
 
 ///
-/// A Node that selects the given Product for each of the items in `field` on `dep_product`.
-///
-/// Begins by selecting the `dep_product` for the subject, and then selects a product for each
-/// member of a collection named `field` on the dep_product.
-///
-/// The value produced by this Node guarantees that the order of the provided values matches the
-/// order of declaration in the list `field` of the `dep_product`.
-///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectDependencies {
-  pub subject: Key,
-  pub variants: Variants,
-  pub selector: selectors::SelectDependencies,
-  pub dep_product_entries: rule_graph::Entries,
-  pub product_entries: rule_graph::Entries,
-}
-
-impl SelectDependencies {
-  pub fn new(
-    selector: selectors::SelectDependencies,
-    subject: Key,
-    variants: Variants,
-    edges: &rule_graph::RuleEdges,
-  ) -> SelectDependencies {
-    // filters entries by whether the subject type is the right subject type
-    let dep_p_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
-      Selector::SelectDependencies(selector.clone()),
-      selectors::Select::without_variant(selector.clone().dep_product),
-    ));
-    let p_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedMultipleNestedSelect(
-      Selector::SelectDependencies(selector.clone()),
-      selector.field_types.clone(),
-      selectors::Select::without_variant(selector.product.clone()),
-    ));
-    SelectDependencies {
-      subject: subject,
-      variants: variants,
-      selector: selector.clone(),
-      dep_product_entries: dep_p_entries,
-      product_entries: p_entries,
-    }
-  }
-
-  fn get_dep(&self, context: &Context, dep_subject: Value) -> NodeFuture<Value> {
-    // TODO: This method needs to consider whether the `dep_subject` is an Address,
-    // and if so, attempt to parse Variants there. See:
-    //   https://github.com/pantsbuild/pants/issues/4020
-
-    let dep_subject_key = externs::key_for(dep_subject);
-    Select {
-      selector: selectors::Select::without_variant(self.selector.product),
-      subject: dep_subject_key,
-      variants: self.variants.clone(),
-      // NB: We're filtering out all of the entries for field types other than
-      //    dep_subject's since none of them will match.
-      entries: self
-        .product_entries
-        .clone()
-        .into_iter()
-        .filter(|e| e.matches_subject_type(dep_subject_key.type_id().clone()))
-        .collect(),
-    }.run(context.clone())
-  }
-}
-
-impl SelectDependencies {
-  fn run(self, context: Context) -> NodeFuture<Value> {
-    // Select the product holding the dependency list.
-    Select {
-      selector: selectors::Select::without_variant(self.selector.dep_product),
-      subject: self.subject.clone(),
-      variants: self.variants.clone(),
-      entries: self.dep_product_entries.clone(),
-    }.run(context.clone())
-      .then(move |dep_product_res| {
-        match dep_product_res {
-          Ok(dep_product) => {
-            // The product and its dependency list are available: project them.
-            let deps = future::join_all(
-              externs::project_multi(&dep_product, &self.selector.field)
-                .into_iter()
-                .map(|dep_subject| self.get_dep(&context, dep_subject))
-                .collect::<Vec<_>>(),
-            );
-            deps
-              .then(move |dep_values_res| {
-                // Finally, store the resulting values.
-                match dep_values_res {
-                  Ok(dep_values) => Ok(externs::store_tuple(&dep_values)),
-                  Err(failure) => Err(was_required(failure)),
-                }
-              })
-              .to_boxed()
-          }
-          Err(failure) => err(failure),
-        }
-      })
-      .to_boxed()
-  }
-}
-
-///
 /// A Node that represents executing a process.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ExecuteProcess(process_execution::ExecuteProcessRequest);
 
 impl ExecuteProcess {
+  fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
+    let fingerprint = externs::project_str(&digest, "fingerprint");
+    let digest_length = externs::project_str(&digest, "serialized_bytes_length");
+    let digest_length_as_usize = digest_length
+      .parse::<usize>()
+      .map_err(|err| format!("Length was not a usize: {:?}", err))?;
+    Ok(hashing::Digest(
+      hashing::Fingerprint::from_hex_string(&fingerprint)?,
+      digest_length_as_usize,
+    ))
+  }
+
   ///
   /// Lifts a Key representing a python ExecuteProcessRequest value into a ExecuteProcess Node.
   ///
-  fn lift(subject: &Key) -> ExecuteProcess {
-    let value = externs::val_for(subject);
-
+  fn lift(value: &Value) -> Result<ExecuteProcess, String> {
     let mut env: BTreeMap<String, String> = BTreeMap::new();
     let env_var_parts = externs::project_multi_strs(&value, "env");
-    // TODO: Error if env_var_parts.len() % 2 != 0
+    if env_var_parts.len() % 2 != 0 {
+      return Err(format!("Error parsing env: odd number of parts"));
+    }
     for i in 0..(env_var_parts.len() / 2) {
       env.insert(
         env_var_parts[2 * i].clone(),
         env_var_parts[2 * i + 1].clone(),
       );
     }
+    let digest = Self::lift_digest(&externs::project_ignoring_type(&value, "input_files"))
+      .map_err(|err| format!("Error parsing digest {}", err))?;
 
-    // TODO: Make this much less unwrap-happy with https://github.com/pantsbuild/pants/issues/5502
-    let fingerprint = externs::project_str(&value, "input_files_digest");
-    let digest_length = externs::project_str(&value, "digest_length");
-    let digest_length_as_usize = digest_length.parse::<usize>().unwrap();
-    let digest = hashing::Digest(
-      hashing::Fingerprint::from_hex_string(&fingerprint).unwrap(),
-      digest_length_as_usize,
-    );
-
-    ExecuteProcess(process_execution::ExecuteProcessRequest {
+    Ok(ExecuteProcess(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
       input_files: digest,
-    })
+    }))
   }
 }
 
@@ -685,18 +615,10 @@ impl From<Scandir> for NodeKey {
 }
 
 ///
-/// A Node that captures an fs::Snapshot for the given subject.
-///
-/// Begins by selecting PathGlobs for the subject, and then computes a Snapshot for the
-/// PathStats matched by the PathGlobs.
+/// A Node that captures an fs::Snapshot for a PathGlobs subject.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Snapshot {
-  subject: Key,
-  product: TypeConstraint,
-  variants: Variants,
-  entry: rule_graph::Entry,
-}
+pub struct Snapshot(Key);
 
 impl Snapshot {
   fn create(context: Context, path_globs: PathGlobs) -> NodeFuture<fs::Snapshot> {
@@ -705,7 +627,7 @@ impl Snapshot {
     // and fs::Snapshot::from_path_stats tracking dependencies for file digests.
     context
       .expand(path_globs)
-      .map_err(|e| format!("PlatGlobs expansion failed: {:?}", e))
+      .map_err(|e| format!("PathGlobs expansion failed: {:?}", e))
       .and_then(move |path_stats| {
         fs::Snapshot::from_path_stats(context.core.store.clone(), context.clone(), path_stats)
           .map_err(move |e| format!("Snapshot failed: {}", e))
@@ -725,6 +647,16 @@ impl Snapshot {
     })
   }
 
+  fn store_directory(context: &Context, item: &hashing::Digest) -> Value {
+    externs::unsafe_call(
+      &context.core.types.construct_directory_digest,
+      &[
+        externs::store_bytes(item.0.to_hex().as_bytes()),
+        externs::store_i64(item.1 as i64),
+      ],
+    )
+  }
+
   fn store_snapshot(context: &Context, item: &fs::Snapshot) -> Value {
     let path_stats: Vec<_> = item
       .path_stats
@@ -734,8 +666,7 @@ impl Snapshot {
     externs::unsafe_call(
       &context.core.types.construct_snapshot,
       &[
-        externs::store_bytes(&(item.digest.0).to_hex().as_bytes()),
-        externs::store_i32(item.digest.1 as i32),
+        Self::store_directory(context, &item.digest),
         externs::store_tuple(&path_stats),
       ],
     )
@@ -793,26 +724,10 @@ impl Node for Snapshot {
   type Output = fs::Snapshot;
 
   fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
-    let ref edges = context
-      .core
-      .rule_graph
-      .edges_for_inner(&self.entry)
-      .expect("edges for snapshot exist.");
-    // Compute and parse PathGlobs for the subject.
-    Select::new(
-      context.core.types.path_globs.clone(),
-      self.subject.clone(),
-      self.variants.clone(),
-      edges,
-    ).run(context.clone())
-      .then(move |path_globs_res| match path_globs_res {
-        Ok(path_globs_val) => match Self::lift_path_globs(&path_globs_val) {
-          Ok(pgs) => Snapshot::create(context, pgs),
-          Err(e) => err(throw(&format!("Failed to parse PathGlobs: {}", e))),
-        },
-        Err(failure) => err(failure),
-      })
-      .to_boxed()
+    match Self::lift_path_globs(&externs::val_for(&self.0)) {
+      Ok(pgs) => Self::create(context, pgs),
+      Err(e) => err(throw(&format!("Failed to parse PathGlobs: {}", e))),
+    }
   }
 }
 
@@ -832,24 +747,6 @@ pub struct Task {
 }
 
 impl Task {
-  fn get(&self, context: &Context, selector: Selector) -> NodeFuture<Value> {
-    let ref edges = context
-      .core
-      .rule_graph
-      .edges_for_inner(&self.entry)
-      .expect("edges for task exist.");
-    match selector {
-      Selector::Select(s) => {
-        Select::new_with_selector(s, self.subject.clone(), self.variants.clone(), edges)
-          .run(context.clone())
-      }
-      Selector::SelectDependencies(s) => {
-        SelectDependencies::new(s, self.subject.clone(), self.variants.clone(), edges)
-          .run(context.clone())
-      }
-    }
-  }
-
   fn gen_get(
     context: &Context,
     entry: Arc<rule_graph::Entry>,
@@ -907,17 +804,29 @@ impl Node for Task {
   type Output = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
-    let deps = future::join_all(
-      self
-        .task
-        .clause
-        .iter()
-        .map(|selector| self.get(&context, selector.clone()))
-        .collect::<Vec<_>>(),
-    );
+    let deps = {
+      let ref edges = context
+        .core
+        .rule_graph
+        .edges_for_inner(&self.entry)
+        .expect("edges for task exist.");
+      let subject = self.subject;
+      let variants = self.variants;
+      future::join_all(
+        self
+          .task
+          .clause
+          .into_iter()
+          .map(|s| {
+            Select::new_with_selector(s, subject.clone(), variants.clone(), edges)
+              .run(context.clone())
+          })
+          .collect::<Vec<_>>(),
+      )
+    };
 
-    let func = self.task.func.clone();
-    let entry = self.entry.clone();
+    let func = self.task.func;
+    let entry = self.entry;
     deps
       .then(move |deps_result| match deps_result {
         Ok(deps) => externs::call(&externs::val_for(&func.0), &deps),
@@ -978,7 +887,7 @@ impl NodeKey {
         keystr(&s.subject),
         typstr(&s.product)
       ),
-      &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.subject)),
+      &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.0)),
     }
   }
 

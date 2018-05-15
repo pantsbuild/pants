@@ -40,6 +40,7 @@ python_tests(
     ':base_compile_integration_test',
   ],
   tags={'integration'},
+  timeout=240,
 )
 
 python_tests(

@@ -30,6 +30,7 @@ from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
+from pants.backend.jvm.tasks.analysis_extraction import AnalysisExtraction
 from pants.backend.jvm.tasks.benchmark_run import BenchmarkRun
 from pants.backend.jvm.tasks.binary_create import BinaryCreate
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
@@ -47,6 +48,7 @@ from pants.backend.jvm.tasks.jar_create import JarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun
+from pants.backend.jvm.tasks.jvm_compile.javac.javac_compile import JavacCompile
 from pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher import RuntimeClasspathPublisher
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.backend.jvm.tasks.jvm_dependency_check import JvmDependencyCheck
@@ -158,6 +160,10 @@ def register_goals():
 
   # Compile
   task(name='zinc', action=ZincCompile).install('compile')
+  task(name='javac', action=JavacCompile).install('compile')
+
+  # Analysis extraction.
+  task(name='zinc', action=AnalysisExtraction).install('analysis')
 
   # Dependency resolution.
   task(name='ivy', action=IvyResolve).install('resolve', first=True)
@@ -171,7 +177,6 @@ def register_goals():
   task(name='services', action=PrepareServices).install('resources')
 
   task(name='export-classpath', action=RuntimeClasspathPublisher).install()
-  task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile')
 
   task(name='jvm', action=JvmDependencyUsage).install('dep-usage')
 
@@ -208,6 +213,7 @@ def register_goals():
   task(name='scalafmt', action=ScalaFmtCheckFormat, serialize=False).install('lint')
   task(name='scalastyle', action=Scalastyle, serialize=False).install('lint')
   task(name='checkstyle', action=Checkstyle, serialize=False).install('lint')
+  task(name='jvm-dep-check', action=JvmDependencyCheck, serialize=False).install('lint')
 
   # Formatting.
   task(name='scalafmt', action=ScalaFmtFormat, serialize=False).install('fmt')

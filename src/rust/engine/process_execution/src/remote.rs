@@ -12,6 +12,7 @@ use futures_timer::Delay;
 use hashing::{Digest, Fingerprint};
 use grpcio;
 use protobuf::{self, Message, ProtobufEnum};
+use resettable::Resettable;
 use sha2::Sha256;
 
 use super::{ExecuteProcessRequest, ExecuteProcessResult};
@@ -19,8 +20,10 @@ use std::cmp::min;
 
 #[derive(Clone)]
 pub struct CommandRunner {
-  execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
-  operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
+  channel: Resettable<grpcio::Channel>,
+  env: Resettable<Arc<grpcio::Environment>>,
+  execution_client: Resettable<Arc<bazel_protos::remote_execution_grpc::ExecutionClient>>,
+  operations_client: Resettable<Arc<bazel_protos::operations_grpc::OperationsClient>>,
   store: Store,
 }
 
@@ -49,21 +52,41 @@ impl CommandRunner {
   const BACKOFF_INCR_WAIT_MILLIS: u64 = 500;
   const BACKOFF_MAX_WAIT_MILLIS: u64 = 5000;
 
-  pub fn new(address: &str, thread_count: usize, store: Store) -> CommandRunner {
-    let env = Arc::new(grpcio::Environment::new(thread_count));
-    let channel = grpcio::ChannelBuilder::new(env.clone()).connect(address);
-    let execution_client = Arc::new(bazel_protos::remote_execution_grpc::ExecutionClient::new(
-      channel.clone(),
-    ));
-    let operations_client = Arc::new(bazel_protos::operations_grpc::OperationsClient::new(
-      channel.clone(),
-    ));
+  pub fn new(address: String, thread_count: usize, store: Store) -> CommandRunner {
+    let env = Resettable::new(Arc::new(move || {
+      Arc::new(grpcio::Environment::new(thread_count))
+    }));
+    let env2 = env.clone();
+    let channel = Resettable::new(Arc::new(move || {
+      grpcio::ChannelBuilder::new(env2.get()).connect(&address)
+    }));
+    let channel2 = channel.clone();
+    let channel3 = channel.clone();
+    let execution_client = Resettable::new(Arc::new(move || {
+      Arc::new(bazel_protos::remote_execution_grpc::ExecutionClient::new(
+        channel2.get(),
+      ))
+    }));
+    let operations_client = Resettable::new(Arc::new(move || {
+      Arc::new(bazel_protos::operations_grpc::OperationsClient::new(
+        channel3.get(),
+      ))
+    }));
 
     CommandRunner {
+      channel,
+      env,
       execution_client,
       operations_client,
       store,
     }
+  }
+
+  pub fn reset_prefork(&self) {
+    self.channel.reset();
+    self.env.reset();
+    self.execution_client.reset();
+    self.operations_client.reset();
   }
 
   ///
@@ -108,7 +131,7 @@ impl CommandRunner {
               execute_request, command
             );
 
-            map_grpc_result(execution_client.execute(&execute_request))
+            map_grpc_result(execution_client.get().execute(&execute_request))
               .map(|result| (Arc::new(execute_request), result))
           })
           .and_then(move |(execute_request, operation)| {
@@ -138,7 +161,7 @@ impl CommandRunner {
                       store.ensure_remote_has_recursive(missing_digests)
                             .and_then(move |()| {
                               map_grpc_result(
-                                execution_client2.execute(
+                                execution_client2.get().execute(
                                   &execute_request.clone()
                                 )
                               )
@@ -146,57 +169,57 @@ impl CommandRunner {
                             // Reset `iter_num` on `MissingDigests`
                             .map(|operation| future::Loop::Continue((operation, 0)))
                             .to_boxed()
-                    }
-                    ExecutionError::NotFinished(operation_name) => {
-                      let mut operation_request =
-                        bazel_protos::operations::GetOperationRequest::new();
-                      operation_request.set_name(operation_name.clone());
+                      },
+                      ExecutionError::NotFinished(operation_name) => {
+                        let mut operation_request =
+                          bazel_protos::operations::GetOperationRequest::new();
+                        operation_request.set_name(operation_name.clone());
 
-                      let backoff_period = min(
-                        CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
-                        (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS,
-                      );
+                        let backoff_period = min(
+                      CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
+                      (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS);
 
-                      let grpc_result =
-                        map_grpc_result(operations_client.get_operation(&operation_request));
+                        let grpc_result = map_grpc_result(
+                    operations_client.get().get_operation(&operation_request));
+                        // take the grpc result and cancel the op if too much time has passed.
+                        match grpc_result {
+                          Ok(operation) => {
+                            match start_time.elapsed() {
+                              Ok(elapsed) => {
+                                if elapsed > timeout {
+                                  // TODO: note what timed out. Options might include
+                                  // the op name, exec digest and a friendly name like zinc-compile
+                                  future::err(format!(
+                                    "Exceeded time out of {:?} with {:?} for {}",
+                                    timeout, elapsed, operation_name
+                                  )).to_boxed() as BoxFuture<_, _>
+                                } else {
+                                  // maybe the delay here should be the min of remaining time and the backoff period
+                                  Delay::new(Duration::from_millis(backoff_period))
+                                    .map_err(move |e| {
+                                      format!(
+                                        // could this message be better?
+                                        "Future-Delay errored at operation result polling for {}: {}",
+                                          operation_name, e)
+                                    })
+                                    .and_then(move |_| {
+                                      future::ok(future::Loop::Continue((operation, iter_num + 1)))
+                                        .to_boxed()
+                                    })
+                                    .to_boxed()
 
-                      // take the grpc result and cancel the op if too much time has passed.
-                      match grpc_result {
-                        Ok(operation) => {
-                          match start_time.elapsed() {
-                            Ok(elapsed) => {
-                              if elapsed > timeout {
-                                // TODO: note what timed out. Options might include
-                                // the op name, exec digest and a friendly name like zinc-compile
-                                future::err(format!(
-                                  "Exceeded time out of {:?} with {:?} for {}",
-                                  timeout, elapsed, operation_name
-                                )).to_boxed() as BoxFuture<_, _>
-                              } else {
-                                // maybe the delay here should be the min of remaining time and the backoff period
-                                Delay::new(Duration::from_millis(backoff_period))
-                                  .map_err(move |e| {
-                                    format!(
-                                      // could this message be better?
-                                      "Future-Delay errored at operation result polling for {}: {}",
-                                        operation_name, e)
-                                  })
-                                  .and_then(move |_| {
-                                    future::ok(future::Loop::Continue((operation, iter_num + 1)))
-                                      .to_boxed()
-                                  })
-                                  .to_boxed()
+                                }
+                              }
+                              Err(err) => {
+                                future::err(format!("Something weird happened with time {:?}", err))
+                                  .to_boxed() as BoxFuture<_, _>
                               }
                             }
-                            Err(err) => {
-                              future::err(format!("Something weird happened with time {:?}", err))
-                                .to_boxed() as BoxFuture<_, _>
-                            }
                           }
+                          Err(err) => future::err(err).to_boxed() as BoxFuture<_, _>,
                         }
-                        Err(err) => future::err(err).to_boxed() as BoxFuture<_, _>,
-                      }
-                    }
+
+                      },
                   }
                 })
             })
@@ -527,7 +550,7 @@ mod tests {
       ))
     };
 
-    let error = run_command_remote(&mock_server.address(), execute_request).expect_err("Want Err");
+    let error = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
     assert_eq!(
       error,
       "InvalidArgument: \"Did not expect this request\"".to_string()
@@ -556,7 +579,7 @@ mod tests {
       ))
     };
 
-    let result = run_command_remote(&mock_server.address(), execute_request).unwrap();
+    let result = run_command_remote(mock_server.address(), execute_request).unwrap();
 
     assert_eq!(
       result,
@@ -635,7 +658,7 @@ mod tests {
       ))
     };
 
-    let result = run_command_remote(&mock_server.address(), execute_request).unwrap();
+    let result = run_command_remote(mock_server.address(), execute_request).unwrap();
 
     assert_eq!(
       result,
@@ -664,7 +687,7 @@ mod tests {
       ))
     };
 
-    let error_msg = run_command_remote(&mock_server.address(), execute_request)
+    let error_msg = run_command_remote(mock_server.address(), execute_request)
       .expect_err("Timeout did not cause failure.");
     assert_contains(&error_msg, "Exceeded time out");
   }
@@ -702,7 +725,7 @@ mod tests {
       ))
     };
 
-    run_command_remote(&mock_server.address(), execute_request).expect_err("Want Err");
+    run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
   }
 
   #[test]
@@ -732,7 +755,7 @@ mod tests {
       ))
     };
 
-    let result = run_command_remote(&mock_server.address(), execute_request).expect_err("Want Err");
+    let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
 
     assert_eq!(result, "INTERNAL: Something went wrong");
   }
@@ -765,7 +788,7 @@ mod tests {
       ))
     };
 
-    let result = run_command_remote(&mock_server.address(), execute_request).expect_err("Want Err");
+    let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
 
     assert_eq!(result, "INTERNAL: Something went wrong");
   }
@@ -791,7 +814,7 @@ mod tests {
       ))
     };
 
-    let result = run_command_remote(&mock_server.address(), execute_request).expect_err("Want Err");
+    let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
 
     assert_eq!(result, "Operation finished but no response supplied");
   }
@@ -818,7 +841,7 @@ mod tests {
       ))
     };
 
-    let result = run_command_remote(&mock_server.address(), execute_request).expect_err("Want Err");
+    let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
 
     assert_eq!(result, "Operation finished but no response supplied");
   }
@@ -865,7 +888,7 @@ mod tests {
       .wait()
       .expect("Saving file bytes to store");
 
-    let result = CommandRunner::new(&mock_server.address(), 1, store)
+    let result = CommandRunner::new(mock_server.address(), 1, store)
       .run_command_remote(cat_roland_request())
       .wait();
     assert_eq!(
@@ -914,7 +937,7 @@ mod tests {
       Duration::from_secs(1),
     ).expect("Failed to make store");
 
-    let error = CommandRunner::new(&mock_server.address(), 1, store)
+    let error = CommandRunner::new(mock_server.address(), 1, store)
       .run_command_remote(cat_roland_request())
       .wait()
       .expect_err("Want error");
@@ -1120,7 +1143,7 @@ mod tests {
         ))
       };
       let start_time = SystemTime::now();
-      run_command_remote(&mock_server.address(), execute_request).unwrap();
+      run_command_remote(mock_server.address(), execute_request).unwrap();
       assert!(start_time.elapsed().unwrap() >= Duration::from_millis(500));
     }
   }
@@ -1148,7 +1171,7 @@ mod tests {
         ))
       };
       let start_time = SystemTime::now();
-      run_command_remote(&mock_server.address(), execute_request).unwrap();
+      run_command_remote(mock_server.address(), execute_request).unwrap();
       assert!(start_time.elapsed().unwrap() >= Duration::from_millis(3000));
     }
   }
@@ -1251,7 +1274,7 @@ mod tests {
   }
 
   fn run_command_remote(
-    address: &str,
+    address: String,
     request: ExecuteProcessRequest,
   ) -> Result<ExecuteProcessResult, String> {
     let cas = mock::StubCAS::with_roland_and_directory(1024);
@@ -1259,7 +1282,7 @@ mod tests {
     command_runner.run_command_remote(request).wait()
   }
 
-  fn create_command_runner(address: &str, cas: &mock::StubCAS) -> CommandRunner {
+  fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
     let store_dir = TempDir::new("store").unwrap();
     let store = fs::Store::with_remote(
       store_dir,
@@ -1277,7 +1300,7 @@ mod tests {
     operation: bazel_protos::operations::Operation,
   ) -> Result<ExecuteProcessResult, ExecutionError> {
     let cas = mock::StubCAS::with_roland_and_directory(1024);
-    let command_runner = create_command_runner("", &cas);
+    let command_runner = create_command_runner("".to_owned(), &cas);
     command_runner.extract_execute_response(operation).wait()
   }
 

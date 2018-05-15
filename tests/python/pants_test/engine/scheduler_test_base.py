@@ -10,7 +10,7 @@ import shutil
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.nodes import Return, Throw
-from pants.engine.scheduler import LocalScheduler
+from pants.engine.scheduler import Scheduler
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants_test.engine.util import init_native
@@ -48,17 +48,16 @@ class SchedulerTestBase(object):
                    project_tree=None,
                    work_dir=None,
                    include_trace_on_error=True):
-    """Creates a Scheduler with the given Rules installed."""
+    """Creates a SchedulerSession for a Scheduler with the given Rules installed."""
     rules = rules or []
-    goals = {}
     work_dir = work_dir or self._create_work_dir()
     project_tree = project_tree or self.mk_fs_tree(work_dir=work_dir)
-    return LocalScheduler(work_dir,
-                          goals,
-                          rules,
+    scheduler = Scheduler(self._native,
                           project_tree,
-                          self._native,
+                          work_dir,
+                          rules,
                           include_trace_on_error=include_trace_on_error)
+    return scheduler.new_session()
 
   def context_with_scheduler(self, scheduler, *args, **kwargs):
     return self.context(*args, scheduler=scheduler, **kwargs)

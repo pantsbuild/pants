@@ -74,18 +74,17 @@ class DaemonPantsRunner(ProcessManager):
   """
 
   def __init__(self, socket, exiter, args, env, target_roots, graph_helper, fork_lock,
-               preceding_graph_size, deferred_exception=None):
+               deferred_exception=None):
     """
     :param socket socket: A connected socket capable of speaking the nailgun protocol.
     :param Exiter exiter: The Exiter instance for this run.
     :param list args: The arguments (i.e. sys.argv) for this run.
     :param dict env: The environment (i.e. os.environ) for this run.
     :param TargetRoots target_roots: The `TargetRoots` for this run.
-    :param LegacyGraphHelper graph_helper: The LegacyGraphHelper instance to use for BuildGraph
-                                           construction. In the event of an exception, this will be
-                                           None.
+    :param LegacyGraphSession graph_helper: The LegacyGraphSession instance to use for BuildGraph
+                                            construction. In the event of an exception, this will be
+                                            None.
     :param threading.RLock fork_lock: A lock to use during forking for thread safety.
-    :param int preceding_graph_size: The size of the graph pre-warming, for stats.
     :param Exception deferred_exception: A deferred exception from the daemon's graph construction.
                                          If present, this will be re-raised in the client context.
     """
@@ -97,7 +96,6 @@ class DaemonPantsRunner(ProcessManager):
     self._target_roots = target_roots
     self._graph_helper = graph_helper
     self._fork_lock = fork_lock
-    self._preceding_graph_size = preceding_graph_size
     self._deferred_exception = deferred_exception
 
   def _make_identity(self):
@@ -202,7 +200,7 @@ class DaemonPantsRunner(ProcessManager):
     in that child process.
     """
     if self._graph_helper:
-      self._graph_helper.scheduler.pre_fork()
+      self._graph_helper.scheduler_session.pre_fork()
 
   def post_fork_child(self):
     """Post-fork child process callback executed via ProcessManager.daemonize()."""
@@ -248,7 +246,6 @@ class DaemonPantsRunner(ProcessManager):
           daemon_build_graph=self._graph_helper
         )
         runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
-        runner.set_preceding_graph_size(self._preceding_graph_size)
         runner.run()
       except KeyboardInterrupt:
         self._exiter.exit(1, msg='Interrupted by user.\n')

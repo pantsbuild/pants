@@ -40,13 +40,14 @@ class PackageManager(object):
     self.name = name
     self.tool_installations = tool_installations
 
-  def _get_installation_args(self, install_optional, production_only, force):
+  def _get_installation_args(self, install_optional, production_only, force, frozen_lockfile):
     """Returns command line args for installing package.
 
     :param install_optional: True to request install optional dependencies.
     :param production_only: True to only install production dependencies, i.e.
       ignore devDependencies.
     :param force: True to force re-download dependencies.
+    :param frozen_lockfile: True to disallow automatic update of lock files.
     :rtype: list of strings
     """
     raise NotImplementedError
@@ -79,6 +80,7 @@ class PackageManager(object):
     install_optional=False,
     production_only=False,
     force=False,
+    frozen_lockfile=True,
     node_paths=None):
     """Returns a command that when executed will install node package.
 
@@ -86,13 +88,15 @@ class PackageManager(object):
     :param production_only: True to only install production dependencies, i.e.
       ignore devDependencies.
     :param force: True to force re-download dependencies.
+    :param frozen_lockfile: True to disallow automatic update of lock files.
     :param node_paths: A list of path that should be included in $PATH when
       running installation.
     """
     args=self._get_installation_args(
       install_optional=install_optional,
       production_only=production_only,
-      force=force)
+      force=force,
+      frozen_lockfile=frozen_lockfile)
     return self.run_command(args=args, node_paths=node_paths)
 
   def run_script(self, script_name, script_args=None, node_paths=None):
@@ -153,7 +157,7 @@ class PackageManagerYarnpkg(PackageManager):
   def _get_run_script_args(self):
     return ['run']
 
-  def _get_installation_args(self, install_optional, production_only, force):
+  def _get_installation_args(self, install_optional, production_only, force, frozen_lockfile):
     return_args = ['--non-interactive']
     if not install_optional:
       return_args.append('--ignore-optional')
@@ -161,6 +165,8 @@ class PackageManagerYarnpkg(PackageManager):
       return_args.append('--production=true')
     if force:
       return_args.append('--force')
+    if frozen_lockfile:
+      return_args.append('--frozen-lockfile')
     return return_args
 
   def _get_add_package_args(self, package, type_option, version_option):
@@ -174,7 +180,7 @@ class PackageManagerYarnpkg(PackageManager):
       PackageInstallationTypeOption.NO_SAVE: None,
     }.get(type_option)
     if package_type_option is None:
-      logging.warning('{} does not support {} packages, ignored.'.format(self.name, type_option))
+      LOG.warning('{} does not support {} packages, ignored.'.format(self.name, type_option))
     elif package_type_option:  # Skip over '' entries
       return_args.append(package_type_option)
     package_version_option = {
@@ -197,7 +203,7 @@ class PackageManagerNpm(PackageManager):
   def _get_run_script_args(self):
     return ['run-script']
 
-  def _get_installation_args(self, install_optional, production_only, force):
+  def _get_installation_args(self, install_optional, production_only, force, frozen_lockfile):
     return_args = ['install']
     if not install_optional:
       return_args.append('--no-optional')
@@ -205,6 +211,8 @@ class PackageManagerNpm(PackageManager):
       return_args.append('--production')
     if force:
       return_args.append('--force')
+    if frozen_lockfile:
+      LOG.warning('{} does not support frozen lockfile option. Ignored.'.format(self.name))
     return return_args
 
   def _get_add_package_args(self, package, type_option, version_option):
@@ -218,7 +226,7 @@ class PackageManagerNpm(PackageManager):
       PackageInstallationTypeOption.NO_SAVE: '--no-save',
     }.get(type_option)
     if package_type_option is None:
-      logging.warning('{} does not support {} packages, ignored.'.format(self.name, type_option))
+      LOG.warning('{} does not support {} packages, ignored.'.format(self.name, type_option))
     elif package_type_option:  # Skip over '' entries
       return_args.append(package_type_option)
     package_version_option = {

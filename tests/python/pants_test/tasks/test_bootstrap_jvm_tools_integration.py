@@ -23,7 +23,7 @@ class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
       args = bootstrap_args + ['compile', 'examples/src/scala/org/pantsbuild/example/hello']
       pants_run = self.run_pants(args)
       self.assert_success(pants_run)
-      self.assertTrue('[shade-zinc]' in pants_run.stdout_data)
+      self.assertTrue('[shade-compiler-interface]' in pants_run.stdout_data)
 
       # The shaded zinc artifact should be cached, so zinc-based Java compilation
       # should reuse it instead of bootstrapping and shading again, even after clean-all.
@@ -32,4 +32,4 @@ class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
                                   'compile',
                                   'examples/src/java/org/pantsbuild/example/hello/simple'])
       self.assert_success(pants_run)
-      self.assertFalse('[shade-zinc]' in pants_run.stdout_data)
+      self.assertFalse('[shade-compiler-interface]' in pants_run.stdout_data)

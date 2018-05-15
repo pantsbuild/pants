@@ -1,9 +1,10 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use futures::future::{self, Future};
 
@@ -14,6 +15,39 @@ use graph::EntryId;
 use nodes::{NodeKey, Select};
 use rule_graph;
 use selectors;
+
+///
+/// A Session represents a related series of requests (generally: one run of the pants CLI) on an
+/// underlying Scheduler, and is a useful scope for metrics.
+///
+/// Both Scheduler and Session are exposed to python and expected to be used by multiple threads, so
+/// they use internal mutability in order to avoid exposing locks to callers.
+///
+pub struct Session {
+  // The total size of the graph at Session-creation time.
+  preceding_graph_size: usize,
+  // The set of roots that have been requested within this session.
+  roots: Mutex<HashSet<Root>>,
+}
+
+impl Session {
+  pub fn new(scheduler: &Scheduler) -> Session {
+    Session {
+      preceding_graph_size: scheduler.core.graph.len(),
+      roots: Mutex::new(HashSet::new()),
+    }
+  }
+
+  fn extend(&self, new_roots: &[Root]) {
+    let mut roots = self.roots.lock().unwrap();
+    roots.extend(new_roots.iter().cloned());
+  }
+
+  fn root_nodes(&self) -> Vec<NodeKey> {
+    let roots = self.roots.lock().unwrap();
+    roots.iter().map(|r| r.clone().into()).collect()
+  }
+}
 
 pub struct ExecutionRequest {
   // Set of roots for an execution, in the order they were declared.
@@ -67,7 +101,7 @@ impl Scheduler {
   ) -> Result<(), String> {
     let edges = self.find_root_edges_or_update_rule_graph(
       subject.type_id().clone(),
-      selectors::Selector::Select(selectors::Select::without_variant(product)),
+      selectors::Select::without_variant(product),
     )?;
     request
       .roots
@@ -78,19 +112,36 @@ impl Scheduler {
   fn find_root_edges_or_update_rule_graph(
     &self,
     subject_type: TypeId,
-    selector: selectors::Selector,
+    select: selectors::Select,
   ) -> Result<rule_graph::RuleEdges, String> {
     self
       .core
       .rule_graph
-      .find_root_edges(subject_type.clone(), selector.clone())
+      .find_root_edges(subject_type.clone(), select.clone())
       .ok_or_else(|| {
         format!(
           "No installed rules can satisfy {} for a root subject of type {}.",
-          rule_graph::selector_str(&selector),
+          rule_graph::select_str(&select),
           rule_graph::type_str(subject_type)
         )
       })
+  }
+
+  ///
+  /// Return Scheduler and per-Session metrics.
+  ///
+  pub fn metrics(&self, session: &Session) -> HashMap<&str, i64> {
+    let mut m = HashMap::new();
+    m.insert(
+      "affected_file_count",
+      self
+        .core
+        .graph
+        .reachable_digest_count(&session.root_nodes()) as i64,
+    );
+    m.insert("preceding_graph_size", session.preceding_graph_size as i64);
+    m.insert("resulting_graph_size", self.core.graph.len() as i64);
+    m
   }
 
   ///
@@ -145,11 +196,14 @@ impl Scheduler {
   /// Compute the results for roots in the given request.
   ///
   pub fn execute<'e>(
-    &mut self,
+    &self,
     request: &'e ExecutionRequest,
+    session: &Session,
   ) -> Vec<(&'e Key, &'e TypeConstraint, RootResult)> {
     // Bootstrap tasks for the roots, and then wait for all of them.
     debug!("Launching {} roots.", request.roots.len());
+
+    session.extend(&request.roots);
 
     // Wait for all roots to complete. Failure here should be impossible, because each
     // individual Future in the join was (eventually) mapped into success.

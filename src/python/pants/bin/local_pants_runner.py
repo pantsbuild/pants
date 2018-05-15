@@ -34,11 +34,7 @@ class LocalPantsRunner(object):
     self._target_roots = target_roots
     self._daemon_build_graph = daemon_build_graph
     self._options_bootstrapper = options_bootstrapper
-    self._preceding_graph_size = -1
     self._run_start_time = None
-
-  def set_preceding_graph_size(self, size):
-    self._preceding_graph_size = size
 
   def set_start_time(self, start_time):
     self._run_start_time = start_time
@@ -80,9 +76,6 @@ class LocalPantsRunner(object):
       repro = Reproducer.global_instance().create_repro()
       if repro:
         repro.capture(run_tracker.run_info.get_as_dict())
-
-      # Record the preceding product graph size.
-      run_tracker.pantsd_stats.set_preceding_graph_size(self._preceding_graph_size)
 
       # Setup and run GoalRunner.
       goal_runner = GoalRunner.Factory(root_dir,

@@ -42,10 +42,11 @@ class DeclaredDepsIntegrationTest(BaseCompileIT):
     # Should fail when it is not whitelisted.
     self.do_test_success_and_failure(
       DIR_DEPS_WHITELISTED,
-      ['--compile-jvm-dep-check-missing-deps-whitelist=["{}"]'.format(DIR_DEPS_WHITELISTED)],
+      ['--lint-jvm-dep-check-missing-deps-whitelist=["{}"]'.format(DIR_DEPS_WHITELISTED)],
       [],
       shared_args=[
-        '--compile-jvm-dep-check-missing-direct-deps=fatal',
+        'lint',
+        '--lint-jvm-dep-check-missing-direct-deps=fatal',
         '--no-java-strict-deps',
       ],
     )
@@ -54,10 +55,11 @@ class DeclaredDepsIntegrationTest(BaseCompileIT):
     # Should fail when it is not whitelisted.
     self.do_test_success_and_failure(
       JAR_DEPS_WHITELISTED,
-      ['--compile-jvm-dep-check-missing-deps-whitelist=["{}"]'.format(JAR_DEPS_WHITELISTED)],
+      ['--lint-jvm-dep-check-missing-deps-whitelist=["{}"]'.format(JAR_DEPS_WHITELISTED)],
       [],
       shared_args=[
-        '--compile-jvm-dep-check-missing-direct-deps=fatal',
+        'lint',
+        '--lint-jvm-dep-check-missing-direct-deps=fatal',
         '--no-java-strict-deps',
       ],
     )

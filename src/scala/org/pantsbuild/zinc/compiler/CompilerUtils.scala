@@ -102,9 +102,17 @@ object CompilerUtils {
   def scalaInstance(setup: CompilerCacheKey): XScalaInstance = {
     import setup.{scalaCompiler, scalaExtra, scalaLibrary}
     val allJars = scalaLibrary +: scalaCompiler +: scalaExtra
-    val loader = scalaLoader(allJars)
-    val version = scalaVersion(loader)
-    new ScalaInstance(version.getOrElse("unknown"), loader, scalaLibrary, scalaCompiler, allJars.toArray, version)
+    val allJarsLoader = scalaLoader(allJars)
+    val libraryOnlyLoader = scalaLoader(scalaLibrary +: scalaExtra)
+    new ScalaInstance(
+      scalaVersion(allJarsLoader).getOrElse("unknown"),
+      allJarsLoader,
+      libraryOnlyLoader,
+      scalaLibrary,
+      scalaCompiler,
+      allJars.toArray,
+      None
+    )
   }
 
   /**

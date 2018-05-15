@@ -151,6 +151,39 @@ Use `test` to run the tests. This uses `pytest`:
                    SUCCESS
     $
 
+Python Apps for Deployment
+--------------------------
+
+For deploying your Python apps, Pants can create archives (e.g.: tar.gz, zip) that contain an
+executable pex along with other files it needs at runtime (e.g.: config files, data sets).
+These archives can be extracted and run on production machines as part of your deployment process.
+
+To create a Python app for deployment, define a `python_app` target. Notice how the `python_app`
+target combines an existing `python_binary` with `bundles` that describe the other files to
+include in the archive.
+
+!inc[start-at=python_binary](hello/main/BUILD)
+
+Use `./pants bundle` to create the archive.
+
+    $ ./pants bundle examples/src/python/example/hello/main/:hello-app --bundle-py-archive=tgz
+    <output omitted for brevity>
+    00:59:52 00:02   [bundle]
+    00:59:52 00:02     [py]
+                       created bundle copy dist/examples.src.python.example.hello.main.hello-app-bundle
+                       created archive copy dist/examples.src.python.example.hello.main.hello-app.tar.gz
+    00:59:53 00:03   [complete]
+
+The archive contains an executable pex file, along with a loose file matched by the bundle glob.
+
+    $ tar -tzvf dist/examples.src.python.example.hello.main.hello-app.tar.gz
+    drwxr-xr-x root/root         0 2018-05-02 02:16 ./
+    -rwxr-xr-x root/root    474997 2018-05-02 02:16 ./main.pex
+    -rw-rw-r-- root/root       562 2018-05-01 13:34 ./BUILD
+
+See <a pantsref="bdict_bundle">bundle</a> in the BUILD dictionary for additional details about
+defining the layout of files in your archive.
+
 Debugging Tests
 ---------------
 Pants scrubs the environment's `PYTHONPATH` when running tests, to ensure a hermetic, repeatable test run.

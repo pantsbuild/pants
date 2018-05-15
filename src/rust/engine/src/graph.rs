@@ -197,36 +197,32 @@ impl InnerGraph {
   ///
   fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> bool {
     // Search either forward from the dst, or backward from the src.
-    let (root, needle, dependents) = {
+    let (root, needle, direction) = {
       let out_from_dst = self.pg.neighbors(dst_id).count();
       let in_to_src = self
         .pg
         .neighbors_directed(src_id, Direction::Incoming)
         .count();
       if out_from_dst < in_to_src {
-        (dst_id, src_id, false)
+        (dst_id, src_id, Direction::Outgoing)
       } else {
-        (src_id, dst_id, true)
+        (src_id, dst_id, Direction::Incoming)
       }
     };
 
     // Search for an existing path from dst to src.
     let mut roots = VecDeque::new();
     roots.push_back(root);
-    self.walk(roots, dependents).any(|eid| eid == needle)
+    self.walk(roots, direction).any(|eid| eid == needle)
   }
 
   ///
   /// Begins a topological Walk from the given roots.
   ///
-  fn walk(&self, roots: VecDeque<EntryId>, dependents: bool) -> Walk {
+  fn walk(&self, roots: VecDeque<EntryId>, direction: Direction) -> Walk {
     Walk {
       graph: self,
-      direction: if dependents {
-        Direction::Incoming
-      } else {
-        Direction::Outgoing
-      },
+      direction: direction,
       deque: roots,
       walked: HashSet::default(),
     }
@@ -236,18 +232,19 @@ impl InnerGraph {
   /// Begins a topological walk from the given roots. Provides both the current entry as well as the
   /// depth from the root.
   ///
-  fn leveled_walk<P>(&self, roots: Vec<EntryId>, predicate: P, dependents: bool) -> LeveledWalk<P>
+  fn leveled_walk<P>(
+    &self,
+    roots: Vec<EntryId>,
+    predicate: P,
+    direction: Direction,
+  ) -> LeveledWalk<P>
   where
     P: Fn(EntryId, Level) -> bool,
   {
     let rrr = roots.into_iter().map(|r| (r, 0)).collect::<VecDeque<_>>();
     LeveledWalk {
       graph: self,
-      direction: if dependents {
-        Direction::Incoming
-      } else {
-        Direction::Outgoing
-      },
+      direction: direction,
       deque: rrr,
       walked: HashSet::default(),
       predicate: predicate,
@@ -279,7 +276,10 @@ impl InnerGraph {
           })
         })
         .collect();
-      self.walk(root_ids, true).map(|eid| eid).collect()
+      self
+        .walk(root_ids, Direction::Incoming)
+        .map(|eid| eid)
+        .collect()
     };
 
     // Then remove all entries in one shot.
@@ -321,7 +321,7 @@ impl InnerGraph {
     );
   }
 
-  fn visualize(&self, roots: &Vec<NodeKey>, path: &Path) -> io::Result<()> {
+  fn visualize(&self, roots: &[NodeKey], path: &Path) -> io::Result<()> {
     let file = try!(File::create(path));
     let mut f = BufWriter::new(file);
     let mut viz_colors = HashMap::new();
@@ -352,7 +352,7 @@ impl InnerGraph {
       .collect();
     let predicate = |_| true;
 
-    for eid in self.walk(root_entries, false) {
+    for eid in self.walk(root_entries, Direction::Outgoing) {
       let entry = self.unsafe_entry_for_id(eid);
       let node_str = entry.format::<NodeKey>();
 
@@ -439,7 +439,7 @@ impl InnerGraph {
       .entry_id(&EntryKey::Valid(root.clone()))
       .map(|&eid| vec![eid])
       .unwrap_or_else(|| vec![]);
-    for t in self.leveled_walk(root_entries, |eid, _| !is_bottom(eid), false) {
+    for t in self.leveled_walk(root_entries, |eid, _| !is_bottom(eid), Direction::Outgoing) {
       let (eid, level) = t;
       try!(write!(&mut f, "{}\n", _format(eid, level)));
     }
@@ -448,21 +448,41 @@ impl InnerGraph {
     Ok(())
   }
 
+  fn reachable_digest_count(&self, roots: &[NodeKey]) -> usize {
+    let root_ids = roots
+      .iter()
+      .cloned()
+      .filter_map(|node| self.entry_id(&EntryKey::Valid(node)))
+      .cloned()
+      .collect();
+    self
+      .digests_internal(self.walk(root_ids, Direction::Outgoing).collect())
+      .count()
+  }
+
   fn all_digests(&self) -> Vec<hashing::Digest> {
     self
-      .pg
-      .node_indices()
-      .map(|node_index| self.pg.node_weight(node_index))
-      .filter_map(|maybe_entry| maybe_entry)
-      .filter_map(|entry| match entry.node.content() {
-        &NodeKey::DigestFile(_) => Some(entry.peek::<DigestFile>()),
-        _ => None,
-      })
-      .filter_map(|output| match output {
-        Some(Ok(digest)) => Some(digest),
-        _ => None,
-      })
+      .digests_internal(self.pg.node_indices().collect())
       .collect()
+  }
+
+  fn digests_internal<'g>(
+    &'g self,
+    entryids: Vec<EntryId>,
+  ) -> Box<Iterator<Item = hashing::Digest> + 'g> {
+    Box::new(
+      entryids
+        .into_iter()
+        .filter_map(move |eid| self.entry_for_id(eid))
+        .filter_map(|entry| match entry.node.content() {
+          &NodeKey::DigestFile(_) => Some(entry.peek::<DigestFile>()),
+          _ => None,
+        })
+        .filter_map(|output| match output {
+          Some(Ok(digest)) => Some(digest),
+          _ => None,
+        }),
+    )
   }
 }
 
@@ -576,9 +596,14 @@ impl Graph {
     inner.trace(root, path)
   }
 
-  pub fn visualize(&self, roots: &Vec<NodeKey>, path: &Path) -> io::Result<()> {
+  pub fn visualize(&self, roots: &[NodeKey], path: &Path) -> io::Result<()> {
     let inner = self.inner.lock().unwrap();
     inner.visualize(roots, path)
+  }
+
+  pub fn reachable_digest_count(&self, roots: &[NodeKey]) -> usize {
+    let inner = self.inner.lock().unwrap();
+    inner.reachable_digest_count(roots)
   }
 
   pub fn all_digests(&self) -> Vec<hashing::Digest> {

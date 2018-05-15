@@ -560,6 +560,10 @@ pub fn mount<'a, P: AsRef<Path>>(
   debug!("About to spawn_mount with options {:?}", options);
 
   let fs = unsafe { fuse::spawn_mount(BuildResultFS::new(store), &mount_path, &options) };
+  // fuse::spawn_mount doesn't always fully initialise the filesystem before returning.
+  // Bluntly sleep for a bit here. If this poses a problem, we should maybe start doing some polling
+  // stats or something until the filesystem seems to be correct.
+  std::thread::sleep(std::time::Duration::from_secs(1));
   debug!("Did spawn mount");
   fs
 }

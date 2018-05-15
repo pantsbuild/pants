@@ -115,11 +115,11 @@ class PantsDaemon(FingerprintedProcessManager):
       if full_init:
         build_root = get_buildroot()
         native = Native.create(bootstrap_options_values)
-        legacy_graph_helper = cls._setup_legacy_graph_helper(native, bootstrap_options_values)
+        legacy_graph_scheduler = cls._setup_legacy_graph_scheduler(native, bootstrap_options_values)
         services, port_map = cls._setup_services(
           build_root,
           bootstrap_options_values,
-          legacy_graph_helper,
+          legacy_graph_scheduler,
           watchman
         )
 
@@ -139,8 +139,8 @@ class PantsDaemon(FingerprintedProcessManager):
       return OptionsBootstrapper().get_bootstrap_options()
 
     @staticmethod
-    def _setup_legacy_graph_helper(native, bootstrap_options):
-      """Initializes a `LegacyGraphHelper` instance."""
+    def _setup_legacy_graph_scheduler(native, bootstrap_options):
+      """Initializes a `LegacyGraphScheduler` instance."""
       return EngineInitializer.setup_legacy_graph(
         bootstrap_options.pants_ignore,
         bootstrap_options.pants_workdir,
@@ -152,7 +152,7 @@ class PantsDaemon(FingerprintedProcessManager):
       )
 
     @staticmethod
-    def _setup_services(build_root, bootstrap_options, legacy_graph_helper, watchman):
+    def _setup_services(build_root, bootstrap_options, legacy_graph_scheduler, watchman):
       """Initialize pantsd services.
 
       :returns: A tuple of (`tuple` service_instances, `dict` port_map).
@@ -165,7 +165,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
       scheduler_service = SchedulerService(
         fs_event_service,
-        legacy_graph_helper,
+        legacy_graph_scheduler,
         build_root,
         bootstrap_options.pantsd_invalidation_globs
       )
@@ -178,7 +178,7 @@ class PantsDaemon(FingerprintedProcessManager):
         scheduler_service=scheduler_service
       )
 
-      store_gc_service = StoreGCService(legacy_graph_helper.scheduler)
+      store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)
 
       return (
         # Services.
