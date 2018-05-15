@@ -53,9 +53,11 @@ cache:
 matrix:
   include:
     - os: osx
-      # We request the oldest image we can (corresponding to OSX 10.10) for maximum compatibility.
+      # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
+      # We use 10.11 not 10.10 because 10.11 has a functioning version of lldb which can be useful
+      # for debugging native code issues.
       # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
-      osx_image: xcode6.4
+      osx_image: xcode7.3
       language: generic
       env:
         - SHARD="OSX Native Engine Binary Builder"
@@ -70,6 +72,8 @@ matrix:
       env:
         - SHARD="Linux Native Engine Binary Builder"
         - PREPARE_DEPLOY=1
+      before_script:
+        - ulimit -c unlimited
       script:
         - docker build --rm -t travis_ci
           --build-arg "TRAVIS_USER=$(id -un)"
@@ -83,6 +87,8 @@ matrix:
           -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
           travis_ci:latest
           sh -c "git clean -xfd && ./pants --version && ./build-support/bin/release.sh -n"
+      after_failure:
+        - build-support/bin/ci-failure.sh
 
     - os: linux
       dist: trusty
