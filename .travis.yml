@@ -62,6 +62,7 @@ matrix:
         - PREPARE_DEPLOY=1
       script:
         - ./pants --version && ./build-support/bin/release.sh -n
+        - bash -c 'for file in ~/Library/Logs/DiagnosticReports/*; do echo "DWH: Diagnostic report: ${file}"; cat "${file}"; done'
 
     - os: linux
       language: generic
