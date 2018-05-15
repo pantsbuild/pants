@@ -128,6 +128,8 @@ fn main() {
     argv,
     env,
     input_files,
+    timeout: Duration::from_millis(1000),
+    description: "TODO".to_string(),
   };
 
   let result = match server_arg {

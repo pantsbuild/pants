@@ -114,6 +114,8 @@ impl CommandRunner {
     let execution_client2 = execution_client.clone();
     let operations_client = self.operations_client.clone();
 
+    let req_timeout = req.timeout;
+    let req_description = req.description.clone();
     let store = self.store.clone();
     let execute_request_result = make_execute_request(&req);
 
@@ -136,11 +138,12 @@ impl CommandRunner {
           })
           .and_then(move |(execute_request, operation)| {
             let start_time = SystemTime::now();
-            // TODO the timeout should be injected rather than local to here.
-            let timeout: Duration = Duration::new(4, 0);
+            let timeout: Duration = req_timeout;
+            let temp_req_description = req_description.clone();
 
             future::loop_fn((operation, 0), move |(operation, iter_num)| {
-              //XXX future::loop_fn(operation, move |operation| {
+              let temp_req_description = req_description.clone();
+
               let execute_request = execute_request.clone();
               let execution_client2 = execution_client2.clone();
               let store = store.clone();
@@ -169,57 +172,54 @@ impl CommandRunner {
                             // Reset `iter_num` on `MissingDigests`
                             .map(|operation| future::Loop::Continue((operation, 0)))
                             .to_boxed()
-                      },
-                      ExecutionError::NotFinished(operation_name) => {
-                        let mut operation_request =
-                          bazel_protos::operations::GetOperationRequest::new();
-                        operation_request.set_name(operation_name.clone());
+                    }
+                    ExecutionError::NotFinished(operation_name) => {
+                      let mut operation_request =
+                        bazel_protos::operations::GetOperationRequest::new();
+                      operation_request.set_name(operation_name.clone());
 
-                        let backoff_period = min(
-                      CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
-                      (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS);
+                      let backoff_period = min(
+                        CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
+                        (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS,
+                      );
 
-                        let grpc_result = map_grpc_result(
-                    operations_client.get().get_operation(&operation_request));
-                        // take the grpc result and cancel the op if too much time has passed.
-                        match grpc_result {
-                          Ok(operation) => {
-                            match start_time.elapsed() {
-                              Ok(elapsed) => {
-                                if elapsed > timeout {
-                                  // TODO: note what timed out. Options might include
-                                  // the op name, exec digest and a friendly name like zinc-compile
-                                  future::err(format!(
-                                    "Exceeded time out of {:?} with {:?} for {}",
-                                    timeout, elapsed, operation_name
-                                  )).to_boxed() as BoxFuture<_, _>
-                                } else {
-                                  // maybe the delay here should be the min of remaining time and the backoff period
-                                  Delay::new(Duration::from_millis(backoff_period))
-                                    .map_err(move |e| {
-                                      format!(
+                      let grpc_result =
+                        map_grpc_result(operations_client.get().get_operation(&operation_request));
+                      // take the grpc result and cancel the op if too much time has passed.
+                      match grpc_result {
+                        Ok(operation) => {
+                          match start_time.elapsed() {
+                            Ok(elapsed) => {
+                              if elapsed > timeout {
+                                future::err(format!(
+                                  "Exceeded time out of {:?} with {:?} for operation {}, {}",
+                                  timeout, elapsed, operation_name, temp_req_description
+                                )).to_boxed() as BoxFuture<_, _>
+                              } else {
+                                // maybe the delay here should be the min of remaining time and the backoff period
+                                Delay::new(Duration::from_millis(backoff_period))
+                                  .map_err(move |e| {
+                                    format!(
                                         // could this message be better?
-                                        "Future-Delay errored at operation result polling for {}: {}",
-                                          operation_name, e)
-                                    })
-                                    .and_then(move |_| {
-                                      future::ok(future::Loop::Continue((operation, iter_num + 1)))
-                                        .to_boxed()
-                                    })
-                                    .to_boxed()
-
-                                }
-                              }
-                              Err(err) => {
-                                future::err(format!("Something weird happened with time {:?}", err))
-                                  .to_boxed() as BoxFuture<_, _>
+                                        "Future-Delay errored at operation result polling for {}, {}: {}",
+                                          operation_name, temp_req_description, e)
+                                  })
+                                  .and_then(move |_| {
+                                    future::ok(future::Loop::Continue((operation, iter_num + 1)))
+                                      .to_boxed()
+                                  })
+                                  .to_boxed()
                               }
                             }
+                            Err(err) => {
+                              future::err(format!("Something weird happened with time {:?}", err))
+                                .to_boxed() as BoxFuture<_, _>
+                            }
                           }
-                          Err(err) => future::err(err).to_boxed() as BoxFuture<_, _>,
                         }
-
-                      },
+                        Err(err) => future::err(err).to_boxed() as BoxFuture<_, _>,
+                      }
+                    }
                   }
                 })
             })
@@ -544,6 +544,8 @@ mod tests {
           argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
           env: BTreeMap::new(),
           input_files: fs::EMPTY_DIGEST,
+          timeout: Duration::from_millis(1000),
+          description: "wrong command".to_string(),
         }).unwrap()
           .1,
         vec![],
@@ -1181,6 +1183,8 @@ mod tests {
       argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
+      timeout: Duration::from_millis(5000),
+      description: "echo a foo".to_string(),
     }
   }
 
@@ -1339,6 +1343,8 @@ mod tests {
       argv: owned_string_vec(&["/bin/cat", "roland"]),
       env: BTreeMap::new(),
       input_files: TestDirectory::containing_roland().digest(),
+      timeout: Duration::from_millis(1000),
+      description: "cat a roland".to_string(),
     }
   }
 }

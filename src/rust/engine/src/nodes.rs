@@ -10,6 +10,7 @@ use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures::future::{self, Future};
 use tempdir::TempDir;
@@ -467,10 +468,16 @@ impl ExecuteProcess {
     let digest = Self::lift_digest(&externs::project_ignoring_type(&value, "input_files"))
       .map_err(|err| format!("Error parsing digest {}", err))?;
 
+    // todo fix
+    let timeout_in_seconds = 4.0;
+    let description = "argv".to_string();
+
     Ok(ExecuteProcess(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
       input_files: digest,
+      timeout: Duration::from_millis((timeout_in_seconds * 1000.0) as u64),
+      description: description,
     }))
   }
 }

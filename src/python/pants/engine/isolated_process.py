@@ -14,7 +14,12 @@ from pants.util.objects import TypeCheckError, datatype
 logger = logging.getLogger(__name__)
 
 
-class ExecuteProcessRequest(datatype([('argv', tuple), ('env', tuple), ('input_files', DirectoryDigest)])):
+class ExecuteProcessRequest(datatype([
+  ('argv', tuple),
+  ('env', tuple),
+  ('input_files', DirectoryDigest),
+  ('timeout', int),
+  ('description', str)])):
   """Request for execution with args and snapshots to extract."""
 
   @classmethod
@@ -24,6 +29,8 @@ class ExecuteProcessRequest(datatype([('argv', tuple), ('env', tuple), ('input_f
       argv=argv,
       env=tuple(env.items()),
       input_files=snapshot.directory_digest,
+      timeout=4,
+      description='process'
     )
 
   @classmethod

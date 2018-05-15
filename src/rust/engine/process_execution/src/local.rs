@@ -38,6 +38,7 @@ mod tests {
   use fs;
   use std::collections::BTreeMap;
   use std::path::PathBuf;
+  use std::time::Duration;
   use self::testutil::{as_bytes, owned_string_vec};
 
   #[test]
@@ -48,6 +49,8 @@ mod tests {
         argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
         env: BTreeMap::new(),
         input_files: fs::EMPTY_DIGEST,
+        timeout: Duration::from_millis(1000),
+        description: "echo foo".to_string(),
       },
       &PathBuf::from("/"),
     );
@@ -70,6 +73,8 @@ mod tests {
         argv: owned_string_vec(&["/bin/bash", "-c", "echo -n foo ; echo >&2 -n bar ; exit 1"]),
         env: BTreeMap::new(),
         input_files: fs::EMPTY_DIGEST,
+        timeout: Duration::from_millis(1000),
+        description: "echo foo and fail".to_string(),
       },
       &PathBuf::from("/"),
     );
@@ -96,6 +101,8 @@ mod tests {
         argv: owned_string_vec(&["/usr/bin/env"]),
         env: env.clone(),
         input_files: fs::EMPTY_DIGEST,
+        timeout: Duration::from_millis(1000),
+        description: "run env".to_string(),
       },
       &PathBuf::from("/"),
     );
@@ -129,6 +136,8 @@ mod tests {
         argv: owned_string_vec(&["/usr/bin/env"]),
         env: env,
         input_files: fs::EMPTY_DIGEST,
+        timeout: Duration::from_millis(1000),
+        description: "run env".to_string(),
       }
     }
 
@@ -145,6 +154,8 @@ mod tests {
         argv: owned_string_vec(&["echo", "-n", "foo"]),
         env: BTreeMap::new(),
         input_files: fs::EMPTY_DIGEST,
+        timeout: Duration::from_millis(1000),
+        description: "echo foo".to_string(),
       },
       &PathBuf::from("/"),
     ).expect_err("Want Err");
