@@ -229,7 +229,6 @@ def javac_compile_process_result(javac_compile_req):
   yield JavacCompileResult(
     stdout,
     stderr,
-    # None,
     javac_proc_result.output_directory_digest,
   )
 
