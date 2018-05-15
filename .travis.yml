@@ -55,7 +55,7 @@ matrix:
     - os: osx
       # We request the oldest image we can (corresponding to OSX 10.10) for maximum compatibility.
       # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
-      osx_image: xcode6.4
+      osx_image: xcode7.3
       language: generic
       env:
         - SHARD="OSX Native Engine Binary Builder"

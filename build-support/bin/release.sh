@@ -15,7 +15,7 @@ function run_local_pants() {
   ${ROOT}/pants "$@"
   exit_code=$?
   if [[ exit_code != 0 ]]; then
-    for file in ~/Library/Logs/DiagnosticReports/*; do echo "DWH: Diagnostic report: ${file}"; cat "${file}"; done
+    lldb --core /cores/* --batch --one-line "bt"
     exit $?
   fi
 }
