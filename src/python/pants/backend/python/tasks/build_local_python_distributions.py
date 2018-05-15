@@ -47,7 +47,7 @@ class BuildLocalPythonDistributions(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(BuildLocalPythonDistributions, cls).implementation_version() + [('BuildLocalPythonDistributions', 1)]
+    return super(BuildLocalPythonDistributions, cls).implementation_version() + [('BuildLocalPythonDistributions', 2)]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -66,18 +66,18 @@ class BuildLocalPythonDistributions(Task):
     return type(tgt) is PythonDistribution
 
   def _ensure_setup_requires_site_dir(self, dist_targets, interpreter, site_dir):
-    reqs_to_resolve = []
+    reqs_to_resolve = set()
 
     for tgt in dist_targets:
       for setup_req_lib_addr in tgt.setup_requires:
         for req_lib in self.context.build_graph.resolve(setup_req_lib_addr):
           for req in req_lib.requirements:
-            reqs_to_resolve.append(req)
+            reqs_to_resolve.add(req)
 
     if not reqs_to_resolve:
       return None
     self.context.log.debug('python_dist target(s) with setup_requires detected. '
-                           'Installing requirements: {}'
+                           'Installing setup requirements: {}\n\n'
                            .format([req.key for req in reqs_to_resolve]))
 
     setup_requires_dists = _resolve_multi(interpreter, reqs_to_resolve, ['current'], None)
@@ -158,6 +158,8 @@ class BuildLocalPythonDistributions(Task):
       SetupPyInvocationEnvironment, self._native_toolchain_instance())
     env = setup_py_env.as_env_dict()
     if pythonpath:
+      self.context.log.debug('Setting PYTHONPATH with setup_requires site directory: {}'
+                             .format(pythonpath))
       env['PYTHONPATH'] = pythonpath
     with environment_as(**env):
       yield
