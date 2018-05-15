@@ -11,7 +11,7 @@ use clap::{App, AppSettings, Arg};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use tempdir::TempDir;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::iter::Iterator;
 use std::process::exit;
 use std::sync::Arc;
@@ -128,7 +128,7 @@ fn main() {
     argv,
     env,
     input_files,
-    output_files: vec![],
+    output_files: BTreeSet::new(),
   };
 
   let result = match server_arg {

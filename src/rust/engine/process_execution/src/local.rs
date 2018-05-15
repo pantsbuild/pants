@@ -64,7 +64,7 @@ impl CommandRunner {
         .map(|posix_fs| Arc::new(posix_fs))
         .and_then(|posix_fs| {
           posix_fs
-            .path_stats(output_file_paths)
+            .path_stats(output_file_paths.into_iter().collect())
             .map_err(|e| format!("Error stating output files: {}", e))
             .and_then(move |paths| {
               fs::Snapshot::from_path_stats(
@@ -100,7 +100,7 @@ mod tests {
   use futures::Future;
   use super::{ExecuteProcessRequest, ExecuteProcessResult};
   use std;
-  use std::collections::BTreeMap;
+  use std::collections::{BTreeMap, BTreeSet};
   use std::env;
   use std::os::unix::fs::PermissionsExt;
   use std::path::{Path, PathBuf};
@@ -116,7 +116,7 @@ mod tests {
       argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
-      output_files: vec![],
+      output_files: BTreeSet::new(),
     });
 
     assert_eq!(
@@ -137,7 +137,7 @@ mod tests {
       argv: owned_string_vec(&["/bin/bash", "-c", "echo -n foo ; echo >&2 -n bar ; exit 1"]),
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
-      output_files: vec![],
+      output_files: BTreeSet::new(),
     });
 
     assert_eq!(
@@ -162,7 +162,7 @@ mod tests {
       argv: owned_string_vec(&["/usr/bin/env"]),
       env: env.clone(),
       input_files: fs::EMPTY_DIGEST,
-      output_files: vec![],
+      output_files: BTreeSet::new(),
     });
 
     let stdout = String::from_utf8(result.unwrap().stdout.to_vec()).unwrap();
@@ -194,7 +194,7 @@ mod tests {
         argv: owned_string_vec(&["/usr/bin/env"]),
         env: env,
         input_files: fs::EMPTY_DIGEST,
-        output_files: vec![],
+        output_files: BTreeSet::new(),
       }
     }
 
@@ -210,7 +210,7 @@ mod tests {
       argv: owned_string_vec(&["echo", "-n", "foo"]),
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
-      output_files: vec![],
+      output_files: BTreeSet::new(),
     }).expect_err("Want Err");
   }
 
@@ -224,7 +224,7 @@ mod tests {
       ]),
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
-      output_files: vec![],
+      output_files: BTreeSet::new(),
     });
     assert_eq!(
       result.unwrap(),
@@ -254,7 +254,7 @@ mod tests {
         ],
         env: BTreeMap::new(),
         input_files: fs::EMPTY_DIGEST,
-        output_files: vec![output_file_path.clone()],
+        output_files: vec![output_file_path.clone()].into_iter().collect(),
       },
       working_dir,
     );

@@ -21,7 +21,7 @@ extern crate tempdir;
 extern crate testutil;
 
 use bytes::Bytes;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 pub mod local;
@@ -51,7 +51,7 @@ pub struct ExecuteProcessRequest {
 
   pub input_files: hashing::Digest,
 
-  pub output_files: Vec<PathBuf>,
+  pub output_files: BTreeSet<PathBuf>,
 }
 
 ///

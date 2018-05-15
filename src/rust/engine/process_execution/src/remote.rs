@@ -472,7 +472,7 @@ mod tests {
   use testutil::{as_bytes, owned_string_vec};
 
   use super::{CommandRunner, ExecuteProcessRequest, ExecuteProcessResult, ExecutionError};
-  use std::collections::BTreeMap;
+  use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
   use std::sync::Arc;
   use std::time::Duration;
@@ -501,7 +501,7 @@ mod tests {
           argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
           env: BTreeMap::new(),
           input_files: fs::EMPTY_DIGEST,
-          output_files: vec![],
+          output_files: BTreeSet::new(),
         }).unwrap()
           .1,
         vec![],
@@ -1119,7 +1119,7 @@ mod tests {
       argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
-      output_files: vec![],
+      output_files: BTreeSet::new(),
     }
   }
 
@@ -1266,7 +1266,7 @@ mod tests {
       argv: owned_string_vec(&["/bin/cat", "roland"]),
       env: BTreeMap::new(),
       input_files: TestDirectory::containing_roland().digest(),
-      output_files: vec![],
+      output_files: BTreeSet::new(),
     }
   }
 }
