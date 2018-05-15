@@ -5,19 +5,17 @@ extern crate tempdir;
 
 use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
-use bytes::Bytes;
 use futures::Future;
 use futures::future::{self, join_all};
 use hashing::{Digest, Fingerprint};
 use indexmap::{self, IndexMap};
 use itertools::Itertools;
-use {File, FileContent, PathStat, PosixFS, Store};
+use {File, PathStat, PosixFS, Store};
 use protobuf;
-use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fmt;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
   0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
@@ -259,91 +257,6 @@ impl Snapshot {
       })
       .to_boxed()
   }
-
-  // Preserves the order of Snapshot's path_stats in its returned Vec.
-  pub fn contents(self, store: Store) -> BoxFuture<Vec<FileContent>, String> {
-    let contents = Arc::new(Mutex::new(HashMap::new()));
-    let path_stats = self.path_stats;
-    Snapshot::contents_for_directory_helper(self.digest, store, PathBuf::from(""), contents.clone())
-      .map(move |_| {
-        let mut contents = contents.lock().unwrap();
-        let mut vec = Vec::new();
-        for path in path_stats.iter().filter_map(|path_stat| match path_stat {
-          &PathStat::File { ref path, .. } => Some(path.to_path_buf()),
-          &PathStat::Dir { .. } => None,
-        }) {
-          match contents.remove(&path) {
-            Some(content) => vec.push(FileContent { path, content }),
-            None => {
-              panic!(format!(
-                "PathStat for {:?} was present in path_stats but missing from Snapshot contents",
-                path
-              ));
-            }
-          }
-        }
-        vec
-      })
-      .to_boxed()
-  }
-
-  // Assumes that all fingerprints it encounters are valid.
-  fn contents_for_directory_helper(
-    digest: Digest,
-    store: Store,
-    path_so_far: PathBuf,
-    contents_wrapped: Arc<Mutex<HashMap<PathBuf, Bytes>>>,
-  ) -> BoxFuture<(), String> {
-    store
-      .load_directory(digest)
-      .and_then(move |maybe_dir| {
-        maybe_dir.ok_or_else(|| format!("Could not find directory with digest {:?}", digest))
-      })
-      .and_then(move |dir| {
-        let contents_wrapped_copy = contents_wrapped.clone();
-        let path_so_far_copy = path_so_far.clone();
-        let store_copy = store.clone();
-        let file_futures = join_all(
-          dir
-            .get_files()
-            .iter()
-            .map(move |file_node| {
-              let path = path_so_far_copy.join(file_node.get_name());
-              let contents_wrapped_copy = contents_wrapped_copy.clone();
-              store_copy
-                .load_file_bytes_with(file_node.get_digest().into(), |b| b)
-                .and_then(move |maybe_bytes| {
-                  maybe_bytes
-                    .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
-                    .map(move |bytes| {
-                      let mut contents = contents_wrapped_copy.lock().unwrap();
-                      contents.insert(path, bytes);
-                    })
-                })
-            })
-            .collect::<Vec<_>>(),
-        );
-        let contents_wrapped_copy2 = contents_wrapped.clone();
-        let store_copy = store.clone();
-        let dir_futures = join_all(
-          dir
-            .get_directories()
-            .iter()
-            .map(move |dir_node| {
-              Snapshot::contents_for_directory_helper(
-                dir_node.get_digest().into(),
-                store_copy.clone(),
-                path_so_far.join(dir_node.get_name()),
-                contents_wrapped_copy2.clone(),
-              )
-            })
-            .collect::<Vec<_>>(),
-        );
-        file_futures.join(dir_futures)
-      })
-      .map(|(_, _)| ())
-      .to_boxed()
-  }
 }
 
 impl fmt::Debug for Snapshot {
@@ -424,22 +337,19 @@ mod tests {
   extern crate tempdir;
   extern crate testutil;
 
-  use bytes::Bytes;
   use futures::future::Future;
   use hashing::{Digest, Fingerprint};
   use tempdir::TempDir;
   use self::testutil::make_file;
 
   use super::OneOffStoreFileByDigest;
-  use super::super::{Dir, File, FileContent, Path, PathGlobs, PathStat, PosixFS, ResettablePool,
-                     Snapshot, Store, VFS};
+  use super::super::{Dir, File, Path, PathGlobs, PathStat, PosixFS, ResettablePool, Snapshot,
+                     Store, VFS};
 
   use std;
   use std::path::PathBuf;
   use std::sync::Arc;
 
-  const AGGRESSIVE: &str = "Aggressive";
-  const LATIN: &str = "Chaetophractus villosus";
   const STR: &str = "European Burmese";
 
   fn setup() -> (Store, TempDir, Arc<PosixFS>, OneOffStoreFileByDigest) {
@@ -621,72 +531,6 @@ mod tests {
     }
   }
 
-  #[test]
-  fn contents_for_one_file() {
-    let (store, dir, posix_fs, digester) = setup();
-
-    let file_name = PathBuf::from("roland");
-    make_file(&dir.path().join(&file_name), STR.as_bytes(), 0o600);
-
-    let contents = Snapshot::from_path_stats(store.clone(), digester, expand_all_sorted(posix_fs))
-      .wait()
-      .unwrap()
-      .contents(store)
-      .wait()
-      .unwrap();
-    assert_snapshot_contents(contents, vec![(&file_name, STR)]);
-  }
-
-  #[test]
-  fn contents_for_files_in_multiple_directories() {
-    let (store, dir, posix_fs, digester) = setup();
-
-    let armadillos = PathBuf::from("armadillos");
-    let armadillos_abs = dir.path().join(&armadillos);
-    std::fs::create_dir_all(&armadillos_abs).unwrap();
-    let amy = armadillos.join("amy");
-    make_file(&dir.path().join(&amy), LATIN.as_bytes(), 0o600);
-    let rolex = armadillos.join("rolex");
-    make_file(&dir.path().join(&rolex), AGGRESSIVE.as_bytes(), 0o600);
-
-    let cats = PathBuf::from("cats");
-    let cats_abs = dir.path().join(&cats);
-    std::fs::create_dir_all(&cats_abs).unwrap();
-    let roland = cats.join("roland");
-    make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
-
-    let dogs = PathBuf::from("dogs");
-    let dogs_abs = dir.path().join(&dogs);
-    std::fs::create_dir_all(&dogs_abs).unwrap();
-
-    let path_stats_sorted = expand_all_sorted(posix_fs);
-    let mut path_stats_reversed = path_stats_sorted.clone();
-    path_stats_reversed.reverse();
-    {
-      let snapshot =
-        Snapshot::from_path_stats(store.clone(), digester.clone(), path_stats_reversed)
-          .wait()
-          .unwrap();
-      let contents = snapshot.contents(store.clone()).wait().unwrap();
-      assert_snapshot_contents(
-        contents,
-        vec![(&roland, STR), (&rolex, AGGRESSIVE), (&amy, LATIN)],
-      );
-    }
-    {
-      let contents = Snapshot::from_path_stats(store.clone(), digester, path_stats_sorted)
-        .wait()
-        .unwrap()
-        .contents(store)
-        .wait()
-        .unwrap();
-      assert_snapshot_contents(
-        contents,
-        vec![(&amy, LATIN), (&rolex, AGGRESSIVE), (&roland, STR)],
-      );
-    }
-  }
-
   fn make_dir_stat(root: &Path, relpath: &Path) -> PathStat {
     std::fs::create_dir(root.join(relpath)).unwrap();
     PathStat::dir(relpath.to_owned(), Dir(relpath.to_owned()))
@@ -714,17 +558,5 @@ mod tests {
       .unwrap();
     v.sort_by(|a, b| a.path().cmp(b.path()));
     v
-  }
-
-  fn assert_snapshot_contents(contents: Vec<FileContent>, expected: Vec<(&Path, &str)>) {
-    let expected_with_array: Vec<_> = expected
-      .into_iter()
-      .map(|(path, s)| (path.to_path_buf(), Bytes::from(s)))
-      .collect();
-    let got: Vec<_> = contents
-      .into_iter()
-      .map(|file_content| (file_content.path, file_content.content))
-      .collect();
-    assert_eq!(expected_with_array, got);
   }
 }

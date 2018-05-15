@@ -32,7 +32,8 @@ class ParseAddressFamilyTest(unittest.TestCase):
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
     address_mapper = AddressMapper(JsonParser(TestTable()))
     af = run_rule(parse_address_family, address_mapper, Dir('/dev/null'), {
-        (FilesContent, PathGlobs): lambda _: FilesContent([FileContent('/dev/null/BUILD', '')])
+        (Snapshot, PathGlobs): lambda _: Snapshot(DirectoryDigest(str("abc"), 10), (File('/dev/null/BUILD'),)),
+        (FilesContent, DirectoryDigest): lambda _: FilesContent([FileContent('/dev/null/BUILD', '')]),
       })
     self.assertEquals(len(af.objects_by_name), 0)
 
