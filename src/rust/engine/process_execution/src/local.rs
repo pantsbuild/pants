@@ -239,24 +239,18 @@ mod tests {
 
   #[test]
   fn output_files_one() {
-    let working_dir = TempDir::new("working").unwrap();
-
-    let content = TestData::roland();
-    let directory = TestDirectory::containing_roland();
-    let output_file_path = PathBuf::from("roland");
-
     let result = run_command_locally_in_dir(
       ExecuteProcessRequest {
         argv: vec![
           find_bash(),
           "-c".to_owned(),
-          format!("echo -n {} > {}", content.string(), "roland"),
+          format!("echo -n {} > {}", TestData::roland().string(), "roland"),
         ],
         env: BTreeMap::new(),
         input_files: fs::EMPTY_DIGEST,
-        output_files: vec![output_file_path.clone()].into_iter().collect(),
+        output_files: vec![PathBuf::from("roland")].into_iter().collect(),
       },
-      working_dir,
+      TempDir::new("working").unwrap(),
     );
 
     assert_eq!(
@@ -265,19 +259,102 @@ mod tests {
         stdout: as_bytes(""),
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: directory.digest(),
+        output_directory: TestDirectory::containing_roland().digest(),
       }
     )
   }
 
   #[test]
   fn output_files_many() {
-    // TODO
+    let result = run_command_locally_in_dir(
+      ExecuteProcessRequest {
+        argv: vec![
+          find_bash(),
+          "-c".to_owned(),
+          format!(
+            "/bin/mkdir cats ; echo -n {} > cats/roland ; echo -n {} > treats",
+            TestData::roland().string(),
+            TestData::catnip().string()
+          ),
+        ],
+        env: BTreeMap::new(),
+        input_files: fs::EMPTY_DIGEST,
+        output_files: vec![PathBuf::from("cats/roland"), PathBuf::from("treats")]
+          .into_iter()
+          .collect(),
+      },
+      TempDir::new("working").unwrap(),
+    );
+
+    assert_eq!(
+      result.unwrap(),
+      ExecuteProcessResult {
+        stdout: as_bytes(""),
+        stderr: as_bytes(""),
+        exit_code: 0,
+        output_directory: TestDirectory::recursive().digest(),
+      }
+    )
   }
 
   #[test]
-  fn output_files_failure() {
-    // TODO
+  fn output_files_execution_failure() {
+    let result = run_command_locally_in_dir(
+      ExecuteProcessRequest {
+        argv: vec![
+          find_bash(),
+          "-c".to_owned(),
+          format!(
+            "echo -n {} > {} ; exit 1",
+            TestData::roland().string(),
+            "roland"
+          ),
+        ],
+        env: BTreeMap::new(),
+        input_files: fs::EMPTY_DIGEST,
+        output_files: vec![PathBuf::from("roland")].into_iter().collect(),
+      },
+      TempDir::new("working").unwrap(),
+    );
+
+    assert_eq!(
+      result.unwrap(),
+      ExecuteProcessResult {
+        stdout: as_bytes(""),
+        stderr: as_bytes(""),
+        exit_code: 1,
+        output_directory: TestDirectory::containing_roland().digest(),
+      }
+    )
+  }
+
+  #[test]
+  fn output_files_partial_output() {
+    let result = run_command_locally_in_dir(
+      ExecuteProcessRequest {
+        argv: vec![
+          find_bash(),
+          "-c".to_owned(),
+          format!("echo -n {} > {}", TestData::roland().string(), "roland"),
+        ],
+        env: BTreeMap::new(),
+        input_files: fs::EMPTY_DIGEST,
+        output_files: vec![PathBuf::from("roland"), PathBuf::from("susannah")]
+          .into_iter()
+          .collect(),
+      },
+      TempDir::new("working").unwrap(),
+    );
+
+    assert_eq!(
+      result.unwrap(),
+      ExecuteProcessResult {
+        stdout: as_bytes(""),
+        stderr: as_bytes(""),
+        exit_code: 0,
+        output_directory: TestDirectory::containing_roland().digest(),
+      }
+    )
   }
 
   fn run_command_locally(req: ExecuteProcessRequest) -> Result<ExecuteProcessResult, String> {
