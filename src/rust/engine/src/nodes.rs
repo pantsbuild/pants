@@ -380,7 +380,6 @@ impl Select {
             ..
           }) => {
             let context = context.clone();
-            let context2 = context.clone();
             self
               .execute_process(&context, &entry)
               .map(move |result| {
@@ -390,7 +389,7 @@ impl Select {
                     externs::store_bytes(&result.0.stdout),
                     externs::store_bytes(&result.0.stderr),
                     externs::store_i64(result.0.exit_code as i64),
-                    Snapshot::store_directory(&context2, &result.0.output_directory),
+                    Snapshot::store_directory(&context.core, &result.0.output_directory),
                   ],
                 )
               })

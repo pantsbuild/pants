@@ -15,6 +15,7 @@ mod selectors;
 mod tasks;
 mod types;
 
+#[macro_use]
 extern crate boxfuture;
 #[macro_use]
 extern crate enum_primitive;
@@ -37,7 +38,6 @@ use std::mem;
 use std::os::raw;
 use std::panic;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use context::Core;
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
@@ -47,7 +47,6 @@ use externs::{Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionE
               ProjectMultiExtern, PyResult, SatisfiedByExtern, SatisfiedByTypeExtern,
               StoreBytesExtern, StoreI64Extern, StoreTupleExtern, TypeIdBuffer, TypeToStrExtern,
               ValToStrExtern};
-use fs::VFS;
 use futures::Future;
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
@@ -577,39 +576,21 @@ pub extern "C" fn capture_snapshot(
   path_globs_value: Value,
 ) -> PyResult {
   let root_path = unsafe { CStr::from_ptr(raw_root_path).to_string_lossy().into_owned() };
+  let path_globs = match nodes::Snapshot::lift_path_globs(&path_globs_value) {
+    Ok(pg) => pg,
+    Err(err) => {
+      let e: Result<Value, String> = Err(err);
+      return e.into();
+    }
+  };
+
   with_scheduler(scheduler_ptr, |scheduler| {
-    capture_snapshot_inner(scheduler, root_path, path_globs_value).into()
-  })
-}
-
-fn capture_snapshot_inner(
-  scheduler: &Scheduler,
-  root_path: String,
-  path_globs_value: Value,
-) -> Result<Value, String> {
-  // Note that we don't use a Context here, and don't cache any intermediate steps, we just place
-  // the resultant Snapshot into the store and return it. This is important, because we're reading
-  // things from arbitrary filepaths which we don't want to cache in the graph, as we don't watch
-  // them for changes.
-  // We assume that this Snapshot is of an immutable piece of the filesystem.
-
-  let posix_fs = Arc::new(scheduler.core.vfs.clone_with_root(&root_path)?);
-  let path_globs = nodes::Snapshot::lift_path_globs(&path_globs_value)?;
-  let store = scheduler.core.store.clone();
-
-  let snapshot = posix_fs
-    .expand(path_globs)
-    .map_err(|err| format!("Error expanding globs: {:?}", err))
-    .and_then(|path_stats| {
-      fs::Snapshot::from_path_stats(
-        scheduler.core.store.clone(),
-        fs::OneOffStoreFileByDigest::new(store, posix_fs),
-        path_stats,
-      )
-    })
-    .wait()?;
-
-  Ok(nodes::Snapshot::store_snapshot(&scheduler.core, &snapshot))
+    let core = scheduler.core.clone();
+    scheduler
+      .capture_snapshot_from_arbitrary_root(root_path, path_globs)
+      .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
+  }).wait()
+    .into()
 }
 
 fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {

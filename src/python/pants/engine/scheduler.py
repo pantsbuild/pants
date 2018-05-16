@@ -158,6 +158,13 @@ class Scheduler(object):
   def _from_value(self, val):
     return self._native.context.from_value(val)
 
+  def _raise_or_return(self, pyresult):
+    value = self._from_value(pyresult.value)
+    if pyresult.is_throw:
+      raise value
+    else:
+      return value
+
   def _to_id(self, typ):
     return self._native.context.to_id(typ)
 
@@ -279,8 +286,7 @@ class Scheduler(object):
                                                      execution_request,
                                                      self._to_key(subject),
                                                      self._to_constraint(product))
-    if res.is_throw:
-      raise self._from_value(res.value)
+    self._raise_or_return(res)
 
   def visualize_to_dir(self):
     return self._native.visualize_to_dir
@@ -310,12 +316,12 @@ class Scheduler(object):
     return roots
 
   def capture_snapshot(self, root_path, path_globs):
-    result = self._native.lib.capture_snapshot(self._scheduler, root_path, self._to_value(path_globs))
-    value = self._from_value(result.value)
-    if result.is_throw:
-      raise value
-    else:
-      return value
+    result = self._native.lib.capture_snapshot(
+      self._scheduler,
+      root_path,
+      self._to_value(path_globs),
+    )
+    return self._raise_or_return(result)
 
   def lease_files_in_graph(self):
     self._native.lib.lease_files_in_graph(self._scheduler)
