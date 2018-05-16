@@ -20,23 +20,20 @@ class PythonSetup(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(PythonSetup, cls).register_options(register)
-    # TODO: On removal, make ['CPython>=2.7,<3'] the default for --interpreter-constraints.
-    register('--interpreter-requirement', advanced=True, default='CPython>=2.7,<3',
-             removal_version='1.5.0.dev0', removal_hint='Use --interpreter-constraints instead.',
-             help='The interpreter requirement string for this python environment.')
-    # Note: This will replace two options:
+    # Note: This replaces two options:
     # A) The global --interpreter option in the old python tasks.
     #    That flag is only relevant in the python backend, and should never have been
     #    global to begin with.
     # B) The --interpreter-requirement option above.  That flag merely served to set the
     #    effective default for when no other constraints were set, so we might as well
     #    roll that into the more general constraints.
-    register('--interpreter-constraints', advanced=True, default=[], type=list,
+    register('--interpreter-constraints', advanced=True, default=['CPython>=2.7,<3'], type=list,
              metavar='<requirement>',
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
-                  "e.g. 'CPython>=2.6,<3' or 'PyPy'. Multiple constraints will be ORed together. "
-                  "These constraints are applied in addition to any compatibilities required by "
-                  "the relevant targets.")
+                  "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
+                  "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
+                  "be ORed together. These constraints are applied in addition to any "
+                  "compatibilities required by the relevant targets.")
     register('--setuptools-version', advanced=True, default='30.0.0',
              help='The setuptools version for this python environment.')
     register('--wheel-version', advanced=True, default='0.29.0',
@@ -62,11 +59,31 @@ class PythonSetup(Subsystem):
     register('--artifact-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the python artifact cache. '
                   'If unspecified, a standard path under the workdir is used.')
+    register('--interpreter-search-paths', advanced=True, type=list, default=[],
+             metavar='<binary-paths>',
+             help='A list of paths to search for python interpreters. Note that if a PEX_PYTHON_PATH '
+              'variable is defined in a pexrc file, those interpreter paths will take precedence over ' 
+              'this option.')
+    register('--resolver-blacklist', advanced=True, type=dict, default={},
+             metavar='<blacklist>',
+             help='A blacklist dict (str->str) that maps package name to an interpreter '
+              'constraint. If a package name is in the blacklist and its interpreter '
+              'constraint matches the target interpreter, skip the requirement. This is needed '
+              'to ensure that universal requirement resolves for a target interpreter version do '
+              'not error out on interpreter specific requirements such as backport libs like '
+              '`functools32`. For example, a valid blacklist is {"functools32": "CPython>3"}. '
+              'NOTE: this keyword is a temporary fix and will be reverted per: '
+              'https://github.com/pantsbuild/pants/issues/5696. The long term '
+              'solution is tracked by: https://github.com/pantsbuild/pex/issues/456.')
 
   @property
   def interpreter_constraints(self):
     return (self.get_options().interpreter_constraints or self.get_options().interpreter or
             [self.get_options().interpreter_requirement or b''])
+
+  @property
+  def interpreter_search_paths(self):
+    return self.get_options().interpreter_search_paths
 
   @property
   def setuptools_version(self):
@@ -102,6 +119,10 @@ class PythonSetup(Subsystem):
   @property
   def resolver_allow_prereleases(self):
     return self.get_options().resolver_allow_prereleases
+
+  @property
+  def resolver_blacklist(self):
+    return self.get_options().resolver_blacklist
 
   @property
   def artifact_cache_dir(self):

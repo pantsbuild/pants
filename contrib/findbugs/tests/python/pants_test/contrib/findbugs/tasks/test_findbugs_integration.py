@@ -23,6 +23,10 @@ class FindBugsTest(PantsRunIntegrationTest):
       'GLOBAL': {
         'pythonpath': ["%(buildroot)s/contrib/findbugs/src/python"],
         'backend_packages': ["pants.backend.codegen", "pants.backend.jvm", "pants.contrib.findbugs"]
+      },
+      'jvm-platform': {
+        'default_platform': 'java8',
+        'platforms': {'java8': {'source': '8', 'target': '8', 'args': [] }}
       }
     }
     if config:

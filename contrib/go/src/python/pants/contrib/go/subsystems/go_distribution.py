@@ -6,57 +6,39 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 from collections import OrderedDict, namedtuple
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.binaries.binary_util import BinaryUtil
-from pants.fs.archive import TGZ
-from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import temporary_dir
+from pants.binaries.binary_tool import NativeTool
+from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.util.memo import memoized_property
+from pants.util.process_handler import subprocess
 
 
-class GoDistribution(object):
+class GoReleaseUrlGenerator(BinaryToolUrlGenerator):
+
+  _DIST_URL_FMT = 'https://storage.googleapis.com/golang/go{version}.{system_id}.tar.gz'
+
+  _SYSTEM_ID = {
+    'darwin': 'darwin-amd64',
+    'linux': 'linux-amd64',
+  }
+
+  def generate_urls(self, version, host_platform):
+    system_id = self._SYSTEM_ID[host_platform.os_name]
+    return [self._DIST_URL_FMT.format(version=version, system_id=system_id)]
+
+
+class GoDistribution(NativeTool):
   """Represents a self-bootstrapping Go distribution."""
 
-  class Factory(Subsystem):
-    options_scope = 'go-distribution'
+  options_scope = 'go-distribution'
+  name = 'go'
+  default_version = '1.8.3'
+  archive_type = 'tgz'
 
-    @classmethod
-    def subsystem_dependencies(cls):
-      return (BinaryUtil.Factory,)
-
-    @classmethod
-    def register_options(cls, register):
-      register('--supportdir', advanced=True, default='bin/go',
-               help='Find the go distributions under this dir.  Used as part of the path to lookup '
-                    'the distribution with --binary-util-baseurls and --pants-bootstrapdir')
-      register('--version', advanced=True, default='1.8.3', fingerprint=True,
-               help='Go distribution version.  Used as part of the path to lookup the distribution '
-                    'with --binary-util-baseurls and --pants-bootstrapdir')
-
-    def create(self):
-      # NB: create is an instance method to allow the user to choose global or scoped.
-      # It's not unreasonable to imagine multiple go versions in play; for example: when
-      # transitioning from the 1.x series to the 2.x series.
-      binary_util = BinaryUtil.Factory.create()
-      options = self.get_options()
-      return GoDistribution(binary_util, options.supportdir, options.version)
-
-  def __init__(self, binary_util, relpath, version):
-    self._binary_util = binary_util
-    self._relpath = relpath
-    self._version = version
-
-  @property
-  def version(self):
-    """Returns the version of the Go distribution.
-
-    :returns: The Go distribution version number string.
-    :rtype: string
-    """
-    return self._version
+  def get_external_url_generator(self):
+    return GoReleaseUrlGenerator()
 
   @memoized_property
   def goroot(self):
@@ -65,14 +47,7 @@ class GoDistribution(object):
     :returns: The Go distribution $GOROOT.
     :rtype: string
     """
-    go_distribution = self._binary_util.select_binary(self._relpath, self.version, 'go.tar.gz')
-    distribution_workdir = os.path.dirname(go_distribution)
-    outdir = os.path.join(distribution_workdir, 'unpacked')
-    if not os.path.exists(outdir):
-      with temporary_dir(root_dir=distribution_workdir) as tmp_dist:
-        TGZ.extract(go_distribution, tmp_dist)
-        os.rename(tmp_dist, outdir)
-    return os.path.join(outdir, 'go')
+    return os.path.join(self.select(), 'go')
 
   def go_env(self, gopath=None):
     """Return an env dict that represents a proper Go environment mapping for this distribution."""
@@ -96,7 +71,7 @@ class GoDistribution(object):
       """
       :param dict env: A custom environment to launch the Go command in.  If `None` the current
                        environment is used.
-      :param **kwargs: Keyword arguments to pass through to `subprocess.Popen`.
+      :param kwargs: Keyword arguments to pass through to `subprocess.Popen`.
       :returns: A handle to the spawned go command subprocess.
       :rtype: :class:`subprocess.Popen`
       """
@@ -109,7 +84,7 @@ class GoDistribution(object):
 
       :param dict env: A custom environment to launch the Go command in.  If `None` the current
                        environment is used.
-      :param **kwargs: Keyword arguments to pass through to `subprocess.check_output`.
+      :param kwargs: Keyword arguments to pass through to `subprocess.check_output`.
       :return str: Output of Go command.
       :raises subprocess.CalledProcessError: Raises if Go command fails.
       """
@@ -149,7 +124,7 @@ class GoDistribution(object):
     :param workunit_factory: An optional callable that can produce a `WorkUnit` context
     :param string workunit_name: An optional name for the work unit; defaults to the `cmd`
     :param list workunit_labels: An optional sequence of labels for the work unit.
-    :param **kwargs: Keyword arguments to pass through to `subprocess.Popen`.
+    :param kwargs: Keyword arguments to pass through to `subprocess.Popen`.
     :returns: A tuple of the exit code and the go command that was run.
     :rtype: (int, :class:`GoDistribution.GoCommand`)
     """

@@ -5,8 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+import time
+
 from pants.base.exiter import Exiter
 from pants.bin.pants_runner import PantsRunner
+from pants.util.contextutil import maybe_profiled
 
 
 TEST_STR = 'T E S T'
@@ -18,11 +22,20 @@ def test():
   print(TEST_STR)
 
 
+def test_env():
+  """An alternate test entrypoint for exercising scrubbing."""
+  import os
+  print('PANTS_ENTRYPOINT={}'.format(os.environ.get('PANTS_ENTRYPOINT')))
+
+
 def main():
+  start_time = time.time()
+
   exiter = Exiter()
   exiter.set_except_hook()
 
-  try:
-    PantsRunner(exiter).run()
-  except KeyboardInterrupt:
-    exiter.exit_and_fail(b'Interrupted by user.')
+  with maybe_profiled(os.environ.get('PANTSC_PROFILE')):
+    try:
+      PantsRunner(exiter, start_time=start_time).run()
+    except KeyboardInterrupt:
+      exiter.exit_and_fail(b'Interrupted by user.')

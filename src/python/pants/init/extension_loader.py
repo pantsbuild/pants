@@ -144,4 +144,8 @@ def load_backend(build_configuration, backend_package):
   if subsystems:
     build_configuration.register_subsystems(subsystems)
 
+  rules = invoke_entrypoint('rules')
+  if rules:
+    build_configuration.register_rules(rules)
+
   invoke_entrypoint('register_goals')

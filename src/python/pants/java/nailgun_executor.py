@@ -20,7 +20,7 @@ from twitter.common.collections import maybe_list
 from pants.base.build_environment import get_buildroot
 from pants.java.executor import Executor, SubprocessExecutor
 from pants.java.nailgun_client import NailgunClient
-from pants.pantsd.process_manager import ProcessGroup, ProcessManager
+from pants.pantsd.process_manager import FingerprintedProcessManager, ProcessGroup
 from pants.util.dirutil import safe_file_dump, safe_open
 
 
@@ -59,7 +59,7 @@ class NailgunProcessGroup(ProcessGroup):
 
 # TODO: Once we integrate standard logging into our reporting framework, we can consider making
 # some of the log.debug() below into log.info(). Right now it just looks wrong on the console.
-class NailgunExecutor(Executor, ProcessManager):
+class NailgunExecutor(Executor, FingerprintedProcessManager):
   """Executes java programs by launching them in nailgun server.
 
      If a nailgun is not available for a given set of jvm args and classpath, one is launched and
@@ -70,8 +70,8 @@ class NailgunExecutor(Executor, ProcessManager):
   _NG_PORT_REGEX = re.compile(r'.*\s+port\s+(\d+)\.$')
 
   # Used to identify if we own a given nailgun server.
+  FINGERPRINT_CMD_KEY = b'-Dpants.nailgun.fingerprint'
   _PANTS_NG_ARG_PREFIX = b'-Dpants.buildroot'
-  _PANTS_FINGERPRINT_ARG_PREFIX = b'-Dpants.nailgun.fingerprint'
   _PANTS_OWNER_ARG_PREFIX = b'-Dpants.nailgun.owner'
   _PANTS_NG_BUILDROOT_ARG = '='.join((_PANTS_NG_ARG_PREFIX, get_buildroot()))
 
@@ -79,13 +79,13 @@ class NailgunExecutor(Executor, ProcessManager):
   _SELECT_WAIT = 1
   _PROCESS_NAME = b'java'
 
-  def __init__(self, identity, workdir, nailgun_classpath, distribution, ins=None,
+  def __init__(self, identity, workdir, nailgun_classpath, distribution,
                connect_timeout=10, connect_attempts=5, metadata_base_dir=None):
     Executor.__init__(self, distribution=distribution)
-    ProcessManager.__init__(self,
-                            name=identity,
-                            process_name=self._PROCESS_NAME,
-                            metadata_base_dir=metadata_base_dir)
+    FingerprintedProcessManager.__init__(self,
+                                         name=identity,
+                                         process_name=self._PROCESS_NAME,
+                                         metadata_base_dir=metadata_base_dir)
 
     if not isinstance(workdir, string_types):
       raise ValueError('Workdir must be a path string, not: {workdir}'.format(workdir=workdir))
@@ -95,7 +95,6 @@ class NailgunExecutor(Executor, ProcessManager):
     self._ng_stdout = os.path.join(workdir, 'stdout')
     self._ng_stderr = os.path.join(workdir, 'stderr')
     self._nailgun_classpath = maybe_list(nailgun_classpath)
-    self._ins = ins
     self._connect_timeout = connect_timeout
     self._connect_attempts = connect_attempts
 
@@ -103,23 +102,12 @@ class NailgunExecutor(Executor, ProcessManager):
     return 'NailgunExecutor({identity}, dist={dist}, pid={pid} socket={socket})'.format(
       identity=self._identity, dist=self._distribution, pid=self.pid, socket=self.socket)
 
-  def _parse_fingerprint(self, cmdline):
-    fingerprints = [cmd.split('=')[1] for cmd in cmdline if cmd.startswith(
-      self._PANTS_FINGERPRINT_ARG_PREFIX + '=')]
-    return fingerprints[0] if fingerprints else None
-
-  @property
-  def fingerprint(self):
-    """This provides the nailgun fingerprint of the running process otherwise None."""
-    if self.cmdline:
-      return self._parse_fingerprint(self.cmdline)
-
   def _create_owner_arg(self, workdir):
     # Currently the owner is identified via the full path to the workdir.
     return '='.join((self._PANTS_OWNER_ARG_PREFIX, workdir))
 
   def _create_fingerprint_arg(self, fingerprint):
-    return '='.join((self._PANTS_FINGERPRINT_ARG_PREFIX, fingerprint))
+    return '='.join((self.FINGERPRINT_CMD_KEY, fingerprint))
 
   @staticmethod
   def _fingerprint(jvm_options, classpath, java_version):
@@ -150,8 +138,8 @@ class NailgunExecutor(Executor, ProcessManager):
       def command(self):
         return list(command)
 
-      def run(this, stdout=None, stderr=None, cwd=None):
-        nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr)
+      def run(this, stdout=None, stderr=None, stdin=None, cwd=None):
+        nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr, stdin)
         try:
           logger.debug('Executing via {ng_desc}: {cmd}'.format(ng_desc=nailgun, cmd=this.cmd))
           return nailgun.execute(main, cwd, *args)
@@ -164,8 +152,7 @@ class NailgunExecutor(Executor, ProcessManager):
 
   def _check_nailgun_state(self, new_fingerprint):
     running = self.is_alive()
-    updated = running and (self.fingerprint != new_fingerprint or
-                           self.cmd != self._distribution.java)
+    updated = self.needs_restart(new_fingerprint) or self.cmd != self._distribution.java
     logging.debug('Nailgun {nailgun} state: updated={up!s} running={run!s} fingerprint={old_fp} '
                   'new_fingerprint={new_fp} distribution={old_dist} new_distribution={new_dist}'
                   .format(nailgun=self._identity, up=updated, run=running,
@@ -173,7 +160,7 @@ class NailgunExecutor(Executor, ProcessManager):
                           old_dist=self.cmd, new_dist=self._distribution.java))
     return running, updated
 
-  def _get_nailgun_client(self, jvm_options, classpath, stdout, stderr):
+  def _get_nailgun_client(self, jvm_options, classpath, stdout, stderr, stdin):
     """This (somewhat unfortunately) is the main entrypoint to this class via the Runner. It handles
        creation of the running nailgun server as well as creation of the client."""
     classpath = self._nailgun_classpath + classpath
@@ -188,9 +175,9 @@ class NailgunExecutor(Executor, ProcessManager):
         self.terminate()
 
       if (not running) or (running and updated):
-        return self._spawn_nailgun_server(new_fingerprint, jvm_options, classpath, stdout, stderr)
+        return self._spawn_nailgun_server(new_fingerprint, jvm_options, classpath, stdout, stderr, stdin)
 
-    return self._create_ngclient(self.socket, stdout, stderr)
+    return self._create_ngclient(self.socket, stdout, stderr, stdin)
 
   def _await_socket(self, timeout):
     """Blocks for the nailgun subprocess to bind and emit a listening port in the nailgun stdout."""
@@ -209,8 +196,8 @@ class NailgunExecutor(Executor, ProcessManager):
           raise NailgunClient.NailgunError(
             'Failed to read nailgun output after {sec} seconds!'.format(sec=timeout))
 
-  def _create_ngclient(self, port, stdout, stderr):
-    return NailgunClient(port=port, ins=self._ins, out=stdout, err=stderr, workdir=get_buildroot())
+  def _create_ngclient(self, port, stdout, stderr, stdin):
+    return NailgunClient(port=port, ins=stdin, out=stdout, err=stderr, workdir=get_buildroot())
 
   def ensure_connectable(self, nailgun):
     """Ensures that a nailgun client is connectable or raises NailgunError."""
@@ -228,7 +215,7 @@ class NailgunExecutor(Executor, ProcessManager):
       attempt_count += 1
       time.sleep(self.WAIT_INTERVAL_SEC)
 
-  def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath, stdout, stderr):
+  def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath, stdout, stderr, stdin):
     """Synchronously spawn a new nailgun server."""
     # Truncate the nailguns stdout & stderr.
     safe_file_dump(self._ng_stdout, '')
@@ -256,7 +243,7 @@ class NailgunExecutor(Executor, ProcessManager):
     logger.debug('Spawned nailgun server {i} with fingerprint={f}, pid={pid} port={port}'
                  .format(i=self._identity, f=fingerprint, pid=self.pid, port=self.socket))
 
-    client = self._create_ngclient(self.socket, stdout, stderr)
+    client = self._create_ngclient(self.socket, stdout, stderr, stdin)
     self.ensure_connectable(client)
 
     return client

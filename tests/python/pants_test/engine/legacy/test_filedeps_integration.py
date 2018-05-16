@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class FiledepsIntegrationTest(PantsRunIntegrationTest):
@@ -25,7 +25,6 @@ class FiledepsIntegrationTest(PantsRunIntegrationTest):
   def _get_rel_paths(self, full_paths):
     return {os.path.relpath(full_path, os.getcwd()) for full_path in full_paths}
 
-  @ensure_engine
   def test_filedeps_basic(self):
     expected_output = {
       'examples/src/java/org/pantsbuild/example/hello/greet/BUILD',
@@ -37,7 +36,6 @@ class FiledepsIntegrationTest(PantsRunIntegrationTest):
     actual_output = self._get_rel_paths(set(self.run_filedeps().split()))
     self.assertEqual(expected_output, actual_output)
 
-  @ensure_engine
   def test_filedeps_globs(self):
     expected_output = {
       'examples/src/java/org/pantsbuild/example/hello/greet/BUILD',

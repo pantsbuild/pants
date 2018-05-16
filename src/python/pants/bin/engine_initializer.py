@@ -6,81 +6,93 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-from collections import namedtuple
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.specs import Specs
 from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.change_calculator import EngineChangeCalculator
-from pants.engine.legacy.graph import HydratedTargets, LegacyBuildGraph, create_legacy_graph_tasks
+from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTargets,
+                                       create_legacy_graph_tasks)
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
-from pants.engine.legacy.structs import (GoTargetAdaptor, JavaLibraryAdaptor, JunitTestsAdaptor,
-                                         JvmAppAdaptor, PythonLibraryAdaptor, PythonTargetAdaptor,
-                                         PythonTestsAdaptor, RemoteSourcesAdaptor,
-                                         ScalaLibraryAdaptor, TargetAdaptor)
+from pants.engine.legacy.structs import (AppAdaptor, GoTargetAdaptor, JavaLibraryAdaptor,
+                                         JunitTestsAdaptor, PythonLibraryAdaptor,
+                                         PythonTargetAdaptor, PythonTestsAdaptor,
+                                         RemoteSourcesAdaptor, ScalaLibraryAdaptor, TargetAdaptor)
 from pants.engine.mapper import AddressMapper
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
-from pants.engine.scheduler import LocalScheduler
+from pants.engine.scheduler import Scheduler
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.util.memo import memoized_method
+from pants.scm.change_calculator import EngineChangeCalculator
+from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
 
 
-# N.B. This should be top-level in the module for pickleability - don't nest it.
 class LegacySymbolTable(SymbolTable):
   """A v1 SymbolTable facade for use with the v2 engine."""
 
-  @classmethod
-  @memoized_method
-  def aliases(cls):
-    """TODO: This is a nasty escape hatch to pass aliases to LegacyPythonCallbacksParser."""
-    _, build_config = OptionsInitializer(OptionsBootstrapper()).setup(init_logging=False)
-    return build_config.registered_aliases()
+  def __init__(self, build_file_aliases):
+    """
+    :param build_file_aliases: BuildFileAliases to register.
+    :type build_file_aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
+    """
+    self._build_file_aliases = build_file_aliases
+    self._table = {alias: TargetAdaptor for alias in build_file_aliases.target_types}
 
-  @classmethod
-  @memoized_method
-  def table(cls):
-    aliases = {alias: TargetAdaptor for alias in cls.aliases().target_types}
     # TODO: The alias replacement here is to avoid elevating "TargetAdaptors" into the public
     # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
     # These should likely move onto Target subclasses as the engine gets deeper into beta
     # territory.
     for alias in ['java_library', 'java_agent', 'javac_plugin']:
-      aliases[alias] = JavaLibraryAdaptor
+      self._table[alias] = JavaLibraryAdaptor
     for alias in ['scala_library', 'scalac_plugin']:
-      aliases[alias] = ScalaLibraryAdaptor
+      self._table[alias] = ScalaLibraryAdaptor
     for alias in ['python_library', 'pants_plugin']:
-      aliases[alias] = PythonLibraryAdaptor
+      self._table[alias] = PythonLibraryAdaptor
     for alias in ['go_library', 'go_binary']:
-      aliases[alias] = GoTargetAdaptor
+      self._table[alias] = GoTargetAdaptor
 
-    aliases['junit_tests'] = JunitTestsAdaptor
-    aliases['jvm_app'] = JvmAppAdaptor
-    aliases['python_tests'] = PythonTestsAdaptor
-    aliases['python_binary'] = PythonTargetAdaptor
-    aliases['remote_sources'] = RemoteSourcesAdaptor
+    self._table['junit_tests'] = JunitTestsAdaptor
+    self._table['jvm_app'] = AppAdaptor
+    self._table['python_app'] = AppAdaptor
+    self._table['python_tests'] = PythonTestsAdaptor
+    self._table['python_binary'] = PythonTargetAdaptor
+    self._table['remote_sources'] = RemoteSourcesAdaptor
 
-    return aliases
+  def aliases(self):
+    return self._build_file_aliases
+
+  def table(self):
+    return self._table
 
 
-class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_table_cls',
-                                                         'change_calculator'])):
-  """A container for the components necessary to construct a legacy BuildGraph facade."""
+class LegacyGraphScheduler(datatype(['scheduler', 'symbol_table'])):
+  """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
+
+  def new_session(self):
+    session = self.scheduler.new_session()
+    scm = get_scm()
+    change_calculator = EngineChangeCalculator(session, self.symbol_table, scm) if scm else None
+    return LegacyGraphSession(session, self.symbol_table, change_calculator)
+
+
+class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'change_calculator'])):
+  """A thin wrapper around a SchedulerSession configured with @rules for a symbol table."""
 
   def warm_product_graph(self, target_roots):
-    """Warm the scheduler's `ProductGraph` with `HydratedTargets` products.
+    """Warm the scheduler's `ProductGraph` with `TransitiveHydratedTargets` products.
 
     :param TargetRoots target_roots: The targets root of the request.
     """
     logger.debug('warming target_roots for: %r', target_roots)
-    request = self.scheduler.execution_request([HydratedTargets], target_roots.as_specs())
-    result = self.scheduler.execute(request)
+    subjects = [Specs(tuple(target_roots.specs))]
+    request = self.scheduler_session.execution_request([TransitiveHydratedTargets], subjects)
+    result = self.scheduler_session.execute(request)
     if result.error:
       raise result.error
 
@@ -92,14 +104,13 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
     :returns: A tuple of (BuildGraph, AddressMapper).
     """
     logger.debug('target_roots are: %r', target_roots)
-    graph = LegacyBuildGraph.create(self.scheduler, self.symbol_table_cls)
+    graph = LegacyBuildGraph.create(self.scheduler_session, self.symbol_table)
     logger.debug('build_graph is: %s', graph)
-    with self.scheduler.locked():
-      # Ensure the entire generator is unrolled.
-      for _ in graph.inject_specs_closure(target_roots.as_specs()):
-        pass
+    # Ensure the entire generator is unrolled.
+    for _ in graph.inject_roots_closure(target_roots):
+      pass
 
-    address_mapper = LegacyAddressMapper(self.scheduler, build_root or get_buildroot())
+    address_mapper = LegacyAddressMapper(self.scheduler_session, build_root or get_buildroot())
     logger.debug('address_mapper is: %s', address_mapper)
     return graph, address_mapper
 
@@ -108,11 +119,18 @@ class EngineInitializer(object):
   """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
 
   @staticmethod
+  def get_default_build_file_aliases():
+    _, build_config = OptionsInitializer(OptionsBootstrapper()).setup(init_logging=False)
+    return build_config.registered_aliases()
+
+  @staticmethod
   def setup_legacy_graph(pants_ignore_patterns,
                          workdir,
+                         build_file_imports_behavior,
                          build_root=None,
                          native=None,
-                         symbol_table_cls=None,
+                         build_file_aliases=None,
+                         rules=None,
                          build_ignore_patterns=None,
                          exclude_target_regexps=None,
                          subproject_roots=None,
@@ -122,10 +140,13 @@ class EngineInitializer(object):
     :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
                                        usually taken from the '--pants-ignore' global option.
     :param str workdir: The pants workdir.
+    :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
+      import statements. Valid values: "allow", "warn", "error".
+    :type build_file_imports_behavior: string
     :param str build_root: A path to be used as the build root. If None, then default is used.
     :param Native native: An instance of the native-engine subsystem.
-    :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
-                                         None to use the default.
+    :param build_file_aliases: BuildFileAliases to register.
+    :type build_file_aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
     :param list build_ignore_patterns: A list of paths ignore patterns used when searching for BUILD
                                        files, usually taken from the '--build-ignore' global option.
     :param list exclude_target_regexps: A list of regular expressions for excluding targets.
@@ -133,19 +154,28 @@ class EngineInitializer(object):
                                   under the current build root.
     :param bool include_trace_on_error: If True, when an error occurs, the error message will
                 include the graph trace.
-    :returns: A tuple of (scheduler, engine, symbol_table_cls, build_graph_cls).
+    :returns: A LegacyGraphScheduler.
     """
 
     build_root = build_root or get_buildroot()
-    scm = get_scm()
-    symbol_table_cls = symbol_table_cls or LegacySymbolTable
+
+    if not build_file_aliases:
+      build_file_aliases = EngineInitializer.get_default_build_file_aliases()
+
+    if not rules:
+      rules = []
+
+    symbol_table = LegacySymbolTable(build_file_aliases)
 
     project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
 
-    # Register "literal" subjects required for these tasks.
-    # TODO: Replace with `Subsystems`.
-    address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                                   parser_cls=LegacyPythonCallbacksParser,
+    # Register "literal" subjects required for these rules.
+    parser = LegacyPythonCallbacksParser(
+      symbol_table,
+      build_file_aliases,
+      build_file_imports_behavior
+    )
+    address_mapper = AddressMapper(parser=parser,
                                    build_ignore_patterns=build_ignore_patterns,
                                    exclude_target_regexps=exclude_target_regexps,
                                    subproject_roots=subproject_roots)
@@ -153,16 +183,21 @@ class EngineInitializer(object):
     # Load the native backend.
     native = native or Native.create()
 
-    # Create a Scheduler containing graph and filesystem tasks, with no installed goals. The
+    # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.
-    tasks = (
-      create_legacy_graph_tasks(symbol_table_cls) +
+    rules = (
+      create_legacy_graph_tasks(symbol_table) +
       create_fs_rules() +
-      create_graph_rules(address_mapper, symbol_table_cls)
+      create_graph_rules(address_mapper, symbol_table) +
+      rules
     )
 
-    # TODO: Do not use the cache yet, as it incurs a high overhead.
-    scheduler = LocalScheduler(workdir, dict(), tasks, project_tree, native, include_trace_on_error=include_trace_on_error)
-    change_calculator = EngineChangeCalculator(scheduler, symbol_table_cls, scm) if scm else None
+    scheduler = Scheduler(
+      native,
+      project_tree,
+      workdir,
+      rules,
+      include_trace_on_error=include_trace_on_error,
+    )
 
-    return LegacyGraphHelper(scheduler, symbol_table_cls, change_calculator)
+    return LegacyGraphScheduler(scheduler, symbol_table)

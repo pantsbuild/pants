@@ -9,4 +9,4 @@ def test_within_timeout():
 
 
 def test_exceeds_timeout():
-  time.sleep(120)
+  time.sleep(1000)

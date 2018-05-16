@@ -13,7 +13,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 
 
 class IvyImports(IvyTaskMixin, NailgunTask):
-  """Resolves all jar files for the import_jar_libraries property on all `ImportJarsMixin` targets.
+  """Resolves jar files for imported_jar_libraries on `ImportJarsMixin` targets.
 
   One use case is for JavaProtobufLibrary, which includes imports for jars containing .proto files.
   """

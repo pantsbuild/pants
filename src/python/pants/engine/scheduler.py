@@ -7,42 +7,38 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
-import threading
 import time
 from collections import defaultdict
-from contextlib import contextmanager
+from types import GeneratorType
 
 from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
-from pants.engine.addressable import SubclassesOf
-from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot
-from pants.engine.isolated_process import _Snapshots, create_snapshot_rules
+from pants.engine.fs import DirectoryDigest, FileContent, FilesContent, Path, PathGlobs, Snapshot
+from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
-from pants.engine.selectors import (Select, SelectDependencies, SelectProjection, SelectTransitive,
-                                    SelectVariant, constraint_for)
+from pants.engine.selectors import Select, SelectVariant, constraint_for
 from pants.engine.struct import HasProducts, Variants
 from pants.util.contextutil import temporary_file_path
-from pants.util.objects import datatype
+from pants.util.objects import SubclassesOf, datatype
 
 
 logger = logging.getLogger(__name__)
 
 
-class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
+class ExecutionRequest(datatype(['roots', 'native'])):
   """Holds the roots for an execution, which might have been requested by a user.
 
-  To create an ExecutionRequest, see `LocalScheduler.build_request` (which performs goal
-  translation) or `LocalScheduler.execution_request`.
+  To create an ExecutionRequest, see `SchedulerSession.execution_request`.
 
   :param roots: Roots for this request.
   :type roots: list of tuples of subject and product.
   """
 
 
-class ExecutionResult(datatype('ExecutionResult', ['error', 'root_products'])):
+class ExecutionResult(datatype(['error', 'root_products'])):
   """Represents the result of a single execution."""
 
   @classmethod
@@ -74,54 +70,82 @@ class ExecutionError(Exception):
   pass
 
 
-class WrappedNativeScheduler(object):
-  def __init__(self, native, build_root, work_dir, ignore_patterns, rule_index):
+class Scheduler(object):
+  def __init__(self, native, project_tree, work_dir, rules, include_trace_on_error=True, validate=True):
+    """
+    :param native: An instance of engine.native.Native.
+    :param project_tree: An instance of ProjectTree for the current build root.
+    :param work_dir: The pants work dir.
+    :param rules: A set of Rules which is used to compute values in the graph.
+    :param include_trace_on_error: Include the trace through the graph upon encountering errors.
+    :type include_trace_on_error: bool
+    :param validate: True to assert that the ruleset is valid.
+    """
     self._native = native
+    self.include_trace_on_error = include_trace_on_error
+
     # TODO: The only (?) case where we use inheritance rather than exact type unions.
     has_products_constraint = SubclassesOf(HasProducts)
+
+    # Validate and register all provided and intrinsic tasks.
+    rule_index = RuleIndex.create(list(rules))
     self._root_subject_types = sorted(rule_index.roots)
 
-    # Create the ExternContext, and the native Scheduler.
+    # Create the native Scheduler and Session.
+    # TODO: This `_tasks` reference could be a local variable, since it is not used
+    # after construction.
     self._tasks = native.new_tasks()
     self._register_rules(rule_index)
 
     self._scheduler = native.new_scheduler(
-        self._tasks,
-        self._root_subject_types,
-        build_root,
-        work_dir,
-        ignore_patterns,
-        Snapshot,
-        _Snapshots,
-        FileContent,
-        FilesContent,
-        Path,
-        Dir,
-        File,
-        Link,
-        has_products_constraint,
-        constraint_for(Address),
-        constraint_for(Variants),
-        constraint_for(PathGlobs),
-        constraint_for(Snapshot),
-        constraint_for(_Snapshots),
-        constraint_for(FilesContent),
-        constraint_for(Dir),
-        constraint_for(File),
-        constraint_for(Link),
-      )
+      self._tasks,
+      self._root_subject_types,
+      project_tree.build_root,
+      work_dir,
+      project_tree.ignore_patterns,
+      DirectoryDigest,
+      Snapshot,
+      FileContent,
+      FilesContent,
+      Path,
+      Dir,
+      File,
+      Link,
+      ExecuteProcessResult,
+      has_products_constraint,
+      constraint_for(Address),
+      constraint_for(Variants),
+      constraint_for(PathGlobs),
+      constraint_for(DirectoryDigest),
+      constraint_for(Snapshot),
+      constraint_for(FilesContent),
+      constraint_for(Dir),
+      constraint_for(File),
+      constraint_for(Link),
+      constraint_for(ExecuteProcessRequest),
+      constraint_for(ExecuteProcessResult),
+      constraint_for(GeneratorType),
+    )
+
+    # If configured, visualize the rule graph before asserting that it is valid.
+    if self.visualize_to_dir() is not None:
+      rule_graph_name = 'rule_graph.dot'
+      self.visualize_rule_graph_to_file(os.path.join(self.visualize_to_dir(), rule_graph_name))
+
+    if validate:
+      self._assert_ruleset_valid()
 
   def _root_type_ids(self):
     return self._to_ids_buf(sorted(self._root_subject_types))
 
-  def graph_trace(self):
+  def graph_trace(self, execution_request):
     with temporary_file_path() as path:
-      self._native.lib.graph_trace(self._scheduler, bytes(path))
+      self._native.lib.graph_trace(self._scheduler, execution_request, bytes(path))
       with open(path) as fd:
         for line in fd.readlines():
           yield line.rstrip()
 
-  def assert_ruleset_valid(self):
+  def _assert_ruleset_valid(self):
     raw_value = self._native.lib.validator_run(self._scheduler)
     value = self._from_value(raw_value)
 
@@ -147,7 +171,7 @@ class WrappedNativeScheduler(object):
     return self._native.context.from_key(cdata)
 
   def _to_constraint(self, type_or_constraint):
-    return TypeConstraint(self._to_id(constraint_for(type_or_constraint)))
+    return TypeConstraint(self._to_key(constraint_for(type_or_constraint)))
 
   def _to_ids_buf(self, types):
     return self._native.to_ids_buf(types)
@@ -187,10 +211,9 @@ class WrappedNativeScheduler(object):
 
   def _register_task(self, output_constraint, rule):
     """Register the given TaskRule with the native scheduler."""
-    input_selects = rule.input_selectors
     func = rule.func
-    self._native.lib.tasks_task_begin(self._tasks, Function(self._to_id(func)), output_constraint)
-    for selector in input_selects:
+    self._native.lib.tasks_task_begin(self._tasks, Function(self._to_key(func)), output_constraint)
+    for selector in rule.input_selectors:
       selector_type = type(selector)
       product_constraint = self._to_constraint(selector.product)
       if selector_type is Select:
@@ -200,30 +223,16 @@ class WrappedNativeScheduler(object):
         self._native.lib.tasks_add_select_variant(self._tasks,
                                                   product_constraint,
                                                   key_buf)
-      elif selector_type is SelectDependencies:
-        self._native.lib.tasks_add_select_dependencies(self._tasks,
-                                                       product_constraint,
-                                                       self._to_constraint(selector.dep_product),
-                                                       self._to_utf8_buf(selector.field),
-                                                       self._to_ids_buf(selector.field_types))
-      elif selector_type is SelectTransitive:
-        self._native.lib.tasks_add_select_transitive(self._tasks,
-                                                     product_constraint,
-                                                     self._to_constraint(selector.dep_product),
-                                                     self._to_utf8_buf(selector.field),
-                                                     self._to_ids_buf(selector.field_types))
-      elif selector_type is SelectProjection:
-        self._native.lib.tasks_add_select_projection(self._tasks,
-                                                     self._to_constraint(selector.product),
-                                                     TypeId(self._to_id(selector.projected_subject)),
-                                                     self._to_utf8_buf(selector.field),
-                                                     self._to_constraint(selector.input_product))
       else:
         raise ValueError('Unrecognized Selector type: {}'.format(selector))
+    for get in rule.input_gets:
+      self._native.lib.tasks_add_get(self._tasks,
+                                     self._to_constraint(get.product),
+                                     TypeId(self._to_id(get.subject)))
     self._native.lib.tasks_task_end(self._tasks)
 
-  def visualize_graph_to_file(self, filename):
-    self._native.lib.graph_visualize(self._scheduler, bytes(filename))
+  def visualize_graph_to_file(self, execution_request, filename):
+    self._native.lib.graph_visualize(self._scheduler, execution_request, bytes(filename))
 
   def visualize_rule_graph_to_file(self, filename):
     self._native.lib.rule_graph_visualize(
@@ -241,7 +250,7 @@ class WrappedNativeScheduler(object):
   def rule_subgraph_visualization(self, root_subject_type, product_type):
     root_type_id = TypeId(self._to_id(root_subject_type))
 
-    product_type_id = TypeConstraint(self._to_id(constraint_for(product_type)))
+    product_type_id = TypeConstraint(self._to_key(constraint_for(product_type)))
     with temporary_file_path() as path:
       self._native.lib.rule_subgraph_visualize(
         self._scheduler,
@@ -252,134 +261,95 @@ class WrappedNativeScheduler(object):
         for line in fd.readlines():
           yield line.rstrip()
 
-  def invalidate(self, filenames):
+  def invalidate_files(self, direct_filenames):
+    # NB: Watchman no longer triggers events when children are created/deleted under a directory,
+    # so we always need to invalidate the direct parent as well.
+    filenames = set(direct_filenames)
+    filenames.update(os.path.dirname(f) for f in direct_filenames)
     filenames_buf = self._native.context.utf8_buf_buf(filenames)
-    return self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
+    invalidated =  self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
+    logger.info('invalidated %d nodes for: %s', invalidated, filenames)
+    return invalidated
 
   def graph_len(self):
     return self._native.lib.graph_len(self._scheduler)
 
-  def exec_reset(self):
-    self._native.lib.execution_reset(self._scheduler)
-
-  def add_root_selection(self, subject, product):
-    self._native.lib.execution_add_root_select(self._scheduler, self._to_key(subject),
-                                               self._to_constraint(product))
-
-  def run_and_return_stat(self):
-    return self._native.lib.execution_execute(self._scheduler)
+  def add_root_selection(self, execution_request, subject, product):
+    res = self._native.lib.execution_add_root_select(self._scheduler,
+                                                     execution_request,
+                                                     self._to_key(subject),
+                                                     self._to_constraint(product))
+    if res.is_throw:
+      raise self._from_value(res.value)
 
   def visualize_to_dir(self):
     return self._native.visualize_to_dir
 
-  def to_keys(self, subjects):
-    return list(self._to_key(subject) for subject in subjects)
+  def _metrics(self, session):
+    metrics_val = self._native.lib.scheduler_metrics(self._scheduler, session)
+    return {k: v for k, v in self._from_value(metrics_val)}
 
   def pre_fork(self):
     self._native.lib.scheduler_pre_fork(self._scheduler)
 
-  def root_entries(self, execution_request):
-    raw_roots = self._native.lib.execution_roots(self._scheduler)
+  def _run_and_return_roots(self, session, execution_request):
+    raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
     try:
       roots = []
-      for root, raw_root in zip(execution_request.roots,
-                                self._native.unpack(raw_roots.nodes_ptr,
-                                                    raw_roots.nodes_len)):
-        if raw_root.state_tag is 0:
-          state = None
-        elif raw_root.state_tag is 1:
+      for raw_root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
+        if raw_root.state_tag is 1:
           state = Return(self._from_value(raw_root.state_value))
-        elif raw_root.state_tag is 2:
-          state = Throw(self._from_value(raw_root.state_value))
-        elif raw_root.state_tag is 3:
+        elif raw_root.state_tag in (2, 3, 4):
           state = Throw(self._from_value(raw_root.state_value))
         else:
           raise ValueError(
             'Unrecognized State type `{}` on: {}'.format(raw_root.state_tag, raw_root))
-        roots.append((root, state))
+        roots.append(state)
     finally:
       self._native.lib.nodes_destroy(raw_roots)
     return roots
 
+  def lease_files_in_graph(self):
+    self._native.lib.lease_files_in_graph(self._scheduler)
 
-class LocalScheduler(object):
-  """A scheduler that expands a product Graph by executing user defined Rules."""
+  def garbage_collect_store(self):
+    self._native.lib.garbage_collect_store(self._scheduler)
 
-  def __init__(self,
-               work_dir,
-               goals,
-               rules,
-               project_tree,
-               native,
-               include_trace_on_error=True,
-               graph_lock=None):
-    """
-    :param goals: A dict from a goal name to a product type. A goal is just an alias for a
-           particular (possibly synthetic) product.
-    :param rules: A set of Rules which is used to compute values in the product graph.
-    :param project_tree: An instance of ProjectTree for the current build root.
-    :param work_dir: The pants work dir.
-    :param native: An instance of engine.native.Native.
-    :param include_trace_on_error: Include the trace through the graph upon encountering errors.
-    :type include_trace_on_error: bool
-    :param graph_lock: A re-entrant lock to use for guarding access to the internal product Graph
-                       instance. Defaults to creating a new threading.RLock().
-    """
-    self._products_by_goal = goals
-    self._project_tree = project_tree
-    self._include_trace_on_error = include_trace_on_error
-    self._product_graph_lock = graph_lock or threading.RLock()
+  def new_session(self):
+    """Creates a new SchedulerSession for this Scheduler."""
+    return SchedulerSession(self, self._native.new_session(self._scheduler))
+
+
+class SchedulerSession(object):
+  """A handle to a shared underlying Scheduler and a unique Session.
+
+  Generally a Session corresponds to a single run of pants: some metrics are specific to
+  a Session.
+  """
+
+  def __init__(self, scheduler, session):
+    self._scheduler = scheduler
+    self._session = session
     self._run_count = 0
 
-    # Create the ExternContext, and the native Scheduler.
-    self._execution_request = None
+  def graph_len(self):
+    return self._scheduler.graph_len()
 
-    # Validate and register all provided and intrinsic tasks.
-    rules = list(rules) + create_snapshot_rules()
-    rule_index = RuleIndex.create(rules)
-    self._scheduler = WrappedNativeScheduler(native,
-                                             project_tree.build_root,
-                                             work_dir,
-                                             project_tree.ignore_patterns,
-                                             rule_index)
-
-    # If configured, visualize the rule graph before asserting that it is valid.
-    if self._scheduler.visualize_to_dir() is not None:
-      rule_graph_name = 'rule_graph.dot'
-      self.visualize_rule_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), rule_graph_name))
-
-    self._scheduler.assert_ruleset_valid()
-
-  def trace(self):
+  def trace(self, execution_request):
     """Yields a stringified 'stacktrace' starting from the scheduler's roots."""
-    with self._product_graph_lock:
-      for line in self._scheduler.graph_trace():
-        yield line
+    for line in self._scheduler.graph_trace(execution_request.native):
+      yield line
 
-  def visualize_graph_to_file(self, filename):
+  def visualize_graph_to_file(self, execution_request, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
 
-    :param iterable roots: An iterable of the root nodes to begin the graph walk from.
+    :param ExecutionRequest execution_request: A set of roots to visualize from.
     :param str filename: The filename to output the graphviz output to.
     """
-    with self._product_graph_lock:
-      self._scheduler.visualize_graph_to_file(filename)
+    self._scheduler.visualize_graph_to_file(execution_request.native, filename)
 
   def visualize_rule_graph_to_file(self, filename):
     self._scheduler.visualize_rule_graph_to_file(filename)
-
-  def build_request(self, goals, subjects):
-    """Translate the given goal names into product types, and return an ExecutionRequest.
-
-    :param goals: The list of goal names supplied on the command line.
-    :type goals: list of string
-    :param subjects: A list of Spec and/or PathGlobs objects.
-    :type subject: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
-      :class:`pants.engine.fs.PathGlobs` objects.
-    :returns: An ExecutionRequest for the given goals and subjects.
-    """
-    return self.execution_request([self._products_by_goal[goal_name] for goal_name in goals],
-                                  subjects)
 
   def execution_request(self, products, subjects):
     """Create and return an ExecutionRequest for the given products and subjects.
@@ -398,46 +368,22 @@ class LocalScheduler(object):
       :class:`pants.engine.fs.PathGlobs` objects.
     :returns: An ExecutionRequest for the given products and subjects.
     """
-    return ExecutionRequest(tuple((s, p) for s in subjects for p in products))
+    roots = tuple((s, p) for s in subjects for p in products)
+    native_execution_request = self._scheduler._native.new_execution_request()
+    for subject, product in roots:
+      self._scheduler.add_root_selection(native_execution_request, subject, product)
+    return ExecutionRequest(roots, native_execution_request)
 
-  @contextmanager
-  def locked(self):
-    with self._product_graph_lock:
-      yield
-
-  def root_entries(self, execution_request):
-    """Returns the roots for the given ExecutionRequest as a list of tuples of:
-         ((subject, product), State)
-    """
-    with self._product_graph_lock:
-      if self._execution_request is not execution_request:
-        raise AssertionError(
-          "Multiple concurrent executions are not supported! {} vs {}".format(
-            self._execution_request, execution_request))
-      return self._scheduler.root_entries(execution_request)
-
-  def invalidate_files(self, filenames):
+  def invalidate_files(self, direct_filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
-    # NB: Watchman will never trigger an invalidation event for the root directory that
-    # is being watched. Instead, we treat any invalidation of a path directly in the
-    # root directory as an invalidation of the root.
-    if any(os.path.dirname(f) in ('', '.') for f in filenames):
-      filenames = tuple(filenames) + ('', '.')
-    with self._product_graph_lock:
-      invalidated = self._scheduler.invalidate(filenames)
-      logger.debug('invalidated %d nodes for: %s', invalidated, filenames)
-      return invalidated
+    return self._scheduler.invalidate_files(direct_filenames)
 
   def node_count(self):
-    with self._product_graph_lock:
-      return self._scheduler.graph_len()
+    return self._scheduler.graph_len()
 
-  def _execution_add_roots(self, execution_request):
-    if self._execution_request is not None:
-      self._scheduler.exec_reset()
-    self._execution_request = execution_request
-    for subject, product in execution_request.roots:
-      self._scheduler.add_root_selection(subject, product)
+  def metrics(self):
+    """Returns metrics for this SchedulerSession as a dict of metric name to metric value."""
+    return self._scheduler._metrics(self._session)
 
   def pre_fork(self):
     self._scheduler.pre_fork()
@@ -449,30 +395,24 @@ class LocalScheduler(object):
     by this method are intended to be executed in multiple threads, and then satisfied by the
     scheduling thread.
     """
+    start_time = time.time()
+    roots = zip(execution_request.roots,
+                self._scheduler._run_and_return_roots(self._session, execution_request.native))
 
-    with self._product_graph_lock:
-      start_time = time.time()
-      # Reset execution, and add any roots from the request.
-      self._execution_add_roots(execution_request)
-      # Execute in native engine.
-      execution_stat = self._scheduler.run_and_return_stat()
-      # Receive execution statistics.
-      runnable_count = execution_stat.runnable_count
-      scheduling_iterations = execution_stat.scheduling_iterations
+    if self._scheduler.visualize_to_dir() is not None:
+      name = 'run.{}.dot'.format(self._run_count)
+      self._run_count += 1
+      self.visualize_graph_to_file(execution_request,
+                                   os.path.join(self._scheduler.visualize_to_dir(), name))
 
-      if self._scheduler.visualize_to_dir() is not None:
-        name = 'run.{}.dot'.format(self._run_count)
-        self._run_count += 1
-        self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), name))
+    logger.debug(
+      'computed %s nodes in %f seconds. there are %s total nodes.',
+      len(roots),
+      time.time() - start_time,
+      self._scheduler.graph_len()
+    )
 
-      logger.debug(
-        'ran %s scheduling iterations and %s runnables in %f seconds. '
-        'there are %s total nodes.',
-        scheduling_iterations,
-        runnable_count,
-        time.time() - start_time,
-        self._scheduler.graph_len()
-      )
+    return roots
 
   def execute(self, execution_request):
     """Executes the requested build and returns the resulting root entries.
@@ -486,8 +426,7 @@ class LocalScheduler(object):
     :rtype: :class:`Engine.Result`
     """
     try:
-      self.schedule(execution_request)
-      return ExecutionResult.finished(self._scheduler.root_entries(execution_request))
+      return ExecutionResult.finished(self.schedule(execution_request))
     except TaskError as e:
       return ExecutionResult.failure(e)
 
@@ -514,16 +453,17 @@ class LocalScheduler(object):
     # TODO: See https://github.com/pantsbuild/pants/issues/3912
     throw_root_states = tuple(state for root, state in result.root_products if type(state) is Throw)
     if throw_root_states:
-      if self._include_trace_on_error:
-        cumulative_trace = '\n'.join(self.trace())
+      if self._scheduler.include_trace_on_error:
+        cumulative_trace = '\n'.join(self.trace(request))
         raise ExecutionError('Received unexpected Throw state(s):\n{}'.format(cumulative_trace))
 
-      if len(throw_root_states) == 1:
+      unique_exceptions = set(t.exc for t in throw_root_states)
+      if len(unique_exceptions) == 1:
         raise throw_root_states[0].exc
       else:
         raise ExecutionError('Multiple exceptions encountered:\n  {}'
-                             .format('\n  '.join('{}: {}'.format(type(t.exc).__name__, str(t.exc))
-                                                 for t in throw_root_states)))
+                             .format('\n  '.join('{}: {}'.format(type(t).__name__, str(t))
+                                                                 for t in unique_exceptions)))
 
     # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
     # order in output lists.
@@ -540,3 +480,9 @@ class LocalScheduler(object):
     :returns: A list of the requested products, with length match len(subjects).
     """
     return self.products_request([product], subjects)[product]
+
+  def lease_files_in_graph(self):
+    self._scheduler.lease_files_in_graph()
+
+  def garbage_collect_store(self):
+    self._scheduler.garbage_collect_store()

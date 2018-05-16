@@ -29,8 +29,13 @@ CONFIG_JSON = """
   "tree": [
     { "page": "index",
       "children": [
-        { "page": "subdir/page1" },
-        { "page": "subdir/page2" }
+        {"heading": "non_collapse"},
+        { "pages": ["subdir/page1"] },
+        {"collapsible_heading" : "collapse",
+          "pages": ["subdir/page2",
+                    "index"
+                  ]
+        }
       ]
     }
   ],
@@ -196,11 +201,11 @@ class AllTheThingsTestCase(unittest.TestCase):
                                    self.precomputed,
                                    """
                                    {{#site_toc}}
-                                   DEPTH={{depth}} LINK={{link}} TEXT={{text}}
+                                   DEPTH={{depth}} LINK={{links}} HEADING={{heading}} 
                                    {{/site_toc}}
                                    """)
-    self.assertIn(u'DEPTH=1 LINK=subdir/page1.html TEXT=東京 is Tokyo', rendered)
-    self.assertIn('DEPTH=1 LINK=subdir/page2.html TEXT=Page 2: Electric Boogaloo', rendered)
+    self.assertIn("DEPTH=1 LINK=None HEADING=non_collapse", rendered)
+    self.assertIn(u"DEPTH=1 LINK=[{'text': u'Page 2: Electric Boogaloo', 'link': u'subdir/page2.html', 'here': False}, {'text': u'Pants Build System', 'link': u'index.html', 'here': True}] HEADING=collapse", rendered)
 
   def test_transform_fixes_up_internal_links(self):
     sitegen.transform_soups(self.config, self.soups, self.precomputed)

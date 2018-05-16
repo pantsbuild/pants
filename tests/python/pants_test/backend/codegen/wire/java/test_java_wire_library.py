@@ -29,10 +29,6 @@ class JavaWireLibraryTest(BaseTest):
                      target.payload.get_field_value('service_writer'))
     self.assertEqual([], target.payload.get_field_value('service_writer_options'))
 
-  def test_label_fields(self):
-    target = self.make_target('//:foo', JavaWireLibrary)
-    self.assertTrue(target.has_label('exportable'))
-
   def test_wire_service_options(self):
     target = self.make_target('//:wire_service_options', JavaWireLibrary,
                               service_writer='com.squareup.wire.RetrofitServiceWriter',

@@ -6,10 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 import unittest
 
 from pants.util.contextutil import environment_as
+from pants.util.process_handler import subprocess
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 from pants.contrib.go.subsystems.go_distribution import GoDistribution
@@ -18,8 +18,7 @@ from pants.contrib.go.subsystems.go_distribution import GoDistribution
 class GoDistributionTest(unittest.TestCase):
 
   def distribution(self):
-    factory = global_subsystem_instance(GoDistribution.Factory)
-    return factory.create()
+    return global_subsystem_instance(GoDistribution)
 
   def test_bootstrap(self):
     go_distribution = self.distribution()

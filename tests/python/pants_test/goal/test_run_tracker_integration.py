@@ -28,6 +28,7 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
         self.assertIn('run_info', stats_json)
         self.assertIn('self_timings', stats_json)
         self.assertIn('cumulative_timings', stats_json)
+        self.assertIn('pantsd_stats', stats_json)
 
   def test_workunit_failure(self):
     pants_run = self.run_pants([

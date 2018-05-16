@@ -9,18 +9,19 @@ from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address
+from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
 
 
-class JUnit(JvmToolMixin, Subsystem):
+class JUnit(JvmToolMixin, InjectablesMixin, Subsystem):
   options_scope = 'junit'
 
   LIBRARY_REV = '4.12'
   RUNNER_MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   LIBRARY_JAR = JarDependency(org='junit', name='junit', rev=LIBRARY_REV)
-  _RUNNER_JAR = JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.17')
+  _RUNNER_JAR = JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.24')
 
   @classmethod
   def register_options(cls, register):
@@ -42,6 +43,8 @@ class JUnit(JvmToolMixin, Subsystem):
                           # @Before, as well as other annotations, but there is also the Assert
                           # class and some subset of the @Rules, @Theories and @RunWith APIs.
                           custom_rules=[
+                            Shader.exclude_package('com.sun.xml', recursive=True),
+                            Shader.exclude_package('javax.xml.bind', recursive=True),
                             Shader.exclude_package('junit.framework', recursive=True),
                             Shader.exclude_package('org.junit', recursive=True),
                             Shader.exclude_package('org.hamcrest', recursive=True),

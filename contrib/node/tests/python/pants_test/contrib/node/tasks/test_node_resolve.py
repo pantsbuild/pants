@@ -9,6 +9,7 @@ import json
 import os
 from textwrap import dedent
 
+import mock
 from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -85,7 +86,9 @@ class NodeResolveTest(TaskTestBase):
                               sources=['util.js', 'package.json'],
                               dependencies=[typ])
 
-    context = self.context(target_roots=[target])
+    context = self.context(target_roots=[target], options={
+      'npm-resolver': {'install_optional': False}
+    })
     task = self.create_task(context)
     task.execute()
 
@@ -140,7 +143,9 @@ class NodeResolveTest(TaskTestBase):
                             target_type=NodeModule,
                             sources=['leaf.js', 'package.json'],
                             dependencies=[util, typ2])
-    context = self.context(target_roots=[leaf])
+    context = self.context(target_roots=[leaf], options={
+      'npm-resolver': {'install_optional': False}
+    })
     task = self.create_task(context)
     task.execute()
 
@@ -205,7 +210,9 @@ class NodeResolveTest(TaskTestBase):
                                        target_type=NodeModule,
                                        sources=['package.json'],
                                        dependencies=[util])
-    context = self.context(target_roots=[scripts_project])
+    context = self.context(target_roots=[scripts_project], options={
+      'npm-resolver': {'install_optional': False}
+    })
     task = self.create_task(context)
     task.execute()
 
@@ -230,3 +237,60 @@ class NodeResolveTest(TaskTestBase):
       self.assertNotIn('devDependencies', package)
       self.assertNotIn('peerDependencies', package)
       self.assertNotIn('optionalDependencies', package)
+
+  def _test_resolve_optional_install_helper(
+      self, install_optional, package_manager, expected_params):
+    self.create_file('src/node/util/package.json', contents=dedent("""
+      {
+        "name": "util",
+        "version": "0.0.1"
+      }
+    """))
+    self.create_file('src/node/util/util.js', contents=dedent("""
+      var typ = require('typ');
+      console.log("type of boolean is: " + typ.BOOLEAN);
+    """))
+    # yarn execution path requires yarn.lock
+    self.create_file('src/node/util/yarn.lock', contents='')
+    target = self.make_target(spec='src/node/util',
+                              target_type=NodeModule,
+                              sources=['util.js', 'package.json', 'yarn.lock'],
+                              dependencies=[],
+                              package_manager=package_manager)
+
+    context = self.context(target_roots=[target], options={
+      'npm-resolver': {'install_optional': install_optional}
+    })
+    task = self.create_task(context)
+
+    package_manager_obj = task.get_package_manager(target=target)
+    with mock.patch.object(package_manager_obj, 'run_command') as exec_call:
+      exec_call.return_value.run.return_value.wait.return_value = 0
+      task.execute()
+      exec_call.assert_called_once_with(
+        args=expected_params,
+        node_paths=None)
+
+  def test_resolve_default_no_optional_install_npm(self):
+    self._test_resolve_optional_install_helper(
+      install_optional=False,
+      package_manager='npm',
+      expected_params=['install', '--no-optional'])
+
+  def test_resolve_optional_install_npm(self):
+    self._test_resolve_optional_install_helper(
+      install_optional=True,
+      package_manager='npm',
+      expected_params=['install'])
+
+  def test_resolve_default_no_optional_install_yarn(self):
+    self._test_resolve_optional_install_helper(
+      install_optional=False,
+      package_manager='yarnpkg',
+      expected_params=['--non-interactive', '--ignore-optional', '--frozen-lockfile'])
+
+  def test_resolve_optional_install_yarn(self):
+    self._test_resolve_optional_install_helper(
+      install_optional=True,
+      package_manager='yarnpkg',
+      expected_params=['--non-interactive', '--frozen-lockfile'])

@@ -29,12 +29,6 @@ class Bob(object):
     return isinstance(other, Bob) and self._key() == other._key()
 
 
-class EmptyTable(parser.SymbolTable):
-  @classmethod
-  def table(cls):
-    return {}
-
-
 class TestTable(parser.SymbolTable):
   @classmethod
   def table(cls):
@@ -47,18 +41,18 @@ class TestTable2(parser.SymbolTable):
     return {'nancy': Bob}
 
 
-def parse(parser, document, symbol_table_cls, **args):
-  return parser.parse('/dev/null', document, symbol_table_cls, **args)
+def parse(parser, document, **args):
+  return parser.parse('/dev/null', document, **args)
 
 
 class JsonParserTest(unittest.TestCase):
-  def parse(self, document, symbol_table_cls=None, **kwargs):
-    symbol_table_cls = symbol_table_cls or EmptyTable
-    return parse(parsers.JsonParser, document, symbol_table_cls, **kwargs)
+  def parse(self, document, symbol_table=None, **kwargs):
+    symbol_table = symbol_table or parser.EmptyTable()
+    return parse(parsers.JsonParser(symbol_table), document, **kwargs)
 
-  def round_trip(self, obj, symbol_table_cls=None):
+  def round_trip(self, obj, symbol_table=None):
     document = parsers.encode_json(obj, inline=True)
-    return self.parse(document, symbol_table_cls=symbol_table_cls)
+    return self.parse(document, symbol_table=symbol_table)
 
   def test_comments(self):
     document = dedent("""
@@ -93,10 +87,10 @@ class JsonParserTest(unittest.TestCase):
       "hobbies": [1, 2, 3]
     }
     """)
-    results = self.parse(document, symbol_table_cls=TestTable)
+    results = self.parse(document, symbol_table=TestTable())
     self.assertEqual(1, len(results))
     self.assertEqual([Bob(hobbies=[1, 2, 3])],
-                     self.round_trip(results[0], symbol_table_cls=TestTable))
+                     self.round_trip(results[0], symbol_table=TestTable()))
     self.assertEqual('bob', results[0]._asdict()['type_alias'])
 
   def test_nested_single(self):
@@ -229,7 +223,7 @@ class JsonParserTest(unittest.TestCase):
     """).strip()
     filepath = '/dev/null'
     with self.assertRaises(parser.ParseError) as exc:
-      parsers.JsonParser.parse(filepath, document, symbol_table_cls=EmptyTable)
+      parsers.JsonParser(parser.EmptyTable()).parse(filepath, document)
 
     # Strip trailing whitespace from the message since our expected literal below will have
     # trailing ws stripped via editors and code reviews calling for it.
@@ -327,7 +321,7 @@ class PythonAssignmentsParserTest(unittest.TestCase):
       hobbies=[1, 2, 3]
     )
     """)
-    results = parse(parsers.PythonAssignmentsParser, document, symbol_table_cls=EmptyTable)
+    results = parse(parsers.PythonAssignmentsParser(parser.EmptyTable()), document)
     self.assertEqual([Bob(name='nancy', hobbies=[1, 2, 3])], results)
 
     # No symbol table was used so no `type_alias` plumbing can be expected.
@@ -339,7 +333,7 @@ class PythonAssignmentsParserTest(unittest.TestCase):
       hobbies=[1, 2, 3]
     )
     """)
-    results = parse(parsers.PythonAssignmentsParser, document, symbol_table_cls=TestTable2)
+    results = parse(parsers.PythonAssignmentsParser(TestTable2()), document)
     self.assertEqual([Bob(name='bill', hobbies=[1, 2, 3])], results)
     self.assertEqual('nancy', results[0]._asdict()['type_alias'])
 
@@ -352,6 +346,6 @@ class PythonCallbacksParserTest(unittest.TestCase):
       hobbies=[1, 2, 3]
     )
     """)
-    results = parse(parsers.PythonCallbacksParser, document, symbol_table_cls=TestTable2)
+    results = parse(parsers.PythonCallbacksParser(TestTable2()), document)
     self.assertEqual([Bob(name='bill', hobbies=[1, 2, 3])], results)
     self.assertEqual('nancy', results[0]._asdict()['type_alias'])

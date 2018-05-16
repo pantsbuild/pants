@@ -8,13 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import StringIO
-import subprocess
 import traceback
 from contextlib import contextmanager
 
 from pants.scm.scm import Scm
 from pants.util.contextutil import pushd
 from pants.util.memo import memoized_method
+from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_binary
 
 
@@ -237,8 +237,11 @@ class Git(Scm):
                      raise_type=Scm.LocalException)
     self.push('refs/tags/' + name)
 
-  def commit(self, message):
-    self._check_call(['commit', '--all', '--message=' + message], raise_type=Scm.LocalException)
+  def commit(self, message, verify=True):
+    cmd = ['commit', '--all', '--message=' + message]
+    if not verify:
+      cmd.append('--no-verify')
+    self._check_call(cmd, raise_type=Scm.LocalException)
 
   def add(self, *paths):
     self._check_call(['add'] + list(paths), raise_type=Scm.LocalException)

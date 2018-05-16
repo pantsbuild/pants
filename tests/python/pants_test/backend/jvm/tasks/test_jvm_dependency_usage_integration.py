@@ -24,7 +24,7 @@ class TestJvmDependencyUsageIntegration(PantsRunIntegrationTest):
       outfile = os.path.join(outdir, 'out.json')
       args = [
           # Enable the on-line equivalent of this check, to confirm consistency.
-          '--compile-zinc-unused-deps=fatal',
+          '--lint-jvm-dep-check-unnecessary-deps=fatal',
           'dep-usage',
           target,
           '--dep-usage-jvm-output-file={}'.format(outfile),

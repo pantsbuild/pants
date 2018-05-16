@@ -64,19 +64,15 @@ class DummyGen(SimpleCodegenTask):
   def __init__(self, *args, **kwargs):
     super(DummyGen, self).__init__(*args, **kwargs)
     self._test_case = None
-    self._all_targets = None
-    self.setup_for_testing(None, None)
+    self.setup_for_testing(None)
     self.execution_counts = 0
 
-  def setup_for_testing(self, test_case, all_targets):
+  def setup_for_testing(self, test_case):
     """Gets this dummy generator class ready for testing.
 
     :param TaskTestBase test_case: the 'parent' test-case using this task. Used for asserts, etc.
-    :param set all_targets: the set of all valid code-gen targets for this task, for validating
-      the correctness of the chosen strategy.
     """
     self._test_case = test_case
-    self._all_targets = all_targets
 
   def is_gentarget(self, target):
     return isinstance(target, DummyLibrary)
@@ -129,7 +125,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
   def _create_dummy_task(self, target_roots=None, **options):
     self.set_options(**options)
     task = self.create_task(self.context(target_roots=target_roots))
-    task.setup_for_testing(self, target_roots or [])
+    task.setup_for_testing(self)
     return task
 
   def _create_dummy_library_targets(self, target_specs):
@@ -142,35 +138,36 @@ class SimpleCodegenTaskTest(TaskTestBase):
         """.format(name=spec_name)))
     return set([self.target(spec) for spec in target_specs])
 
-  def _test_execute_strategy(self, strategy, expected_execution_count):
+  @ensure_cached(DummyGen)
+  def test_expected_codegen_targets_and_right_execution_count(self):
+    expected_execution_count = 3
     dummy_suffixes = ['a', 'b', 'c']
 
     self.add_to_build_file('gen-lib', '\n'.join(dedent("""
-      dummy_library(name='{suffix}',
-        sources=['org/pantsbuild/example/foo{suffix}.dummy'],
-      )
-    """).format(suffix=suffix) for suffix in dummy_suffixes))
+        dummy_library(name='{suffix}',
+          sources=['org/pantsbuild/example/foo{suffix}.dummy'],
+        )
+      """).format(suffix=suffix) for suffix in dummy_suffixes))
 
     for suffix in dummy_suffixes:
       self.create_file('gen-lib/org/pantsbuild/example/foo{suffix}.dummy'.format(suffix=suffix),
-                       'org.pantsbuild.example Foo{0}'.format(suffix))
+        'org.pantsbuild.example Foo{0}'.format(suffix))
 
     targets = [self.target('gen-lib:{suffix}'.format(suffix=suffix)) for suffix in dummy_suffixes]
-    task = self._create_dummy_task(target_roots=targets, strategy=strategy)
+    task = self._create_dummy_task(target_roots=targets)
+
     expected_targets = set(targets)
     found_targets = set(task.codegen_targets())
     self.assertEqual(expected_targets, found_targets,
-                     'TestGen failed to find codegen target {expected}! Found: [{found}].'
-                     .format(expected=', '.join(t.id for t in expected_targets),
-                             found=', '.join(t.id for t in found_targets)))
-    task.execute()
-    self.assertEqual(expected_execution_count, task.execution_counts,
-                     '{} strategy had the wrong number of executions!\n  expected: {}\n  got: {}'
-                     .format(strategy, expected_execution_count, task.execution_counts))
+      'TestGen failed to find codegen target {expected}! Found: [{found}].'
+        .format(expected=', '.join(t.id for t in expected_targets),
+        found=', '.join(t.id for t in found_targets)))
 
-  @ensure_cached(DummyGen)
-  def test_execute_isolated(self):
-    self._test_execute_strategy('isolated', 3)
+    task.execute()
+
+    self.assertEqual(expected_execution_count, task.execution_counts,
+      'had the wrong number of executions!\n  expected: {}\n  got: {}'
+        .format(expected_execution_count, task.execution_counts))
 
   def _get_duplication_test_targets(self):
     self.add_to_build_file('gen-parent', dedent("""
@@ -204,7 +201,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
     return self.target('gen-parent'), self.target('gen-child:good'), self.target('gen-child:bad')
 
   def _do_test_duplication(self, targets, allow_dups, should_fail):
-    task = self._create_dummy_task(target_roots=targets, strategy='isolated', allow_dups=allow_dups)
+    task = self._create_dummy_task(target_roots=targets, allow_dups=allow_dups)
     target_workdirs = {t: safe_mkdtemp(dir=task.workdir) for t in targets}
     syn_targets = []
 
@@ -265,7 +262,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
     """))
 
     targets = [self.target('fleem')]
-    task = self._create_dummy_task(target_roots=targets, strategy='isolated')
+    task = self._create_dummy_task(target_roots=targets)
     task.execute()
     self.assertEqual('copythis', task.codegen_targets()[0].copied)
 
@@ -276,7 +273,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
                           target_type=DummyLibrary,
                           sources=['one.thrift'])
 
-    task1 = self._create_dummy_task(target_roots=t1, strategy='isolated')
+    task1 = self._create_dummy_task(target_roots=t1)
     task1.execute()
 
     gen_targets = [self.build_graph.get_target(syn_addr)
@@ -293,7 +290,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
                           target_type=DummyLibrary,
                           sources=['one.thrift'])
 
-    task2 = self._create_dummy_task(target_roots=t2, strategy='isolated')
+    task2 = self._create_dummy_task(target_roots=t2)
     task2.execute()
 
     gen_targets = [self.build_graph.get_target(syn_addr)
@@ -302,3 +299,224 @@ class SimpleCodegenTaskTest(TaskTestBase):
 
     t2_hash = syn_targets_for_t2[0].invalidation_hash()
     self.assertNotEqual(t1_hash, t2_hash)
+
+
+class ExportingDummyGen(DummyGen):
+
+  def __init__(self, *args, **kwargs):
+    super(ExportingDummyGen, self).__init__(*args, **kwargs)
+    self.synthetic_type = ExportingSyntheticDummyLibrary
+    self.synthetic_exports = ['marionette:no-strings']
+    self.synthetic_dependencies = ['marionette:no-strings']
+
+  def synthetic_target_extra_exports(self, target, target_workdir):
+    return [self.context.build_graph.get_target_from_spec(s) for s in self.synthetic_exports]
+
+  def synthetic_target_extra_dependencies(self, target, target_workdir):
+    return [self.context.build_graph.get_target_from_spec(s) for s in self.synthetic_dependencies]
+
+  def synthetic_target_type(self, target):
+    return self.synthetic_type
+
+
+class ExportingDummyLibrary(DummyLibrary):
+  def __init__(self, exports=None, **kwargs):
+    super(ExportingDummyLibrary, self).__init__(**kwargs)
+    self._export_specs = exports or tuple() # NB: export_specs can't be None
+
+  @property
+  def export_specs(self):
+    return self._export_specs
+
+
+class ExportingSyntheticDummyLibrary(SyntheticDummyLibrary):
+  def __init__(self, address, sources, exports=None, **kwargs):
+    super(ExportingSyntheticDummyLibrary, self).__init__(address, sources, **kwargs)
+    self._export_specs = exports or tuple() # NB: export_specs can't be None
+
+  @property
+  def export_specs(self):
+    return self._export_specs
+
+
+class ExportSimpleCodegenTaskTest(TaskTestBase):
+
+  @classmethod
+  def task_type(cls):
+    return ExportingDummyGen
+
+  @property
+  def alias_groups(self):
+    return register_core().merge(BuildFileAliases({
+      'target': Target,
+      'dummy_library': DummyLibrary,
+      'exporting_dummy_library': ExportingDummyLibrary
+    }))
+
+  def _create_dummy_task(self,
+    target_roots=None,
+    synthetic_type=ExportingSyntheticDummyLibrary,
+    synthetic_exports=None,
+    synthetic_dependencies=None,
+    **options):
+
+    self.set_options(**options)
+    task = self.create_task(self.context(target_roots=target_roots))
+    task.synthetic_type = synthetic_type
+    if synthetic_exports is not None:
+      task.synthetic_exports = synthetic_exports
+    if synthetic_dependencies is not None:
+      task.synthetic_dependencies = synthetic_dependencies
+
+    task.setup_for_testing(self)
+    return task
+
+  def synthetic_target_for(self, spec):
+    for syn_addr in self.build_graph.synthetic_addresses:
+      t = self.build_graph.get_target(syn_addr)
+      if t.derived_from == self.build_graph.get_target_from_spec(spec):
+        return t
+    else:
+      return None
+
+  def test_add_export_from_target_that_supports_exports(self):
+    self.add_to_build_file('marionette', dedent("""
+      dummy_library(name='no-strings', sources=[])
+    """))
+    self.target('marionette:no-strings')
+
+    self.create_file('fleem/org/pantsbuild/example/fleem.dummy',
+      'org.pantsbuild.example Fleem')
+    self.add_to_build_file('fleem', dedent("""
+      exporting_dummy_library(name='fleem',
+        sources=['org/pantsbuild/example/fleem.dummy'],
+      )
+    """))
+
+    targets = [self.target('fleem')]
+    task = self._create_dummy_task(target_roots=targets)
+    task.execute()
+
+    self.assertEqual(self.synthetic_target_for('fleem').export_specs, ['marionette:no-strings'])
+
+  def test_skip_adding_export_from_target_that_supports_exports_to_one_that_doesnt(self):
+    self.add_to_build_file('marionette', dedent("""
+      dummy_library(name='no-strings', sources=[])
+    """))
+    self.target('marionette:no-strings')
+
+    self.create_file('fleem/org/pantsbuild/example/fleem.dummy',
+      'org.pantsbuild.example Fleem')
+    self.add_to_build_file('fleem', dedent("""
+      exporting_dummy_library(name='fleem',
+        sources=['org/pantsbuild/example/fleem.dummy'],
+      )
+    """))
+
+    targets = [self.target('fleem')]
+    task = self._create_dummy_task(target_roots=targets, synthetic_type=SyntheticDummyLibrary)
+    task.execute()
+
+    self.assertEqual(type(self.synthetic_target_for('fleem')), SyntheticDummyLibrary)
+
+  def test_merges_exports(self):
+    self.add_to_build_file('marionette', dedent("""
+      dummy_library(name='no-strings', sources=[])
+    """))
+    self.target('marionette:no-strings')
+
+    self.create_file('fleem/org/pantsbuild/example/fleem.dummy',
+      'org.pantsbuild.example Fleem')
+    self.add_to_build_file('fleem', dedent("""
+      dummy_library(name='flaam', sources=[])
+
+      exporting_dummy_library(name='fleem',
+        sources=['org/pantsbuild/example/fleem.dummy'],
+        dependencies=[':flaam'],
+        exports=[':flaam']
+      )
+    """))
+
+    targets = [self.target('fleem')]
+    task = self._create_dummy_task(target_roots=targets)
+    task.execute()
+
+    self.assertIn('fleem:flaam',self.synthetic_target_for('fleem').export_specs)
+    self.assertIn('marionette:no-strings',self.synthetic_target_for('fleem').export_specs)
+
+  def test_exports_always_copied_even_if_no_extra(self):
+    self.add_to_build_file('marionette', dedent("""
+      dummy_library(name='no-strings', sources=[])
+    """))
+    self.target('marionette:no-strings')
+
+    self.create_file('fleem/org/pantsbuild/example/fleem.dummy',
+      'org.pantsbuild.example Fleem')
+    self.add_to_build_file('fleem', dedent("""
+      dummy_library(name='flaam', sources=[])
+
+      exporting_dummy_library(name='fleem',
+        sources=['org/pantsbuild/example/fleem.dummy'],
+        dependencies=[':flaam'],
+        exports=[':flaam']
+      )
+    """))
+
+    targets = [self.target('fleem')]
+    task = self._create_dummy_task(target_roots=targets, synthetic_exports=[])
+
+    task.execute()
+
+    self.assertIn('fleem:flaam',self.synthetic_target_for('fleem').export_specs)
+
+  def test_missing_extra_dependency_fails(self):
+    self.add_to_build_file('marionette', dedent("""
+      dummy_library(name='no-strings', sources=[])
+    """))
+    self.target('marionette:no-strings')
+
+    self.create_file('fleem/org/pantsbuild/example/fleem.dummy',
+      'org.pantsbuild.example Fleem')
+    self.add_to_build_file('fleem', dedent("""
+      dummy_library(name='flaam', sources=[])
+
+      exporting_dummy_library(name='fleem',
+        sources=['org/pantsbuild/example/fleem.dummy'],
+      )
+    """))
+
+    targets = [self.target('fleem')]
+    task = self._create_dummy_task(
+      target_roots=targets,
+      synthetic_exports=['marionette:no-strings'],
+      synthetic_dependencies=[])
+
+    with self.assertRaises(SimpleCodegenTask.MismatchedExtraExports):
+      task.execute()
+
+  def test_additional_extra_dependency_fine(self):
+    self.add_to_build_file('marionette', dedent("""
+      dummy_library(name='no-strings', sources=[])
+    """))
+    self.target('marionette:no-strings')
+
+    self.create_file('fleem/org/pantsbuild/example/fleem.dummy',
+      'org.pantsbuild.example Fleem')
+    self.add_to_build_file('fleem', dedent("""
+      dummy_library(name='flaam', sources=[])
+
+      exporting_dummy_library(name='fleem',
+        sources=['org/pantsbuild/example/fleem.dummy'],
+      )
+    """))
+
+    targets = [self.target('fleem')]
+    task = self._create_dummy_task(target_roots=targets,
+      synthetic_exports=[],
+      synthetic_dependencies=['marionette:no-strings'])
+
+    task.execute()
+
+    self.assertEqual(
+      self.synthetic_target_for('fleem').dependencies[0].address.spec,
+      'marionette:no-strings')

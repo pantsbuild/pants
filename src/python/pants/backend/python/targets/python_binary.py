@@ -43,6 +43,7 @@ class PythonBinary(PythonTarget):
                repositories=None,         # pex option
                indices=None,              # pex option
                ignore_errors=False,       # pex option
+               shebang=None,              # pex option
                platforms=(),
                **kwargs):
     """
@@ -73,16 +74,20 @@ class PythonBinary(PythonTarget):
       e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements agnostic to interpreter class.
     """
 
+    if inherit_path is False:
+      inherit_path = "false"
+
     payload = Payload()
     payload.add_fields({
       'entry_point': PrimitiveField(entry_point),
-      'inherit_path': PrimitiveField(bool(inherit_path)),
+      'inherit_path': PrimitiveField(inherit_path),
       'zip_safe': PrimitiveField(bool(zip_safe)),
       'always_write_cache': PrimitiveField(bool(always_write_cache)),
       'repositories': PrimitiveField(maybe_list(repositories or [])),
       'indices': PrimitiveField(maybe_list(indices or [])),
       'ignore_errors': PrimitiveField(bool(ignore_errors)),
       'platforms': PrimitiveField(tuple(maybe_list(platforms or []))),
+      'shebang': PrimitiveField(shebang),
     })
 
     sources = [] if source is None else [source]
@@ -133,6 +138,10 @@ class PythonBinary(PythonTarget):
     else:
       return None
 
+  @property
+  def shebang(self):
+    return self.payload.shebang
+    
   @property
   def pexinfo(self):
     info = PexInfo.default()

@@ -135,7 +135,7 @@ lives somewhere outside the workspace.
 ### Depending on a Jar
 
 The test example depends on a jar, `junit`. Instead of compiling from
-source, Pants invokes ivy to fetch such jars. To reduce the danger of
+source, Pants invokes the resolver to fetch such jars. To reduce the danger of
 version conflicts, we use the 3rdparty idiom: we keep references to
 these "third-party" jars together in `BUILD` files under the `3rdparty/`
 directory. Thus, the test has a `3rdparty` dependency:
@@ -208,17 +208,100 @@ contents a directory tree, a giant jar, or something else.
 Toolchain
 ---------
 
+### Ivy
+
 Pants uses [Ivy](http://ant.apache.org/ivy/) to resolve `jar` dependencies. To change how Pants
 resolves these, configure `resolve.ivy`.
+
+### Coursier
+
+Starting at release `1.4.0.dev26`, Pants added an option to pick [coursier](https://github.com/coursier/coursier)
+as the JVM 3rdparty resolver, with performance improvement being the main motivation. The goal is to retire ivy
+eventually.
+
+#### Limitation
+
+* Currently coursier only supports maven style repo resolves. [Resolving with ivy settings is still not mature](https://github.com/coursier/coursier/issues/created_by/benjyw).
+* Coursier does not do publishing.
+
+#### Example config to use coursier
+
+##### For Pants >= 1.7.x
+
+    :::ini
+    # This will turn on coursier and turn off ivy.
+    [resolver]
+    resolver: coursier
+
+    [resolve.coursier]
+    # jvm option in case of large resolves
+    jvm_options: ['-Xmx4g', '-XX:MaxMetaspaceSize=256m']
+
+    [export]
+    # Same if needed for large resolves
+    jvm_options: ['-Xmx4g', '-XX:MaxMetaspaceSize=256m']
+
+    [coursier]
+    repos: ['https://repo1.maven.org/maven2', 'https://dl.google.com/dl/android/maven2/']
+
+    # Change the following if you choose to [build coursier jar from scratch](https://github.com/coursier/coursier/blob/master/DEVELOPMENT.md#build-with-pants)
+    # or to fetch from different location.
+    bootstrap_jar_url: <url>
+    version: <version>
+
+* To inspect the resolve result, specify `--resolver-coursier-report`
+* To show coursier command line invocation, use `-ldebug`
+
+        :::bash
+        ./pants --resolver-resolver=coursier resolve.coursier --report examples/tests/scala/org/pantsbuild/example/hello/welcome -ldebug
+
+##### For Pants <= 1.6.x
+
+    :::ini
+    # This will turn on coursier and turn off ivy.
+    [resolver]
+    resolver: coursier
+
+    [export]
+    # Same if needed for large resolves
+    jvm_options: ['-Xmx4g', '-XX:MaxMetaspaceSize=256m']
+
+    [coursier]
+    # Change the following if you choose to [build coursier jar from scratch](https://github.com/coursier/coursier/blob/master/DEVELOPMENT.md#build-with-pants)
+    # or to fetch from different location.
+    bootstrap_jar_url: <url>
+    version: <version>
+
+    fetch_options: [
+        # Specify maven repos
+        '-r', 'https://repo1.maven.org/maven2/',
+        '-r', 'https://dl.google.com/dl/android/maven2/',
+
+        # Quiet mode
+        '-q',
+
+        # Do not use default public maven repo.
+        '--no-default',
+
+        # Concurrent workers
+        '-n', '10',
+
+        # Specify the type of artifacts to fetch
+        '-A', 'jar,bundle,test-jar,maven-plugin,src,doc,aar'
+      ]
+
+### Nailgun
 
 Pants uses [Nailgun](https://github.com/martylamb/nailgun) to speed up compiles. Nailgun is a
 JVM daemon that runs in the background. This means you don't need to start up a JVM and load
 classes for each JVM-based operation. Things go faster.
 
+### Zinc
+
 Pants uses Zinc, a dependency tracking compiler facade that supports sub-target incremental
 compilation for Java and Scala.
 
-Java7 vs Java6, Which Java
+Java9 vs Java8, Which Java
 --------------------------
 
 Pants first looks through any JDKs specified by the `paths` map in pants.ini's jvm-distributions
@@ -228,11 +311,11 @@ section, eg:
     [jvm-distributions]
     paths = {
         'macos': [
-          '/Library/Java/JavaVirtualMachines/jdk1.7.0_79.jdk',
+          '/Library/Java/JavaVirtualMachines/jdk-9.0.4.jdk',
           '/Library/Java/JavaVirtualMachines/jdk1.8.0_45.jdk',
         ],
         'linux': [
-          '/usr/java/jdk1.7.0_80',
+          '/usr/java/jdk1.8.0_152',
         ]
       }
 
@@ -241,18 +324,18 @@ or `PATH`. If no `paths` are specified in pants.ini, you can use JDK_HOME to set
 for just one pants invocation:
 
     :::bash
-    $ JDK_HOME=/usr/lib/jvm/java-1.7.0-openjdk-amd64 ./pants ...
+    $ JDK_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./pants ...
 
-If you sometimes need to compile some code in Java 6 and sometimes Java 7, you can define
+If you sometimes need to compile some code in Java 8 and sometimes Java 9, you can define
 jvm-platforms in pants.ini, and set what targets use which platforms. For example, in pants.ini:
 
     :::ini
     [jvm-platform]
-    default_platform: java6
+    default_platform: java8
     platforms: {
-        'java6': {'source': '6', 'target': '6', 'args': [] },
         'java7': {'source': '7', 'target': '7', 'args': [] },
         'java8': {'source': '8', 'target': '8', 'args': [] },
+        java9': {'source': '9', 'target': '9', 'args': [] },
       }
 
 And then in a BUILD file:
@@ -260,13 +343,13 @@ And then in a BUILD file:
     :::python
     java_library(name='my-library',
       sources=globs('*.java'),
-      platform='java7',
+      platform='java8',
     )
 
 You can also override these on the cli:
 
     :::bash
-    ./pants compile --jvm-platform-default-platform=java8 examples/src/java/org/pantsbuild/example/hello/main
+    ./pants compile --jvm-platform-default-platform=java9 examples/src/java/org/pantsbuild/example/hello/main
 
 If you want to set the `-bootclasspath` (or `-Xbootclasspath`) to use the
 appropriate java distribution, you can use the `$JAVA_HOME` symbol in the
@@ -274,7 +357,7 @@ appropriate java distribution, you can use the `$JAVA_HOME` symbol in the
 
     :::ini
     [jvm-platform]
-    default_platform: java6
+    default_platform: java8
     platforms: {
         'java7': {'source': '7', 'target': '7', 'args': ["-C-bootclasspath:$JAVA_HOME/jre/lib/resources.jar:$JAVA_HOME/jre/lib/rt.jar:$JAVA_HOME/jre/lib/sunrsasign.jar:$JAVA_HOME/jre/lib/jsse.jar:$JAVA_HOME/jre/lib/jce.jar:$JAVA_HOME/jre/lib/charsets.jar:$JAVA_HOME/jre/lib/jfr.jar:$JAVA_HOME/jre/classes"] },
       }
@@ -624,17 +707,23 @@ a simple 'badness' score. The "badness" score is intended to indicate both how e
 would be to remove (based on the maximum fraction used by each dependee) and how valuable it would
 be remove (based on a estimate of the transitive cost to build the dep).
 
+Stat explanation:
+
+* `max_usage`: fraction of the dependency target is being used. 0 means the target is safe to drop.
+* `cost_transitive`: the cost to bring in this target including its transitive dependencies in the build process
+* `badness`: `cost_transitive/max_usage`, so the lower the better.
+
     :::shell
-    $ ./pants dep-usage.jvm examples/src/scala/org/pantsbuild/example::
-    ...
+    $ ./pants -q dep-usage.jvm examples/src/scala/org/pantsbuild/example/hello/:
     [
-      {"badness": 4890, "max_usage": 0.3, "cost_transitive": 1630, "target": "examples/src/scala/org/pantsbuild/example/hello/welcome"},
-      {"badness": 1098, "max_usage": 1.0, "cost_transitive": 1098, "target": "examples/src/java/org/pantsbuild/example/hello/greet"}
+      {"badness": 0, "max_usage": 1.0, "cost_transitive": 0, "target": "//:scala-library-synthetic"},
+      {"badness": 8872, "max_usage": 0.125, "cost_transitive": 1109, "target": "examples/src/java/org/pantsbuild/example/hello/greet:greet"},
+      {"badness": 16410, "max_usage": 0.1, "cost_transitive": 1641, "target": "examples/src/scala/org/pantsbuild/example/hello/welcome:welcome"}
     ]
 
 The above example indicates that within the scope of the scala examples, the
 `examples/src/scala/org/pantsbuild/example/hello/welcome` target is the worst dependency. This is
-because it has a high transitive "cost" to build, and sees a maximum of 30% usage by its dependees.
+because it has a high transitive "cost" to build, and sees a maximum of 10% usage by its dependees.
 
 ### For global analysis
 

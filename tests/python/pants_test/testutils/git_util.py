@@ -6,12 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import re
-import subprocess
 from contextlib import contextmanager
 
 from pants.base.revision import Revision
 from pants.scm.git import Git
 from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.process_handler import subprocess
 
 
 MIN_REQUIRED_GIT_VERSION = Revision.semver('1.7.10')
@@ -25,6 +25,11 @@ def git_version():
   # stdout is like 'git version 1.9.1.598.g9119e8b\n'  We want '1.9.1.598'
   matches = re.search(r'\s(\d+(?:\.\d+)*)[\s\.]', stdout)
   return Revision.lenient(matches.group(1))
+
+
+def get_repo_root():
+  """Return the absolute path to the root directory of the Pants git repo."""
+  return subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).strip()
 
 
 @contextmanager

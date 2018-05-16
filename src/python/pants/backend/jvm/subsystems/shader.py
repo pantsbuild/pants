@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 import re
 from collections import namedtuple
@@ -17,6 +18,9 @@ from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem, SubsystemError
 from pants.util.contextutil import temporary_file
+
+
+logger = logging.getLogger(__name__)
 
 
 class UnaryRule(namedtuple('UnaryRule', ['name', 'pattern'])):
@@ -234,10 +238,15 @@ class Shader(object):
     @classmethod
     def register_options(cls, register):
       super(Shader.Factory, cls).register_options(register)
+
+      register('--binary-package-excludes', type=list, fingerprint=True,
+               default=['com.oracle', 'com.sun', 'java', 'javax', 'jdk', 'oracle', 'sun'],
+               help='Packages that the shader will exclude for binaries')
+
       cls.register_jvm_tool(register,
                             'jarjar',
                             classpath=[
-                              JarDependency(org='org.pantsbuild', name='jarjar', rev='1.6.4')
+                              JarDependency(org='org.pantsbuild', name='jarjar', rev='1.6.5')
                             ])
 
     @classmethod
@@ -250,7 +259,7 @@ class Shader(object):
         executor = SubprocessExecutor(DistributionLocator.cached())
       classpath = cls.global_instance().tool_classpath_from_products(context.products, 'jarjar',
                                                                      cls.options_scope)
-      return Shader(classpath, executor)
+      return Shader(classpath, executor, cls.global_instance().get_options().binary_package_excludes)
 
   @classmethod
   def exclude_package(cls, package_name=None, recursive=False):
@@ -307,27 +316,22 @@ class Shader(object):
   def _potential_package_path(path):
     # TODO(John Sirois): Implement a full valid java package name check, `-` just happens to get
     # the common non-package cases like META-INF/...
-    return path.endswith('.class') or path.endswith('.java') and '-' not in path
-
-  @classmethod
-  def _iter_dir_packages(cls, path):
-    paths = set()
-    for root, dirs, files in os.walk(path):
-      for filename in files:
-        if cls._potential_package_path(filename):
-          package_path = os.path.dirname(os.path.join(root, filename))
-          paths.add(os.path.relpath(package_path, path))
-    return cls._iter_packages(paths)
+    return (path.endswith('.class') or path.endswith('.java')) and '-' not in path
 
   @classmethod
   def _iter_jar_packages(cls, path):
     paths = set()
     for pathname in ClasspathUtil.classpath_entries_contents([path]):
       if cls._potential_package_path(pathname):
-        paths.add(os.path.dirname(pathname))
+        package = os.path.dirname(pathname)
+        if package:
+          # This check avoids a false positive on things like module-info.class.
+          # We must never add an empty package, as this will cause every single string
+          # literal to be rewritten.
+          paths.add(package)
     return cls._iter_packages(paths)
 
-  def __init__(self, jarjar_classpath, executor):
+  def __init__(self, jarjar_classpath, executor, binary_package_excludes):
     """Creates a `Shader` the will use the given `jarjar` jar to create shaded jars.
 
     :param jarjar_classpath: The jarjar classpath.
@@ -336,24 +340,7 @@ class Shader(object):
     """
     self._jarjar_classpath = jarjar_classpath
     self._executor = executor
-    self._system_packages = None
-
-  def _calculate_system_packages(self):
-    system_packages = set()
-    boot_classpath = self._executor.distribution.system_properties['sun.boot.class.path']
-    for path in boot_classpath.split(os.pathsep):
-      if os.path.exists(path):
-        if os.path.isdir(path):
-          system_packages.update(self._iter_dir_packages(path))
-        else:
-          system_packages.update(self._iter_jar_packages(path))
-    return system_packages
-
-  @property
-  def system_packages(self):
-    if self._system_packages is None:
-      self._system_packages = self._calculate_system_packages()
-    return self._system_packages
+    self._binary_package_excludes = binary_package_excludes
 
   def assemble_binary_rules(self, main, jar, custom_rules=None):
     """Creates an ordered list of rules suitable for fully shading the given binary.
@@ -390,7 +377,8 @@ class Shader(object):
       main_package = None
     rules.append(self.exclude_package(main_package))
 
-    rules.extend(self.exclude_package(system_pkg) for system_pkg in sorted(self.system_packages))
+    rules.extend(self.exclude_package(system_pkg, recursive=True)
+                 for system_pkg in self._binary_package_excludes)
 
     # Shade everything else.
     #
@@ -433,6 +421,7 @@ class Shader(object):
     :rtype: :class:`pants.java.executor.Executor.Runner`
     """
     with self.temporary_rules_file(rules) as rules_file:
+      logger.debug('Running jarjar with rules:\n{}'.format(' '.join(rule.render() for rule in rules)))
       yield self._executor.runner(classpath=self._jarjar_classpath,
                                   main='org.pantsbuild.jarjar.Main',
                                   jvm_options=jvm_options,

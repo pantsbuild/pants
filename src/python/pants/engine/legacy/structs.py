@@ -10,16 +10,14 @@ from abc import abstractproperty
 
 from six import string_types
 
-from pants.base.deprecated import deprecated_conditional
-from pants.build_graph.target import Target
-from pants.engine.addressable import Exactly, addressable_list
+from pants.engine.addressable import addressable_list
 from pants.engine.fs import PathGlobs
 from pants.engine.objects import Locatable
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.contextutil import exception_logging
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
+from pants.util.objects import Exactly, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -42,17 +40,9 @@ class TargetAdaptor(StructWithDeps):
     # N.B. Here we check specifically for `sources is None`, as it's possible for sources
     # to be e.g. an explicit empty list (sources=[]).
     if sources is None and self.default_sources_globs is not None:
-      if self.default_sources:
-        return Globs(*self.default_sources_globs,
-                     spec_path=self.address.spec_path,
-                     exclude=self.default_sources_exclude_globs or [])
-      else:
-        deprecated_conditional(lambda: True, '1.5.0.dev0',
-                               'default empty sources list',
-                               'Targets which do not explicitly pass sources will soon get a default set. '
-                               'Please pass an explicit set of sources for target: {address}'
-                            .format(address=self.address.spec))
-        return Files(spec_path=self.address.spec_path)
+      return Globs(*self.default_sources_globs,
+                    spec_path=self.address.spec_path,
+                    exclude=self.default_sources_exclude_globs or [])
     return sources
 
   @property
@@ -67,11 +57,6 @@ class TargetAdaptor(StructWithDeps):
       return (SourcesField(self.address, 'sources', base_globs.filespecs, path_globs),)
 
   @property
-  def default_sources(self):
-    """True if this adaptor should use default sources if they are defined."""
-    return Target.Arguments.global_instance().get_options().implicit_sources
-
-  @property
   def default_sources_globs(self):
     return None
 
@@ -84,7 +69,7 @@ class Field(object):
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
 
 
-class SourcesField(datatype('SourcesField', ['address', 'arg', 'filespecs', 'path_globs']), Field):
+class SourcesField(datatype(['address', 'arg', 'filespecs', 'path_globs']), Field):
   """Represents the `sources` argument for a particular Target.
 
   Sources are currently eagerly computed in-engine in order to provide the `BuildGraph`
@@ -99,14 +84,8 @@ class SourcesField(datatype('SourcesField', ['address', 'arg', 'filespecs', 'pat
   :param path_globs: A PathGlobs describing included files.
   """
 
-  def __eq__(self, other):
-    return type(self) == type(other) and self.address == other.address and self.arg == other.arg
-
-  def __ne__(self, other):
-    return not (self == other)
-
   def __hash__(self):
-    return hash(self.address)
+    return hash((self.address, self.arg))
 
   def __repr__(self):
     return str(self)
@@ -144,7 +123,7 @@ class JunitTestsAdaptor(TargetAdaptor):
     return self.java_test_globs + self.scala_test_globs
 
 
-class BundlesField(datatype('BundlesField', ['address', 'bundles', 'filespecs_list', 'path_globs_list']), Field):
+class BundlesField(datatype(['address', 'bundles', 'filespecs_list', 'path_globs_list']), Field):
   """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
 
   def __eq__(self, other):
@@ -167,12 +146,12 @@ class BundleAdaptor(Struct):
   """
 
 
-class JvmAppAdaptor(TargetAdaptor):
+class AppAdaptor(TargetAdaptor):
   def __init__(self, bundles=None, **kwargs):
     """
     :param list bundles: A list of `BundleAdaptor` objects
     """
-    super(JvmAppAdaptor, self).__init__(**kwargs)
+    super(AppAdaptor, self).__init__(**kwargs)
     self.bundles = bundles
 
   @addressable_list(Exactly(BundleAdaptor))
@@ -183,7 +162,7 @@ class JvmAppAdaptor(TargetAdaptor):
   @property
   def field_adaptors(self):
     with exception_logging(logger, 'Exception in `field_adaptors` property'):
-      field_adaptors = super(JvmAppAdaptor, self).field_adaptors
+      field_adaptors = super(AppAdaptor, self).field_adaptors
       if getattr(self, 'bundles', None) is None:
         return field_adaptors
 

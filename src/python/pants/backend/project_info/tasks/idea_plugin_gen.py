@@ -11,7 +11,6 @@ import os
 import pkgutil
 import re
 import shutil
-import subprocess
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.python.targets.python_target import PythonTarget
@@ -22,6 +21,7 @@ from pants.task.console_task import ConsoleTask
 from pants.util import desktop
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
+from pants.util.process_handler import subprocess
 
 
 _TEMPLATE_BASEDIR = 'templates/idea'
@@ -65,7 +65,7 @@ class IdeaPluginGen(ConsoleTask):
              help='Attempts to open the generated project in IDEA.')
     register('--java-encoding', default='UTF-8',
              help='Sets the file encoding for java files in this project.')
-    register('--open-with', advanced=True, default=None, recursive=True,
+    register('--open-with', type=str, default=None, recursive=True,
              help='Program used to open the generated IntelliJ project.')
     register('--debug_port', type=int, default=5005,
              help='Port to use for launching tasks under the debugger.')

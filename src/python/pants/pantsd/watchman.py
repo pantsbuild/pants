@@ -20,35 +20,38 @@ from pants.util.retry import retry_on_exception
 class Watchman(ProcessManager):
   """Watchman process manager and helper class."""
 
+  class WatchmanCrash(Exception):
+    """Raised when Watchman crashes."""
+
   STARTUP_TIMEOUT_SECONDS = 30.0
   SOCKET_TIMEOUT_SECONDS = 5.0
 
   EventHandler = namedtuple('EventHandler', ['name', 'metadata', 'callback'])
 
-  def __init__(self, watchman_path, work_dir, log_level='1', startup_timeout=STARTUP_TIMEOUT_SECONDS,
-               timeout=SOCKET_TIMEOUT_SECONDS, socket_path_override=None, metadata_base_dir=None):
+  def __init__(self, watchman_path, metadata_base_dir, log_level='1', startup_timeout=STARTUP_TIMEOUT_SECONDS,
+               timeout=SOCKET_TIMEOUT_SECONDS, socket_path_override=None):
     """
     :param str watchman_path: The path to the watchman binary.
-    :param str work_dir: The path to the pants work dir.
+    :param str metadata_base_dir: The metadata base dir for `ProcessMetadataManager`.
     :param float startup_timeout: The timeout for the initial `watch-project` query (in seconds).
     :param float timeout: The watchman socket timeout for all subsequent queries (in seconds).
     :param str log_level: The watchman log level. Watchman has 3 log levels: '0' for no logging,
                           '1' for standard logging and '2' for verbose logging.
     :param str socket_path_override: The overridden target path of the watchman socket, if any.
-    :param str metadata_base_dir: The overriden metadata base dir for `ProcessMetadataManager`.
     """
     super(Watchman, self).__init__(name='watchman',
                                    process_name='watchman',
                                    socket_type=str,
                                    metadata_base_dir=metadata_base_dir)
     self._watchman_path = self._normalize_watchman_path(watchman_path)
-    self._watchman_work_dir = os.path.join(work_dir, self.name)
+    self._watchman_work_dir = os.path.join(metadata_base_dir, self.name)
     self._log_level = log_level
     self._startup_timeout = startup_timeout
     self._timeout = timeout
 
     self._state_file = os.path.join(self._watchman_work_dir, '{}.state'.format(self.name))
     self._log_file = os.path.join(self._watchman_work_dir, '{}.log'.format(self.name))
+    self._pid_file = os.path.join(self._watchman_work_dir, '{}.pid'.format(self.name))
     self._sock_file = socket_path_override or os.path.join(self._watchman_work_dir,
                                                            '{}.sock'.format(self.name))
 
@@ -77,15 +80,16 @@ class Watchman(ProcessManager):
     return os.path.abspath(watchman_path)
 
   def _maybe_init_metadata(self):
-    self._logger.debug('ensuring creation of directory: {}'.format(self._watchman_work_dir))
     safe_mkdir(self._watchman_work_dir)
     # Initialize watchman with an empty, but valid statefile so it doesn't complain on startup.
     safe_file_dump(self._state_file, '{}')
 
-  def _construct_cmd(self, cmd_parts, state_file, sock_file, log_file, log_level):
+  def _construct_cmd(self, cmd_parts, state_file, sock_file, pid_file, log_file, log_level):
     return [part for part in cmd_parts] + ['--no-save-state',
+                                           '--no-site-spawner',
                                            '--statefile={}'.format(state_file),
                                            '--sockname={}'.format(sock_file),
+                                           '--pidfile={}'.format(pid_file),
                                            '--logfile={}'.format(log_file),
                                            '--log-level', log_level]
 
@@ -110,6 +114,7 @@ class Watchman(ProcessManager):
     cmd = self._construct_cmd((self._watchman_path, 'get-pid'),
                               state_file=self._state_file,
                               sock_file=self._sock_file,
+                              pid_file=self._pid_file,
                               log_file=self._log_file,
                               log_level=str(self._log_level))
     self._logger.debug('watchman cmd is: {}'.format(' '.join(cmd)))
@@ -138,6 +143,15 @@ class Watchman(ProcessManager):
     self.write_pid(pid)
     self.write_socket(self._sock_file)
 
+  def _attempt_set_timeout(self, timeout):
+    """Sets a timeout on the inner watchman client's socket."""
+    try:
+      self.client.setTimeout(timeout)
+    except Exception:
+      self._logger.debug('failed to set post-startup watchman timeout to %s', self._timeout)
+    else:
+      self._logger.debug('set post-startup watchman timeout to %s', self._timeout)
+
   def watch_project(self, path):
     """Issues the watch-project command to watchman to begin watching the buildroot.
 
@@ -147,8 +161,7 @@ class Watchman(ProcessManager):
     try:
       return self.client.query('watch-project', os.path.realpath(path))
     finally:
-      self.client.setTimeout(self._timeout)
-      self._logger.debug('setting post-startup watchman timeout to %s', self._timeout)
+      self._attempt_set_timeout(self._timeout)
 
   def subscribed(self, build_root, handlers):
     """Bulk subscribe generator for StreamableWatchmanClient.
@@ -164,13 +177,16 @@ class Watchman(ProcessManager):
 
     self._logger.debug('watchman command_list is: {}'.format(command_list))
 
-    for event in self.client.stream_query(command_list):
-      if event is None:
-        yield None, None
-      elif 'subscribe' in event:
-        self._logger.info('confirmed watchman subscription: {}'.format(event))
-        yield None, None
-      elif 'subscription' in event:
-        yield event.get('subscription'), event
-      else:
-        self._logger.warning('encountered non-subscription event: {}'.format(event))
+    try:
+      for event in self.client.stream_query(command_list):
+        if event is None:
+          yield None, None
+        elif 'subscribe' in event:
+          self._logger.info('confirmed watchman subscription: {}'.format(event))
+          yield None, None
+        elif 'subscription' in event:
+          yield event.get('subscription'), event
+        else:
+          self._logger.warning('encountered non-subscription event: {}'.format(event))
+    except self.client.WatchmanError as e:
+      raise self.WatchmanCrash(e)

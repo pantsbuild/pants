@@ -6,8 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import errno
+import logging
 import os
-import subprocess
 import sys
 from contextlib import contextmanager
 
@@ -18,6 +18,7 @@ from pants.pantsd.process_manager import (ProcessGroup, ProcessManager, ProcessM
                                           swallow_psutil_exceptions)
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump
+from pants.util.process_handler import subprocess
 from pants_test.base_test import BaseTest
 
 
@@ -141,7 +142,10 @@ class TestProcessMetadataManager(BaseTest):
 
   def test_deadline_until(self):
     with self.assertRaises(self.pmm.Timeout):
-      self.pmm._deadline_until(lambda: False, timeout=.1)
+      with self.captured_logging(logging.INFO) as captured:
+        self.pmm._deadline_until(lambda: False, 'the impossible', timeout=.5, info_interval=.1)
+    self.assertTrue(4 <= len(captured.infos()) <= 6,
+                    'Expected between 4 and 6 infos, got: {}'.format(captured.infos()))
 
   def test_wait_for_file(self):
     with temporary_dir() as td:

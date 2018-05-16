@@ -13,6 +13,7 @@ from collections import defaultdict, namedtuple
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -26,17 +27,14 @@ from pants.contrib.scrooge.tasks.java_thrift_library_fingerprint_strategy import
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
 
 
-_RPC_STYLES = frozenset(['sync', 'finagle', 'ostrich'])
-
-
 class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   DepInfo = namedtuple('DepInfo', ['service', 'structs'])
   PartialCmd = namedtuple('PartialCmd', [
-    'language', 
-    'namespace_map', 
-    'default_java_namespace', 
-    'include_paths', 
+    'language',
+    'namespace_map',
+    'default_java_namespace',
+    'include_paths',
     'compiler_args'
   ])
 
@@ -51,6 +49,12 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
                   'synthetic thrift libraries that contain services.')
     register('--structs-deps', default={}, advanced=True, type=dict,
              help='A map of language to targets to add as dependencies of '
+                  'synthetic thrift libraries that contain structs.')
+    register('--service-exports', default={}, advanced=True, type=dict,
+             help='A map of language to targets to add as exports of '
+                  'synthetic thrift libraries that contain services.')
+    register('--structs-exports', default={}, advanced=True, type=dict,
+             help='A map of language to targets to add as exports of '
                   'synthetic thrift libraries that contain structs.')
     register('--target-types',
              default={'scala': 'scala_library', 'java': 'java_library', 'android': 'java_library'},
@@ -108,17 +112,9 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     language = self._thrift_defaults.language(target)
     if language not in self._registered_language_aliases():
       raise TargetDefinitionException(
-          target,
-          'language {} not supported: expected one of {}.'.format(language, self._registered_language_aliases().keys()))
+        target,
+        'language {} not supported: expected one of {}.'.format(language, self._registered_language_aliases().keys()))
     return language
-
-  def _validate_rpc_style(self, target):
-    rpc_style = self._thrift_defaults.rpc_style(target)
-    if rpc_style not in _RPC_STYLES:
-      raise TargetDefinitionException(
-          target,
-          'rpc_style {} not supported: expected one of {}.'.format(rpc_style, _RPC_STYLES))
-    return rpc_style
 
   @memoized_method
   def _registered_language_aliases(self):
@@ -136,34 +132,16 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     return next(iter(target_types))
 
   def execute_codegen(self, target, target_workdir):
-    self._validate_compiler_configs([target])
+    self._validate_compiler_configs(target)
     self._must_have_sources(target)
 
-    def compiler_args_has_rpc_style(compiler_args):
-      return "--finagle" in compiler_args or "--ostrich" in compiler_args
-
-    def merge_rpc_style_with_compiler_args(compiler_args, rpc_style):
-      new_compiler_args = list(compiler_args)
-      # ignore rpc_style if we think compiler_args is setting it
-      if not compiler_args_has_rpc_style(compiler_args):
-        if rpc_style == 'ostrich':
-          new_compiler_args.append('--finagle')
-          new_compiler_args.append('--ostrich')
-        elif rpc_style == 'finagle':
-          new_compiler_args.append('--finagle')
-      return new_compiler_args
-
     namespace_map = self._thrift_defaults.namespace_map(target)
-    compiler_args = merge_rpc_style_with_compiler_args(
-        self._thrift_defaults.compiler_args(target), 
-        self._validate_rpc_style(target))
-
     partial_cmd = self.PartialCmd(
-        language=self._validate_language(target),
-        namespace_map=tuple(sorted(namespace_map.items())) if namespace_map else (),
-        default_java_namespace=self._thrift_defaults.default_java_namespace(target),
-        include_paths=target.include_paths,
-        compiler_args=compiler_args)
+      language=self._validate_language(target),
+      namespace_map=tuple(sorted(namespace_map.items())) if namespace_map else (),
+      default_java_namespace=self._thrift_defaults.default_java_namespace(target),
+      include_paths=target.include_paths,
+      compiler_args=(self._thrift_defaults.compiler_args(target)))
 
     self.gen(partial_cmd, target, target_workdir)
 
@@ -211,11 +189,23 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     if 0 != returncode:
       raise TaskError('Scrooge compiler exited non-zero for {} ({})'.format(target, returncode))
 
-  SERVICE_PARSER = re.compile(r'^\s*service\s+(?:[^\s{]+)')
+  @staticmethod
+  def _declares_exception(source):
+    # ideally we'd use more sophisticated parsing
+    exception_parser = re.compile(r'^\s*exception\s+(?:[^\s{]+)')
+    return ScroogeGen._has_declaration(source, exception_parser)
 
-  def _declares_service(self, source):
-    with open(source) as thrift:
-      return any(line for line in thrift if self.SERVICE_PARSER.search(line))
+  @staticmethod
+  def _declares_service(source):
+    # ideally we'd use more sophisticated parsing
+    service_parser = re.compile(r'^\s*service\s+(?:[^\s{]+)')
+    return ScroogeGen._has_declaration(source, service_parser)
+
+  @staticmethod
+  def _has_declaration(source, regex):
+    source_path = os.path.join(get_buildroot(), source)
+    with open(source_path) as thrift:
+      return any(line for line in thrift if regex.search(line))
 
   def parse_gen_file_map(self, gen_file_map_path, outdir):
     d = defaultdict(set)
@@ -235,29 +225,24 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     # Apache thrift compiler
     return self._thrift_defaults.compiler(target) == 'scrooge'
 
-  def _validate_compiler_configs(self, targets):
-    assert len(targets) == 1, ("TODO: This method now only ever receives one target. Simplify.")
-    ValidateCompilerConfig = namedtuple('ValidateCompilerConfig', ['language', 'rpc_style'])
+  _ValidateCompilerConfig = namedtuple('ValidateCompilerConfig',
+                                       ['language', 'compiler', 'compiler_args'])
+
+  def _validate_compiler_configs(self, target):
 
     def compiler_config(tgt):
-      # Note compiler is not present in this signature. At this time
-      # Scrooge and the Apache thrift generators produce identical
-      # java sources, and the Apache generator does not produce scala
-      # sources. As there's no permutation allowing the creation of
-      # incompatible sources with the same language+rpc_style we omit
-      # the compiler from the signature at this time.
-      return ValidateCompilerConfig(language=self._thrift_defaults.language(tgt),
-                                    rpc_style=self._thrift_defaults.rpc_style(tgt))
+      return self._ValidateCompilerConfig(language=self._thrift_defaults.language(tgt),
+                                          compiler=self._thrift_defaults.compiler(tgt),
+                                          compiler_args=self._thrift_defaults.compiler_args(tgt))
 
     mismatched_compiler_configs = defaultdict(set)
+    mycompilerconfig = compiler_config(target)
 
-    for target in filter(lambda t: isinstance(t, JavaThriftLibrary), targets):
-      mycompilerconfig = compiler_config(target)
+    def collect(dep):
+      if mycompilerconfig != compiler_config(dep):
+        mismatched_compiler_configs[target].add(dep)
 
-      def collect(dep):
-        if mycompilerconfig != compiler_config(dep):
-          mismatched_compiler_configs[target].add(dep)
-      target.walk(collect, predicate=lambda t: isinstance(t, JavaThriftLibrary))
+    target.walk(collect, predicate=lambda t: isinstance(t, JavaThriftLibrary))
 
     if mismatched_compiler_configs:
       msg = ['Thrift dependency trees must be generated with a uniform compiler configuration.\n\n']
@@ -280,8 +265,8 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     deps.update(target.dependencies)
     return deps
 
-  def _thrift_dependencies_for_target(self, target):
-    dep_info = self._resolved_dep_info
+  def synthetic_target_extra_exports(self, target, target_workdir):
+    dep_info = self._resolved_export_info
     target_declares_service = any(self._declares_service(source)
                                   for source in target.sources_relative_to_buildroot())
     language = self._thrift_defaults.language(target)
@@ -291,10 +276,26 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     else:
       return dep_info.structs[language]
 
+  def _thrift_dependencies_for_target(self, target):
+    dep_info = self._resolved_dep_info
+    target_declares_service_or_exception = any(self._declares_service(source) or self._declares_exception(source)
+                                               for source in target.sources_relative_to_buildroot())
+    language = self._thrift_defaults.language(target)
+
+    if target_declares_service_or_exception:
+      return dep_info.service[language]
+    else:
+      return dep_info.structs[language]
+
   @memoized_property
   def _resolved_dep_info(self):
     return ScroogeGen.DepInfo(self._resolve_deps(self.get_options().service_deps),
                               self._resolve_deps(self.get_options().structs_deps))
+
+  @memoized_property
+  def _resolved_export_info(self):
+    return ScroogeGen.DepInfo(self._resolve_deps(self.get_options().service_exports),
+                              self._resolve_deps(self.get_options().structs_exports))
 
   @property
   def _copy_target_attributes(self):

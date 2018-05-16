@@ -36,6 +36,7 @@ class OwnerPrintingInterProcessFileLock(InterProcessLock):
     )
 
   def acquire(self, message_fn=print_to_stderr, **kwargs):
+    logger.debug('acquiring lock: {!r}'.format(self))
     super(OwnerPrintingInterProcessFileLock, self).acquire(blocking=False)
     if not self.acquired:
       try:
@@ -59,6 +60,7 @@ class OwnerPrintingInterProcessFileLock(InterProcessLock):
     return self.acquired
 
   def release(self):
+    logger.debug('releasing lock: {!r}'.format(self))
     if self.acquired:
       safe_delete(self.message_path)
     return super(OwnerPrintingInterProcessFileLock, self).release()

@@ -8,24 +8,67 @@ build = "src/cffi_build.rs"
 # Enable debug symbols in the `release` profile: doesn't add a noticeable overhead in size/speed,
 # but enables profiling of optimized builds.
 debug = true
+# Optimise for the speed of our binary, rather than the speed of compilation.
+codegen-units = 1
 
 [lib]
-crate-type = ["dylib"]
+crate-type = ["cdylib"]
 
 [build-dependencies]
-gcc = "0.3"
+cc = "1.0"
+
+[workspace]
+# These are the packages which are built/tested when the --all flag is passed to cargo.
+#
+# We need to explicitly list these, because otherwise the standalone tools
+# (e.g. fs_util) won't be included when we build/test things.
+members = [
+  ".",
+  "boxfuture",
+  "fs",
+  "fs/brfs",
+  "fs/fs_util",
+  "hashing",
+  "process_execution",
+  "process_execution/bazel_protos",
+  "process_executor",
+  "resettable",
+  "testutil",
+  "testutil/mock",
+]
+
+# These are the packages which are built/tested when no special selector flags are passed to cargo.
+#
+# This is the set of packages which are expected to work on any arbitrary system that checks out the code.
+# It should be exactly equivalent to members, except without any packages that require more system
+# configuration than we're comfortable doing in our bootstrap scripts.
+#
+# In particular, it does not contain the fs/brfs package, which will not compile without a fuse installation.
+# On Ubuntu, that means installing libfuse-dev. On OSX, that means installing OSXFUSE.
+default-members = [
+  ".",
+  "boxfuture",
+  "fs",
+  "fs/fs_util",
+  "hashing",
+  "process_execution",
+  "process_execution/bazel_protos",
+  "process_executor",
+  "resettable",
+  "testutil",
+  "testutil/mock",
+]
 
 [dependencies]
-blake2-rfc = "0.2.17"
+bazel_protos = { path = "process_execution/bazel_protos" }
+boxfuture = { path = "boxfuture" }
+enum_primitive = "0.1.1"
 fnv = "1.0.5"
-# TODO: Waiting on a release incorporating https://github.com/alexcrichton/futures-rs/pull/442
-futures = { git = "https://github.com/alexcrichton/futures-rs", branch = "master" }
-futures-cpupool = { git = "https://github.com/alexcrichton/futures-rs", branch = "master" }
-glob = "0.2.11"
-ignore = "0.1.8"
+fs = { path = "fs" }
+futures = "0.1.16"
+hashing = { path = "hashing" }
 lazy_static = "0.2.2"
-ordermap = "0.2.8"
-petgraph = "0.4.4"
-# TODO: See https://github.com/alexcrichton/tar-rs/pull/107.
-tar = { git = "https://github.com/stuhood/tar-rs", rev = "893a96e89c84f44f60f0e2398d27ae3267d196f8" }
+log = "0.4"
+petgraph = "0.4.5"
+process_execution = { path = "process_execution" }
 tempdir = "0.3.5"

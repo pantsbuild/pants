@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import shutil
+import signal
 import sys
 import tempfile
 import time
@@ -26,12 +27,33 @@ class InvalidZipPath(ValueError):
   """Indicates a bad zip file path."""
 
 
+def get_joined_path(new_entries, env=None, env_var='PATH', delimiter=':', prepend=False):
+  """Join path entries, combining with an environment variable if specified."""
+  if env is None:
+    env = {}
+
+  prev_path = env.get(env_var, None)
+  if prev_path is None:
+    path_dirs = list()
+  else:
+    path_dirs = list(prev_path.split(delimiter))
+
+  new_entries_list = list(new_entries)
+
+  if prepend:
+    path_dirs = new_entries_list + path_dirs
+  else:
+    path_dirs += new_entries_list
+
+  return delimiter.join(path_dirs)
+
+
 @contextmanager
 def environment_as(**kwargs):
   """Update the environment to the supplied values, for example:
 
   with environment_as(PYTHONPATH='foo:bar:baz',
-                      PYTHON='/usr/bin/python2.6'):
+                      PYTHON='/usr/bin/python2.7'):
     subprocess.Popen(foo).wait()
   """
   new_environment = kwargs
@@ -55,16 +77,72 @@ def environment_as(**kwargs):
 
 
 @contextmanager
-def stdio_as(stdout, stderr, stdin=None):
-  """Redirect sys.{stdout, stderr, stdin} to alternate file-like objects."""
-  old_stdout, sys.stdout = sys.stdout, stdout
-  old_stderr, sys.stderr = sys.stderr, stderr
-  if stdin:
-    old_stdin, sys.stdin = sys.stdin, stdin
-  yield
-  sys.stdout, sys.stderr = old_stdout, old_stderr
-  if stdin:
-    sys.stdin = old_stdin
+def hermetic_environment_as(**kwargs):
+  """Set the environment to the supplied values from an empty state."""
+  old_environment, os.environ = os.environ, {}
+  try:
+    with environment_as(**kwargs):
+      yield
+  finally:
+    os.environ = old_environment
+
+
+@contextmanager
+def _stdio_stream_as(src_fd, dst_fd, dst_sys_attribute, mode):
+  """Replace the given dst_fd and attribute on `sys` with an open handle to the given src_fd."""
+  if src_fd == -1:
+    src = open('/dev/null', mode)
+    src_fd = src.fileno()
+
+  # Capture the python and os level file handles.
+  old_dst = getattr(sys, dst_sys_attribute)
+  old_dst_fd = os.dup(dst_fd)
+  if src_fd != dst_fd:
+    os.dup2(src_fd, dst_fd)
+
+  # Open up a new file handle to temporarily replace the python-level io object, then yield.
+  new_dst = os.fdopen(dst_fd, mode)
+  setattr(sys, dst_sys_attribute, new_dst)
+  try:
+    yield
+  finally:
+    new_dst.close()
+
+    # Restore the python and os level file handles.
+    os.dup2(old_dst_fd, dst_fd)
+    setattr(sys, dst_sys_attribute, old_dst)
+
+
+@contextmanager
+def stdio_as(stdout_fd, stderr_fd, stdin_fd):
+  """Redirect sys.{stdout, stderr, stdin} to alternate file descriptors.
+
+  As a special case, if a given destination fd is `-1`, we will replace it with an open file handle
+  to `/dev/null`.
+
+  NB: If the filehandles for sys.{stdout, stderr, stdin} have previously been closed, it's
+  possible that the OS has repurposed fds `0, 1, 2` to represent other files or sockets. It's
+  impossible for this method to locate all python objects which refer to those fds, so it's up
+  to the caller to guarantee that `0, 1, 2` are safe to replace.
+  """
+  with _stdio_stream_as(stdin_fd,  0, 'stdin',  'rb'),\
+       _stdio_stream_as(stdout_fd, 1, 'stdout', 'wb'),\
+       _stdio_stream_as(stderr_fd, 2, 'stderr', 'wb'):
+    yield
+
+
+@contextmanager
+def signal_handler_as(sig, handler):
+  """Temporarily replaces a signal handler for the given signal and restores the old handler.
+
+  :param int sig: The target signal to replace the handler for (e.g. signal.SIGINT).
+  :param func handler: The new temporary handler.
+  """
+  old_handler = signal.signal(sig, handler)
+  try:
+    yield
+  finally:
+    signal.signal(sig, old_handler)
 
 
 @contextmanager

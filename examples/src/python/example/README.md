@@ -135,18 +135,79 @@ Use `test` to run the tests. This uses `pytest`:
     13:29:29 00:01     [pytest]
     13:29:29 00:01       [run]
                          ============== test session starts ===============
-                         platform darwin -- Python 2.6.8 -- py-1.4.20 -- pytest-2.5.2
-                         plugins: cov, timeout
+                         platform linux2 -- Python 2.7.12, pytest-3.0.7, py-1.4.32, pluggy-0.4.0
+                         rootdir: /home/jsirois, inifile:
+                         plugins: cov-2.4.0, timeout-1.2.0
                          collected 2 items
 
-                         examples/tests/python/example_test/hello/greet/test_greet.py ..
+                         .pants.d/pyprep/sources/48bd113ee4f5fa26f55357fbd9bb6d31382241fa/example_test/hello/greet/test_greet.py ..
 
-                         ============ 1 passed in 0.02 seconds ============
+                          generated xml file: /home/jsirois/dev/pantsbuild/jsirois-pants2/.pants.d/test/pytest/examples.tests.python.example_test.hello.greet.greet/junitxml/TEST-examples.tests.python.example_test.hello.greet.greet.xml 
+                         ============ 2 passed in 0.01 seconds ============
 
+                       examples.tests.python.example_test.hello.greet.greet                            .....   SUCCESS
     13:30:18 00:50     [junit]
     13:30:18 00:50     [specs]
                    SUCCESS
     $
+
+Python Apps for Deployment
+--------------------------
+
+For deploying your Python apps, Pants can create archives (e.g.: tar.gz, zip) that contain an
+executable pex along with other files it needs at runtime (e.g.: config files, data sets).
+These archives can be extracted and run on production machines as part of your deployment process.
+
+To create a Python app for deployment, define a `python_app` target. Notice how the `python_app`
+target combines an existing `python_binary` with `bundles` that describe the other files to
+include in the archive.
+
+!inc[start-at=python_binary](hello/main/BUILD)
+
+Use `./pants bundle` to create the archive.
+
+    $ ./pants bundle examples/src/python/example/hello/main/:hello-app --bundle-py-archive=tgz
+    <output omitted for brevity>
+    00:59:52 00:02   [bundle]
+    00:59:52 00:02     [py]
+                       created bundle copy dist/examples.src.python.example.hello.main.hello-app-bundle
+                       created archive copy dist/examples.src.python.example.hello.main.hello-app.tar.gz
+    00:59:53 00:03   [complete]
+
+The archive contains an executable pex file, along with a loose file matched by the bundle glob.
+
+    $ tar -tzvf dist/examples.src.python.example.hello.main.hello-app.tar.gz
+    drwxr-xr-x root/root         0 2018-05-02 02:16 ./
+    -rwxr-xr-x root/root    474997 2018-05-02 02:16 ./main.pex
+    -rw-rw-r-- root/root       562 2018-05-01 13:34 ./BUILD
+
+See <a pantsref="bdict_bundle">bundle</a> in the BUILD dictionary for additional details about
+defining the layout of files in your archive.
+
+Debugging Tests
+---------------
+Pants scrubs the environment's `PYTHONPATH` when running tests, to ensure a hermetic, repeatable test run.
+
+However some Python debuggers require you to add the debugger's code to the `PYTHONPATH`.
+To do so, set the `extra_pythonpath` option on the `test.pytest` scope.
+
+You can do so with the `--test-pytest-extra-pythonpath` flag, but it may be more convenient to 
+set this permanently in your personal environment using the `PANTS_TEST_PYTEST_EXTRA_PYTHONPATH` 
+environment variable.
+
+So, for example, to use PyCharm's interactive debugger:
+ 
+- Find the [pycharm-debug.egg](https://www.jetbrains.com/help/pycharm/remote-debugging.html) 
+  in your PyCharm installation.
+- Set the environment variable to point to it:  
+  `PANTS_TEST_PYTEST_EXTRA_PYTHONPATH=/path/to/pycharm-debug.egg`.
+- Start the debug server in PyCharm (this assumes you have previously set it up to listen on port 5000).
+- Set a breakpoint in your code by adding this line where you wish to break:    
+  `import pydevd;pydevd.settrace('localhost', port=5000, stdoutToServer=True, stderrToServer=True)`
+- Run your `./pants test` command.
+
+When your code hits the breakpoint, you'll enter an interactive debugging session in PyCharm!
+
 
 Handling `python_requirement`
 -----------------------------
@@ -279,16 +340,19 @@ Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` with
 you could run:
 
     :::bash
-    $ ./pants test.pytest --options='-k req' examples/tests/python/example_test/hello/greet
+    $ ./pants test.pytest --options='-k foo' examples/tests/python/example_test/hello/greet
     ...
                      ============== test session starts ===============
-                     platform darwin -- Python 2.6.8 -- py-1.4.20 -- pytest-2.5.2
-                     plugins: cov, timeout
+                     platform linux2 -- Python 2.7.12, pytest-3.0.7, py-1.4.32, pluggy-0.4.0
+                     rootdir: /home/jsirois, inifile:
+                     plugins: cov-2.4.0, timeout-1.2.0
                      collected 2 items
 
-                     ========= 2 tests deselected by '-kfoo' ==========
+                      generated xml file: /home/jsirois/dev/pantsbuild/jsirois-pants2/.pants.d/test/pytest/examples.tests.python.example_test.hello.greet.greet/junitxml/TEST-examples.tests.python.example_test.hello.greet.greet.xml 
+                     =============== 2 tests deselected ===============
                      ========== 2 deselected in 0.01 seconds ==========
 
+                   examples.tests.python.example_test.hello.greet.greet                            .....   SUCCESS
     13:34:28 00:02     [junit]
     13:34:28 00:02     [specs]
                SUCCESS
@@ -305,16 +369,19 @@ parameters:
     10:43:04 00:01       [prep_command]
     10:43:04 00:01     [pytest]
     10:43:04 00:01       [run]
-                         ============== test session starts ===============
-                         platform darwin -- Python 2.7.5 -- py-1.4.26 -- pytest-2.6.4
-                         plugins: cov, timeout
-                         collected 2 items
+                     ============== test session starts ===============
+                     platform linux2 -- Python 2.7.12, pytest-3.0.7, py-1.4.32, pluggy-0.4.0
+                     rootdir: /home/jsirois, inifile:
+                     plugins: cov-2.4.0, timeout-1.2.0
+                     collected 2 items
 
-                         examples/tests/python/example_test/hello/greet/test_greet.py .
+                     .pants.d/pyprep/sources/48bd113ee4f5fa26f55357fbd9bb6d31382241fa/example_test/hello/greet/test_greet.py .
 
-                         ========= 1 tests deselected by '-kreq' ==========
-                         ===== 1 passed, 1 deselected in 0.05 seconds =====
+                      generated xml file: /home/jsirois/dev/pantsbuild/jsirois-pants2/.pants.d/test/pytest/examples.tests.python.example_test.hello.greet.greet/junitxml/TEST-examples.tests.python.example_test.hello.greet.greet.xml 
+                     =============== 1 tests deselected ===============
+                     ===== 1 passed, 1 deselected in 0.01 seconds =====
 
+                   examples.tests.python.example_test.hello.greet.greet                            .....   SUCCESS
     10:43:05 00:02     [junit]
     10:43:05 00:02     [specs]
                    SUCCESS

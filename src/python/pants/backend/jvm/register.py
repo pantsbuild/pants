@@ -21,7 +21,7 @@ from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.junit_tests import JUnitTests
-from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
+from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
 from pants.backend.jvm.targets.managed_jar_dependencies import (ManagedJarDependencies,
@@ -30,6 +30,7 @@ from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
+from pants.backend.jvm.tasks.analysis_extraction import AnalysisExtraction
 from pants.backend.jvm.tasks.benchmark_run import BenchmarkRun
 from pants.backend.jvm.tasks.binary_create import BinaryCreate
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
@@ -38,6 +39,7 @@ from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
 from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.backend.jvm.tasks.classmap import ClassmapTask
 from pants.backend.jvm.tasks.consolidate_classpath import ConsolidateClasspath
+from pants.backend.jvm.tasks.coursier_resolve import CoursierResolve
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.backend.jvm.tasks.ivy_imports import IvyImports
 from pants.backend.jvm.tasks.ivy_outdated import IvyOutdated
@@ -46,6 +48,7 @@ from pants.backend.jvm.tasks.jar_create import JarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun
+from pants.backend.jvm.tasks.jvm_compile.javac.javac_compile import JavacCompile
 from pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher import RuntimeClasspathPublisher
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.backend.jvm.tasks.jvm_dependency_check import JvmDependencyCheck
@@ -61,10 +64,12 @@ from pants.backend.jvm.tasks.run_jvm_prep_command import (RunBinaryJvmPrepComman
                                                           RunTestJvmPrepCommand)
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
+from pants.backend.jvm.tasks.scalafix import ScalaFixCheck, ScalaFixFix
 from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
 from pants.backend.jvm.tasks.scalastyle import Scalastyle
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
 from pants.base.deprecated import warn_or_error
+from pants.build_graph.app_base import Bundle, DirectoryReMapper
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -155,9 +160,14 @@ def register_goals():
 
   # Compile
   task(name='zinc', action=ZincCompile).install('compile')
+  task(name='javac', action=JavacCompile).install('compile')
+
+  # Analysis extraction.
+  task(name='zinc', action=AnalysisExtraction).install('analysis')
 
   # Dependency resolution.
   task(name='ivy', action=IvyResolve).install('resolve', first=True)
+  task(name='coursier', action=CoursierResolve).install('resolve')
   task(name='ivy-imports', action=IvyImports).install('imports')
   task(name='unpack-jars', action=UnpackJars).install()
   task(name='ivy', action=IvyOutdated).install('outdated')
@@ -167,7 +177,6 @@ def register_goals():
   task(name='services', action=PrepareServices).install('resources')
 
   task(name='export-classpath', action=RuntimeClasspathPublisher).install()
-  task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile')
 
   task(name='jvm', action=JvmDependencyUsage).install('dep-usage')
 
@@ -200,16 +209,21 @@ def register_goals():
   task(name='bench', action=BenchmarkRun).install('bench')
 
   # Linting.
+  task(name='scalafix', action=ScalaFixCheck).install('lint')
   task(name='scalafmt', action=ScalaFmtCheckFormat, serialize=False).install('lint')
   task(name='scalastyle', action=Scalastyle, serialize=False).install('lint')
   task(name='checkstyle', action=Checkstyle, serialize=False).install('lint')
+  task(name='jvm-dep-check', action=JvmDependencyCheck, serialize=False).install('lint')
+
+  # Formatting.
+  task(name='scalafmt', action=ScalaFmtFormat, serialize=False).install('fmt')
+  task(name='scalafix', action=ScalaFixFix).install('fmt')
 
   # Running.
   task(name='jvm', action=JvmRun, serialize=False).install('run')
   task(name='jvm-dirty', action=JvmRun, serialize=False).install('run-dirty')
   task(name='scala', action=ScalaRepl, serialize=False).install('repl')
   task(name='scala-dirty', action=ScalaRepl, serialize=False).install('repl-dirty')
-  task(name='scalafmt', action=ScalaFmtFormat, serialize=False).install('fmt')
   task(name='test-jvm-prep-command', action=RunTestJvmPrepCommand).install('test', first=True)
   task(name='binary-jvm-prep-command', action=RunBinaryJvmPrepCommand).install('binary', first=True)
   task(name='compile-jvm-prep-command', action=RunCompileJvmPrepCommand).install('compile', first=True)

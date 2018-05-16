@@ -20,22 +20,22 @@ Recommended Installation
 To set up pants in your repo, we recommend installing our self-contained `pants` bash script
 in the root (ie, "buildroot") of your repo:
 
-      :::bash
-      curl -L -O https://pantsbuild.github.io/setup/pants && chmod +x pants && touch pants.ini
+    :::bash
+    curl -L -O https://pantsbuild.github.io/setup/pants && chmod +x pants && touch pants.ini
 
 The first time you run the new `./pants` script it will install the latest version of pants (using
 virtualenv) and then run it.  It's recommended though, that you pin the version of pants.  To do
 this, first find out the version of pants you just installed:
 
-      :::bash
-      ./pants -V
-      1.0.0
+    :::bash
+    ./pants -V
+    1.0.0
 
 Then add an entry like so to `pants.ini` with that version:
 
-      :::ini
-      [GLOBAL]
-      pants_version: 1.0.0
+    :::ini
+    [GLOBAL]
+    pants_version: 1.0.0
 
 When you'd like to upgrade pants, just edit the version in `pants.ini` and pants will self-update on
 the next run.  This script stores the various pants versions you use centrally in
@@ -45,14 +45,14 @@ correct version from your local cache and use that.
 If you use pants plugins published to pypi you can configure them by adding a `plugins` list as
 follows:
 
-      :::ini
-      [GLOBAL]
-      pants_version: 1.0.0
+    :::ini
+    [GLOBAL]
+    pants_version: 1.0.0
 
-      plugins: [
-          'pantsbuild.pants.contrib.go==%(pants_version)s',
-          'pantsbuild.pants.contrib.scrooge==%(pants_version)s',
-        ]
+    plugins: [
+        'pantsbuild.pants.contrib.go==%(pants_version)s',
+        'pantsbuild.pants.contrib.scrooge==%(pants_version)s',
+      ]
 
 Pants notices you changed your plugins and it installs them.
 NB: The formatting of the plugins list is important; all lines below the `plugins:` line must be

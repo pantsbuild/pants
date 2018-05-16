@@ -8,7 +8,7 @@ use std::{fmt, hash};
 use std::ops::Drop;
 
 use externs;
-use handles::{Handle, enqueue_drop_handle};
+use handles::{enqueue_drop_handle, Handle};
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
@@ -21,7 +21,6 @@ pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 pub struct Variants(pub Vec<(String, String)>);
 
 impl Variants {
-
   ///
   /// Merges right over self (by key, and then sorted by key).
   ///
@@ -39,7 +38,9 @@ impl Variants {
   }
 
   pub fn find(&self, key: &String) -> Option<&str> {
-    self.0.iter()
+    self
+      .0
+      .iter()
       .find(|&&(ref k, _)| k == key)
       .map(|&(_, ref v)| v.as_str())
   }
@@ -47,13 +48,10 @@ impl Variants {
 
 pub type Id = u64;
 
-// The name of a field.
-pub type Field = String;
-
 // The type of a python object (which itself has a type, but which is not represented
 // by a Key, because that would result in a infinitely recursive structure.)
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct TypeId(pub Id);
 
 // On the python side, the 0th type id is used as an anonymous id
@@ -61,13 +59,13 @@ pub const ANY_TYPE: TypeId = TypeId(0);
 
 // A type constraint, which a TypeId may or may-not satisfy.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub struct TypeConstraint(pub Id);
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct TypeConstraint(pub Key);
 
 // An identifier for a python function.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub struct Function(pub Id);
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct Function(pub Key);
 
 ///
 /// Wraps a type id for use as a key in HashMaps and sets.
@@ -94,8 +92,8 @@ impl hash::Hash for Key {
 }
 
 impl Key {
-  pub fn new_with_anon_type_id(id: Id) -> Key {
-    Key { id: id, type_id: ANY_TYPE }
+  pub fn new(id: Id, type_id: TypeId) -> Key {
+    Key { id, type_id }
   }
 
   pub fn id(&self) -> Id {
@@ -156,7 +154,12 @@ impl fmt::Debug for Value {
 
 #[derive(Debug, Clone)]
 pub enum Failure {
+  /// A Node failed because a filesystem change invalidated it or its inputs.
+  /// A root requestor should usually immediately retry their request.
+  Invalidated,
+  /// There was no valid combination of rules to satisfy a request.
   Noop(Noop),
+  /// A rule raised an exception.
   Throw(Value, String),
 }
 
@@ -171,12 +174,20 @@ pub enum Noop {
 
 impl fmt::Debug for Noop {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    f.write_str(
-      match self {
-        &Noop::Cycle => "Dep graph contained a cycle.",
-        &Noop::NoTask => "No task was available to compute the value.",
-        &Noop::NoVariant => "A matching variant key was not configured in variants.",
-      }
-    )
+    f.write_str(match self {
+      &Noop::Cycle => "Dep graph contained a cycle.",
+      &Noop::NoTask => "No task was available to compute the value.",
+      &Noop::NoVariant => "A matching variant key was not configured in variants.",
+    })
   }
+}
+
+pub fn throw(msg: &str) -> Failure {
+  Failure::Throw(
+    externs::create_exception(msg),
+    format!(
+      "Traceback (no traceback):\n  <pants native internals>\nException: {}",
+      msg
+    ).to_string(),
+  )
 }

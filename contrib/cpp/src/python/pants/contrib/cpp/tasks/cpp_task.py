@@ -5,10 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import subprocess
-
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
+from pants.util.process_handler import subprocess
 
 from pants.contrib.cpp.targets.cpp_binary import CppBinary
 from pants.contrib.cpp.targets.cpp_library import CppLibrary

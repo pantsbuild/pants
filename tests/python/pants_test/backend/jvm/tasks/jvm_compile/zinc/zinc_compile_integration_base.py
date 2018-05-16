@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import unittest
 import xml.etree.ElementTree as ET
 from textwrap import dedent
 
@@ -123,40 +124,14 @@ class BaseZincCompileIntegrationTest(object):
         # Confirm that we were warned.
         self.assertIn('is not supported, and is subject to change/removal', pants_run.stdout_data)
 
-  def test_analysis_portability(self):
-    target = 'testprojects/src/scala/org/pantsbuild/testproject/javasources'
-    analysis_file_name = \
-      'testprojects.src.scala.org.pantsbuild.testproject.javasources.javasources.analysis.portable'
-
-    # do_new_project_compile_and_return_analysis executes pants with
-    # different build root/work directory each time.
-    def do_new_project_compilation_and_return_analysis():
-      with self.do_test_compile(target, iterations=1, expected_files=[analysis_file_name],
-                                workdir_outside_of_buildroot=True) as found:
-        files = found[analysis_file_name]
-        self.assertEqual(1, len(files))
-        with open(list(files)[0]) as file:
-          return file.read()
-
-    analysis1 = do_new_project_compilation_and_return_analysis()
-    analysis2 = do_new_project_compilation_and_return_analysis()
-
-    def extract_content(analysis):
-      # TODO(stuhood): Comparing content before stamps only, because there is
-      # a different line in internal apis section.
-      # return re.sub(re.compile('lastModified\(\d+\)'), "lastModified()", analysis).split('\n')
-      return analysis.partition("stamps")[0].split("\n")
-
-    self.assertListEqual(extract_content(analysis1), extract_content(analysis2))
-
   def test_zinc_fatal_warning(self):
     def test_combination(target, default_fatal_warnings, expect_success, extra_args=[]):
       with self.temporary_workdir() as workdir:
         with self.temporary_cachedir() as cachedir:
           if default_fatal_warnings:
-            arg = '--scala-platform-fatal-warnings'
+            arg = '--scala-fatal-warnings'
           else:
-            arg = '--no-scala-platform-fatal-warnings'
+            arg = '--no-scala-fatal-warnings'
           pants_run = self.run_test_compile(
               workdir,
               cachedir,
@@ -179,6 +154,14 @@ class BaseZincCompileIntegrationTest(object):
       extra_args=['--compile-zinc-fatal-warnings-enabled-args=[\'-C-Werror\']'])
     test_combination('fatal', default_fatal_warnings=False, expect_success=False,
       extra_args=['--compile-zinc-fatal-warnings-disabled-args=[\'-S-Xfatal-warnings\']'])
+
+  @unittest.expectedFailure
+  def test_soft_excludes_at_compiletime(self):
+    with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/exclude_direct_dep',
+                              extra_args=['--resolve-ivy-soft-excludes'],
+                              expect_failure=True):
+      # TODO See #4874. Should have failed to compile because its only dependency is excluded.
+      pass
 
   def test_pool_created_for_fresh_compile_but_not_for_valid_compile(self):
     with self.temporary_cachedir() as cachedir, self.temporary_workdir() as workdir:

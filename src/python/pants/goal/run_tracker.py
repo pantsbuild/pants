@@ -18,13 +18,12 @@ from contextlib import contextmanager
 import requests
 
 from pants.base.build_environment import get_pants_cachedir
-from pants.base.deprecated import deprecated_conditional
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool, WorkerPool
 from pants.base.workunit import WorkUnit
-from pants.build_graph.target import Target
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
+from pants.goal.pantsd_stats import PantsDaemonStats
 from pants.reporting.report import Report
 from pants.stats.statsdb import StatsDBFactory
 from pants.subsystem.subsystem import Subsystem
@@ -83,40 +82,25 @@ class RunTracker(Subsystem):
     :API: public
     """
     super(RunTracker, self).__init__(*args, **kwargs)
-    run_timestamp = time.time()
-    cmd_line = ' '.join(['pants'] + sys.argv[1:])
+    self._run_timestamp = time.time()
+    self._cmd_line = ' '.join(['pants'] + sys.argv[1:])
+    self._sorted_goal_infos = tuple()
 
-    # run_id is safe for use in paths.
-    millis = int((run_timestamp * 1000) % 1000)
-    run_id = 'pants_run_{}_{}_{}'.format(
-      time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(run_timestamp)), millis,
-      uuid.uuid4().hex)
+    # Initialized in `initialize()`.
+    self.run_info_dir = None
+    self.run_info = None
+    self.cumulative_timings = None
+    self.self_timings = None
+    self.artifact_cache_stats = None
+    self.pantsd_stats = None
 
-    info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
-    self.run_info_dir = os.path.join(info_dir, run_id)
-    self.run_info = RunInfo(os.path.join(self.run_info_dir, 'info'))
-    self.run_info.add_basic_info(run_id, run_timestamp)
-    self.run_info.add_info('cmd_line', cmd_line)
-
-    # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
-    link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), 'latest')
-
-    relative_symlink(self.run_info_dir, link_to_latest)
+    # Initialized in `start()`.
+    self.report = None
+    self._main_root_workunit = None
 
     # A lock to ensure that adding to stats at the end of a workunit
     # operates thread-safely.
     self._stats_lock = threading.Lock()
-
-    # Time spent in a workunit, including its children.
-    self.cumulative_timings = AggregatedTimings(os.path.join(self.run_info_dir,
-                                                             'cumulative_timings'))
-
-    # Time spent in a workunit, not including its children.
-    self.self_timings = AggregatedTimings(os.path.join(self.run_info_dir, 'self_timings'))
-
-    # Hit/miss stats for the artifact cache.
-    self.artifact_cache_stats = \
-      ArtifactCacheStats(os.path.join(self.run_info_dir, 'artifact_cache_stats'))
 
     # Log of success/failure/aborted for each workunit.
     self.outcomes = {}
@@ -127,15 +111,9 @@ class RunTracker(Subsystem):
     # Number of threads for background work.
     self._num_background_workers = self.get_options().num_background_workers
 
-    # We report to this Report.
-    self.report = None
-
     # self._threadlocal.current_workunit contains the current workunit for the calling thread.
     # Note that multiple threads may share a name (e.g., all the threads in a pool).
     self._threadlocal = threading.local()
-
-    # For main thread work. Created on start().
-    self._main_root_workunit = None
 
     # For background work.  Created lazily if needed.
     self._background_worker_pool = None
@@ -161,6 +139,9 @@ class RunTracker(Subsystem):
     # }
     self._target_to_data = {}
 
+  def set_sorted_goal_infos(self, sorted_goal_infos):
+    self._sorted_goal_infos = sorted_goal_infos
+
   def register_thread(self, parent_workunit):
     """Register the parent workunit for all work in the calling thread.
 
@@ -172,19 +153,78 @@ class RunTracker(Subsystem):
     """Is the workunit running under the main thread's root."""
     return workunit.root() == self._main_root_workunit
 
-  def start(self, report):
-    """Start tracking this pants run.
+  def initialize(self):
+    """Create run_info and relevant directories, and return the run id.
+
+    Must be called before `start`.
+    """
+    if self.run_info:
+      raise AssertionError('RunTracker.initialize must not be called multiple times.')
+
+    # Initialize the run.
+    millis = int((self._run_timestamp * 1000) % 1000)
+    run_id = 'pants_run_{}_{}_{}'.format(
+      time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self._run_timestamp)),
+      millis,
+      uuid.uuid4().hex
+    )
+
+    info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
+    self.run_info_dir = os.path.join(info_dir, run_id)
+    self.run_info = RunInfo(os.path.join(self.run_info_dir, 'info'))
+    self.run_info.add_basic_info(run_id, self._run_timestamp)
+    self.run_info.add_info('cmd_line', self._cmd_line)
+
+    # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
+    link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), 'latest')
+
+    relative_symlink(self.run_info_dir, link_to_latest)
+
+    # Time spent in a workunit, including its children.
+    self.cumulative_timings = AggregatedTimings(os.path.join(self.run_info_dir,
+                                                             'cumulative_timings'))
+
+    # Time spent in a workunit, not including its children.
+    self.self_timings = AggregatedTimings(os.path.join(self.run_info_dir, 'self_timings'))
+
+    # Hit/miss stats for the artifact cache.
+    self.artifact_cache_stats = ArtifactCacheStats(os.path.join(self.run_info_dir,
+                                                                'artifact_cache_stats'))
+
+    # Daemon stats.
+    self.pantsd_stats = PantsDaemonStats()
+
+    return run_id
+
+  def start(self, report, run_start_time=None):
+    """Start tracking this pants run using the given Report.
+
+    `RunTracker.initialize` must have been called first to create the run_info_dir and
+    run_info. TODO: This lifecycle represents a delicate dance with the `Reporting.initialize`
+    method, and portions of the `RunTracker` should likely move to `Reporting` instead.
 
     report: an instance of pants.reporting.Report.
     """
+    if not self.run_info:
+      raise AssertionError('RunTracker.initialize must be called before RunTracker.start.')
+
     self.report = report
     self.report.open()
 
+    # And create the workunit.
     self._main_root_workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=None,
                                         name=RunTracker.DEFAULT_ROOT_NAME, cmd=None)
     self.register_thread(self._main_root_workunit)
-    self._main_root_workunit.start()
+    # Set the true start time in the case of e.g. the daemon.
+    self._main_root_workunit.start(run_start_time)
     self.report.start_workunit(self._main_root_workunit)
+
+    # Log reporting details.
+    url = self.run_info.get_info('report_url')
+    if url:
+      self.log(Report.INFO, 'See a report at: {}'.format(url))
+    else:
+      self.log(Report.INFO, '(To run a reporting server: ./pants server)')
 
   def set_root_outcome(self, outcome):
     """Useful for setup code that doesn't have a reference to a workunit."""
@@ -311,7 +351,9 @@ class RunTracker(Subsystem):
       'run_info': run_information,
       'cumulative_timings': self.cumulative_timings.get_all(),
       'self_timings': self.self_timings.get_all(),
+      'critical_path_timings': self.get_critical_path_timings().get_all(),
       'artifact_cache_stats': self.artifact_cache_stats.get_all(),
+      'pantsd_stats': self.pantsd_stats.get_all(),
       'outcomes': self.outcomes
     }
     # Dump individual stat file.
@@ -326,12 +368,7 @@ class RunTracker(Subsystem):
     # Upload to remote stats db.
     stats_url = self.get_options().stats_upload_url
     if stats_url:
-      pid = os.fork()
-      if pid == 0:
-        try:
-          self.post_stats(stats_url, stats, timeout=self.get_options().stats_upload_timeout)
-        finally:
-          os._exit(0)
+      self.post_stats(stats_url, stats, timeout=self.get_options().stats_upload_timeout)
 
     # Write stats to local json file.
     stats_json_file_name = self.get_options().stats_local_json_file
@@ -393,6 +430,30 @@ class RunTracker(Subsystem):
       self.cumulative_timings.add_timing(path, duration, is_tool)
       self.self_timings.add_timing(path, self_time, is_tool)
       self.outcomes[path] = workunit.outcome_string(workunit.outcome())
+
+  def get_critical_path_timings(self):
+    """
+    Get the cumulative timings of each goal and all of the goals it (transitively) depended on.
+    """
+    transitive_dependencies = dict()
+    for goal_info in self._sorted_goal_infos:
+      deps = transitive_dependencies.setdefault(goal_info.goal.name, set())
+      for dep in goal_info.goal_dependencies:
+        deps.add(dep.name)
+        deps.update(transitive_dependencies.get(dep.name))
+
+    raw_timings = dict()
+    for entry in self.cumulative_timings.get_all():
+      raw_timings[entry["label"]] = entry["timing"]
+
+    timings = AggregatedTimings()
+    for goal, deps in transitive_dependencies.items():
+      label = "{}:{}".format(RunTracker.DEFAULT_ROOT_NAME, goal)
+      timings.add_timing(label, raw_timings.get(label, 0.0))
+      for dep in deps:
+        dep_label = "{}:{}".format(RunTracker.DEFAULT_ROOT_NAME, dep)
+        timings.add_timing(label, raw_timings.get(dep_label, 0.0))
+    return timings
 
   def get_background_root_workunit(self):
     if self._background_root_workunit is None:
@@ -497,24 +558,14 @@ class RunTracker(Subsystem):
     an error.
 
     :param string scope: The scope for which we are reporting the information.
-    :param Target target: The target for which we want to store information.
+    :param target: The target for which we want to store information.
+    :type target: :class:`pants.build_graph.target.Target`
     :param list of string keys: The keys that will be recursively
            nested and pointing to the information being stored.
     :param primitive val: The value of the information being stored.
 
     :API: public
     """
-    if isinstance(target, Target):
-      target_spec = target.address.spec
-    else:
-      deprecated_conditional(
-        lambda: True,
-        '1.6.0.dev0',
-        'The `target=` argument to `report_target_info`',
-        'Should pass a Target instance rather than a string.'
-      )
-      target_spec = target
-
-    new_key_list = [target_spec, scope]
+    new_key_list = [target.address.spec, scope]
     new_key_list += keys
     self._merge_list_of_keys_into_dict(self._target_to_data, new_key_list, val, 0)

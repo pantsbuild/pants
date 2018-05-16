@@ -8,33 +8,50 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 
+from pants.base.project_tree import Dir, File
+from pants.base.specs import SingleAddress, Specs
 from pants.build_graph.address import Address
-from pants.engine.addressable import (Exactly, SubclassesOf, addressable, addressable_dict,
-                                      addressable_list)
-from pants.engine.build_files import ResolvedTypeMismatchError, create_graph_rules
-from pants.engine.fs import create_fs_rules
-from pants.engine.mapper import AddressMapper, ResolveError
+from pants.engine.addressable import addressable, addressable_dict
+from pants.engine.build_files import (ResolvedTypeMismatchError, addresses_from_address_families,
+                                      create_graph_rules, parse_address_family)
+from pants.engine.fs import (DirectoryDigest, FileContent, FilesContent, Path, PathGlobs, Snapshot,
+                             create_fs_rules)
+from pants.engine.mapper import AddressFamily, AddressMapper, ResolveError
 from pants.engine.nodes import Return, Throw
 from pants.engine.parser import SymbolTable
-from pants.engine.struct import HasProducts, Struct, StructWithDeps
+from pants.engine.struct import Struct, StructWithDeps
+from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import (JsonParser, PythonAssignmentsParser,
                                                 PythonCallbacksParser)
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
+from pants_test.engine.util import Target, run_rule
 
 
-class Target(Struct, HasProducts):
+class ParseAddressFamilyTest(unittest.TestCase):
+  def test_empty(self):
+    """Test that parsing an empty BUILD file results in an empty AddressFamily."""
+    address_mapper = AddressMapper(JsonParser(TestTable()))
+    af = run_rule(parse_address_family, address_mapper, Dir('/dev/null'), {
+        (FilesContent, PathGlobs): lambda _: FilesContent([FileContent('/dev/null/BUILD', '')])
+      })
+    self.assertEquals(len(af.objects_by_name), 0)
 
-  def __init__(self, name=None, configurations=None, **kwargs):
-    super(Target, self).__init__(name=name, **kwargs)
-    self.configurations = configurations
 
-  @property
-  def products(self):
-    return self.configurations
+class AddressesFromAddressFamiliesTest(unittest.TestCase):
+  def test_duplicated(self):
+    """Test that matching the same Spec twice succeeds."""
+    address = SingleAddress('a', 'a')
+    address_mapper = AddressMapper(JsonParser(TestTable()))
+    snapshot = Snapshot(DirectoryDigest(str('xx'), 2), (Path('a/BUILD', File('a/BUILD')),))
+    address_family = AddressFamily('a', {'a': ('a/BUILD', 'this is an object!')})
 
-  @addressable_list(SubclassesOf(Struct))
-  def configurations(self):
-    pass
+    bfas = run_rule(addresses_from_address_families, address_mapper, Specs([address, address]), {
+        (Snapshot, PathGlobs): lambda _: snapshot,
+        (AddressFamily, Dir): lambda _: address_family,
+      })
+
+    self.assertEquals(len(bfas.dependencies), 1)
+    self.assertEquals(bfas.dependencies[0].spec, 'a:a')
 
 
 class ApacheThriftConfiguration(StructWithDeps):
@@ -79,8 +96,7 @@ class PublishConfiguration(Struct):
 
 
 class TestTable(SymbolTable):
-  @classmethod
-  def table(cls):
+  def table(self):
     return {'ApacheThriftConfig': ApacheThriftConfiguration,
             'Struct': Struct,
             'StructWithDeps': StructWithDeps,
@@ -92,40 +108,33 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
   def setUp(self):
     super(GraphTestBase, self).setUp()
 
-  def create(self, build_patterns=None, parser_cls=None):
-    symbol_table_cls = TestTable
+  def create(self, build_patterns=None, parser=None):
+    address_mapper = AddressMapper(build_patterns=build_patterns,
+                                   parser=parser)
+    symbol_table = address_mapper.parser.symbol_table
 
-    address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                                   build_patterns=build_patterns,
-                                   parser_cls=parser_cls)
-
-    rules = create_fs_rules() + create_graph_rules(address_mapper, symbol_table_cls)
+    rules = create_fs_rules() + create_graph_rules(address_mapper, symbol_table)
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
     scheduler = self.mk_scheduler(rules=rules, project_tree=project_tree)
     return scheduler
 
   def create_json(self):
-    return self.create(build_patterns=('*.BUILD.json',), parser_cls=JsonParser)
+    return self.create(build_patterns=('*.BUILD.json',), parser=JsonParser(TestTable()))
 
   def _populate(self, scheduler, address):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
-    request = scheduler.execution_request([TestTable.constraint()], [address])
+    request = scheduler.execution_request([TestTable().constraint()], [address])
     root_entries = scheduler.execute(request).root_products
     self.assertEquals(1, len(root_entries))
-    return root_entries[0]
-
-  def walk(self, scheduler, address):
-    """Return a list of all (Node, State) tuples reachable from the given Address."""
-    root, _ = self._populate(scheduler, address)
-    return list(e for e in scheduler.product_graph.walk([root], predicate=lambda n, s: True))
+    return request, root_entries[0][1]
 
   def resolve_failure(self, scheduler, address):
-    root, state = self._populate(scheduler, address)
+    _, state = self._populate(scheduler, address)
     self.assertEquals(type(state), Throw, '{} is not a Throw.'.format(state))
     return state.exc
 
   def resolve(self, scheduler, address):
-    root, state = self._populate(scheduler, address)
+    _, state = self._populate(scheduler, address)
     self.assertEquals(type(state), Return, '{} is not a Return.'.format(state))
     return state.value
 
@@ -169,12 +178,12 @@ class InlinedGraphTest(GraphTestBase):
 
   def test_python(self):
     scheduler = self.create(build_patterns=('*.BUILD.python',),
-                            parser_cls=PythonAssignmentsParser)
+                            parser=PythonAssignmentsParser(TestTable()))
     self.do_test_codegen_simple(scheduler)
 
   def test_python_classic(self):
     scheduler = self.create(build_patterns=('*.BUILD',),
-                            parser_cls=PythonCallbacksParser)
+                            parser=PythonCallbacksParser(TestTable()))
     self.do_test_codegen_simple(scheduler)
 
   def test_resolve_cache(self):
@@ -193,9 +202,9 @@ class InlinedGraphTest(GraphTestBase):
 
   def do_test_trace_message(self, scheduler, parsed_address, expected_string=None):
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
-    root, state = self._populate(scheduler, parsed_address)
+    request, state = self._populate(scheduler, parsed_address)
     self.assertEqual(type(state), Throw)
-    trace_message = '\n'.join(scheduler.trace())
+    trace_message = '\n'.join(scheduler.trace(request))
 
     self.assert_throws_are_leaves(trace_message, Throw.__name__)
     if expected_string:
@@ -328,10 +337,10 @@ class LazyResolvingGraphTest(GraphTestBase):
 
   def test_python_lazy(self):
     scheduler = self.create(build_patterns=('*.BUILD.python',),
-                            parser_cls=PythonAssignmentsParser)
+                            parser=PythonAssignmentsParser(TestTable()))
     self.do_test_codegen_simple(scheduler)
 
   def test_python_classic_lazy(self):
     scheduler = self.create(build_patterns=('*.BUILD',),
-                            parser_cls=PythonCallbacksParser)
+                            parser=PythonCallbacksParser(TestTable()))
     self.do_test_codegen_simple(scheduler)

@@ -76,12 +76,12 @@ def safe_mkdir(directory, clean=False):
       raise
 
 
-def safe_mkdir_for(path):
+def safe_mkdir_for(path, clean=False):
   """Ensure that the parent directory for a file is present.
 
   If it's not there, create it. If it is, no-op.
   """
-  safe_mkdir(os.path.dirname(path), clean=False)
+  safe_mkdir(os.path.dirname(path), clean=clean)
 
 
 def safe_file_dump(filename, payload):
@@ -472,3 +472,14 @@ def rm_rf(name):
     elif e.errno != errno.ENOENT:
       # Pass on 'No such file or directory', otherwise re-raise OSError to surface perm issues etc.
       raise
+
+
+def is_executable(path):
+  """Returns whether a path names an existing executable file."""
+  return os.path.isfile(path) and os.access(path, os.X_OK)
+
+
+def split_basename_and_dirname(path):
+  if not os.path.isfile(path):
+    raise ValueError("{} does not exist or is not a regular file.".format(path))
+  return (os.path.dirname(path), os.path.basename(path))

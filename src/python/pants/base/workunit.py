@@ -140,9 +140,9 @@ class WorkUnit(object):
     """
     return label in self.labels
 
-  def start(self):
+  def start(self, start_time=None):
     """Mark the time at which this workunit started."""
-    self.start_time = time.time()
+    self.start_time = start_time or time.time()
 
   def end(self):
     """Mark the time at which this workunit ended."""

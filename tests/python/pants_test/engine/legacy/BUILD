@@ -43,9 +43,10 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:process_handler',
+    'tests/python/pants_test/testutils:git_util',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test:int-test',
-    'tests/python/pants_test/testutils:git_util',
   ],
   tags = {'integration'},
   timeout = 600,
@@ -97,6 +98,7 @@ python_tests(
   sources = ['test_graph.py'],
   dependencies = [
     '3rdparty/python:mock',
+    '3rdparty/python:requirements_files',
     'src/python/pants/bin',
     'src/python/pants/build_graph',
     'src/python/pants/init',
@@ -130,6 +132,16 @@ python_tests(
     'tests/python/pants_test:int-test'
   ],
   tags = {'integration'}
+)
+
+python_tests(
+  name = 'parser',
+  sources = ['test_parser.py'],
+  dependencies = [
+    'src/python/pants/build_graph',
+    'src/python/pants/engine/legacy:parser',
+    'src/python/pants/engine:parser',
+  ]
 )
 
 python_tests(

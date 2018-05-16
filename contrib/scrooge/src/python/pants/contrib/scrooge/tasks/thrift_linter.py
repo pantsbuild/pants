@@ -7,11 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import multiprocessing
 
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
 from pants.base.workunit import WorkUnitLabel
 from pants.option.ranked_value import RankedValue
+from pants.task.lint_task_mixin import LintTaskMixin
 
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
 
@@ -20,17 +22,16 @@ class ThriftLintError(Exception):
   """Raised on a lint failure."""
 
 
-class ThriftLinter(NailgunTask):
-  """Print linter warnings for thrift files."""
+class ThriftLinter(LintTaskMixin, NailgunTask):
+  """Print lint warnings for thrift files."""
 
   @staticmethod
   def _is_thrift(target):
-    return target.is_thrift
+    return isinstance(target, JavaThriftLibrary)
 
   @classmethod
   def register_options(cls, register):
     super(ThriftLinter, cls).register_options(register)
-    register('--skip', type=bool, fingerprint=True, help='Skip thrift linting.')
     register('--strict', type=bool, fingerprint=True,
              help='Fail the goal if thrift linter errors are found. Overrides the '
                   '`strict-default` option.')
@@ -104,10 +105,7 @@ class ThriftLinter(NailgunTask):
         'Lint errors in target {0} for {1}.'.format(target.address.spec, paths))
 
   def execute(self):
-    if self.get_options().skip:
-      return
-
-    thrift_targets = self.context.targets(self._is_thrift)
+    thrift_targets = self.get_targets(self._is_thrift)
     with self.invalidated(thrift_targets) as invalidation_check:
       if not invalidation_check.invalid_vts:
         return

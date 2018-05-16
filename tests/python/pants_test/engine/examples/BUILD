@@ -34,7 +34,6 @@ python_library(
     'src/python/pants/engine:parser',
     'src/python/pants/engine:scheduler',
     'src/python/pants/engine:selectors',
-    'src/python/pants/engine:storage',
     'src/python/pants/engine:struct',
   ]
 )
@@ -47,6 +46,7 @@ python_library(
     'src/python/pants/engine:fs',
     'src/python/pants/engine:struct',
     'src/python/pants/source',
+    'src/python/pants/util:objects',
   ]
 )
 
@@ -56,11 +56,12 @@ python_library(
   dependencies=[
     ':planners',
     'src/python/pants/base:cmd_line_spec_parser',
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/binaries',
     'src/python/pants/build_graph',
     'src/python/pants/engine:scheduler',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:desktop',
+    'src/python/pants/util:process_handler',
     'tests/python/pants_test/engine:util',
   ]
 )

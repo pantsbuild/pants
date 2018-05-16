@@ -288,16 +288,15 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
     register('--filter',
              help='Limit jvm platform possibility explanation to targets whose specs match this '
                   'regex pattern.')
+    # Note: We don't use the appropriate target_restriction_mixin, because --transitive
+    # here appears to mean something slightly different than what's implied by that mixin.
     register('--transitive', type=bool,
              help='List transitive dependencies in analysis output.')
 
   def __init__(self, *args, **kwargs):
     super(JvmPlatformExplain, self).__init__(*args, **kwargs)
-    self.explain_regex = (re.compile(self.get_options().filter) if self.get_options().filter
-                          else None)
-    self.detailed = self.get_options().detailed
-    self.only_broken = self.get_options().only_broken
-    self.transitive = self.get_options().transitive
+    self._explain_regex = (re.compile(self.get_options().filter) if self.get_options().filter
+                           else None)
 
   def _format_error(self, text):
     if self.get_options().colors:
@@ -305,11 +304,11 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
     return text
 
   def _is_relevant(self, target):
-    return not self.explain_regex or self.explain_regex.match(target.address.spec)
+    return not self._explain_regex or self._explain_regex.match(target.address.spec)
 
   @memoized_property
   def dependency_map(self):
-    if not self.transitive:
+    if not self.get_options().transitive:
       return self.jvm_dependency_map
     full_map = self._unfiltered_jvm_dependency_map(fully_transitive=True)
     return {target: deps for target, deps in full_map.items()
@@ -344,6 +343,7 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
 
   def possible_version_evaluation(self):
     """Evaluate the possible range of versions for each target, yielding the output analysis."""
+    only_broken = self.get_options().only_broken
     ranges = self._ranges
     yield 'Allowable JVM platform ranges (* = anything):'
     for target in sorted(filter(self._is_relevant, self.jvm_targets)):
@@ -357,7 +357,7 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
       current_text = str(self.jvm_version(target))
       if not current_valid:
         current_text = self._format_error(current_text)
-      elif self.only_broken:
+      elif only_broken:
         continue
 
       if min_version and max_version:
@@ -373,7 +373,7 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
       yield '{address}: {range}  (is {current})'.format(address=target.address.spec,
                                                         range=range_text,
                                                         current=current_text,)
-      if self.detailed or not current_valid:
+      if self.get_options().detailed or not current_valid:
         if min_version:
           min_because = [t for t in ranges.target_dependencies[target]
                          if self.jvm_version(t) == min_version]

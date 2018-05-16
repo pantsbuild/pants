@@ -1,0 +1,9 @@
+[package]
+name = "hashing"
+version = "0.0.1"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+
+[dependencies]
+digest = "0.6.2"
+hex = "0.3.1"
+sha2 = "0.6.0"

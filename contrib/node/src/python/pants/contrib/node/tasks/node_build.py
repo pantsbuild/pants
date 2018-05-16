@@ -36,27 +36,20 @@ class NodeBuild(NodeTask):
   def create_target_dirs(self):
     return True
 
-  def _run_build_script(self, target, results_dir, node_installed_path):
+  def _run_build_script(self, target, results_dir, node_installed_path, node_paths):
     target_address = target.address.reference()
     # If there is build script defined, run the build script and return build output directory;
     # If there is not build script defined, use installation directory as build output.
     if target.payload.build_script:
       self.context.log.info('Running node build {} for {} at {}\n'.format(
         target.payload.build_script, target_address, node_installed_path))
-      package_manager = self.get_package_manager_for_target(target)
-      if package_manager == self.node_distribution.PACKAGE_MANAGER_NPM:
-        result, build_command = self.execute_npm(
-          ['run-script', target.payload.build_script],
-          workunit_name=target_address,
-          workunit_labels=[WorkUnitLabel.COMPILER])
-      elif package_manager == self.node_distribution.PACKAGE_MANAGER_YARNPKG:
-        result, build_command = self.execute_yarnpkg(
-          ['run', target.payload.build_script],
-          workunit_name=target_address,
-          workunit_labels=[WorkUnitLabel.COMPILER]
-          )
-      else:
-        raise TaskError('Unknown node package manager {}'.format(package_manager))
+      result, build_command = self.run_script(
+        target.payload.build_script,
+        target=target,
+        node_paths=node_paths,
+        workunit_name=target_address,
+        workunit_labels=[WorkUnitLabel.COMPILER]
+      )
       # Make sure script run is successful.
       if result != 0:
         raise TaskError(
@@ -83,8 +76,8 @@ class NodeBuild(NodeTask):
 
         with pushd(node_installed_path):
           if not vt.valid:
-            self._run_build_script(target, vt.results_dir, node_installed_path)
-
+            self._run_build_script(
+              target, vt.results_dir, node_installed_path, node_paths.all_node_paths)
           if not target.payload.dev_dependency:
             output_dir = self._get_output_dir(target, node_installed_path)
             # Make sure that there is output generated.

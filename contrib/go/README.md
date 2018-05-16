@@ -17,6 +17,9 @@ pants_version: 1.0.0
 plugins: [
     'pantsbuild.pants.contrib.go==%(pants_version)s',
   ]
+
+[go-distribution]
+version: 1.10
 ```
 
 On your next run of `./pants` the plugin will be installed and you'll find these new goals:
@@ -117,7 +120,7 @@ done
 
 ### Dependency metadata generation
 
-Now that we have roper source root configuration and skeleton BUILD files, we can proceed to
+Now that we have proper source root configuration and skeleton BUILD files, we can proceed to
 auto-generate the dependency information pants needs from BUILD files using the `buildgen` goal.
 Here we set options to emit the BUILD files to disk, include 3rdparty remote dependency BUILD
 files, and fail if any 3rdparty dependencies have un-pinned versions:

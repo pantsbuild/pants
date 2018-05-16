@@ -4,6 +4,6 @@
 jar_library(
   name='mockito-core',
   jars=[
-    jar(org='org.mockito', name='mockito-core', rev='2.7.21'),
+    jar(org='org.mockito', name='mockito-core', rev='2.17.0'),
   ],
 )

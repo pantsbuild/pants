@@ -14,6 +14,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.build_graph.target import Target
 from pants.util.meta import AbstractClass
 
@@ -49,8 +50,8 @@ class BuildGraph(AbstractClass):
       super(BuildGraph.ManualSyntheticTargetError, self).__init__(
           'Found a manually-defined target at synthetic address {}'.format(addr.spec))
 
-  class DepthAgnosticWalk(object):
-    """This is a utility class to aid in graph traversals that don't care about the depth."""
+  class NoDepPredicateWalk(object):
+    """This is a utility class to aid in graph traversals that don't have predicates on dependency edges."""
 
     def __init__(self):
       self._worked = set()
@@ -74,23 +75,18 @@ class BuildGraph(AbstractClass):
       self._expanded.add(vertex)
       return True
 
-  class DepthAwareWalk(DepthAgnosticWalk):
-    """This is a utility class to aid in graph traversals that care about the depth."""
-
-    def __init__(self):
-      super(BuildGraph.DepthAwareWalk, self).__init__()
-      self._expanded = defaultdict(set)
-
-    def expand_once(self, vertex, level):
-      """Returns True if this (vertex, level) pair has never been expanded, and False otherwise.
-
-      This method marks the (vertex, level) pair as expanded after executing, such that this method
-      will return True for a given (vertex, level) pair exactly once.
-      """
-      if level in self._expanded[vertex]:
-        return False
-      self._expanded[vertex].add(level)
+    def dep_predicate(self, target, dep, level):
       return True
+
+  class DepPredicateWalk(NoDepPredicateWalk):
+    """This is a utility class to aid in graph traversals that don't care about the depth."""
+
+    def __init__(self, dep_predicate):
+      super(BuildGraph.DepPredicateWalk, self).__init__()
+      self._dep_predicate = dep_predicate
+
+    def dep_predicate(self, target, dep, level):
+      return self._dep_predicate(target, dep)
 
   @staticmethod
   def closure(*vargs, **kwargs):
@@ -103,6 +99,14 @@ class BuildGraph(AbstractClass):
   def __init__(self):
     self.reset()
 
+  def __len__(self):
+    return len(self._target_by_address)
+
+  def target_file_count(self):
+    """Returns a count of source files owned by all Targets in the BuildGraph."""
+    # TODO: Move this file counting into the `ProductGraph`.
+    return sum(t.sources_count() for t in self.targets())
+
   @abstractmethod
   def clone_new(self):
     """Returns a new BuildGraph instance of the same type and with the same __init__ params."""
@@ -112,8 +116,8 @@ class BuildGraph(AbstractClass):
     target_types = {type(t) for t in targets}
     target_subsystem_deps = {s for s in itertools.chain(*(t.subsystems() for t in target_types))}
     for subsystem in target_subsystem_deps:
-      # TODO: This check is primarily for tests and would be nice to do away with.
-      if subsystem.is_initialized():
+      # TODO: The is_initialized() check is primarily for tests and would be nice to do away with.
+      if issubclass(subsystem, InjectablesMixin) and subsystem.is_initialized():
         subsystem.global_instance().injectables(self)
 
   def reset(self):
@@ -124,7 +128,8 @@ class BuildGraph(AbstractClass):
     self._target_by_address = OrderedDict()
     self._target_dependencies_by_address = defaultdict(OrderedSet)
     self._target_dependees_by_address = defaultdict(set)
-    self._derived_from_by_derivative_address = {}
+    self._derived_from_by_derivative = {}  # Address -> Address.
+    self._derivatives_by_derived_from = defaultdict(list)   # Address -> list of Address.
     self.synthetic_addresses = set()
 
   def contains_address(self, address):
@@ -161,7 +166,7 @@ class BuildGraph(AbstractClass):
     return self._target_dependencies_by_address[address]
 
   def dependents_of(self, address):
-    """Returns the Targets which depend on the target at `address`.
+    """Returns the addresses of the targets that depend on the target at `address`.
 
     This method asserts that the address given is actually in the BuildGraph.
 
@@ -181,7 +186,7 @@ class BuildGraph(AbstractClass):
 
     :API: public
     """
-    parent_address = self._derived_from_by_derivative_address.get(address, address)
+    parent_address = self._derived_from_by_derivative.get(address, address)
     return self.get_target(parent_address)
 
   def get_concrete_derived_from(self, address):
@@ -192,11 +197,35 @@ class BuildGraph(AbstractClass):
     :API: public
     """
     current_address = address
-    next_address = self._derived_from_by_derivative_address.get(current_address, current_address)
+    next_address = self._derived_from_by_derivative.get(current_address, current_address)
     while next_address != current_address:
       current_address = next_address
-      next_address = self._derived_from_by_derivative_address.get(current_address, current_address)
+      next_address = self._derived_from_by_derivative.get(current_address, current_address)
     return self.get_target(current_address)
+
+  def get_direct_derivatives(self, address):
+    """Get all targets derived directly from the specified target.
+
+    Note that the specified target itself is not returned.
+
+    :API: public
+    """
+    derivative_addrs = self._derivatives_by_derived_from.get(address, [])
+    return [self.get_target(addr) for addr in derivative_addrs]
+
+  def get_all_derivatives(self, address):
+    """Get all targets derived directly or indirectly from the specified target.
+
+    Note that the specified target itself is not returned.
+
+    :API: public
+    """
+    ret = []
+    direct = self.get_direct_derivatives(address)
+    ret.extend(direct)
+    for t in direct:
+      ret.extend(self.get_all_derivatives(t.address))
+    return ret
 
   def inject_target(self, target, dependencies=None, derived_from=None, synthetic=False):
     """Injects a fully realized Target into the BuildGraph.
@@ -237,7 +266,8 @@ class BuildGraph(AbstractClass):
                          ' Target already in the BuildGraph.'
                          .format(target=target,
                                  derived_from=derived_from))
-      self._derived_from_by_derivative_address[target.address] = derived_from.address
+      self._derived_from_by_derivative[target.address] = derived_from.address
+      self._derivatives_by_derived_from[derived_from.address].append(target.address)
 
     if derived_from or synthetic:
       self.synthetic_addresses.add(address)
@@ -303,8 +333,21 @@ class BuildGraph(AbstractClass):
     """
     return sort_targets(self.targets())
 
-  def walk_transitive_dependency_graph(self, addresses, work, predicate=None, postorder=False,
-                                       leveled_predicate=None):
+  def _walk_factory(self, dep_predicate):
+    """Construct the right context object for managing state during a transitive walk."""
+    walk = None
+    if dep_predicate:
+      walk = self.DepPredicateWalk(dep_predicate)
+    else:
+      walk = self.NoDepPredicateWalk()
+    return walk
+
+  def walk_transitive_dependency_graph(self,
+                                       addresses,
+                                       work,
+                                       predicate=None,
+                                       postorder=False,
+                                       dep_predicate=None):
     """Given a work function, walks the transitive dependency closure of `addresses` using DFS.
 
     :API: public
@@ -318,14 +361,13 @@ class BuildGraph(AbstractClass):
       out of the closure.  If it is given, any Target which fails the predicate will not be
       walked, nor will its dependencies.  Thus predicate effectively trims out any subgraph
       that would only be reachable through Targets that fail the predicate.
-    :param function leveled_predicate: Behaves identically to predicate, but takes the depth of the
-      target in the search tree as a second parameter, and it is checked just before a dependency is
-      expanded.
+    :param function dep_predicate: Takes two parameters, the current target and the dependency of
+      the current target. If this parameter is not given, no dependencies will be filtered
+      when traversing the closure. If it is given, when the predicate fails, the edge to the dependency
+      will not be expanded.
     """
-    # Use the DepthAgnosticWalk if we can, because DepthAwareWalk does a bit of extra work that can
-    # slow things down by few millis.
-    walker = self.DepthAwareWalk if leveled_predicate else self.DepthAgnosticWalk
-    walk = walker()
+    walk = self._walk_factory(dep_predicate)
+
     def _walk_rec(addr, level=0):
       # If we've followed an edge to this address, stop recursing.
       if not walk.expand_once(addr, level):
@@ -342,8 +384,7 @@ class BuildGraph(AbstractClass):
       for dep_address in self._target_dependencies_by_address[addr]:
         if walk.expanded_or_worked(dep_address):
           continue
-        if not leveled_predicate \
-                or leveled_predicate(self._target_by_address[dep_address], level):
+        if walk.dep_predicate(target, self._target_by_address[dep_address], level):
           _walk_rec(dep_address, level + 1)
 
       if postorder and walk.do_work_once(addr):
@@ -412,9 +453,10 @@ class BuildGraph(AbstractClass):
       out of the closure.  If it is given, any Target which fails the predicate will not be
       walked, nor will its dependencies.  Thus predicate effectively trims out any subgraph
       that would only be reachable through Targets that fail the predicate.
-    :param function leveled_predicate: Behaves identically to predicate, but takes the depth of the
-      target in the search tree as a second parameter, and it is checked just before a dependency is
-      expanded.
+    :param function dep_predicate: Takes two parameters, the current target and the dependency of
+      the current target. If this parameter is not given, no dependencies will be filtered
+      when traversing the closure. If it is given, when the predicate fails, the edge to the dependency
+      will not be expanded.
     """
     ret = OrderedSet()
     self.walk_transitive_dependency_graph(addresses, ret.add,
@@ -422,7 +464,10 @@ class BuildGraph(AbstractClass):
                                           **kwargs)
     return ret
 
-  def transitive_subgraph_of_addresses_bfs(self, addresses, predicate=None, leveled_predicate=None):
+  def transitive_subgraph_of_addresses_bfs(self,
+                                           addresses,
+                                           predicate=None,
+                                           dep_predicate=None):
     """Returns the transitive dependency closure of `addresses` using BFS.
 
     :API: public
@@ -432,15 +477,14 @@ class BuildGraph(AbstractClass):
       out of the closure.  If it is given, any Target which fails the predicate will not be
       walked, nor will its dependencies.  Thus predicate effectively trims out any subgraph
       that would only be reachable through Targets that fail the predicate.
-    :param function leveled_predicate: Behaves identically to predicate, but takes the depth of the
-      target in the search tree as a second parameter, and it is checked just before a dependency is
-      expanded.
+    :param function dep_predicate: Takes two parameters, the current target and the dependency of
+      the current target. If this parameter is not given, no dependencies will be filtered
+      when traversing the closure. If it is given, when the predicate fails, the edge to the dependency
+      will not be expanded.
     """
+    walk = self._walk_factory(dep_predicate)
+
     ordered_closure = OrderedSet()
-    # Use the DepthAgnosticWalk if we can, because DepthAwareWalk does a bit of extra work that can
-    # slow things down by few millis.
-    walker = self.DepthAwareWalk if leveled_predicate else self.DepthAgnosticWalk
-    walk = walker()
     to_walk = deque((0, addr) for addr in addresses)
     while len(to_walk) > 0:
       level, address = to_walk.popleft()
@@ -453,11 +497,11 @@ class BuildGraph(AbstractClass):
         continue
       if walk.do_work_once(address):
         ordered_closure.add(target)
-      for addr in self._target_dependencies_by_address[address]:
-        if walk.expanded_or_worked(addr):
+      for dep_address in self._target_dependencies_by_address[address]:
+        if walk.expanded_or_worked(dep_address):
           continue
-        if not leveled_predicate or leveled_predicate(self._target_by_address[addr], level):
-          to_walk.append((level + 1, addr))
+        if walk.dep_predicate(target, self._target_by_address[dep_address], level):
+          to_walk.append((level + 1, dep_address))
     return ordered_closure
 
   @abstractmethod

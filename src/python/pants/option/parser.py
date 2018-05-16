@@ -20,10 +20,10 @@ from pants.option.custom_types import (DictValueComponent, ListValueComponent, U
                                        dict_option, dir_option, file_option, list_option,
                                        target_option)
 from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, ImplicitValIsNone,
-                                 InvalidKwarg, InvalidMemberType, MemberTypeNotAllowed,
-                                 NoOptionNames, OptionAlreadyRegistered, OptionNameDash,
-                                 OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
-                                 Shadowing)
+                                 InvalidKwarg, InvalidKwargNonGlobalScope, InvalidMemberType,
+                                 MemberTypeNotAllowed, NoOptionNames, OptionAlreadyRegistered,
+                                 OptionNameDash, OptionNameDoubleDash, ParseError,
+                                 RecursiveSubsystemOption, Shadowing)
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
@@ -340,7 +340,8 @@ class Parser(object):
   _allowed_registration_kwargs = {
     'type', 'member_type', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
-    'fingerprint', 'removal_version', 'removal_hint', 'fromfile', 'mutually_exclusive_group'
+    'fingerprint', 'removal_version', 'removal_hint', 'fromfile', 'mutually_exclusive_group',
+    'daemon'
   }
 
   # TODO: Remove dict_option from here after deprecation is complete.
@@ -380,6 +381,10 @@ class Parser(object):
     for kwarg in kwargs:
       if kwarg not in self._allowed_registration_kwargs:
         error(InvalidKwarg, kwarg=kwarg)
+
+      # Ensure `daemon=True` can't be passed on non-global scopes (except for `recursive=True`).
+      if (kwarg == 'daemon' and self._scope != GLOBAL_SCOPE and kwargs.get('recursive') is False):
+        error(InvalidKwargNonGlobalScope, kwarg=kwarg)
 
     removal_version = kwargs.get('removal_version')
     if removal_version is not None:
@@ -520,7 +525,17 @@ class Parser(object):
     # instances of RankedValue (so none will be None, although they may wrap a None value).
     ranked_vals = list(reversed(list(RankedValue.prioritized_iter(*values_to_rank))))
 
-    # Record info about the derivation of each of the values.
+    def record_option(value, rank, option_details=None):
+      deprecation_version = kwargs.get('removal_version')
+      self._option_tracker.record_option(scope=self._scope,
+                                         option=dest,
+                                         value=value,
+                                         rank=rank,
+                                         deprecation_version=deprecation_version,
+                                         details=option_details)
+
+    # Record info about the derivation of each of the contributing values.
+    detail_history = []
     for ranked_val in ranked_vals:
       if ranked_val.rank in (RankedValue.CONFIG, RankedValue.CONFIG_DEFAULT):
         details = config_details
@@ -528,12 +543,9 @@ class Parser(object):
         details = env_details
       else:
         details = None
-      self._option_tracker.record_option(scope=self._scope,
-                                         option=dest,
-                                         value=ranked_val.value,
-                                         rank=ranked_val.rank,
-                                         deprecation_version=kwargs.get('removal_version'),
-                                         details=details)
+      if details:
+        detail_history.append(details)
+      record_option(value=ranked_val.value, rank=ranked_val.rank, option_details=details)
 
     # Helper function to check various validity constraints on final option values.
     def check(val):
@@ -568,6 +580,10 @@ class Parser(object):
     else:
       ret = ranked_vals[-1]
       check(ret.value)
+
+    # Record info about the derivation of the final value.
+    merged_details = ', '.join(detail_history) if detail_history else None
+    record_option(value=ret.value, rank=ret.rank, option_details=merged_details)
 
     # All done!
     return ret

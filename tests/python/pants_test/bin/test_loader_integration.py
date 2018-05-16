@@ -36,3 +36,11 @@ class LoaderIntegrationTest(PantsRunIntegrationTest):
     self.assert_failure(pants_run)
     self.assertIn('TEST_STR', pants_run.stderr_data)
     self.assertIn('not callable', pants_run.stderr_data)
+
+  def test_alternate_entrypoint_scrubbing(self):
+    pants_run = self.run_pants(
+      command=['help'],
+      extra_env={'PANTS_ENTRYPOINT': 'pants.bin.pants_exe:test_env'}
+    )
+    self.assert_success(pants_run)
+    self.assertIn('PANTS_ENTRYPOINT=None', pants_run.stdout_data)

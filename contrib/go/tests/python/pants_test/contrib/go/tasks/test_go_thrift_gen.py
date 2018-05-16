@@ -5,8 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.codegen.thrift.lib.thrift import Thrift
 from pants.base.exceptions import TaskError
-from pants.binaries.thrift_binary import ThriftBinary
 from pants_test.tasks.task_test_base import TaskTestBase
 
 from pants.contrib.go.tasks.go_thrift_gen import GoThriftGen
@@ -19,7 +19,7 @@ class GoThriftGenTest(TaskTestBase):
     return GoThriftGen
 
   def _validate_for(self, version):
-    options = {ThriftBinary.Factory.options_scope: {'version': version}}
+    options = {Thrift.options_scope: {'version': version}}
     self.create_task(self.context(options=options))._validate_supports_more_than_one_source()
 
   def test_validate_source_too_low(self):

@@ -14,10 +14,8 @@ python_library(
 
 python_library(
   name = 'project_tree',
-  sources = ['file_system_project_tree.py', 'project_tree.py', 'project_tree_factory.py',
-             'scm_project_tree.py'],
+  sources = ['file_system_project_tree.py', 'project_tree.py', 'project_tree_factory.py'],
   dependencies = [
-    ':deprecated',
     '3rdparty/python:pathspec',
     '3rdparty/python:scandir',
     '3rdparty/python:six',
@@ -120,6 +118,8 @@ python_library(
   sources = ['payload_field.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':deprecated',
+    ':hash_utils',
     'src/python/pants/util:meta',
   ]
 )
@@ -156,6 +156,14 @@ python_library(
     ':build_file',
     ':specs',
     'src/python/pants/build_graph',
+  ],
+)
+
+python_library(
+  name = 'target_roots',
+  sources = ['target_roots.py'],
+  dependencies = [
+    'src/python/pants/util:objects',
   ],
 )
 

@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 import types
 import unittest
 from contextlib import contextmanager
@@ -17,6 +16,7 @@ from pants.scm.git import Git
 from pants.scm.scm import Scm
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_mkdir, safe_mkdtemp, safe_open, safe_rmtree, touch
+from pants.util.process_handler import subprocess
 from pants_test.testutils.git_util import MIN_REQUIRED_GIT_VERSION, git_version
 
 
@@ -67,7 +67,7 @@ class GitTest(unittest.TestCase):
       self.initial_rev = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
       subprocess.check_call(['git', 'tag', 'first'])
       subprocess.check_call(['git', 'push', '--tags', 'depot', 'master'])
-      subprocess.check_call(['git', 'branch', '--set-upstream', 'master', 'depot/master'])
+      subprocess.check_call(['git', 'branch', '--set-upstream-to', 'depot/master'])
 
       with safe_open(self.readme_file, 'w') as readme:
         readme.write('Hello World.\u2764'.encode('utf-8'))

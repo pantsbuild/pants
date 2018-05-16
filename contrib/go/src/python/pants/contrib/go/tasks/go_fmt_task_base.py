@@ -6,10 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 from contextlib import contextmanager
 
 from pants.base.exceptions import TaskError
+from pants.util.process_handler import subprocess
 
 from pants.contrib.go.targets.go_local_source import GoLocalSource
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
@@ -32,7 +32,7 @@ class GoFmtTaskBase(GoWorkspaceTask):
 
   @contextmanager
   def go_fmt_invalid_targets(self, flags):
-    targets = self.context.targets(self.is_checked)
+    targets = self.get_targets(self.is_checked)
     with self.invalidated(targets) as invalidation_check:
       invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
       sources = self.calculate_sources(invalid_targets)

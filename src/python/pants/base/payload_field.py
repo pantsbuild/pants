@@ -5,24 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import json
 from abc import abstractmethod
 from hashlib import sha1
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.hash_utils import stable_json_hash
 from pants.util.meta import AbstractClass
-
-
-def stable_json_dumps(obj):
-  return json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True)
-
-
-def stable_json_sha1(obj):
-  """
-  :API: public
-  """
-  return sha1(stable_json_dumps(obj)).hexdigest()
 
 
 def combine_hashes(hashes):
@@ -127,7 +116,7 @@ class PythonRequirementsField(frozenset, PayloadField):
           req._use_2to3,
           req.compatibility,
         )
-        yield stable_json_sha1(hash_items)
+        yield stable_json_hash(hash_items)
     return combine_hashes(fingerprint_iter())
 
 
@@ -140,7 +129,7 @@ class ExcludesField(OrderedSet, PayloadField):
   """
 
   def _compute_fingerprint(self):
-    return stable_json_sha1(tuple(repr(exclude) for exclude in self))
+    return stable_json_hash(tuple(repr(exclude) for exclude in self))
 
 
 class JarsField(tuple, PayloadField):
@@ -152,7 +141,7 @@ class JarsField(tuple, PayloadField):
   """
 
   def _compute_fingerprint(self):
-    return stable_json_sha1(tuple(jar.cache_key() for jar in self))
+    return stable_json_hash(tuple(jar.cache_key() for jar in self))
 
 
 class PrimitiveField(PayloadField):
@@ -171,7 +160,7 @@ class PrimitiveField(PayloadField):
     return self._underlying
 
   def _compute_fingerprint(self):
-    return stable_json_sha1(self._underlying)
+    return stable_json_hash(self._underlying)
 
 
 class SetOfPrimitivesField(PayloadField):
@@ -191,4 +180,4 @@ class SetOfPrimitivesField(PayloadField):
     return self._underlying
 
   def _compute_fingerprint(self):
-    return stable_json_sha1(self._underlying)
+    return stable_json_hash(self._underlying)

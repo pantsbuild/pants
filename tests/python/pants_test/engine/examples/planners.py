@@ -15,17 +15,17 @@ from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.project_tree import Dir
 from pants.build_graph.address import Address
-from pants.engine.addressable import BuildFileAddresses, SubclassesOf, addressable_list
+from pants.engine.addressable import addressable_list
 from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import FilesContent, PathGlobs, Snapshot, create_fs_rules
 from pants.engine.mapper import AddressFamily, AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import SingletonRule, TaskRule, rule
-from pants.engine.scheduler import LocalScheduler
-from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectVariant
+from pants.engine.scheduler import Scheduler
+from pants.engine.selectors import Get, Select, SelectVariant
 from pants.engine.struct import HasProducts, Struct, StructWithDeps, Variants
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
+from pants.util.objects import SubclassesOf, datatype
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.sources import Sources
 
@@ -92,26 +92,20 @@ class ScalaInferredDepsSources(Sources):
   extensions = ('.scala',)
 
 
-class ImportedJVMPackages(datatype('ImportedJVMPackages', ['dependencies'])):
-  """Holds a list of 'JVMPackageName' dependencies."""
-  pass
-
-
-class JVMPackageName(datatype('JVMPackageName', ['name'])):
+class JVMPackageName(datatype(['name'])):
   """A typedef to represent a fully qualified JVM package name."""
   pass
 
 
-class SourceRoots(datatype('SourceRoots', ['srcroots'])):
+class SourceRoots(datatype(['srcroots'])):
   """Placeholder for the SourceRoot subsystem."""
 
 
-@rule(Address,
-      [Select(JVMPackageName),
-       SelectDependencies(AddressFamily, Snapshot, field='dir_stats', field_types=(Dir,))])
 @printing_func
-def select_package_address(jvm_package_name, address_families):
+@rule(Address, [Select(JVMPackageName), Select(Snapshot)])
+def select_package_address(jvm_package_name, snapshot):
   """Return the Address from the given AddressFamilies which provides the given package."""
+  address_families = yield [Get(AddressFamily, Dir, ds) for ds in snapshot.dir_stats]
   addresses = [address for address_family in address_families
                        for address in address_family.addressables.keys()]
   if len(addresses) == 0:
@@ -120,11 +114,11 @@ def select_package_address(jvm_package_name, address_families):
   elif len(addresses) > 1:
     raise ValueError('Multiple targets might be able to provide {}:\n  {}'.format(
       jvm_package_name, '\n  '.join(str(a) for a in addresses)))
-  return addresses[0].to_address()
+  yield addresses[0].to_address()
 
 
-@rule(PathGlobs, [Select(JVMPackageName), Select(SourceRoots)])
 @printing_func
+@rule(PathGlobs, [Select(JVMPackageName), Select(SourceRoots)])
 def calculate_package_search_path(jvm_package_name, source_roots):
   """Return PathGlobs to match directories where the given JVMPackageName might exist."""
   rel_package_dir = jvm_package_name.name.replace('.', os_sep)
@@ -132,11 +126,11 @@ def calculate_package_search_path(jvm_package_name, source_roots):
   return PathGlobs.create('', include=specs)
 
 
-@rule(ImportedJVMPackages,
-      [SelectProjection(FilesContent, PathGlobs, 'path_globs', ScalaInferredDepsSources)])
 @printing_func
-def extract_scala_imports(source_files_content):
-  """A toy example of dependency inference. Would usually be a compiler plugin."""
+@rule(ScalaSources, [Select(ScalaInferredDepsSources)])
+def reify_scala_sources(sources):
+  """Given a ScalaInferredDepsSources object, create ScalaSources."""
+  source_files_content = yield Get(FilesContent, PathGlobs, sources.path_globs)
   packages = set()
   import_re = re.compile(r'^import ([^;]*);?$')
   for filecontent in source_files_content.dependencies:
@@ -144,18 +138,12 @@ def extract_scala_imports(source_files_content):
       match = import_re.search(line)
       if match:
         packages.add(match.group(1).rsplit('.', 1)[0])
-  return ImportedJVMPackages([JVMPackageName(p) for p in packages])
 
+  dependency_addresses = yield [Get(Address, JVMPackageName(p)) for p in packages]
 
-@rule(ScalaSources,
-      [Select(ScalaInferredDepsSources),
-       SelectDependencies(Address, ImportedJVMPackages, field_types=(JVMPackageName,))])
-@printing_func
-def reify_scala_sources(sources, dependency_addresses):
-  """Given a ScalaInferredDepsSources object and its inferred dependencies, create ScalaSources."""
   kwargs = sources._asdict()
   kwargs['dependencies'] = list(set(dependency_addresses))
-  return ScalaSources(**kwargs)
+  yield ScalaSources(**kwargs)
 
 
 class Requirement(Struct):
@@ -214,8 +202,8 @@ class ManagedJar(Struct):
     super(ManagedJar, self).__init__(org=org, name=name, **kwargs)
 
 
-@rule(Jar, [Select(ManagedJar), SelectVariant(ManagedResolve, 'resolve')])
 @printing_func
+@rule(Jar, [Select(ManagedJar), SelectVariant(ManagedResolve, 'resolve')])
 def select_rev(managed_jar, managed_resolve):
   (org, name) = (managed_jar.org, managed_jar.name)
   rev = managed_resolve.revs.get('{}#{}'.format(org, name), None)
@@ -224,14 +212,14 @@ def select_rev(managed_jar, managed_resolve):
   return Jar(org=managed_jar.org, name=managed_jar.name, rev=rev)
 
 
-@rule(Classpath, [Select(Jar)])
 @printing_func
+@rule(Classpath, [Select(Jar)])
 def ivy_resolve(jars):
   return Classpath(creator='ivy_resolve')
 
 
-@rule(Classpath, [Select(ResourceSources)])
 @printing_func
+@rule(Classpath, [Select(ResourceSources)])
 def isolate_resources(resources):
   """Copies resources into a private directory, and provides them as a Classpath entry."""
   return Classpath(creator='isolate_resources')
@@ -287,14 +275,14 @@ class BuildPropertiesConfiguration(Struct):
   pass
 
 
-@rule(Classpath, [Select(BuildPropertiesConfiguration)])
 @printing_func
+@rule(Classpath, [Select(BuildPropertiesConfiguration)])
 def write_name_file(name):
   """Write a file containing the name of this target in the CWD."""
   return Classpath(creator='write_name_file')
 
 
-class Scrooge(datatype('Scrooge', ['tool_address'])):
+class Scrooge(datatype(['tool_address'])):
   """Placeholder for a Scrooge subsystem."""
 
 
@@ -317,18 +305,18 @@ class ScroogeJavaConfiguration(ScroogeConfiguration):
 
 @rule(ScalaSources,
       [Select(ThriftSources),
-       SelectVariant(ScroogeScalaConfiguration, 'thrift'),
-       SelectProjection(Classpath, Address, 'tool_address', Scrooge)])
-def gen_scrooge_scala_thrift(sources, config, scrooge_classpath):
-  return gen_scrooge_thrift(sources, config, scrooge_classpath)
+       SelectVariant(ScroogeScalaConfiguration, 'thrift')])
+def gen_scrooge_scala_thrift(sources, config):
+  scrooge_classpath = yield Get(Classpath, Address, Scrooge.tool_address)
+  yield gen_scrooge_thrift(sources, config, scrooge_classpath)
 
 
 @rule(JavaSources,
       [Select(ThriftSources),
-       SelectVariant(ScroogeJavaConfiguration, 'thrift'),
-       SelectProjection(Classpath, Address, 'tool_address', Scrooge)])
-def gen_scrooge_java_thrift(sources, config, scrooge_classpath):
-  return gen_scrooge_thrift(sources, config, scrooge_classpath)
+       SelectVariant(ScroogeJavaConfiguration, 'thrift')])
+def gen_scrooge_java_thrift(sources, config):
+  scrooge_classpath = yield Get(Classpath, Address, Scrooge.tool_address)
+  yield gen_scrooge_thrift(sources, config, scrooge_classpath)
 
 
 @printing_func
@@ -339,20 +327,22 @@ def gen_scrooge_thrift(sources, config, scrooge_classpath):
     return ScalaSources(files=['Fake.scala'], dependencies=config.dependencies)
 
 
-@rule(Classpath,
-      [Select(JavaSources),
-       SelectDependencies(Classpath, JavaSources, field_types=(Address, Jar))])
 @printing_func
-def javac(sources, classpath):
-  return Classpath(creator='javac')
+@rule(Classpath, [Select(JavaSources)])
+def javac(sources):
+  classpath = yield [(Get(Classpath, Address, d) if type(d) is Address else Get(Classpath, Jar, d))
+                     for d in sources.dependencies]
+  print('compiling {} with {}'.format(sources, classpath))
+  yield Classpath(creator='javac')
 
 
-@rule(Classpath,
-      [Select(ScalaSources),
-       SelectDependencies(Classpath, ScalaSources, field_types=(Address, Jar))])
 @printing_func
-def scalac(sources, classpath):
-  return Classpath(creator='scalac')
+@rule(Classpath, [Select(ScalaSources)])
+def scalac(sources):
+  classpath = yield [(Get(Classpath, Address, d) if type(d) is Address else Get(Classpath, Jar, d))
+                     for d in sources.dependencies]
+  print('compiling {} with {}'.format(sources, classpath))
+  yield Classpath(creator='scalac')
 
 
 class Goal(AbstractClass):
@@ -436,30 +426,19 @@ class ExampleTable(SymbolTable):
 def setup_json_scheduler(build_root, native):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
-  :rtype :class:`pants.engine.scheduler.LocalScheduler`
+  :rtype :class:`pants.engine.scheduler.SchedulerSession`
   """
 
-  symbol_table_cls = ExampleTable
+  symbol_table = ExampleTable()
 
-  # Register "literal" subjects required for these tasks.
-  # TODO: Replace with `Subsystems`.
-  address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                                 build_patterns=('BLD.json',),
-                                 parser_cls=JsonParser)
+  # Register "literal" subjects required for these rules.
+  address_mapper = AddressMapper(build_patterns=('BLD.json',),
+                                 parser=JsonParser(symbol_table))
 
   work_dir = os_path_join(build_root, '.pants.d')
   project_tree = FileSystemProjectTree(build_root)
 
-  goals = {
-      'compile': Classpath,
-      # TODO: to allow for running resolve alone, should split out a distinct 'IvyReport' product.
-      'resolve': Classpath,
-      'list': BuildFileAddresses,
-      GenGoal.name(): GenGoal,
-      'ls': Snapshot,
-      'cat': FilesContent,
-    }
-  tasks = [
+  rules = [
       # Codegen
       GenGoal.rule(),
       gen_apache_java_thrift,
@@ -470,7 +449,6 @@ def setup_json_scheduler(build_root, native):
     ] + [
       # scala dependency inference
       reify_scala_sources,
-      extract_scala_imports,
       select_package_address,
       calculate_package_search_path,
       SingletonRule(SourceRoots, SourceRoots(('src/java','src/scala'))),
@@ -485,14 +463,14 @@ def setup_json_scheduler(build_root, native):
       javac,
       scalac,
     ] + (
-      create_graph_rules(address_mapper, symbol_table_cls)
+      create_graph_rules(address_mapper, symbol_table)
     ) + (
       create_fs_rules()
     )
 
-  return LocalScheduler(work_dir,
-                        goals,
-                        tasks,
+  scheduler = Scheduler(native,
                         project_tree,
-                        native,
-                        graph_lock=None)
+                        work_dir,
+                        rules,
+                        native)
+  return scheduler.new_session()

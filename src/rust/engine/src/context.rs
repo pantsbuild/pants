@@ -1,14 +1,16 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::os::unix::ffi::OsStrExt;
-use std::path::PathBuf;
+use std;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use core::TypeId;
 use externs;
-use fs::{PosixFS, Snapshots};
+use fs::{safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
 use graph::{EntryId, Graph};
+use handles::maybe_drain_handles;
+use nodes::{Node, NodeFuture};
 use rule_graph::RuleGraph;
 use tasks::Tasks;
 use types::Types;
@@ -22,56 +24,55 @@ pub struct Core {
   pub tasks: Tasks,
   pub rule_graph: RuleGraph,
   pub types: Types,
-  pub snapshots: Snapshots,
+  pub pool: Arc<ResettablePool>,
+  pub store: Store,
   pub vfs: PosixFS,
 }
 
 impl Core {
   pub fn new(
     root_subject_types: Vec<TypeId>,
-    mut tasks: Tasks,
+    tasks: Tasks,
     types: Types,
-    build_root: PathBuf,
+    build_root: &Path,
     ignore_patterns: Vec<String>,
-    work_dir: PathBuf,
+    work_dir: &Path,
   ) -> Core {
-    let mut snapshots_dir = work_dir.clone();
+    let mut snapshots_dir = PathBuf::from(work_dir);
     snapshots_dir.push("snapshots");
 
-    // TODO: Create the Snapshots directory, and then expose it as a singleton to python.
-    //   see: https://github.com/pantsbuild/pants/issues/4397
-    let snapshots =
-      Snapshots::new(snapshots_dir)
-        .unwrap_or_else(|e| {
-          panic!("Could not initialize Snapshot directory: {:?}", e);
-        });
-    tasks.singleton_replace(
-      externs::invoke_unsafe(
-        &types.construct_snapshots,
-        &vec![externs::store_bytes(snapshots.snapshot_path().as_os_str().as_bytes())],
-      ),
-      types.snapshots.clone(),
-    );
+    let pool = Arc::new(ResettablePool::new("io-".to_string()));
+
+    let store_path = match std::env::home_dir() {
+      Some(home_dir) => home_dir.join(".cache").join("pants").join("lmdb_store"),
+      None => panic!("Could not find home dir"),
+    };
+
+    let store = safe_create_dir_all_ioerror(&store_path)
+      .map_err(|e| format!("{:?}", e))
+      .and_then(|()| Store::local_only(store_path, pool.clone()))
+      .unwrap_or_else(|e| panic!("Could not initialize Store directory {:?}", e));
+
     let rule_graph = RuleGraph::new(&tasks, root_subject_types);
 
     Core {
       graph: Graph::new(),
       tasks: tasks,
-      types: types,
       rule_graph: rule_graph,
-      snapshots: snapshots,
+      types: types,
+      pool: pool.clone(),
+      store: store,
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs:
-        PosixFS::new(build_root, ignore_patterns)
-        .unwrap_or_else(|e| {
-          panic!("Could not initialize VFS: {:?}", e);
-        }),
+      vfs: PosixFS::new(build_root, pool, ignore_patterns).unwrap_or_else(|e| {
+        panic!("Could not initialize VFS: {:?}", e);
+      }),
     }
   }
 
   pub fn pre_fork(&self) {
-    self.vfs.pre_fork();
+    self.pool.reset();
+    self.store.reset_prefork();
   }
 }
 
@@ -87,6 +88,17 @@ impl Context {
       entry_id: entry_id,
       core: core,
     }
+  }
+
+  ///
+  /// Get the future value for the given Node implementation.
+  ///
+  pub fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output> {
+    // TODO: Odd place for this... could do it periodically in the background?
+    maybe_drain_handles().map(|handles| {
+      externs::drop_handles(handles);
+    });
+    self.core.graph.get(self.entry_id, self, node)
   }
 }
 

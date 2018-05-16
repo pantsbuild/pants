@@ -3,16 +3,14 @@
 
 package org.pantsbuild.tools.junit.impl;
 
-import java.util.LinkedList;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import org.junit.runners.model.RunnerScheduler;
 import org.pantsbuild.junit.annotations.TestParallel;
 import org.pantsbuild.junit.annotations.TestSerial;
@@ -44,7 +42,7 @@ public class ConcurrentRunnerScheduler implements RunnerScheduler {
         .setNameFormat("concurrent-junit-runner-%d")
         .build();
     executor = Executors.newFixedThreadPool(numThreads, threadFactory);
-    serialTasks = new LinkedList<Runnable>();
+    serialTasks = new ArrayDeque<Runnable>();
   }
 
   @Override

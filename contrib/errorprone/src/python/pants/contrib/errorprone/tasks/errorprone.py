@@ -8,9 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
-from pants.backend.jvm.subsystems.shader import Shader, Shading
+from pants.backend.jvm import argfile
+from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
+from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.java.jar.jar_dependency import JarDependency
 from pants.util.dirutil import safe_mkdir
@@ -42,14 +44,22 @@ class ErrorProne(NailgunTask):
                           classpath=[
                             JarDependency(org='com.google.errorprone',
                                           name='error_prone_core',
-                                          rev='2.0.17'),
+                                          rev='2.3.1'),
                           ],
                           main=cls._ERRORPRONE_MAIN,
                           custom_rules=[
-                            Shader.exclude_package('com.google.errorprone', recursive=True),
-                            Shading.create_exclude('*'), # https://github.com/pantsbuild/pants/issues/4288
+                            Shader.exclude_package('com.google.errorprone', recursive=True)
                           ]
                          )
+
+    # The javac version should be kept in sync with the version used by errorprone above.
+    cls.register_jvm_tool(register,
+                          'errorprone-javac',
+                          classpath=[
+                            JarDependency(org='com.google.errorprone',
+                                          name='javac',
+                                          rev='9+181-r4173-1'),
+                          ])
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -123,24 +133,52 @@ class ErrorProne(NailgunTask):
     safe_mkdir(output_dir)
     runtime_classpath.append(output_dir)
 
+    # Try to run errorprone with the same java version as the target
+    # The minimum JDK for errorprone is JDK 1.8
+    min_jdk_version = max(target.platform.target_level, Revision.lenient('1.8'))
+    if min_jdk_version.components[0] == 1:
+      max_jdk_version = Revision(min_jdk_version.components[0], min_jdk_version.components[1], '9999')
+    else:
+      max_jdk_version = Revision(min_jdk_version.components[0], '9999')
+    self.set_distribution(minimum_version=min_jdk_version, maximum_version=max_jdk_version, jdk=True)
+
+    jvm_options = self.get_options().jvm_options[:]
+    if self.dist.version < Revision.lenient('9'):
+      # For Java 8 we need to add the errorprone javac jar to the bootclasspath to
+      # avoid the "java.lang.NoSuchFieldError: ANNOTATION_PROCESSOR_MODULE_PATH" error
+      # See https://github.com/google/error-prone/issues/653 for more information
+      jvm_options.extend(['-Xbootclasspath/p:{}'.format(self.tool_classpath('errorprone-javac')[0])])
+
     args = [
-      '-classpath', ':'.join(runtime_classpath),
       '-d', output_dir,
     ]
+
+    # Errorprone does not recognize source or target 10 yet
+    if target.platform.source_level < Revision.lenient('10'):
+      args.extend(['-source', str(target.platform.source_level)])
+
+    if target.platform.target_level < Revision.lenient('10'):
+      args.extend(['-target', str(target.platform.target_level)])
+
+    errorprone_classpath_file = os.path.join(self.workdir, '{}.classpath'.format(os.path.basename(output_dir)))
+    with open(errorprone_classpath_file, 'w') as f:
+      f.write('-classpath ')
+      f.write(':'.join(runtime_classpath))
+    args.append('@{}'.format(errorprone_classpath_file))
 
     for opt in self.get_options().command_line_options:
       args.extend(safe_shlex_split(opt))
 
-    args.extend(self.calculate_sources(target))
+    with argfile.safe_args(self.calculate_sources(target), self.get_options()) as batched_sources:
+      args.extend(batched_sources)
+      result = self.runjava(classpath=self.tool_classpath('errorprone'),
+                            main=self._ERRORPRONE_MAIN,
+                            jvm_options=jvm_options,
+                            args=args,
+                            workunit_name='errorprone',
+                            workunit_labels=[WorkUnitLabel.LINT])
 
-    result = self.runjava(classpath=self.tool_classpath('errorprone'),
-                          main=self._ERRORPRONE_MAIN,
-                          jvm_options=self.get_options().jvm_options,
-                          args=args,
-                          workunit_name='errorprone',
-                          workunit_labels=[WorkUnitLabel.LINT])
-
-    self.context.log.debug('java {main} ... exited with result ({result})'.format(
-                           main=self._ERRORPRONE_MAIN, result=result))
+      self.context.log.debug('java {main} ... exited with result ({result})'.format(
+        main=self._ERRORPRONE_MAIN, result=result))
 
     return result

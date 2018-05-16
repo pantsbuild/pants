@@ -2,6 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+set -e
+
 ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 source ${ROOT}/build-support/common.sh
 
@@ -9,35 +11,72 @@ PY=$(which python2.7)
 [[ -n "${PY}" ]] || die "You must have python2.7 installed and on the path to release."
 export PY
 
+function run_local_pants() {
+  ${ROOT}/pants "$@"
+}
+
+# NB: Pants core does not have the ability to change its own version, so we compute the
+# suffix here and mutate the VERSION_FILE to affect the current version.
+readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
+readonly PANTS_STABLE_VERSION="$(cat "${VERSION_FILE}")"
+readonly HEAD_SHA=$(git rev-parse --verify HEAD)
+readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+${HEAD_SHA:0:8}"
+
+readonly DEPLOY_DIR="${ROOT}/dist/deploy"
+readonly DEPLOY_3RDPARTY_WHEELS_PATH="wheels/3rdparty/${HEAD_SHA}"
+readonly DEPLOY_PANTS_WHEELS_PATH="wheels/pantsbuild.pants/${HEAD_SHA}"
+readonly DEPLOY_PANTS_SDIST_PATH="sdists/pantsbuild.pants/${HEAD_SHA}"
+readonly DEPLOY_3RDPARTY_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_3RDPARTY_WHEELS_PATH}"
+readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
+readonly DEPLOY_PANTS_SDIST_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_SDIST_PATH}"
+
+# A space-separated list of pants packages to include in any pexes that are built: by default,
+# only pants core is included.
+: ${PANTS_PEX_PACKAGES:="pantsbuild.pants"}
+
 source ${ROOT}/contrib/release_packages.sh
+
+source "${ROOT}/build-support/bin/native/bootstrap.sh"
+
+function find_pkg() {
+  local -r pkg_name=$1
+  local -r version=$2
+  local -r search_dir=$3
+  find "${search_dir}" -type f -name "${pkg_name}-${version}-*.whl"
+}
+
+function find_plat_name() {
+  # See: https://www.python.org/dev/peps/pep-0425/#id13
+  "${PY}" << EOF
+from __future__ import print_function
+from distutils.util import get_platform
+
+print(get_platform().replace('-', '_').replace('.', '_'))
+EOF
+}
 
 #
 # List of packages to be released
 #
-# Each package definition is of form:
-#
-# PKG_<NAME>=(
-#   "package.name"
-#   "build.target"
-#   "pkg_<name>_install_test"
-# )
-# function pkg_<name>_install_test() {
-#   ...
-# }
+# See build-support/README.md for more information on the format of each
+# `PKG_$NAME` definition.
 #
 PKG_PANTS=(
   "pantsbuild.pants"
   "//src/python/pants:pants-packaged"
   "pkg_pants_install_test"
+  "--python-tag cp27 --plat-name $(find_plat_name)"
 )
 function pkg_pants_install_test() {
-  PIP_ARGS="$@"
-  pip install ${PIP_ARGS} "${ROOT}/dist/pantsbuild.pants-$(local_version).tar.gz" || \
+  local version=$1
+  shift
+  local PIP_ARGS="$@"
+  pip install ${PIP_ARGS} "pantsbuild.pants==${version}" || \
     die "pip install of pantsbuild.pants failed!"
   execute_packaged_pants_with_internal_backends list src:: || \
     die "'pants list src::' failed in venv!"
   [[ "$(execute_packaged_pants_with_internal_backends --version 2>/dev/null)" \
-     == "$(local_version)" ]] || die "Installed version of pants does match local version!"
+     == "${version}" ]] || die "Installed version of pants does match requested version!"
 }
 
 PKG_PANTS_TESTINFRA=(
@@ -46,24 +85,31 @@ PKG_PANTS_TESTINFRA=(
   "pkg_pants_testinfra_install_test"
 )
 function pkg_pants_testinfra_install_test() {
-  PIP_ARGS="$@"
-  pip install ${PIP_ARGS} "${ROOT}/dist/pantsbuild.pants.testinfra-$(local_version).tar.gz" && \
+  local version=$1
+  shift
+  local PIP_ARGS="$@"
+  pip install ${PIP_ARGS} "pantsbuild.pants.testinfra==${version}" && \
   python -c "import pants_test"
 }
 
 # Once an individual (new) package is declared above, insert it into the array below)
-RELEASE_PACKAGES=(
+CORE_PACKAGES=(
   PKG_PANTS
   PKG_PANTS_TESTINFRA
+)
+RELEASE_PACKAGES=(
+  ${CORE_PACKAGES[*]}
   ${CONTRIB_PACKAGES[*]}
 )
+
 #
 # End of package declarations.
 #
 
-function run_local_pants() {
-  ${ROOT}/pants "$@"
-}
+REQUIREMENTS_3RDPARTY_FILES=(
+  "3rdparty/python/requirements.txt"
+  "3rdparty/python/twitter/commons/requirements.txt"
+)
 
 # When we do (dry-run) testing, we need to run the packaged pants.
 # It doesn't have internal backend plugins so when we execute it
@@ -74,7 +120,7 @@ function run_local_pants() {
 function execute_packaged_pants_with_internal_backends() {
   pip install --ignore-installed \
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
-  PANTS_PYTHON_REPOS_REPOS="['${ROOT}/dist']" pants \
+  pants \
     --no-verify-config \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[\
@@ -82,6 +128,7 @@ function execute_packaged_pants_with_internal_backends() {
         'pants.backend.docgen',\
         'pants.backend.graph_info',\
         'pants.backend.jvm',\
+        'pants.backend.native',\
         'pants.backend.project_info',\
         'pants.backend.python',\
         'internal_backend.repositories',\
@@ -109,40 +156,102 @@ function pkg_install_test_func() {
   echo ${INSTALL_TEST_FUNC}
 }
 
-function local_version() {
-  run_local_pants --version 2>/dev/null
+function bdist_wheel_flags() {
+  PACKAGE=$1
+  eval BDIST_WHEEL_FLAGS=\${$PACKAGE[3]}
+    echo ${BDIST_WHEEL_FLAGS}
 }
 
-function build_packages() {
+function pants_version_reset() {
+  pushd ${ROOT} > /dev/null
+    git checkout -- ${VERSION_FILE}
+  popd > /dev/null
+}
+
+function pants_version_set() {
+  # Mutates `src/python/pants/VERSION` to temporarily override it. Sets a `trap` to restore to
+  # HEAD on exit.
+  local version=$1
+  trap pants_version_reset EXIT
+  echo "${version}" > "${VERSION_FILE}"
+}
+
+function build_3rdparty_packages() {
+  # Builds whls for 3rdparty dependencies of pants.
+  local version=$1
+
+  rm -rf "${DEPLOY_3RDPARTY_WHEEL_DIR}"
+  mkdir -p "${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}"
+
+  local req_args=""
+  for req_file in "${REQUIREMENTS_3RDPARTY_FILES[@]}"; do
+    req_args="${req_args} -r ${ROOT}/$req_file"
+  done
+
+  start_travis_section "3rdparty" "Building 3rdparty whls from ${REQUIREMENTS_3RDPARTY_FILES[@]}"
+  activate_tmp_venv
+
+  pip wheel --wheel-dir="${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}" ${req_args}
+
+  deactivate
+  end_travis_section
+}
+
+function build_pants_packages() {
+  # TODO(John Sirois): Remove sdist generation and twine upload when
+  # https://github.com/pantsbuild/pants/issues/4956 is resolved.
+  local version=$1
+
+  rm -rf "${DEPLOY_PANTS_WHEEL_DIR}" "${DEPLOY_PANTS_SDIST_DIR}"
+  mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}/${version}" "${DEPLOY_PANTS_SDIST_DIR}/${version}"
+
+  pants_version_set "${version}"
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
     NAME=$(pkg_name $PACKAGE)
     BUILD_TARGET=$(pkg_build_target $PACKAGE)
+    BDIST_WHEEL_FLAGS=$(bdist_wheel_flags $PACKAGE)
 
-    start_travis_section "${NAME}" "Building package ${NAME}-$(local_version) with target '${BUILD_TARGET}'"
-    run_local_pants setup-py --recursive ${BUILD_TARGET} || \
-      die "Failed to build package ${NAME}-$(local_version) with target '${BUILD_TARGET}'!"
+    start_travis_section "${NAME}" "Building package ${NAME}-${version} with target '${BUILD_TARGET}'"
+    (
+      run_local_pants setup-py \
+        --run="sdist bdist_wheel ${BDIST_WHEEL_FLAGS:---python-tag py27}" \
+          ${BUILD_TARGET} && \
+      wheel=$(find_pkg ${NAME} ${version} "${ROOT}/dist") && \
+      cp -p "${wheel}" "${DEPLOY_PANTS_WHEEL_DIR}/${version}" && \
+      cp -p "${ROOT}/dist/${NAME}-${version}/dist/${NAME}-${version}.tar.gz" "${DEPLOY_PANTS_SDIST_DIR}/${version}"
+    ) || die "Failed to build package ${NAME}-${version} with target '${BUILD_TARGET}'!"
     end_travis_section
   done
+
+  start_travis_section "fs_util" "Building fs_util binary"
+  # fs_util is a standalone tool which can be used to inspect and manipulate
+  # Pants's engine's file store, and interact with content addressable storage
+  # services which implement the Bazel remote execution API.
+  # It is a useful standalone tool which people may want to consume, for
+  # instance when debugging pants issues, or if they're implementing a remote
+  # execution API. Accordingly, we include it in our releases.
+  (
+    set -e
+    RUST_BACKTRACE=1 PANTS_SRCPATH="${ROOT}/src/python" run_cargo build --release --manifest-path="${ROOT}/src/rust/engine/fs/fs_util/Cargo.toml"
+    dst_dir="${DEPLOY_DIR}/bin/fs_util/$("${ROOT}/build-support/bin/get_os.sh")/${version}"
+    mkdir -p "${dst_dir}"
+    cp "${ROOT}/src/rust/engine/target/release/fs_util" "${dst_dir}/"
+  ) || die "Failed to build fs_util"
+  end_travis_section
+
+  pants_version_reset
 }
 
-function publish_packages() {
-  targets=()
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
-  do
-    targets+=($(pkg_build_target $PACKAGE))
-  done
-  start_travis_section "Publishing" "Publishing packages"
-  run_local_pants setup-py --run="sdist upload --sign --identity=$(get_pgp_keyid)" \
-    --recursive ${targets[@]} || die "Failed to publish packages!"
-  end_travis_section
+function activate_tmp_venv() {
+  VENV_DIR=$(mktemp -d -t pants.XXXXX) && \
+  ${ROOT}/build-support/virtualenv $VENV_DIR && \
+  source $VENV_DIR/bin/activate
 }
 
 function pre_install() {
   start_travis_section "SetupVenv" "Setting up virtualenv"
-  VENV_DIR=$(mktemp -d -t pants.XXXXX) && \
-  ${ROOT}/build-support/virtualenv $VENV_DIR && \
-  source $VENV_DIR/bin/activate
+  activate_tmp_venv
   end_travis_section
 }
 
@@ -167,43 +276,55 @@ EOM
 }
 
 function install_and_test_packages() {
-  PIP_ARGS=(
+  local VERSION=$1
+  shift
+  local PIP_ARGS=(
+    "${VERSION}"
     "$@"
     --quiet
-
-    # Make sure we go out and hit pypi to get the new packages.
+    # Prefer remote or `--find-links` packages to cache contents.
     --no-cache-dir
   )
 
-  pre_install || die "Failed to setup virtualenv while testing ${NAME}-$(local_version)!"
+  pre_install || die "Failed to setup virtualenv while testing ${NAME}-${VERSION}!"
 
-  # Make sure we install fresh plugins since pants uses a fixed version number between releases.
+  # Avoid caching plugin installs.
   export PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
   trap "rm -rf ${PANTS_PLUGIN_CACHE_DIR}" EXIT
 
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
+  PACKAGES=("${RELEASE_PACKAGES[@]}")
+
+  export PANTS_PYTHON_REPOS_REPOS="${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
+  for PACKAGE in "${PACKAGES[@]}"
   do
     NAME=$(pkg_name $PACKAGE)
     INSTALL_TEST_FUNC=$(pkg_install_test_func $PACKAGE)
 
-    start_travis_section "${NAME}" "Installing and testing package ${NAME}-$(local_version)"
+    start_travis_section "${NAME}" "Installing and testing package ${NAME}-${VERSION}"
     eval $INSTALL_TEST_FUNC ${PIP_ARGS[@]} || \
-      die "Failed to install and test package ${NAME}-$(local_version)!"
+      die "Failed to install and test package ${NAME}-${VERSION}!"
     end_travis_section
   done
+  unset PANTS_PYTHON_REPOS_REPOS
 
-  post_install || die "Failed to deactivate virtual env while testing ${NAME}-$(local_version)!"
-
+  post_install || die "Failed to deactivate virtual env while testing ${NAME}-${VERSION}!"
 }
 
 function dry_run_install() {
-  build_packages && \
-  install_and_test_packages --find-links=file://${ROOT}/dist
+  # Build a complete set of whls, and then ensure that we can install pants using only whls.
+  local VERSION="${PANTS_UNSTABLE_VERSION}"
+  build_pants_packages "${VERSION}" && \
+  build_3rdparty_packages "${VERSION}" && \
+  install_and_test_packages "${VERSION}" \
+    --only-binary=:all: \
+    -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${VERSION}" -f "${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
 }
 
 ALLOWED_ORIGIN_URLS=(
   git@github.com:pantsbuild/pants.git
+  git@github.com:pantsbuild/pants
   https://github.com/pantsbuild/pants.git
+  https://github.com/pantsbuild/pants
 )
 
 function check_origin() {
@@ -265,47 +386,8 @@ function get_pgp_keyid() {
   git config --get user.signingkey
 }
 
-function check_pypi() {
-  if [[ ! -r ~/.pypirc ]]
-  then
-    msg=$(cat << EOM
-You must create a ~/.pypirc file with your pypi credentials:
-cat << EOF > ~/.pypirc && chmod 600 ~/.pypirc
-[server-login]
-username: <fill me in>
-password: <fill me in>
-EOF
-
-More information is here: https://wiki.python.org/moin/EnhancedPyPI
-EOM
-)
-    die "${msg}"
-  fi
-  ${PY} << EOF || die
-from __future__ import print_function
-
-import os
-import sys
-from ConfigParser import ConfigParser
-
-config = ConfigParser()
-config.read(os.path.expanduser('~/.pypirc'))
-
-def check_option(section, option):
-  if config.has_option(section, option):
-    return config.get(section, option)
-  print('Your ~/.pypirc must define a {} option in the {} section'.format(option, section))
-
-username = check_option('server-login', 'username')
-if not (username or check_option('server-login', 'password')):
-  sys.exit(1)
-else:
-  print(username)
-EOF
-}
-
 function tag_release() {
-  release_version="$(local_version)" && \
+  release_version="${PANTS_STABLE_VERSION}" && \
   tag_name="release_${release_version}" && \
   git tag -f \
     --local-user=$(get_pgp_keyid) \
@@ -323,154 +405,245 @@ function publish_docs_if_master() {
   fi
 }
 
-function list_packages() {
-  echo "Releases the following source distributions to PyPi."
-  version="$(local_version)"
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
-  do
-    echo "  $(pkg_name $PACKAGE)-${version}"
-  done
-}
-
-function package_exists() {
-  package_name="$1"
-
-  curl --fail --head https://pypi.python.org/pypi/${package_name} &>/dev/null
-}
-
-function get_owners() {
-  package_name="$1"
-
-  latest_package_path=$(
-    curl -s https://pypi.python.org/pypi/${package_name} | \
-        grep -oE  "/pypi/${package_name}/[0-9]+\.[0-9]+\.[0-9]+([-.]?(rc|dev)[0-9]+)?" | head -n1
-  )
-  curl -s "https://pypi.python.org${latest_package_path}" | \
-    grep -A1 "Owner" | tail -1 | \
-    cut -d'>' -f2 | cut -d'<' -f1 | \
-    tr ',' ' ' | sed -E -e "s|[[:space:]]+| |g"
-}
-
-function list_owners() {
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
-  do
-    package_name=$(pkg_name $PACKAGE)
-    if package_exists ${package_name}
-    then
-      echo "Owners of ${package_name}:"
-      owners=($(get_owners ${package_name}))
-      for owner in "${owners[@]}"
-      do
-        echo "  ${owner}"
-      done
-    else
-      echo "The ${package_name} package is new!  There are no owners yet."
-    fi
-    echo
-  done
-}
-
-function check_owner() {
-   username="$1"
-   package_name="$2"
-
-   for owner in $(get_owners ${package_name})
-   do
-     # NB: A case-insensitive comparison is done since pypi is case-insensitive wrt usernames.
-     # Note that the ^^ case operator requires bash 4.  If you're on a Mac you may need to brew
-     # install bash, as the version that comes with MacOS is ancient.
-     if [[ "${username^^}" == "${owner^^}" ]]
-     then
-       return 0
-     fi
-   done
-   return 1
-}
-
 function check_owners() {
-  username="$(check_pypi)"
+  run_local_pants -q run src/python/pants/releases:packages -- check-my-ownership
+}
 
-  total=${#RELEASE_PACKAGES[@]}
-  banner "Checking package ownership for pypi user ${username} of ${total} packages"
-  dont_own=()
-  index=0
+function reversion_whls() {
+  # Reversions all whls from an input directory to an output directory.
+  # Adds one pants-specific glob to match the `VERSION` file in `pantsbuild.pants`.
+  local src_dir=$1
+  local dest_dir=$2
+  local output_version=$3
+
+  for whl in `ls -1 "${src_dir}"/*.whl`; do
+    run_local_pants -q run src/python/pants/releases:reversion -- \
+      --glob='pants/VERSION' \
+      "${whl}" "${dest_dir}" "${output_version}" \
+      || die "Could not reversion whl ${whl} to ${output_version}"
+  done
+}
+
+readonly BINARY_BASE_URL=https://binaries.pantsbuild.org
+
+function list_prebuilt_wheels() {
+  # List prebuilt wheels as tab-separated tuples of filename and URL-encoded name.
+  wheel_listing="$(mktemp -t pants.wheels.XXXXX)"
+  trap "rm -f ${wheel_listing}" RETURN
+
+  for wheels_path in "${DEPLOY_PANTS_WHEELS_PATH}" "${DEPLOY_3RDPARTY_WHEELS_PATH}"; do
+    curl -sSL "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
+    "${PY}" << EOF
+from __future__ import print_function
+import sys
+import urllib
+import xml.etree.ElementTree as ET
+root = ET.parse("${wheel_listing}")
+ns = {'s3': 'http://s3.amazonaws.com/doc/2006-03-01/'}
+for key in root.findall('s3:Contents/s3:Key', ns):
+  # Because filenames may contain characters that have different meanings
+  # in URLs (namely '+'), # print the key both as url-encoded and as a file path.
+  print('{}\t{}'.format(key.text, urllib.quote_plus(key.text)))
+EOF
+ done
+}
+
+function fetch_prebuilt_wheels() {
+  local -r to_dir="$1"
+
+  banner "Fetching prebuilt wheels for ${PANTS_UNSTABLE_VERSION}"
+  (
+    cd "${to_dir}"
+    list_prebuilt_wheels | {
+      while read path_tuple
+      do
+        local file_path=$(echo "$path_tuple" | awk -F'\t' '{print $1}')
+        local url_path=$(echo "$path_tuple" | awk -F'\t' '{print $2}')
+        echo "${BINARY_BASE_URL}/${url_path}:"
+        local dest="${to_dir}/${file_path}"
+        mkdir -p "$(dirname "${dest}")"
+        curl --fail --progress-bar -o "${dest}" "${BINARY_BASE_URL}/${url_path}" \
+          || die "Could not fetch ${dest}."
+      done
+    }
+  )
+}
+
+function fetch_and_check_prebuilt_wheels() {
+  # Fetches wheels from S3 into subdirectories of the given directory.
+  local check_dir="$1"
+  if [[ -z "${check_dir}" ]]
+  then
+    check_dir=$(mktemp -d -t pants.wheel_check.XXXXX)
+    trap "rm -rf ${check_dir}" RETURN
+  fi
+
+  banner "Checking prebuilt wheels for ${PANTS_UNSTABLE_VERSION}"
+  fetch_prebuilt_wheels "${check_dir}"
+
+  local missing=()
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
-    index=$((index+1))
-    package_name="$(pkg_name $PACKAGE)"
-    banner "[${index}/${total}] checking that ${username} owns ${package_name}"
-    if package_exists ${package_name}
-    then
-      if ! check_owner "${username}" "${package_name}"
+    NAME=$(pkg_name $PACKAGE)
+    packages=($(find_pkg "${NAME}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))
+    if [ ${#packages[@]} -eq 0 ]; then
+      missing+=("${NAME}")
+      continue
+    fi
+
+    # Confirm that if the package is not cross platform that we have whls for two platforms.
+    local cross_platform=""
+    for package in "${packages[@]}"
+    do
+      if [[ "${package}" =~ "-none-any.whl" ]]
       then
-        dont_own+=("${package_name}")
+        cross_platform="true"
       fi
-    else
-      echo "The ${package_name} package is new!  There are no owners yet."
+    done
+
+    if [ "${cross_platform}" != "true" ] && [ ${#packages[@]} -ne 2 ]; then
+      missing+=("${NAME} (expected whls for each platform: had only ${packages[@]})")
+      continue
     fi
   done
 
-  if (( ${#dont_own[@]} > 0 ))
+  if (( ${#missing[@]} > 0 ))
   then
-    msg=$(cat << EOM
-Your pypi account ${username} needs to be added as an owner for the
-following packages:
-$(echo "${dont_own[@]}" | tr ' ' '\n' | sed -E "s|^|  |")
-EOM
-)
-    die "${msg}"
+    echo "Failed to find prebuilt packages for:"
+    for package in "${missing[@]}"
+    do
+      echo "  ${package}"
+    done
+    die
   fi
 }
 
-# Indirectly defines:
-# + RUST_OSX_MIN_VERSION: The minimum minor version of OSX supported by Rust; eg 7 for OSX 10.7.
-# + OSX_MAX_VERSION: The current latest OSX minor version; eg 12 for OSX Sierra 10.12.
-# + LIB_EXTENSION: The extension of native libraries.
-# + KERNEL: The lower-cased name of the kernel as reported by uname.
-# + OS_NAME: The name of the OS as seen by pants.
-# + OS_ID: The ID of the current OS as seen by pants.
-# Indirectly exposes:
-# + get_native_engine_version: Echoes the current native engine version.
-# + get_rust_osx_versions: Produces the osx minor versions supported by Rust one per line.
-# + get_rust_osx_ids: Produces the BinaryUtil osx os id paths supported by rust, one per line.
-# + get_rust_os_ids: Produces the BinaryUtil os id paths supported by rust, one per line.
-# Defines:
-# + CACHE_ROOT: The pants cache root dir.
-# + NATIVE_ENGINE_CACHE_DIR: The native engine binary root cache directory.
-# + NATIVE_ENGINE_CACHE_TARGET_DIR: The directory containing all versions of the native engine for
-#                                   the current OS.
-# + NATIVE_ENGINE_BINARY: The basename of the native engine binary for the current OS.
-# + NATIVE_ENGINE_VERSION_RESOURCE: The path of the resource file containing the native engine
-#                                   version hash.
-# Exposes:
-# + calculate_current_hash: Calculates the current native engine version hash and echoes it to
-#                           stdout.
-# + bootstrap_native_code: Builds target-specific native engine binaries.
-source ${ROOT}/build-support/bin/native/bootstrap.sh
-
-readonly BINARY_BASE_URL=https://s3.amazonaws.com/binaries.pantsbuild.org
-readonly NATIVE_ENGINE_BASE_URL=${BINARY_BASE_URL}/bin/native-engine
-
-function check_native_engine() {
-  local readonly native_engine_version=${NATIVE_ENGINE_VERSION:-$(get_native_engine_version)}
-  banner "Checking for native engine release version ${native_engine_version}"
-
-  local readonly headers=$(mktemp -t pants-release.XXXXXX)
-  local result=0
-  for os_id in $(get_rust_os_ids)
-  do
-    local url=${NATIVE_ENGINE_BASE_URL}/${os_id}/${native_engine_version}/${NATIVE_ENGINE_BINARY}
-    echo -n "  for ${os_id} -> ${url}... "
-    curl --progress-bar --fail --head ${url} &> ${headers} && echo OK || {
-      result=$(( ${result} + 1 )) && echo FAILURE && cat ${headers} && echo
-    }
+function adjust_wheel_platform() {
+  # Renames wheels to adjust their tag from a src platform to a dst platform.
+  # TODO: pypi will only accept manylinux wheels, but pex does not support manylinux whls:
+  # this function is used to go in one direction or another, depending on who is consuming.
+  #   see https://github.com/pantsbuild/pants/issues/4956
+  local src_plat="$1"
+  local dst_plat="$2"
+  local dir="$3"
+  for src_whl in `find "${dir}" -name '*'"${src_plat}.whl"`; do
+    local dst_whl=${src_whl/$src_plat/$dst_plat}
+    mv -f "${src_whl}" "${dst_whl}"
   done
-  rm -f ${headers}
+}
 
-  if (( ${result} != 0 ))
-  then
-    die "Failed to find ${result} releases of native engine version ${native_engine_version}"
+function activate_twine() {
+  local -r venv_dir="${ROOT}/build-support/twine-deps.venv"
+
+  rm -rf "${venv_dir}"
+  "${ROOT}/build-support/virtualenv" "${venv_dir}"
+  source "${venv_dir}/bin/activate"
+  pip install twine
+}
+
+function build_pex() {
+  # Builds a pex from the current UNSTABLE version.
+  # If $1 == "build", builds a pex just for this platform, from source.
+  # If $1 == "fetch", fetches the linux and OSX wheels which were built on travis.
+  local mode="$1"
+
+  local linux_platform="linux_x86_64"
+  local osx_platform="macosx_10.10_x86_64"
+
+  case "${mode}" in
+    build)
+      case "$(uname)" in
+	Darwin)
+	  local platform="${osx_platform}"
+	  ;;
+	Linux)
+	  local platform="${linux_platform}"
+	  ;;
+	*)
+	  echo >&2 "Unknown uname"
+	  exit 1
+	  ;;
+      esac
+      local platforms=("${platform}")
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.pex"
+      ;;
+    fetch)
+      local platforms=("${linux_platform}" "macosx_10.10_x86_64")
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
+      ;;
+    *)
+      echo >&2 "Bad build_pex mode ${mode}"
+      exit 1
+      ;;
+  esac
+
+  rm -rf "${DEPLOY_DIR}"
+  mkdir -p "${DEPLOY_DIR}"
+
+  if [[ "${mode}" == "fetch" ]]; then
+    fetch_and_check_prebuilt_wheels "${DEPLOY_DIR}"
+  else
+    build_pants_packages "${PANTS_UNSTABLE_VERSION}"
+    build_3rdparty_packages "${PANTS_UNSTABLE_VERSION}"
   fi
+
+  adjust_wheel_platform "manylinux1_x86_64" "${linux_platform}" "${DEPLOY_DIR}"
+
+  activate_tmp_venv && trap deactivate RETURN && pip install "pex==1.3.1" || die "Failed to install pex."
+
+  local requirements=()
+  for pkg_name in $PANTS_PEX_PACKAGES; do
+    requirements=("${requirements[@]}" "${pkg_name}==${PANTS_UNSTABLE_VERSION}")
+  done
+
+  local platform_flags=()
+  for platform in "${platforms[@]}"; do
+    platform_flags=("${platform_flags[@]}" "--platform=${platform}")
+  done
+
+  pex \
+    -o "${dest}" \
+    --entry-point="pants.bin.pants_loader:main" \
+    --no-build \
+    --no-pypi \
+    --disable-cache \
+    "${platform_flags[@]}" \
+    -f "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
+    -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
+    "${requirements[@]}"
+
+  banner "Successfully built ${dest}"
+}
+
+function publish_packages() {
+  # TODO(John Sirois): Remove sdist generation and twine upload when
+  # https://github.com/pantsbuild/pants/issues/4956 is resolved.
+  # NB: We need this step to generate sdists. It also generates wheels locally, but we nuke them
+  # and replace with pre-tested binary wheels we download from s3.
+  build_pants_packages "${PANTS_STABLE_VERSION}"
+
+  rm -rf "${DEPLOY_PANTS_WHEEL_DIR}"
+  mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"
+
+  start_travis_section "Publishing" "Publishing packages for ${PANTS_STABLE_VERSION}"
+
+  # Fetch unstable wheels, rename any linux whls to manylinux, and reversion them
+  # from PANTS_UNSTABLE_VERSION to PANTS_STABLE_VERSION
+  fetch_and_check_prebuilt_wheels "${DEPLOY_DIR}"
+  adjust_wheel_platform "linux_x86_64" "manylinux1_x86_64" \
+    "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}"
+  reversion_whls \
+    "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
+    "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}" \
+    "${PANTS_STABLE_VERSION}"
+
+  activate_twine
+  trap deactivate RETURN
+
+  twine upload --sign --identity=$(get_pgp_keyid) "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"/*.whl
+  twine upload --sign --identity=$(get_pgp_keyid) "${DEPLOY_PANTS_SDIST_DIR}/${PANTS_STABLE_VERSION}"/*.tar.gz
+
+  end_travis_section
 }
 
 function usage() {
@@ -478,7 +651,7 @@ function usage() {
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.org/release.html"
   echo
-  echo "Usage: $0 [-d] (-h|-n|-t|-l|-o|-e)"
+  echo "Usage: $0 [-d] [-c] (-h|-n|-t|-l|-o|-e|-p)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
   echo " -n  Performs a release dry run."
@@ -490,7 +663,9 @@ function usage() {
   echo "       and can be installed in an ephemeral virtualenv."
   echo " -l  Lists all pantsbuild packages that this script releases."
   echo " -o  Lists all pantsbuild package owners."
-  echo " -e  Check that native engine binaries are deployed for this release."
+  echo " -e  Check that wheels are prebuilt for this release."
+  echo " -p  Build a pex from prebuilt wheels for this release."
+  echo " -q  Build a pex which only works on the host platform, using the code as exists on disk."
   echo
   echo "All options (except for '-d') are mutually exclusive."
 
@@ -501,15 +676,18 @@ function usage() {
   fi
 }
 
-while getopts "hdntloe" opt; do
+while getopts "hdntcloepqw" opt; do
   case ${opt} in
     h) usage ;;
     d) debug="true" ;;
     n) dry_run="true" ;;
     t) test_release="true" ;;
-    l) list_packages && exit 0 ;;
-    o) list_owners && exit 0 ;;
-    e) check_native_engine && exit 0 ;;
+    l) run_local_pants -q run src/python/pants/releases:packages -- list ; exit $? ;;
+    o) run_local_pants -q run src/python/pants/releases:packages -- list-owners ; exit $? ;;
+    e) fetch_and_check_prebuilt_wheels ; exit $? ;;
+    p) build_pex fetch ; exit $? ;;
+    q) build_pex build ; exit $? ;;
+    w) list_prebuilt_wheels ; exit $? ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -530,14 +708,14 @@ elif [[ "${dry_run}" == "true" ]]; then
 elif [[ "${test_release}" == "true" ]]; then
   banner "Installing and testing the latest released packages" && \
   (
-    install_and_test_packages && \
+    install_and_test_packages "${PANTS_STABLE_VERSION}" && \
     banner "Successfully installed and tested the latest released packages"
   ) || die "Failed to install and test the latest released packages."
 else
   banner "Releasing packages to PyPi" && \
   (
-    check_origin && check_clean_branch && check_pgp && check_native_engine && check_owners && \
-      dry_run_install && publish_packages && tag_release && publish_docs_if_master && \
+    check_origin && check_clean_branch && check_pgp && check_owners && \
+      publish_packages && tag_release && publish_docs_if_master && \
       banner "Successfully released packages to PyPi"
   ) || die "Failed to release packages to PyPi."
 fi

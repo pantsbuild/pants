@@ -9,11 +9,11 @@ import os
 
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
+from pants.init.subprocess import Subprocess
 from pants.java import util
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
-from pants.pantsd.subsystem.subprocess import Subprocess
 from pants.task.task import Task, TaskBase
 
 
@@ -53,24 +53,25 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     self._executor_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
                                           *id_tuple)
 
-  def create_java_executor(self):
+  def create_java_executor(self, dist=None):
     """Create java executor that uses this task's ng daemon, if allowed.
 
     Call only in execute() or later. TODO: Enforce this.
     """
+    dist = dist or self.dist
     if self.get_options().use_nailgun:
       classpath = os.pathsep.join(self.tool_classpath('nailgun-server'))
       return NailgunExecutor(self._identity,
                              self._executor_workdir,
                              classpath,
-                             self.dist,
+                             dist,
                              connect_timeout=self.get_options().nailgun_timeout_seconds,
                              connect_attempts=self.get_options().nailgun_connect_attempts)
     else:
-      return SubprocessExecutor(self.dist)
+      return SubprocessExecutor(dist)
 
   def runjava(self, classpath, main, jvm_options=None, args=None, workunit_name=None,
-              workunit_labels=None, workunit_log_config=None):
+              workunit_labels=None, workunit_log_config=None, dist=None):
     """Runs the java main using the given classpath and args.
 
     If --no-use-nailgun is specified then the java main is run in a freshly spawned subprocess,
@@ -79,7 +80,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
     :API: public
     """
-    executor = self.create_java_executor()
+    executor = self.create_java_executor(dist=dist)
 
     # Creating synthetic jar to work around system arg length limit is not necessary
     # when `NailgunExecutor` is used because args are passed through socket, therefore turning off

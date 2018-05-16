@@ -21,6 +21,15 @@ jvm_binary(
   ],
 )
 
+jvm_binary(
+  name = 'manifest-with-agent',
+  main = 'org.pantsbuild.testproject.manifest.Manifest',
+  manifest_entries = {
+    'Implementation-Version' :  '4.5.6',
+  },
+  dependencies = [':agent'],
+)
+
 java_library(
   name = 'manifest-lib',
   sources = ['Manifest.java'],
@@ -31,4 +40,10 @@ jvm_app(
   dependencies = [
     ':manifest-no-source',
   ]
+)
+
+java_agent(
+  name = 'agent',
+  agent_class = 'org.pantsbuild.testproject.manifest.Agent',
+  sources = ['Agent.java'],
 )

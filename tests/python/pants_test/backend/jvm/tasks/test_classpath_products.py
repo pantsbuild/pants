@@ -277,7 +277,7 @@ class ClasspathProductsTest(BaseTest):
                                                            cache_path='somewhere',
                                                            pants_path=None)])
     self.assertEqual(
-      'Jar: org:name:::jar has no specified path.',
+      'Jar: org:name: has no specified path.',
       str(cm.exception))
 
   def test_get_product_target_mappings_for_targets_respect_excludes(self):

@@ -9,10 +9,10 @@ import logging
 import os
 
 from pants.base.build_file import BuildFile
-from pants.base.specs import DescendantAddresses, SiblingAddresses
+from pants.base.specs import DescendantAddresses, SiblingAddresses, Specs
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import BuildFilesCollection
 from pants.engine.mapper import ResolveError
 from pants.engine.nodes import Throw
 from pants.util.dirutil import fast_relpath
@@ -32,34 +32,27 @@ class LegacyAddressMapper(AddressMapper):
     self._build_root = build_root
 
   def scan_build_files(self, base_path):
-    request = self._scheduler.execution_request([BuildFilesCollection], [(DescendantAddresses(base_path))])
+    build_file_addresses = self._internal_scan_specs([DescendantAddresses(base_path)],
+                                                     missing_is_fatal=False)
 
-    result = self._scheduler.execute(request)
-    if result.error:
-      raise result.error
+    return {bfa.rel_path for bfa in build_file_addresses}
 
-    build_files_set = set()
-    for _, state in result.root_products:
-      for build_files in state.value.dependencies:
-        build_files_set.update(f.path for f in build_files.files_content.dependencies)
-
-    return build_files_set
+  @staticmethod
+  def any_is_declaring_file(address, file_paths):
+    try:
+      # A precise check for BuildFileAddress
+      return address.rel_path in file_paths
+    except AttributeError:
+      pass
+    # NB: this will cause any BUILD file, whether it contains the address declaration or not to be
+    # considered the one that declared it. That's ok though, because the spec path should be enough
+    # information for debugging most of the time.
+    return any(address.spec_path == os.path.dirname(fp)
+               for fp in file_paths if BuildFile._is_buildfile_name(os.path.basename(fp)))
 
   @staticmethod
   def is_declaring_file(address, file_path):
-    if not BuildFile._is_buildfile_name(os.path.basename(file_path)):
-      return False
-
-    try:
-      # A precise check for BuildFileAddress
-      return address.rel_path == file_path
-    except AttributeError:
-      # NB: this will cause any BUILD file, whether it contains the address declaration or not to be
-      # considered the one that declared it. That's ok though, because the spec path should be enough
-      # information for debugging most of the time.
-      #
-      # TODO: remove this after https://github.com/pantsbuild/pants/issues/3925 lands
-      return os.path.dirname(file_path) == address.spec_path
+    return LegacyAddressMapper.any_is_declaring_file(address, [file_path])
 
   def addresses_in_spec_path(self, spec_path):
     return self.scan_specs([SiblingAddresses(spec_path)])
@@ -67,30 +60,34 @@ class LegacyAddressMapper(AddressMapper):
   def scan_specs(self, specs, fail_fast=True):
     return self._internal_scan_specs(specs, fail_fast=fail_fast, missing_is_fatal=True)
 
+  def _specs_string(self, specs):
+    return ', '.join(s.to_spec_string() for s in specs)
+
   def _internal_scan_specs(self, specs, fail_fast=True, missing_is_fatal=True):
-    request = self._scheduler.execution_request([BuildFileAddresses], specs)
+    # TODO: This should really use `product_request`, but on the other hand, we need to
+    # deprecate the entire `AddressMapper` interface anyway. See #4769.
+    request = self._scheduler.execution_request([BuildFileAddresses], [Specs(tuple(specs))])
     result = self._scheduler.execute(request)
     if result.error:
       raise self.BuildFileScanError(str(result.error))
+    (_, state), = result.root_products
 
-    addresses = set()
-    for (spec, _), state in result.root_products:
-      if isinstance(state, Throw):
-        if isinstance(state.exc, ResolveError):
-          if missing_is_fatal:
-            raise self.BuildFileScanError(
-              'Spec `{}` does not match any targets.\n{}'.format(spec.to_spec_string(), str(state.exc)))
-          else:
-            # NB: ignore Throws containing ResolveErrors because they are due to missing targets / files
-            continue
+    if isinstance(state, Throw):
+      if isinstance(state.exc, (AddressLookupError, ResolveError)):
+        if missing_is_fatal:
+          raise self.BuildFileScanError(
+            'Spec `{}` does not match any targets.\n{}'.format(
+              self._specs_string(specs), str(state.exc)))
         else:
-          raise self.BuildFileScanError(str(state.exc))
-      elif missing_is_fatal and not state.value.dependencies:
-        raise self.BuildFileScanError(
-          'Spec `{}` does not match any targets.'.format(spec.to_spec_string()))
+          # NB: ignore Throws containing ResolveErrors because they are due to missing targets / files
+          return set()
+      else:
+        raise self.BuildFileScanError(str(state.exc))
+    elif missing_is_fatal and not state.value.dependencies:
+      raise self.BuildFileScanError(
+        'Spec `{}` does not match any targets.'.format(self._specs_string(specs)))
 
-      addresses.update(state.value.dependencies)
-    return addresses
+    return set(state.value.dependencies)
 
   def scan_addresses(self, root=None):
     if root:

@@ -58,7 +58,13 @@ python_library(
   dependencies = [
     ':error',
     'src/python/pants/option',
+    'src/python/pants/util:memo',
   ],
+)
+
+python_library(
+  name = 'pantsd_stats',
+  sources = ['pantsd_stats.py'],
 )
 
 python_library(
@@ -76,7 +82,9 @@ python_library(
   dependencies = [
     ':aggregated_timings',
     ':artifact_cache_stats',
+    ':pantsd_stats',
     '3rdparty/python:requests',
+    '3rdparty/python:pyopenssl',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:run_info',
     'src/python/pants/base:worker_pool',

@@ -4,6 +4,12 @@
 
 set -eo pipefail
 
+PANTS_GH_PAGES='https://github.com/pantsbuild/pantsbuild.github.io.git'
+GIT_URL="${GIT_URL:-${PANTS_GH_PAGES}}"
+
+PANTS_SITE_URL='https://www.pantsbuild.org'
+VIEW_PUBLISH_URL="${VIEW_PUBLISH_URL:-${PANTS_SITE_URL}}"
+
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 
 source ${REPO_ROOT}/build-support/common.sh
@@ -11,14 +17,27 @@ source ${REPO_ROOT}/build-support/common.sh
 PANTS_EXE="${REPO_ROOT}/pants"
 
 function usage() {
-  echo "Publishes the http://pantsbuild.org/ docs locally or remotely."
-  echo
-  echo "Usage: $0 (-h|-opd)"
-  echo " -h           print out this help message"
-  echo " -o           open the doc site locally"
-  echo " -p           publish the doc site remotely"
-  echo " -y           continue publishing without prompting"
-  echo " -d  <dir>    publish the site to a subdir staging/<dir> (useful for public previews)"
+  cat <<EOF
+Generates the Pants html documentation and optionally publishes it locally
+and/or remotely.
+
+Usage: $0 (-h|-opyld)
+ -h           Print out this help message.
+ -o           Open the published site in a web browser at \$VIEW_PUBLISH_URL.
+ -p           Publish the site to \$GIT_URL with an automated commit.
+ -y           Continue publishing without a y/n prompt.
+ -l  <dir>    Also publish the documentation into the existing local directory
+              <dir>.
+ -d  <dir>    Publish the site to a subdir staging/<dir>. This is useful for
+              Pants maintainers to make public previews of potential site
+              changes without modifying the main Pants site.
+
+Environment Variables and Defaults:
+GIT_URL=${PANTS_GH_PAGES}
+  URL of a git remote repository to publish to with an automated commit.
+VIEW_PUBLISH_URL=${PANTS_SITE_URL}
+  URL of the web page to open after publishing, if '-o' is provided.
+EOF
 
   if (( $# > 0 )); then
     die "$@"
@@ -29,26 +48,24 @@ function usage() {
 
 publish_path=""
 
-while getopts "hopyd:" opt; do
+while getopts "hopyl:d:" opt; do
   case ${opt} in
     h) usage ;;
     o) preview="true" ;;
     p) publish="true" ;;
     y) publish_confirmed="true" ;;
+    l) local_dir="${OPTARG}" ;;
     d) publish_path="staging/${OPTARG}" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
 
-# TODO(benjy): Instead of invoking Pants multiple times, these actions should be chained using
-# products, like everything else.
-
 set -x
 
-${PANTS_EXE} reference \
-  --pants-reference-template=reference/pants_reference_body.html \
-  --build-dictionary-template=reference/build_dictionary_body.html \
-  || die "Failed to generate the reference and/or build dictionary documents."
+${PANTS_EXE} sitegen \
+             src:: examples:: contrib::  \
+             testprojects/src/java/org/pantsbuild/testproject/page:readme \
+  || die "Failed to generate doc site'."
 
 function do_open() {
   if [[ "${preview}" = "true" ]]; then
@@ -62,42 +79,40 @@ function do_open() {
   fi
 }
 
-# generate html from markdown pages.
-${PANTS_EXE} markdown --fragment \
-  src:: examples:: contrib::  \
-  testprojects/src/java/org/pantsbuild/testproject/page:readme || \
-    die "Failed to generate HTML from markdown'."
-
-
-# invoke doc site generator.
-${PANTS_EXE} sitegen --config-path=src/docs/docsite.json || \
-  die "Failed to generate doc site'."
-
 set +x
 
-do_open "${REPO_ROOT}/dist/docsite/index.html"
+if [[ -z "${local_dir}" ]]; then
+  do_open "${REPO_ROOT}/dist/docsite/index.html"
+else
+  find "${REPO_ROOT}/dist/docsite" -mindepth 1 -maxdepth 1 \
+    | xargs -I '{}' cp -r '{}' "${local_dir}"
+  do_open "${local_dir}/index.html"
+fi
 
 if [[ "${publish}" = "true" ]]; then
-  url="http://pantsbuild.github.io/${publish_path}"
+  url="${VIEW_PUBLISH_URL}/${publish_path}"
   if [[ "${publish_confirmed}" != "true" ]] ; then
     read -ep "To abort publishing these docs to ${url} press CTRL-C, otherwise press enter to \
 continue."
   fi
   (
-    ${REPO_ROOT}/src/docs/publish_via_git.sh \
-      https://github.com/pantsbuild/pantsbuild.github.io.git \
-      ${publish_path} && \
-      ${REPO_ROOT}/src/docs/publish_via_git.sh \
-      https://github.com/benjyw/benjyw.github.io.git \
-      ${publish_path} && \
-    do_open ${url}/index.html
+    "${REPO_ROOT}/src/docs/publish_via_git.sh" \
+      "${GIT_URL}" \
+      "${publish_path}"
+    do_open "${url}/index.html"
   ) || die "Publish to ${url} failed."
 fi
 
-# Note that we push the docs to two repos: pantsbuild.github.io and benjyw.github.io.
-# The latter is where we redirect www.pantsbuild.org to via CNAME. We can't redirect
-# to the former because then HTTPS won't work (the cert is for pantsbuild.github.io).
-# This way we have working https URLs when needed, but also an http-only version at the
-# more respectable domain of pantsbuild.org.
-# This is a stopgap workaround until we can host the docsite ourselves, under our own
-# SSL cert.
+# Note that we use Cloudflare to enforce:
+#
+# - Flattening the apex domain pantsbuild.org to www.pantsbuild.org
+# - Requiring HTTPS
+# - Directing www.pantsbuild.org traffic via CNAME to pantsbuild.github.io.
+# - Caching www.pantsbuild.org content.
+# - Directing binaries.pantsbuild.org and node-preinstalled-modules.pantsbuild.org
+#   to the appropriate S3 buckets via CNAME.
+
+# Google domains is still our registrar, but we use it only to point to Cloudflare's nameservers.
+
+# See the DNS and Page Rules tabs in our Cloudflare acct, and also the GitHub Pages
+# custom domain setup here:  https://github.com/pantsbuild/pantsbuild.github.io/settings

@@ -15,5 +15,6 @@ if __name__ == '__main__':
     output_dir = sys.argv[1]
   except Exception:
     print('usage: {} <output dir>'.format(sys.argv[0]))
+    sys.exit(1)
 
   bootstrap_c_source(output_dir)

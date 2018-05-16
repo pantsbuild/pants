@@ -5,12 +5,17 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import json
 import os
 from hashlib import sha1
 
+import six
+
 from pants.base.build_environment import get_buildroot
-from pants.option.custom_types import UnsetBool, dict_with_files_option, file_option, target_option
+from pants.base.hash_utils import stable_json_hash
+from pants.option.custom_types import (UnsetBool, dict_with_files_option, dir_option, file_option,
+                                       target_option)
 
 
 class Encoder(json.JSONEncoder):
@@ -20,12 +25,7 @@ class Encoder(json.JSONEncoder):
     return super(Encoder, self).default(o)
 
 
-def stable_json_dumps(obj):
-  return json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True, cls=Encoder)
-
-
-def stable_json_sha1(obj):
-  return sha1(stable_json_dumps(obj)).hexdigest()
+stable_json_sha1 = functools.partial(stable_json_hash, encoder=Encoder)
 
 
 class OptionsFingerprinter(object):
@@ -34,7 +34,34 @@ class OptionsFingerprinter(object):
   :API: public
   """
 
-  def __init__(self, build_graph):
+  @classmethod
+  def combined_options_fingerprint_for_scope(cls, scope, options,
+                                             build_graph=None, **kwargs):
+    """Given options and a scope, compute a combined fingerprint for the scope.
+
+    :param string scope: The scope to fingerprint.
+    :param Options options: The `Options` object to fingerprint.
+    :param BuildGraph build_graph: A `BuildGraph` instance, only needed if fingerprinting
+                                   target options.
+    :param dict **kwargs: Keyword parameters passed on to
+                          `Options#get_fingerprintable_for_scope`.
+    :return: Hexadecimal string representing the fingerprint for all `options`
+             values in `scope`.
+    """
+    fingerprinter = cls(build_graph)
+    hasher = sha1()
+    pairs = options.get_fingerprintable_for_scope(scope, **kwargs)
+    for (option_type, option_value) in pairs:
+      hasher.update(
+        # N.B. `OptionsFingerprinter.fingerprint()` can return `None`,
+        # so we always cast to bytes here.
+        six.binary_type(
+          fingerprinter.fingerprint(option_type, option_value)
+        )
+      )
+    return hasher.hexdigest()
+
+  def __init__(self, build_graph=None):
     self._build_graph = build_graph
 
   def fingerprint(self, option_type, option_val):
@@ -54,6 +81,8 @@ class OptionsFingerprinter(object):
 
     if option_type == target_option:
       return self._fingerprint_target_specs(option_val)
+    elif option_type == dir_option:
+      return self._fingerprint_dirs(option_val)
     elif option_type == file_option:
       return self._fingerprint_files(option_val)
     elif option_type == dict_with_files_option:
@@ -63,6 +92,9 @@ class OptionsFingerprinter(object):
 
   def _fingerprint_target_specs(self, specs):
     """Returns a fingerprint of the targets resolved from given target specs."""
+    assert self._build_graph is not None, (
+      'cannot fingerprint specs `{}` without a `BuildGraph`'.format(specs)
+    )
     hasher = sha1()
     for spec in sorted(specs):
       for target in sorted(self._build_graph.resolve(spec)):
@@ -91,6 +123,23 @@ class OptionsFingerprinter(object):
                          '  build_root:  {buildroot}\n'
                          .format(filepath=filepath, buildroot=root))
       return filepath
+
+  def _fingerprint_dirs(self, dirpaths, topdown=True, onerror=None, followlinks=False):
+    """Returns a fingerprint of the given file directories and all their sub contents.
+
+    This assumes that the file directories are of reasonable size
+    to cause memory or performance issues.
+    """
+    # Note that we don't sort the dirpaths, as their order may have meaning.
+    filepaths = []
+    for dirpath in dirpaths:
+      dirs = os.walk(dirpath, topdown=topdown, onerror=onerror,
+                     followlinks=followlinks)
+      sorted_dirs = sorted(dirs, key=lambda d: d[0])
+      filepaths.extend([os.path.join(dirpath, filename)
+                   for dirpath, dirnames, filenames in sorted_dirs
+                   for filename in sorted(filenames)])
+    return self._fingerprint_files(filepaths)
 
   def _fingerprint_files(self, filepaths):
     """Returns a fingerprint of the given filepaths and their contents.

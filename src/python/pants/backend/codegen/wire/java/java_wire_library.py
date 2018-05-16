@@ -5,19 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import logging
-
-from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.base.validation import assert_list
 
 
-logger = logging.getLogger(__name__)
-
-
-class JavaWireLibrary(ExportableJvmLibrary):
+class JavaWireLibrary(JvmTarget):
   """A Java library generated from Wire IDL files.
 
   Supports Wire 1.x only.

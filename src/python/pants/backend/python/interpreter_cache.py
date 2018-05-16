@@ -11,11 +11,13 @@ import shutil
 from pex.interpreter import PythonIdentity, PythonInterpreter
 from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import resolve
-from twitter.common.collections import OrderedSet
+from pex.variables import Variables
 
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
+from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
+from pants.util.memo import memoized_property
 
 
 # TODO(wickman) Create a safer version of this and add to twitter.common.dirutil
@@ -28,6 +30,10 @@ def _safe_link(src, dst):
 
 
 class PythonInterpreterCache(object):
+
+  class UnsatisfiableInterpreterConstraintsError(TaskError):
+    """Indicates a python interpreter matching given constraints could not be located."""
+
   @staticmethod
   def _matches(interpreter, filters):
     return any(interpreter.identity.matches(filt) for filt in filters)
@@ -39,49 +45,59 @@ class PythonInterpreterCache(object):
         yield interpreter
 
   @classmethod
-  def select_interpreter(cls, compatibilities, allow_multiple=False):
-    """Given a set of interpreters, either return them all if ``allow_multiple`` is ``True``;
-    otherwise, return the lowest compatible interpreter.
+  def pex_python_paths(cls):
+    """A list of paths to Python interpreter binaries as defined by a
+    PEX_PYTHON_PATH defined in either in '/etc/pexrc', '~/.pexrc'.
+    PEX_PYTHON_PATH defines a colon-seperated list of paths to interpreters
+    that a pex can be built and ran against.
+
+    :return: paths to interpreters as specified by PEX_PYTHON_PATH
+    :rtype: list
     """
-    if allow_multiple:
-      return compatibilities
-    return [min(compatibilities)] if compatibilities else []
+    ppp = Variables.from_rc().get('PEX_PYTHON_PATH')
+    if ppp:
+      return ppp.split(os.pathsep)
+    else:
+      return []
 
   def __init__(self, python_setup, python_repos, logger=None):
     self._python_setup = python_setup
     self._python_repos = python_repos
-    self._cache_dir = python_setup.interpreter_cache_dir
-    safe_mkdir(self._cache_dir)
-    self._interpreters = set()
     self._logger = logger or (lambda msg: True)
 
-  @property
-  def interpreters(self):
-    """Returns the set of cached interpreters."""
-    return self._interpreters
+  @memoized_property
+  def _cache_dir(self):
+    cache_dir = self._python_setup.interpreter_cache_dir
+    safe_mkdir(cache_dir)
+    return cache_dir
 
   def select_interpreter_for_targets(self, targets):
     """Pick an interpreter compatible with all the specified targets."""
-    allowed_interpreters = OrderedSet(self.interpreters)
-    tgts_with_compatibilities = []  # Used only for error messages.
-
-    # Constrain allowed_interpreters based on each target's compatibility requirements.
+    tgts_with_compatibilities = []
+    filters = set()
     for target in targets:
       if isinstance(target, PythonTarget) and target.compatibility:
         tgts_with_compatibilities.append(target)
-        compatible_with_target = list(self.matched_interpreters(target.compatibility))
-        allowed_interpreters &= compatible_with_target
+        filters.update(target.compatibility)
+
+    allowed_interpreters = set(self.setup(filters=filters))
+
+    # Constrain allowed_interpreters based on each target's compatibility requirements.
+    for target in tgts_with_compatibilities:
+      compatible_with_target = set(self._matching(allowed_interpreters, target.compatibility))
+      allowed_interpreters &= compatible_with_target
 
     if not allowed_interpreters:
       # Create a helpful error message.
       unique_compatibilities = set(tuple(t.compatibility) for t in tgts_with_compatibilities)
       unique_compatibilities_strs = [','.join(x) for x in unique_compatibilities if x]
       tgts_with_compatibilities_strs = [t.address.spec for t in tgts_with_compatibilities]
-      raise TaskError('Unable to detect a suitable interpreter for compatibilities: {} '
-                      '(Conflicting targets: {})'.format(' && '.join(unique_compatibilities_strs),
-                                                         ', '.join(tgts_with_compatibilities_strs)))
+      raise self.UnsatisfiableInterpreterConstraintsError(
+        'Unable to detect a suitable interpreter for compatibilities: {} '
+        '(Conflicting targets: {})'.format(' && '.join(unique_compatibilities_strs),
+                                           ', '.join(tgts_with_compatibilities_strs)))
     # Return the lowest compatible interpreter.
-    return self.select_interpreter(allowed_interpreters)[0]
+    return min(allowed_interpreters)
 
   def _interpreter_from_path(self, path, filters):
     interpreter_dir = os.path.basename(path)
@@ -104,11 +120,12 @@ class PythonInterpreterCache(object):
   def _setup_cached(self, filters):
     """Find all currently-cached interpreters."""
     for interpreter_dir in os.listdir(self._cache_dir):
-      path = os.path.join(self._cache_dir, interpreter_dir)
-      pi = self._interpreter_from_path(path, filters)
-      if pi:
-        self._logger('Detected interpreter {}: {}'.format(pi.binary, str(pi.identity)))
-        self._interpreters.add(pi)
+      if os.path.isdir(interpreter_dir):
+        path = os.path.join(self._cache_dir, interpreter_dir)
+        pi = self._interpreter_from_path(path, filters)
+        if pi:
+          self._logger('Detected interpreter {}: {}'.format(pi.binary, str(pi.identity)))
+          yield pi
 
   def _setup_paths(self, paths, filters):
     """Find interpreters under paths, and cache them."""
@@ -119,46 +136,44 @@ class PythonInterpreterCache(object):
       if pi is None:
         self._setup_interpreter(interpreter, cache_path)
         pi = self._interpreter_from_path(cache_path, filters)
-        if pi is None:
-          continue
-      self._interpreters.add(pi)
+      if pi:
+        yield pi
 
-  def matched_interpreters(self, filters):
-    """Given some filters, yield any interpreter that matches at least one of them.
-
-    :param filters: A sequence of strings that constrain the interpreter compatibility for this
-      cache, using the Requirement-style format, e.g. ``'CPython>=3', or just ['>=2.7','<3']``
-      for requirements agnostic to interpreter class.
-    """
-    for match in self._matching(self.interpreters, filters):
-      yield match
-
-  def setup(self, paths=(), force=False, filters=(b'',)):
+  def setup(self, paths=(), filters=(b'',)):
     """Sets up a cache of python interpreters.
 
-    NB: Must be called prior to accessing the ``interpreters`` property or the ``matches`` method.
-
     :param paths: The paths to search for a python interpreter; the system ``PATH`` by default.
-    :param bool force: When ``True`` the interpreter cache is always re-built.
     :param filters: A sequence of strings that constrain the interpreter compatibility for this
       cache, using the Requirement-style format, e.g. ``'CPython>=3', or just ['>=2.7','<3']``
       for requirements agnostic to interpreter class.
+    :returns: A list of cached interpreters
+    :rtype: list of :class:`pex.interpreter.PythonInterpreter`
     """
     # We filter the interpreter cache itself (and not just the interpreters we pull from it)
     # because setting up some python versions (e.g., 3<=python<3.3) crashes, and this gives us
     # an escape hatch.
-    filters = self._python_setup.interpreter_constraints if not any(filters) else filters
-    setup_paths = paths or os.getenv('PATH').split(os.pathsep)
-    self._setup_cached(filters)
-    def unsatisfied_filters():
-      return filter(lambda f: len(list(self._matching(self.interpreters, [f]))) == 0, filters)
-    if force or len(unsatisfied_filters()) > 0:
-      self._setup_paths(setup_paths, filters)
-    for filt in unsatisfied_filters():
+    filters = filters if any(filters) else self._python_setup.interpreter_constraints
+    setup_paths = (paths
+                   or self.pex_python_paths()
+                   or self._python_setup.interpreter_search_paths
+                   or os.getenv('PATH').split(os.pathsep))
+
+    def unsatisfied_filters(interpreters):
+      return filter(lambda f: len(list(self._matching(interpreters, [f]))) == 0, filters)
+
+    interpreters = []
+    with OwnerPrintingInterProcessFileLock(path=os.path.join(self._cache_dir, '.file_lock')):
+      interpreters.extend(self._setup_cached(filters))
+      if unsatisfied_filters(interpreters):
+        interpreters.extend(self._setup_paths(setup_paths, filters))
+
+    for filt in unsatisfied_filters(interpreters):
       self._logger('No valid interpreters found for {}!'.format(filt))
-    matches = list(self.matched_interpreters(filters))
+
+    matches = list(self._matching(interpreters, filters))
     if len(matches) == 0:
       self._logger('Found no valid interpreters!')
+
     return matches
 
   def _resolve(self, interpreter, interpreter_dir=None):

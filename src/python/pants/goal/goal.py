@@ -7,6 +7,30 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.goal.error import GoalError
 from pants.option.optionable import Optionable
+from pants.util.memo import memoized
+
+
+@memoized
+def _create_stable_task_type(superclass, options_scope):
+  """Creates a singleton (via `memoized`) subclass instance for the given superclass and scope.
+
+  Currently we need to support registering the same task type multiple times in different
+  scopes. However we still want to have each task class know the options scope it was
+  registered in. So we create a synthetic subclass here.
+
+  TODO(benjy): Revisit this when we revisit the task lifecycle. We probably want to have
+  a task *instance* know its scope, but this means converting option registration from
+  a class method to an instance method, and instantiating the task much sooner in the
+  lifecycle.
+  """
+  subclass_name = b'{0}_{1}'.format(superclass.__name__,
+                                    options_scope.replace('.', '_').replace('-', '_'))
+  return type(subclass_name, (superclass,), {
+    b'__doc__': superclass.__doc__,
+    b'__module__': superclass.__module__,
+    b'options_scope': options_scope,
+    b'_stable_name': superclass.stable_name()
+  })
 
 
 class Goal(object):
@@ -22,7 +46,7 @@ class Goal(object):
     raise TypeError('Do not instantiate {0}. Call by_name() instead.'.format(cls))
 
   @classmethod
-  def register(cls, name, description):
+  def register(cls, name, description, options_registrar_cls=None):
     """Register a goal description.
 
     Otherwise the description must be set when registering some task on the goal,
@@ -38,11 +62,15 @@ class Goal(object):
 
     :param string name: The name of the goal; ie: the way to specify it on the command line.
     :param string description: A description of the tasks in the goal do.
+    :param :class:pants.option.Optionable options_registrar_cls: A class for registering options
+           at the goal scope. Useful for registering recursive options on all tasks in a goal.
     :return: The freshly registered goal.
     :rtype: :class:`_Goal`
     """
     goal = cls.by_name(name)
     goal._description = description
+    goal._options_registrar_cls = (options_registrar_cls.registrar_for_scope(name)
+                                   if options_registrar_cls else None)
     return goal
 
   @classmethod
@@ -82,6 +110,14 @@ class Goal(object):
     return [goal for _, goal in sorted(Goal._goal_by_name.items()) if goal.active]
 
   @classmethod
+  def get_optionables(cls):
+    for goal in cls.all():
+      if goal._options_registrar_cls:
+        yield goal._options_registrar_cls
+      for task_type in goal.task_types():
+        yield task_type
+
+  @classmethod
   def subsystems(cls):
     """Returns all subsystem types used by all tasks, in no particular order.
 
@@ -102,6 +138,7 @@ class _Goal(object):
     Optionable.validate_scope_name_component(name)
     self.name = name
     self._description = ''
+    self._options_registrar_cls = None
     self.serialize = False
     self._task_type_by_name = {}  # name -> Task subclass.
     self._ordered_task_names = []  # The task names, in the order imposed by registration.
@@ -121,8 +158,8 @@ class _Goal(object):
     return ''
 
   def register_options(self, options):
-    for task_type in sorted(self.task_types(), key=lambda cls: cls.options_scope):
-      task_type.register_options_on_scope(options)
+    if self._options_registrar_cls:
+      self._options_registrar_cls.register_options_on_scope(options)
 
   def install(self, task_registrar, first=False, replace=False, before=None, after=None):
     """Installs the given task in this goal.
@@ -140,33 +177,24 @@ class _Goal(object):
     if [bool(place) for place in [first, replace, before, after]].count(True) > 1:
       raise GoalError('Can only specify one of first, replace, before or after')
 
-    task_name = task_registrar.name
-    Optionable.validate_scope_name_component(task_name)
-    options_scope = Goal.scope(self.name, task_name)
-
-    # Currently we need to support registering the same task type multiple times in different
-    # scopes. However we still want to have each task class know the options scope it was
-    # registered in. So we create a synthetic subclass here.
-    # TODO(benjy): Revisit this when we revisit the task lifecycle. We probably want to have
-    # a task *instance* know its scope, but this means converting option registration from
-    # a class method to an instance method, and instantiating the task much sooner in the
-    # lifecycle.
-    superclass = task_registrar.task_type
-    subclass_name = b'{0}_{1}'.format(superclass.__name__,
-                                      options_scope.replace('.', '_').replace('-', '_'))
-    task_type = type(subclass_name, (superclass,), {
-      '__doc__': superclass.__doc__,
-      '__module__': superclass.__module__,
-      'options_scope': options_scope,
-      '_stable_name': superclass.stable_name()
-    })
-
     otn = self._ordered_task_names
     if replace:
       for tt in self.task_types():
         tt.options_scope = None
       del otn[:]
       self._task_type_by_name = {}
+
+    task_name = task_registrar.name
+    if task_name in self._task_type_by_name:
+      raise GoalError(
+        'Can only specify a task name once per goal, saw multiple values for {} in goal {}'.format(
+          task_name,
+          self.name))
+    Optionable.validate_scope_name_component(task_name)
+    options_scope = Goal.scope(self.name, task_name)
+
+    task_type = _create_stable_task_type(task_registrar.task_type, options_scope)
+
     if first:
       otn.insert(0, task_name)
     elif before in otn:
@@ -199,15 +227,6 @@ class _Goal(object):
       self._ordered_task_names = [x for x in self._ordered_task_names if x != name]
     else:
       raise GoalError('Cannot uninstall unknown task: {0}'.format(name))
-
-  def known_scope_infos(self):
-    """Yields ScopeInfos for all known scopes under this goal."""
-    # Note that we don't yield the goal's own scope. We don't need it (as we don't register
-    # options on it), and it's needlessly confusing when a task has the same name as its goal,
-    # in which case we shorten its scope to the goal's scope (e.g., idea.idea -> idea).
-    for task_type in self.task_types():
-      for scope_info in task_type.known_scope_infos():
-        yield scope_info
 
   def subsystems(self):
     """Returns all subsystem types used by tasks in this goal, in no particular order."""

@@ -50,7 +50,8 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
                                }
                              },
                              'jvm-platform': {
-                               'default_platform': 'java{}'.format(one.version.components[1])
+                               'default_platform': 'java{}'.format(one.version.components[1]),
+                               'compiler': 'javac',
                              }
                            },
                            extra_env={

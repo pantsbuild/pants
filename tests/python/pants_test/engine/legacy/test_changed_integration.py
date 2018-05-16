@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
-import subprocess
-import unittest
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -16,7 +14,7 @@ from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
 from pants_test.base_test import TestGenerator
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.git_util import initialize_repo
 
 
@@ -25,6 +23,14 @@ def lines_to_set(str_or_list):
     return set(str_or_list)
   else:
     return set(x for x in str(str_or_list).split('\n') if x)
+
+
+def create_file_in(worktree, path, content):
+  """Creates a file in the given worktree, and returns its path."""
+  write_path = os.path.join(worktree, path)
+  with safe_open(write_path, 'w') as f:
+    f.write(dedent(content))
+  return write_path
 
 
 @contextmanager
@@ -80,10 +86,7 @@ def create_isolated_git_repo():
   with temporary_dir(root_dir=get_buildroot()) as worktree:
     def create_file(path, content):
       """Creates a file in the isolated git repo."""
-      write_path = os.path.join(worktree, path)
-      with safe_open(write_path, 'w') as f:
-        f.write(dedent(content))
-      return write_path
+      return create_file_in(worktree, path, content)
 
     def copy_into(path, to_path=None):
       """Copies a file from the real git repo into the isolated git repo."""
@@ -263,9 +266,8 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
           with create_isolated_git_repo() as worktree:
             # Mutate the working copy so we can do `--changed-parent=HEAD` deterministically.
             with mutated_working_copy([os.path.join(worktree, filename)]):
-              stdout = self.assert_changed_new_equals_old(
+              stdout = self.run_list(
                 ['--changed-include-dependees={}'.format(dependee_type), '--changed-parent=HEAD'],
-                test_list=True
               )
 
               self.assertEqual(
@@ -278,72 +280,11 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
           inner_integration_coverage_test
         )
 
-  def assert_changed_new_equals_old(self, extra_args, success=True, test_list=False):
-    args = ['-q', 'changed'] + extra_args
-    changed_run = self.do_command(*args, success=success, enable_v2_engine=False)
-    engine_changed_run = self.do_command(*args, success=success, enable_v2_engine=True)
-    self.assertEqual(
-      lines_to_set(changed_run.stdout_data), lines_to_set(engine_changed_run.stdout_data)
-    )
+  def run_list(self, extra_args, success=True):
+    list_args = ['-q', 'list'] + extra_args
+    pants_run = self.do_command(*list_args, success=success)
+    return pants_run.stdout_data
 
-    if test_list:
-      # In the v2 engine, `--changed-*` options can alter the specs of any goal - test with `list`.
-      list_args = ['-q', 'list'] + extra_args
-      engine_list_run = self.do_command(*list_args, success=success, enable_v2_engine=True)
-      self.assertEqual(
-        lines_to_set(changed_run.stdout_data), lines_to_set(engine_list_run.stdout_data)
-      )
-
-    # If we get to here without asserting, we know all copies of stdout are identical - return one.
-    return changed_run.stdout_data
-
-  @ensure_engine
-  def test_changed_options_scope_shadowing(self):
-    """Tests that the `test-changed` scope overrides `changed` scope."""
-    changed_src = 'src/python/python_targets/test_library.py'
-    expected_target = self.TEST_MAPPING[changed_src]['none'][0]
-    expected_set = {expected_target}
-    not_expected_set = set(self.TEST_MAPPING[changed_src]['transitive']).difference(expected_set)
-
-    with create_isolated_git_repo() as worktree:
-      with mutated_working_copy([os.path.join(worktree, changed_src)]):
-        pants_run = self.run_pants([
-          '-ldebug',   # This ensures the changed target name shows up in the pants output.
-          'test-changed',
-          '--test-changed-changes-since=HEAD',
-          '--test-changed-include-dependees=none',     # This option should be used.
-          '--changed-include-dependees=transitive'     # This option should be stomped on.
-        ])
-
-      self.assert_success(pants_run)
-
-      for expected_item in expected_set:
-        self.assertIn(expected_item, pants_run.stdout_data)
-
-      for not_expected_item in not_expected_set:
-        if expected_target.startswith(not_expected_item):
-          continue  # Ignore subset matches.
-        self.assertNotIn(not_expected_item, pants_run.stdout_data)
-
-  @ensure_engine
-  def test_changed_options_scope_positional(self):
-    changed_src = 'src/python/python_targets/test_library.py'
-    expected_set = set(self.TEST_MAPPING[changed_src]['transitive'])
-
-    with create_isolated_git_repo() as worktree:
-      with mutated_working_copy([os.path.join(worktree, changed_src)]):
-        pants_run = self.run_pants([
-          '-ldebug',   # This ensures the changed target names show up in the pants output.
-          'test-changed',
-          '--changes-since=HEAD',
-          '--include-dependees=transitive'
-        ])
-
-      self.assert_success(pants_run)
-      for expected_item in expected_set:
-        self.assertIn(expected_item, pants_run.stdout_data)
-
-  @ensure_engine
   def test_test_changed_exclude_target(self):
     changed_src = 'src/python/python_targets/test_library.py'
     exclude_target_regexp = r'_[0-9]'
@@ -357,9 +298,9 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
         pants_run = self.run_pants([
           '-ldebug',   # This ensures the changed target names show up in the pants output.
           '--exclude-target-regexp={}'.format(exclude_target_regexp),
-          'test-changed',
-          '--changes-since=HEAD',
-          '--include-dependees=transitive'
+          '--changed-parent=HEAD',
+          '--changed-include-dependees=transitive',
+          'test',
         ])
 
       self.assert_success(pants_run)
@@ -369,80 +310,50 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       for excluded_item in excluded_set:
         self.assertNotIn(excluded_item, pants_run.stdout_data)
 
-  @ensure_engine
-  def test_changed_changed_since_and_files(self):
-    with create_isolated_git_repo():
-      stdout = self.assert_changed_new_equals_old(['--changed-since=HEAD^^', '--files'])
-
-      # The output should be the files added in the last 2 commits.
-      self.assertEqual(
-        lines_to_set(stdout),
-        {'src/python/sources/BUILD',
-         'src/python/sources/sources.py',
-         'src/python/sources/sources.txt',
-         '3rdparty/BUILD'}
-      )
-
-  @ensure_engine
-  def test_changed_diffspec_and_files(self):
-    with create_isolated_git_repo():
-      git_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD^^']).strip()
-      stdout = self.assert_changed_new_equals_old(['--changed-diffspec={}'.format(git_sha), '--files'])
-
-      # The output should be the files added in the last 2 commits.
-      self.assertEqual(
-        lines_to_set(stdout),
-        {'src/python/python_targets/BUILD',
-         'src/python/python_targets/test_binary.py',
-         'src/python/python_targets/test_library.py',
-         'src/python/python_targets/test_unclaimed_src.py'}
-      )
-
-  @ensure_engine
   def test_changed_with_multiple_build_files(self):
     new_build_file = 'src/python/python_targets/BUILD.new'
 
     with create_isolated_git_repo() as worktree:
       touch(os.path.join(worktree, new_build_file))
-      pants_run = self.run_pants(['changed'])
+      stdout_data = self.run_list([])
+      self.assertEqual(stdout_data.strip(), '')
 
-      self.assert_success(pants_run)
-      self.assertEqual(pants_run.stdout_data.strip(), '')
-
-  @ensure_engine
-  def test_changed_with_deleted_file(self):
-    deleted_file = 'src/python/sources/sources.py'
-
+  def test_changed_with_deleted_source(self):
     with create_isolated_git_repo() as worktree:
-      safe_delete(os.path.join(worktree, deleted_file))
-      pants_run = self.run_pants(['changed'])
+      safe_delete(os.path.join(worktree, 'src/python/sources/sources.py'))
+      pants_run = self.run_pants(['list', '--changed-parent=HEAD'])
       self.assert_success(pants_run)
       self.assertEqual(pants_run.stdout_data.strip(), 'src/python/sources:sources')
+
+  def test_changed_with_deleted_resource(self):
+    with create_isolated_git_repo() as worktree:
+      safe_delete(os.path.join(worktree, 'src/python/sources/sources.txt'))
+      pants_run = self.run_pants(['list', '--changed-parent=HEAD'])
+      self.assert_success(pants_run)
+      self.assertEqual(pants_run.stdout_data.strip(), 'src/python/sources:text')
+
+  def test_changed_with_deleted_target_transitive(self):
+    with create_isolated_git_repo() as worktree:
+      safe_delete(os.path.join(worktree, 'src/resources/org/pantsbuild/resourceonly/BUILD'))
+      pants_run = self.run_pants(['list', '--changed-parent=HEAD', '--changed-include-dependees=transitive'])
+      self.assert_failure(pants_run)
+      self.assertIn('src/resources/org/pantsbuild/resourceonly', pants_run.stderr_data)
+
+  def test_changed_in_directory_without_build_file(self):
+    with create_isolated_git_repo() as worktree:
+      create_file_in(worktree, 'new-project/README.txt', 'This is important.')
+      pants_run = self.run_pants(['list', '--changed-parent=HEAD'])
+      self.assert_success(pants_run)
+      self.assertEqual(pants_run.stdout_data.strip(), '')
 
   def test_list_changed(self):
     deleted_file = 'src/python/sources/sources.py'
 
     with create_isolated_git_repo() as worktree:
       safe_delete(os.path.join(worktree, deleted_file))
-      pants_run = self.run_pants(['--enable-v2-engine', '--changed-parent=HEAD', 'list'])
+      pants_run = self.run_pants(['--changed-parent=HEAD', 'list'])
       self.assert_success(pants_run)
       self.assertEqual(pants_run.stdout_data.strip(), 'src/python/sources:sources')
-
-  # Following 4 tests do not run in isolated repo because they don't mutate working copy.
-  def test_changed(self):
-    self.assert_changed_new_equals_old([])
-
-  @unittest.skip("Pending fix for https://github.com/pantsbuild/pants/issues/4010")
-  def test_changed_with_changes_since(self):
-    self.assert_changed_new_equals_old(['--changes-since=HEAD^^'])
-
-  @unittest.skip("Pending fix for https://github.com/pantsbuild/pants/issues/4010")
-  def test_changed_with_changes_since_direct(self):
-    self.assert_changed_new_equals_old(['--changes-since=HEAD^^', '--include-dependees=direct'])
-
-  @unittest.skip("Pending fix for https://github.com/pantsbuild/pants/issues/4010")
-  def test_changed_with_changes_since_transitive(self):
-    self.assert_changed_new_equals_old(['--changes-since=HEAD^^', '--include-dependees=transitive'])
 
 
 ChangedIntegrationTest.generate_tests()

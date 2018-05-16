@@ -64,6 +64,10 @@ pre {
 .build-symbol-args {
     margin-left: 48px;
 }
+.build-symbol-args td {
+  vertical-align: top;
+  padding-bottom: 1em;
+}
 .build-symbol-details {
   white-space: pre;
 }
@@ -83,6 +87,7 @@ ul.collapsible > li.collapsed:before {
     font-family: monospace;
     display: block;
     float: left;
+    cursor: pointer;
 }
 ul.collapsible > li.expanded:before {
     content: "▼";
@@ -90,6 +95,7 @@ ul.collapsible > li.expanded:before {
     font-family: monospace;
     display: block;
     float: left;
+    cursor: pointer;
 }
 ul.collapsible > li.collapsed > ul {
     display: none;

@@ -5,14 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import itertools
 import logging
 import traceback
 
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
-from pants.build_graph.target import Target
 
 
 logger = logging.getLogger(__name__)
@@ -84,13 +82,7 @@ class MutableBuildGraph(BuildGraph):
             self.inject_dependency(target_address, dep_address)
         target = self.get_target(target_address)
 
-      traversables = [target.compute_dependency_specs(payload=target.payload)]
-      # Only poke `traversable_dependency_specs` if a concrete implementation is defined
-      # in order to avoid spurious deprecation warnings.
-      if type(target).traversable_dependency_specs is not Target.traversable_dependency_specs:
-        traversables.append(target.traversable_dependency_specs)
-
-      for traversable_spec in itertools.chain(*traversables):
+      for traversable_spec in target.compute_dependency_specs(payload=target.payload):
         traversable_address = Address.parse(traversable_spec, relative_to=target_address.spec_path)
         self.maybe_inject_address_closure(traversable_address)
 
@@ -98,13 +90,7 @@ class MutableBuildGraph(BuildGraph):
           self.inject_dependency(dependent=target.address, dependency=traversable_address)
           target.mark_transitive_invalidation_hash_dirty()
 
-      traversables = [target.compute_injectable_specs(payload=target.payload)]
-      # Only poke `traversable_specs` if a concrete implementation is defined
-      # in order to avoid spurious deprecation warnings.
-      if type(target).traversable_specs is not Target.traversable_specs:
-        traversables.append(target.traversable_specs)
-
-      for traversable_spec in itertools.chain(*traversables):
+      for traversable_spec in target.compute_injectable_specs(payload=target.payload):
         traversable_address = Address.parse(traversable_spec, relative_to=target_address.spec_path)
         self.maybe_inject_address_closure(traversable_address)
         target.mark_transitive_invalidation_hash_dirty()
@@ -112,6 +98,12 @@ class MutableBuildGraph(BuildGraph):
     except AddressLookupError as e:
       raise self.TransitiveLookupError("{message}\n  referenced from {spec}"
                                        .format(message=e, spec=target_address.spec))
+
+  def inject_roots_closure(self, target_roots, fail_fast=None):
+    for address in self._address_mapper.scan_specs(target_roots.specs,
+                                                    fail_fast=fail_fast):
+      self.inject_address_closure(address)
+      yield address
 
   def inject_specs_closure(self, specs, fail_fast=None):
     for address in self._address_mapper.scan_specs(specs,

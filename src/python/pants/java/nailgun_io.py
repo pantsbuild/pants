@@ -5,35 +5,35 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import errno
 import io
 import os
 import select
-import socket
 import threading
 from contextlib import contextmanager
+
+from contextlib2 import ExitStack
 
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
 
-class NailgunStreamReader(threading.Thread):
-  """Reads input from stdin and emits Nailgun 'stdin' chunks over a socket."""
+@contextmanager
+def _pipe(isatty):
+  r_fd, w_fd = os.openpty() if isatty else os.pipe()
+  try:
+    yield (r_fd, w_fd)
+  finally:
+    os.close(r_fd)
+    os.close(w_fd)
 
-  SELECT_TIMEOUT = 1
 
-  def __init__(self, in_fd, sock, buf_size=io.DEFAULT_BUFFER_SIZE, select_timeout=SELECT_TIMEOUT):
-    """
-    :param file in_fd: the input file descriptor (e.g. sys.stdin) to read from.
-    :param socket sock: the socket to emit nailgun protocol chunks over.
-    :param int buf_size: the buffer size for reads from the file descriptor.
-    :param int select_timeout: the timeout (in seconds) for select.select() calls against the fd.
-    """
-    super(NailgunStreamReader, self).__init__()
+class _StoppableDaemonThread(threading.Thread):
+  """A stoppable daemon threading.Thread."""
+
+  JOIN_TIMEOUT = 3
+
+  def __init__(self, *args, **kwargs):
+    super(_StoppableDaemonThread, self).__init__(*args, **kwargs)
     self.daemon = True
-    self._stdin = in_fd
-    self._socket = sock
-    self._buf_size = buf_size
-    self._select_timeout = select_timeout
     # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
     self._stopped = threading.Event()
 
@@ -46,70 +46,161 @@ class NailgunStreamReader(threading.Thread):
     """Stops the instance."""
     self._stopped.set()
 
+  def join(self, timeout=None):
+    """Joins with a default timeout exposed on the class."""
+    return super(_StoppableDaemonThread, self).join(timeout or self.JOIN_TIMEOUT)
+
   @contextmanager
   def running(self):
     self.start()
-    yield
-    self.stop()
+    try:
+      yield
+    finally:
+      self.stop()
+      self.join()
+
+
+class NailgunStreamStdinReader(_StoppableDaemonThread):
+  """Reads Nailgun 'stdin' chunks on a socket and writes them to an output file-like.
+
+  Because a Nailgun server only ever receives STDIN and STDIN_EOF ChunkTypes after initial
+  setup, this thread executes all reading from a server socket.
+
+  Runs until the socket is closed.
+  """
+
+  def __init__(self, sock, write_handle):
+    """
+    :param socket sock: the socket to read nailgun protocol chunks from.
+    :param file write_handle: A file-like (usually the write end of a pipe/pty) onto which
+      to write data decoded from the chunks.
+    """
+    super(NailgunStreamStdinReader, self).__init__(name=self.__class__.__name__)
+    self._socket = sock
+    self._write_handle = write_handle
+
+  @classmethod
+  @contextmanager
+  def open(cls, sock, isatty=False):
+    with _pipe(isatty) as (read_fd, write_fd):
+      reader = NailgunStreamStdinReader(sock, os.fdopen(write_fd, 'wb'))
+      with reader.running():
+        # Instruct the thin client to begin reading and sending stdin.
+        NailgunProtocol.send_start_reading_input(sock)
+        yield read_fd
 
   def run(self):
-    while not self.is_stopped:
-      readable, _, errored = select.select([self._stdin], [], [self._stdin], self._select_timeout)
-
-      if self._stdin in errored:
-        self.stop()
-        return
-
-      if not self.is_stopped and self._stdin in readable:
-        data = os.read(self._stdin.fileno(), self._buf_size)
-
-        if not self.is_stopped:
-          if data:
-            NailgunProtocol.write_chunk(self._socket, ChunkType.STDIN, data)
-          else:
-            NailgunProtocol.write_chunk(self._socket, ChunkType.STDIN_EOF)
-            try:
-              self._socket.shutdown(socket.SHUT_WR)  # Shutdown socket sends.
-            except socket.error:  # Can happen if response is quick.
-              pass
-            finally:
-              self.stop()
-
-
-class NailgunStreamWriter(object):
-  """A sys.{stdout,stderr} replacement that writes output to a socket using the nailgun protocol."""
-
-  def __init__(self, sock, chunk_type, isatty=True, mask_broken_pipe=False):
-    """
-    :param socket sock: A connected socket capable of speaking the nailgun protocol.
-    :param str chunk_type: A ChunkType constant representing the nailgun protocol chunk type.
-    :param bool isatty: Whether or not the consumer of this stream has tty capabilities. (Optional)
-    :param bool mask_broken_pipe: This will toggle the masking of 'broken pipe' errors when writing
-                                  to the remote socket. This allows for completion of execution in
-                                  the event of a client disconnect (e.g. to support cleanup work).
-    """
-    self._socket = sock
-    self._chunk_type = chunk_type
-    self._isatty = isatty
-    self._mask_broken_pipe = mask_broken_pipe
-
-  def write(self, payload):
     try:
-      NailgunProtocol.write_chunk(self._socket, self._chunk_type, payload)
-    except IOError as e:
-      # If the remote client disconnects and we try to perform a write (e.g. socket.send/sendall),
-      # an 'error: [Errno 32] Broken pipe' exception can be thrown. Setting mask_broken_pipe=True
-      # safeguards against this case (which is unexpected for most writers of sys.stdout etc) so
-      # that we don't awkwardly interrupt the runtime by throwing this exception on writes to
-      # stdout/stderr.
-      if e.errno == errno.EPIPE and not self._mask_broken_pipe:
-        raise
+      for chunk_type, payload in NailgunProtocol.iter_chunks(self._socket, return_bytes=True):
+        if self.is_stopped:
+          return
 
-  def flush(self):
-    return
+        if chunk_type == ChunkType.STDIN:
+          self._write_handle.write(payload)
+          self._write_handle.flush()
+        elif chunk_type == ChunkType.STDIN_EOF:
+          return
+        else:
+          raise NailgunProtocol.ProtocolError(
+            'received unexpected chunk {} -> {}'.format(chunk_type, payload)
+          )
+    finally:
+      self._write_handle.close()
 
-  def isatty(self):
-    return self._isatty
 
-  def fileno(self):
-    return self._socket.fileno()
+class NailgunStreamWriter(_StoppableDaemonThread):
+  """Reads input from an input fd and writes Nailgun chunks on a socket.
+
+  Should generally be managed with the `open` classmethod contextmanager, which will create
+  a pipe and provide its writing end to the caller.
+  """
+
+  SELECT_TIMEOUT = .15
+
+  def __init__(self, in_fds, sock, chunk_types, chunk_eof_type, buf_size=None, select_timeout=None):
+    """
+    :param tuple in_fds: A tuple of input file descriptors to read from.
+    :param socket sock: the socket to emit nailgun protocol chunks over.
+    :param tuple chunk_types: A tuple of chunk types with a 1:1 positional association with in_files.
+    :param int chunk_eof_type: The nailgun chunk type for EOF (applies only to stdin).
+    :param int buf_size: the buffer size for reads from the file descriptor.
+    :param int select_timeout: the timeout (in seconds) for select.select() calls against the fd.
+    """
+    super(NailgunStreamWriter, self).__init__(name=self.__class__.__name__)
+    # Validates that we've received file descriptor numbers.
+    self._in_fds = [int(f) for f in in_fds]
+    self._socket = sock
+    self._chunk_eof_type = chunk_eof_type
+    self._buf_size = buf_size or io.DEFAULT_BUFFER_SIZE
+    self._select_timeout = select_timeout or self.SELECT_TIMEOUT
+    self._assert_aligned(in_fds, chunk_types)
+    self._fileno_chunk_type_map = {f: t for f, t in zip(in_fds, chunk_types)}
+
+  @classmethod
+  def _assert_aligned(self, *iterables):
+    assert len(set(len(i) for i in iterables)) == 1, 'inputs are not aligned'
+
+  @classmethod
+  @contextmanager
+  def open(cls, sock, chunk_type, isatty, chunk_eof_type=None, buf_size=None, select_timeout=None):
+    """Yields the write side of a pipe that will copy appropriately chunked values to a socket."""
+    with cls.open_multi(sock,
+                        (chunk_type,),
+                        (isatty,),
+                        chunk_eof_type,
+                        buf_size,
+                        select_timeout) as ctx:
+      yield ctx
+
+  @classmethod
+  @contextmanager
+  def open_multi(cls, sock, chunk_types, isattys, chunk_eof_type=None, buf_size=None,
+                 select_timeout=None):
+    """Yields the write sides of pipes that will copy appropriately chunked values to the socket."""
+    cls._assert_aligned(chunk_types, isattys)
+
+    # N.B. This is purely to permit safe handling of a dynamic number of contextmanagers.
+    with ExitStack() as stack:
+      read_fds, write_fds = zip(
+        # Allocate one pipe pair per chunk type provided.
+        *(stack.enter_context(_pipe(isatty)) for isatty in isattys)
+      )
+      writer = NailgunStreamWriter(
+        read_fds,
+        sock,
+        chunk_types,
+        chunk_eof_type,
+        buf_size=buf_size,
+        select_timeout=select_timeout
+      )
+      with writer.running():
+        yield write_fds, writer
+
+  def run(self):
+    while self._in_fds and not self.is_stopped:
+      readable, _, errored = select.select(self._in_fds, [], self._in_fds, self._select_timeout)
+
+      if readable:
+        for fileno in readable:
+          data = os.read(fileno, self._buf_size)
+
+          if not data:
+            # We've reached EOF.
+            try:
+              if self._chunk_eof_type is not None:
+                NailgunProtocol.write_chunk(self._socket, self._chunk_eof_type)
+            finally:
+              try:
+                os.close(fileno)
+              finally:
+                self._in_fds.remove(fileno)
+          else:
+            NailgunProtocol.write_chunk(
+              self._socket,
+              self._fileno_chunk_type_map[fileno],
+              data
+            )
+
+      if errored:
+        for fileno in errored:
+          self._in_fds.remove(fileno)

@@ -4,7 +4,7 @@
 
 target(
   dependencies=[
-    'testprojects/maven_layout/junit_resource_collision/onedir/src/test/java',
-    'testprojects/maven_layout/junit_resource_collision/twodir/src/test/java',
+    'testprojects/maven_layout/junit_resource_collision/onedir/src/test/java:test',
+    'testprojects/maven_layout/junit_resource_collision/twodir/src/test/java:test',
   ],
 )

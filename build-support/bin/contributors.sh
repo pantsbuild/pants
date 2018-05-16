@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
-REPO_ROOT=$(cd "$(git rev-parse --show-toplevel)" && pwd)
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT" || exit 1
 
-source ${REPO_ROOT}/build-support/common.sh
+source "${REPO_ROOT}/build-support/common.sh"
 
 function usage() {
   echo "Generates contributor lists."
@@ -41,14 +42,14 @@ function contributors() {
   # Include all commits in range but exclude:
   #  - all commits from the imported zinc tree.
   #  - commits that are from running the publish goal
-  git log --use-mailmap --format="format:%aN;%s" ${range} ^imported_zinc_tree \
+  git log --use-mailmap --format="format:%aN;%s" "${range}" ^imported_zinc_tree \
     | grep -v "pants build committing publish data" \
     | sed -e 's/;.*$//'
 
 }
 
 if [[ -n "${since}" ]]; then
-  contributors ${since}..HEAD | sort | uniq -c | sort -rn
+  contributors "${since}..HEAD" | sort | uniq -c | sort -rn
 else
   cat << HEADER > CONTRIBUTORS.md
 Created by running \`$0\`.

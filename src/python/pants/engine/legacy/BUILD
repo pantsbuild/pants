@@ -54,7 +54,6 @@ python_library(
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':structs',
-    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:parse_context',
     'src/python/pants/build_graph',
@@ -77,15 +76,6 @@ python_library(
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'src/python/pants/source',
-  ]
-)
-
-python_library(
-  name='change_calculator',
-  sources=['change_calculator.py'],
-  dependencies=[
-    'src/python/pants/engine/legacy:source_mapper',
-    'src/python/pants/goal:workspace',
-    'src/python/pants/scm:change_calculator',
+    '3rdparty/python:six'
   ]
 )

@@ -9,6 +9,7 @@ python_tests(
     'src/python/pants/java:executor',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:process_handler',
   ]
 )
 
@@ -71,4 +72,15 @@ python_tests(
     'tests/python/pants_test:int-test'
   ],
   tags = {'integration'},
+)
+
+python_tests(
+  name = 'test_runjava',
+  sources = ['test_runjava_synthetic_classpath.py'],
+  dependencies = [
+    'src/python/pants/java:util',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'src/python/pants/backend/jvm/tasks:nailgun_task',
+  ]
 )

@@ -5,6 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
@@ -45,25 +49,35 @@ class JavadocGen(JvmdocGen):
             '-encoding', 'UTF-8',
             '-notimestamp',
             '-use',
-            '-classpath', ':'.join(classpath),
+            '-Xmaxerrs', '10000', # the default is 100
+            '-Xmaxwarns', '10000', # the default is 100
             '-d', gendir]
 
     # Always provide external linking for java API
-    offlinelinks = {'http://download.oracle.com/javase/6/docs/api/'}
+    offlinelinks = {'http://download.oracle.com/javase/8/docs/api/'}
 
     def link(target):
       for jar in target.jar_dependencies:
         if jar.apidocs:
           offlinelinks.add(jar.apidocs)
     for target in targets:
-      target.walk(link, lambda t: t.is_jvm)
+      target.walk(link, lambda t: isinstance(t, (JvmTarget, JarLibrary)))
 
     for link in offlinelinks:
       args.extend(['-linkoffline', link, link])
 
     args.extend(self.args)
 
-    args.extend(sources)
+    javadoc_classpath_file = os.path.join(self.workdir, '{}.classpath'.format(os.path.basename(gendir)))
+    with open(javadoc_classpath_file, 'w') as f:
+      f.write('-classpath ')
+      f.write(':'.join(classpath))
+    args.extend(['@{}'.format(javadoc_classpath_file)])
+
+    javadoc_sources_file = os.path.join(self.workdir, '{}.source.files'.format(os.path.basename(gendir)))
+    with open(javadoc_sources_file, 'w') as f:
+      f.write('\n'.join(sources))
+    args.extend(['@{}'.format(javadoc_sources_file)])
 
     java_executor = SubprocessExecutor(jdk)
     runner = java_executor.runner(jvm_options=self.jvm_options,

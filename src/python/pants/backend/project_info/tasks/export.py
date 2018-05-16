@@ -10,34 +10,41 @@ import os
 from collections import defaultdict
 
 import six
-from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
+from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
+from pants.backend.python.interpreter_cache import PythonInterpreterCache
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks.python_task import PythonTask
+from pants.backend.python.targets.python_tests import PythonTests
+from pants.backend.python.tasks.pex_build_util import has_python_requirements
+from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
+from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency_utils import M2Coordinate
-from pants.option.errors import OptionsError
-from pants.option.ranked_value import RankedValue
+from pants.python.python_repos import PythonRepos
 from pants.task.console_task import ConsoleTask
 from pants.util.memo import memoized_property
 
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin.
-# Please add tdesai to reviews for this file.
-class ExportTask(IvyTaskMixin, PythonTask):
+# Please add @yic to reviews for this file.
+class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
   """Base class for generating a json-formattable blob of data about the target graph.
 
   Subclasses can invoke the generate_targets_map method to get a dictionary of plain datastructures
@@ -55,11 +62,13 @@ class ExportTask(IvyTaskMixin, PythonTask):
   #
   # Note format changes in src/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION = '1.0.9'
+  DEFAULT_EXPORT_VERSION = '1.0.10'
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ExportTask, cls).subsystem_dependencies() + (DistributionLocator, JvmPlatform)
+    return super(ExportTask, cls).subsystem_dependencies() + (
+      DistributionLocator, JvmPlatform, PythonSetup, PythonRepos
+    )
 
   class SourceRootTypes(object):
     """Defines SourceRoot Types Constants"""
@@ -72,7 +81,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
 
   @staticmethod
   def _is_jvm(dep):
-    return dep.is_jvm or isinstance(dep, JvmApp)
+    return  isinstance(dep, (JarLibrary, JvmTarget, JvmApp))
 
   @staticmethod
   def _jar_id(jar):
@@ -104,11 +113,8 @@ class ExportTask(IvyTaskMixin, PythonTask):
              help='Causes libraries with javadocs to be output.')
     register('--sources', type=bool,
              help='Causes sources to be output.')
-    # Required by IvyTaskMixin.
-    # TODO: Remove this once IvyTaskMixin registers an --ivy-jvm-options option.
-    # See also https://github.com/pantsbuild/pants/issues/3200.
-    register('--jvm-options', type=list, metavar='<option>...',
-             help='Run Ivy with these extra jvm options.')
+    register('--formatted', type=bool, implicit_value=False,
+             help='Causes output to be a single line of JSON.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -117,7 +123,21 @@ class ExportTask(IvyTaskMixin, PythonTask):
       round_manager.require_data('java')
       round_manager.require_data('scala')
 
+  @memoized_property
+  def _interpreter_cache(self):
+    return PythonInterpreterCache(PythonSetup.global_instance(),
+                                  PythonRepos.global_instance(),
+                                  logger=self.context.log.debug)
+
+  def check_artifact_cache_for(self, invalidation_check):
+    # Export is an output dependent on the entire target set, and is not divisible
+    # by target. So we can only cache it keyed by the entire target set.
+    global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+    return [global_vts]
+
   def resolve_jars(self, targets):
+    # TODO: Why is this computed directly here instead of taking from the actual product
+    # computed by the {Ivy,Coursier}Resolve task?
     executor = SubprocessExecutor(DistributionLocator.cached())
     confs = []
     if self.get_options().libraries:
@@ -127,31 +147,21 @@ class ExportTask(IvyTaskMixin, PythonTask):
     if self.get_options().libraries_javadocs:
       confs.append('javadoc')
 
-    self._support_current_pants_plugin_options_usage()
-
     compile_classpath = None
+
     if confs:
       compile_classpath = ClasspathProducts(self.get_options().pants_workdir)
-      self.resolve(executor=executor,
-                   targets=targets,
-                   classpath_products=compile_classpath,
-                   confs=confs)
-    return compile_classpath
+      if JvmResolveSubsystem.global_instance().get_options().resolver == 'ivy':
+        IvyTaskMixin.resolve(self, executor=executor,
+                                          targets=targets,
+                                          classpath_products=compile_classpath,
+                                          confs=confs)
+      else:
+        CoursierMixin.resolve(self, targets, compile_classpath,
+                              sources=self.get_options().libraries_sources,
+                              javadoc=self.get_options().libraries_javadocs)
 
-  # TODO: This is a terrible hack for backwards-compatibility with the pants-plugin.
-  # Kill it when https://github.com/pantsbuild/intellij-pants-plugin/issues/46 is resolved,
-  # and update test_export_integration#test_export_jar_path_with_excludes_soft to use the flag
-  # actually scoped for this task.
-  def _support_current_pants_plugin_options_usage(self):
-    export_options = self.get_options()
-    try:
-      ivy_options = self.context.options.for_scope('resolve.ivy')
-    except OptionsError:
-      # No resolve.ivy task installed, so continue silently.
-      ivy_options = []
-    for name in set.intersection(set(export_options), set(ivy_options)):
-      if not ivy_options.is_default(name):
-        setattr(export_options, name, RankedValue(RankedValue.FLAG, ivy_options[name]))
+    return compile_classpath
 
   def generate_targets_map(self, targets, classpath_products=None):
     """Generates a dictionary containing all pertinent information about the target graph.
@@ -178,15 +188,17 @@ class ExportTask(IvyTaskMixin, PythonTask):
       """
       :type current_target:pants.build_graph.target.Target
       """
-      def get_target_type(target):
-        if target.is_test:
+      def get_target_type(tgt):
+        def is_test(t):
+          return isinstance(t, JUnitTests) or isinstance(t, PythonTests)
+        if is_test(tgt):
           return ExportTask.SourceRootTypes.TEST
         else:
-          if (isinstance(target, Resources) and
-              target in resource_target_map and
-              resource_target_map[target].is_test):
+          if (isinstance(tgt, Resources) and
+              tgt in resource_target_map and
+                is_test(resource_target_map[tgt])):
             return ExportTask.SourceRootTypes.TEST_RESOURCE
-          elif isinstance(target, Resources):
+          elif isinstance(tgt, Resources):
             return ExportTask.SourceRootTypes.RESOURCE
           else:
             return ExportTask.SourceRootTypes.SOURCE
@@ -218,7 +230,8 @@ class ExportTask(IvyTaskMixin, PythonTask):
         info['requirements'] = [req.key for req in reqs]
 
       if isinstance(current_target, PythonTarget):
-        interpreter_for_target = self.select_interpreter_for_targets([current_target])
+        interpreter_for_target = self._interpreter_cache.select_interpreter_for_targets(
+          [current_target])
         if interpreter_for_target is None:
           raise TaskError('Unable to find suitable interpreter for {}'
                           .format(current_target.address))
@@ -289,25 +302,20 @@ class ExportTask(IvyTaskMixin, PythonTask):
       'version': self.DEFAULT_EXPORT_VERSION,
       'targets': targets_map,
       'jvm_platforms': jvm_platforms_map,
+      # `jvm_distributions` are static distribution settings from config,
+      # `preferred_jvm_distributions` are distributions that pants actually uses for the
+      # given platform setting.
+      'preferred_jvm_distributions': {}
     }
-
-    # `jvm_distributions` are static distribution settings from config,
-    # `preferred_jvm_distributions` are distributions that pants actually uses for the
-    # given platform setting.
-    graph_info['preferred_jvm_distributions'] = {}
-
-    def get_preferred_distribution(platform, strict):
-      try:
-        return JvmPlatform.preferred_jvm_distribution([platform], strict=strict)
-      except DistributionLocator.Error:
-        return None
 
     for platform_name, platform in JvmPlatform.global_instance().platforms_by_name.items():
       preferred_distributions = {}
       for strict, strict_key in [(True, 'strict'), (False, 'non_strict')]:
-        dist = get_preferred_distribution(platform, strict=strict)
-        if dist:
+        try:
+          dist = JvmPlatform.preferred_jvm_distribution([platform], strict=strict)
           preferred_distributions[strict_key] = dist.home
+        except DistributionLocator.Error:
+          pass
 
       if preferred_distributions:
         graph_info['preferred_jvm_distributions'][platform_name] = preferred_distributions
@@ -316,17 +324,26 @@ class ExportTask(IvyTaskMixin, PythonTask):
       graph_info['libraries'] = self._resolve_jars_info(targets, classpath_products)
 
     if python_interpreter_targets_mapping:
-      interpreters = self.interpreter_cache.select_interpreter(
-        python_interpreter_targets_mapping.keys())
-      default_interpreter = interpreters[0]
+      # NB: We've selected a python interpreter compatible with each python target individually into
+      # the `python_interpreter_targets_mapping`. These python targets may not be compatible, ie: we
+      # could have a python target requiring 'CPython>=2.7<3' (ie: CPython-2.7.x) and another
+      # requiring 'CPython>=3.6'. To pick a default interpreter then from among these two choices
+      # is arbitrary and not to be relied on to work as a default interpreter if ever needed by the
+      # export consumer.
+      #
+      # TODO(John Sirois): consider either eliminating the 'default_interpreter' field and pressing
+      # export consumers to make their own choice of a default (if needed) or else use
+      # `select.select_interpreter_for_targets` and fail fast if there is no interpreter compatible
+      # across all the python targets in-play.
+      #
+      # For now, make our arbitrary historical choice of a default interpreter explicit and use the
+      # lowest version.
+      default_interpreter = min(python_interpreter_targets_mapping.keys())
 
       interpreters_info = {}
       for interpreter, targets in six.iteritems(python_interpreter_targets_mapping):
-        chroot = self.cached_chroot(
-          interpreter=interpreter,
-          pex_info=PexInfo.default(),
-          targets=targets
-        )
+        req_libs = filter(has_python_requirements, Target.closure_for_targets(targets))
+        chroot = self.resolve_requirements(interpreter, req_libs)
         interpreters_info[str(interpreter.identity)] = {
           'binary': interpreter.binary,
           'chroot': chroot.path()
@@ -359,12 +376,12 @@ class ExportTask(IvyTaskMixin, PythonTask):
   @memoized_property
   def target_aliases_map(self):
     registered_aliases = self.context.build_file_parser.registered_aliases()
-    map = {}
+    mapping = {}
     for alias, target_types in registered_aliases.target_types_by_alias.items():
       # If a target class is registered under multiple aliases returns the last one.
       for target_type in target_types:
-        map[target_type] = alias
-    return map
+        mapping[target_type] = alias
+    return mapping
 
   def _get_pants_target_alias(self, pants_target_type):
     """Returns the pants target alias for the given target"""
@@ -389,12 +406,6 @@ class Export(ExportTask, ConsoleTask):
 
   Intended for exporting project information for IDE, such as the IntelliJ Pants plugin.
   """
-
-  @classmethod
-  def register_options(cls, register):
-    super(Export, cls).register_options(register)
-    register('--formatted', type=bool, implicit_value=False,
-             help='Causes output to be a single line of JSON.')
 
   def __init__(self, *args, **kwargs):
     super(ExportTask, self).__init__(*args, **kwargs)

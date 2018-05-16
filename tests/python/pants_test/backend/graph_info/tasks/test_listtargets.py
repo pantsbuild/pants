@@ -16,7 +16,6 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
-from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -30,9 +29,9 @@ class BaseListTargetsTest(ConsoleTaskTestBase):
 class ListTargetsTestEmpty(BaseListTargetsTest):
 
   def test_list_all_empty(self):
+    # NB: Also renders a warning to stderr, which is challenging to detect here but confirmed in:
+    #   tests/python/pants_test/engine/legacy/test_list_integration.py
     self.assertEqual('', self.execute_task())
-    self.assertEqual('', self.execute_task(options={'sep': '###'}))
-    self.assertEqual([], self.execute_console_task())
 
 
 class ListTargetsTest(BaseListTargetsTest):
@@ -196,16 +195,3 @@ class ListTargetsTest(BaseListTargetsTest):
       options={'documented': True},
       targets=self.targets('::')
     )
-
-  def test_no_synthetic_resources_in_output(self):
-    # `python_library` w/o `sources` requires initializing the needed subsystem.
-    init_subsystem(Target.Arguments)
-    self.add_to_build_file('BUILD', dedent("""
-    python_library(
-      name = 'lib',
-      resources = ['BUILD'],
-    )
-    """))
-    output = self.execute_console_task(targets=self.targets('::'))
-    self.assertIn('//:lib', output)
-    self.assertTrue(all('synthetic' not in line for line in output))

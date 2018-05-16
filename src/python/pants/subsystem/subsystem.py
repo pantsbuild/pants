@@ -7,9 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import inspect
 
-from twitter.common.collections import OrderedSet
-
-from pants.build_graph.address import Address
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin, SubsystemDependency
@@ -49,20 +46,6 @@ class Subsystem(SubsystemClientMixin, Optionable):
         'Subsystem "{}" not initialized for scope "{}". '
         'Is subsystem missing from subsystem_dependencies() in a task? '.format(class_name, scope))
 
-  class CycleException(Exception):
-    """Thrown when a circular dependency is detected."""
-
-    def __init__(self, cycle):
-      message = 'Cycle detected:\n\t{}'.format(' ->\n\t'.join(
-          '{} scope: {}'.format(subsystem, subsystem.options_scope) for subsystem in cycle))
-      super(Subsystem.CycleException, self).__init__(message)
-
-  class NoMappingForKey(Exception):
-    """Thrown when a mapping doesn't exist for a given injectables key."""
-
-  class TooManySpecsForKey(Exception):
-    """Thrown when a mapping contains multiple specs when a singular spec is expected."""
-
   @classmethod
   def is_subsystem_type(cls, obj):
     return inspect.isclass(obj) and issubclass(obj, cls)
@@ -82,36 +65,6 @@ class Subsystem(SubsystemClientMixin, Optionable):
       return super(Subsystem, cls).get_scope_info()
     else:
       return ScopeInfo(cls.subscope(subscope), ScopeInfo.SUBSYSTEM, cls)
-
-  @classmethod
-  def closure(cls, subsystem_types):
-    """Gathers the closure of the `subsystem_types` and their transitive `dependencies`.
-
-    :param subsystem_types: An iterable of subsystem types.
-    :returns: A set containing the closure of subsystem types reachable from the given
-              `subsystem_types` roots.
-    :raises: :class:`pants.subsystem.subsystem.Subsystem.CycleException` if a dependency cycle is
-             detected.
-    """
-    known_subsystem_types = set()
-    path = OrderedSet()
-
-    def collect_subsystems(subsystem):
-      if subsystem in path:
-        cycle = list(path) + [subsystem]
-        raise cls.CycleException(cycle)
-
-      path.add(subsystem)
-      if subsystem not in known_subsystem_types:
-        known_subsystem_types.add(subsystem)
-        for dependency in subsystem.subsystem_dependencies():
-          collect_subsystems(dependency)
-      path.remove(subsystem)
-
-    for subsystem_type in subsystem_types:
-      collect_subsystems(subsystem_type)
-
-    return known_subsystem_types
 
   @classmethod
   def subscope(cls, scope):
@@ -204,52 +157,3 @@ class Subsystem(SubsystemClientMixin, Optionable):
     :API: public
     """
     return self._scoped_options
-
-  def injectables(self, build_graph):
-    """Given a `BuildGraph`, inject any targets required for the `Subsystem` to function.
-
-    This function will be called just before `Target` injection time. Any objects injected here
-    should have a static spec path that will need to be emitted, pre-injection, by the
-    `injectables_specs` classmethod for the purpose of dependency association for e.g. `changed`.
-
-    :API: public
-    """
-
-  @property
-  def injectables_spec_mapping(self):
-    """A mapping of {key: spec} that is used for locating injectable specs.
-
-    This should be overridden by subclasses who wish to define an injectables mapping.
-
-    :API: public
-    """
-    return {}
-
-  def injectables_specs_for_key(self, key):
-    """Given a key, yield all relevant injectable spec addresses.
-
-    :API: public
-    """
-    mapping = self.injectables_spec_mapping
-    if key not in mapping:
-      raise self.NoMappingForKey(key)
-    specs = mapping[key]
-    assert isinstance(specs, list), (
-      'invalid `injectables_spec_mapping` on {!r} for key "{}". '
-      'expected a `list` but instead found a `{}`: {}'
-    ).format(self, key, type(specs), specs)
-    return [Address.parse(s).spec for s in specs]
-
-  def injectables_spec_for_key(self, key):
-    """Given a key, yield a singular spec representing that key.
-
-    :API: public
-    """
-    specs = self.injectables_specs_for_key(key)
-    specs_len = len(specs)
-    if specs_len == 0:
-      return None
-    if specs_len != 1:
-      raise self.TooManySpecsForKey('injectables spec mapping for key included {} elements, expected 1'
-                               .format(specs_len))
-    return specs[0]

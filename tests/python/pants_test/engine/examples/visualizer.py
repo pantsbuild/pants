@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 import sys
 from textwrap import dedent
 
@@ -14,6 +13,7 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.engine.fs import PathGlobs
 from pants.util import desktop
 from pants.util.contextutil import temporary_file_path
+from pants.util.process_handler import subprocess
 from pants_test.engine.examples.planners import setup_json_scheduler
 from pants_test.engine.util import init_native
 

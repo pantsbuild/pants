@@ -54,7 +54,7 @@ class ConsoleTask(QuietTaskMixin, Task):
     with self._guard_sigpipe():
       try:
         targets = self.context.targets()
-        for value in self.console_output(targets):
+        for value in self.console_output(targets) or tuple():
           self._outstream.write(value.encode('utf-8'))
           self._outstream.write(self._console_separator)
       finally:

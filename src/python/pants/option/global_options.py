@@ -9,17 +9,16 @@ import logging
 import os
 import sys
 
-import pkg_resources
-
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
                                           get_pants_cachedir, get_pants_configdir, pants_version)
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import dir_option
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
+from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 
 
-class GlobalOptionsRegistrar(Optionable):
+class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
   options_scope = GLOBAL_SCOPE
   options_scope_category = ScopeInfo.GLOBAL
 
@@ -38,6 +37,9 @@ class GlobalOptionsRegistrar(Optionable):
     status as "bootstrap options" is only pertinent during option registration.
     """
     buildroot = get_buildroot()
+    default_distdir_name = 'dist'
+    default_distdir = os.path.join(buildroot, default_distdir_name)
+    default_rel_distdir = '/{}/'.format(default_distdir_name)
 
     # Although logging supports the WARN level, its not documented and could conceivably be yanked.
     # Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
@@ -45,11 +47,12 @@ class GlobalOptionsRegistrar(Optionable):
     logging.addLevelName(logging.WARNING, 'WARN')
     register('-l', '--level', choices=['debug', 'info', 'warn'], default='info', recursive=True,
              help='Set the logging level.')
-    register('-q', '--quiet', type=bool, recursive=True,
-             help='Squelches most console output.')
+    register('-q', '--quiet', type=bool, recursive=True, daemon=False,
+             help='Squelches most console output. NOTE: Some tasks default to behaving quietly: '
+                  'inverting this option supports making them noisier than they would be otherwise.')
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
-    register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True,
+    register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True, daemon=False,
              help='Set whether log messages are displayed in color.')
 
     # Pants code uses this only to verify that we are of the requested version. However
@@ -68,6 +71,7 @@ class GlobalOptionsRegistrar(Optionable):
              default=['pants.backend.graph_info',
                       'pants.backend.python',
                       'pants.backend.jvm',
+                      'pants.backend.native',
                       'pants.backend.codegen.antlr.java',
                       'pants.backend.codegen.antlr.python',
                       'pants.backend.codegen.jaxb',
@@ -91,32 +95,46 @@ class GlobalOptionsRegistrar(Optionable):
              default=os.path.join(buildroot, 'build-support'),
              help='Use support files from this dir.')
     register('--pants-distdir', advanced=True, metavar='<dir>',
-             default=os.path.join(buildroot, 'dist'),
-             help='Write end-product artifacts to this dir.')
+             default=default_distdir,
+             help='Write end-product artifacts to this dir. If you modify this path, you '
+                  'should also update --build-ignore and --pants-ignore to include the '
+                  'custom dist dir path as well.')
     register('--pants-subprocessdir', advanced=True, default=os.path.join(buildroot, '.pids'),
              help='The directory to use for tracking subprocess metadata, if any. This should '
                   'live outside of the dir used by `--pants-workdir` to allow for tracking '
                   'subprocesses that outlive the workdir data (e.g. `./pants server`).')
-    register('--pants-config-files', advanced=True, type=list,
+    register('--pants-config-files', advanced=True, type=list, daemon=False,
              default=[get_default_pants_config_file()], help='Paths to Pants config files.')
     # TODO: Deprecate the --pantsrc/--pantsrc-files options?  This would require being able
     # to set extra config file locations in an initial bootstrap config file.
-    register('--config-override', advanced=True, type=list, metavar='<path>',
-             removal_version='1.6.0.dev0',
-             removal_hint='Use --pants-config-files=<second config file path> instead.',
-             help='A second config file, to override pants.ini.')
     register('--pantsrc', advanced=True, type=bool, default=True,
              help='Use pantsrc files.')
-    register('--pantsrc-files', advanced=True, type=list, metavar='<path>',
+    register('--pantsrc-files', advanced=True, type=list, metavar='<path>', daemon=False,
              default=['/etc/pantsrc', '~/.pants.rc'],
              help='Override config with values from these files. '
                   'Later files override earlier ones.')
     register('--pythonpath', advanced=True, type=list,
              help='Add these directories to PYTHONPATH to search for plugins.')
-    register('--target-spec-file', type=list, dest='target_spec_files',
+    register('--target-spec-file', type=list, dest='target_spec_files', daemon=False,
              help='Read additional specs from this file, one per line')
-    register('--verify-config', type=bool, default=True,
+    register('--verify-config', type=bool, default=True, daemon=False,
              help='Verify that all config file values correspond to known options.')
+    register('--build-ignore', advanced=True, type=list, fromfile=True,
+             default=['.*/', default_rel_distdir, 'bower_components/',
+                      'node_modules/', '*.egg-info/'],
+             help='Paths to ignore when identifying BUILD files. '
+                  'This does not affect any other filesystem operations. '
+                  'Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
+    register('--pants-ignore', advanced=True, type=list, fromfile=True,
+             default=['.*/', default_rel_distdir],
+             help='Paths to ignore for all filesystem operations performed by pants '
+                  '(e.g. BUILD file scanning, glob matching, etc). '
+                  'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore).')
+    register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,
+             metavar='<regexp>', help='Exclude target roots that match these regexes.')
+    register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
+             help='Paths that correspond with build roots for any subproject that this '
+                  'project depends on.')
 
     # These logging options are registered in the bootstrap phase so that plugins can log during
     # registration and not so that their values can be interpolated in configs.
@@ -129,21 +147,59 @@ class GlobalOptionsRegistrar(Optionable):
     register('--enable-pantsd', advanced=True, type=bool, default=False,
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
-    # This facilitates use of the v2 engine, sans daemon.
-    # TODO: Add removal_version='1.5.0.dev0' before 1.4 lands.
-    register('--enable-v2-engine', advanced=True, type=bool, default=True,
-             help='Enables use of the v2 engine.')
-
     # These facilitate configuring the native engine.
-    register('--native-engine-version', advanced=True,
-             default=pkg_resources.resource_string('pants.engine', 'native_engine_version').strip(),
-             help='Native engine version.')
-    register('--native-engine-supportdir', advanced=True, default='bin/native-engine',
-             help='Find native engine binaries under this dir. Used as part of the path to '
-                  'lookup the binary with --binary-util-baseurls and --pants-bootstrapdir.')
-    register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option,
+    register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option, daemon=False,
              help='A directory to write execution and rule graphs to as `dot` files. The contents '
                   'of the directory will be overwritten if any filenames collide.')
+
+    # BinaryUtil options.
+    register('--binaries-baseurls', type=list, advanced=True,
+             default=['https://binaries.pantsbuild.org'],
+             help='List of URLs from which binary tools are downloaded. URLs are '
+                  'searched in order until the requested path is found.')
+    register('--binaries-fetch-timeout-secs', type=int, default=30, advanced=True, daemon=False,
+             help='Timeout in seconds for URL reads when fetching binary tools from the '
+                  'repos specified by --baseurls.')
+    register('--binaries-path-by-id', type=dict, advanced=True,
+             help=("Maps output of uname for a machine to a binary search path: "
+                   "(sysname, id) -> (os, arch), e.g. {('darwin', '15'): ('mac', '10.11'), "
+                   "('linux', 'arm32'): ('linux', 'arm32')}."))
+    register('--allow-external-binary-tool-downloads', type=bool, default=True, advanced=True,
+             help="If False, require BinaryTool subclasses to download their contents from urls "
+                  "generated from --binaries-baseurls, even if the tool has an external url "
+                  "generator. This can be necessary if using Pants in an environment which cannot "
+                  "contact the wider Internet.")
+
+    # Pants Daemon options.
+    register('--pantsd-pailgun-host', advanced=True, default='127.0.0.1',
+             help='The host to bind the pants nailgun server to.')
+    register('--pantsd-pailgun-port', advanced=True, type=int, default=0,
+             help='The port to bind the pants nailgun server to. Defaults to a random port.')
+    register('--pantsd-log-dir', advanced=True, default=None,
+             help='The directory to log pantsd output to.')
+    register('--pantsd-fs-event-workers', advanced=True, type=int, default=4,
+             help='The number of workers to use for the filesystem event service executor pool.')
+    register('--pantsd-invalidation-globs', advanced=True, type=list, fromfile=True, default=[],
+             help='Filesystem events matching any of these globs will trigger a daemon restart.')
+
+    # Watchman options.
+    register('--watchman-version', advanced=True, default='4.9.0-pants1', help='Watchman version.')
+    register('--watchman-supportdir', advanced=True, default='bin/watchman',
+             help='Find watchman binaries under this dir. Used as part of the path to lookup '
+                  'the binary with --binaries-baseurls and --pants-bootstrapdir.')
+    register('--watchman-startup-timeout', type=float, advanced=True, default=30.0,
+             help='The watchman socket timeout (in seconds) for the initial `watch-project` command. '
+                  'This may need to be set higher for larger repos due to watchman startup cost.')
+    register('--watchman-socket-timeout', type=float, advanced=True, default=5.0,
+             help='The watchman client socket timeout in seconds.')
+    register('--watchman-socket-path', type=str, advanced=True, default=None,
+             help='The path to the watchman UNIX socket. This can be overridden if the default '
+                  'absolute path length exceeds the maximum allowed by the OS.')
+
+    # This option changes the parser behavior in a fundamental way (which currently invalidates
+    # all caches), and needs to be parsed out early, so we make it a bootstrap option.
+    register('--build-file-imports', choices=['allow', 'warn', 'error'], default='warn',
+      help='Whether to allow import statements in BUILD files')
 
   @classmethod
   def register_options(cls, register):
@@ -167,36 +223,12 @@ class GlobalOptionsRegistrar(Optionable):
     # TODO: After moving to the new options system these abstraction leaks can go away.
     register('-k', '--kill-nailguns', advanced=True, type=bool,
              help='Kill nailguns before exiting')
-    register('-i', '--interpreter', advanced=True, default=[], type=list,
-             metavar='<requirement>',
-             removal_version='1.5.0.dev0',
-             removal_hint='Use --interpreter-constraints in scope python-setup instead.',
-             help="Constrain what Python interpreters to use.  Uses Requirement format from "
-                  "pkg_resources, e.g. 'CPython>=2.6,<3' or 'PyPy'. By default, no constraints "
-                  "are used.  Multiple constraints may be added.  They will be ORed together.")
-    register('--exclude-target-regexp', advanced=True, type=list, default=[],
-             metavar='<regexp>',
-             help='Exclude target roots that match these regexes.')
-    # Relative pants_distdir to buildroot. Requires --pants-distdir to be bootstrapped above first.
-    # e.g. '/dist/'
-    rel_distdir = '/{}/'.format(os.path.relpath(register.bootstrap.pants_distdir, get_buildroot()))
-    register('--build-ignore', advanced=True, type=list, fromfile=True,
-             default=['.*/', rel_distdir, 'bower_components/', 'node_modules/', '*.egg-info/'],
-             help='Paths to ignore when identifying BUILD files. '
-                  'This does not affect any other filesystem operations. '
-                  'Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
-    register('--pants-ignore', advanced=True, type=list, fromfile=True, default=['.*/', rel_distdir],
-             help='Paths to ignore for all filesystem operations performed by pants '
-                  '(e.g. BUILD file scanning, glob matching, etc). '
-                  'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
-                  'This currently only affects the v2 engine. '
-                  'To experiment with v2 engine, try --enable-v2-engine option.')
     register('--fail-fast', advanced=True, type=bool, recursive=True,
              help='Exit as quickly as possible on error, rather than attempting to continue '
                   'to process the non-erroneous subset of the input.')
     register('--cache-key-gen-version', advanced=True, default='200', recursive=True,
              help='The cache key generation. Bump this to invalidate every artifact for a scope.')
-    register('--workdir-max-build-entries', advanced=True, type=int, default=None,
+    register('--workdir-max-build-entries', advanced=True, type=int, default=8,
              help='Maximum number of previous builds to keep per task target pair in workdir. '
              'If set, minimum 2 will always be kept to support incremental compilation.')
     register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,
@@ -204,13 +236,6 @@ class GlobalOptionsRegistrar(Optionable):
              'the command up into multiple invocations.')
     register('--print-exception-stacktrace', advanced=True, type=bool,
              help='Print to console the full exception stack trace if encountered.')
-    register('--build-file-rev', advanced=True,
-             removal_hint='Lightly used feature, scheduled for removal.', removal_version='1.5.0.dev0',
-             help='Read BUILD files from this scm rev instead of from the working tree.  This is '
-             'useful for implementing pants-aware sparse checkouts.')
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
-    register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
-             help='Paths that correspond with build roots for any subproject that this '
-                  'project depends on.')

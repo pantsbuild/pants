@@ -6,12 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 from abc import abstractmethod
 
 from colors import green, red, yellow
 from pants.base.exceptions import TaskError
 from pants.task.task import QuietTaskMixin
+from pants.util.process_handler import subprocess
 from twitter.common.collections import OrderedSet
 
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask

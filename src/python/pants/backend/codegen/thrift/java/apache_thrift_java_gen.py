@@ -10,7 +10,6 @@ from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
 from pants.backend.codegen.thrift.lib.apache_thrift_gen_base import ApacheThriftGenBase
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TargetDefinitionException
-from pants.binaries.thrift_binary import ThriftBinary
 
 
 # TODO: Currently the injected runtime deps are specified by the --deps option defined in the
@@ -20,19 +19,15 @@ from pants.binaries.thrift_binary import ThriftBinary
 # to have a BUILD file entry for the default spec to point to.
 class ApacheThriftJavaGen(ApacheThriftGenBase):
   """Generate Java source files from thrift IDL files."""
-  deprecated_options_scope = 'gen.thrift'  # New scope is gen.thrift-java.
-  deprecated_options_scope_removal_version = '1.5.0.dev0'
 
   gentarget_type = JavaThriftLibrary
   thrift_generator = 'java'
 
   _COMPILER = 'thrift'
-  _RPC_STYLE = 'sync'
 
   @classmethod
   def subsystem_dependencies(cls):
-    return (super(ApacheThriftJavaGen, cls).subsystem_dependencies() +
-            (ThriftDefaults, ThriftBinary.Factory.scoped(cls)))
+    return super(ApacheThriftJavaGen, cls).subsystem_dependencies() + (ThriftDefaults,)
 
   @classmethod
   def implementation_version(cls):
@@ -56,10 +51,6 @@ class ApacheThriftJavaGen(ApacheThriftGenBase):
       raise TargetDefinitionException(
           target,
           'Compiler {} supports only language={}.'.format(self._COMPILER, self.thrift_generator))
-    if self._thrift_defaults.rpc_style(target) != self._RPC_STYLE:
-      raise TargetDefinitionException(
-          target,
-          'Compiler {} supports only rpc_style={}.'.format(self._COMPILER, self._RPC_STYLE))
 
   def execute_codegen(self, target, target_workdir):
     self._validate(target)

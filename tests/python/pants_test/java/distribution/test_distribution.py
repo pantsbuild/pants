@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 import textwrap
 import unittest
 from contextlib import contextmanager
@@ -19,6 +18,7 @@ from pants.java.distribution.distribution import (Distribution, DistributionLoca
                                                   _OSXEnvironment, _UnknownEnvironment)
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_open, touch
+from pants.util.process_handler import subprocess
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 

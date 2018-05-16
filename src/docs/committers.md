@@ -21,12 +21,11 @@ After approval by a vote of the current committers, a new committer has access t
 
   - Commit access to the github repo.
   - Ability to Stop/restart builds on Travis-CI.
-  - An account on the code review site (RBCommons) that is part of the 'twitter’ team.
   - Access to the pants-committers@googlegroups.com group.
 
 A committer may also request access to publish changes to the org.pantsbuild groupId on the Maven Central Repository.
 
-The list of current and past committers will be listed in a file named COMMITTERS.rb in the root of the pantsbuild/pants repo.
+The list of current and past committers will be listed in a file named COMMITTERS.md in the root of the pantsbuild/pants repo.
 
 Committer Responsibilities
 --------------------------

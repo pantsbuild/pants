@@ -7,35 +7,22 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
-import subprocess
 
 from pants.backend.codegen.ragel.java.java_ragel_library import JavaRagelLibrary
+from pants.backend.codegen.ragel.subsystems.ragel import Ragel
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.binaries.binary_util import BinaryUtil
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_property
+from pants.util.process_handler import subprocess
 
 
 class RagelGen(SimpleCodegenTask):
   @classmethod
   def subsystem_dependencies(cls):
-    return super(RagelGen, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
-
-  @classmethod
-  def register_options(cls, register):
-    super(RagelGen, cls).register_options(register)
-    register('--supportdir', default='bin/ragel', advanced=True,
-             help='The path to find the ragel binary.  Used as part of the path to lookup the'
-                  'tool with --pants-support-baseurls and --pants_bootstrapdir.')
-
-    # We take the cautious approach here and assume a version bump will always correspond to
-    # changes in ragel codegen products.
-    register('--version', default='6.9', advanced=True, fingerprint=True,
-             help='The version of ragel to use.  Used as part of the path to lookup the'
-                  'tool with --pants-support-baseurls and --pants-bootstrapdir')
+    return super(RagelGen, cls).subsystem_dependencies() + (Ragel.scoped(cls),)
 
   def __init__(self, *args, **kwargs):
     super(RagelGen, self).__init__(*args, **kwargs)
@@ -43,10 +30,7 @@ class RagelGen(SimpleCodegenTask):
 
   @memoized_property
   def ragel_binary(self):
-    binary_util = BinaryUtil.Factory.create()
-    return binary_util.select_binary(self.get_options().supportdir,
-                                     self.get_options().version,
-                                     'ragel')
+    return Ragel.scoped_instance(self).select(context=self.context)
 
   def synthetic_target_type(self, target):
     return JavaLibrary

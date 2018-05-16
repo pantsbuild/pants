@@ -88,7 +88,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
   def test_compile_changed(self):
     with self.known_commits():
       # Just look for changes in the 1st commit (addition of Class.java).
-      cmd = ['compile-changed', '--diffspec=HEAD~2..HEAD~1']
+      cmd = ['--changed-diffspec=HEAD~2..HEAD~1', 'compile']
 
       with self.temporary_workdir() as workdir:
         # Nothing exists.
@@ -107,7 +107,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
         self.assertIsNone(self.find_classfile(workdir, 'Class.class'))
         self.assertIsNone(self.find_classfile(workdir, 'ClassTest.class'))
 
-        run = self.run_pants_with_workdir(cmd + ['--include-dependees=direct'], workdir)
+        run = self.run_pants_with_workdir(cmd + ['--changed-include-dependees=direct'], workdir)
         self.assert_success(run)
 
         # The changed target's and its direct dependees' (eg its tests) classfiles exist.
@@ -121,8 +121,9 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
 
   def test_test_changed(self):
     with self.known_commits(), self.temporary_workdir() as workdir:
-      cmd = ['test-changed', '--diffspec=HEAD~2..HEAD~1']
-      junit_out = os.path.join(workdir, 'test', 'junit', 'org.pantsbuild.ClassTest.out.txt')
+      cmd = ['--changed-diffspec=HEAD~2..HEAD~1', 'test']
+      junit_out = os.path.join(get_buildroot(), 'dist', 'test', 'junit',
+                               'org.pantsbuild.ClassTest.out.txt')
 
       self.assertFalse(os.path.exists(junit_out))
 
@@ -131,7 +132,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
 
       self.assertFalse(os.path.exists(junit_out))
 
-      run = self.run_pants_with_workdir(cmd + ['--include-dependees=direct'], workdir)
+      run = self.run_pants_with_workdir(cmd + ['--changed-include-dependees=direct'], workdir)
       self.assert_success(run)
 
       self.assertTrue(os.path.exists(junit_out))

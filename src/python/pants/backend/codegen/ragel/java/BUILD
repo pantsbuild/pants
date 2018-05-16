@@ -4,13 +4,14 @@
 python_library(
   dependencies = [
     'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/codegen/ragel/subsystems',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
-    'src/python/pants/binaries:binary_util',
     'src/python/pants/goal:task_registrar',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
+    'src/python/pants/util:process_handler',
   ],
 )

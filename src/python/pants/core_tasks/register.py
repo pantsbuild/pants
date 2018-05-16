@@ -6,11 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.core_tasks.bash_completion import BashCompletion
-from pants.core_tasks.changed_target_tasks import CompileChanged, TestChanged
 from pants.core_tasks.clean import Clean
 from pants.core_tasks.deferred_sources_mapper import DeferredSourcesMapper
 from pants.core_tasks.explain_options_task import ExplainOptionsTask
-from pants.core_tasks.invalidate import Invalidate
 from pants.core_tasks.list_goals import ListGoals
 from pants.core_tasks.noop import NoopCompile, NoopTest
 from pants.core_tasks.pantsd_kill import PantsDaemonKill
@@ -21,9 +19,10 @@ from pants.core_tasks.run_prep_command import (RunBinaryPrepCommand, RunCompileP
                                                RunTestPrepCommand)
 from pants.core_tasks.substitute_aliased_targets import SubstituteAliasedTargets
 from pants.core_tasks.targets_help import TargetsHelp
-from pants.core_tasks.what_changed import WhatChanged
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
+from pants.task.fmt_task_mixin import FmtTaskMixin
+from pants.task.lint_task_mixin import LintTaskMixin
 
 
 def register_goals():
@@ -47,19 +46,22 @@ def register_goals():
   Goal.register('doc', 'Generate documentation.')
   Goal.register('publish', 'Publish a build artifact.')
   Goal.register('dep-usage', 'Collect target dependency usage data.')
-  Goal.register('lint', 'Find formatting errors in source code.')
-  Goal.register('fmt', 'Autoformat source code.')
+  Goal.register('lint', 'Find formatting errors in source code.',
+                LintTaskMixin.goal_options_registrar_cls)
+  Goal.register('fmt', 'Autoformat source code.', FmtTaskMixin.goal_options_registrar_cls)
+  Goal.register('buildozer', 'Manipulate BUILD files.')
 
   # Register tasks.
 
   # Cleaning.
-  task(name='invalidate', action=Invalidate).install()
   task(name='clean-all', action=Clean).install('clean-all')
 
   # Pantsd.
   kill_pantsd = task(name='kill-pantsd', action=PantsDaemonKill)
   kill_pantsd.install()
-  kill_pantsd.install('clean-all')
+  # Kill pantsd/watchman first, so that they're not using any files
+  # in .pants.d at the time of removal.
+  kill_pantsd.install('clean-all', first=True)
 
   # Reporting server.
   # TODO: The reporting server should be subsumed into pantsd, and not run via a task.
@@ -82,12 +84,6 @@ def register_goals():
   # Stub for other goals to schedule 'test'. See noop_exec_task.py for why this is useful.
   task(name='test', action=NoopTest).install('test')
 
-  # Operations on files that the SCM detects as changed.
-  # TODO: Remove these in `1.5.0dev0` as part of the changed goal deprecations.
-  task(name='changed', action=WhatChanged).install()
-  task(name='compile-changed', action=CompileChanged).install()
-  task(name='test-changed', action=TestChanged).install()
-
   # Workspace information.
   task(name='roots', action=ListRoots).install()
   task(name='bash-completion', action=BashCompletion).install()
@@ -96,5 +92,5 @@ def register_goals():
   task(name='deferred-sources', action=DeferredSourcesMapper).install()
 
   # Processing aliased targets has to occur very early.
-  task(name='substitute-aliased-targets', action=SubstituteAliasedTargets).install('bootstrap',
-                                                                                   first=True)
+  task(name='substitute-aliased-targets', action=SubstituteAliasedTargets).install(
+    'bootstrap', first=True)

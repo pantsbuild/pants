@@ -14,9 +14,7 @@ from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class DummyJvmCompile(JvmCompile):
-
-  def create_analysis_tools(self):
-    return None
+  pass
 
 
 class JvmCompileTest(TaskTestBase):

@@ -8,17 +8,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 import shutil
-import subprocess
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.codegen.thrift.lib.thrift import Thrift
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.binaries.thrift_binary import ThriftBinary
 from pants.option.custom_types import target_option
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.memo import memoized_property
+from pants.util.process_handler import subprocess
 
 
 class ApacheThriftGenBase(SimpleCodegenTask):
@@ -40,10 +40,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
              help='Run thrift compiler with strict warnings.')
     # The old --gen-options was string-typed, so we keep it that way for backwards compatibility,
     # and reluctantly use the clunky name --gen-options-map for the new, map-typed options.
-    # TODO: Once --gen-options is gone, do a deprecation cycle to restore the old name.
-    register('--gen-options', advanced=True, fingerprint=True,
-             removal_version='1.5.0.dev0', removal_hint='Use --gen-options-map instead',
-             help='Use these options for the {} generator.'.format(cls.thrift_generator))
+    # TODO: Do a deprecation cycle to restore the old name.
     register('--gen-options-map', type=dict, advanced=True, fingerprint=True,
              default=cls.default_gen_options_map,
              help='Use these options for the {} generator.'.format(cls.thrift_generator))
@@ -55,8 +52,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return (super(ApacheThriftGenBase, cls).subsystem_dependencies() +
-            (ThriftBinary.Factory.scoped(cls),))
+    return super(ApacheThriftGenBase, cls).subsystem_dependencies() + (Thrift.scoped(cls),)
 
   def synthetic_target_extra_dependencies(self, target, target_workdir):
     for source in target.sources_relative_to_buildroot():
@@ -98,8 +94,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
 
   @memoized_property
   def _thrift_binary(self):
-    thrift_binary = ThriftBinary.Factory.scoped_instance(self).create()
-    return thrift_binary.path
+    return Thrift.scoped_instance(self).select(context=self.context)
 
   @memoized_property
   def _deps(self):
@@ -126,8 +121,6 @@ class ApacheThriftGenBase(SimpleCodegenTask):
 
     gen_opts_map = self.get_options().gen_options_map or {}
     gen_opts = [opt_str(item) for item in gen_opts_map.items()]
-    if self.get_options().gen_options:  # Add the deprecated, old options.
-      gen_opts.append(self.get_options().gen_options)
 
     generator_spec = ('{}:{}'.format(self.thrift_generator, ','.join(gen_opts)) if gen_opts
                       else self.thrift_generator)

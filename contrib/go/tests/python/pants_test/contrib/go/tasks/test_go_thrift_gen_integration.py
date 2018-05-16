@@ -93,7 +93,6 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
       with self._create_thrift_project(thrift_files) as (srcdir, config):
         args = [
             'compile',
-            '--compile-gofmt-skip',
             os.path.join(srcdir, 'src/go/usethrift')
           ]
         pants_run = self.run_pants_with_workdir(args, workdir, config=config)
@@ -131,9 +130,8 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
       with self._create_thrift_project(thrift_files) as (srcdir, config):
         args = [
             # Necessary to use a newer thrift version.
-            '--thrift-binary-version=0.10.0',
+            '--thrift-version=0.10.0',
             'compile',
-            '--compile-gofmt-skip',
             os.path.join(srcdir, 'src/go/usethrift')
           ]
         pants_run = self.run_pants_with_workdir(args, workdir, config=config)

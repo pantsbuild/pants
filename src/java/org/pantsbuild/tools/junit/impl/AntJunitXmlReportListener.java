@@ -10,7 +10,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.FilterWriter;
 import java.io.IOException;
 import java.io.Writer;
@@ -51,6 +50,7 @@ class AntJunitXmlReportListener extends RunListener {
    */
   @XmlRootElement
   @XmlAccessorType(XmlAccessType.FIELD)
+  @SuppressWarnings("JavaLangClash")
   static class Exception {
     @XmlAttribute private final String message;
     @XmlAttribute private final String type;
@@ -231,16 +231,13 @@ class AntJunitXmlReportListener extends RunListener {
     private TestSuite() {
       name = null;
       testClass = null;
+      hostname = null;
     }
 
-    TestSuite(Description test) {
+    TestSuite(Description test, String localHostName) {
       name = test.getClassName();
       testClass = test.getTestClass();
-      try {
-        hostname = InetAddress.getLocalHost().getHostName();
-      } catch (UnknownHostException e) {
-        hostname = "localhost";
-      }
+      hostname = localHostName;
     }
 
     public int getErrors() {
@@ -337,10 +334,15 @@ class AntJunitXmlReportListener extends RunListener {
 
   private final File outdir;
   private final StreamSource streamSource;
+  // NB: Cache the localhost name as a workaround for an issue where localhost resolution on OSX
+  // may take seconds.
+  // See: https://bugs.openjdk.java.net/browse/JDK-8170910
+  private final String localHostName;
 
   AntJunitXmlReportListener(File outdir, StreamSource streamSource) {
     this.outdir = outdir;
     this.streamSource = streamSource;
+    this.localHostName = getLocalHostName();
   }
 
   @Override
@@ -363,7 +365,7 @@ class AntJunitXmlReportListener extends RunListener {
         String testClass = test.getClassName();
         TestSuite suite = suites.get(testClass);
         if (suite == null) {
-          suite = new TestSuite(test);
+          suite = new TestSuite(test, localHostName);
           suites.put(testClass, suite);
         }
         TestCase testCase = new TestCase(test);
@@ -375,7 +377,9 @@ class AntJunitXmlReportListener extends RunListener {
 
   @Override
   public void testStarted(Description description) throws java.lang.Exception {
-    if (!Util.isRunnable(description)) return;
+    if (!Util.isRunnable(description)) {
+      return;
+    }
     getTestSuiteFor(description).started();
     getTestCaseFor(description).started();
   }
@@ -494,20 +498,22 @@ class AntJunitXmlReportListener extends RunListener {
       }
 
       if (suite.tests > 0) {
-        Writer xmlOut = Files.newBufferedWriter(
-            new File(outdir, String.format("TEST-%s.xml", suite.getName())).toPath(), UTF_8);
-
-        // Only output valid XML1.0 characters - JAXB does not handle this.
-        JAXB.marshal(suite, new XmlWriter(xmlOut) {
-          @Override protected void handleInvalid(int c) throws IOException {
-            out.write(' ');
+        Writer xmlOut = null;
+        try {
+          xmlOut = Files.newBufferedWriter(
+              new File(outdir, String.format("TEST-%s.xml", suite.getName())).toPath(), UTF_8);
+          // Use XmlWriter to output valid XML1.0 characters - JAXB does not handle this.
+          JAXB.marshal(suite, new XmlWriter(xmlOut));
+        } finally {
+          if (xmlOut != null) {
+            xmlOut.close();
           }
-        });
+        }
       }
     }
   }
 
-  private abstract static class XmlWriter extends FilterWriter {
+  private static class XmlWriter extends FilterWriter {
     protected XmlWriter(Writer out) {
       super(out);
     }
@@ -554,7 +560,9 @@ class AntJunitXmlReportListener extends RunListener {
      * @throws IOException If there is a problem using this stream while handling the invalid
      *     character.
      */
-    protected abstract void handleInvalid(int c) throws IOException;
+    protected void handleInvalid(int c) throws IOException {
+      out.write(' ');
+    };
   }
 
   /**
@@ -580,7 +588,7 @@ class AntJunitXmlReportListener extends RunListener {
     }
     TestSuite unknownSuite = getTestSuiteFor(description);
     if (unknownSuite == null) {
-      unknownSuite = new TestSuite(description);
+      unknownSuite = new TestSuite(description, localHostName);
       suites.put(description.getClassName(), unknownSuite);
     }
     unknownSuite.incrementFailures();
@@ -620,5 +628,13 @@ class AntJunitXmlReportListener extends RunListener {
   @VisibleForTesting
   protected Map<String, TestCase> getCases() {
     return cases;
+  }
+
+  private static String getLocalHostName() {
+    try {
+      return InetAddress.getLocalHost().getHostName();
+    } catch (UnknownHostException e) {
+      return "localhost";
+    }
   }
 }

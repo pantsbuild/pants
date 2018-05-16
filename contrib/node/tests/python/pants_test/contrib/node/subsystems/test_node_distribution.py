@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import os
-import subprocess
 import unittest
 
+from pants.util.process_handler import subprocess
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 from pants.contrib.node.subsystems.node_distribution import NodeDistribution
@@ -18,12 +18,12 @@ from pants.contrib.node.subsystems.node_distribution import NodeDistribution
 class NodeDistributionTest(unittest.TestCase):
 
   def setUp(self):
-    self.distribution = global_subsystem_instance(NodeDistribution.Factory).create()
+    self.distribution = global_subsystem_instance(NodeDistribution)
 
   def test_bootstrap(self):
     node_cmd = self.distribution.node_command(args=['--version'])
     output = node_cmd.check_output()
-    self.assertEqual(self.distribution.version, output.strip())
+    self.assertEqual(self.distribution.version(), output.strip())
 
   def test_node(self):
     node_command = self.distribution.node_command(args=['--interactive'])  # Force a REPL session.
@@ -41,26 +41,30 @@ class NodeDistributionTest(unittest.TestCase):
                 'output:\n{}'.format(out))
 
   def test_npm(self):
-    npm_version_flag = self.distribution.npm_command(args=['--version'])
+    npm_version_flag = self.distribution.get_package_manager('npm').run_command(
+      args=['--version'])
     raw_version = npm_version_flag.check_output().strip()
 
-    npm_version_cmd = self.distribution.npm_command(args=['version', '--json'])
+    npm_version_cmd = self.distribution.get_package_manager('npm').run_command(
+      args=['version', '--json'])
     versions_json = npm_version_cmd.check_output()
     versions = json.loads(versions_json)
 
     self.assertEqual(raw_version, versions['npm'])
 
   def test_yarnpkg(self):
-    yarnpkg_version_command = self.distribution.yarnpkg_command(args=['--version'])
+    yarnpkg_version_command = self.distribution.get_package_manager('yarn').run_command(
+      args=['--version'])
     yarnpkg_version = yarnpkg_version_command.check_output().strip()
-    yarnpkg_versions_command = self.distribution.yarnpkg_command(args=['versions', '--json'])
+    yarnpkg_versions_command = self.distribution.get_package_manager('yarn').run_command(
+      args=['versions', '--json'])
     yarnpkg_versions = json.loads(yarnpkg_versions_command.check_output())
     self.assertEqual(yarnpkg_version, yarnpkg_versions['data']['yarn'])
 
   def test_node_command_path_injection(self):
-    node_bin_path = self.distribution.install_node()
     node_path_cmd = self.distribution.node_command(
       args=['--eval', 'console.log(process.env["PATH"])'])
+    node_bin_path = self.distribution._install_node()
 
     # Test the case in which we do not pass in env,
     # which should fall back to env=os.environ.copy()
@@ -68,9 +72,9 @@ class NodeDistributionTest(unittest.TestCase):
     self.assertEqual(node_bin_path, injected_paths[0])
 
   def test_node_command_path_injection_with_overrided_path(self):
-    node_bin_path = self.distribution.install_node()
     node_path_cmd = self.distribution.node_command(
       args=['--eval', 'console.log(process.env["PATH"])'])
+    node_bin_path = self.distribution._install_node()
     injected_paths = node_path_cmd.check_output(
       env={'PATH': '/test/path'}
     ).strip().split(os.pathsep)
@@ -78,9 +82,9 @@ class NodeDistributionTest(unittest.TestCase):
     self.assertListEqual([node_bin_path, '/test/path'], injected_paths)
 
   def test_node_command_path_injection_with_empty_path(self):
-    node_bin_path = self.distribution.install_node()
     node_path_cmd = self.distribution.node_command(
       args=['--eval', 'console.log(process.env["PATH"])'])
+    node_bin_path = self.distribution._install_node()
     injected_paths = node_path_cmd.check_output(
       env={'PATH': ''}
     ).strip().split(os.pathsep)

@@ -7,13 +7,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.base.specs import AscendantAddresses, SingleAddress
+import six
+
+from pants.base.specs import AscendantAddresses, SingleAddress, Specs
 from pants.build_graph.address import parse_spec
 from pants.build_graph.source_mapper import SourceMapper
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import HydratedTargets
-from pants.source.filespec import matches_filespec
-from pants.source.wrapped_globs import EagerFilesetWithSpec
+from pants.source.filespec import any_matches_filespec
 
 
 def iter_resolve_and_parse_specs(rel_path, specs):
@@ -49,10 +50,14 @@ class EngineSourceMapper(SourceMapper):
   def target_addresses_for_source(self, source):
     return list(self.iter_target_addresses_for_sources([source]))
 
-  def _match_source(self, source, fileset):
-    return fileset.matches(source) or matches_filespec(source, fileset.filespec)
+  def _match_sources(self, sources_set, fileset):
+    # NB: Deleted files can only be matched against the 'filespec' (ie, `PathGlobs`) for a target,
+    # so we don't actually call `fileset.matches` here.
+    # TODO: This call should be pushed down into the engine to match directly against
+    # `PathGlobs` as we erode the `AddressMapper`/`SourceMapper` split.
+    return any_matches_filespec(sources_set, fileset.filespec)
 
-  def _owns_source(self, source, legacy_target):
+  def _owns_any_source(self, sources_set, legacy_target):
     """Given a `HydratedTarget` instance, check if it owns the given source file."""
     target_kwargs = legacy_target.adaptor.kwargs()
 
@@ -60,42 +65,13 @@ class EngineSourceMapper(SourceMapper):
     target_source = target_kwargs.get('source')
     if target_source:
       path_from_build_root = os.path.join(legacy_target.adaptor.address.spec_path, target_source)
-      if path_from_build_root == source:
+      if path_from_build_root in sources_set:
         return True
 
     # Handle `sources`-declaring targets.
     target_sources = target_kwargs.get('sources', [])
-    if target_sources and self._match_source(source, target_sources):
+    if target_sources and self._match_sources(sources_set, target_sources):
       return True
-
-    # Handle `resources`-declaring targets.
-    # TODO: Remember to get rid of this in 1.5.0.dev0, when the deprecation of `resources` is complete.
-    target_resources = target_kwargs.get('resources')
-    if target_resources:
-      # N.B. `resources` params come in two flavors:
-      #
-      # 1) Strings of filenames, which are represented in kwargs by an EagerFilesetWithSpec e.g.:
-      #
-      #      python_library(..., resources=['file.txt', 'file2.txt'])
-      #
-      if isinstance(target_resources, EagerFilesetWithSpec):
-        if self._match_source(source, target_resources):
-          return True
-      # 2) Strings of addresses, which are represented in kwargs by a list of strings:
-      #
-      #      java_library(..., resources=['testprojects/src/resources/...:resource'])
-      #
-      #    which is closer in premise to the `resource_targets` param.
-      elif isinstance(target_resources, list):
-        resource_dep_subjects = resolve_and_parse_specs(legacy_target.adaptor.address.spec_path,
-                                                        target_resources)
-        for hydrated_targets in self._scheduler.product_request(HydratedTargets, resource_dep_subjects):
-          for hydrated_target in hydrated_targets.dependencies:
-            resource_sources = hydrated_target.adaptor.kwargs().get('sources')
-            if resource_sources and self._match_source(source, resource_sources):
-              return True
-      else:
-        raise AssertionError('Could not process target_resources with type {}'.format(type(target_resources)))
 
     return False
 
@@ -103,15 +79,17 @@ class EngineSourceMapper(SourceMapper):
     """Bulk, iterable form of `target_addresses_for_source`."""
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
     sources_set = set(sources)
-    subjects = [AscendantAddresses(directory=d) for d in self._unique_dirs_for_sources(sources_set)]
+    specs = tuple(AscendantAddresses(directory=d) for d in self._unique_dirs_for_sources(sources_set))
 
-    for hydrated_targets in self._scheduler.product_request(HydratedTargets, subjects):
-      for hydrated_target in hydrated_targets.dependencies:
-        legacy_address = hydrated_target.adaptor.address
+    # Uniqify all transitive hydrated targets.
+    hydrated_target_to_address = {}
+    hydrated_targets, = self._scheduler.product_request(HydratedTargets, [Specs(specs)])
+    for hydrated_target in hydrated_targets.dependencies:
+      if hydrated_target not in hydrated_target_to_address:
+        hydrated_target_to_address[hydrated_target] = hydrated_target.adaptor.address
 
-        # Handle BUILD files.
-        if any(LegacyAddressMapper.is_declaring_file(legacy_address, f) for f in sources_set):
-          yield legacy_address
-        else:
-          if any(self._owns_source(source, hydrated_target) for source in sources_set):
-            yield legacy_address
+    for hydrated_target, legacy_address in six.iteritems(hydrated_target_to_address):
+      # Handle BUILD files.
+      if (LegacyAddressMapper.any_is_declaring_file(legacy_address, sources_set) or
+          self._owns_any_source(sources_set, hydrated_target)):
+        yield legacy_address

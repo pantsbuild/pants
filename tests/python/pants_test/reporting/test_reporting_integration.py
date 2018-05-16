@@ -9,6 +9,8 @@ import os.path
 import re
 import unittest
 
+from parameterized import parameterized
+
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -144,3 +146,11 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     self.assertIn('*** Got invalid key BAZ for --reporting-console-tool-output-format. Expected one of [', pants_run.stdout_data)
     self.assertIn('*** Got invalid value QUX for --reporting-console-tool-output-format. Expected one of [', pants_run.stdout_data)
     self.assertIn('', pants_run.stdout_data)
+
+  @parameterized.expand(['--quiet', '--no-quiet'])
+  def test_epilog_to_stderr(self, quiet_flag):
+    command = ['--time', quiet_flag, 'bootstrap', 'examples/src/java/org/pantsbuild/example/hello::']
+    pants_run = self.run_pants(command)
+    self.assert_success(pants_run)
+    self.assertIn('Cumulative Timings', pants_run.stderr_data)
+    self.assertNotIn('Cumulative Timings', pants_run.stdout_data)

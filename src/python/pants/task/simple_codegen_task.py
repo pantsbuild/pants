@@ -25,6 +25,10 @@ from pants.util.dirutil import fast_relpath, safe_delete, safe_walk
 logger = logging.getLogger(__name__)
 
 
+class EmptyDepContext(object):
+  codegen_types = tuple()
+
+
 class SimpleCodegenTask(Task):
   """A base-class for code generation for a single target language.
 
@@ -99,6 +103,22 @@ class SimpleCodegenTask(Task):
     :API: public
 
     :return: a list of dependencies.
+    """
+    return []
+
+  def synthetic_target_extra_exports(self, target, target_workdir):
+    """Gets any extra exports generated synthetic targets should have.
+
+   This method is optional for subclasses to implement, because some code generators may have no
+    extra exports.
+    NB: Extra exports must also be present in the extra dependencies.
+    :param Target target: the Target from which we are generating a synthetic Target. E.g., 'target'
+    might be a JavaProtobufLibrary, whose corresponding synthetic Target would be a JavaLibrary.
+    It may not be necessary to use this parameter depending on the details of the subclass.
+
+    :API: public
+
+    :return: a list of exported targets.
     """
     return []
 
@@ -183,9 +203,15 @@ class SimpleCodegenTask(Task):
     return synthetic_address
 
   def execute(self):
-    with self.invalidated(self.codegen_targets(),
+    codegen_targets = self.codegen_targets()
+    if not codegen_targets:
+      return
+
+    with self.invalidated(codegen_targets,
                           invalidate_dependents=True,
+                          topological_order=True,
                           fingerprint_strategy=self.get_fingerprint_strategy()) as invalidation_check:
+
       with self.context.new_workunit(name='execute', labels=[WorkUnitLabel.MULTITOOL]):
         for vt in invalidation_check.all_vts:
           # Build the target and handle duplicate sources.
@@ -194,8 +220,21 @@ class SimpleCodegenTask(Task):
               self.execute_codegen(vt.target, vt.results_dir)
               self._handle_duplicate_sources(vt.target, vt.results_dir)
             vt.update()
-          # And inject a synthetic target to represent it.
-          self._inject_synthetic_target(vt.target, vt.results_dir, vt.cache_key)
+
+          self._inject_synthetic_target(
+            vt.target,
+            vt.results_dir,
+            vt.cache_key,
+          )
+        self._mark_transitive_invalidation_hashes_dirty(
+          vt.target.address for vt in invalidation_check.all_vts
+        )
+
+  def _mark_transitive_invalidation_hashes_dirty(self, addresses):
+    self.context.build_graph.walk_transitive_dependee_graph(
+      addresses,
+      work=lambda t: t.mark_transitive_invalidation_hash_dirty(),
+    )
 
   @property
   def _copy_target_attributes(self):
@@ -228,19 +267,43 @@ class SimpleCodegenTask(Task):
     return EagerFilesetWithSpec(results_dir_relpath, filespec=filespec,
       files=files, files_hash='{}.{}'.format(fingerprint.id, fingerprint.hash))
 
-  def _inject_synthetic_target(self, target, target_workdir, fingerprint):
+  def _inject_synthetic_target(
+    self,
+    target,
+    target_workdir,
+    fingerprint,
+  ):
     """Create, inject, and return a synthetic target for the given target and workdir.
 
     :param target: The target to inject a synthetic target for.
     :param target_workdir: The work directory containing the generated code for the target.
     :param fingerprint: The fingerprint to create the synthetic target
-           with to avoid re-fingerprinting
+           with to avoid re-fingerprinting.
     """
+
+    synthetic_target_type = self.synthetic_target_type(target)
+    target_workdir = self.synthetic_target_dir(target, target_workdir)
+    synthetic_extra_dependencies = self.synthetic_target_extra_dependencies(target, target_workdir)
+
     copied_attributes = {}
     for attribute in self._copy_target_attributes:
       copied_attributes[attribute] = getattr(target, attribute)
 
-    target_workdir = self.synthetic_target_dir(target, target_workdir)
+    if self._supports_exports(synthetic_target_type):
+      extra_exports = self.synthetic_target_extra_exports(target, target_workdir)
+
+      extra_exports_not_in_extra_dependencies = set(extra_exports).difference(
+        set(synthetic_extra_dependencies))
+      if len(extra_exports_not_in_extra_dependencies) > 0:
+        raise self.MismatchedExtraExports(
+          'Extra synthetic exports included targets not in the extra dependencies: {}. Affected target: {}'
+            .format(extra_exports_not_in_extra_dependencies, target))
+
+      extra_export_specs = {e.address.spec for e in extra_exports}
+      original_export_specs = self._original_export_specs(target)
+      union = set(original_export_specs).union(extra_export_specs)
+
+      copied_attributes['exports'] = sorted(union)
 
     sources = list(self.find_sources(target, target_workdir))
     if fingerprint:
@@ -248,8 +311,8 @@ class SimpleCodegenTask(Task):
 
     synthetic_target = self.context.add_new_target(
       address=self._get_synthetic_address(target, target_workdir),
-      target_type=self.synthetic_target_type(target),
-      dependencies=self.synthetic_target_extra_dependencies(target, target_workdir),
+      target_type=synthetic_target_type,
+      dependencies=synthetic_extra_dependencies,
       sources=sources,
       derived_from=target,
       **copied_attributes
@@ -271,15 +334,17 @@ class SimpleCodegenTask(Task):
         dependent=synthetic_target.address,
         dependency=concrete_dependency_address,
       )
-    build_graph.walk_transitive_dependee_graph(
-      build_graph.dependencies_of(target.address),
-      work=lambda t: t.mark_transitive_invalidation_hash_dirty(),
-    )
 
     if target in self.context.target_roots:
       self.context.target_roots.append(synthetic_target)
 
     return synthetic_target
+
+  def _supports_exports(self, target_type):
+    return hasattr(target_type, 'export_specs')
+
+  def _original_export_specs(self, target):
+    return [t.spec for t in target.export_addresses]
 
   def resolve_deps(self, unresolved_deps):
     """
@@ -374,4 +439,11 @@ class SimpleCodegenTask(Task):
     """A target generated the same code that was generated by one of its dependencies.
 
     This is only thrown when --allow-dups=False.
+    """
+
+  class MismatchedExtraExports(Exception):
+    """An extra export didn't have an accompanying explicit extra dependency for the same target.
+
+    NB: Exports without accompanying dependencies are caught during compile, but this error will
+    allow errors caused by injected exports to be surfaced earlier.
     """

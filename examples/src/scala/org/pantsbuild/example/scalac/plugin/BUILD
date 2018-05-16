@@ -6,8 +6,18 @@ scalac_plugin(
   plugin='simple_scalac_plugin',
   classname='org.pantsbuild.example.scalac.plugin.SimpleScalacPlugin',
   sources=['SimpleScalacPlugin.scala'],
-  dependencies=[':other_simple_scalac_plugin'],
+  dependencies=[
+    ':other_simple_scalac_plugin',
+    ':simple_scalac_plugin_helper'
+  ],
   scope='compile',
+)
+
+scala_library(
+  name = 'simple_scalac_plugin_helper',
+  sources = ['SimpleScalacPluginHelper.scala'],
+  # In case we try and compile simple_scalac_plugin with other_simple_scalac_plugin.
+  dependencies = [':other_simple_scalac_plugin']
 )
 
 scalac_plugin(

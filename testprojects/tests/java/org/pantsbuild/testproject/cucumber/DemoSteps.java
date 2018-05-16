@@ -3,8 +3,8 @@
 
 package org.pantsbuild.testproject.cucumber;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.LinkedList;
 
 import cucumber.api.java.After;
 import cucumber.api.java.Before;
@@ -22,9 +22,9 @@ public class DemoSteps {
   private List<String> cart;
 
   @Before public void before() {
-    fruits = new LinkedList<String>();
-    veggies = new LinkedList<String>();
-    cart = new LinkedList<String>();
+    fruits = new ArrayList<String>();
+    veggies = new ArrayList<String>();
+    cart = new ArrayList<String>();
   }
 
   @After public void after() {

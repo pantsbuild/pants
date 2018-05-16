@@ -2,30 +2,9 @@
 
 #
 # List of contrib packages to be released
+# See build-support/README.md for more information on the format of each
+# `PKG_$NAME` definition.
 #
-# Each package definition is of form:
-#
-# PKG_<NAME>=(
-#   "package.name"
-#   "build.target"
-#   "pkg_<name>_install_test"
-# )
-# function pkg_<name>_install_test() {
-#   ...
-# }
-#
-
-PKG_ANDROID=(
-  "pantsbuild.pants.contrib.android"
-  "//contrib/android/src/python/pants/contrib/android:plugin"
-  "pkg_android_install_test"
-)
-function pkg_android_install_test() {
-  execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.android==$(local_version)']" \
-    --explain apk | grep "apk" &> /dev/null
-}
-
 
 PKG_SCROOGE=(
   "pantsbuild.pants.contrib.scrooge"
@@ -33,12 +12,13 @@ PKG_SCROOGE=(
   "pkg_scrooge_install_test"
 )
 function pkg_scrooge_install_test() {
+  local version=$1
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.scrooge==$(local_version)']" \
+    --plugins="['pantsbuild.pants.contrib.scrooge==${version}']" \
     --explain gen | grep "scrooge" &> /dev/null && \
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.scrooge==$(local_version)']" \
-    goals | grep "thrift-linter" &> /dev/null
+    --plugins="['pantsbuild.pants.contrib.scrooge==${version}']" \
+    --explain lint | grep "thrift" &> /dev/null
 }
 
 PKG_BUILDGEN=(
@@ -47,8 +27,10 @@ PKG_BUILDGEN=(
   "pkg_buildgen_install_test"
 )
 function pkg_buildgen_install_test() {
-  PIP_ARGS="$@"
-  pip install ${PIP_ARGS} pantsbuild.pants.contrib.buildgen==$(local_version) && \
+  local version=$1
+  shift
+  local PIP_ARGS="$@"
+  pip install ${PIP_ARGS} "pantsbuild.pants.contrib.buildgen==${version}" && \
   python -c "from pants.contrib.buildgen.build_file_manipulator import *"
 }
 
@@ -58,9 +40,10 @@ PKG_GO=(
   "pkg_go_install_test"
 )
 function pkg_go_install_test() {
+  local version=$1
   execute_packaged_pants_with_internal_backends \
-      --plugins="['pantsbuild.pants.contrib.go==$(local_version)']" \
-      buildgen test contrib/go/examples::
+      --plugins="['pantsbuild.pants.contrib.go==${version}']" \
+      --explain test | grep "GoTest_test_go" &> /dev/null
 }
 
 PKG_NODE=(
@@ -69,9 +52,10 @@ PKG_NODE=(
   "pkg_node_install_test"
 )
 function pkg_node_install_test() {
+  local version=$1
   execute_packaged_pants_with_internal_backends \
-      --plugins="['pantsbuild.pants.contrib.node==$(local_version)']" \
-      test.node contrib/node/examples::
+      --plugins="['pantsbuild.pants.contrib.node==${version}']" \
+      --explain test | grep "NodeTest_test_node" &> /dev/null
 }
 
 PKG_SCALAJS=(
@@ -80,9 +64,10 @@ PKG_SCALAJS=(
   "pkg_scalajs_install_test"
 )
 function pkg_scalajs_install_test() {
+  local version=$1
   execute_packaged_pants_with_internal_backends \
-      --plugins="['pantsbuild.pants.contrib.scalajs==$(local_version)']" \
-      test contrib/scalajs::
+      --plugins="['pantsbuild.pants.contrib.scalajs==${version}']" \
+      --explain compile | grep "scala-js-link" &> /dev/null
 }
 
 PKG_PYTHON_CHECKS=(
@@ -91,11 +76,12 @@ PKG_PYTHON_CHECKS=(
   "pkg_python_checks_install_test"
 )
 function pkg_python_checks_install_test() {
+  local version=$1
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.python.checks==$(local_version)']" \
+    --plugins="['pantsbuild.pants.contrib.python.checks==${version}']" \
     --explain lint | grep "python-eval" &> /dev/null && \
   execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.python.checks==$(local_version)']" \
+    --plugins="['pantsbuild.pants.contrib.python.checks==${version}']" \
     --explain lint | grep "pythonstyle" &> /dev/null
 }
 
@@ -105,8 +91,9 @@ PKG_FINDBUGS=(
   "pkg_findbugs_install_test"
 )
 function pkg_findbugs_install_test() {
+  local version=$1
   execute_packaged_pants_with_internal_backends \
-      --plugins="['pantsbuild.pants.contrib.findbugs==$(local_version)']" \
+      --plugins="['pantsbuild.pants.contrib.findbugs==${version}']" \
       --explain compile | grep "findbugs" &> /dev/null
 }
 
@@ -116,9 +103,22 @@ PKG_CPP=(
   "pkg_cpp_install_test"
 )
 function pkg_cpp_install_test() {
+  local version=$1
   execute_packaged_pants_with_internal_backends \
-      --plugins="['pantsbuild.pants.contrib.cpp==$(local_version)']" \
+      --plugins="['pantsbuild.pants.contrib.cpp==${version}']" \
       --explain compile | grep "cpp" &> /dev/null
+}
+
+PKG_CONFLUENCE=(
+  "pantsbuild.pants.contrib.confluence"
+  "//contrib/confluence/src/python/pants/contrib/confluence:plugin"
+  "pkg_confluence_install_test"
+)
+function pkg_confluence_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+      --plugins="['pantsbuild.pants.contrib.confluence==${version}']" \
+      --explain confluence | grep "ConfluencePublish_confluence" &> /dev/null
 }
 
 PKG_ERRORPRONE=(
@@ -127,9 +127,22 @@ PKG_ERRORPRONE=(
   "pkg_errorprone_install_test"
 )
 function pkg_errorprone_install_test() {
+  local version=$1
   execute_packaged_pants_with_internal_backends \
-      --plugins="['pantsbuild.pants.contrib.errorprone==$(local_version)']" \
+      --plugins="['pantsbuild.pants.contrib.errorprone==${version}']" \
       --explain compile | grep "errorprone" &> /dev/null
+}
+
+PKG_CODEANALYSIS=(
+  "pantsbuild.pants.contrib.codeanalysis"
+  "//contrib/codeanalysis/src/python/pants/contrib/codeanalysis:plugin"
+  "pkg_codeanalysis_install_test"
+)
+function pkg_codeanalysis_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+      --plugins="['pantsbuild.pants.contrib.codeanalysis==${version}']" \
+      --explain index | grep "kythe" &> /dev/null
 }
 
 PKG_JAXWS=(
@@ -138,14 +151,69 @@ PKG_JAXWS=(
   "pkg_jax_ws_install_test"
 )
 function pkg_jax_ws_install_test() {
+  local version=$1
+  # Ensure our goal and target are installed and exposed.
   execute_packaged_pants_with_internal_backends \
-      --plugins="['pantsbuild.pants.contrib.jax_ws==$(local_version)']" \
+      --plugins="['pantsbuild.pants.contrib.jax_ws==${version}']" \
       --explain gen | grep "jax-ws" &> /dev/null
+  execute_packaged_pants_with_internal_backends \
+      --plugins="['pantsbuild.pants.contrib.jax_ws==${version}']" \
+      targets | grep "jax_ws_library" &> /dev/null
+}
+
+PKG_MYPY=(
+  "pantsbuild.pants.contrib.mypy"
+  "//contrib/mypy/src/python/pants/contrib/mypy:plugin"
+  "pkg_mypy_install_test"
+)
+function pkg_mypy_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.mypy==${version}']" \
+    --explain mypy &> /dev/null
+}
+
+PKG_AVRO=(
+  "pantsbuild.pants.contrib.avro"
+  "//contrib/avro/src/python/pants/contrib/avro:plugin"
+  "pkg_avro_install_test"
+)
+function pkg_avro_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.avro==${version}']" \
+    --explain gen | grep "avro-java" &> /dev/null
+}
+
+PKG_THRIFTY=(
+  "pantsbuild.pants.contrib.thrifty"
+  "//contrib/thrifty/src/python/pants/contrib/thrifty:plugin"
+  "pkg_thrifty_install_test"
+)
+function pkg_thrifty_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.thrifty==${version}']" \
+    --explain gen | grep "thrifty" &> /dev/null
+}
+
+PKG_GOOGLEJAVAFORMAT=(
+  "pantsbuild.pants.contrib.googlejavaformat"
+  "//contrib/googlejavaformat/src/python/pants/contrib/googlejavaformat:plugin"
+  "pkg_googlejavaformat_install_test"
+)
+function pkg_googlejavaformat_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.googlejavaformat==${version}']" \
+    --explain fmt | grep "google-java-format" &> /dev/null
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.googlejavaformat==${version}']" \
+    --explain lint | grep "google-java-format" &> /dev/null
 }
 
 # Once individual (new) package is declared above, insert it into the array below)
 CONTRIB_PACKAGES=(
-  PKG_ANDROID
   PKG_SCROOGE
   PKG_BUILDGEN
   PKG_GO
@@ -154,6 +222,12 @@ CONTRIB_PACKAGES=(
   PKG_SCALAJS
   PKG_FINDBUGS
   PKG_CPP
+  PKG_CONFLUENCE
   PKG_ERRORPRONE
+  PKG_CODEANALYSIS
   PKG_JAXWS
+  PKG_MYPY
+  PKG_AVRO
+  PKG_THRIFTY
+  PKG_GOOGLEJAVAFORMAT
 )

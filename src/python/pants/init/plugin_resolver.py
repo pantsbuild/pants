@@ -8,17 +8,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import hashlib
 import logging
 import os
+import site
 
 from pex import resolver
 from pex.base import requirement_is_exact
-from pex.package import EggPackage, SourcePackage
 from pkg_resources import working_set as global_working_set
 from pkg_resources import Requirement
+from wheel.install import WheelFile
 
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.python.python_repos import PythonRepos
-from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import safe_open
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.memo import memoized_property
 from pants.version import PANTS_SEMVER
 
@@ -27,6 +28,33 @@ logger = logging.getLogger(__name__)
 
 
 class PluginResolver(object):
+  @staticmethod
+  def _is_wheel(path):
+    return os.path.isfile(path) and path.endswith('.whl')
+
+  @classmethod
+  def _activate_wheel(cls, wheel_path):
+    install_dir = '{}-install'.format(wheel_path)
+    if not os.path.isdir(install_dir):
+      with temporary_dir(root_dir=os.path.dirname(install_dir)) as tmp:
+        cls._install_wheel(wheel_path, tmp)
+        os.rename(tmp, install_dir)
+    # Activate any .pth files installed above.
+    site.addsitedir(install_dir)
+    return install_dir
+
+  @classmethod
+  def _install_wheel(cls, wheel_path, install_dir):
+    safe_mkdir(install_dir, clean=True)
+    WheelFile(wheel_path).install(force=True,
+                                  overrides={
+                                    'purelib': install_dir,
+                                    'headers': os.path.join(install_dir, 'headers'),
+                                    'scripts': os.path.join(install_dir, 'bin'),
+                                    'platlib': install_dir,
+                                    'data': install_dir
+                                  })
+
   def __init__(self, options_bootstrapper):
     self._options_bootstrapper = options_bootstrapper
 
@@ -44,6 +72,8 @@ class PluginResolver(object):
     working_set = working_set or global_working_set
     if self._plugin_requirements:
       for plugin_location in self._resolve_plugin_locations():
+        if self._is_wheel(plugin_location):
+          plugin_location = self._activate_wheel(plugin_location)
         working_set.add_entry(plugin_location)
     return working_set
 
@@ -76,15 +106,10 @@ class PluginResolver(object):
         yield plugin_location.strip()
 
   def _resolve_plugins(self):
-    # When bootstrapping plugins without the full pants python backend machinery in-play, we are not
-    # guaranteed a properly initialized interpreter with wheel support so we enforce eggs only for
-    # bdists with this custom precedence.
-    precedence = (EggPackage, SourcePackage)
     logger.info('Resolving new plugins...:\n  {}'.format('\n  '.join(self._plugin_requirements)))
     return resolver.resolve(self._plugin_requirements,
                             fetchers=self._python_repos.get_fetchers(),
                             context=self._python_repos.get_network_context(),
-                            precedence=precedence,
                             cache=self.plugin_cache_dir,
                             cache_ttl=10 * 365 * 24 * 60 * 60,  # Effectively never expire.
                             allow_prereleases=PANTS_SEMVER.is_prerelease)
@@ -107,9 +132,8 @@ class PluginResolver(object):
     # NB: The PluginResolver runs very early in the pants startup sequence before the standard
     # Subsystem facility is wired up.  As a result PluginResolver is not itself a Subsystem with
     # PythonRepos as a dependency.  Instead it does the minimum possible work to hand-roll
-    # bootstrapping of the Subsystem it needs.
-    subsystems = Subsystem.closure([PythonRepos])
-    known_scope_infos = [subsystem.get_scope_info() for subsystem in subsystems]
+    # bootstrapping of the Subsystems it needs.
+    known_scope_infos = PythonRepos.known_scope_infos()
     options = self._options_bootstrapper.get_full_options(known_scope_infos)
 
     # Ignore command line flags since we'd blow up on any we don't understand (most of them).
@@ -118,6 +142,8 @@ class PluginResolver(object):
     defaulted_only_options = options.drop_flag_values()
 
     GlobalOptionsRegistrar.register_options_on_scope(defaulted_only_options)
-    for subsystem in subsystems:
-      subsystem.register_options_on_scope(defaulted_only_options)
+    distinct_optionable_classes = sorted({si.optionable_cls for si in known_scope_infos},
+                                         key=lambda o: o.options_scope)
+    for optionable_cls in distinct_optionable_classes:
+      optionable_cls.register_options_on_scope(defaulted_only_options)
     return defaulted_only_options

@@ -6,59 +6,46 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 from collections import OrderedDict
 from hashlib import sha1
 
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
+from pants.backend.codegen.protobuf.subsystems.protoc import Protoc
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
 from pants.task.simple_codegen_task import SimpleCodegenTask
-from pants.util.memo import memoized_property
+from pants.util.process_handler import subprocess
 
 
 class ProtobufGen(SimpleCodegenTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ProtobufGen, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
+    return super(ProtobufGen, cls).subsystem_dependencies() + (Protoc.scoped(cls),)
 
   @classmethod
   def register_options(cls, register):
     super(ProtobufGen, cls).register_options(register)
 
-    # The protoc version and the plugin names are used as proxies for the identity of the protoc
-    # executable environment here.  Although version is an obvious proxy for the protoc binary
-    # itself, plugin names are less so and plugin authors must include a version in the name for
+    # The protoc plugin names are used as proxies for the identity of the protoc
+    # executable environment here.  Plugin authors must include a version in the name for
     # proper invalidation of protobuf products in the face of plugin modification that affects
     # plugin outputs.
-    register('--version', advanced=True, fingerprint=True,
-             help='Version of protoc.  Used to create the default --javadeps and as part of '
-                  'the path to lookup the tool with --pants-support-baseurls and '
-                  '--pants-bootstrapdir.  When changing this parameter you may also need to '
-                  'update --javadeps.',
-             default='2.4.1')
     register('--protoc-plugins', advanced=True, fingerprint=True, type=list,
              help='Names of protobuf plugins to invoke.  Protoc will look for an executable '
                   'named protoc-gen-$NAME on PATH.')
-
     register('--extra_path', advanced=True, type=list,
              help='Prepend this path onto PATH in the environment before executing protoc. '
                   'Intended to help protoc find its plugins.',
              default=None)
-    register('--supportdir', advanced=True,
-             help='Path to use for the protoc binary.  Used as part of the path to lookup the'
-                  'tool under --pants-bootstrapdir.',
-             default='bin/protobuf')
     register('--javadeps', advanced=True, type=list,
              help='Dependencies to bootstrap this task for generating java code.  When changing '
                   'this parameter you may also need to update --version.',
@@ -82,12 +69,9 @@ class ProtobufGen(SimpleCodegenTask):
     self.plugins = self.get_options().protoc_plugins or []
     self._extra_paths = self.get_options().extra_path or []
 
-  @memoized_property
+  @property
   def protobuf_binary(self):
-    binary_util = BinaryUtil.Factory.create()
-    return binary_util.select_binary(self.get_options().supportdir,
-                                     self.get_options().version,
-                                     'protoc')
+    return Protoc.scoped_instance(self).select(context=self.context)
 
   @property
   def javadeps(self):
@@ -140,7 +124,7 @@ class ProtobufGen(SimpleCodegenTask):
 
     args.extend(sources)
 
-    # Tack on extra path entries. These can be used to find protoc plugins
+    # Tack on extra path entries. These can be used to find protoc plugins.
     protoc_environ = os.environ.copy()
     if self._extra_paths:
       protoc_environ['PATH'] = os.pathsep.join(self._extra_paths

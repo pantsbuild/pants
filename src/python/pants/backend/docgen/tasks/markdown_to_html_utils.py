@@ -174,6 +174,10 @@ class IncludeExcerptExtension(markdown.Extension):
     md.inlinePatterns.add('excerpt',
                           IncludeExcerptPattern(source_path=self.source_path),
                           '_begin')
+    # NB: this line allows <!-- --> comments to be used in markdown files. This
+    # doesn't work otherwise due to a bug in markdown/preprocessors.py in the
+    # version of markdown we use, where it calls .keys() on an empty tuple ().
+    md.preprocessors['html_block'].markdown_in_raw = False
 
 
 def page_to_html_path(page):

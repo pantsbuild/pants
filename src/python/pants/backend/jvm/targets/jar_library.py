@@ -47,7 +47,6 @@ class JarLibrary(Target):
     # NB: Waiting to validate until superclasses are initialized.
     if not jars:
       raise TargetDefinitionException(self, 'Must have a non-empty list of jars.')
-    self.add_labels('jars', 'jvm')
 
   @property
   def managed_dependencies(self):
@@ -77,12 +76,8 @@ class JarLibrary(Target):
     return self.payload.excludes
 
   @property
-  def exports(self):
-    """
-    :API: public
-    """
-
-    # It is currently aliased to dependencies. For future work see
+  def export_specs(self):
+    # Is currently aliased to dependencies. For future work see
     # https://github.com/pantsbuild/pants/issues/4398
     return self.dependencies
 

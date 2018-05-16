@@ -11,12 +11,22 @@ python_tests(
 )
 
 python_tests(
+  name = 'collections',
+  sources = ['test_collections.py'],
+  coverage = ['pants.util.collections'],
+  dependencies = [
+    'src/python/pants/util:collections',
+  ]
+)
+
+python_tests(
   name = 'contextutil',
   sources = ['test_contextutil.py'],
   coverage = ['pants.util.contextutil'],
   dependencies = [
     '3rdparty/python:mock',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:process_handler',
   ]
 )
 
@@ -89,8 +99,8 @@ python_tests(
   sources = ['test_objects.py'],
   coverage = ['pants.util.objects'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/util:objects',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -99,6 +109,7 @@ python_tests(
   sources = ['test_osutil.py'],
   dependencies = [
     'src/python/pants/util:osutil',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -106,7 +117,7 @@ python_tests(
   name = 'process_handler',
   sources = ['test_process_handler.py'],
   dependencies = [
-    'src/python/pants/util:process_handler'
+    'src/python/pants/util:process_handler',
   ]
 )
 
@@ -143,14 +154,6 @@ python_tests(
   dependencies = [
     'src/python/pants/util:dirutil',
     'src/python/pants/util:tarutil',
-  ]
-)
-
-python_tests(
-  name = 'timeout',
-  sources = ['test_timeout.py'],
-  dependencies = [
-    'src/python/pants/util:timeout',
   ]
 )
 

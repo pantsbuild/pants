@@ -85,3 +85,31 @@ class GoCompileTest(TaskTestBase):
     mtime = lambda t: os.lstat(os.path.join(os.path.join(a_gopath, 'pkg', t.address.spec))).st_mtime
     # Make sure c's link was untouched, while b's link was refreshed.
     self.assertLessEqual(mtime(c), mtime(b) - 1)
+
+  def test_split_build_flags_simple(self):
+    actual = GoCompile._split_build_flags("-v -race")
+    expected = ['-v', '-race']
+    self.assertEqual(actual, expected)
+
+  def test_split_build_flags_single_quoted(self):
+    actual = GoCompile._split_build_flags("-v -race -tags 'tag list'")
+    expected = ['-v', '-race', '-tags', "tag list"]
+    self.assertEqual(actual, expected)
+
+  def test_split_build_flags_nested_quotes(self):
+    actual = GoCompile._split_build_flags("--ldflags \'-extldflags \"-static\"\'")
+    expected = ['--ldflags', '-extldflags "-static"']
+    self.assertEqual(actual, expected)
+
+  def test_split_build_flags_ldflags(self):
+    actual = GoCompile._split_build_flags(' '.join([
+      'compile',
+      'contrib/go/examples/src/go/server',
+      '--compile-go-build-flags="--ldflags \'-extldflags \"-static\"\'"'
+    ]))
+    expected = [
+      'compile',
+      'contrib/go/examples/src/go/server',
+      "--compile-go-build-flags=--ldflags '-extldflags -static'",
+    ]
+    self.assertEqual(actual, expected)

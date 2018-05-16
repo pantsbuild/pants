@@ -6,5 +6,6 @@ python_library(
     '3rdparty/python:fasteners',
     '3rdparty/python:psutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:process_handler',
   ]
 )

@@ -272,6 +272,7 @@ page(
   source='release.md',
   links=[
     ':release_jvm',
+    ':release_strategy',
   ]
 )
 

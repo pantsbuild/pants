@@ -7,12 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import re
-import subprocess
 from collections import namedtuple
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.task.task import Task
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.process_handler import subprocess
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.contrib.go.subsystems.go_distribution import GoDistribution
@@ -27,7 +27,7 @@ class GoTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(GoTask, cls).subsystem_dependencies() + (GoDistribution.Factory,)
+    return super(GoTask, cls).subsystem_dependencies() + (GoDistribution.scoped(cls),)
 
   @staticmethod
   def is_binary(target):
@@ -51,7 +51,7 @@ class GoTask(Task):
 
   @memoized_property
   def go_dist(self):
-    return GoDistribution.Factory.global_instance().create()
+    return GoDistribution.scoped_instance(self)
 
   @memoized_property
   def import_oracle(self):

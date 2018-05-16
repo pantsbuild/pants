@@ -5,35 +5,44 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import itertools
 import logging
+from collections import deque
+from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
-from pants.base.specs import SingleAddress
+from pants.base.specs import SingleAddress, Specs
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.build_graph.app_base import AppBase, Bundle
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
-from pants.build_graph.target import Target
-from pants.engine.addressable import BuildFileAddresses, Collection
+from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
-from pants.engine.mapper import ResolveError
 from pants.engine.rules import TaskRule, rule
-from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectTransitive
+from pants.engine.selectors import Get, Select
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
-from pants.util.objects import datatype
+from pants.util.objects import Collection, datatype
 
 
 logger = logging.getLogger(__name__)
 
 
-class _DestWrapper(datatype('DestWrapper', ['target_types'])):
+def target_types_from_symbol_table(symbol_table):
+  """Given a LegacySymbolTable, return the concrete target types constructed for each alias."""
+  aliases = symbol_table.aliases()
+  target_types = dict(aliases.target_types)
+  for alias, factory in aliases.target_macro_factories.items():
+    target_type, = factory.target_types
+    target_types[alias] = target_type
+  return target_types
+
+
+class _DestWrapper(datatype(['target_types'])):
   """A wrapper for dest field of RemoteSources target.
 
   This is only used when instantiating RemoteSources target.
@@ -43,22 +52,19 @@ class _DestWrapper(datatype('DestWrapper', ['target_types'])):
 class LegacyBuildGraph(BuildGraph):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
 
-  This implementation is backed by a Scheduler that is able to resolve HydratedTargets.
+  This implementation is backed by a Scheduler that is able to resolve TransitiveHydratedTargets.
   """
 
-  class InvalidCommandLineSpecError(AddressLookupError):
-    """Raised when command line spec is not a valid directory"""
-
   @classmethod
-  def create(cls, scheduler, symbol_table_cls):
+  def create(cls, scheduler, symbol_table):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class."""
-    return cls(scheduler, cls._get_target_types(symbol_table_cls))
+    return cls(scheduler, target_types_from_symbol_table(symbol_table))
 
   def __init__(self, scheduler, target_types):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class.
 
-    :param scheduler: A Scheduler that is configured to be able to resolve HydratedTargets.
-    :param symbol_table_cls: A SymbolTable class used to instantiate Target objects. Must match
+    :param scheduler: A Scheduler that is configured to be able to resolve TransitiveHydratedTargets.
+    :param symbol_table: A SymbolTable instance used to instantiate Target objects. Must match
       the symbol table installed in the scheduler (TODO: see comment in `_instantiate_target`).
     """
     self._scheduler = scheduler
@@ -69,16 +75,7 @@ class LegacyBuildGraph(BuildGraph):
     """Returns a new BuildGraph instance of the same type and with the same __init__ params."""
     return LegacyBuildGraph(self._scheduler, self._target_types)
 
-  @staticmethod
-  def _get_target_types(symbol_table_cls):
-    aliases = symbol_table_cls.aliases()
-    target_types = dict(aliases.target_types)
-    for alias, factory in aliases.target_macro_factories.items():
-      target_type, = factory.target_types
-      target_types[alias] = target_type
-    return target_types
-
-  def _index(self, roots):
+  def _index(self, hydrated_targets):
     """Index from the given roots into the storage provided by the base class.
 
     This is an additive operation: any existing connections involving these nodes are preserved.
@@ -87,14 +84,12 @@ class LegacyBuildGraph(BuildGraph):
     new_targets = list()
 
     # Index the ProductGraph.
-    for product in roots:
-      # We have a successful HydratedTargets value (for a particular input Spec).
-      for hydrated_target in product.dependencies:
-        target_adaptor = hydrated_target.adaptor
-        address = target_adaptor.address
-        all_addresses.add(address)
-        if address not in self._target_by_address:
-          new_targets.append(self._index_target(target_adaptor))
+    for hydrated_target in hydrated_targets:
+      target_adaptor = hydrated_target.adaptor
+      address = target_adaptor.address
+      all_addresses.add(address)
+      if address not in self._target_by_address:
+        new_targets.append(self._index_target(target_adaptor))
 
     # Once the declared dependencies of all targets are indexed, inject their
     # additional "traversable_(dependency_)?specs".
@@ -110,18 +105,10 @@ class LegacyBuildGraph(BuildGraph):
     self.apply_injectables(new_targets)
 
     for target in new_targets:
-      traversables = [target.compute_dependency_specs(payload=target.payload)]
-      # Only poke `traversable_dependency_specs` if a concrete implementation is defined
-      # in order to avoid spurious deprecation warnings.
-      if type(target).traversable_dependency_specs is not Target.traversable_dependency_specs:
-        traversables.append(target.traversable_dependency_specs)
-      for spec in itertools.chain(*traversables):
+      for spec in target.compute_dependency_specs(payload=target.payload):
         inject(target, spec, is_dependency=True)
 
-      traversables = [target.compute_injectable_specs(payload=target.payload)]
-      if type(target).traversable_specs is not Target.traversable_specs:
-        traversables.append(target.traversable_specs)
-      for spec in itertools.chain(*traversables):
+      for spec in target.compute_injectable_specs(payload=target.payload):
         inject(target, spec, is_dependency=False)
 
     # Inject all addresses, then declare injected dependencies.
@@ -165,8 +152,8 @@ class LegacyBuildGraph(BuildGraph):
       kwargs.pop('dependencies')
 
       # Instantiate.
-      if target_cls is JvmApp:
-        return self._instantiate_jvm_app(kwargs)
+      if issubclass(target_cls, AppBase):
+        return self._instantiate_app(target_cls, kwargs)
       elif target_cls is RemoteSources:
         return self._instantiate_remote_sources(kwargs)
       return target_cls(build_graph=self, **kwargs)
@@ -177,8 +164,8 @@ class LegacyBuildGraph(BuildGraph):
           target_adaptor.address,
           'Failed to instantiate Target with type {}: {}'.format(target_cls, e))
 
-  def _instantiate_jvm_app(self, kwargs):
-    """For JvmApp target, convert BundleAdaptor to BundleProps."""
+  def _instantiate_app(self, target_cls, kwargs):
+    """For App targets, convert BundleAdaptor to BundleProps."""
     parse_context = ParseContext(kwargs['address'].spec_path, dict())
     bundleprops_factory = Bundle(parse_context)
     kwargs['bundles'] = [
@@ -186,7 +173,7 @@ class LegacyBuildGraph(BuildGraph):
       for bundle in kwargs['bundles']
     ]
 
-    return JvmApp(build_graph=self, **kwargs)
+    return target_cls(build_graph=self, **kwargs)
 
   def _instantiate_remote_sources(self, kwargs):
     """For RemoteSources target, convert "dest" field to its real target type."""
@@ -215,16 +202,16 @@ class LegacyBuildGraph(BuildGraph):
     addresses = set(addresses) - set(self._target_by_address.keys())
     if not addresses:
       return
-    matched = set(self._inject([SingleAddress(a.spec_path, a.target_name) for a in addresses]))
-    missing = addresses - matched
-    if missing:
-      # TODO: When SingleAddress resolution converted from projection of a directory
-      # and name to a match for PathGlobs, we lost our useful AddressLookupError formatting.
-      raise AddressLookupError('Addresses were not matched: {}'.format(missing))
+    for _ in self._inject_specs([SingleAddress(a.spec_path, a.target_name) for a in addresses]):
+      pass
+
+  def inject_roots_closure(self, target_roots, fail_fast=None):
+    for address in self._inject_specs(target_roots.specs):
+      yield address
 
   def inject_specs_closure(self, specs, fail_fast=None):
     # Request loading of these specs.
-    for address in self._inject(specs):
+    for address in self._inject_specs(specs):
       yield address
 
   def resolve_address(self, address):
@@ -232,38 +219,55 @@ class LegacyBuildGraph(BuildGraph):
       self.inject_address_closure(address)
     return self.get_target(address)
 
-  def _inject(self, subjects):
-    """Inject Targets into the graph for each of the subjects and yield the resulting addresses."""
-    logger.debug('Injecting to %s: %s', self, subjects)
+  @contextmanager
+  def _resolve_context(self):
     try:
-      product_results = self._scheduler.products_request([HydratedTargets, BuildFileAddresses],
-                                                         subjects)
-    except ResolveError as e:
-      # NB: ResolveError means that a target was not found, which is a common user facing error.
-      raise AddressLookupError(str(e))
+      yield
     except Exception as e:
       raise AddressLookupError(
         'Build graph construction failed: {} {}'.format(type(e).__name__, str(e))
       )
 
-    # Update the base class indexes for this request.
-    self._index(product_results[HydratedTargets])
+  def _inject_addresses(self, subjects):
+    """Injects targets into the graph for each of the given `Address` objects, and then yields them.
+
+    TODO: See #5606 about undoing the split between `_inject_addresses` and `_inject_specs`.
+    """
+    logger.debug('Injecting addresses to %s: %s', self, subjects)
+    with self._resolve_context():
+      addresses = tuple(subjects)
+      thts, = self._scheduler.product_request(TransitiveHydratedTargets,
+                                              [BuildFileAddresses(addresses)])
+
+    self._index(thts.closure)
 
     yielded_addresses = set()
-    for subject, product in zip(subjects, product_results[BuildFileAddresses]):
-      if not product.dependencies:
-        raise self.InvalidCommandLineSpecError(
-          'Spec {} does not match any targets.'.format(subject))
-      for address in product.dependencies:
-        if address not in yielded_addresses:
-          yielded_addresses.add(address)
-          yield address
+    for address in subjects:
+      if address not in yielded_addresses:
+        yielded_addresses.add(address)
+        yield address
+
+  def _inject_specs(self, subjects):
+    """Injects targets into the graph for each of the given `Spec` objects.
+
+    Yields the resulting addresses.
+    """
+    logger.debug('Injecting specs to %s: %s', self, subjects)
+    with self._resolve_context():
+      specs = tuple(subjects)
+      thts, = self._scheduler.product_request(TransitiveHydratedTargets,
+                                              [Specs(specs)])
+
+    self._index(thts.closure)
+
+    for hydrated_target in thts.roots:
+      yield hydrated_target.address
 
 
-class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependencies'])):
+class HydratedTarget(datatype(['address', 'adaptor', 'dependencies'])):
   """A wrapper for a fully hydrated TargetAdaptor object.
 
-  Transitive graph walks collect ordered sets of HydratedTargets which involve a huge amount
+  Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge amount
   of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
   """
 
@@ -283,26 +287,72 @@ class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependen
     return hash(self.address)
 
 
-HydratedTargets = Collection.of(HydratedTarget)
+class TransitiveHydratedTarget(datatype(['root', 'dependencies'])):
+  """A recursive structure wrapping a HydratedTarget root and TransitiveHydratedTarget deps."""
 
 
-@rule(HydratedTargets, [SelectTransitive(HydratedTarget, BuildFileAddresses, field_types=(Address,), field='addresses')])
-def transitive_hydrated_targets(targets):
-  """Recursively requests HydratedTargets, which will result in an eager, transitive graph walk."""
-  return HydratedTargets(targets)
+class TransitiveHydratedTargets(datatype(['roots', 'closure'])):
+  """A set of HydratedTarget roots, and their transitive, flattened, de-duped closure."""
 
 
-class HydratedField(datatype('HydratedField', ['name', 'value'])):
+class HydratedTargets(Collection.of(HydratedTarget)):
+  """An intransitive set of HydratedTarget objects."""
+
+
+@rule(TransitiveHydratedTargets, [Select(BuildFileAddresses)])
+def transitive_hydrated_targets(build_file_addresses):
+  """Given BuildFileAddresses, kicks off recursion on expansion of TransitiveHydratedTargets.
+
+  The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk
+  and flatten here. The engine memoizes the computation of TransitiveHydratedTarget, so
+  when multiple TransitiveHydratedTargets objects are being constructed for multiple
+  roots, their structure will be shared.
+  """
+
+  transitive_hydrated_targets = yield [Get(TransitiveHydratedTarget, Address, a)
+                                       for a in build_file_addresses.addresses]
+
+  closure = set()
+  to_visit = deque(transitive_hydrated_targets)
+
+  while to_visit:
+    tht = to_visit.popleft()
+    if tht.root in closure:
+      continue
+    closure.add(tht.root)
+    to_visit.extend(tht.dependencies)
+
+  yield TransitiveHydratedTargets(tuple(tht.root for tht in transitive_hydrated_targets), closure)
+
+
+@rule(TransitiveHydratedTarget, [Select(HydratedTarget)])
+def transitive_hydrated_target(root):
+  dependencies = yield [Get(TransitiveHydratedTarget, Address, d) for d in root.dependencies]
+  yield TransitiveHydratedTarget(root, dependencies)
+
+
+@rule(HydratedTargets, [Select(BuildFileAddresses)])
+def hydrated_targets(build_file_addresses):
+  """Requests HydratedTarget instances for BuildFileAddresses."""
+  targets = yield [Get(HydratedTarget, Address, a) for a in build_file_addresses.addresses]
+  yield HydratedTargets(targets)
+
+
+class HydratedField(datatype(['name', 'value'])):
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
 
 
-def hydrate_target(target_adaptor, hydrated_fields):
+def hydrate_target(target_adaptor):
   """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
   # Hydrate the fields of the adaptor and re-construct it.
+  hydrated_fields = yield [(Get(HydratedField, BundlesField, fa)
+                            if type(fa) is BundlesField
+                            else Get(HydratedField, SourcesField, fa))
+                           for fa in target_adaptor.field_adaptors]
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
-  return HydratedTarget(target_adaptor.address,
+  yield HydratedTarget(target_adaptor.address,
                         TargetAdaptor(**kwargs),
                         tuple(target_adaptor.dependencies))
 
@@ -319,25 +369,25 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
   return EagerFilesetWithSpec(spec_path,
                               relpath_adjusted_filespec,
                               files=files,
-                              files_hash=snapshot.fingerprint)
+                              files_hash=snapshot.directory_digest.fingerprint)
 
 
-@rule(HydratedField,
-      [Select(SourcesField),
-       SelectProjection(Snapshot, PathGlobs, 'path_globs', SourcesField)])
-def hydrate_sources(sources_field, snapshot):
-  """Given a SourcesField and a Snapshot for its path_globs, create an EagerFilesetWithSpec."""
+@rule(HydratedField, [Select(SourcesField)])
+def hydrate_sources(sources_field):
+  """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec."""
+
+  snapshot = yield Get(Snapshot, PathGlobs, sources_field.path_globs)
   fileset_with_spec = _eager_fileset_with_spec(sources_field.address.spec_path,
                                                sources_field.filespecs,
                                                snapshot)
-  return HydratedField(sources_field.arg, fileset_with_spec)
+  yield HydratedField(sources_field.arg, fileset_with_spec)
 
 
-@rule(HydratedField,
-      [Select(BundlesField),
-       SelectDependencies(Snapshot, BundlesField, 'path_globs_list', field_types=(PathGlobs,))])
-def hydrate_bundles(bundles_field, snapshot_list):
-  """Given a BundlesField and a Snapshot for each of its filesets create a list of BundleAdaptors."""
+@rule(HydratedField, [Select(BundlesField)])
+def hydrate_bundles(bundles_field):
+  """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
+  snapshot_list = yield [Get(Snapshot, PathGlobs, pg) for pg in bundles_field.path_globs_list]
+
   bundles = []
   zipped = zip(bundles_field.bundles,
                bundles_field.filespecs_list,
@@ -353,22 +403,25 @@ def hydrate_bundles(bundles_field, snapshot_list):
                                                  snapshot,
                                                  include_dirs=True)
     bundles.append(BundleAdaptor(**kwargs))
-  return HydratedField('bundles', bundles)
+  yield HydratedField('bundles', bundles)
 
 
-def create_legacy_graph_tasks(symbol_table_cls):
+def create_legacy_graph_tasks(symbol_table):
   """Create tasks to recursively parse the legacy graph."""
-  symbol_table_constraint = symbol_table_cls.constraint()
+  symbol_table_constraint = symbol_table.constraint()
+
   return [
     transitive_hydrated_targets,
+    transitive_hydrated_target,
+    hydrated_targets,
     TaskRule(
       HydratedTarget,
-      [Select(symbol_table_constraint),
-       SelectDependencies(HydratedField,
-                          symbol_table_constraint,
-                          'field_adaptors',
-                          field_types=(SourcesField, BundlesField,))],
-      hydrate_target
+      [Select(symbol_table_constraint)],
+      hydrate_target,
+      input_gets=[
+        Get(HydratedField, SourcesField),
+        Get(HydratedField, BundlesField),
+      ]
     ),
     hydrate_sources,
     hydrate_bundles,

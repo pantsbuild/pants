@@ -27,14 +27,10 @@ class JavacPlugin(JavaLibrary):
 
     self.plugin = plugin or self.name
     self.classname = classname
-    self.add_labels('javac_plugin')
 
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):
     for spec in super(JavacPlugin, cls).compute_dependency_specs(kwargs, payload):
       yield spec
 
-    yield (
-      Java.global_instance().injectables_spec_for_key('javac') or
-      Java.global_instance().injectables_spec_for_key('tools.jar')
-    )
+    yield Java.global_instance().injectables_spec_for_key('tools.jar')

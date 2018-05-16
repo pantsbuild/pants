@@ -13,27 +13,26 @@ function log() {
 }
 
 function die() {
-  (($# > 0)) && log "\n${COLOR_RED}$@${COLOR_RESET}"
+  (($# > 0)) && log "\n${COLOR_RED}$*${COLOR_RESET}"
   exit 1
 }
 
 function green() {
-  (($# > 0)) && log "\n${COLOR_GREEN}$@${COLOR_RESET}"
+  (($# > 0)) && log "\n${COLOR_GREEN}$*${COLOR_RESET}"
 }
 
 # Initialization for elapsed()
-if [ -z "$elapsed_start_time" ] ; then
-  export elapsed_start_time=$(date +'%s')
-fi
+: ${elapsed_start_time:=$(date +'%s')}
+export elapsed_start_time
 
 function elapsed() {
   now=$(date '+%s')
-  elapsed_secs=$(($now - $elapsed_start_time))
+  elapsed_secs=$(( $now - $elapsed_start_time ))
   echo $elapsed_secs | awk '{printf "%02d:%02d\n",int($1/60), int($1%60)}'
 }
 
 function banner() {
-  echo -e "${COLOR_BLUE}[=== $(elapsed) $@ ===]${COLOR_RESET}"
+  echo -e "${COLOR_BLUE}[=== $(elapsed) $* ===]${COLOR_RESET}"
 }
 
 function travis_fold() {
@@ -45,11 +44,11 @@ function travis_fold() {
 }
 
 function start_travis_section() {
-  local slug=$1
+  local slug="$1"
   travis_fold start "${slug}"
   /bin/echo -n "${slug}" > "${TRAVIS_FOLD_STATE}"
   shift
-  local section="$@"
+  local section="$*"
   banner "${section}"
 }
 
@@ -71,7 +70,7 @@ function ensure_file_exists() {
 # Prevent bootstrapping failure due to unrecognized flag:
 # https://github.com/pantsbuild/pants/issues/78
 function set_archflags() {
-  GCC_VERSION=`gcc -v 2>&1`
+  GCC_VERSION=$(gcc -v 2>&1)
   if [ $? -ne 0 ]; then
     die "ERROR: unable to execute 'gcc'. Please verify that your compiler is installed, in your\n" \
         "      \$PATH and functional.\n\n" \

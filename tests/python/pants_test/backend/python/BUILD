@@ -14,29 +14,6 @@ python_tests(
 )
 
 python_tests(
-  name='python_chroot',
-  sources=['test_python_chroot.py'],
-  dependencies=[
-    '3rdparty/python:pex',
-    'src/python/pants/backend/codegen/antlr/python',
-    'src/python/pants/backend/codegen/thrift/python',
-    'src/python/pants/backend/python/targets:python',
-    'src/python/pants/backend/python:interpreter_cache',
-    'src/python/pants/backend/python:python_chroot',
-    'src/python/pants/backend/python:python_requirement',
-    'src/python/pants/backend/python/subsystems',
-    'src/python/pants/binaries:binary_util',
-    'src/python/pants/binaries:thrift_util',
-    'src/python/pants/ivy',
-    'src/python/pants/java/distribution',
-    'src/python/pants/python',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:base_test',
-  ]
-)
-
-python_tests(
   name='python_requirement_list',
   sources=['test_python_requirement_list.py'],
   dependencies=[
@@ -58,5 +35,30 @@ python_tests(
     'src/python/pants/python',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
+    'tests/python/pants_test:int-test',
+    'tests/python/pants_test/testutils:git_util',
+    'tests/python/pants_test/testutils:pexrc_util',
   ],
+  timeout=1200
+)
+
+python_tests(
+  name='integration',
+  sources=globs('*_integration.py'),
+  dependencies=[
+    ':pants_requirement_integration_test_base',
+    'src/python/pants/base:build_environment',
+  ],
+  tags={'integration'},
+)
+
+python_library(
+  name='pants_requirement_integration_test_base',
+  sources=['pants_requirement_integration_test_base.py'],
+  dependencies=[
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:int-test',
+  ]
 )

@@ -5,17 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import logging
-
-from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
 
-logger = logging.getLogger(__name__)
-
-
-class JaxWsLibrary(ExportableJvmLibrary):
+class JaxWsLibrary(JvmTarget):
   """Generates a Java library from JAX-WS wsdl files."""
 
   def __init__(self,
@@ -34,4 +29,3 @@ class JaxWsLibrary(ExportableJvmLibrary):
       'extra_args': PrimitiveField(self.assert_list(extra_args, key_arg='extra_args')),
     })
     super(JaxWsLibrary, self).__init__(payload=payload, **kwargs)
-    self.add_labels('codegen')

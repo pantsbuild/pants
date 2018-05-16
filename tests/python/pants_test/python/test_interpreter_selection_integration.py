@@ -6,9 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 
 from pants.util.contextutil import temporary_dir
+from pants.util.process_handler import subprocess
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -21,8 +21,8 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
     self.assert_failure(pants_run,
                         'Unexpected successful build of {binary}.'.format(binary=binary_target))
 
-  def test_select_26(self):
-    self._maybe_test_version('2.6')
+  def test_select_3(self):
+    self._maybe_test_version('3')
 
   def test_select_27(self):
     self._maybe_test_version('2.7')
@@ -31,9 +31,10 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
     if self.has_python_version(version):
       print('Found python {}. Testing interpreter selection against it.'.format(version))
       echo = self._echo_version(version)
-      v = echo.split('.')  # E.g., 2.6.8 .
+      v = echo.split('.')  # E.g., 2.7.13.
       self.assertTrue(len(v) > 2, 'Not a valid version string: {}'.format(v))
-      self.assertEquals(version, '{}.{}'.format(v[0], v[1]))
+      expected_components = version.split('.')
+      self.assertEquals(expected_components, v[:len(expected_components)])
     else:
       print('No python {} found. Skipping.'.format(version))
       self.skipTest('No python {} on system'.format(version))
@@ -60,6 +61,6 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
     # Avoid some known-to-choke-on interpreters.
     command = ['binary',
                binary_target,
-               '--python-setup-interpreter-constraints=CPython>=2.6,<3',
+               '--python-setup-interpreter-constraints=CPython>=2.7,<3',
                '--python-setup-interpreter-constraints=CPython>=3.3']
     return self.run_pants(command=command, config=config)

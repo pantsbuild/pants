@@ -6,17 +6,19 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import sys
 from contextlib import contextmanager
 from textwrap import dedent
 
+from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.python_repl import PythonRepl
+from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
+from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.task.repl_task_mixin import ReplTaskMixin
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import environment_as, stdio_as, temporary_dir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
@@ -67,20 +69,16 @@ class PythonReplTest(PythonTaskTestBase):
     ReplTaskMixin.reset_implementations()
 
   @contextmanager
-  def new_io(self, input):
-    orig_stdin, orig_stdout, orig_stderr = sys.stdin, sys.stdout, sys.stderr
+  def new_io(self, stdin_data):
     with temporary_dir() as iodir:
       stdin = os.path.join(iodir, 'stdin')
       stdout = os.path.join(iodir, 'stdout')
       stderr = os.path.join(iodir, 'stderr')
       with open(stdin, 'w') as fp:
-        fp.write(input)
+        fp.write(stdin_data)
       with open(stdin, 'rb') as inp, open(stdout, 'wb') as out, open(stderr, 'wb') as err:
-        sys.stdin, sys.stdout, sys.stderr = inp, out, err
-        try:
-          yield inp, out, err
-        finally:
-          sys.stdin, sys.stdout, sys.stderr = orig_stdin, orig_stdout, orig_stderr
+        with stdio_as(stdin_fd=inp.fileno(), stdout_fd=out.fileno(), stderr_fd=err.fileno()):
+          yield (stdin, stdout, stderr)
 
   def do_test_repl(self, code, expected, targets, options=None):
     if options:
@@ -102,15 +100,21 @@ class PythonReplTest(PythonTaskTestBase):
     # Add a competing REPL impl.
     JvmRepl.prepare(self.options, round_manager=None)
 
-    python_repl = self.create_task(self.context(target_roots=targets))
-    original_launcher = python_repl.launch_repl
-    with self.new_io('\n'.join(code)) as (inp, out, err):
-      def custom_io_patched_launcher(pex):
-        return original_launcher(pex, stdin=inp, stdout=out, stderr=err)
-      python_repl.launch_repl = custom_io_patched_launcher
+    # The easiest way to create products required by the PythonRepl task is to
+    # execute the relevant tasks.
+    si_task_type = self.synthesize_task_subtype(SelectInterpreter, 'si_scope')
+    rr_task_type = self.synthesize_task_subtype(ResolveRequirements, 'rr_scope')
+    gs_task_type = self.synthesize_task_subtype(GatherSources, 'gs_scope')
+    context = self.context(for_task_types=[si_task_type, rr_task_type, gs_task_type],
+                           target_roots=targets)
+    si_task_type(context, os.path.join(self.pants_workdir, 'si')).execute()
+    rr_task_type(context, os.path.join(self.pants_workdir, 'rr')).execute()
+    gs_task_type(context, os.path.join(self.pants_workdir, 'gs')).execute()
+    python_repl = self.create_task(context)
 
+    with self.new_io('\n'.join(code)) as (inp, out, err):
       python_repl.execute()
-      with open(out.name) as fp:
+      with open(out) as fp:
         lines = fp.read()
         if not expected:
           self.assertEqual('', lines)
@@ -158,6 +162,13 @@ class PythonReplTest(PythonTaskTestBase):
     self.do_test_repl(code=['import java.lang.unreachable'],
                       expected=[''],
                       targets=[self.non_python_target])
+
+  def test_access_to_env(self):
+    with environment_as(SOME_ENV_VAR='twelve'):
+      self.do_test_repl(code=['import os',
+                               'print(os.environ.get("SOME_ENV_VAR"))'],
+                        expected=['twelve'],
+                        targets=[self.library])
 
   def test_ipython(self):
     # IPython supports shelling out with a leading !, so indirectly test its presence by reading

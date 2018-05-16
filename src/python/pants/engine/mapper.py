@@ -8,9 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import re
 from collections import OrderedDict
 
-from pathspec import PathSpec
-from pathspec.patterns.gitwildmatch import GitWildMatchPattern
-
 from pants.build_graph.address import BuildFileAddress
 from pants.engine.objects import Serializable
 from pants.util.memo import memoized_property
@@ -29,7 +26,7 @@ class DuplicateNameError(MappingError):
   """Indicates more than one top-level object was found with the same name."""
 
 
-class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
+class AddressMap(datatype(['path', 'objects_by_name'])):
   """Maps addressable Serializable objects from a byte source.
 
   To construct an AddressMap, use `parse`.
@@ -39,7 +36,7 @@ class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
   """
 
   @classmethod
-  def parse(cls, filepath, filecontent, symbol_table_cls, parser_cls):
+  def parse(cls, filepath, filecontent, parser):
     """Parses a source for addressable Serializable objects.
 
     No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
@@ -48,13 +45,13 @@ class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
 
     :param string filepath: The path to the byte source containing serialized objects.
     :param string filecontent: The content of byte source containing serialized objects to be parsed.
-    :param symbol_table_cls: The symbol table cls to expose a symbol table dict.
-    :type symbol_table_cls: A :class:`pants.engine.parser.SymbolTable`.
-    :param parser_cls: The parser cls to use.
-    :type parser_cls: A :class:`pants.engine.parser.Parser`.
+    :param symbol_table: The symbol table cls to expose a symbol table dict.
+    :type symbol_table: Instance of :class:`pants.engine.parser.SymbolTable`.
+    :param parser: The parser cls to use.
+    :type parser: A :class:`pants.engine.parser.Parser`.
     """
     try:
-      objects = parser_cls.parse(filepath, filecontent, symbol_table_cls)
+      objects = parser.parse(filepath, filecontent)
     except Exception as e:
       raise MappingError('Failed to parse {}:\n{}'.format(filepath, e))
     objects_by_name = {}
@@ -78,7 +75,7 @@ class DifferingFamiliesError(MappingError):
   """Indicates an attempt was made to merge address maps from different families together."""
 
 
-class AddressFamily(datatype('AddressFamily', ['namespace', 'objects_by_name'])):
+class AddressFamily(datatype(['namespace', 'objects_by_name'])):
   """Represents the family of addressed objects in a namespace.
 
   To create an AddressFamily, use `create`.
@@ -166,8 +163,7 @@ class AddressMapper(object):
   """Configuration to parse build files matching a filename pattern."""
 
   def __init__(self,
-               symbol_table_cls,
-               parser_cls,
+               parser,
                build_patterns=None,
                build_ignore_patterns=None,
                exclude_target_regexps=None,
@@ -177,19 +173,16 @@ class AddressMapper(object):
     Both the set of files that define a mappable BUILD files and the parser used to parse those
     files can be customized.  See the `pants.engine.parsers` module for example parsers.
 
-    :param symbol_table_cls: The symbol table cls to expose a symbol table dict.
-    :type symbol_table_cls: A :class:`pants.engine.parser.SymbolTable`.
-    :param parser_cls: The BUILD file parser cls to use.
-    :type parser_cls: A :class:`pants.engine.parser.Parser`.
+    :param parser: The BUILD file parser to use.
+    :type parser: An instance of :class:`pants.engine.parser.Parser`.
     :param tuple build_patterns: A tuple of fnmatch-compatible patterns for identifying BUILD files
                                  used to resolve addresses.
     :param list build_ignore_patterns: A list of path ignore patterns used when searching for BUILD files.
     :param list exclude_target_regexps: A list of regular expressions for excluding targets.
     """
-    self.symbol_table_cls = symbol_table_cls
-    self.parser_cls = parser_cls
-    self.build_patterns = build_patterns or (b'BUILD', b'BUILD.*')
-    self.build_ignore_patterns = PathSpec.from_lines(GitWildMatchPattern, build_ignore_patterns or [])
+    self.parser = parser
+    self.build_patterns = tuple(build_patterns or [b'BUILD', b'BUILD.*'])
+    self.build_ignore_patterns = tuple(build_ignore_patterns or [])
     self._exclude_target_regexps = exclude_target_regexps or []
     self.exclude_patterns = [re.compile(pattern) for pattern in self._exclude_target_regexps]
     self.subproject_roots = subproject_roots or []
@@ -199,20 +192,18 @@ class AddressMapper(object):
       return True
     if type(other) != type(self):
       return NotImplemented
-    return (other.symbol_table_cls == self.symbol_table_cls and
-            other.build_patterns == self.build_patterns and
-            other.parser_cls == self.parser_cls)
+    return (other.build_patterns == self.build_patterns and
+            other.parser == self.parser)
 
   def __ne__(self, other):
     return not (self == other)
 
   def __hash__(self):
     # Compiled regexes are not hashable.
-    return hash((self.symbol_table_cls, self.parser_cls))
+    return hash(self.parser)
 
   def __repr__(self):
-    return 'AddressMapper(parser={}, symbol_table={}, build_patterns={})'.format(
-      self.parser_cls, self.symbol_table_cls, self.build_patterns)
+    return 'AddressMapper(parser={}, build_patterns={})'.format(self.parser, self.build_patterns)
 
   def __str__(self):
     return repr(self)

@@ -18,10 +18,21 @@ python_library(
 )
 
 python_library(
+  name = 'collections',
+  sources = ['collections.py'],
+)
+
+python_library(
+  name = 'debug',
+  sources = ['debug.py'],
+)
+
+python_library(
   name = 'desktop',
   sources = ['desktop.py'],
   dependencies = [
     ':osutil',
+    'src/python/pants/util:process_handler',
   ],
 )
 
@@ -72,6 +83,10 @@ python_library(
 python_library(
   name = 'objects',
   sources = ['objects.py'],
+  dependencies = [
+    ':memo',
+    ':meta',
+  ],
 )
 
 python_library(
@@ -82,6 +97,11 @@ python_library(
 python_library(
   name = 'process_handler',
   sources = ['process_handler.py'],
+  dependencies=[
+    '3rdparty/python:six',
+    '3rdparty/python:subprocess32',
+    ':meta',
+  ]
 )
 
 python_library(
@@ -116,11 +136,6 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
   ],
-)
-
-python_library(
-  name = 'timeout',
-  sources = ['timeout.py'],
 )
 
 python_library(

@@ -13,16 +13,11 @@ use petgraph::stable_graph::{NodeIndex, StableDiGraph, StableGraph};
 use futures::future::{self, Future};
 
 use externs;
+use boxfuture::Boxable;
 use context::ContextFactory;
-use core::{Failure, FNV, Noop};
-use nodes::{
-  Node,
-  NodeFuture,
-  NodeKey,
-  NodeResult,
-  TryInto
-};
-
+use core::{Failure, Noop, FNV};
+use hashing;
+use nodes::{DigestFile, Node, NodeFuture, NodeKey, NodeResult, TryInto};
 
 // 2^32 Nodes ought to be more than enough for anyone!
 pub type EntryId = NodeIndex<u32>;
@@ -40,7 +35,7 @@ impl EntryStateGetter for EntryStateField {
     self
       .clone()
       .then(|node_result| Entry::unwrap::<N>(node_result))
-      .boxed()
+      .to_boxed()
   }
 }
 
@@ -89,16 +84,16 @@ impl Entry {
   }
 
   fn unwrap<N: Node>(
-    res: Result<future::SharedItem<NodeResult>, future::SharedError<Failure>>
+    res: Result<future::SharedItem<NodeResult>, future::SharedError<Failure>>,
   ) -> Result<N::Output, Failure> {
     match res {
-      Ok(nr) =>
-        Ok(
-          (*nr).clone().try_into().unwrap_or_else(|_| {
-            panic!("A Node implementation was ambiguous.")
-          })
-        ),
-      Err(failure) => Err((*failure).clone())
+      Ok(nr) => Ok(
+        (*nr)
+          .clone()
+          .try_into()
+          .unwrap_or_else(|_| panic!("A Node implementation was ambiguous.")),
+      ),
+      Err(failure) => Err((*failure).clone()),
     }
   }
 
@@ -109,17 +104,15 @@ impl Entry {
     if let Some(ref state) = self.state {
       state.clone()
     } else {
-      let state =
-        match &self.node {
-          &EntryKey::Valid(ref n) => {
-            // Wrap the launch in future::lazy to defer it until after we're outside the Graph lock.
-            let context = context_factory.create(entry_id);
-            let node = n.clone();
-            future::lazy(move || node.run(context)).boxed()
-          },
-          &EntryKey::Cyclic(_) =>
-            future::err(Failure::Noop(Noop::Cycle)).boxed(),
-        };
+      let state = match &self.node {
+        &EntryKey::Valid(ref n) => {
+          // Wrap the launch in future::lazy to defer it until after we're outside the Graph lock.
+          let context = context_factory.create(entry_id);
+          let node = n.clone();
+          future::lazy(move || node.run(context)).to_boxed()
+        }
+        &EntryKey::Cyclic(_) => future::err(Failure::Noop(Noop::Cycle)).to_boxed(),
+      };
 
       self.state = Some(state.shared());
       self.state(context_factory, entry_id)
@@ -130,21 +123,23 @@ impl Entry {
   /// If the Future for this Node has already completed, returns a clone of its result.
   ///
   fn peek<N: Node>(&self) -> Option<Result<N::Output, Failure>> {
-    self.state
+    self
+      .state
       .as_ref()
-      .and_then(|state|
-        state.peek().map(|nr| Entry::unwrap::<N>(nr))
-      )
+      .and_then(|state| state.peek().map(|nr| Entry::unwrap::<N>(nr)))
+  }
+
+  fn clear(&mut self) {
+    self.state = None;
   }
 
   fn format<N: Node>(&self) -> String {
-    let state =
-      match self.peek::<N>() {
-        Some(Ok(ref nr)) => format!("{:?}", nr),
-        Some(Err(Failure::Throw(ref v, _))) => externs::val_to_str(v),
-        Some(Err(ref x)) => format!("{:?}", x),
-        None => "<None>".to_string(),
-      };
+    let state = match self.peek::<N>() {
+      Some(Ok(ref nr)) => format!("{:?}", nr),
+      Some(Err(Failure::Throw(ref v, _))) => externs::val_to_str(v),
+      Some(Err(ref x)) => format!("{:?}", x),
+      None => "<None>".to_string(),
+    };
     format!("{} == {}", self.node.content().format(), state).replace("\"", "\\\"")
   }
 }
@@ -158,34 +153,33 @@ struct InnerGraph {
 
 impl InnerGraph {
   fn entry(&self, node: &EntryKey) -> Option<&Entry> {
-    self.entry_id(node).map(|&id| self.entry_for_id(id))
+    self.entry_id(node).and_then(|&id| self.entry_for_id(id))
   }
 
   fn entry_id(&self, node: &EntryKey) -> Option<&EntryId> {
     self.nodes.get(node)
   }
 
-  fn entry_for_id(&self, id: EntryId) -> &Entry {
-    self.pg.node_weight(id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
+  fn entry_for_id(&self, id: EntryId) -> Option<&Entry> {
+    self.pg.node_weight(id)
   }
 
-  fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
-    self.pg.node_weight_mut(id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
+  fn entry_for_id_mut(&mut self, id: EntryId) -> Option<&mut Entry> {
+    self.pg.node_weight_mut(id)
+  }
+
+  fn unsafe_entry_for_id(&self, id: EntryId) -> &Entry {
+    self
+      .pg
+      .node_weight(id)
+      .expect("The unsafe_entry_for_id method should only be used in read-only methods!")
   }
 
   fn ensure_entry(&mut self, node: EntryKey) -> EntryId {
-    InnerGraph::ensure_entry_internal(
-      &mut self.pg,
-      &mut self.nodes,
-      node
-    )
+    InnerGraph::ensure_entry_internal(&mut self.pg, &mut self.nodes, node)
   }
 
-  fn ensure_entry_internal<'a>(
-    pg: &mut PGraph,
-    nodes: &mut Nodes,
-    node: EntryKey
-  ) -> EntryId {
+  fn ensure_entry_internal<'a>(pg: &mut PGraph, nodes: &mut Nodes, node: EntryKey) -> EntryId {
     if let Some(&id) = nodes.get(&node) {
       return id;
     }
@@ -203,29 +197,32 @@ impl InnerGraph {
   ///
   fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> bool {
     // Search either forward from the dst, or backward from the src.
-    let (root, needle, dependents) = {
+    let (root, needle, direction) = {
       let out_from_dst = self.pg.neighbors(dst_id).count();
-      let in_to_src = self.pg.neighbors_directed(src_id, Direction::Incoming).count();
+      let in_to_src = self
+        .pg
+        .neighbors_directed(src_id, Direction::Incoming)
+        .count();
       if out_from_dst < in_to_src {
-        (dst_id, src_id, false)
+        (dst_id, src_id, Direction::Outgoing)
       } else {
-        (src_id, dst_id, true)
+        (src_id, dst_id, Direction::Incoming)
       }
     };
 
     // Search for an existing path from dst to src.
     let mut roots = VecDeque::new();
     roots.push_back(root);
-    self.walk(roots, dependents).any(|eid| eid == needle)
+    self.walk(roots, direction).any(|eid| eid == needle)
   }
 
   ///
   /// Begins a topological Walk from the given roots.
   ///
-  fn walk(&self, roots: VecDeque<EntryId>, dependents: bool) -> Walk {
+  fn walk(&self, roots: VecDeque<EntryId>, direction: Direction) -> Walk {
     Walk {
       graph: self,
-      direction: if dependents { Direction::Incoming } else { Direction::Outgoing },
+      direction: direction,
       deque: roots,
       walked: HashSet::default(),
     }
@@ -235,15 +232,28 @@ impl InnerGraph {
   /// Begins a topological walk from the given roots. Provides both the current entry as well as the
   /// depth from the root.
   ///
-  fn leveled_walk<P>(&self, roots: Vec<EntryId>, predicate: P, dependents: bool) -> LeveledWalk<P>
-    where P: Fn(EntryId, Level) -> bool {
+  fn leveled_walk<P>(
+    &self,
+    roots: Vec<EntryId>,
+    predicate: P,
+    direction: Direction,
+  ) -> LeveledWalk<P>
+  where
+    P: Fn(EntryId, Level) -> bool,
+  {
     let rrr = roots.into_iter().map(|r| (r, 0)).collect::<VecDeque<_>>();
     LeveledWalk {
       graph: self,
-      direction: if dependents { Direction::Incoming } else { Direction::Outgoing },
+      direction: direction,
       deque: rrr,
       walked: HashSet::default(),
       predicate: predicate,
+    }
+  }
+
+  fn clear(&mut self) {
+    for eid in self.nodes.values() {
+      self.pg.node_weight_mut(*eid).map(|entry| entry.clear());
     }
   }
 
@@ -253,55 +263,54 @@ impl InnerGraph {
   fn invalidate(&mut self, paths: HashSet<PathBuf>) -> usize {
     // Collect all entries that will be deleted.
     let ids: HashSet<EntryId, FNV> = {
-      let root_ids =
-        self.nodes.iter()
-          .filter_map(|(node, &entry_id)| {
-            node.content().fs_subject().and_then(|path| {
-              if paths.contains(path) {
-                Some(entry_id)
-              } else {
-                None
-              }
-            })
+      let root_ids = self
+        .nodes
+        .iter()
+        .filter_map(|(node, &entry_id)| {
+          node.content().fs_subject().and_then(|path| {
+            if paths.contains(path) {
+              Some(entry_id)
+            } else {
+              None
+            }
           })
-          .collect();
-      self.walk(root_ids, true).map(|eid| eid).collect()
+        })
+        .collect();
+      self
+        .walk(root_ids, Direction::Incoming)
+        .map(|eid| eid)
+        .collect()
     };
 
     // Then remove all entries in one shot.
     let result = ids.len();
-    InnerGraph::invalidate_internal(
-      &mut self.pg,
-      &mut self.nodes,
-      ids,
-    );
+    InnerGraph::invalidate_internal(&mut self.pg, &mut self.nodes, ids);
 
     // And return the removed count.
     result
   }
 
-  fn invalidate_internal(
-    pg: &mut PGraph,
-    nodes: &mut Nodes,
-    ids: HashSet<EntryId, FNV>
-  ) {
+  fn invalidate_internal(pg: &mut PGraph, nodes: &mut Nodes, ids: HashSet<EntryId, FNV>) {
     if ids.is_empty() {
       return;
     }
 
     for &id in &ids {
       // Validate that all dependents of the id are also scheduled for removal.
-      assert!(pg.neighbors_directed(id, Direction::Incoming).all(|dep| ids.contains(&dep)));
+      assert!(
+        pg.neighbors_directed(id, Direction::Incoming)
+          .all(|dep| ids.contains(&dep))
+      );
 
       // Remove the entry from the graph (which will also remove dependent edges).
       pg.remove_node(id);
     }
 
     // Filter the Nodes to delete any with matching ids.
-    let filtered: Vec<(EntryKey, EntryId)> =
-      nodes.drain()
-        .filter(|&(_, id)| !ids.contains(&id))
-        .collect();
+    let filtered: Vec<(EntryKey, EntryId)> = nodes
+      .drain()
+      .filter(|&(_, id)| !ids.contains(&id))
+      .collect();
     nodes.extend(filtered);
 
     assert!(
@@ -312,54 +321,57 @@ impl InnerGraph {
     );
   }
 
-  pub fn visualize(&self, roots: &Vec<NodeKey>, path: &Path) -> io::Result<()> {
+  fn visualize(&self, roots: &[NodeKey], path: &Path) -> io::Result<()> {
     let file = try!(File::create(path));
     let mut f = BufWriter::new(file);
     let mut viz_colors = HashMap::new();
     let viz_color_scheme = "set312";
     let viz_max_colors = 12;
-    let mut format_color =
-      |entry: &Entry| {
-        match entry.peek::<NodeKey>() {
-          None | Some(Err(Failure::Noop(_))) => "white".to_string(),
-          Some(Err(Failure::Throw(..))) => "4".to_string(),
-          Some(Ok(_)) => {
-            let viz_colors_len = viz_colors.len();
-            viz_colors.entry(entry.node.content().product_str()).or_insert_with(|| {
-              format!("{}", viz_colors_len % viz_max_colors + 1)
-            }).clone()
-          },
-        }
-      };
+    let mut format_color = |entry: &Entry| match entry.peek::<NodeKey>() {
+      None | Some(Err(Failure::Noop(_))) => "white".to_string(),
+      Some(Err(Failure::Throw(..))) => "4".to_string(),
+      Some(Err(Failure::Invalidated)) => "12".to_string(),
+      Some(Ok(_)) => {
+        let viz_colors_len = viz_colors.len();
+        viz_colors
+          .entry(entry.node.content().product_str())
+          .or_insert_with(|| format!("{}", viz_colors_len % viz_max_colors + 1))
+          .clone()
+      }
+    };
 
     try!(f.write_all(b"digraph plans {\n"));
-    try!(f.write_fmt(format_args!("  node[colorscheme={}];\n", viz_color_scheme)));
+    try!(f.write_fmt(format_args!("  node[colorscheme={}];\n", viz_color_scheme),));
     try!(f.write_all(b"  concentrate=true;\n"));
     try!(f.write_all(b"  rankdir=TB;\n"));
 
-    let root_entries =
-      roots.iter()
-        .filter_map(|n| self.entry_id(&EntryKey::Valid(n.clone())))
-        .map(|&eid| eid)
-        .collect();
+    let root_entries = roots
+      .iter()
+      .filter_map(|n| self.entry_id(&EntryKey::Valid(n.clone())))
+      .map(|&eid| eid)
+      .collect();
     let predicate = |_| true;
 
-    for eid in self.walk(root_entries, false) {
-      let entry = self.entry_for_id(eid);
+    for eid in self.walk(root_entries, Direction::Outgoing) {
+      let entry = self.unsafe_entry_for_id(eid);
       let node_str = entry.format::<NodeKey>();
 
       // Write the node header.
-      try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];\n", node_str, format_color(entry))));
+      try!(f.write_fmt(format_args!(
+        "  \"{}\" [style=filled, fillcolor={}];\n",
+        node_str,
+        format_color(entry)
+      )));
 
       for dep_id in self.pg.neighbors(eid) {
-        let dep_entry = self.entry_for_id(dep_id);
+        let dep_entry = self.unsafe_entry_for_id(dep_id);
         if !predicate(dep_entry) {
           continue;
         }
 
         // Write an entry per edge.
         let dep_str = dep_entry.format::<NodeKey>();
-        try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"\n", node_str, dep_str)));
+        try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"\n", node_str, dep_str),));
       }
     }
 
@@ -367,21 +379,27 @@ impl InnerGraph {
     Ok(())
   }
 
-  pub fn trace(&self, root: &NodeKey, path: &Path) -> io::Result<()> {
+  fn trace(&self, root: &NodeKey, path: &Path) -> io::Result<()> {
     let file = try!(OpenOptions::new().append(true).open(path));
     let mut f = BufWriter::new(file);
 
     let is_bottom = |eid: EntryId| -> bool {
-      match self.entry_for_id(eid).peek::<NodeKey>() {
-        None | Some(Err(Failure::Noop(..))) => true,
+      match self.unsafe_entry_for_id(eid).peek::<NodeKey>() {
+        Some(Err(Failure::Invalidated)) => false,
+        Some(Err(Failure::Noop(..))) => true,
         Some(Err(Failure::Throw(..))) => false,
         Some(Ok(_)) => true,
+        None => {
+          // A Node with no state is either still running, or effectively cancelled
+          // because a dependent failed. In either case, it's not useful to render
+          // them, as we don't know whether they would have succeeded or failed.
+          true
+        }
       }
     };
 
-    let is_one_level_above_bottom = |eid: EntryId| -> bool {
-      self.pg.neighbors(eid).all(|d| is_bottom(d))
-    };
+    let is_one_level_above_bottom =
+      |eid: EntryId| -> bool { self.pg.neighbors(eid).all(|d| is_bottom(d)) };
 
     let _indent = |level: Level| -> String {
       let mut indent = String::new();
@@ -392,7 +410,7 @@ impl InnerGraph {
     };
 
     let _format = |eid: EntryId, level: Level| -> String {
-      let entry = self.entry_for_id(eid);
+      let entry = self.unsafe_entry_for_id(eid);
       let indent = _indent(level);
       let output = format!("{}Computing {}", indent, entry.node.content().format());
       if is_one_level_above_bottom(eid) {
@@ -402,12 +420,14 @@ impl InnerGraph {
           Some(Err(Failure::Throw(ref x, ref traceback))) => format!(
             "Throw({})\n{}",
             externs::val_to_str(x),
-            traceback.split("\n")
-                     .map(|l| format!("{}    {}", indent, l))
-                     .collect::<Vec<_>>()
-                     .join("\n")
+            traceback
+              .split("\n")
+              .map(|l| format!("{}    {}", indent, l))
+              .collect::<Vec<_>>()
+              .join("\n")
           ),
           Some(Err(Failure::Noop(ref x))) => format!("Noop({:?})", x),
+          Some(Err(Failure::Invalidated)) => "Invalidated".to_string(),
         };
         format!("{}\n{}  {}", output, indent, state_str)
       } else {
@@ -415,17 +435,54 @@ impl InnerGraph {
       }
     };
 
-    let root_entries =
-      self.entry_id(&EntryKey::Valid(root.clone()))
-        .map(|&eid| vec![eid])
-        .unwrap_or_else(|| vec![]);
-    for t in self.leveled_walk(root_entries, |eid,_| !is_bottom(eid), false) {
+    let root_entries = self
+      .entry_id(&EntryKey::Valid(root.clone()))
+      .map(|&eid| vec![eid])
+      .unwrap_or_else(|| vec![]);
+    for t in self.leveled_walk(root_entries, |eid, _| !is_bottom(eid), Direction::Outgoing) {
       let (eid, level) = t;
       try!(write!(&mut f, "{}\n", _format(eid, level)));
     }
 
     try!(f.write_all(b"\n"));
     Ok(())
+  }
+
+  fn reachable_digest_count(&self, roots: &[NodeKey]) -> usize {
+    let root_ids = roots
+      .iter()
+      .cloned()
+      .filter_map(|node| self.entry_id(&EntryKey::Valid(node)))
+      .cloned()
+      .collect();
+    self
+      .digests_internal(self.walk(root_ids, Direction::Outgoing).collect())
+      .count()
+  }
+
+  fn all_digests(&self) -> Vec<hashing::Digest> {
+    self
+      .digests_internal(self.pg.node_indices().collect())
+      .collect()
+  }
+
+  fn digests_internal<'g>(
+    &'g self,
+    entryids: Vec<EntryId>,
+  ) -> Box<Iterator<Item = hashing::Digest> + 'g> {
+    Box::new(
+      entryids
+        .into_iter()
+        .filter_map(move |eid| self.entry_for_id(eid))
+        .filter_map(|entry| match entry.node.content() {
+          &NodeKey::DigestFile(_) => Some(entry.peek::<DigestFile>()),
+          _ => None,
+        })
+        .filter_map(|output| match output {
+          Some(Ok(digest)) => Some(digest),
+          _ => None,
+        }),
+    )
   }
 }
 
@@ -438,11 +495,10 @@ pub struct Graph {
 
 impl Graph {
   pub fn new() -> Graph {
-    let inner =
-      InnerGraph {
-        nodes: HashMap::default(),
-        pg: StableGraph::new(),
-      };
+    let inner = InnerGraph {
+      nodes: HashMap::default(),
+      pg: StableGraph::new(),
+    };
     Graph {
       inner: Mutex::new(inner),
     }
@@ -459,14 +515,21 @@ impl Graph {
   pub fn peek<N: Node>(&self, node: N) -> Option<Result<N::Output, Failure>> {
     let node = node.into();
     let inner = self.inner.lock().unwrap();
-    inner.entry(&EntryKey::Valid(node)).and_then(|e| e.peek::<N>())
+    inner
+      .entry(&EntryKey::Valid(node))
+      .and_then(|e| e.peek::<N>())
   }
 
   ///
   /// In the context of the given src Node, declare a dependency on the given dst Node and
   /// begin its execution if it has not already started.
   ///
-  pub fn get<N: Node>(&self, src_id: EntryId, context: &ContextFactory, dst_node: N) -> NodeFuture<N::Output> {
+  pub fn get<N: Node>(
+    &self,
+    src_id: EntryId,
+    context: &ContextFactory,
+    dst_node: N,
+  ) -> NodeFuture<N::Output> {
     let dst_node = dst_node.into();
 
     // Get or create the destination, and then insert the dep and return its state.
@@ -487,7 +550,10 @@ impl Graph {
 
       // Declare the dep, and return the state of the destination.
       inner.pg.add_edge(src_id, dst_id, ());
-      inner.entry_for_id_mut(dst_id).state(context, dst_id)
+      inner
+        .entry_for_id_mut(dst_id)
+        .map(|entry| entry.state(context, dst_id))
+        .unwrap_or_else(|| future::err(Failure::Invalidated).to_boxed().shared())
     };
 
     // Got the destination's state. Now that we're outside the graph locks, we can safely
@@ -503,10 +569,21 @@ impl Graph {
     let state = {
       let mut inner = self.inner.lock().unwrap();
       let id = inner.ensure_entry(EntryKey::Valid(node.into()));
-      inner.entry_for_id_mut(id).state(context, id)
+      inner
+        .entry_for_id_mut(id)
+        .map(|entry| entry.state(context, id))
+        .unwrap_or_else(|| future::err(Failure::Invalidated).to_boxed().shared())
     };
     // ...but only `get` it outside the lock.
     state.get::<N>()
+  }
+
+  ///
+  /// Clears the state of all Nodes in the Graph by dropping their state fields.
+  ///
+  pub fn clear(&self) {
+    let mut inner = self.inner.lock().unwrap();
+    inner.clear()
   }
 
   pub fn invalidate(&self, paths: HashSet<PathBuf>) -> usize {
@@ -519,9 +596,19 @@ impl Graph {
     inner.trace(root, path)
   }
 
-  pub fn visualize(&self, roots: &Vec<NodeKey>, path: &Path) -> io::Result<()> {
+  pub fn visualize(&self, roots: &[NodeKey], path: &Path) -> io::Result<()> {
     let inner = self.inner.lock().unwrap();
     inner.visualize(roots, path)
+  }
+
+  pub fn reachable_digest_count(&self, roots: &[NodeKey]) -> usize {
+    let inner = self.inner.lock().unwrap();
+    inner.reachable_digest_count(roots)
+  }
+
+  pub fn all_digests(&self) -> Vec<hashing::Digest> {
+    let inner = self.inner.lock().unwrap();
+    inner.all_digests()
   }
 }
 
@@ -546,7 +633,9 @@ impl<'a> Iterator for Walk<'a> {
       }
 
       // Queue the neighbors of the entry and then return it.
-      self.deque.extend(self.graph.pg.neighbors_directed(id, self.direction));
+      self
+        .deque
+        .extend(self.graph.pg.neighbors_directed(id, self.direction));
       return Some(id);
     }
 
@@ -560,7 +649,7 @@ type Level = u32;
 /// Represents the state of a particular topological walk through a Graph. Implements Iterator and
 /// has the same lifetime as the Graph itself.
 ///
-struct LeveledWalk<'a, P: Fn(EntryId, Level)->bool> {
+struct LeveledWalk<'a, P: Fn(EntryId, Level) -> bool> {
   graph: &'a InnerGraph,
   direction: Direction,
   deque: VecDeque<(EntryId, Level)>,
@@ -568,7 +657,7 @@ struct LeveledWalk<'a, P: Fn(EntryId, Level)->bool> {
   predicate: P,
 }
 
-impl<'a, P: Fn(EntryId, Level)->bool> Iterator for LeveledWalk<'a, P> {
+impl<'a, P: Fn(EntryId, Level) -> bool> Iterator for LeveledWalk<'a, P> {
   type Item = (EntryId, Level);
 
   fn next(&mut self) -> Option<Self::Item> {
@@ -584,8 +673,12 @@ impl<'a, P: Fn(EntryId, Level)->bool> Iterator for LeveledWalk<'a, P> {
 
       // Entry matches: queue its neighbors and then return it.
       self.deque.extend(
-        self.graph.pg.neighbors_directed(id, self.direction).into_iter()
-          .map(|d| (d, level+1))
+        self
+          .graph
+          .pg
+          .neighbors_directed(id, self.direction)
+          .into_iter()
+          .map(|d| (d, level + 1)),
       );
       return Some((id, level));
     }

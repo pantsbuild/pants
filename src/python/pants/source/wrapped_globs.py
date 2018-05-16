@@ -13,7 +13,7 @@ from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
-from pants.util.dirutil import fast_relpath
+from pants.util.dirutil import fast_relpath, fast_relpath_optional
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
@@ -104,8 +104,8 @@ class EagerFilesetWithSpec(FilesetWithSpec):
     return 'EagerFilesetWithSpec(rel_root={!r}, files={!r})'.format(self.rel_root, self.files)
 
   def matches(self, path_from_buildroot):
-    path_relative_to_rel_root = os.path.relpath(path_from_buildroot, self.rel_root)
-    return path_relative_to_rel_root in self._files
+    path_relative_to_rel_root = fast_relpath_optional(path_from_buildroot, self.rel_root)
+    return path_relative_to_rel_root is not None and path_relative_to_rel_root in self._files
 
 
 class LazyFilesetWithSpec(FilesetWithSpec):

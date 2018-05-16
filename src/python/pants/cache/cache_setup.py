@@ -19,6 +19,7 @@ from pants.cache.pinger import BestUrlSelector, Pinger
 from pants.cache.resolver import NoopResolver, Resolver, RESTfulResolver
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized_property
 
 
 class EmptyCacheSpecError(ArtifactCacheError): pass
@@ -73,6 +74,10 @@ class CacheSetup(Subsystem):
                   'a RESTful cache, a path of a filesystem cache, or a pipe-separated list of '
                   'alternate caches to choose from. This list is also used as input to '
                   'the resolver. When resolver is \'none\' list is used as is.')
+    register('--read-timeout', advanced=True, type=float, default=4.0,
+             help='The read timeout for any remote caches in use, in seconds.')
+    register('--write-timeout', advanced=True, type=float, default=4.0,
+             help='The write timeout for any remote caches in use, in seconds.')
     register('--compression-level', advanced=True, type=int, default=5,
              help='The gzip compression level (0-9) for created artifacts.')
     register('--dereference-symlinks', type=bool, default=True, fingerprint=True,
@@ -87,26 +92,26 @@ class CacheSetup(Subsystem):
              help='Permissions to use when writing artifacts to a local cache, in octal.')
 
   @classmethod
-  def create_cache_factory_for_task(cls, task, pinger=None, resolver=None):
-    return CacheFactory(cls.scoped_instance(task).get_options(),
-                        task.context.log, task.stable_name(), pinger=pinger, resolver=resolver)
+  def create_cache_factory_for_task(cls, task, **kwargs):
+    scoped_options = cls.scoped_instance(task).get_options()
+    return CacheFactory(scoped_options, task.context.log, task, **kwargs)
 
 
 class CacheFactory(object):
 
-  def __init__(self, options, log, stable_name, pinger=None, resolver=None):
+  def __init__(self, options, log, task, pinger=None, resolver=None):
     """Create a cache factory from settings.
 
     :param options: Task's scoped options.
     :param log: Task's context log.
-    :param stable_name: Task's stable name.
+    :param task: Task to cache results for.
     :param pinger: Pinger to choose the best remote artifact cache URL.
     :param resolver: Resolver to look up remote artifact cache URLs.
     :return: cache factory.
     """
     self._options = options
     self._log = log
-    self._stable_name = stable_name
+    self._task = task
 
     # Created on-demand.
     self._read_cache = None
@@ -129,6 +134,16 @@ class CacheFactory(object):
       self._resolver = RESTfulResolver(timeout=1.0, tries=3)
     else:
       self._resolver = NoopResolver()
+
+  @staticmethod
+  def make_task_cache_dirname(task):
+    """Use the task fingerprint as the name of the cache subdirectory to store
+    results from the task."""
+    return task.fingerprint
+
+  @memoized_property
+  def _cache_dirname(self):
+    return self.make_task_cache_dirname(self._task)
 
   @property
   def ignore(self):
@@ -261,9 +276,9 @@ class CacheFactory(object):
     artifact_root = self._options.pants_workdir
 
     def create_local_cache(parent_path):
-      path = os.path.join(parent_path, self._stable_name)
+      path = os.path.join(parent_path, self._cache_dirname)
       self._log.debug('{0} {1} local artifact cache at {2}'
-                      .format(self._stable_name, action, path))
+                      .format(self._task.stable_name(), action, path))
       return LocalArtifactCache(artifact_root, path, compression,
                                 self._options.max_entries_per_target,
                                 permissions=self._options.write_permissions,
@@ -273,10 +288,17 @@ class CacheFactory(object):
       urls = self.get_available_urls(remote_spec.split('|'))
 
       if len(urls) > 0:
-        best_url_selector = BestUrlSelector(['{}/{}'.format(url.rstrip('/'), self._stable_name)
-                                             for url in urls])
+        best_url_selector = BestUrlSelector(
+          ['{}/{}'.format(url.rstrip('/'), self._cache_dirname) for url in urls]
+        )
         local_cache = local_cache or TempLocalArtifactCache(artifact_root, compression)
-        return RESTfulArtifactCache(artifact_root, best_url_selector, local_cache)
+        return RESTfulArtifactCache(
+          artifact_root,
+          best_url_selector,
+          local_cache,
+          read_timeout=self._options.read_timeout,
+          write_timeout=self._options.write_timeout,
+        )
 
     local_cache = create_local_cache(spec.local) if spec.local else None
     remote_cache = create_remote_cache(spec.remote, local_cache) if spec.remote else None

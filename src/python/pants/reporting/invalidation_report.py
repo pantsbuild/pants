@@ -25,15 +25,12 @@ class InvalidationReport(object):
       :param valid: True if the cache_key is valid
       """
 
-    def __init__(self, task_name, cache_manager, invocation_id):
+    def __init__(self, task_name, invocation_id):
       self._task_name = task_name
-      self.cache_manager = cache_manager
       self._invocation_id = invocation_id
       self._entries = []
 
-    def add(self, targets, cache_key, valid, phase=None):
-      if not phase:
-        raise ValueError('Must specify a descriptive phase= value (e.g. "init", "pre-check", ...')
+    def add(self, targets, cache_key, valid, phase):
       # Manufacture an id from a hash of the target ids
       targets_hash = Target.identify(targets)
       self._entries.append(self.TaskEntry(targets_hash=targets_hash,
@@ -69,22 +66,22 @@ class InvalidationReport(object):
   def set_filename(self, filename):
     self._filename = filename
 
-  def add_task(self, cache_manager):
+  def add_task(self, task_name):
     self._invocation_id += 1
-    task_report = self.TaskReport(cache_manager.task_name, cache_manager, self._invocation_id)
-    self._task_reports[id(cache_manager)] = task_report
+    task_report = self.TaskReport(task_name, self._invocation_id)
+    self._task_reports[task_name] = task_report
     return task_report
 
-  def add_vts(self, cache_manager, targets, cache_key, valid, phase):
+  def add_vts(self, task_name, targets, cache_key, valid, phase):
     """ Add a single VersionedTargetSet entry to the report.
     :param InvalidationCacheManager cache_manager:
     :param CacheKey cache_key:
     :param bool valid:
     :param string phase:
     """
-    if id(cache_manager) not in self._task_reports:
-      self.add_task(cache_manager)
-    self._task_reports[id(cache_manager)].add(targets, cache_key, valid, phase)
+    if task_name not in self._task_reports:
+      self.add_task(task_name)
+    self._task_reports[task_name].add(targets, cache_key, valid, phase)
 
   def report(self, filename=None):
     """ Write details of each versioned target to file

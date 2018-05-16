@@ -61,7 +61,7 @@ class Context(object):
   def __init__(self, options, run_tracker, target_roots,
                requested_goals=None, target_base=None, build_graph=None,
                build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
-               workspace=None, invalidation_report=None, pantsd_launcher=None):
+               workspace=None, invalidation_report=None, scheduler=None):
     self._options = options
     self.build_graph = build_graph
     self.build_file_parser = build_file_parser
@@ -80,7 +80,7 @@ class Context(object):
     self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
     self._replace_targets(target_roots)
     self._invalidation_report = invalidation_report
-    self._pantsd_launcher = pantsd_launcher
+    self._scheduler = scheduler
 
   @property
   def options(self):
@@ -151,13 +151,31 @@ class Context(object):
   def invalidation_report(self):
     return self._invalidation_report
 
-  @property
-  def pantsd_launcher(self):
-    return self._pantsd_launcher
-
   def __str__(self):
     ident = Target.identify(self.targets())
     return 'Context(id:{}, targets:{})'.format(ident, self.targets())
+
+  @contextmanager
+  def executing(self):
+    """A contextmanager that sets metrics in the context of a (v1) engine execution."""
+    self._set_target_root_count_in_runtracker()
+    yield
+    self.run_tracker.pantsd_stats.set_scheduler_metrics(self._scheduler.metrics())
+    self._set_affected_target_count_in_runtracker()
+
+  def _set_target_root_count_in_runtracker(self):
+    """Sets the target root count in the run tracker's daemon stats object."""
+    # N.B. `self._target_roots` is always an expanded list of `Target` objects as
+    # provided by `GoalRunner`.
+    target_count = len(self._target_roots)
+    self.run_tracker.pantsd_stats.set_target_root_size(target_count)
+    return target_count
+
+  def _set_affected_target_count_in_runtracker(self):
+    """Sets the realized target count in the run tracker's daemon stats object."""
+    target_count = len(self.build_graph)
+    self.run_tracker.pantsd_stats.set_affected_targets_size(target_count)
+    return target_count
 
   def submit_background_work_chain(self, work_chain, parent_workunit_name=None):
     """

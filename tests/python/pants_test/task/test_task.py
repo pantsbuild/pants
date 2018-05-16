@@ -9,25 +9,18 @@ import os
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.payload import Payload
-from pants.build_graph.target import Target
+from pants.build_graph.files import Files
 from pants.cache.cache_setup import CacheSetup
+from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.subsystem.subsystem import Subsystem
+from pants.subsystem.subsystem_client_mixin import SubsystemDependency
 from pants.task.task import Task
 from pants.util.dirutil import safe_rmtree
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
-class DummyLibrary(Target):
-  def __init__(self, address, source, *args, **kwargs):
-    payload = Payload()
-    payload.add_fields({'sources': self.create_sources_field(sources=[source],
-                                                             sources_rel_path=address.spec_path)})
-    self.source = source
-    super(DummyLibrary, self).__init__(address=address, payload=payload, *args, **kwargs)
-
-
 class DummyTask(Task):
-  """A task that appends the content of a DummyLibrary's source into its results_dir."""
+  """A task that appends the content of a Files's sources into its results_dir."""
 
   _implementation_version = 0
   _force_fail = False
@@ -54,14 +47,82 @@ class DummyTask(Task):
       if not was_valid:
         if vt.is_incremental:
           assert os.path.isdir(vt.previous_results_dir)
-        with open(os.path.join(get_buildroot(), vt.target.source), 'r') as infile:
-          outfile_name = os.path.join(vt.results_dir, os.path.basename(vt.target.source))
-          with open(outfile_name, 'a') as outfile:
-            outfile.write(infile.read())
+        for source in vt.target.sources_relative_to_buildroot():
+          with open(os.path.join(get_buildroot(), source), 'r') as infile:
+            outfile_name = os.path.join(vt.results_dir, source)
+            with open(outfile_name, 'a') as outfile:
+              outfile.write(infile.read())
         if self._force_fail:
           raise TaskError('Task forced to fail before updating vt state.')
         vt.update()
       return vt, was_valid
+
+
+class FakeTask(Task):
+  _impls = []
+
+  @classmethod
+  def implementation_version(cls):
+    return super(FakeTask, cls).implementation_version() + cls._impls
+
+  @classmethod
+  def supports_passthru_args(cls):
+    return True
+
+  options_scope = 'fake-task'
+
+  _deps = ()
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(FakeTask, cls).subsystem_dependencies() + cls._deps
+
+  def execute(self): pass
+
+
+class OtherFakeTask(FakeTask):
+  _other_impls = []
+
+  @classmethod
+  def supports_passthru_args(cls):
+    return False
+
+  @classmethod
+  def implementation_version(cls):
+    return super(OtherFakeTask, cls).implementation_version() + cls._other_impls
+
+  options_scope = 'other-fake-task'
+
+
+class FakeSubsystem(Subsystem):
+  options_scope = 'fake-subsystem'
+
+  @classmethod
+  def register_options(cls, register):
+    super(FakeSubsystem, cls).register_options(register)
+    register('--fake-option', type=bool)
+
+
+class AnotherFakeTask(Task):
+  options_scope = 'another-fake-task'
+
+  @classmethod
+  def supports_passthru_args(cls):
+    return True
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(AnotherFakeTask, cls).subsystem_dependencies() + (FakeSubsystem.scoped(cls),)
+
+  def execute(self): pass
+
+
+class YetAnotherFakeTask(AnotherFakeTask):
+  options_scope = 'yet-another-fake-task'
+
+  @classmethod
+  def supports_passthru_args(cls):
+    return False
 
 
 class TaskTest(TaskTestBase):
@@ -89,7 +150,7 @@ class TaskTest(TaskTestBase):
     )
 
   def _fixture(self, incremental, options=None):
-    target = self.make_target(':t', target_type=DummyLibrary, source=self._filename)
+    target = self.make_target(':t', target_type=Files, sources=[self._filename])
     context = self.context(options=options, target_roots=[target])
     task = self.create_task(context)
     task._incremental = incremental
@@ -107,6 +168,39 @@ class TaskTest(TaskTestBase):
   def _create_clean_file(self, target, content):
     self.create_file(self._filename, content)
     target.mark_invalidation_hash_dirty()
+
+  def _cache_ignore_options(self, globally=False):
+    return {
+      'cache' + ('' if globally else '.' + self.options_scope): {
+        'ignore': True
+      }
+    }
+
+  def _synthesize_subtype(self, name='A', scope=None, cls=FakeTask, **kwargs):
+    """Generate a synthesized subtype of `cls`."""
+    if scope is None:
+      scope = cls.options_scope
+    subclass_name = b'test_{0}_{1}_{2}'.format(cls.__name__, scope, name)
+    kwargs['options_scope'] = scope
+    return type(subclass_name, (cls,), kwargs)
+
+  def _instantiate_synthesized_type(self, task_type, **kwargs):
+    """Generate a new instance of the synthesized type `task_type`."""
+    ctx = super(TaskTestBase, self).context(for_task_types=[task_type], **kwargs)
+    return task_type(ctx, self.test_workdir)
+
+  def _task_type_to_fp(self, task_type, **kwargs):
+    """Instantiate the `task_type` and return its fingerprint."""
+    task_object = self._instantiate_synthesized_type(task_type, **kwargs)
+    return task_object.fingerprint
+
+  def _synth_fp(self, scope=None, cls=FakeTask, options_fingerprintable=None, **kwargs):
+    """Synthesize a subtype of `cls`, instantiate it, and take its
+    fingerprint. `options_fingerprintable` describes the registered options in
+    their respective scopes which can contribute to the task fingerprint."""
+    task_type = self._synthesize_subtype(scope=scope, cls=cls, **kwargs)
+    return self._task_type_to_fp(
+      task_type, options_fingerprintable=options_fingerprintable)
 
   def test_revert_after_failure(self):
     # Regression test to catch the following scenario:
@@ -319,26 +413,149 @@ class TaskTest(TaskTestBase):
     self.assertEqual(len(vtC_live), 2)
 
   def test_ignore_global(self):
-    _, _, was_valid = self._run_fixture()
+    _, vtA, was_valid = self._run_fixture()
     self.assertFalse(was_valid)
+    self.assertTrue(vtA.cacheable)
 
     self.reset_build_graph()
-    _, _, was_valid = self._run_fixture()
+    _, vtA, was_valid = self._run_fixture()
     self.assertTrue(was_valid)
+    self.assertTrue(vtA.cacheable)
 
     self.reset_build_graph()
-    _, _, was_valid = self._run_fixture(options={'cache': {'ignore': True}})
+    _, vtA, was_valid = self._run_fixture(options=self._cache_ignore_options(globally=True))
     self.assertFalse(was_valid)
+    self.assertFalse(vtA.cacheable)
 
   def test_ignore(self):
-    _, _, was_valid = self._run_fixture()
+    _, vtA, was_valid = self._run_fixture()
     self.assertFalse(was_valid)
+    self.assertTrue(vtA.cacheable)
 
     self.reset_build_graph()
-    _, _, was_valid = self._run_fixture()
+    _, vtA, was_valid = self._run_fixture()
     self.assertTrue(was_valid)
+    self.assertTrue(vtA.cacheable)
 
     self.reset_build_graph()
-    _, _, was_valid = self._run_fixture(options={'cache.{}'.format(self.options_scope):
-                                                   {'ignore': True}})
+    _, vtA, was_valid = self._run_fixture(options=self._cache_ignore_options())
     self.assertFalse(was_valid)
+    self.assertFalse(vtA.cacheable)
+
+  def test_fingerprint_identity(self):
+    """Tasks formed with the same parameters should have the same fingerprint
+    (smoke test)."""
+    x = self._synth_fp()
+    y = self._synth_fp()
+    self.assertEqual(y, x)
+
+  def test_fingerprint_implementation_version_single(self):
+    """Tasks with a different implementation_version() should have different
+    fingerprints."""
+    empty_impls = self._synth_fp(_impls=[])
+    zero_version = self._synth_fp(_impls=[('asdf', 0)])
+    self.assertNotEqual(zero_version, empty_impls)
+    one_version = self._synth_fp(_impls=[('asdf', 1)])
+    self.assertNotEqual(one_version, empty_impls)
+    alt_name_version = self._synth_fp(_impls=[('xxx', 0)])
+    self.assertNotEqual(alt_name_version, zero_version)
+    zero_one_version = self._synth_fp(_impls=[('asdf', 0), ('asdf', 1)])
+    self.assertNotEqual(zero_one_version, zero_version)
+    self.assertNotEqual(zero_one_version, one_version)
+
+  def test_fingerprint_implementation_version_inheritance(self):
+    """The implementation_version() of superclasses of the task should affect
+    the task fingerprint."""
+    versioned_fake = self._synth_fp(_impls=[('asdf', 0)])
+    base_version_other_fake = self._synth_fp(
+      cls=OtherFakeTask,
+       _impls=[('asdf', 0)],
+      _other_impls=[],
+    )
+    self.assertNotEqual(base_version_other_fake, versioned_fake)
+    extended_version_other_fake = self._synth_fp(
+      cls=OtherFakeTask,
+       _impls=[('asdf', 0)],
+      _other_impls=[('xxx', 0)],
+    )
+    self.assertNotEqual(extended_version_other_fake, base_version_other_fake)
+
+    extended_version_copy = self._synth_fp(
+      cls=OtherFakeTask,
+       _impls=[('asdf', 1)],
+      _other_impls=[('xxx', 0)],
+    )
+    self.assertNotEqual(extended_version_copy, extended_version_other_fake)
+
+  def test_stable_name(self):
+    """The stable_name() should be used to form the task fingerprint."""
+    a_fingerprint = self._synth_fp(name='some_name', _stable_name='xxx')
+    b_fingerprint = self._synth_fp(name='some_name', _stable_name='yyy')
+    self.assertNotEqual(b_fingerprint, a_fingerprint)
+
+  def test_fingerprint_changing_options_scope(self):
+    """The options_scope of the task and any of its subsystem_dependencies
+    should affect the task fingerprint."""
+    task_fp = self._synth_fp(scope='xxx')
+    other_task_fp = self._synth_fp(scope='yyy')
+    self.assertNotEqual(other_task_fp, task_fp)
+
+    subsystem_deps_fp = self._synth_fp(scope='xxx', _deps=(SubsystemDependency(FakeSubsystem, GLOBAL_SCOPE),))
+    self.assertNotEqual(subsystem_deps_fp, task_fp)
+
+    scoped_subsystems_fp = self._synth_fp(scope='xxx', _deps=(SubsystemDependency(FakeSubsystem, 'xxx'),))
+    self.assertNotEqual(scoped_subsystems_fp, subsystem_deps_fp)
+
+  def test_fingerprint_options_on_registered_scopes_only(self):
+    """Changing or setting an option value should only affect the task
+    fingerprint if it is registered as a fingerprintable option."""
+    default_fp = self._synth_fp(cls=AnotherFakeTask, options_fingerprintable={})
+    self.set_options_for_scope(
+      AnotherFakeTask.options_scope, **{'fake-option': False})
+    unregistered_option_fp = self._synth_fp(cls=AnotherFakeTask, options_fingerprintable={})
+    self.assertEqual(unregistered_option_fp, default_fp)
+
+    registered_option_fp = self._synth_fp(cls=AnotherFakeTask, options_fingerprintable={
+      AnotherFakeTask.options_scope: {'fake-option': bool},
+    })
+    self.assertNotEqual(registered_option_fp, default_fp)
+
+  def test_fingerprint_changing_option_value(self):
+    """Changing an option value in some scope should affect the task
+    fingerprint."""
+    cur_option_spec = {
+      AnotherFakeTask.options_scope: {'fake-option': bool},
+    }
+    self.set_options_for_scope(
+      AnotherFakeTask.options_scope, **{'fake-option': False})
+    task_opt_false_fp = self._synth_fp(cls=AnotherFakeTask, options_fingerprintable=cur_option_spec)
+    self.set_options_for_scope(
+      AnotherFakeTask.options_scope, **{'fake-option': True})
+    task_opt_true_fp = self._synth_fp(cls=AnotherFakeTask, options_fingerprintable=cur_option_spec)
+    self.assertNotEqual(task_opt_true_fp, task_opt_false_fp)
+
+  def test_fingerprint_passthru_args(self):
+    """Passthrough arguments should affect fingerprints iff the task
+    supports passthrough args."""
+    task_type_base = self._synthesize_subtype(cls=AnotherFakeTask)
+    empty_passthru_args_fp = self._task_type_to_fp(
+      task_type_base,
+      passthru_args=[],
+    )
+    non_empty_passthru_args_fp = self._task_type_to_fp(
+      task_type_base,
+      passthru_args=['something'],
+    )
+    self.assertNotEqual(non_empty_passthru_args_fp, empty_passthru_args_fp)
+
+    # YetAnotherFakeTask.supports_passthru_args() returns False
+    task_type_derived_ignore_passthru = self._synthesize_subtype(cls=YetAnotherFakeTask)
+    different_task_with_same_opts_fp = self._task_type_to_fp(
+      task_type_derived_ignore_passthru,
+      passthru_args=[],
+    )
+    different_task_with_passthru_fp = self._task_type_to_fp(
+      task_type_derived_ignore_passthru,
+      passthru_args=['asdf'],
+    )
+    self.assertEqual(different_task_with_passthru_fp, different_task_with_same_opts_fp)

@@ -4,6 +4,7 @@
 python_library(
   dependencies = [
     '3rdparty/python:requests',
+    '3rdparty/python:pyopenssl',
     '3rdparty/python:six',
     'src/python/pants/base:deprecated',
     'src/python/pants/base:validation',

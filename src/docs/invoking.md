@@ -111,11 +111,12 @@ through all tasks in `test` that support them. In this case, it would pass them 
 So it only makes sense to do this if you know that JUnit won't be invoked in practice (because
 you're not invoking Pants on any Java tests).
 
-The Pants Daemon
-----------------
+The Pants Daemon (pantsd)
+-------------------------
 
-The `1.3.0` release of pants includes an alpha release of a daemon to accelerate common
-graph operations including build file parsing and source fingerprinting.
+The `1.3.0` release of pants included an alpha release of a daemon (`pantsd`) to accelerate common
+graph operations including build file parsing and source fingerprinting. As of the `1.4.0` release,
+we now consider the daemon to be of late beta quality: it's nearly ready to be enabled by default!
 
 ### Benefits
 
@@ -125,12 +126,11 @@ cases where relatively small portions of the repo have changed since the previou
 
 ### Caveats
 
-In this "alpha" release, there are two significant caveats to using the daemon:
+As of `1.4.0`, there is one remaining set of caveats to using the daemon:
 
-1. Changes to `pants.ini` [require running clean-all](https://github.com/pantsbuild/pants/issues/3941)
-in order to force re-reading configuration. While this is unlikely to happen directly within your
-branch, it will occasionally happen when switching back and forth between branches.
-2. `./pants repl` and `./pants run` are [not yet supported](https://github.com/pantsbuild/pants/issues/3774).
+* Although `./pants repl` works, it is missing some advanced TTY integrations which prevent
+  line editing and some control sequences from being propagated. See the
+  [Daemon Beta milestone](https://github.com/pantsbuild/pants/milestone/11) for a summary.
 
 ### Usage
 
@@ -140,6 +140,25 @@ To enable the daemon, see the example in `pants.daemon.ini` in the root of the p
 
 ### Rollout
 
-The daemon will be in "alpha" until the Caveats mentioned above are addressed, after which we
-hope to move it into a "beta" period where we recommend its use more widely. Finally, we hope to
-enable the daemon by default for the [`1.4.0` release of pants](https://github.com/pantsbuild/pants/milestone/9).
+The daemon will be in beta until the caveat mentioned above is addressed, but we hope to
+enable the daemon by default for the [`1.5.0` release of pants](https://github.com/pantsbuild/pants/milestone/12).
+
+Profiling Pants
+---------------
+
+There are three environment variables that profile various parts of a pants run.
+
+* `PANTS_PROFILE` - Covers the entire run when pantsd is disabled, or the post-fork portion
+  of a pantsd run.
+* `PANTSC_PROFILE` - Covers the client in a pantsd run, which connects to pantsd and then
+  communicates on the socket until the run completes.
+* `PANTSD_PROFILE` - Covers the graph warming operations pre-fork in a pantsd run.
+
+To enable profiling, set the relevant environment variable to a path to write a profile to, and
+then run pants:
+
+    :::bash
+    PANTS_PROFILE=myprofile.prof ./pants ..
+
+Once you have a profile file, you can use any visualizer that supports python profiles, such as
+`snakeviz` or `gprof2dot`.

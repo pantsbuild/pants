@@ -6,9 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import ConfigParser
+import glob
 import os
 import shutil
-import subprocess
 import unittest
 from collections import namedtuple
 from contextlib import contextmanager
@@ -23,6 +23,7 @@ from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_open
+from pants.util.process_handler import SubprocessProcessHandler, subprocess
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
 
@@ -59,14 +60,33 @@ def ensure_cached(expected_num_artifacts=None):
   return decorator
 
 
-# TODO: Remove this in 1.5.0dev0, when `--enable-v2-engine` is removed.
-def ensure_engine(f):
-  """A decorator for running an integration test with and without the v2 engine enabled via
-  temporary environment variables."""
+def ensure_resolver(f):
+  """A decorator for running an integration test with ivy and coursier as the resolver."""
   def wrapper(self, *args, **kwargs):
-    for env_var_value in ('false', 'true'):
-      with environment_as(HERMETIC_ENV='PANTS_ENABLE_V2_ENGINE', PANTS_ENABLE_V2_ENGINE=env_var_value):
+    for env_var_value in ('ivy', 'coursier'):
+      with environment_as(HERMETIC_ENV='PANTS_RESOLVER_RESOLVER', PANTS_RESOLVER_RESOLVER=env_var_value):
         f(self, *args, **kwargs)
+
+  return wrapper
+
+
+def ensure_daemon(f):
+  """A decorator for running an integration test with and without the daemon enabled."""
+  def wrapper(self, *args, **kwargs):
+    for enable_daemon in ('false', 'true',):
+      with temporary_dir() as subprocess_dir:
+        env = {
+            'HERMETIC_ENV': 'PANTS_ENABLE_PANTSD,PANTS_ENABLE_V2_ENGINE,PANTS_SUBPROCESSDIR',
+            'PANTS_ENABLE_PANTSD': enable_daemon,
+            'PANTS_ENABLE_V2_ENGINE': enable_daemon,
+            'PANTS_SUBPROCESSDIR': subprocess_dir,
+          }
+        with environment_as(**env):
+          try:
+            f(self, *args, **kwargs)
+          finally:
+            if enable_daemon:
+              self.assert_success(self.run_pants(['kill-pantsd']))
   return wrapper
 
 
@@ -97,13 +117,23 @@ class PantsRunIntegrationTest(unittest.TestCase):
   def has_python_version(cls, version):
     """Returns true if the current system has the specified version of python.
 
-    :param version: A python version string, such as 2.6, 3.
+    :param version: A python version string, such as 2.7, 3.
+    """
+    return cls.python_interpreter_path(version) is not None
+
+  @classmethod
+  def python_interpreter_path(cls, version):
+    """Returns the interpreter path if the current system has the specified version of python.
+
+    :param version: A python version string, such as 2.7, 3.
     """
     try:
-      subprocess.call(['python%s' % version, '-V'])
-      return True
+      py_path = subprocess.check_output(['python%s' % version,
+                                         '-c',
+                                         'import sys; print(sys.executable)']).strip()
+      return os.path.realpath(py_path)
     except OSError:
-      return False
+      return None
 
   def setUp(self):
     super(PantsRunIntegrationTest, self).setUp()
@@ -157,14 +187,38 @@ class PantsRunIntegrationTest(unittest.TestCase):
       cls._profile_disambiguator += 1
       return ret
 
-  def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
-                             build_root=None, **kwargs):
+  def get_cache_subdir(self, cache_dir, subdir_glob='*/', other_dirs=()):
+    """Check that there is only one entry of `cache_dir` which matches the glob
+    specified by `subdir_glob`, excluding `other_dirs`, and
+    return it.
 
+    :param str cache_dir: absolute path to some directory.
+    :param str subdir_glob: string specifying a glob for (one level down)
+                            subdirectories of `cache_dir`.
+    :param list other_dirs: absolute paths to subdirectories of `cache_dir`
+                            which must exist and match `subdir_glob`.
+    :return: Assert that there is a single remaining directory entry matching
+             `subdir_glob` after removing `other_dirs`, and return it.
+
+             This method oes not check if its arguments or return values are
+             files or directories. If `subdir_glob` has a trailing slash, so
+             will the return value of this method.
+    """
+    subdirs = set(glob.glob(os.path.join(cache_dir, subdir_glob)))
+    other_dirs = set(other_dirs)
+    self.assertTrue(other_dirs.issubset(subdirs))
+    remaining_dirs = subdirs - other_dirs
+    self.assertEqual(len(remaining_dirs), 1)
+    return list(remaining_dirs)[0]
+
+  def run_pants_with_workdir_without_waiting(self, command, workdir, config=None, extra_env=None,
+                                             build_root=None, print_exception_stacktrace=True,
+                                             **kwargs):
     args = [
       '--no-pantsrc',
       '--pants-workdir={}'.format(workdir),
       '--kill-nailguns',
-      '--print-exception-stacktrace',
+      '--print-exception-stacktrace={}'.format(print_exception_stacktrace),
     ]
 
     if self.hermetic():
@@ -220,9 +274,18 @@ class PantsRunIntegrationTest(unittest.TestCase):
       with open('{}.cmd'.format(prof), 'w') as fp:
         fp.write(b' '.join(pants_command))
 
-    proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
-    (stdout_data, stderr_data) = proc.communicate(stdin_data)
+    return pants_command, subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
+      stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+
+  def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, tee_output=False, **kwargs):
+    if config:
+      kwargs["config"] = config
+    pants_command, proc = self.run_pants_with_workdir_without_waiting(command, workdir, **kwargs)
+
+    communicate_fn = proc.communicate
+    if tee_output:
+      communicate_fn = SubprocessProcessHandler(proc).communicate_teeing_stdout_and_stderr
+    (stdout_data, stderr_data) = communicate_fn(stdin_data)
 
     return PantsResult(pants_command, proc.returncode, stdout_data.decode("utf-8"),
                        stderr_data.decode("utf-8"), workdir)
@@ -234,10 +297,17 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param config: Optional data for a generated ini file. A map of <section-name> ->
     map of key -> value. If order in the ini file matters, this should be an OrderedDict.
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
-    :returns a tuple (returncode, stdout_data, stderr_data).
+    :returns a PantsResult instance.
     """
     with self.temporary_workdir() as workdir:
-      return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
+      return self.run_pants_with_workdir(
+        command,
+        workdir,
+        config,
+        stdin_data=stdin_data,
+        extra_env=extra_env,
+        **kwargs
+      )
 
   @contextmanager
   def pants_results(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
@@ -248,10 +318,17 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param config: Optional data for a generated ini file. A map of <section-name> ->
     map of key -> value. If order in the ini file matters, this should be an OrderedDict.
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
-    :returns a tuple (returncode, stdout_data, stderr_data).
+    :returns a PantsResult instance.
     """
     with self.temporary_workdir() as workdir:
-      yield self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
+      yield self.run_pants_with_workdir(
+        command,
+        workdir,
+        config,
+        stdin_data=stdin_data,
+        extra_env=extra_env,
+        **kwargs
+      )
 
   def bundle_and_run(self, target, bundle_name, bundle_jar_name=None, bundle_options=None,
                      args=None,
@@ -366,7 +443,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       os.unlink(path)
 
   @contextmanager
-  def mock_buildroot(self):
+  def mock_buildroot(self, dirs_to_copy=None):
     """Construct a mock buildroot and return a helper object for interacting with it."""
     Manager = namedtuple('Manager', 'write_file pushd dir')
     # N.B. BUILD.tools, contrib, 3rdparty needs to be copied vs symlinked to avoid
@@ -374,7 +451,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     files_to_copy = ('BUILD.tools',)
     files_to_link = ('pants', 'pants.ini', 'pants.travis-ci.ini', '.pants.d',
                      'build-support', 'pants-plugins', 'src')
-    dirs_to_copy = ('contrib', '3rdparty')
+    dirs_to_copy = ('contrib', '3rdparty') + tuple(dirs_to_copy or [])
 
     with self.temporary_workdir() as tmp_dir:
       for filename in files_to_copy:
@@ -403,14 +480,12 @@ class PantsRunIntegrationTest(unittest.TestCase):
     """Wrapper around run_pants method.
 
     :param args: command line arguments used to run pants
-    :param kwargs: handles 2 keys
+    :param kwargs: handles 1 key
       success - indicate whether to expect pants run to succeed or fail.
-      enable_v2_engine - indicate whether to use v2 engine or not.
     :return: a PantsResult object
     """
     success = kwargs.get('success', True)
-    enable_v2_engine = kwargs.get('enable_v2_engine', False)
-    cmd = ['--enable-v2-engine'] if enable_v2_engine else []
+    cmd = []
     cmd.extend(list(args))
     pants_run = self.run_pants(cmd)
     if success:

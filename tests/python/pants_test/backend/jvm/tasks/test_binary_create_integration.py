@@ -6,11 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_delete
+from pants.util.process_handler import subprocess
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -67,6 +67,18 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
       java_args=['-cp', 'manifest-no-source.jar', 'org.pantsbuild.testproject.manifest.Manifest'],
       expected_output='Hello World!  Version: 4.5.6',
     )
+
+  def test_agent_dependency(self):
+    directory = "testprojects/src/java/org/pantsbuild/testproject/manifest"
+    target = "{}:manifest-with-agent".format(directory)
+    with self.temporary_workdir() as workdir:
+      pants_run = self.run_pants_with_workdir(["binary", target], workdir=workdir)
+      self.assert_success(pants_run)
+      jar = "dist/manifest-with-agent.jar"
+      with open_zip(jar, mode='r') as j:
+        with j.open("META-INF/MANIFEST.MF") as jar_entry:
+          entries = {tuple(line.strip().split(": ", 2)) for line in jar_entry.readlines() if line.strip()}
+          self.assertIn(('Agent-Class', 'org.pantsbuild.testproject.manifest.Agent'), entries)
 
   def test_deploy_excludes(self):
     jar_filename = os.path.join('dist', 'deployexcludes.jar')

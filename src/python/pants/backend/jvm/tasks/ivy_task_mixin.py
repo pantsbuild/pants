@@ -98,7 +98,7 @@ class IvyTaskMixin(TaskBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(IvyTaskMixin, cls).implementation_version() + [('IvyTaskMixin', 3)]
+    return super(IvyTaskMixin, cls).implementation_version() + [('IvyTaskMixin', 4)]
 
   @memoized_property
   def ivy_cache_dir(self):

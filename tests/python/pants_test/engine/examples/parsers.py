@@ -17,7 +17,7 @@ import six
 from pants.build_graph.address import Address
 from pants.engine.objects import Resolvable, Serializable
 from pants.engine.parser import ParseError, Parser
-from pants.util.memo import memoized, memoized_method
+from pants.util.memo import memoized, memoized_property
 
 
 @memoized
@@ -38,13 +38,15 @@ def _import(typename):
 
 
 class JsonParser(Parser):
+  def __init__(self, symbol_table):
+    super(JsonParser, self).__init__()
+    self.symbol_table = symbol_table
 
-  @classmethod
-  def _as_type(cls, type_or_name):
+  def _as_type(self, type_or_name):
     return _import(type_or_name) if isinstance(type_or_name, six.string_types) else type_or_name
 
-  @classmethod
-  def _object_decoder(cls, obj, symbol_table):
+  @staticmethod
+  def _object_decoder(obj, symbol_table):
     # A magic field will indicate type and this can be used to wrap the object in a type.
     type_alias = obj.get('type_alias', None)
     if not type_alias:
@@ -53,16 +55,14 @@ class JsonParser(Parser):
       symbol = symbol_table(type_alias)
       return symbol(**obj)
 
-  @classmethod
-  @memoized_method
-  def _get_decoder(cls, symbol_table_cls):
-    symbol_table = symbol_table_cls.table()
-    decoder = functools.partial(cls._object_decoder,
-                                symbol_table=symbol_table.__getitem__ if symbol_table else cls._as_type)
+  @memoized_property
+  def _decoder(self):
+    symbol_table = self.symbol_table.table()
+    decoder = functools.partial(self._object_decoder,
+                                symbol_table=symbol_table.__getitem__ if symbol_table else self._as_type)
     return JSONDecoder(encoding='UTF-8', object_hook=decoder, strict=True)
 
-  @classmethod
-  def parse(cls, filepath, filecontent, symbol_table_cls):
+  def parse(self, filepath, filecontent):
     """Parse the given json encoded string into a list of top-level objects found.
 
     The parser accepts both blank lines and comment lines (those beginning with optional whitespace
@@ -74,7 +74,7 @@ class JsonParser(Parser):
     """
     json = filecontent
 
-    decoder = cls._get_decoder(symbol_table_cls)
+    decoder = self._decoder
 
     # Strip comment lines and blank lines, which we allow, but preserve enough information about the
     # stripping to constitute a reasonable error message that can be used to find the portion of the
@@ -202,20 +202,22 @@ class PythonAssignmentsParser(Parser):
   objects will be addressable via their top-level variable names in the parsed namespace.
   """
 
-  @classmethod
-  @memoized_method
-  def _get_globals(cls, symbol_table_cls):
+  def __init__(self, symbol_table):
+    super(PythonAssignmentsParser, self).__init__()
+    self.symbol_table = symbol_table
+
+  @memoized_property
+  def _globals(self):
     def aliased(type_alias, object_type, **kwargs):
       return object_type(type_alias=type_alias, **kwargs)
 
     parse_globals = {}
-    for alias, symbol in symbol_table_cls.table().items():
+    for alias, symbol in self.symbol_table.table().items():
       parse_globals[alias] = functools.partial(aliased, alias, symbol)
     return parse_globals
 
-  @classmethod
-  def parse(cls, filepath, filecontent, symbol_table_cls):
-    parse_globals = cls._get_globals(symbol_table_cls)
+  def parse(self, filepath, filecontent):
+    parse_globals = self._globals
 
     python = filecontent
     symbols = {}
@@ -250,11 +252,13 @@ class PythonCallbacksParser(Parser):
   addressable via their name in the parsed namespace.
   """
 
-  _lock = threading.Lock()
+  def __init__(self, symbol_table):
+    super(PythonCallbacksParser, self).__init__()
+    self.symbol_table = symbol_table
+    self._lock = threading.Lock()
 
-  @classmethod
-  @memoized_method
-  def _get_globals(cls, symbol_table_cls):
+  @memoized_property
+  def _globals(self):
     objects = []
 
     def registered(type_name, object_type, name=None, **kwargs):
@@ -267,16 +271,15 @@ class PythonCallbacksParser(Parser):
         return object_type(type_alias=type_name, **kwargs)
 
     parse_globals = {}
-    for alias, symbol in symbol_table_cls.table().items():
+    for alias, symbol in self.symbol_table.table().items():
       parse_globals[alias] = functools.partial(registered, alias, symbol)
     return objects, parse_globals
 
-  @classmethod
-  def parse(cls, filepath, filecontent, symbol_table_cls):
-    objects, parse_globals = cls._get_globals(symbol_table_cls)
+  def parse(self, filepath, filecontent):
+    objects, parse_globals = self._globals
 
     python = filecontent
-    with cls._lock:
+    with self._lock:
       del objects[:]
       six.exec_(python, parse_globals, {})
       return list(objects)

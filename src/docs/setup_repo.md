@@ -231,9 +231,9 @@ proxy for the `dl.bintray.com` repo, or create your own repo of build
 tools:
 
     :::ini
-    pants_support_baseurls = [
+    binaries_baseurls = [
         "https://nexus.example.com/content/repositories/dl.bintray.com/pantsbuild/bin/build-support"
-	  ]
+      ]
 
 ### Redirecting python requirements to other servers
 
@@ -257,4 +257,3 @@ You can also reference a local repo relative to your project's build root with t
     repos: [
         "%(buildroot)s/repo_path"
       ]
-

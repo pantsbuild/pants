@@ -16,7 +16,7 @@ public class SimpleJavacPlugin implements Plugin {
 
   @Override
   public String getName() {
-    return "simple_javac_plugin";
+    return SimpleJavacPluginHelper.getName();
   }
 
   @Override

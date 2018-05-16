@@ -5,7 +5,7 @@ python_tests(
   name='cache_compile_integration',
   sources=['test_cache_compile_integration.py'],
   dependencies=[
-    'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',
+    'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'src/python/pants/base:build_environment',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
@@ -13,7 +13,7 @@ python_tests(
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
   tags = {'integration'},
-  timeout=240
+  timeout=240,
 )
 
 python_tests(
@@ -32,7 +32,7 @@ python_tests(
   name='java_compile_integration',
   sources=['test_java_compile_integration.py'],
   dependencies=[
-    'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',
+    'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -68,7 +68,7 @@ python_tests(
   name='java_compile_settings_partitioning',
   sources=['test_java_compile_settings_partitioning.py'],
   dependencies=[
-    'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',
+    'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'src/python/pants/fs',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',

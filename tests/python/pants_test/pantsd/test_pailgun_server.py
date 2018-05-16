@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import socket
+import threading
 import unittest
 from contextlib import contextmanager
 from SocketServer import TCPServer
@@ -19,24 +20,25 @@ from pants.pantsd.pailgun_server import PailgunHandler, PailgunServer
 PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 
-@contextmanager
-def mock_context_lock():
-  yield
-
-
 class TestPailgunServer(unittest.TestCase):
   def setUp(self):
     self.mock_handler_inst = mock.Mock()
     self.mock_runner_factory = mock.Mock(side_effect=Exception('this should never be called'))
     self.mock_handler_class = mock.Mock(return_value=self.mock_handler_inst)
-    self.scheduler_lock = mock_context_lock
+    self.lock = threading.RLock()
+
+    @contextmanager
+    def lock():
+      with self.lock:
+        yield
+
     with mock.patch.object(PailgunServer, 'server_bind'), \
          mock.patch.object(PailgunServer, 'server_activate'):
       self.server = PailgunServer(
         server_address=('0.0.0.0', 0),
         runner_factory=self.mock_runner_factory,
-        context_lock=self.scheduler_lock,
-        handler_class=self.mock_handler_class
+        handler_class=self.mock_handler_class,
+        lifecycle_lock=lock
       )
 
   @mock.patch.object(TCPServer, 'server_bind', **PATCH_OPTS)

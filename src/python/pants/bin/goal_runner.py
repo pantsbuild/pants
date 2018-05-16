@@ -9,23 +9,21 @@ import logging
 import sys
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.project_tree_factory import get_project_tree
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.engine_initializer import EngineInitializer
 from pants.bin.repro import Reproducer
-from pants.binaries.binary_util import BinaryUtil
-from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
+from pants.binaries.binary_util import BinaryUtilPrivate
 from pants.build_graph.build_file_parser import BuildFileParser
-from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.engine.native import Native
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
-from pants.init.pants_daemon_launcher import PantsDaemonLauncher
-from pants.init.target_roots import TargetRoots
+from pants.init.subprocess import Subprocess
+from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.java.nailgun_executor import NailgunProcessGroup
+from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting import Reporting
 from pants.scm.subsystems.changed import Changed
 from pants.source.source_root import SourceRootConfig
@@ -38,14 +36,16 @@ logger = logging.getLogger(__name__)
 
 class GoalRunnerFactory(object):
   def __init__(self, root_dir, options, build_config, run_tracker, reporting,
-               daemon_graph_helper=None, exiter=sys.exit):
+               target_roots=None, daemon_graph_helper=None, exiter=sys.exit):
     """
     :param str root_dir: The root directory of the pants workspace (aka the "build root").
     :param Options options: The global, pre-initialized Options instance.
     :param BuildConfiguration build_config: A pre-initialized BuildConfiguration instance.
     :param Runtracker run_tracker: The global, pre-initialized/running RunTracker instance.
     :param Reporting reporting: The global, pre-initialized Reporting instance.
-    :param LegacyGraphHelper daemon_graph_helper: A LegacyGraphHelper instance for graph reuse. (Optional)
+    :param TargetRoots target_roots: A pre-existing `TargetRoots` object, if available.
+    :param LegacyGraphSession daemon_graph_helper: A LegacyGraphSession instance for graph
+                                                   reuse. (Optional)
     :param func exiter: A function that accepts an exit code value and exits. (for tests, Optional)
     """
     self._root_dir = root_dir
@@ -53,6 +53,7 @@ class GoalRunnerFactory(object):
     self._build_config = build_config
     self._run_tracker = run_tracker
     self._reporting = reporting
+    self._target_roots = target_roots
     self._daemon_graph_helper = daemon_graph_helper
     self._exiter = exiter
 
@@ -75,56 +76,56 @@ class GoalRunnerFactory(object):
       result = help_printer.print_help()
       self._exiter(result)
 
-  def _init_graph(self, use_engine, pants_ignore_patterns, build_ignore_patterns,
-                  exclude_target_regexps, target_specs, workdir, graph_helper=None,
-                  subproject_build_roots=None):
+  def _init_graph(self,
+                  pants_ignore_patterns,
+                  build_ignore_patterns,
+                  exclude_target_regexps,
+                  target_specs,
+                  target_roots,
+                  workdir,
+                  graph_helper,
+                  subproject_build_roots):
     """Determine the BuildGraph, AddressMapper and spec_roots for a given run.
 
-    :param bool use_engine: Whether or not to use the v2 engine to construct the BuildGraph.
     :param list pants_ignore_patterns: The pants ignore patterns from '--pants-ignore'.
     :param list build_ignore_patterns: The build ignore patterns from '--build-ignore',
                                        applied during BUILD file searching.
     :param str workdir: The pants workdir.
     :param list exclude_target_regexps: Regular expressions for targets to be excluded.
     :param list target_specs: The original target specs.
-    :param LegacyGraphHelper graph_helper: A LegacyGraphHelper to use for graph construction,
-                                           if available. This would usually come from the daemon.
-    :returns: A tuple of (BuildGraph, AddressMapper, spec_roots).
+    :param TargetRoots target_roots: The existing `TargetRoots` object, if any.
+    :param LegacyGraphSession graph_helper: A LegacyGraphSession to use for graph construction,
+                                            if available. This would usually come from the daemon.
+    :returns: A tuple of (BuildGraph, AddressMapper, SchedulerSession, TargetRoots).
     """
-    # N.B. Use of the daemon implies use of the v2 engine.
-    if graph_helper or use_engine:
-      # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
-      if not graph_helper:
-        native = Native.create(self._global_options)
-        native.set_panic_handler()
-        graph_helper = EngineInitializer.setup_legacy_graph(
-          pants_ignore_patterns,
-          workdir,
-          native=native,
-          build_ignore_patterns=build_ignore_patterns,
-          exclude_target_regexps=exclude_target_regexps,
-          subproject_roots=subproject_build_roots,
-          include_trace_on_error=self._options.for_global_scope().print_exception_stacktrace
-        )
+    # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
+    if not graph_helper:
+      native = Native.create(self._global_options)
+      native.set_panic_handler()
+      graph_helper = EngineInitializer.setup_legacy_graph(
+        pants_ignore_patterns,
+        workdir,
+        self._global_options.build_file_imports,
+        native=native,
+        build_file_aliases=self._build_config.registered_aliases(),
+        rules=self._build_config.rules(),
+        build_ignore_patterns=build_ignore_patterns,
+        exclude_target_regexps=exclude_target_regexps,
+        subproject_roots=subproject_build_roots,
+        include_trace_on_error=self._options.for_global_scope().print_exception_stacktrace
+      ).new_session()
 
-      target_roots = TargetRoots.create(options=self._options,
-                                        build_root=self._root_dir,
-                                        change_calculator=graph_helper.change_calculator)
-      graph, address_mapper = graph_helper.create_build_graph(target_roots, self._root_dir)
-      return graph, address_mapper, target_roots.as_specs()
-    else:
-      spec_roots = TargetRoots.parse_specs(target_specs, self._root_dir)
-      address_mapper = BuildFileAddressMapper(self._build_file_parser,
-                                              get_project_tree(self._global_options),
-                                              build_ignore_patterns,
-                                              exclude_target_regexps,
-                                              subproject_build_roots)
-      return MutableBuildGraph(address_mapper), address_mapper, spec_roots
+    target_roots = target_roots or TargetRootsCalculator.create(
+      options=self._options,
+      build_root=self._root_dir,
+      change_calculator=graph_helper.change_calculator
+    )
+    graph, address_mapper = graph_helper.create_build_graph(target_roots,
+                                                            self._root_dir)
+    return graph, address_mapper, graph_helper.scheduler_session, target_roots
 
   def _determine_goals(self, requested_goals):
     """Check and populate the requested goals for a given run."""
-    def is_quiet(goals):
-      return any(goal.has_task_of_type(QuietTaskMixin) for goal in goals) or self._explain
 
     spec_parser = CmdLineSpecParser(self._root_dir)
     for goal in requested_goals:
@@ -133,45 +134,50 @@ class GoalRunnerFactory(object):
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 
     goals = [Goal.by_name(goal) for goal in requested_goals]
-    return goals, is_quiet(goals)
+    return goals
 
-  def _specs_to_targets(self, specs):
-    """Populate the BuildGraph and target list from a set of input specs."""
+  def _roots_to_targets(self, target_roots):
+    """Populate the BuildGraph and target list from a set of input TargetRoots."""
     with self._run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
       def filter_for_tag(tag):
         return lambda target: tag in map(str, target.tags)
 
       tag_filter = wrap_filters(create_filters(self._tag, filter_for_tag))
 
-      def generate_targets(specs):
-        for address in self._build_graph.inject_specs_closure(specs, self._fail_fast):
+      def generate_targets():
+        for address in self._build_graph.inject_roots_closure(target_roots, self._fail_fast):
           target = self._build_graph.get_target(address)
           if tag_filter(target):
             yield target
 
-    return list(generate_targets(specs))
+      return list(generate_targets())
 
-  def _maybe_launch_pantsd(self, pantsd_launcher):
-    """Launches pantsd if configured to do so."""
-    if self._global_options.enable_pantsd:
-      # Avoid runtracker output if pantsd is disabled. Otherwise, show up to inform the user its on.
-      with self._run_tracker.new_workunit(name='pantsd', labels=[WorkUnitLabel.SETUP]):
-        pantsd_launcher.maybe_launch()
+  def _should_be_quiet(self, goals):
+    if self._explain:
+      return True
 
-  def _setup_context(self, pantsd_launcher):
+    if self._global_options.get_rank('quiet') > RankedValue.HARDCODED:
+      return self._global_options.quiet
+
+    return any(goal.has_task_of_type(QuietTaskMixin) for goal in goals)
+
+  def _setup_context(self):
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
-      self._build_graph, self._address_mapper, spec_roots = self._init_graph(
-        self._global_options.enable_v2_engine,
+      self._build_graph, self._address_mapper, scheduler, target_roots = self._init_graph(
         self._global_options.pants_ignore,
         self._global_options.build_ignore,
         self._global_options.exclude_target_regexp,
         self._options.target_specs,
+        self._target_roots,
         self._global_options.pants_workdir,
         self._daemon_graph_helper,
-        self._global_options.subproject_roots,
+        self._global_options.subproject_roots
       )
-      goals, is_quiet = self._determine_goals(self._requested_goals)
-      target_roots = self._specs_to_targets(spec_roots)
+
+      goals = self._determine_goals(self._requested_goals)
+      is_quiet = self._should_be_quiet(goals)
+
+      target_root_instances = self._roots_to_targets(target_roots)
 
       # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
       self._run_tracker.run_info.add_scm_info()
@@ -183,20 +189,18 @@ class GoalRunnerFactory(object):
 
       context = Context(options=self._options,
                         run_tracker=self._run_tracker,
-                        target_roots=target_roots,
+                        target_roots=target_root_instances,
                         requested_goals=self._requested_goals,
                         build_graph=self._build_graph,
                         build_file_parser=self._build_file_parser,
                         address_mapper=self._address_mapper,
                         invalidation_report=invalidation_report,
-                        pantsd_launcher=pantsd_launcher)
+                        scheduler=scheduler)
       return goals, context
 
   def setup(self):
-    pantsd_launcher = PantsDaemonLauncher.Factory.global_instance().create(EngineInitializer)
-    self._maybe_launch_pantsd(pantsd_launcher)
     self._handle_help(self._help_request)
-    goals, context = self._setup_context(pantsd_launcher)
+    goals, context = self._setup_context()
     return GoalRunner(context=context,
                       goals=goals,
                       run_tracker=self._run_tracker,
@@ -231,9 +235,9 @@ class GoalRunner(object):
       Reporting,
       Reproducer,
       RunTracker,
-      Changed.Factory,
-      BinaryUtil.Factory,
-      PantsDaemonLauncher.Factory,
+      Changed,
+      BinaryUtilPrivate.Factory,
+      Subprocess.Factory
     }
 
   def _execute_engine(self):
@@ -249,6 +253,10 @@ class GoalRunner(object):
       return 1
 
     engine = RoundEngine()
+
+    sorted_goal_infos = engine.sort_goals(self._context, self._goals)
+    RunTracker.global_instance().set_sorted_goal_infos(sorted_goal_infos)
+
     result = engine.execute(self._context, self._goals)
 
     if self._context.invalidation_report:
@@ -260,9 +268,10 @@ class GoalRunner(object):
     should_kill_nailguns = self._kill_nailguns
 
     try:
-      result = self._execute_engine()
-      if result:
-        self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
+      with self._context.executing():
+        result = self._execute_engine()
+        if result:
+          self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
     except KeyboardInterrupt:
       self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
       # On ctrl-c we always kill nailguns, otherwise they might keep running

@@ -161,6 +161,7 @@ def call_use_cached_files(tup):
       sys.stderr.write('.')
     else:
       sys.stderr.write(' ')
+    sys.stderr.flush()
     return res
   except NonfatalArtifactCacheError as e:
     logger.warn('Error calling use_cached_files in artifact cache: {0}'.format(e))

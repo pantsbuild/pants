@@ -7,7 +7,8 @@ import org.pantsbuild.testproject.javasources.ScalaWithJavaSources
 
 class ScalaDepsOnBoth {
   def example(): String = {
-    System.out.println("ScalaDepsOnBoth calling ScalaWithJavaSources().example()")
+    System.out.println(
+      "ScalaDepsOnBoth calling ScalaWithJavaSources().example()")
     new ScalaWithJavaSources().example()
   }
 }

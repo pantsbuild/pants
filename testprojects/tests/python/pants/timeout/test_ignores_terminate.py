@@ -11,7 +11,7 @@ def test_ignores_terminate():
     pass
 
   signal.signal(signal.SIGTERM, signal_term_handler)
-  time.sleep(120)
+  time.sleep(1000)
 
   # We need a second sleep because the SIGTERM will interrupt the first sleep.
-  time.sleep(120)
+  time.sleep(1000)

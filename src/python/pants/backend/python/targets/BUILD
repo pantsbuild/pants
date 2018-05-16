@@ -3,7 +3,9 @@
 
 python_library(
   sources = [
+    'python_app.py',
     'python_binary.py',
+    'python_distribution.py',
     'python_library.py',
     'python_requirement_library.py',
     'python_target.py',

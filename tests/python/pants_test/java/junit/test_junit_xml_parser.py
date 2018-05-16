@@ -115,7 +115,8 @@ class TestParseFailedTargets(unittest.TestCase):
   def test_parse_failed_targets_nominal(self):
     registry = RegistryOfTests({JUnitTest('org.pantsbuild.Failure'): 'Bob',
                                 JUnitTest('org.pantsbuild.Error'): 'Jane',
-                                JUnitTest('org.pantsbuild.AnotherError'): 'Bob'})
+                                JUnitTest('org.pantsbuild.AnotherError'): 'Bob',
+                                JUnitTest('org.pantsbuild.subpackage.AnotherFailure'): 'Mary'})
 
     with temporary_dir() as junit_xml_dir:
       with open(os.path.join(junit_xml_dir, 'TEST-a.xml'), 'w') as fp:
@@ -141,12 +142,20 @@ class TestParseFailedTargets(unittest.TestCase):
       with open(os.path.join(junit_xml_dir, 'random.xml'), 'w') as fp:
         fp.write('<invalid></xml>')
       with safe_open(os.path.join(junit_xml_dir, 'subdir', 'TEST-c.xml'), 'w') as fp:
-        fp.write('<invalid></xml>')
+        fp.write("""
+        <testsuite failures="1" errors="0">
+          <testcase classname="org.pantsbuild.subpackage.AnotherFailure" name="testAnotherFailue">
+            <failure/>
+          </testcase>
+        </testsuite>
+        """)
 
       failed_targets = parse_failed_targets(registry, junit_xml_dir, self._raise_handler)
       self.assertEqual({'Bob': {JUnitTest('org.pantsbuild.Failure', 'testFailure'),
                                 JUnitTest('org.pantsbuild.AnotherError', 'testAnotherError')},
-                        'Jane': {JUnitTest('org.pantsbuild.Error', 'testError')}},
+                        'Jane': {JUnitTest('org.pantsbuild.Error', 'testError')},
+                        'Mary': {JUnitTest('org.pantsbuild.subpackage.AnotherFailure',
+                                           'testAnotherFailue')}},
                        failed_targets)
 
   def test_parse_failed_targets_error_raise(self):
@@ -157,7 +166,7 @@ class TestParseFailedTargets(unittest.TestCase):
         fp.write('<invalid></xml>')
       with self.assertRaises(ParseError) as exc:
         parse_failed_targets(registry, junit_xml_dir, self._raise_handler)
-      self.assertEqual(junit_xml_file, exc.exception.junit_xml_path)
+      self.assertEqual(junit_xml_file, exc.exception.xml_path)
       self.assertIsInstance(exc.exception.cause, XmlParser.XmlError)
 
   def test_parse_failed_targets_error_continue(self):
@@ -181,6 +190,6 @@ class TestParseFailedTargets(unittest.TestCase):
       collect_handler = self.CollectHandler()
       failed_targets = parse_failed_targets(registry, junit_xml_dir, collect_handler)
       self.assertEqual(2, len(collect_handler.errors))
-      self.assertEqual({bad_file1, bad_file2}, {e.junit_xml_path for e in collect_handler.errors})
+      self.assertEqual({bad_file1, bad_file2}, {e.xml_path for e in collect_handler.errors})
 
       self.assertEqual({None: {JUnitTest('org.pantsbuild.Error', 'testError')}}, failed_targets)

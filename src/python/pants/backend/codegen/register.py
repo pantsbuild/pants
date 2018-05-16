@@ -43,12 +43,7 @@ def build_file_aliases():
 def register_goals():
   task(name='thrift-java', action=ApacheThriftJavaGen).install('gen')
   task(name='thrift-py', action=ApacheThriftPyGen).install('gen')
-
-  # TODO(Garrett Malmquist): 'protoc' depends on a nonlocal goal (imports is in the jvm register).
-  # This should be cleaned up, with protobuf stuff moved to its own backend. (See John's comment on
-  # RB 592).
   task(name='protoc', action=ProtobufGen).install('gen')
-
   task(name='antlr-java', action=AntlrJavaGen).install('gen')
   task(name='antlr-py', action=AntlrPyGen).install('gen')
   task(name='ragel', action=RagelGen).install('gen')

@@ -11,6 +11,8 @@ import time
 from textwrap import dedent
 
 from pants.backend.jvm.ivy_utils import IvyUtils
+from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
@@ -23,6 +25,10 @@ from pants.util.strutil import safe_shlex_split
 
 
 class IvyResolve(IvyTaskMixin, NailgunTask):
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(IvyResolve, cls).subsystem_dependencies() + (JvmResolveSubsystem,)
 
   @classmethod
   def register_options(cls, register):
@@ -44,7 +50,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     register('--args', type=list,
              fingerprint=True,
              help='Pass these extra args to ivy.')
-    register('--confs', type=list, default=['default'],
+    register('--confs', type=list, default=['default'], fingerprint=True,
              help='Pass a configuration to ivy in addition to the default ones.')
     register('--mutable-pattern',
              fingerprint=True,
@@ -81,10 +87,19 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     """Resolves the specified confs for the configured targets and returns an iterator over
     tuples of (conf, jar path).
     """
-    executor = self.create_java_executor()
-    targets = self.context.targets()
+    if JvmResolveSubsystem.global_instance().get_options().resolver != 'ivy':
+      return
+
     compile_classpath = self.context.products.get_data('compile_classpath',
         init_func=ClasspathProducts.init_func(self.get_options().pants_workdir))
+
+    targets = self.context.targets()
+    if all(not isinstance(target, JarLibrary) for target in targets):
+      if self._report:
+        self.context.log.info("Not generating a report. No resolution performed.")
+      return
+
+    executor = self.create_java_executor()
     results = self.resolve(executor=executor,
                                       targets=targets,
                                       classpath_products=compile_classpath,

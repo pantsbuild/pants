@@ -7,29 +7,37 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.build_environment import get_buildroot
 from pants.bin.goal_runner import GoalRunner
-from pants.bin.reporting_initializer import ReportingInitializer
 from pants.bin.repro import Reproducer
+from pants.goal.run_tracker import RunTracker
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.reporting.reporting import Reporting
 from pants.util.contextutil import hard_exit_handler, maybe_profiled
 
 
 class LocalPantsRunner(object):
   """Handles a single pants invocation running in the process-local context."""
 
-  def __init__(self, exiter, args, env, daemon_build_graph=None, options_bootstrapper=None):
+  def __init__(self, exiter, args, env, target_roots=None, daemon_build_graph=None,
+               options_bootstrapper=None):
     """
     :param Exiter exiter: The Exiter instance to use for this run.
     :param list args: The arguments (e.g. sys.argv) for this run.
     :param dict env: The environment (e.g. os.environ) for this run.
+    :param TargetRoots target_roots: The `TargetRoots` for this run.
     :param BuildGraph daemon_build_graph: A BuildGraph instance for graph reuse (optional).
     :param OptionsBootstrapper options_bootstrapper: An optional existing OptionsBootstrapper.
     """
     self._exiter = exiter
     self._args = args
     self._env = env
+    self._target_roots = target_roots
     self._daemon_build_graph = daemon_build_graph
     self._options_bootstrapper = options_bootstrapper
+    self._run_start_time = None
+
+  def set_start_time(self, start_time):
+    self._run_start_time = start_time
 
   def run(self):
     profile_path = self._env.get('PANTS_PROFILE')
@@ -56,7 +64,9 @@ class LocalPantsRunner(object):
       options_bootstrapper.verify_configs_against_options(options)
 
     # Launch RunTracker as early as possible (just after Subsystem options are initialized).
-    run_tracker, reporting = ReportingInitializer().setup()
+    run_tracker = RunTracker.global_instance()
+    reporting = Reporting.global_instance()
+    reporting.initialize(run_tracker, self._run_start_time)
 
     try:
       # Determine the build root dir.
@@ -73,6 +83,7 @@ class LocalPantsRunner(object):
                                        build_config,
                                        run_tracker,
                                        reporting,
+                                       self._target_roots,
                                        self._daemon_build_graph,
                                        self._exiter).setup()
 

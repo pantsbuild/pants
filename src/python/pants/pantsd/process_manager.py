@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import signal
-import subprocess
 import time
 import traceback
 from contextlib import contextmanager
@@ -16,8 +15,11 @@ from contextlib import contextmanager
 import psutil
 
 from pants.base.build_environment import get_buildroot
-from pants.pantsd.subsystem.subprocess import Subprocess
+from pants.init.subprocess import Subprocess
+from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
+from pants.util.memo import memoized_property
+from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)
@@ -72,7 +74,8 @@ class ProcessMetadataManager(object):
   class MetadataError(Exception): pass
   class Timeout(Exception): pass
 
-  FILE_WAIT_SEC = 10
+  FAIL_WAIT_SEC = 10
+  INFO_INTERVAL_SEC = 5
   WAIT_INTERVAL_SEC = .1
 
   def __init__(self, metadata_base_dir=None):
@@ -103,38 +106,47 @@ class ProcessMetadataManager(object):
       return item
 
   @classmethod
-  def _deadline_until(cls, closure, timeout, wait_interval=WAIT_INTERVAL_SEC):
+  def _deadline_until(cls, closure, action_msg, timeout=FAIL_WAIT_SEC,
+                      wait_interval=WAIT_INTERVAL_SEC, info_interval=INFO_INTERVAL_SEC):
     """Execute a function/closure repeatedly until a True condition or timeout is met.
 
     :param func closure: the function/closure to execute (should not block for long periods of time
                          and must return True on success).
+    :param str action_msg: a description of the action that is being executed, to be rendered as
+                           info while we wait, and as part of any rendered exception.
     :param float timeout: the maximum amount of time to wait for a true result from the closure in
                           seconds. N.B. this is timing based, so won't be exact if the runtime of
                           the closure exceeds the timeout.
     :param float wait_interval: the amount of time to sleep between closure invocations.
+    :param float info_interval: the amount of time to wait before and between reports via info
+                                logging that we're still waiting for the closure to succeed.
     :raises: :class:`ProcessManager.Timeout` on execution timeout.
     """
-    deadline = time.time() + timeout
+    now = time.time()
+    deadline = now + timeout
+    info_deadline = now + info_interval
     while 1:
       if closure():
         return True
-      elif time.time() > deadline:
-        raise cls.Timeout('exceeded timeout of {} seconds for {}'.format(timeout, closure))
+
+      now = time.time()
+      if now > deadline:
+        raise cls.Timeout('exceeded timeout of {} seconds while waiting for {}'.format(timeout, action_msg))
+
+      if now > info_deadline:
+        logger.info('waiting for {}...'.format(action_msg))
+        info_deadline = info_deadline + info_interval
       elif wait_interval:
         time.sleep(wait_interval)
 
   @classmethod
-  def _wait_for_file(cls, filename, timeout=FILE_WAIT_SEC, want_content=True):
+  def _wait_for_file(cls, filename, timeout=FAIL_WAIT_SEC, want_content=True):
     """Wait up to timeout seconds for filename to appear with a non-zero size or raise Timeout()."""
     def file_waiter():
       return os.path.exists(filename) and (not want_content or os.path.getsize(filename))
 
-    try:
-      return cls._deadline_until(file_waiter, timeout)
-    except cls.Timeout:
-      # Re-raise with a more helpful exception message.
-      raise cls.Timeout('exceeded timeout of {} seconds while waiting for file {} to appear'
-                         .format(timeout, filename))
+    action_msg = 'file {} to appear'.format(filename)
+    return cls._deadline_until(file_waiter, action_msg, timeout=timeout)
 
   def _get_metadata_dir_by_name(self, name):
     """Retrieve the metadata dir by name.
@@ -226,7 +238,7 @@ class ProcessManager(ProcessMetadataManager):
     :param str metadata_base_dir: The overridden base directory for process metadata.
     """
     super(ProcessManager, self).__init__(metadata_base_dir)
-    self._name = name
+    self._name = name.lower().strip()
     self._pid = pid
     self._socket = socket
     self._socket_type = socket_type
@@ -243,6 +255,17 @@ class ProcessManager(ProcessMetadataManager):
   def process_name(self):
     """The logical process name. If defined, this is compared to exe_name for stale pid checking."""
     return self._process_name
+
+  @memoized_property
+  def lifecycle_lock(self):
+    """An identity-keyed inter-process lock for safeguarding lifecycle and other operations."""
+    safe_mkdir(self._metadata_base_dir)
+    return OwnerPrintingInterProcessFileLock(
+      # N.B. This lock can't key into the actual named metadata dir (e.g. `.pids/pantsd/lock`
+      # via `ProcessMetadataManager._get_metadata_dir_by_name()`) because of a need to purge
+      # the named metadata dir on startup to avoid stale metadata reads.
+      os.path.join(self._metadata_base_dir, '.lock.{}'.format(self._name))
+    )
 
   @property
   def cmdline(self):
@@ -301,8 +324,9 @@ class ProcessManager(ProcessMetadataManager):
     """Wait up to a given timeout for a process to write socket info."""
     return self.await_metadata_by_name(self._name, 'socket', timeout, self._socket_type)
 
-  def write_pid(self, pid):
+  def write_pid(self, pid=None):
     """Write the current processes PID to the pidfile location"""
+    pid = pid or os.getpid()
     self.write_metadata_by_name(self._name, 'pid', str(pid))
 
   def write_socket(self, socket_info):
@@ -312,6 +336,10 @@ class ProcessManager(ProcessMetadataManager):
   def write_named_socket(self, socket_name, socket_info):
     """A multi-tenant, named alternative to ProcessManager.write_socket()."""
     self.write_metadata_by_name(self._name, 'socket_{}'.format(socket_name), str(socket_info))
+
+  def read_named_socket(self, socket_name, socket_type):
+    """A multi-tenant, named alternative to ProcessManager.socket."""
+    return self.read_metadata_by_name(self._name, 'socket_{}'.format(socket_name), socket_type)
 
   def _as_process(self):
     """Returns a psutil `Process` object wrapping our pid.
@@ -389,7 +417,7 @@ class ProcessManager(ProcessMetadataManager):
 
         # Wait up to kill_wait seconds to terminate or move onto the next signal.
         try:
-          if self._deadline_until(self.is_dead, kill_wait):
+          if self._deadline_until(self.is_dead, 'daemon to exit', timeout=kill_wait):
             alive = False
             logger.debug('successfully terminated pid {}'.format(pid))
             break
@@ -433,16 +461,16 @@ class ProcessManager(ProcessMetadataManager):
           self.post_fork_child(**post_fork_child_opts or {})
         except Exception:
           logger.critical(traceback.format_exc())
-
-        os._exit(0)
+        finally:
+          os._exit(0)
       else:
         try:
           if write_pid: self.write_pid(second_pid)
           self.post_fork_parent(**post_fork_parent_opts or {})
         except Exception:
           logger.critical(traceback.format_exc())
-
-        os._exit(0)
+        finally:
+          os._exit(0)
     else:
       # This prevents un-reaped, throw-away parent processes from lingering in the process table.
       os.waitpid(pid, 0)
@@ -465,8 +493,8 @@ class ProcessManager(ProcessMetadataManager):
         self.post_fork_child(**post_fork_child_opts or {})
       except Exception:
         logger.critical(traceback.format_exc())
-
-      os._exit(0)
+      finally:
+        os._exit(0)
     else:
       try:
         self.post_fork_parent(**post_fork_parent_opts or {})
@@ -475,12 +503,66 @@ class ProcessManager(ProcessMetadataManager):
 
   def pre_fork(self):
     """Pre-fork callback for subclasses."""
-    pass
 
   def post_fork_child(self):
     """Pre-fork child callback for subclasses."""
-    pass
 
   def post_fork_parent(self):
     """Post-fork parent callback for subclasses."""
-    pass
+
+
+class FingerprintedProcessManager(ProcessManager):
+  """A `ProcessManager` subclass that provides a general strategy for process fingerprinting."""
+
+  FINGERPRINT_KEY = 'fingerprint'
+  FINGERPRINT_CMD_KEY = None
+  FINGERPRINT_CMD_SEP = '='
+
+  @property
+  def fingerprint(self):
+    """The fingerprint of the current process.
+
+    This can either read the current fingerprint from the running process's psutil.Process.cmdline
+    (if the managed process supports that) or from the `ProcessManager` metadata.
+
+    :returns: The fingerprint of the running process as read from the process table, ProcessManager
+              metadata or `None`.
+    :rtype: string
+    """
+    return (
+      self.parse_fingerprint(self.cmdline) or
+      self.read_metadata_by_name(self.name, self.FINGERPRINT_KEY)
+    )
+
+  def parse_fingerprint(self, cmdline, key=None, sep=None):
+    """Given a psutil.Process.cmdline, parse and return a fingerprint.
+
+    :param list cmdline: The psutil.Process.cmdline of the current process.
+    :param string key: The key for fingerprint discovery.
+    :param string sep: The key/value separator for fingerprint discovery.
+    :returns: The parsed fingerprint or `None`.
+    :rtype: string or `None`
+    """
+    key = key or self.FINGERPRINT_CMD_KEY
+    if key:
+      sep = sep or self.FINGERPRINT_CMD_SEP
+      cmdline = cmdline or []
+      for cmd_part in cmdline:
+        if cmd_part.startswith('{}{}'.format(key, sep)):
+          return cmd_part.split(sep)[1]
+
+  def has_current_fingerprint(self, fingerprint):
+    """Determines if a new fingerprint is the current fingerprint of the running process.
+
+    :param string fingerprint: The new fingerprint to compare to.
+    :rtype: bool
+    """
+    return fingerprint == self.fingerprint
+
+  def needs_restart(self, fingerprint):
+    """Determines if the current ProcessManager needs to be started or restarted.
+
+    :param string fingerprint: The new fingerprint to compare to.
+    :rtype: bool
+    """
+    return self.is_dead() or not self.has_current_fingerprint(fingerprint)

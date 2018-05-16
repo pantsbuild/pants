@@ -9,6 +9,7 @@ from collections import namedtuple
 from textwrap import dedent
 
 from pants.base.exceptions import TaskError
+from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import target_option
 
 
@@ -16,6 +17,8 @@ class JvmToolMixin(object):
   """A mixin for registering and accessing JVM-based tools.
 
   Must be mixed in to something that can register and use options, e.g., a Task or a Subsystem.
+
+  :API: public
   """
   class InvalidToolClasspath(TaskError):
     """Indicates an invalid jvm tool classpath."""
@@ -50,6 +53,10 @@ class JvmToolMixin(object):
   _jvm_tools = []  # List of JvmTool objects.
 
   @classmethod
+  def subsystem_dependencies(cls):
+    return super(JvmToolMixin, cls).subsystem_dependencies() + (DistributionLocator,)
+
+  @classmethod
   def get_jvm_options_default(cls, bootstrap_option_values):
     """Subclasses may override to provide different defaults for their JVM options.
 
@@ -81,7 +88,7 @@ class JvmToolMixin(object):
                         removal_hint=None):
     """Registers a jvm tool under `key` for lazy classpath resolution.
 
-    Classpaths can be retrieved in `execute` scope via `tool_classpath`.
+    Classpaths can be retrieved in `execute` scope via `tool_classpath_from_products`.
 
     NB: If the tool's `main` class name is supplied the tool classpath will be shaded.
 
@@ -156,7 +163,22 @@ class JvmToolMixin(object):
     """Needed only for test isolation."""
     JvmToolMixin._jvm_tools = []
 
-  def tool_jar_from_products(self, products, key, scope):
+  def set_distribution(self, minimum_version=None, maximum_version=None, jdk=False):
+    try:
+      self._dist = DistributionLocator.cached(minimum_version=minimum_version,
+                                              maximum_version=maximum_version, jdk=jdk)
+    except DistributionLocator.Error as e:
+      raise TaskError(e)
+
+  @property
+  def dist(self):
+    if getattr(self, '_dist', None) is None:
+      # Use default until told otherwise.
+      self.set_distribution()
+    return self._dist
+
+  @classmethod
+  def tool_jar_from_products(cls, products, key, scope):
     """Get the jar for the tool previously registered under key in the given scope.
 
     :param products: The products of the current pants run.
@@ -168,14 +190,15 @@ class JvmToolMixin(object):
     :raises: `JvmToolMixin.InvalidToolClasspath` when the tool classpath is not composed of exactly
              one jar.
     """
-    classpath = self.tool_classpath_from_products(products, key, scope)
+    classpath = cls.tool_classpath_from_products(products, key, scope)
     if len(classpath) != 1:
       params = dict(tool=key, scope=scope, count=len(classpath), classpath='\n\t'.join(classpath))
-      raise self.InvalidToolClasspath('Expected tool {tool} in scope {scope} to resolve to one '
-                                      'jar, instead found {count}:\n\t{classpath}'.format(**params))
+      raise cls.InvalidToolClasspath('Expected tool {tool} in scope {scope} to resolve to one '
+                                     'jar, instead found {count}:\n\t{classpath}'.format(**params))
     return classpath[0]
 
-  def tool_classpath_from_products(self, products, key, scope):
+  @staticmethod
+  def tool_classpath_from_products(products, key, scope):
     """Get a classpath for the tool previously registered under key in the given scope.
 
     :param products: The products of the current pants run.

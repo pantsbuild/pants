@@ -12,38 +12,19 @@ import os
 logger = logging.getLogger(__name__)
 
 
-_ID_BY_OS = {
-  'linux': lambda release, machine: ('linux', machine),
-  'darwin': lambda release, machine: ('darwin', release.split('.')[0]),
-}
-
-
 OS_ALIASES = {
   'darwin': {'macos', 'darwin', 'macosx', 'mac os x', 'mac'},
   'linux': {'linux', 'linux2'},
 }
 
 
-def get_os_name():
+def get_os_name(uname_result=None):
   """
   :API: public
   """
-  return os.uname()[0].lower()
-
-
-def get_os_id(uname_func=None):
-  """Return an OS identifier sensitive only to its major version.
-
-  :param uname_func: An `os.uname` compliant callable; intended for tests.
-  :returns: a tuple of (OS name, sub identifier) or `None` if the OS is not supported.
-  :rtype: tuple of string, string
-  """
-  uname_func = uname_func or os.uname
-  sysname, _, release, _, machine = uname_func()
-  os_id = _ID_BY_OS.get(sysname.lower())
-  if os_id:
-    return os_id(release, machine)
-  return None
+  if uname_result is None:
+    uname_result = os.uname()
+  return uname_result[0].lower()
 
 
 def normalize_os_name(os_name):
@@ -59,5 +40,32 @@ def normalize_os_name(os_name):
   return os_name
 
 
+def get_normalized_os_name():
+  return normalize_os_name(get_os_name())
+
+
+def all_normalized_os_names():
+  return OS_ALIASES.keys()
+
+
 def known_os_names():
   return reduce(set.union, OS_ALIASES.values())
+
+
+# TODO(cosmicexplorer): use this as the default value for the global --binaries-path-by-id option!
+# panstd testing fails saying no run trackers were created when I tried to do this.
+SUPPORTED_PLATFORM_NORMALIZED_NAMES = {
+  ('linux', 'x86_64'): ('linux', 'x86_64'),
+  ('linux', 'amd64'): ('linux', 'x86_64'),
+  ('linux', 'i386'): ('linux', 'i386'),
+  ('linux', 'i686'): ('linux', 'i386'),
+  ('darwin', '9'): ('mac', '10.5'),
+  ('darwin', '10'): ('mac', '10.6'),
+  ('darwin', '11'): ('mac', '10.7'),
+  ('darwin', '12'): ('mac', '10.8'),
+  ('darwin', '13'): ('mac', '10.9'),
+  ('darwin', '14'): ('mac', '10.10'),
+  ('darwin', '15'): ('mac', '10.11'),
+  ('darwin', '16'): ('mac', '10.12'),
+  ('darwin', '17'): ('mac', '10.13'),
+}

@@ -21,7 +21,6 @@ function usage() {
   echo " -k           skip bootstrapped pants self compile check"
   echo " -m           skip sanity checks of bootstrapped pants and repo BUILD"
   echo "              files"
-  echo " -s           skip self-distribution tests"
   echo " -r           skip doc generation tests"
   echo " -j           skip core jvm tests"
   echo " -l           skip internal backends python tests"
@@ -30,8 +29,8 @@ function usage() {
   echo "              if running core python tests, divide them into"
   echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
   echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
-  echo " -a           skip android targets when running tests"
   echo " -n           skip contrib python tests"
+  echo " -e           skip rust tests"
   echo " -y SHARD_NUMBER/TOTAL_SHARDS"
   echo "              if running contrib python tests, divide them into"
   echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
@@ -50,7 +49,7 @@ function usage() {
 
 bootstrap_compile_args=(
   lint.python-eval
-  --closure
+  --transitive
 )
 
 # No python test sharding (1 shard) by default.
@@ -58,7 +57,7 @@ python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
 
-while getopts "hfxbkmsrjlpu:ny:ci:at" opt; do
+while getopts "hfxbkmsrjlpeu:ny:ci:at" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_pre_commit_checks="true" ;;
@@ -66,28 +65,21 @@ while getopts "hfxbkmsrjlpu:ny:ci:at" opt; do
     b) skip_bootstrap="true" ;;
     k) bootstrap_compile_args=() ;;
     m) skip_sanity_checks="true" ;;
-    s) skip_distribution="true" ;;
     r) skip_docs="true" ;;
     j) skip_jvm="true" ;;
     l) skip_internal_backends="true" ;;
     p) skip_python="true" ;;
     u) python_unit_shard=${OPTARG} ;;
+    e) skip_rust_tests="true" ;;
     n) skip_contrib="true" ;;
     y) python_contrib_shard=${OPTARG} ;;
     c) skip_integration="true" ;;
     i) python_intg_shard=${OPTARG} ;;
-    a) skip_android="true" ;;
     t) skip_lint="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
 shift $((${OPTIND} - 1))
-
-# Android testing requires the SDK to be installed and configured in Pants.
-# Skip if ANDROID_HOME isn't configured in the environment
-if [[ -z "${ANDROID_HOME}"  || "${skip_android:-false}" == "true" ]] ; then
-  export SKIP_ANDROID_PATTERN='contrib/android'
-fi
 
 echo
 if [[ $# > 0 ]]; then
@@ -162,17 +154,9 @@ fi
 if [[ "${skip_lint:-false}" == "false" ]]; then
   start_travis_section "Lint" "Running lint checks"
   (
-    ./pants.pex ${PANTS_ARGS[@]} lint contrib:: examples:: src:: tests:: zinc::
+    ./pants.pex ${PANTS_ARGS[@]} --tag=-nolint lint contrib:: examples:: src:: tests:: zinc::
   ) || die "Lint check failure"
   end_travis_section
-fi
-
-if [[ "${skip_distribution:-false}" == "false" ]]; then
-  # N.B. Defer start_travis_section to those within release.sh, since we can't nest.
-  banner "Running pants distribution tests"
-  (
-    ./build-support/bin/release.sh -n
-  ) || die "Failed to create pants distributions."
 fi
 
 if [[ "${skip_docs:-false}" == "false" ]]; then
@@ -193,7 +177,7 @@ if [[ "${skip_internal_backends:-false}" == "false" ]]; then
   start_travis_section "BackendTests" "Running internal backend python tests"
   (
     ./pants.pex ${PANTS_ARGS[@]} test.pytest \
-    pants-plugins/tests/python::
+    pants-plugins/tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Internal backend python test failure"
   end_travis_section
 fi
@@ -204,9 +188,9 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   fi
   start_travis_section "CoreTests" "Running core python tests${shard_desc}"
   (
-    ./pants.pex --tag='-integration' ${PANTS_ARGS[@]} test.pytest \
+    ./pants.pex --tag='-integration' ${PANTS_ARGS[@]} test.pytest --chroot \
       --test-pytest-test-shard=${python_unit_shard} \
-      tests/python::
+      tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Core python test failure"
   end_travis_section
 fi
@@ -217,13 +201,32 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
   fi
   start_travis_section "ContribTests" "Running contrib python tests${shard_desc}"
   (
-    ./pants.pex ${PANTS_ARGS[@]} --exclude-target-regexp='.*/testprojects/.*' \
-    --build-ignore=$SKIP_ANDROID_PATTERN test.pytest \
+    ./pants.pex ${PANTS_ARGS[@]} --exclude-target-regexp='.*/testprojects/.*' test.pytest \
     --test-pytest-test-shard=${python_contrib_shard} \
-    contrib:: \
+    contrib:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Contrib python test failure"
   end_travis_section
 fi
+
+if [[ "${skip_rust_tests:-false}" == "false" ]]; then
+  start_travis_section "RustTests" "Running Pants rust tests"
+  (
+    source "${REPO_ROOT}/build-support/pants_venv"
+    source "${REPO_ROOT}/build-support/bin/native/bootstrap.sh"
+
+    test_threads_flag=""
+    if [[ "$(uname)" == "Darwin" ]]; then
+      # The osx travis environment has a low file descriptors ulimit, so we avoid running too many
+      # tests in parallel.
+      test_threads_flag="--test-threads=1"
+    fi
+
+    activate_pants_venv
+    RUST_BACKTRACE=1 PANTS_SRCPATH="${REPO_ROOT}/src/python" ensure_cffi_sources=1 run_cargo test --all --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" -- "${test_threads_flag}"
+  ) || die "Pants rust test failure"
+  end_travis_section
+fi
+
 
 if [[ "${skip_integration:-false}" == "false" ]]; then
   if [[ "0/1" != "${python_intg_shard}" ]]; then
@@ -233,7 +236,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   (
     ./pants.pex ${PANTS_ARGS[@]} --tag='+integration' test.pytest \
       --test-pytest-test-shard=${python_intg_shard} \
-      tests/python::
+      tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Pants Integration test failure"
   end_travis_section
 fi

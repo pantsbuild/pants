@@ -57,6 +57,8 @@ class JvmPlatform(Subsystem):
              help='Compile settings that can be referred to by name in jvm_targets.')
     register('--default-platform', advanced=True, type=str, default=None, fingerprint=True,
              help='Name of the default platform to use if none are specified.')
+    register('--compiler', advanced=True, choices=['zinc', 'javac'], default='zinc', fingerprint=True,
+             help='Java compiler implementation to use.')
 
   @classmethod
   def subsystem_dependencies(cls):

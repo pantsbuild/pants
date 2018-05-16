@@ -14,6 +14,7 @@ from textwrap import dedent
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -59,9 +60,17 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     }
     init_subsystems([JUnit, ScalaPlatform], scala_options)
 
-    self.make_target(':scala-library',
-                     JarLibrary,
-                     jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')])
+    self.make_target(
+      ':scala-library',
+      JarLibrary,
+      jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')]
+    )
+
+    self.make_target(
+      ':nailgun-server',
+      JarLibrary,
+      jars=[JarDependency(org='com.martiansoftware', name='nailgun-server', rev='0.9.1'),]
+    )
 
     self.make_target(
       'project_info:first',
@@ -118,9 +127,8 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     self.make_target(
       'project_info:java_test',
       target_type=JUnitTests,
-      dependencies=[jar_lib],
+      dependencies=[jar_lib, test_resource],
       sources=['this/is/a/test/source/FooTest.scala'],
-      resources=[test_resource.address.spec],
     )
 
     jvm_binary = self.make_target(
@@ -144,9 +152,8 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     self.make_target(
         'project_info:target_type',
         target_type=ScalaLibrary,
-        dependencies=[jvm_binary],
+        dependencies=[jvm_binary, src_resource],
         sources=[],
-        resources=[src_resource.address.spec],
     )
 
     self.make_target(
@@ -176,16 +183,31 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       target(name="alias")
     """.strip())
 
+    self.add_to_build_file('src/python/has_reqs/BUILD', textwrap.dedent("""
+       python_library(name="has_reqs", sources=globs("*.py"), dependencies=[':six'])
+       
+       python_requirement_library(
+         name='six',
+         requirements=[
+           python_requirement('six==1.9.0')
+         ]
+       ) 
+    """))
+
   def execute_export(self, *specs, **options_overrides):
     options = {
+      JvmResolveSubsystem.options_scope: {
+        'resolver': 'ivy'
+      },
       JvmPlatform.options_scope: {
-        'default_platform': 'java6',
+        'default_platform': 'java8',
         'platforms': {
-          'java6': {'source': '1.6', 'target': '1.6'}
+          'java8': {'source': '1.8', 'target': '1.8'}
         }
       },
     }
     options.update(options_overrides)
+
     context = self.context(options=options, target_roots=[self.target(spec) for spec in specs],
                            for_subsystems=[JvmPlatform])
     context.products.safe_create_data('compile_classpath',
@@ -231,7 +253,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
   def test_version(self):
     result = self.execute_export_json('project_info:first')
     # If you have to update this test, make sure export.md is updated with changelog notes
-    self.assertEqual('1.0.9', result['version'])
+    self.assertEqual('1.0.10', result['version'])
 
   def test_sources(self):
     self.set_options(sources=True)
@@ -296,7 +318,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       'target_type': 'SOURCE',
       'transitive' : True,
       'pants_target_type': 'scala_library',
-      'platform': 'java6',
+      'platform': 'java8',
     }
     self.assertEqual(jvm_target, expected_jvm_target)
 
@@ -341,7 +363,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
 
   def test_target_platform(self):
     result = self.execute_export_json('project_info:target_type')
-    self.assertEqual('java6',
+    self.assertEqual('java8',
                      result['targets']['project_info:target_type']['platform'])
 
   def test_output_file(self):
@@ -404,17 +426,16 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       result['targets']['src/python/z:z']['globs']
     )
 
-  # TODO: Delete this test in 1.5.0.dev0, once we remove support for resources=.
-  def test_synthetic_target(self):
-    # Create a BUILD file then add itself as resources
-    self.add_to_build_file('src/python/alpha/BUILD', """
-        python_library(name="alpha", sources=zglobs("**/*.py"), resources=["BUILD"])
-      """.strip())
-
-    result = self.execute_export_json('src/python/alpha')
-    self.assertTrue(result['targets']['src/python/alpha:alpha_synthetic_resources'])
-    # But not the origin target
-    self.assertFalse(result['targets']['src/python/alpha:alpha']['is_synthetic'])
+  def test_has_python_requirements(self):
+    result = self.execute_export_json('src/python/has_reqs')
+    interpreters = result['python_setup']['interpreters']
+    self.assertEquals(1, len(interpreters))
+    chroot = interpreters.values()[0]['chroot']
+    deps = os.listdir(os.path.join(chroot, '.deps'))
+    self.assertEquals(1, len(deps))
+    six_whl = deps[0]
+    self.assertTrue(six_whl.startswith('six-1.9.0'))
+    self.assertTrue(six_whl.endswith('.whl'))
 
   @contextmanager
   def fake_distribution(self, version):
@@ -450,5 +471,10 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
         }
 
         export_json = self.execute_export_json(**options)
-        self.assertEqual({'strict': strict_home, 'non_strict': non_strict_home},
-                         export_json['preferred_jvm_distributions']['java9999'])
+        self.assertEqual(strict_home, export_json['preferred_jvm_distributions']['java9999']['strict'],
+                         "strict home does not match")
+
+        # Since it is non-strict, it can be either.
+        self.assertIn(export_json['preferred_jvm_distributions']['java9999']['non_strict'],
+                      [non_strict_home, strict_home],
+                      "non-strict home does not match")

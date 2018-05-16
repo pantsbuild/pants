@@ -14,6 +14,7 @@ from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDepende
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.revision import Revision
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
@@ -359,9 +360,9 @@ class JarDependencyManagementSetup(Task):
                              .format(target.id, dm._artifact_set_map[target.id]))
 
   def _library_targets(self, managed_jar_dependencies):
-    for spec in managed_jar_dependencies.library_specs:
-      for target in self.context.resolve(spec):
-        yield target # NB(gmalmquist): I don't think this needs to be transitive.
+    targets = [t for spec in managed_jar_dependencies.library_specs for t in self.context.resolve(spec)]
+    for t in Target.closure_for_targets(targets):
+      yield t
 
   def _jar_iterator(self, managed_jar_dependencies):
     for jar in managed_jar_dependencies.payload.artifacts:
@@ -370,10 +371,13 @@ class JarDependencyManagementSetup(Task):
       if isinstance(dep, JarLibrary):
         for jar in dep.jar_dependencies:
           yield jar
+      elif type(dep) == Target:
+        pass
       else:
         raise TargetDefinitionException(managed_jar_dependencies,
-                                        'Artifacts must be jar() objects or the addresses of '
-                                        'jar_library objects.')
+                                        'Artifacts must be jar() objects, the address of a jar_library(), '
+                                        'or the address of a target() with jar_library()\'s as dependencies. '
+                                        'Spec {} does not refer to any of those.'.format(dep.address.spec))
 
   def _compute_artifact_set(self, management_target):
     """Computes the set of pinned artifacts specified by this target, and any of its dependencies.

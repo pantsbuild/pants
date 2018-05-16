@@ -29,7 +29,6 @@ python_library(
     ':objects',
     'src/python/pants/build_graph',
     'src/python/pants/util:memo',
-    'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]
 )
@@ -38,8 +37,8 @@ python_library(
   name='struct',
   sources=['struct.py'],
   dependencies=[
-    ':addressable',
     ':objects',
+    'src/python/pants/util:objects',
   ]
 )
 
@@ -70,6 +69,8 @@ python_library(
     ':struct',
     'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:objects',
   ]
 )
 
@@ -77,7 +78,6 @@ python_library(
   name='mapper',
   sources=['mapper.py'],
   dependencies=[
-    '3rdparty/python:pathspec',
     ':objects',
     ':parser',
     'src/python/pants/build_graph',
@@ -89,12 +89,9 @@ python_library(
   name='isolated_process',
   sources=['isolated_process.py'],
   dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':addressable',
     ':fs',
-    ':nodes',
-    ':struct',
-    'src/python/pants/build_graph',
+    ':rules',
+    ':selectors',
     'src/python/pants/util:objects',
   ]
 )
@@ -138,7 +135,6 @@ python_library(
   sources=['rules.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':addressable',
     ':selectors',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
@@ -151,7 +147,6 @@ python_library(
   sources=['selectors.py'],
   dependencies=[
     '3rdparty/python:six',
-    ':addressable',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]
@@ -162,7 +157,6 @@ python_library(
   sources=['scheduler.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':addressable',
     ':fs',
     ':isolated_process',
     ':native',
@@ -176,25 +170,14 @@ python_library(
 )
 
 python_library(
-  name='storage',
-  sources=['storage.py'],
-  dependencies=[
-    ':nodes',
-    ':objects',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:meta',
-  ]
-)
-
-python_library(
   name='native',
   sources=['native.py'],
   dependencies=[
-    ':native_engine_version',
+    ':native_engine_shared_library',
+    ':selectors',
     '3rdparty/python:cffi',
     '3rdparty/python:setuptools',
-    'src/python/pants/binaries:binary_util',
-    'src/python/pants/engine:storage',
+    'src/python/pants/binaries',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:objects'
@@ -202,6 +185,6 @@ python_library(
 )
 
 resources(
-  name='native_engine_version',
-  sources=['native_engine_version']
+  name='native_engine_shared_library',
+  sources=['native_engine.so']
 )

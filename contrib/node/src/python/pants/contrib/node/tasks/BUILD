@@ -9,6 +9,7 @@ target(
     ':node_resolve',
     ':node_run',
     ':node_test',
+    ':javascript_style',
   ]
 )
 
@@ -57,7 +58,7 @@ python_library(
   name='node_task',
   sources=['node_task.py'],
   dependencies=[
-    'contrib/node/src/python/pants/contrib/node/subsystems:node_distribution',
+    'contrib/node/src/python/pants/contrib/node/subsystems',
     'contrib/node/src/python/pants/contrib/node/targets:node_bundle',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',
@@ -100,6 +101,21 @@ python_library(
     ':node_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:process_handler',
+  ]
+)
+
+python_library(
+  name='javascript_style',
+  sources=['javascript_style.py'],
+  dependencies=[
+    ':node_paths',
+    ':node_task',
+    'src/python/pants/base:deprecated',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
+    'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
   ]

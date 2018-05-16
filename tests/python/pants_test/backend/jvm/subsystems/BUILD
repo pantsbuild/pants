@@ -23,7 +23,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:scalastyle',
-    'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',
+    'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
@@ -33,10 +33,12 @@ python_tests(
   name='incomplete_custom_scala',
   sources=['test_incomplete_custom_scala.py'],
   dependencies=[
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
-  timeout=180,
+  timeout=360,
 )
 
 python_tests(

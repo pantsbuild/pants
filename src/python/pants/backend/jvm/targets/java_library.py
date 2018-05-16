@@ -30,7 +30,6 @@ class JavaLibrary(ExportableJvmLibrary):
 
   def __init__(self, address=None, **kwargs):
     super(JavaLibrary, self).__init__(address=address, **kwargs)
-    self.add_labels('java')
     if 'scalac_plugins' in kwargs:
       raise self.IllegalArgument(address.spec,
                                  'java_library does not support the scalac_plugins argument.')

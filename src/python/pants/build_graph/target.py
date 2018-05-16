@@ -13,13 +13,13 @@ from six import string_types
 from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.base.validation import assert_list
+from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
@@ -53,73 +53,6 @@ class AbstractTarget(object):
     :rtype: string
     """
     raise NotImplementedError()
-
-  # TODO: Kill this in 1.5.0.dev0, once this old-style resource specification is gone.
-  @property
-  def has_resources(self):
-    """Returns True if the target has an associated set of Resources.
-
-    :API: public
-    """
-    return hasattr(self, 'resources') and self.resources
-
-  @property
-  def is_exported(self):
-    """Returns True if the target provides an artifact exportable from the repo.
-
-    :API: public
-    """
-    # TODO(John Sirois): fixup predicate dipping down into details here.
-    return self.has_label('exportable') and self.provides
-
-  # DEPRECATED  to be removed after 0.0.29
-  # do not use this method, use  isinstance(..., JavaThriftLibrary) or a yet-to-be-defined mixin
-  @property
-  def is_thrift(self):
-    """Returns True if the target has thrift IDL sources."""
-    return False
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_jvm(self):
-    """Returns True if the target produces jvm bytecode."""
-    return self.has_label('jvm')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_java(self):
-    """Returns True if the target has or generates java sources."""
-    return self.has_label('java')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_python(self):
-    """Returns True if the target has python sources."""
-    return self.has_label('python')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_scala(self):
-    """Returns True if the target has scala sources."""
-    return self.has_label('scala')
-
-  # DEPRECATED to be removed after 0.0.29
-  #  do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_scalac_plugin(self):
-    """Returns True if the target builds a scalac plugin."""
-    return self.has_label('scalac_plugin')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_test(self):
-    """Returns True if the target is comprised of tests."""
-    return self.has_label('tests')
 
 
 class Target(AbstractTarget):
@@ -164,12 +97,6 @@ class Target(AbstractTarget):
                help='Map of target name to a list of keyword arguments that should be ignored if a '
                     'target receives them unexpectedly. Typically used to allow usage of arguments '
                     'in BUILD files that are not yet available in the current version of pants.')
-      register('--implicit-sources', advanced=True, default=True, type=bool,
-               removal_version='1.6.0.dev0',
-               removal_hint='Implicit sources are now the default.',
-               help='If True, Pants will infer the value of the sources argument for certain '
-                    'target types, if they do not have explicit sources specified. '
-                    'See http://www.pantsbuild.org/build_files.html#target-definitions')
 
     @classmethod
     def check(cls, target, kwargs):
@@ -270,13 +197,16 @@ class Target(AbstractTarget):
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
   @classmethod
-  def _closure_predicate(cls, include_scopes=None, exclude_scopes=None, respect_intransitive=False):
+  def _closure_dep_predicate(cls, roots, include_scopes=None, exclude_scopes=None, respect_intransitive=False):
     if not respect_intransitive and include_scopes is None and exclude_scopes is None:
       return None
-    def predicate(target, level):
-      if not target.scope.in_scope(include_scopes=include_scopes, exclude_scopes=exclude_scopes):
+
+    root_lookup = set(roots)
+    def predicate(target, dep_target):
+      if not dep_target.scope.in_scope(include_scopes=include_scopes, exclude_scopes=exclude_scopes):
         return False
-      if respect_intransitive and not target.transitive and level > 0:
+      # dep_target.transitive == False means that dep_target is only included if target is a root target.
+      if respect_intransitive and not dep_target.transitive and target not in root_lookup:
         return False
       return True
     return predicate
@@ -305,7 +235,8 @@ class Target(AbstractTarget):
 
     build_graph = target_roots[0]._build_graph
     addresses = [target.address for target in target_roots]
-    leveled_predicate = cls._closure_predicate(include_scopes=include_scopes,
+    dep_predicate = cls._closure_dep_predicate(target_roots,
+                                               include_scopes=include_scopes,
                                                exclude_scopes=exclude_scopes,
                                                respect_intransitive=respect_intransitive)
     closure = OrderedSet()
@@ -315,12 +246,12 @@ class Target(AbstractTarget):
         addresses=addresses,
         work=closure.add,
         postorder=postorder,
-        leveled_predicate=leveled_predicate,
+        dep_predicate=dep_predicate,
       )
     else:
       closure.update(build_graph.transitive_subgraph_of_addresses_bfs(
         addresses=addresses,
-        leveled_predicate=leveled_predicate,
+        dep_predicate=dep_predicate,
       ))
 
     # Make sure all the roots made it into the closure.
@@ -372,13 +303,13 @@ class Target(AbstractTarget):
     self._type_alias = type_alias
     self._tags = set(tags or [])
     self.description = description
-    self.labels = set()
 
     self._cached_fingerprint_map = {}
     self._cached_all_transitive_fingerprint_map = {}
     self._cached_direct_transitive_fingerprint_map = {}
-    if no_cache:
-      self.add_labels('no_cache')
+    self._cached_strict_dependencies_map = {}
+    self._cached_exports_addresses = None
+    self._no_cache = no_cache
     if kwargs:
       self.Arguments.check(self, kwargs)
 
@@ -389,6 +320,10 @@ class Target(AbstractTarget):
   @property
   def transitive(self):
     return self.payload.transitive
+
+  @property
+  def no_cache(self):
+    return self._no_cache
 
   @property
   def type_alias(self):
@@ -456,6 +391,8 @@ class Target(AbstractTarget):
     self._cached_fingerprint_map = {}
     self._cached_all_transitive_fingerprint_map = {}
     self._cached_direct_transitive_fingerprint_map = {}
+    self._cached_strict_dependencies_map = {}
+    self._cached_exports_addresses = None
     self.mark_extra_invalidation_hash_dirty()
     self.payload.mark_dirty()
 
@@ -589,6 +526,10 @@ class Target(AbstractTarget):
     """
     return self._sources_field.sources
 
+  def sources_count(self):
+    """Returns the count of source files owned by the target."""
+    return len(self._sources_field.sources.files)
+
   @property
   def derived_from(self):
     """Returns the target this target was derived from.
@@ -622,29 +563,6 @@ class Target(AbstractTarget):
     :API: public
     """
     return self._build_graph.get_concrete_derived_from(self.address)
-
-  @property
-  @deprecated('1.5.0.dev0', 'Use `Target.compute_injectable_specs()` instead.')
-  def traversable_specs(self):
-    """
-    :API: public
-
-    :return: specs referenced by this target to be injected into the build graph
-    :rtype: list of strings
-    """
-    return []
-
-  @property
-  @deprecated('1.5.0.dev0', 'Use `Target.compute_dependency_specs()` instead.')
-  def traversable_dependency_specs(self):
-    """
-    :API: public
-
-    :return: specs representing dependencies of this target that will be injected to the build
-    graph and linked in the graph as dependencies of this target
-    :rtype: list of strings
-    """
-    return []
 
   @staticmethod
   def _validate_target_representation_args(kwargs, payload):
@@ -706,6 +624,83 @@ class Target(AbstractTarget):
     """
     return [self._build_graph.get_target(dep_address)
             for dep_address in self._build_graph.dependencies_of(self.address)]
+
+  @property
+  def export_addresses(self):
+    exports = self._cached_exports_addresses
+    if exports is None:
+
+      exports = []
+      for export_spec in getattr(self, 'export_specs', tuple()):
+        if isinstance(export_spec, Target):
+          exports.append(export_spec.address)
+        else:
+          exports.append(Address.parse(export_spec, relative_to=self.address.spec_path))
+      exports = tuple(exports)
+
+      dep_addresses = {d.address for d in self.dependencies}
+      invalid_export_specs = [a.spec for a in exports if a not in dep_addresses]
+      if len(invalid_export_specs) > 0:
+        raise TargetDefinitionException(
+            self,
+            'Invalid exports: these exports must also be dependencies\n  {}'.format('\n  '.join(invalid_export_specs)))
+
+      self._cached_exports_addresses = exports
+    return exports
+
+  def strict_dependencies(self, dep_context):
+    """
+    :param dep_context: A DependencyContext with configuration for the request.
+    :return: targets that this target "strictly" depends on. This set of dependencies contains
+      only directly declared dependencies, with two exceptions:
+        1) aliases are expanded transitively
+        2) the strict_dependencies of targets exported targets exported by
+      strict_dependencies (transitively).
+    :rtype: list of Target
+    """
+    strict_deps = self._cached_strict_dependencies_map.get(dep_context, None)
+    if strict_deps is None:
+      default_predicate = self._closure_dep_predicate({self},
+                                                      **dep_context.target_closure_kwargs)
+
+      def dep_predicate(source, dependency):
+        if not default_predicate(source, dependency):
+          return False
+
+        # Always expand aliases.
+        if type(source) in dep_context.alias_types:
+          return True
+
+        # Traverse other dependencies if they are exported.
+        if source._dep_is_exported(dependency):
+          return True
+        return False
+
+      dep_addresses = [d.address for d in self.dependencies
+                        if default_predicate(self, d)
+                      ]
+      result = self._build_graph.transitive_subgraph_of_addresses_bfs(
+        addresses=dep_addresses,
+        dep_predicate=dep_predicate
+      )
+
+      strict_deps = OrderedSet()
+      for declared in result:
+        if type(declared) in dep_context.alias_types:
+          continue
+        if isinstance(declared, dep_context.compiler_plugin_types):
+          strict_deps.update(declared.closure(
+            bfs=True,
+            **dep_context.target_closure_kwargs))
+        strict_deps.add(declared)
+
+      strict_deps = list(strict_deps)
+      self._cached_strict_dependencies_map[dep_context] = strict_deps
+    return strict_deps
+
+  def _dep_is_exported(self, dependency):
+    return dependency.address in self.export_addresses or \
+           dependency.is_synthetic and (dependency.concrete_derived_from.address in self.export_addresses)
 
   @property
   def dependents(self):
@@ -785,18 +780,6 @@ class Target(AbstractTarget):
     """
     return self.closure_for_targets([self], *vargs, **kwargs)
 
-  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-  def add_labels(self, *label):
-    self.labels.update(label)
-
-  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-  def remove_label(self, label):
-    self.labels.remove(label)
-
-  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-  def has_label(self, label):
-    return label in self.labels
-
   def __lt__(self, other):
     return self.address < other.address
 
@@ -863,9 +846,7 @@ class Target(AbstractTarget):
       # Note that the check for supports_default_sources() precedes the subsystem check.
       # This is so that tests don't need to set up the subsystem when creating targets that
       # legitimately do not require sources.
-      if ((key_arg is None or key_arg == 'sources') and
-          self.supports_default_sources() and
-          self.Arguments.global_instance().get_options().implicit_sources):
+      if (key_arg is None or key_arg == 'sources') and self.supports_default_sources():
         sources = self.default_sources(sources_rel_path)
       else:
         sources = FilesetWithSpec.empty(sources_rel_path)

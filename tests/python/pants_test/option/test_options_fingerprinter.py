@@ -9,7 +9,7 @@ import os
 
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
-from pants.option.custom_types import (UnsetBool, dict_option, file_option, list_option,
+from pants.option.custom_types import (UnsetBool, dict_option, dir_option, file_option, list_option,
                                        target_option)
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.util.contextutil import temporary_dir
@@ -101,3 +101,25 @@ class OptionsFingerprinterTest(BaseTest):
     fp1 = self.options_fingerprinter.fingerprint(UnsetBool, UnsetBool)
     fp2 = self.options_fingerprinter.fingerprint(UnsetBool, UnsetBool)
     self.assertEqual(fp1, fp2)
+
+  def test_fingerprint_dir(self):
+    d1 = self.create_dir('a')
+    d2 = self.create_dir('b')
+    d3 = self.create_dir('c')
+
+    f1, f2, f3, f4, f5 = (self.create_file(f, contents=c) for (f, c) in (
+      ('a/bar/bar.config', 'blah blah blah'),
+      ('a/foo/foo.config', 'meow meow meow'),
+      ('b/foo/foo.config', 'meow meow meow'),
+      ('b/bar/bar.config', 'blah blah blah'),
+      ('c/bar/bar.config', 'blah meow blah')))
+    dp1 = self.options_fingerprinter.fingerprint(dir_option, [d1])
+    dp2 = self.options_fingerprinter.fingerprint(dir_option, [d1, d2])
+    dp3 = self.options_fingerprinter.fingerprint(dir_option, [d2, d1])
+    dp4 = self.options_fingerprinter.fingerprint(dir_option, [d3])
+
+    self.assertEquals(dp1, dp1)
+    self.assertEquals(dp2, dp2)
+    self.assertNotEquals(dp1, dp3)
+    self.assertNotEquals(dp1, dp4)
+    self.assertNotEquals(dp2, dp3)

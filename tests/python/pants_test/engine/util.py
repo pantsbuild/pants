@@ -5,32 +5,94 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import re
+from types import GeneratorType
 
-from pants.binaries.binary_util import BinaryUtil
-from pants.engine.addressable import SubclassesOf, addressable_list
+from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.binaries.binary_util import BinaryUtilPrivate
+from pants.engine.addressable import addressable_list
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
-from pants.engine.rules import RuleIndex
-from pants.engine.scheduler import WrappedNativeScheduler
+from pants.engine.scheduler import Scheduler
+from pants.engine.selectors import Get
 from pants.engine.struct import HasProducts, Struct
+from pants.util.objects import SubclassesOf
 from pants_test.option.util.fakes import create_options_for_optionables
 from pants_test.subsystem.subsystem_util import init_subsystem
 
 
+def run_rule(rule, *args):
+  """A test helper function that runs an @rule with a set of arguments and Get providers.
+
+  An @rule named `my_rule` that takes one argument and makes no `Get` requests can be invoked
+  like so (although you could also just invoke it directly):
+  ```
+  return_value = run_rule(my_rule, arg1)
+  ```
+
+  In the case of an @rule that makes Get requests, things get more interesting: an extra argument
+  is required that represents a dict mapping (product, subject) type pairs to one argument functions
+  that take a subject value and return a product value.
+
+  So in the case of an @rule named `my_co_rule` that takes one argument and makes Get requests
+  for product and subject types (Listing, Dir), the invoke might look like:
+  ```
+  return_value = run_rule(my_co_rule, arg1, {(Listing, Dir): lambda x: Listing(..)})
+  ```
+
+  :returns: The return value of the completed @rule.
+  """
+
+  task_rule = getattr(rule, '_rule', None)
+  if task_rule is None:
+    raise TypeError('Expected to receive a decorated `@rule`; got: {}'.format(rule))
+
+  gets_len = len(task_rule.input_gets)
+
+  if len(args) != len(task_rule.input_selectors) + (1 if gets_len else 0):
+    raise ValueError('Rule expected to receive arguments of the form: {}; got: {}'.format(
+      task_rule.input_selectors, args))
+
+  args, get_providers = (args[:-1], args[-1]) if gets_len > 0 else (args, {})
+  if gets_len != len(get_providers):
+    raise ValueError('Rule expected to receive Get providers for {}; got: {}'.format(
+      task_rule.input_gets, get_providers))
+
+  res = rule(*args)
+  if not isinstance(res, GeneratorType):
+    return res
+
+  def get(product, subject):
+    provider = get_providers.get((product, type(subject)))
+    if provider is None:
+      raise AssertionError('Rule requested: Get{}, which cannot be satisfied.'.format(
+        (product, type(subject), subject)))
+    return provider(subject)
+
+  rule_coroutine = res
+  rule_input = None
+  while True:
+    res = rule_coroutine.send(rule_input)
+    if isinstance(res, Get):
+      rule_input = get(res.product, res.subject)
+    elif type(res) in (tuple, list):
+      rule_input = [get(g.product, g.subject) for g in res]
+    else:
+      return res
+
+
 def init_native():
   """Initialize and return a `Native` instance."""
-  init_subsystem(BinaryUtil.Factory)
+  init_subsystem(BinaryUtilPrivate.Factory)
   opts = create_options_for_optionables([])
   return Native.create(opts.for_global_scope())
 
 
-def create_native_scheduler(rules):
-  """Create a WrappedNativeScheduler, with an initialized native instance."""
-  rule_index = RuleIndex.create(rules)
+def create_scheduler(rules, validate=True):
+  """Create a Scheduler."""
   native = init_native()
-  scheduler = WrappedNativeScheduler(native, '.', './.pants.d', [], rule_index)
-  return scheduler
+  return Scheduler(native, FileSystemProjectTree(os.getcwd()), './.pants.d', rules, validate=validate)
 
 
 class Target(Struct, HasProducts):

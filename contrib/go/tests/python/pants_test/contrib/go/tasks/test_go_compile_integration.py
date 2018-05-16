@@ -22,8 +22,7 @@ class GoCompileIntegrationTest(PantsRunIntegrationTest):
               'contrib/go/examples/src/go/libA']
       pants_run = self.run_pants_with_workdir(args, workdir)
       self.assert_success(pants_run)
-      factory = global_subsystem_instance(GoDistribution.Factory)
-      go_dist = factory.create()
+      go_dist = global_subsystem_instance(GoDistribution)
       goos = go_dist.create_go_cmd('env', args=['GOOS']).check_output().strip()
       goarch = go_dist.create_go_cmd('env', args=['GOARCH']).check_output().strip()
       expected_files = set('contrib.go.examples.src.go.{libname}.{libname}/'
@@ -43,7 +42,23 @@ class GoCompileIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)
 
-  def test_go_compile_fully_static(self):
-    args = ['compile', 'contrib/go/examples/src/go/server', '--compile-go-build-flags="--ldflags \'-extldflags \"-static\"\'"']
+  def test_go_compile_double_quoted_build_flags(self):
+    args = ['compile',
+            'contrib/go/examples/src/go/server',
+            '--compile-go-build-flags="--ldflags \'-extldflags \"-static\"\'"']
+    pants_run = self.run_pants(args)
+    self.assert_success(pants_run)
+
+  def test_go_compile_single_quoted_build_flags(self):
+    args = ['compile',
+            'contrib/go/examples/src/go/server',
+            '--compile-go-build-flags=\'--ldflags \'-extldflags "-static"\'\'']
+    pants_run = self.run_pants(args)
+    self.assert_success(pants_run)
+
+  def test_go_compile_adjacent_single_double_quotes_build_flags(self):
+    args = ['compile',
+            'contrib/go/examples/src/go/server',
+            '--compile-go-build-flags=\'-v -tags "netgo"\'']
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)
