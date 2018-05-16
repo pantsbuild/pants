@@ -17,7 +17,7 @@ use std::fmt;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
+pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
   0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
   0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55,
 ]);
@@ -189,7 +189,6 @@ impl Snapshot {
   ///
   fn merge_helper(store: Store, dir_digests: Vec<Digest>) -> BoxFuture<Digest, String> {
     if dir_digests.is_empty() {
-      // TODO: This will not have been stored... we'll need to explicitly store it.
       return future::ok(EMPTY_DIGEST).to_boxed();
     } else if dir_digests.len() == 1 {
       let mut dir_digests = dir_digests;

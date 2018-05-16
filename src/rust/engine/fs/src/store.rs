@@ -562,6 +562,7 @@ mod local {
   use byteorder::{ByteOrder, LittleEndian};
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
+  use futures::future;
   use hashing::{Digest, Fingerprint};
   use lmdb::{self, Cursor, Database, DatabaseFlags, Environment, RwTransaction, Transaction,
              WriteFlags, NO_OVERWRITE, NO_SYNC, NO_TLS};
@@ -576,6 +577,7 @@ mod local {
 
   use pool::ResettablePool;
   use super::MAX_LOCAL_STORE_SIZE_BYTES;
+  use super::super::EMPTY_FINGERPRINT;
 
   #[derive(Clone)]
   pub struct ByteStore {
@@ -848,6 +850,13 @@ mod local {
       fingerprint: Fingerprint,
       f: F,
     ) -> BoxFuture<Option<T>, String> {
+      if fingerprint == EMPTY_FINGERPRINT {
+        // Avoid expensive I/O for this super common case.
+        // Also, this allows some client-provided operations (like merging snapshots) to work
+        // without needing to first store the empty snapshot.
+        return future::ok(Some(f(Bytes::new()))).to_boxed();
+      }
+
       let dbs = match entry_type {
         EntryType::Directory => self.inner.directory_dbs.clone(),
         EntryType::File => self.inner.file_dbs.clone(),
@@ -1446,8 +1455,34 @@ mod local {
         .wait()
         .expect("Error storing");
       assert_eq!(
-        store.entry_type(&TestDirectory::empty().fingerprint()),
+        store.entry_type(&TestDirectory::recursive().fingerprint()),
         Ok(None)
+      )
+    }
+
+    #[test]
+    pub fn empty_file_is_known() {
+      let dir = TempDir::new("store").unwrap();
+      let store = new_store(dir.path());
+      let empty_file = TestData::empty();
+      assert_eq!(
+        store
+          .load_bytes_with(EntryType::File, empty_file.fingerprint(), |b| b)
+          .wait(),
+        Ok(Some(empty_file.bytes())),
+      )
+    }
+
+    #[test]
+    pub fn empty_directory_is_known() {
+      let dir = TempDir::new("store").unwrap();
+      let store = new_store(dir.path());
+      let empty_dir = TestDirectory::empty();
+      assert_eq!(
+        store
+          .load_bytes_with(EntryType::Directory, empty_dir.fingerprint(), |b| b)
+          .wait(),
+        Ok(Some(empty_dir.bytes())),
       )
     }
 
@@ -2334,7 +2369,7 @@ mod tests {
   fn wrong_remote_directory_bytes_is_error() {
     let dir = TempDir::new("store").unwrap();
 
-    let testdir = TestDirectory::empty();
+    let testdir = TestDirectory::containing_dnalor();
 
     let cas = StubCAS::with_unverified_content(
       1024,
@@ -2360,11 +2395,6 @@ mod tests {
     let dir = TempDir::new("store").unwrap();
 
     let empty_dir = TestDirectory::empty();
-
-    new_local_store(dir.path())
-      .record_directory(&empty_dir.directory(), false)
-      .wait()
-      .expect("Error storing directory locally");
 
     let expanded = new_local_store(dir.path())
       .expand_directory(empty_dir.digest())
@@ -2435,12 +2465,13 @@ mod tests {
   #[test]
   fn expand_missing_directory() {
     let dir = TempDir::new("store").unwrap();
+    let digest = TestDirectory::containing_roland().digest();
     let error = new_local_store(dir.path())
-      .expand_directory(TestDirectory::empty().digest())
+      .expand_directory(digest)
       .wait()
       .expect_err("Want error");
     assert!(
-      error.contains(&format!("{:?}", TestDirectory::empty().digest())),
+      error.contains(&format!("{:?}", digest)),
       "Bad error message: {}",
       error
     );
@@ -2896,14 +2927,9 @@ mod tests {
   fn contents_for_directory_empty() {
     let store_dir = TempDir::new("store").unwrap();
     let store = new_local_store(store_dir.path());
-    let empty_directory = TestDirectory::empty().directory();
-    store
-      .record_directory(&empty_directory, false)
-      .wait()
-      .expect("Error saving Directory");
 
     let file_contents = store
-      .contents_for_directory(empty_directory)
+      .contents_for_directory(TestDirectory::empty().directory())
       .wait()
       .expect("Getting FileContents");
 
