@@ -455,7 +455,7 @@ impl From<Select> for NodeKey {
   }
 }
 
-fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
+pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
   let fingerprint = externs::project_str(&digest, "fingerprint");
   let digest_length = externs::project_str(&digest, "serialized_bytes_length");
   let digest_length_as_usize = digest_length
@@ -682,7 +682,7 @@ impl Snapshot {
     })
   }
 
-  fn store_directory(core: &Arc<Core>, item: &hashing::Digest) -> Value {
+  pub fn store_directory(core: &Arc<Core>, item: &hashing::Digest) -> Value {
     externs::unsafe_call(
       &core.types.construct_directory_digest,
       &[

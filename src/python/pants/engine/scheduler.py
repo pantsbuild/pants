@@ -331,6 +331,18 @@ class Scheduler(object):
     )
     return self._raise_or_return(result)
 
+  def merge_directories(self, directory_digests):
+    """Merges any number of directories.
+
+    :param directory_digests: Tuple of DirectoryDigests.
+    :return: A DirectoryDigest.
+    """
+    result = self._native.lib.merge_directories(
+      self._scheduler,
+      self._to_value(_DirectoryDigests(directory_digests)),
+    )
+    return self._raise_or_return(result)
+
   def lease_files_in_graph(self):
     self._native.lib.lease_files_in_graph(self._scheduler)
 
@@ -343,6 +355,9 @@ class Scheduler(object):
 
 
 _PathGlobsAndRootCollection = Collection.of(PathGlobsAndRoot)
+
+
+_DirectoryDigests = Collection.of(DirectoryDigest)
 
 
 class SchedulerSession(object):
@@ -516,6 +531,9 @@ class SchedulerSession(object):
     :returns: A tuple of Snapshots.
     """
     return self._scheduler.capture_snapshots(path_globs_and_roots)
+
+  def merge_directories(self, directory_digests):
+    return self._scheduler.merge_directories(directory_digests)
 
   def lease_files_in_graph(self):
     self._scheduler.lease_files_in_graph()

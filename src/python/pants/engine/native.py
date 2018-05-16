@@ -223,6 +223,8 @@ PyResult  execution_add_root_select(Scheduler*, ExecutionRequest*, Key, TypeCons
 
 PyResult capture_snapshots(Scheduler*, Value);
 
+PyResult merge_directories(Scheduler*, Value);
+
 Value validator_run(Scheduler*);
 
 void rule_graph_visualize(Scheduler*, TypeIdBuffer, char*);
