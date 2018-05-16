@@ -23,6 +23,7 @@ from pants.option.optionable import Optionable
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
+from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.dirutil import safe_mkdir, safe_rm_oldest_items_in_dir
 from pants.util.memo import memoized_method, memoized_property
@@ -87,8 +88,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(TaskBase, cls).subsystem_dependencies() + (CacheSetup.scoped(cls),
-                                                            BuildInvalidator.Factory)
+    return (super(TaskBase, cls).subsystem_dependencies() +
+            (CacheSetup.scoped(cls), BuildInvalidator.Factory, SourceRootConfig))
 
   @classmethod
   def product_types(cls):
