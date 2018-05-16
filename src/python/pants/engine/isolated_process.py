@@ -14,21 +14,27 @@ from pants.util.objects import TypeCheckError, datatype
 logger = logging.getLogger(__name__)
 
 
-class ExecuteProcessRequest(datatype([('argv', tuple), ('env', tuple), ('input_files', DirectoryDigest)])):
+class ExecuteProcessRequest(datatype([
+  ('argv', tuple),
+  ('env', tuple),
+  ('input_files', DirectoryDigest),
+  ('output_files', tuple)
+])):
   """Request for execution with args and snapshots to extract."""
 
   @classmethod
-  def create_from_snapshot(cls, argv, env, snapshot):
+  def create_from_snapshot(cls, argv, env, snapshot, output_files):
     cls._verify_env_is_dict(env)
     return ExecuteProcessRequest(
       argv=argv,
       env=tuple(env.items()),
       input_files=snapshot.directory_digest,
+      output_files=output_files,
     )
 
   @classmethod
-  def create_with_empty_snapshot(cls, argv, env):
-    return cls.create_from_snapshot(argv, env, EMPTY_SNAPSHOT)
+  def create_with_empty_snapshot(cls, argv, env, output_files):
+    return cls.create_from_snapshot(argv, env, EMPTY_SNAPSHOT, output_files)
 
   @classmethod
   def _verify_env_is_dict(cls, env):
@@ -42,5 +48,5 @@ class ExecuteProcessRequest(datatype([('argv', tuple), ('env', tuple), ('input_f
       )
 
 
-class ExecuteProcessResult(datatype(['stdout', 'stderr', 'exit_code'])):
+class ExecuteProcessResult(datatype(['stdout', 'stderr', 'exit_code', 'output_directory_digest'])):
   pass

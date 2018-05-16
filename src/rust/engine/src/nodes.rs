@@ -73,7 +73,7 @@ impl VFS<Failure> for Context {
 
 impl StoreFileByDigest<Failure> for Context {
   fn store_by_digest(&self, file: File) -> BoxFuture<hashing::Digest, Failure> {
-    self.get(DigestFile(file))
+    self.get(DigestFile(file.clone()))
   }
 }
 
@@ -380,6 +380,7 @@ impl Select {
             ..
           }) => {
             let context = context.clone();
+            let context2 = context.clone();
             self
               .execute_process(&context, &entry)
               .map(move |result| {
@@ -389,6 +390,7 @@ impl Select {
                     externs::store_bytes(&result.0.stdout),
                     externs::store_bytes(&result.0.stderr),
                     externs::store_i64(result.0.exit_code as i64),
+                    Snapshot::store_directory(&context2, &result.0.output_directory),
                   ],
                 )
               })
@@ -491,10 +493,16 @@ impl ExecuteProcess {
     let digest = lift_digest(&externs::project_ignoring_type(&value, "input_files"))
       .map_err(|err| format!("Error parsing digest {}", err))?;
 
+    let output_files = externs::project_multi_strs(&value, "output_files")
+      .into_iter()
+      .map(|path: String| PathBuf::from(path))
+      .collect();
+
     Ok(ExecuteProcess(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
       input_files: digest,
+      output_files: output_files,
     }))
   }
 }
@@ -508,22 +516,26 @@ impl Node for ExecuteProcess {
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0;
     let context2 = context.clone();
+
+    let command_runner = process_execution::local::CommandRunner::new(
+      context.core.store.clone(),
+      context.core.fs_pool.clone(),
+    );
+
     // TODO: Process pool management should likely move into the `process_execution` crate, which
     // will have different strategies depending on remote/local execution.
     context
       .core
-      .pool
+      .fs_pool
       .spawn_fn(move || {
         let tmpdir = TempDir::new("process-execution").unwrap();
+        let dir = tmpdir.path().to_owned();
         context2
           .core
           .store
-          .materialize_directory(tmpdir.path().to_owned(), request.input_files)
-          .map(move |_| {
-            ProcessResult(
-              process_execution::local::run_command_locally(request, tmpdir.path()).unwrap(),
-            )
-          })
+          .materialize_directory(dir.clone(), request.input_files)
+          .and_then(move |()| command_runner.run(request, tmpdir))
+          .map(|result| ProcessResult(result))
           .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
       })
       .to_boxed()

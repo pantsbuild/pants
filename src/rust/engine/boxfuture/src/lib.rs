@@ -23,3 +23,19 @@ where
     Box::new(self)
   }
 }
+
+///
+/// Just like try! (or the ? operator) but which early-returns a Box<FutureResult<Err>> instead of
+/// an Err.
+///
+#[macro_export]
+macro_rules! try_future {
+( $x:expr) => {
+    {
+        match $x {
+            Ok(value) => {value}
+            Err(error) => {return future::err(error).to_boxed();}
+        }
+    }
+};
+}

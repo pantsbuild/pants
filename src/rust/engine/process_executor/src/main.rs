@@ -11,7 +11,7 @@ use clap::{App, AppSettings, Arg};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use tempdir::TempDir;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::iter::Iterator;
 use std::process::exit;
 use std::sync::Arc;
@@ -128,6 +128,7 @@ fn main() {
     argv,
     env,
     input_files,
+    output_files: BTreeSet::new(),
   };
 
   let result = match server_arg {
@@ -141,7 +142,9 @@ fn main() {
         .materialize_directory(dir.path().to_owned(), request.input_files)
         .wait()
         .expect("Error materializing directory");
-      process_execution::local::run_command_locally(request, dir.path())
+      process_execution::local::CommandRunner::new(store, pool)
+        .run(request, dir)
+        .wait()
         .expect("Error executing locally")
     }
   };
