@@ -268,15 +268,18 @@ impl Snapshot {
             .group_by(|d| d.name.clone())
             .into_iter()
             .map(move |(child_name, group)| {
-              Self::merge_directories(
-                store2.clone(),
-                group.map(|d| d.get_digest().into()).collect(),
-              ).map(move |merged_digest| {
-                let mut child_dir = bazel_protos::remote_execution::DirectoryNode::new();
-                child_dir.set_name(child_name);
-                child_dir.set_digest((&merged_digest).into());
-                child_dir
-              })
+              let store2 = store2.clone();
+              let digests_result = group
+                .map(|d| d.get_digest().into())
+                .collect::<Result<Vec<_>, String>>();
+              future::done(digests_result)
+                .and_then(move |digests| Self::merge_directories(store2.clone(), digests))
+                .map(move |merged_digest| {
+                  let mut child_dir = bazel_protos::remote_execution::DirectoryNode::new();
+                  child_dir.set_name(child_name);
+                  child_dir.set_digest((&merged_digest).into());
+                  child_dir
+                })
             })
             .collect::<Vec<_>>(),
         ).and_then(move |child_directories| {
@@ -584,8 +587,10 @@ mod tests {
     assert_eq!(merged_root_directory.directories.len(), 1);
 
     let merged_child_dirnode = merged_root_directory.directories[0].clone();
+    let merged_child_dirnode_digest: Result<Digest, String> =
+      merged_child_dirnode.get_digest().into();
     let merged_child_directory = store
-      .load_directory(merged_child_dirnode.get_digest().into())
+      .load_directory(merged_child_dirnode_digest.unwrap())
       .wait()
       .unwrap()
       .unwrap();

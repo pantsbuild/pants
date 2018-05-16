@@ -10,6 +10,7 @@ mod pool;
 pub use pool::ResettablePool;
 
 extern crate bazel_protos;
+#[macro_use]
 extern crate boxfuture;
 extern crate byteorder;
 extern crate bytes;

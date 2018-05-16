@@ -71,11 +71,8 @@ impl super::CommandRunner for CommandRunner {
     match execute_request_result {
       Ok((command, execute_request)) => {
         let command_runner = self.clone();
-        self
-          .upload_command(
-            &command,
-            execute_request.get_action().get_command_digest().into(),
-          )
+        let command_digest = try_future!(execute_request.get_action().get_command_digest().into());
+        self.upload_command(&command, command_digest)
           .and_then(move |_| {
             debug!(
               "Executing remotely request: {:?} (command: {:?})",
@@ -361,7 +358,12 @@ impl CommandRunner {
     execute_response: &bazel_protos::remote_execution::ExecuteResponse,
   ) -> BoxFuture<Bytes, ExecutionError> {
     let stdout = if execute_response.get_result().has_stdout_digest() {
-      let stdout_digest = execute_response.get_result().get_stdout_digest().into();
+      let stdout_digest_result: Result<Digest, String> =
+        execute_response.get_result().get_stdout_digest().into();
+      let stdout_digest = try_future!(
+        stdout_digest_result
+          .map_err(|err| ExecutionError::Fatal(format!("Error extracting stdout: {}", err)))
+      );
       self
         .store
         .load_file_bytes_with(stdout_digest, |v| v)
@@ -401,7 +403,12 @@ impl CommandRunner {
     execute_response: &bazel_protos::remote_execution::ExecuteResponse,
   ) -> BoxFuture<Bytes, ExecutionError> {
     let stderr = if execute_response.get_result().has_stderr_digest() {
-      let stderr_digest = execute_response.get_result().get_stderr_digest().into();
+      let stderr_digest_result: Result<Digest, String> =
+        execute_response.get_result().get_stderr_digest().into();
+      let stderr_digest = try_future!(
+        stderr_digest_result
+          .map_err(|err| ExecutionError::Fatal(format!("Error extracting stderr: {}", err)))
+      );
       self
         .store
         .load_file_bytes_with(stderr_digest, |v| v)
@@ -443,17 +450,18 @@ impl CommandRunner {
     let mut futures = vec![];
     let path_map = Arc::new(Mutex::new(HashMap::new()));
     let path_map_2 = path_map.clone();
-    let path_stats: Vec<PathStat> = execute_response
+    let path_stats_result: Result<Vec<PathStat>, String> = execute_response
       .get_result()
       .get_output_files()
       .into_iter()
       .map(|output_file| {
         let output_file_path_buf = PathBuf::from(output_file.get_path());
         if output_file.has_digest() {
+          let digest: Result<Digest, String> = output_file.get_digest().into();
           let mut underlying_path_map = path_map.lock().unwrap();
           underlying_path_map.insert(
             output_file_path_buf.clone(),
-            output_file.get_digest().into(),
+            digest?,
           );
         } else {
           let raw_content = output_file.content.clone();
@@ -476,15 +484,17 @@ impl CommandRunner {
               }),
           );
         }
-        PathStat::file(
+        Ok(PathStat::file(
           output_file_path_buf.clone(),
           File {
             path: output_file_path_buf.clone(),
             is_executable: output_file.get_is_executable(),
           },
-        )
+        ))
       })
       .collect();
+
+    let path_stats = try_future!(path_stats_result.map_err(|err| ExecutionError::Fatal(err)));
 
     #[derive(Clone)]
     struct StoreOneOffRemoteDigest {

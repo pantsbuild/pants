@@ -308,7 +308,11 @@ impl BuildResultFS {
               });
 
               for (digest, name, filetype, is_executable) in directories.chain(files) {
-                let child_digest = digest.into();
+                let child_digest_result: Result<Digest, String> = digest.into();
+                let child_digest = child_digest_result.map_err(|err| {
+                  error!("Error parsing digest: {:?}", err);
+                  libc::ENOENT
+                })?;
                 let maybe_child_inode = match filetype {
                   fuse::FileType::Directory => self.inode_for_directory(child_digest),
                   fuse::FileType::RegularFile => self.inode_for_file(child_digest, is_executable),
@@ -406,11 +410,19 @@ impl fuse::Filesystem for BuildResultFS {
           })
           .and_then(|node| match node {
             Node::Directory(directory_node) => {
-              let digest = directory_node.get_digest().into();
+              let digest_result: Result<Digest, String> = directory_node.get_digest().into();
+              let digest = digest_result.map_err(|err| {
+                error!("Error parsing digest: {:?}", err);
+                libc::ENOENT
+              })?;
               self.dir_attr_for(digest)
             }
             Node::File(file_node) => {
-              let digest = file_node.get_digest().into();
+              let digest_result: Result<Digest, String> = file_node.get_digest().into();
+              let digest = digest_result.map_err(|err| {
+                error!("Error parsing digest: {:?}", err);
+                libc::ENOENT
+              })?;
               self
                 .inode_for_file(digest, file_node.get_is_executable())
                 .map_err(|err| {
