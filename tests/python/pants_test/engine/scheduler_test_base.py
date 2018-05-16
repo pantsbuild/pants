@@ -85,7 +85,10 @@ class SchedulerTestBase(object):
     states = [state for _, state in result.root_products]
     self.assertEqual(len(states), 1)
 
-    return states[0]
+    state = states[0]
+    if isinstance(state, Throw):
+      raise state.exc
+    return state
 
   def execute_raising_throw(self, scheduler, product, subject):
     resulting_value = self.execute_expecting_one_result(scheduler, product, subject)

@@ -1,4 +1,5 @@
 extern crate bazel_protos;
+#[macro_use]
 extern crate boxfuture;
 extern crate bytes;
 extern crate digest;
@@ -20,8 +21,9 @@ extern crate tempdir;
 extern crate testutil;
 
 use bytes::Bytes;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::hash::{Hash, Hasher};
+use std::path::PathBuf;
 
 pub mod local;
 pub mod remote;
@@ -49,6 +51,7 @@ pub struct ExecuteProcessRequest {
   pub env: BTreeMap<String, String>,
 
   pub input_files: hashing::Digest,
+  pub output_files: BTreeSet<PathBuf>,
 
   pub timeout: std::time::Duration,
   pub description: String,
@@ -79,4 +82,8 @@ pub struct ExecuteProcessResult {
   pub stdout: Bytes,
   pub stderr: Bytes,
   pub exit_code: i32,
+
+  // It's unclear whether this should be a Snapshot or a digest of a Directory. A Directory digest
+  // is handy, so let's try that out for now.
+  pub output_directory: hashing::Digest,
 }

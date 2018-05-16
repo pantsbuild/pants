@@ -167,7 +167,7 @@ If new commits have landed after your release commit, you can reset to your comm
     $ ./build-support/bin/release.sh
 
 This also performs a dry run and then proceeds to upload the smoke
-tested wheels to PyPi.
+tested wheels to PyPi. It may take a few minutes for the packages to be downloadable.
 
 4. Announce
 -----------
@@ -192,24 +192,10 @@ if the tag for the prior release (eg: release_0.0.33)
     :::bash
     $ ./build-support/bin/contributors.sh -s <tag>
 
-Owners
+Listing Packages and Owners
 ------
 
-The following folks are set up to publish to pypi for
-pantsbuild.pants wheels:
-
-Name              | Email                       | PYPI Usename
-------------------|-----------------------------|---------------
-John Sirois       | john.sirois@gmail.com       | john.sirois
-Benjy Weinberger  | benjyw@gmail.com            | benjyw
-Ity Kaul          | itykaul@gmail.com           | ity
-Stu Hood          | stuhood@gmail.com           | stuhood
-Mateo Rodriguez   | mateorod9@gmail.com         | mateor
-Yi Cheng          | wisechengyi@gmail.com       | wisechengyi
-Daniel Wagner-Hall| dawagner@gmail.com          | illicitonion
-
-And the current list of packages that these folks can release can
-be obtained via:
+The current list of packages can be obtained via :
 
     :::bash
     $ ./build-support/bin/release.sh -l
@@ -217,21 +203,23 @@ be obtained via:
 Right now that's:
 
 - pantsbuild.pants
-- pantsbuild.pants.testinfra
-- pantsbuild.pants.contrib.scrooge
+- pantsbuild.pants.contrib.avro
 - pantsbuild.pants.contrib.buildgen
+- pantsbuild.pants.contrib.codeanalysis
+- pantsbuild.pants.contrib.confluence
+- pantsbuild.pants.contrib.cpp
+- pantsbuild.pants.contrib.errorprone
+- pantsbuild.pants.contrib.findbugs
 - pantsbuild.pants.contrib.go
+- pantsbuild.pants.contrib.googlejavaformat
+- pantsbuild.pants.contrib.jax_ws
+- pantsbuild.pants.contrib.mypy
 - pantsbuild.pants.contrib.node
 - pantsbuild.pants.contrib.python.checks
 - pantsbuild.pants.contrib.scalajs
-- pantsbuild.pants.contrib.findbugs
-- pantsbuild.pants.contrib.cpp
-- pantsbuild.pants.contrib.confluence
-- pantsbuild.pants.contrib.errorprone
-- pantsbuild.pants.contrib.codeanalysis
-- pantsbuild.pants.contrib.jax_ws
-- pantsbuild.pants.contrib.mypy
-- pantsbuild.pants.contrib.avro
+- pantsbuild.pants.contrib.scrooge
+- pantsbuild.pants.contrib.thrifty
+- pantsbuild.pants.testinfra
 
 You can run the following to get a full ownership roster for each
 package :

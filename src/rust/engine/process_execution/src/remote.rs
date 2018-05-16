@@ -6,7 +6,7 @@ use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
-use fs::Store;
+use fs::{self, Store};
 use futures::{future, Future};
 use futures_timer::Delay;
 use hashing::{Digest, Fingerprint};
@@ -35,17 +35,6 @@ enum ExecutionError {
   MissingDigests(Vec<Digest>),
   // String is the operation name which can be used to poll the GetOperation gRPC API.
   NotFinished(String),
-}
-
-macro_rules! try_future {
-( $x:expr) => {
-    {
-        match $x {
-            Ok(value) => {value}
-            Err(error) => {return future::err(error).to_boxed();}
-        }
-    }
-};
 }
 
 impl CommandRunner {
@@ -139,10 +128,10 @@ impl CommandRunner {
           .and_then(move |(execute_request, operation)| {
             let start_time = SystemTime::now();
             let timeout: Duration = req_timeout;
-            let temp_req_description = req_description.clone();
+            let req_description = req_description.clone();
 
             future::loop_fn((operation, 0), move |(operation, iter_num)| {
-              let temp_req_description = req_description.clone();
+              let req_description = req_description.clone();
 
               let execute_request = execute_request.clone();
               let execution_client2 = execution_client2.clone();
@@ -193,7 +182,7 @@ impl CommandRunner {
                               if elapsed > timeout {
                                 future::err(format!(
                                   "Exceeded time out of {:?} with {:?} for operation {}, {}",
-                                  timeout, elapsed, operation_name, temp_req_description
+                                  timeout, elapsed, operation_name, req_description
                                 )).to_boxed() as BoxFuture<_, _>
                               } else {
                                 // maybe the delay here should be the min of remaining time and the backoff period
@@ -202,7 +191,7 @@ impl CommandRunner {
                                     format!(
                                         // could this message be better?
                                         "Future-Delay errored at operation result polling for {}, {}: {}",
-                                          operation_name, temp_req_description, e)
+                                          operation_name, req_description, e)
                                   })
                                   .and_then(move |_| {
                                     future::ok(future::Loop::Continue((operation, iter_num + 1)))
@@ -288,6 +277,8 @@ impl CommandRunner {
             stdout: stdout,
             stderr: stderr,
             exit_code: execute_response.get_result().get_exit_code(),
+            // TODO: Populate output directory: https://github.com/pantsbuild/pants/issues/5709
+            output_directory: fs::EMPTY_DIGEST,
           }).to_boxed(),
           grpcio::RpcStatusCode::FailedPrecondition => {
             if execute_response.get_status().get_details().len() != 1 {
@@ -516,7 +507,7 @@ mod tests {
   use testutil::{as_bytes, owned_string_vec};
 
   use super::{CommandRunner, ExecuteProcessRequest, ExecuteProcessResult, ExecutionError};
-  use std::collections::BTreeMap;
+  use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
   use std::sync::Arc;
   use std::time::{Duration, SystemTime};
@@ -544,6 +535,7 @@ mod tests {
           argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
           env: BTreeMap::new(),
           input_files: fs::EMPTY_DIGEST,
+          output_files: BTreeSet::new(),
           timeout: Duration::from_millis(1000),
           description: "wrong command".to_string(),
         }).unwrap()
@@ -589,6 +581,7 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
+        output_directory: fs::EMPTY_DIGEST,
       }
     );
   }
@@ -611,6 +604,7 @@ mod tests {
         stdout: testdata.bytes(),
         stderr: testdata_empty.bytes(),
         exit_code: 0,
+        output_directory: fs::EMPTY_DIGEST,
       })
     );
   }
@@ -633,6 +627,7 @@ mod tests {
         stdout: testdata_empty.bytes(),
         stderr: testdata.bytes(),
         exit_code: 0,
+        output_directory: fs::EMPTY_DIGEST,
       })
     );
   }
@@ -668,6 +663,7 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
+        output_directory: fs::EMPTY_DIGEST,
       }
     );
   }
@@ -899,6 +895,7 @@ mod tests {
         stdout: roland.bytes(),
         stderr: Bytes::from(""),
         exit_code: 0,
+        output_directory: fs::EMPTY_DIGEST,
       })
     );
     {
@@ -974,6 +971,7 @@ mod tests {
       stdout: as_bytes("roland"),
       stderr: Bytes::from("simba"),
       exit_code: 17,
+      output_directory: fs::EMPTY_DIGEST,
     };
 
     let mut operation = bazel_protos::operations::Operation::new();
@@ -1183,6 +1181,7 @@ mod tests {
       argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
+      output_files: BTreeSet::new(),
       timeout: Duration::from_millis(5000),
       description: "echo a foo".to_string(),
     }
@@ -1343,6 +1342,7 @@ mod tests {
       argv: owned_string_vec(&["/bin/cat", "roland"]),
       env: BTreeMap::new(),
       input_files: TestDirectory::containing_roland().digest(),
+      output_files: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "cat a roland".to_string(),
     }

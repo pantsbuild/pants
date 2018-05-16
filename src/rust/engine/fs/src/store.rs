@@ -1,3 +1,5 @@
+use FileContent;
+
 use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
@@ -353,7 +355,7 @@ impl Store {
     }
   }
 
-  fn expand_directory(&self, digest: Digest) -> BoxFuture<HashMap<Digest, EntryType>, String> {
+  pub fn expand_directory(&self, digest: Digest) -> BoxFuture<HashMap<Digest, EntryType>, String> {
     let accumulator = Arc::new(Mutex::new(HashMap::new()));
 
     self
@@ -471,6 +473,79 @@ impl Store {
       })
       .to_boxed()
   }
+
+  // Returns files sorted by their path.
+  pub fn contents_for_directory(
+    &self,
+    directory: bazel_protos::remote_execution::Directory,
+  ) -> BoxFuture<Vec<FileContent>, String> {
+    let accumulator = Arc::new(Mutex::new(HashMap::new()));
+    self
+      .contents_for_directory_helper(directory, PathBuf::new(), accumulator.clone())
+      .map(|()| {
+        let map = Arc::try_unwrap(accumulator).unwrap().into_inner().unwrap();
+        let mut vec: Vec<FileContent> = map
+          .into_iter()
+          .map(|(path, content)| FileContent { path, content })
+          .collect();
+        vec.sort_by(|l, r| l.path.cmp(&r.path));
+        vec
+      })
+      .to_boxed()
+  }
+
+  // Assumes that all fingerprints it encounters are valid.
+  fn contents_for_directory_helper(
+    &self,
+    directory: bazel_protos::remote_execution::Directory,
+    path_so_far: PathBuf,
+    contents_wrapped: Arc<Mutex<HashMap<PathBuf, Bytes>>>,
+  ) -> BoxFuture<(), String> {
+    let contents_wrapped_copy = contents_wrapped.clone();
+    let path_so_far_copy = path_so_far.clone();
+    let store_copy = self.clone();
+    let file_futures = future::join_all(
+      directory
+        .get_files()
+        .iter()
+        .map(move |file_node| {
+          let path = path_so_far_copy.join(file_node.get_name());
+          let contents_wrapped_copy = contents_wrapped_copy.clone();
+          store_copy
+            .load_file_bytes_with(file_node.get_digest().into(), |b| b)
+            .and_then(move |maybe_bytes| {
+              maybe_bytes
+                .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
+                .map(move |bytes| {
+                  let mut contents = contents_wrapped_copy.lock().unwrap();
+                  contents.insert(path, bytes);
+                })
+            })
+        })
+        .collect::<Vec<_>>(),
+    );
+    let store = self.clone();
+    let dir_futures = future::join_all(
+      directory
+        .get_directories()
+        .into_iter()
+        .map(move |dir_node| {
+          let digest = dir_node.get_digest().into();
+          let path = path_so_far.join(dir_node.get_name());
+          let store = store.clone();
+          let contents_wrapped = contents_wrapped.clone();
+          store
+            .load_directory(digest)
+            .and_then(move |maybe_dir| {
+              maybe_dir
+                .ok_or_else(|| format!("Could not find sub-directory with digest {:?}", digest))
+            })
+            .and_then(move |dir| store.contents_for_directory_helper(dir, path, contents_wrapped))
+        })
+        .collect::<Vec<_>>(),
+    );
+    file_futures.join(dir_futures).map(|(_, _)| ()).to_boxed()
+  }
 }
 
 // Only public for testing.
@@ -487,6 +562,7 @@ mod local {
   use byteorder::{ByteOrder, LittleEndian};
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
+  use futures::future;
   use hashing::{Digest, Fingerprint};
   use lmdb::{self, Cursor, Database, DatabaseFlags, Environment, RwTransaction, Transaction,
              WriteFlags, NO_OVERWRITE, NO_SYNC, NO_TLS};
@@ -501,6 +577,7 @@ mod local {
 
   use pool::ResettablePool;
   use super::MAX_LOCAL_STORE_SIZE_BYTES;
+  use super::super::EMPTY_FINGERPRINT;
 
   #[derive(Clone)]
   pub struct ByteStore {
@@ -773,6 +850,13 @@ mod local {
       fingerprint: Fingerprint,
       f: F,
     ) -> BoxFuture<Option<T>, String> {
+      if fingerprint == EMPTY_FINGERPRINT {
+        // Avoid expensive I/O for this super common case.
+        // Also, this allows some client-provided operations (like merging snapshots) to work
+        // without needing to first store the empty snapshot.
+        return future::ok(Some(f(Bytes::new()))).to_boxed();
+      }
+
       let dbs = match entry_type {
         EntryType::Directory => self.inner.directory_dbs.clone(),
         EntryType::File => self.inner.file_dbs.clone(),
@@ -1371,8 +1455,34 @@ mod local {
         .wait()
         .expect("Error storing");
       assert_eq!(
-        store.entry_type(&TestDirectory::empty().fingerprint()),
+        store.entry_type(&TestDirectory::recursive().fingerprint()),
         Ok(None)
+      )
+    }
+
+    #[test]
+    pub fn empty_file_is_known() {
+      let dir = TempDir::new("store").unwrap();
+      let store = new_store(dir.path());
+      let empty_file = TestData::empty();
+      assert_eq!(
+        store
+          .load_bytes_with(EntryType::File, empty_file.fingerprint(), |b| b)
+          .wait(),
+        Ok(Some(empty_file.bytes())),
+      )
+    }
+
+    #[test]
+    pub fn empty_directory_is_known() {
+      let dir = TempDir::new("store").unwrap();
+      let store = new_store(dir.path());
+      let empty_dir = TestDirectory::empty();
+      assert_eq!(
+        store
+          .load_bytes_with(EntryType::Directory, empty_dir.fingerprint(), |b| b)
+          .wait(),
+        Ok(Some(empty_dir.bytes())),
       )
     }
 
@@ -1928,7 +2038,7 @@ mod remote {
 
 #[cfg(test)]
 mod tests {
-  use super::{local, EntryType, Store};
+  use super::{local, EntryType, FileContent, Store};
 
   use bazel_protos;
   use bytes::Bytes;
@@ -2259,7 +2369,7 @@ mod tests {
   fn wrong_remote_directory_bytes_is_error() {
     let dir = TempDir::new("store").unwrap();
 
-    let testdir = TestDirectory::empty();
+    let testdir = TestDirectory::containing_dnalor();
 
     let cas = StubCAS::with_unverified_content(
       1024,
@@ -2285,11 +2395,6 @@ mod tests {
     let dir = TempDir::new("store").unwrap();
 
     let empty_dir = TestDirectory::empty();
-
-    new_local_store(dir.path())
-      .record_directory(&empty_dir.directory(), false)
-      .wait()
-      .expect("Error storing directory locally");
 
     let expanded = new_local_store(dir.path())
       .expand_directory(empty_dir.digest())
@@ -2360,12 +2465,13 @@ mod tests {
   #[test]
   fn expand_missing_directory() {
     let dir = TempDir::new("store").unwrap();
+    let digest = TestDirectory::containing_roland().digest();
     let error = new_local_store(dir.path())
-      .expand_directory(TestDirectory::empty().digest())
+      .expand_directory(digest)
       .wait()
       .expect_err("Want error");
     assert!(
-      error.contains(&format!("{:?}", TestDirectory::empty().digest())),
+      error.contains(&format!("{:?}", digest)),
       "Bad error message: {}",
       error
     );
@@ -2814,6 +2920,98 @@ mod tests {
     assert_eq!(
       store.load_directory(testdir.digest()).wait(),
       Ok(Some(testdir.directory()))
+    );
+  }
+
+  #[test]
+  fn contents_for_directory_empty() {
+    let store_dir = TempDir::new("store").unwrap();
+    let store = new_local_store(store_dir.path());
+
+    let file_contents = store
+      .contents_for_directory(TestDirectory::empty().directory())
+      .wait()
+      .expect("Getting FileContents");
+
+    assert_same_filecontents(file_contents, vec![]);
+  }
+
+  #[test]
+  fn contents_for_directory() {
+    let roland = TestData::roland();
+    let catnip = TestData::catnip();
+    let testdir = TestDirectory::containing_roland();
+    let recursive_testdir = TestDirectory::recursive();
+
+    let store_dir = TempDir::new("store").unwrap();
+    let store = new_local_store(store_dir.path());
+    store
+      .record_directory(&recursive_testdir.directory(), false)
+      .wait()
+      .expect("Error saving recursive Directory");
+    store
+      .record_directory(&testdir.directory(), false)
+      .wait()
+      .expect("Error saving Directory");
+    store
+      .store_file_bytes(roland.bytes(), false)
+      .wait()
+      .expect("Error saving file bytes");
+    store
+      .store_file_bytes(catnip.bytes(), false)
+      .wait()
+      .expect("Error saving catnip file bytes");
+
+    let file_contents = store
+      .contents_for_directory(recursive_testdir.directory())
+      .wait()
+      .expect("Getting FileContents");
+
+    assert_same_filecontents(
+      file_contents,
+      vec![
+        FileContent {
+          path: PathBuf::from("cats").join("roland"),
+          content: roland.bytes(),
+        },
+        FileContent {
+          path: PathBuf::from("treats"),
+          content: catnip.bytes(),
+        },
+      ],
+    );
+  }
+
+  fn assert_same_filecontents(left: Vec<FileContent>, right: Vec<FileContent>) {
+    assert_eq!(
+      left.len(),
+      right.len(),
+      "FileContents did not match, different lengths: left: {:?} right: {:?}",
+      left,
+      right
+    );
+
+    let mut success = true;
+    for (index, (l, r)) in left.iter().zip(right.iter()).enumerate() {
+      if l.path != r.path {
+        success = false;
+        eprintln!(
+          "Paths did not match for index {}: {:?}, {:?}",
+          index, l.path, r.path
+        );
+      }
+      if l.content != r.content {
+        success = false;
+        eprintln!(
+          "Content did not match for index {}: {:?}, {:?}",
+          index, l.content, r.content
+        );
+      }
+    }
+    assert!(
+      success,
+      "FileContents did not match: Left: {:?}, Right: {:?}",
+      left, right
     );
   }
 

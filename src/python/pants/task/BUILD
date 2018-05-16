@@ -20,6 +20,7 @@ python_library(
     'src/python/pants/reporting',
     'src/python/pants/scm',
     'src/python/pants/scm/subsystems:changed',
+    'src/python/pants/source',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',

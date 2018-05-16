@@ -74,7 +74,7 @@ impl VFS<Failure> for Context {
 
 impl StoreFileByDigest<Failure> for Context {
   fn store_by_digest(&self, file: File) -> BoxFuture<hashing::Digest, Failure> {
-    self.get(DigestFile(file))
+    self.get(DigestFile(file.clone()))
   }
 }
 
@@ -340,14 +340,38 @@ impl Select {
             kind: IntrinsicKind::FilesContent,
             ..
           }) => {
+            let ref edges = context
+              .core
+              .rule_graph
+              .edges_for_inner(entry)
+              .expect("Expected edges to exist for FilesContent intrinsic.");
             let context = context.clone();
-            self
-              .snapshot(&context, &entry)
-              .and_then(move |snapshot| {
-                // Request the file contents of the Snapshot, and then store them.
-                snapshot
-                  .contents(context.core.store.clone())
-                  .map_err(|e| throw(&e))
+            Select::new(
+              context.core.types.directory_digest.clone(),
+              self.subject.clone(),
+              self.variants.clone(),
+              edges,
+            ).run(context.clone())
+              .and_then(|directory_digest_val| {
+                lift_digest(&directory_digest_val).map_err(|str| throw(&str))
+              })
+              .and_then(move |digest| {
+                let store = context.core.store.clone();
+                context
+                  .core
+                  .store
+                  .load_directory(digest)
+                  .map_err(|str| throw(&str))
+                  .and_then(move |maybe_directory| {
+                    maybe_directory
+                      .ok_or_else(|| format!("Could not find directory with digest {:?}", digest))
+                      .map_err(|str| throw(&str))
+                  })
+                  .and_then(move |directory| {
+                    store
+                      .contents_for_directory(directory)
+                      .map_err(|str| throw(&str))
+                  })
                   .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
               })
               .to_boxed()
@@ -357,6 +381,7 @@ impl Select {
             ..
           }) => {
             let context = context.clone();
+            let context2 = context.clone();
             self
               .execute_process(&context, &entry)
               .map(move |result| {
@@ -366,6 +391,7 @@ impl Select {
                     externs::store_bytes(&result.0.stdout),
                     externs::store_bytes(&result.0.stderr),
                     externs::store_i64(result.0.exit_code as i64),
+                    Snapshot::store_directory(&context2, &result.0.output_directory),
                   ],
                 )
               })
@@ -431,6 +457,18 @@ impl From<Select> for NodeKey {
   }
 }
 
+fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
+  let fingerprint = externs::project_str(&digest, "fingerprint");
+  let digest_length = externs::project_str(&digest, "serialized_bytes_length");
+  let digest_length_as_usize = digest_length
+    .parse::<usize>()
+    .map_err(|err| format!("Length was not a usize: {:?}", err))?;
+  Ok(hashing::Digest(
+    hashing::Fingerprint::from_hex_string(&fingerprint)?,
+    digest_length_as_usize,
+  ))
+}
+
 ///
 /// A Node that represents executing a process.
 ///
@@ -438,18 +476,6 @@ impl From<Select> for NodeKey {
 pub struct ExecuteProcess(process_execution::ExecuteProcessRequest);
 
 impl ExecuteProcess {
-  fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
-    let fingerprint = externs::project_str(&digest, "fingerprint");
-    let digest_length = externs::project_str(&digest, "serialized_bytes_length");
-    let digest_length_as_usize = digest_length
-      .parse::<usize>()
-      .map_err(|err| format!("Length was not a usize: {:?}", err))?;
-    Ok(hashing::Digest(
-      hashing::Fingerprint::from_hex_string(&fingerprint)?,
-      digest_length_as_usize,
-    ))
-  }
-
   ///
   /// Lifts a Key representing a python ExecuteProcessRequest value into a ExecuteProcess Node.
   ///
@@ -465,17 +491,23 @@ impl ExecuteProcess {
         env_var_parts[2 * i + 1].clone(),
       );
     }
-    let digest = Self::lift_digest(&externs::project_ignoring_type(&value, "input_files"))
+    let digest = lift_digest(&externs::project_ignoring_type(&value, "input_files"))
       .map_err(|err| format!("Error parsing digest {}", err))?;
 
     // todo fix
     let timeout_in_seconds = 4.0;
     let description = "argv".to_string();
 
+    let output_files = externs::project_multi_strs(&value, "output_files")
+      .into_iter()
+      .map(|path: String| PathBuf::from(path))
+      .collect();
+
     Ok(ExecuteProcess(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
       input_files: digest,
+      output_files: output_files,
       timeout: Duration::from_millis((timeout_in_seconds * 1000.0) as u64),
       description: description,
     }))
@@ -491,22 +523,26 @@ impl Node for ExecuteProcess {
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0;
     let context2 = context.clone();
+
+    let command_runner = process_execution::local::CommandRunner::new(
+      context.core.store.clone(),
+      context.core.fs_pool.clone(),
+    );
+
     // TODO: Process pool management should likely move into the `process_execution` crate, which
     // will have different strategies depending on remote/local execution.
     context
       .core
-      .pool
+      .fs_pool
       .spawn_fn(move || {
         let tmpdir = TempDir::new("process-execution").unwrap();
+        let dir = tmpdir.path().to_owned();
         context2
           .core
           .store
-          .materialize_directory(tmpdir.path().to_owned(), request.input_files)
-          .map(move |_| {
-            ProcessResult(
-              process_execution::local::run_command_locally(request, tmpdir.path()).unwrap(),
-            )
-          })
+          .materialize_directory(dir.clone(), request.input_files)
+          .and_then(move |()| command_runner.run(request, tmpdir))
+          .map(|result| ProcessResult(result))
           .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
       })
       .to_boxed()

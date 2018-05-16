@@ -55,7 +55,8 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
   def assert_content(self, filespecs, expected_content):
     with self.mk_project_tree() as project_tree:
       scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
-      result = self.execute(scheduler, FilesContent, self.specs('', *filespecs))[0]
+      snapshot = self.execute_expecting_one_result(scheduler, Snapshot, self.specs('', *filespecs)).value
+      result = self.execute_expecting_one_result(scheduler, FilesContent, snapshot.directory_digest).value
       actual_content = {f.path: f.content for f in result.dependencies}
       self.assertEquals(expected_content, actual_content)
 
