@@ -98,6 +98,11 @@ impl super::CommandRunner for CommandRunner {
       })
       .to_boxed()
   }
+
+  fn reset_prefork(&self) {
+    self.store.reset_prefork();
+    self.fs_pool.reset();
+  }
 }
 
 #[cfg(test)]
