@@ -6,9 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import six
 
 from pants.engine.fs import EMPTY_SNAPSHOT, DirectoryDigest
-from pants.util.objects import TypeCheckError, datatype
+from pants.util.objects import Exactly, SubclassesOf, TypeCheckError, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -19,8 +20,8 @@ class ExecuteProcessRequest(datatype([
   ('env', tuple),
   ('input_files', DirectoryDigest),
   ('output_files', tuple),
-  ('timeout', float),
-  ('description', str),
+  ('timeout', Exactly(float, int)),
+  ('description', SubclassesOf(*six.string_types)),
 ])):
   """Request for execution with args and snapshots to extract."""
 

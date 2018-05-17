@@ -247,12 +247,37 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
 
     # TODO(cosmicexplorer): we should probably check that the digest info in
     # ExecuteProcessRequest is valid, beyond just checking if it's a string.
-    with self.assertRaises(TypeCheckError):
-      ExecuteProcessRequest(argv=('1',), env=dict(), input_files='', output_files=())
-    with self.assertRaises(TypeCheckError):
-      ExecuteProcessRequest(argv=('1',), env=dict(), input_files=3, output_files=())
-    with self.assertRaises(TypeCheckError):
-      ExecuteProcessRequest(argv=('1',), env=tuple(), input_files=EMPTY_DIRECTORY_DIGEST, output_files=["blah"])
+    with self.assertRaisesRegexp(TypeCheckError, "env"):
+      ExecuteProcessRequest(
+        argv=('1',),
+        env=dict(),
+        input_files='',
+        output_files=(),
+        timeout=0.1,
+        description='')
+    with self.assertRaisesRegexp(TypeCheckError, "input_files"):
+      ExecuteProcessRequest(argv=('1',),
+        env=dict(),
+        input_files=3,
+        output_files=(),
+        timeout=0.1,
+        description='')
+    with self.assertRaisesRegexp(TypeCheckError, "output_files"):
+      ExecuteProcessRequest(
+        argv=('1',),
+        env=tuple(),
+        input_files=EMPTY_DIRECTORY_DIGEST,
+        output_files=["blah"],
+        timeout=0.1,
+        description='')
+    with self.assertRaisesRegexp(TypeCheckError, "timeout"):
+      ExecuteProcessRequest(
+        argv=('1',),
+        env=tuple(),
+        input_files=EMPTY_DIRECTORY_DIGEST,
+        output_files=["blah"],
+        timeout=None,
+        description='')
 
 
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
@@ -332,7 +357,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       dict(),
       tuple(),
       timeout=0.1,
-      description=str('sleepy-cat')
+      description='sleepy-cat',
     )
 
     self.execute_expecting_one_result(scheduler, ExecuteProcessResult, request).value
