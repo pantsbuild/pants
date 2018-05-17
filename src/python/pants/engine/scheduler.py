@@ -317,6 +317,14 @@ class Scheduler(object):
     return roots
 
   def capture_snapshots(self, path_globs_and_roots):
+    """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root directory.
+
+    This is a blocking operation, and should be avoided where possible.
+
+    :param path_globs_and_roots tuple<PathGlobsAndRoot>: The PathGlobs to capture, and the root
+           directory relative to which each should be captured.
+    :returns: A tuple of Snapshots.
+    """
     result = self._native.lib.capture_snapshots(
       self._scheduler,
       self._to_value(_PathGlobsAndRootCollection(path_globs_and_roots)),
@@ -499,6 +507,14 @@ class SchedulerSession(object):
     return self.products_request([product], subjects)[product]
 
   def capture_snapshots(self, path_globs_and_roots):
+    """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root directory.
+
+    This is a blocking operation, and should be avoided where possible.
+
+    :param path_globs_and_roots tuple<PathGlobsAndRoot>: The PathGlobs to capture, and the root
+           directory relative to which each should be captured.
+    :returns: A tuple of Snapshots.
+    """
     return self._scheduler.capture_snapshots(path_globs_and_roots)
 
   def lease_files_in_graph(self):
