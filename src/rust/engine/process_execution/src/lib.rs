@@ -51,9 +51,11 @@ pub struct ExecuteProcessRequest {
   pub env: BTreeMap<String, String>,
 
   pub input_files: hashing::Digest,
+
   pub output_files: BTreeSet<PathBuf>,
 
   pub timeout: std::time::Duration,
+
   pub description: String,
 }
 

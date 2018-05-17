@@ -189,9 +189,9 @@ impl CommandRunner {
                                 Delay::new(Duration::from_millis(backoff_period))
                                   .map_err(move |e| {
                                     format!(
-                                        // could this message be better?
-                                        "Future-Delay errored at operation result polling for {}, {}: {}",
-                                          operation_name, req_description, e)
+                                          // could this message be better?
+                                          "Future-Delay errored at operation result polling for {}, {}: {}",
+                                            operation_name, req_description, e)
                                   })
                                   .and_then(move |_| {
                                     future::ok(future::Loop::Continue((operation, iter_num + 1)))
@@ -670,7 +670,17 @@ mod tests {
 
   #[test]
   fn timeout_after_sufficiently_delayed_getoperations() {
-    let execute_request = echo_foo_request();
+    let request_timeout = Duration::new(4, 0);
+    let delayed_operation_time = Duration::new(5, 0);
+
+    let execute_request = ExecuteProcessRequest {
+      argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: BTreeSet::new(),
+      timeout: request_timeout,
+      description: "echo-a-foo".to_string(),
+    };
 
     let mock_server = {
       let op_name = "gimme-foo".to_string();
@@ -680,7 +690,7 @@ mod tests {
         super::make_execute_request(&execute_request).unwrap().1,
         vec![
           make_incomplete_operation(&op_name),
-          make_delayed_incomplete_operation(&op_name, Duration::new(5, 0)),
+          make_delayed_incomplete_operation(&op_name, delayed_operation_time),
         ],
       ))
     };
@@ -688,6 +698,7 @@ mod tests {
     let error_msg = run_command_remote(mock_server.address(), execute_request)
       .expect_err("Timeout did not cause failure.");
     assert_contains(&error_msg, "Exceeded time out");
+    assert_contains(&error_msg, "echo-a-foo");
   }
 
   #[test]

@@ -129,7 +129,7 @@ fn main() {
     env,
     input_files,
     output_files: BTreeSet::new(),
-    timeout: Duration::from_millis(1000),
+    timeout: Duration::new(60, 0),
     description: "TODO".to_string(),
   };
 

@@ -19,25 +19,26 @@ class ExecuteProcessRequest(datatype([
   ('env', tuple),
   ('input_files', DirectoryDigest),
   ('output_files', tuple),
-  ('timeout', int),
-  ('description', str)])):
+  ('timeout', float),
+  ('description', str),
+])):
   """Request for execution with args and snapshots to extract."""
 
   @classmethod
-  def create_from_snapshot(cls, argv, env, snapshot, output_files):
+  def create_from_snapshot(cls, argv, env, snapshot, output_files, timeout=4, description='process'):
     cls._verify_env_is_dict(env)
     return ExecuteProcessRequest(
       argv=argv,
       env=tuple(env.items()),
       input_files=snapshot.directory_digest,
       output_files=output_files,
-      timeout=4,
-      description='process',
+      timeout=timeout,
+      description=description,
     )
 
   @classmethod
-  def create_with_empty_snapshot(cls, argv, env, output_files):
-    return cls.create_from_snapshot(argv, env, EMPTY_SNAPSHOT, output_files)
+  def create_with_empty_snapshot(cls, argv, env, output_files, timeout=4, description='process'):
+    return cls.create_from_snapshot(argv, env, EMPTY_SNAPSHOT, output_files, timeout, description)
 
   @classmethod
   def _verify_env_is_dict(cls, env):

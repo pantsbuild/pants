@@ -321,6 +321,22 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       (FileContent("roland", "European Burmese"),)
     )
 
+  def test_exercise_python_side_of_timeout_implementation(self):
+    # Local execution currently doesn't support timeouts,
+    # but this allows us to ensure that all of the setup
+    # on the python side does not blow up.
+    scheduler = self.mk_scheduler_in_example_fs(())
+
+    request = ExecuteProcessRequest.create_with_empty_snapshot(
+      ("/bin/bash", "-c", "/bin/sleep 1; echo -n 'European Burmese'"),
+      dict(),
+      tuple(),
+      timeout=0.1,
+      description=str('sleepy-cat')
+    )
+
+    self.execute_expecting_one_result(scheduler, ExecuteProcessResult, request).value
+
   def test_javac_compilation_example_success(self):
     scheduler = self.mk_scheduler_in_example_fs(create_javac_compile_rules())
 

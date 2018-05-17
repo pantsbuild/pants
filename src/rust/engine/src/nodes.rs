@@ -494,14 +494,17 @@ impl ExecuteProcess {
     let digest = lift_digest(&externs::project_ignoring_type(&value, "input_files"))
       .map_err(|err| format!("Error parsing digest {}", err))?;
 
-    // todo fix
-    let timeout_in_seconds = 4.0;
-    let description = "argv".to_string();
-
     let output_files = externs::project_multi_strs(&value, "output_files")
       .into_iter()
       .map(|path: String| PathBuf::from(path))
       .collect();
+
+    let timeout_str = externs::project_str(&value, "timeout");
+    let timeout_in_seconds = timeout_str
+      .parse::<f64>()
+      .map_err(|err| format!("Timeout was not a float: {:?}", err))?;
+
+    let description = externs::project_str(&value, "description");
 
     Ok(ExecuteProcess(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
