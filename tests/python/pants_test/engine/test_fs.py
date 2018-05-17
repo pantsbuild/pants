@@ -308,3 +308,46 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
   def assert_snapshot_equals(self, snapshot, files, directory_digest):
     self.assertEquals([file.path for file in snapshot.files], files)
     self.assertEquals(snapshot.directory_digest, directory_digest)
+
+  def test_merge_zero_directories(self):
+    scheduler = self.mk_scheduler(rules=create_fs_rules())
+    dir = scheduler.merge_directories(())
+    self.assertEqual(EMPTY_DIRECTORY_DIGEST, dir)
+
+  def test_merge_directories(self):
+    with temporary_dir() as temp_dir:
+      with open(os.path.join(temp_dir, "roland"), "w") as f:
+        f.write("European Burmese")
+      with open(os.path.join(temp_dir, "susannah"), "w") as f:
+        f.write("Not sure actually")
+      scheduler = self.mk_scheduler(rules=create_fs_rules())
+      (empty_snapshot, roland_snapshot, susannah_snapshot, both_snapshot) = (
+          scheduler.capture_snapshots((
+            PathGlobsAndRoot(PathGlobs(("doesnotmatch",), ()), temp_dir),
+            PathGlobsAndRoot(PathGlobs(("roland",), ()), temp_dir),
+            PathGlobsAndRoot(PathGlobs(("susannah",), ()), temp_dir),
+            PathGlobsAndRoot(PathGlobs(("*",), ()), temp_dir),
+        ))
+      )
+
+      empty_merged = scheduler.merge_directories((empty_snapshot.directory_digest))
+      self.assertEquals(
+        empty_snapshot.directory_digest,
+        empty_merged,
+      )
+
+      roland_merged = scheduler.merge_directories((
+        roland_snapshot.directory_digest,
+        empty_snapshot.directory_digest,
+      ))
+      self.assertEquals(
+        roland_snapshot.directory_digest,
+        roland_merged,
+      )
+
+      both_merged = scheduler.merge_directories((
+        roland_snapshot.directory_digest,
+        susannah_snapshot.directory_digest,
+      ))
+
+      self.assertEquals(both_snapshot.directory_digest, both_merged)

@@ -611,6 +611,32 @@ pub extern "C" fn capture_snapshots(
     .into()
 }
 
+#[no_mangle]
+pub extern "C" fn merge_directories(
+  scheduler_ptr: *mut Scheduler,
+  directories_value: Value,
+) -> PyResult {
+  let digests_result: Result<Vec<hashing::Digest>, String> =
+    externs::project_multi(&directories_value, "dependencies")
+      .iter()
+      .map(|v| nodes::lift_digest(v))
+      .collect();
+  let digests = match digests_result {
+    Ok(d) => d,
+    Err(err) => {
+      let e: Result<Value, String> = Err(err);
+      return e.into();
+    }
+  };
+
+  with_scheduler(scheduler_ptr, |scheduler| {
+    fs::Snapshot::merge_directories(scheduler.core.store.clone(), digests)
+      .wait()
+      .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
+      .into()
+  })
+}
+
 fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
   let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types);
   graph_maker.full_graph()
