@@ -14,6 +14,8 @@ from pants.util.objects import Exactly, SubclassesOf, TypeCheckError, datatype
 
 logger = logging.getLogger(__name__)
 
+_default_timeout = 15 * 60
+
 
 class ExecuteProcessRequest(datatype([
   ('argv', tuple),
@@ -26,7 +28,7 @@ class ExecuteProcessRequest(datatype([
   """Request for execution with args and snapshots to extract."""
 
   @classmethod
-  def create_from_snapshot(cls, argv, env, snapshot, output_files, timeout=4, description='process'):
+  def create_from_snapshot(cls, argv, env, snapshot, output_files, timeout=_default_timeout, description='process'):
     cls._verify_env_is_dict(env)
     return ExecuteProcessRequest(
       argv=argv,
@@ -38,7 +40,7 @@ class ExecuteProcessRequest(datatype([
     )
 
   @classmethod
-  def create_with_empty_snapshot(cls, argv, env, output_files, timeout=4, description='process'):
+  def create_with_empty_snapshot(cls, argv, env, output_files, timeout=_default_timeout, description='process'):
     return cls.create_from_snapshot(argv, env, EMPTY_SNAPSHOT, output_files, timeout, description)
 
   @classmethod

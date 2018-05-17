@@ -129,8 +129,8 @@ fn main() {
     env,
     input_files,
     output_files: BTreeSet::new(),
-    timeout: Duration::new(60, 0),
-    description: "TODO".to_string(),
+    timeout: Duration::new(15 * 60, 0),
+    description: "process_executor".to_string(),
   };
 
   let result = match server_arg {
