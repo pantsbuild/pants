@@ -11,7 +11,9 @@ import unittest
 from contextlib import contextmanager
 
 from pants.base.project_tree import Dir, Link
-from pants.engine.fs import FilesContent, PathGlobs, Snapshot, create_fs_rules
+from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, FilesContent, PathGlobs,
+                             PathGlobsAndRoot, Snapshot, create_fs_rules)
+from pants.util.contextutil import temporary_dir
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
@@ -259,3 +261,50 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
         (Dir('a'), DirectoryListing),
         (Dir('a/b'), DirectoryListing),
       ])
+
+  def test_snapshot_from_outside_buildroot(self):
+    with temporary_dir() as temp_dir:
+      with open(os.path.join(temp_dir, "roland"), "w") as f:
+        f.write("European Burmese")
+      scheduler = self.mk_scheduler(rules=create_fs_rules())
+      globs = PathGlobs(("*",), ())
+      snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, temp_dir),))[0]
+      self.assert_snapshot_equals(snapshot, ["roland"], DirectoryDigest(
+        str("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        80
+      ))
+
+  def test_multiple_snapshots_from_outside_buildroot(self):
+    with temporary_dir() as temp_dir:
+      with open(os.path.join(temp_dir, "roland"), "w") as f:
+        f.write("European Burmese")
+      with open(os.path.join(temp_dir, "susannah"), "w") as f:
+        f.write("I don't know")
+      scheduler = self.mk_scheduler(rules=create_fs_rules())
+      snapshots = scheduler.capture_snapshots((
+        PathGlobsAndRoot(PathGlobs(("roland",), ()), temp_dir),
+        PathGlobsAndRoot(PathGlobs(("susannah",), ()), temp_dir),
+        PathGlobsAndRoot(PathGlobs(("doesnotexist",), ()), temp_dir),
+      ))
+      self.assertEquals(3, len(snapshots))
+      self.assert_snapshot_equals(snapshots[0], ["roland"], DirectoryDigest(
+        str("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        80
+      ))
+      self.assert_snapshot_equals(snapshots[1], ["susannah"], DirectoryDigest(
+        str("d3539cfc21eb4bab328ca9173144a8e932c515b1b9e26695454eeedbc5a95f6f"),
+        82
+      ))
+      self.assert_snapshot_equals(snapshots[2], [], EMPTY_DIRECTORY_DIGEST)
+
+  def test_snapshot_from_outside_buildroot_failure(self):
+    with temporary_dir() as temp_dir:
+      scheduler = self.mk_scheduler(rules=create_fs_rules())
+      globs = PathGlobs(("*",), ())
+      with self.assertRaises(Exception) as cm:
+        scheduler.capture_snapshots((PathGlobsAndRoot(globs, str(os.path.join(temp_dir, "doesnotexist"))),))
+      self.assertIn("doesnotexist", str(cm.exception))
+
+  def assert_snapshot_equals(self, snapshot, files, directory_digest):
+    self.assertEquals([file.path for file in snapshot.files], files)
+    self.assertEquals(snapshot.directory_digest, directory_digest)

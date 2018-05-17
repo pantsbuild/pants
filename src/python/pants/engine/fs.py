@@ -49,6 +49,10 @@ class PathGlobs(datatype(['include', 'exclude'])):
                      tuple(join(relative_to, f) for f in exclude))
 
 
+class PathGlobsAndRoot(datatype([('path_globs', PathGlobs), ('root', str)])):
+  pass
+
+
 class DirectoryDigest(datatype([('fingerprint', str), ('serialized_bytes_length', int)])):
   """A DirectoryDigest is an opaque handle to a set of files known about by the engine.
 
