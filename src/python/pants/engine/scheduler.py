@@ -14,7 +14,8 @@ from types import GeneratorType
 from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
-from pants.engine.fs import DirectoryDigest, FileContent, FilesContent, Path, PathGlobs, Snapshot
+from pants.engine.fs import (DirectoryDigest, FileContent, FilesContent, Path, PathGlobs,
+                             PathGlobsAndRoot, Snapshot)
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
@@ -22,7 +23,7 @@ from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import Select, SelectVariant, constraint_for
 from pants.engine.struct import HasProducts, Variants
 from pants.util.contextutil import temporary_file_path
-from pants.util.objects import SubclassesOf, datatype
+from pants.util.objects import Collection, SubclassesOf, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -315,11 +316,10 @@ class Scheduler(object):
       self._native.lib.nodes_destroy(raw_roots)
     return roots
 
-  def capture_snapshot(self, root_path, path_globs):
-    result = self._native.lib.capture_snapshot(
+  def capture_snapshots(self, path_globs_and_roots):
+    result = self._native.lib.capture_snapshots(
       self._scheduler,
-      root_path,
-      self._to_value(path_globs),
+      self._to_value(_PathGlobsAndRootCollection(path_globs_and_roots)),
     )
     return self._raise_or_return(result)
 
@@ -332,6 +332,9 @@ class Scheduler(object):
   def new_session(self):
     """Creates a new SchedulerSession for this Scheduler."""
     return SchedulerSession(self, self._native.new_session(self._scheduler))
+
+
+_PathGlobsAndRootCollection = Collection.of(PathGlobsAndRoot)
 
 
 class SchedulerSession(object):
@@ -495,8 +498,8 @@ class SchedulerSession(object):
     """
     return self.products_request([product], subjects)[product]
 
-  def capture_snapshot(self, root_path, path_globs):
-    return self._scheduler.capture_snapshot(root_path, path_globs)
+  def capture_snapshots(self, path_globs_and_roots):
+    return self._scheduler.capture_snapshots(path_globs_and_roots)
 
   def lease_files_in_graph(self):
     self._scheduler.lease_files_in_graph()

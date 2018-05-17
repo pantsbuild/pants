@@ -221,7 +221,7 @@ void graph_trace(Scheduler*, ExecutionRequest*, char*);
 
 PyResult  execution_add_root_select(Scheduler*, ExecutionRequest*, Key, TypeConstraint);
 
-PyResult capture_snapshot(Scheduler*, char*, Value);
+PyResult capture_snapshots(Scheduler*, Value);
 
 Value validator_run(Scheduler*);
 

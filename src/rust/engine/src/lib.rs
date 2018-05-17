@@ -570,14 +570,23 @@ pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler) {
 }
 
 #[no_mangle]
-pub extern "C" fn capture_snapshot(
+pub extern "C" fn capture_snapshots(
   scheduler_ptr: *mut Scheduler,
-  raw_root_path: *const raw::c_char,
-  path_globs_value: Value,
+  path_globs_and_root_tuple_wrapper: Value,
 ) -> PyResult {
-  let root_path = unsafe { CStr::from_ptr(raw_root_path).to_string_lossy().into_owned() };
-  let path_globs = match nodes::Snapshot::lift_path_globs(&path_globs_value) {
-    Ok(pg) => pg,
+  let values = externs::project_multi(&path_globs_and_root_tuple_wrapper, "dependencies");
+  let path_globs_and_roots_result: Result<Vec<(fs::PathGlobs, PathBuf)>, String> = values
+    .iter()
+    .map(|value| {
+      let root = PathBuf::from(externs::project_str(&value, "root"));
+      let path_globs =
+        nodes::Snapshot::lift_path_globs(&externs::project_ignoring_type(&value, "path_globs"));
+      path_globs.map(|path_globs| (path_globs, root))
+    })
+    .collect();
+
+  let path_globs_and_roots = match path_globs_and_roots_result {
+    Ok(v) => v,
     Err(err) => {
       let e: Result<Value, String> = Err(err);
       return e.into();
@@ -586,10 +595,19 @@ pub extern "C" fn capture_snapshot(
 
   with_scheduler(scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
-    scheduler
-      .capture_snapshot_from_arbitrary_root(root_path, path_globs)
-      .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
-  }).wait()
+    futures::future::join_all(
+      path_globs_and_roots
+        .into_iter()
+        .map(|(path_globs, root)| {
+          let core = core.clone();
+          scheduler
+            .capture_snapshot_from_arbitrary_root(root, path_globs)
+            .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
+        })
+        .collect::<Vec<_>>(),
+    )
+  }).map(|values| externs::store_tuple(&values))
+    .wait()
     .into()
 }
 

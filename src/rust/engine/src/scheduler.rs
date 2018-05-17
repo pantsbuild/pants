@@ -11,7 +11,7 @@ use futures::future::{self, Future};
 use boxfuture::{BoxFuture, Boxable};
 use context::{Context, ContextFactory, Core};
 use core::{Failure, Key, TypeConstraint, TypeId, Value};
-use fs::{self, VFS};
+use fs::{self, PosixFS, VFS};
 use graph::EntryId;
 use nodes::{NodeKey, Select};
 use rule_graph;
@@ -231,7 +231,11 @@ impl Scheduler {
     // them for changes.
     // We assume that this Snapshot is of an immutable piece of the filesystem.
 
-    let posix_fs = Arc::new(try_future!(self.core.vfs.clone_with_root(root_path)));
+    let posix_fs = Arc::new(try_future!(PosixFS::new(
+      root_path,
+      self.core.fs_pool.clone(),
+      vec![]
+    )));
     let store = self.core.store.clone();
 
     posix_fs
