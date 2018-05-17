@@ -12,14 +12,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use futures::future::{self, Future};
-use tempdir::TempDir;
 
 use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
 use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDigest, VFS};
-use process_execution;
+use process_execution::{self, CommandRunner};
 use hashing;
 use rule_graph;
 use selectors;
@@ -514,7 +513,6 @@ impl Node for ExecuteProcess {
 
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0;
-    let context2 = context.clone();
 
     let command_runner = process_execution::local::CommandRunner::new(
       context.core.store.clone(),
@@ -527,13 +525,8 @@ impl Node for ExecuteProcess {
       .core
       .fs_pool
       .spawn_fn(move || {
-        let tmpdir = TempDir::new("process-execution").unwrap();
-        let dir = tmpdir.path().to_owned();
-        context2
-          .core
-          .store
-          .materialize_directory(dir.clone(), request.input_files)
-          .and_then(move |()| command_runner.run(request, tmpdir))
+        command_runner
+          .run(request)
           .map(|result| ProcessResult(result))
           .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
       })

@@ -37,6 +37,111 @@ enum ExecutionError {
   NotFinished(String),
 }
 
+impl super::CommandRunner for CommandRunner {
+  ///
+  /// Runs a command via a gRPC service implementing the Bazel Remote Execution API
+  /// (https://docs.google.com/document/d/1AaGk7fOPByEvpAbqeXIyE8HX_A3_axxNnvroblTZ_6s/edit).
+  ///
+  /// If the CommandRunner has a Store, files will be uploaded to the remote CAS as needed.
+  /// Note that it does not proactively upload files to a remote CAS. This is because if we will
+  /// get a cache hit, uploading the files was wasted time and bandwidth, and if the remote CAS
+  /// already has some files, uploading them all is a waste. Instead, we look at the responses we
+  /// get back from the server, and upload the files it says it's missing.
+  ///
+  /// In the future, we may want to do some clever things like proactively upload files which the
+  /// user has changed, or files which aren't known to the local git repository, but these are
+  /// optimizations to shave off a round-trip in the future.
+  ///
+  /// Loops until the server gives a response, either successful or error. Does not have any
+  /// timeout: polls in a tight loop.
+  ///
+  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<ExecuteProcessResult, String> {
+    let execution_client = self.execution_client.clone();
+    let execution_client2 = execution_client.clone();
+    let operations_client = self.operations_client.clone();
+
+    let store = self.store.clone();
+    let execute_request_result = make_execute_request(&req);
+
+    match execute_request_result {
+      Ok((command, execute_request)) => {
+        let command_runner = self.clone();
+        self.upload_command(&command, execute_request.get_action().get_command_digest().into())
+            .and_then(move |_| {
+              debug!("Executing remotely request: {:?} (command: {:?})", execute_request, command);
+
+              map_grpc_result(execution_client.get().execute(&execute_request))
+                  .map(|result| (Arc::new(execute_request), result))
+            })
+
+            // TODO: Add a timeout of some kind.
+            // https://github.com/pantsbuild/pants/issues/5504
+
+            .and_then(move |(execute_request, operation)| {
+              future::loop_fn((operation, 0), move |(operation, iter_num)| {
+
+                let execute_request = execute_request.clone();
+                let execution_client2 = execution_client2.clone();
+                let store = store.clone();
+                let operations_client = operations_client.clone();
+                command_runner.extract_execute_response(operation)
+                    .map(|value|  future::Loop::Break(value))
+                    .or_else(move |value| {
+                      match value {
+                        ExecutionError::Fatal(err) => {
+                          future::err(err).to_boxed()
+                        },
+                        ExecutionError::MissingDigests(missing_digests) => {
+                          debug!(
+                            "Server reported missing digests; trying to upload: {:?}",
+                            missing_digests
+                          );
+                          let execute_request = execute_request.clone();
+                          let execution_client2 = execution_client2.clone();
+                          store.ensure_remote_has_recursive(missing_digests)
+                              .and_then(move |()| {
+                                map_grpc_result(
+                                  execution_client2.get().execute(
+                                    &execute_request.clone()
+                                  )
+                                )
+                              })
+                              // Reset `iter_num` on `MissingDigests`
+                              .map(|operation| future::Loop::Continue((operation, 0)))
+                              .to_boxed()
+                        },
+                        ExecutionError::NotFinished(operation_name) => {
+                          let mut operation_request =
+                            bazel_protos::operations::GetOperationRequest::new();
+                          operation_request.set_name(operation_name.clone());
+
+                          let backoff_period = min(
+                            CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
+                            (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS);
+
+                          let grpc_result = map_grpc_result(
+                            operations_client.get().get_operation(&operation_request));
+
+                          Delay::new(Duration::from_millis(backoff_period))
+                              .map_err(move |e| format!(
+                                "Future-Delay errored at operation result polling for {}: {}",
+                                operation_name, e))
+                              .and_then(move |_| {
+                                future::ok(
+                                  future::Loop::Continue(
+                                    (try_future!(grpc_result), iter_num + 1))).to_boxed()
+                              }).to_boxed()
+                        },
+                      }
+                    })
+              })
+            }).to_boxed()
+      }
+      Err(err) => future::err(err).to_boxed(),
+    }
+  }
+}
+
 impl CommandRunner {
   const BACKOFF_INCR_WAIT_MILLIS: u64 = 500;
   const BACKOFF_MAX_WAIT_MILLIS: u64 = 5000;
@@ -76,112 +181,6 @@ impl CommandRunner {
     self.env.reset();
     self.execution_client.reset();
     self.operations_client.reset();
-  }
-
-  ///
-  /// Runs a command via a gRPC service implementing the Bazel Remote Execution API
-  /// (https://docs.google.com/document/d/1AaGk7fOPByEvpAbqeXIyE8HX_A3_axxNnvroblTZ_6s/edit).
-  ///
-  /// If the CommandRunner has a Store, files will be uploaded to the remote CAS as needed.
-  /// Note that it does not proactively upload files to a remote CAS. This is because if we will
-  /// get a cache hit, uploading the files was wasted time and bandwidth, and if the remote CAS
-  /// already has some files, uploading them all is a waste. Instead, we look at the responses we
-  /// get back from the server, and upload the files it says it's missing.
-  ///
-  /// In the future, we may want to do some clever things like proactively upload files which the
-  /// user has changed, or files which aren't known to the local git repository, but these are
-  /// optimizations to shave off a round-trip in the future.
-  ///
-  /// Loops until the server gives a response, either successful or error. Does not have any
-  /// timeout: polls in a tight loop.
-  ///
-  pub fn run_command_remote(
-    &self,
-    req: ExecuteProcessRequest,
-  ) -> BoxFuture<ExecuteProcessResult, String> {
-    let execution_client = self.execution_client.clone();
-    let execution_client2 = execution_client.clone();
-    let operations_client = self.operations_client.clone();
-
-    let store = self.store.clone();
-    let execute_request_result = make_execute_request(&req);
-
-    match execute_request_result {
-      Ok((command, execute_request)) => {
-        let command_runner = self.clone();
-        self.upload_command(&command, execute_request.get_action().get_command_digest().into())
-          .and_then(move |_| {
-            debug!("Executing remotely request: {:?} (command: {:?})", execute_request, command);
-
-            map_grpc_result(execution_client.get().execute(&execute_request))
-                .map(|result| (Arc::new(execute_request), result))
-          })
-
-          // TODO: Add a timeout of some kind.
-          // https://github.com/pantsbuild/pants/issues/5504
-
-          .and_then(move |(execute_request, operation)| {
-            future::loop_fn((operation, 0), move |(operation, iter_num)| {
-
-              let execute_request = execute_request.clone();
-              let execution_client2 = execution_client2.clone();
-              let store = store.clone();
-              let operations_client = operations_client.clone();
-              command_runner.extract_execute_response(operation)
-                  .map(|value|  future::Loop::Break(value))
-                  .or_else(move |value| {
-                    match value {
-                      ExecutionError::Fatal(err) => {
-                        future::err(err).to_boxed()
-                      },
-                      ExecutionError::MissingDigests(missing_digests) => {
-                        debug!(
-                        "Server reported missing digests; trying to upload: {:?}",
-                        missing_digests
-                        );
-                        let execute_request = execute_request.clone();
-                        let execution_client2 = execution_client2.clone();
-                        store.ensure_remote_has_recursive(missing_digests)
-                            .and_then(move |()| {
-                              map_grpc_result(
-                                execution_client2.get().execute(
-                                  &execute_request.clone()
-                                )
-                              )
-                            })
-                            // Reset `iter_num` on `MissingDigests`
-                            .map(|operation| future::Loop::Continue((operation, 0)))
-                            .to_boxed()
-                      },
-                      ExecutionError::NotFinished(operation_name) => {
-                        let mut operation_request =
-                          bazel_protos::operations::GetOperationRequest::new();
-                        operation_request.set_name(operation_name.clone());
-
-                        let backoff_period = min(
-                      CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
-                      (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS);
-
-                        let grpc_result = map_grpc_result(
-                    operations_client.get().get_operation(&operation_request));
-
-                        Delay::new(Duration::from_millis(backoff_period))
-                          .map_err(move |e| format!(
-                            "Future-Delay errored at operation result polling for {}: {}",
-                              operation_name, e))
-                            .and_then(move |_| {
-                              future::ok(
-                             future::Loop::Continue(
-                                  (try_future!(grpc_result), iter_num + 1))).to_boxed()
-                            }).to_boxed()
-                      },
-                    }
-                  })
-              })
-            }).to_boxed()
-      }
-      Err(err) => future::err(err).to_boxed(),
-    }
   }
 
   fn upload_command(
@@ -472,6 +471,7 @@ mod tests {
   use testutil::{as_bytes, owned_string_vec};
 
   use super::{CommandRunner, ExecuteProcessRequest, ExecuteProcessResult, ExecutionError};
+  use super::super::CommandRunner as CommandRunnerTrait;
   use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
   use std::sync::Arc;
@@ -825,7 +825,7 @@ mod tests {
       .expect("Saving file bytes to store");
 
     let result = CommandRunner::new(mock_server.address(), 1, store)
-      .run_command_remote(cat_roland_request())
+      .run(cat_roland_request())
       .wait();
     assert_eq!(
       result,
@@ -875,7 +875,7 @@ mod tests {
     ).expect("Failed to make store");
 
     let error = CommandRunner::new(mock_server.address(), 1, store)
-      .run_command_remote(cat_roland_request())
+      .run(cat_roland_request())
       .wait()
       .expect_err("Want error");
     assert_contains(&error, &format!("{}", missing_digest.0));
@@ -1206,7 +1206,7 @@ mod tests {
   ) -> Result<ExecuteProcessResult, String> {
     let cas = mock::StubCAS::with_roland_and_directory(1024);
     let command_runner = create_command_runner(address, &cas);
-    command_runner.run_command_remote(request).wait()
+    command_runner.run(request).wait()
   }
 
   fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
