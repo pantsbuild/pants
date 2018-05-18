@@ -13,7 +13,7 @@ use fs::{safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
 use graph::{EntryId, Graph};
 use handles::maybe_drain_handles;
 use nodes::{Node, NodeFuture};
-use process_execution::{self, CommandRunner};
+use process_execution::{self, BoundedCommandRunner, CommandRunner};
 use resettable::Resettable;
 use rule_graph::RuleGraph;
 use tasks::Tasks;
@@ -32,7 +32,7 @@ pub struct Core {
   pub runtime: Resettable<Arc<Runtime>>,
   pub store: Store,
   pub vfs: PosixFS,
-  pub command_runner: Arc<CommandRunner>,
+  pub command_runner: BoundedCommandRunner<process_execution::local::CommandRunner>,
 }
 
 impl Core {
@@ -62,8 +62,11 @@ impl Core {
       .and_then(|()| Store::local_only(store_path, fs_pool.clone()))
       .unwrap_or_else(|e| panic!("Could not initialize Store directory: {:?}", e));
 
-    let command_runner =
-      process_execution::local::CommandRunner::new(store.clone(), fs_pool.clone());
+    // TODO: Allow configuration of process concurrency.
+    let command_runner = BoundedCommandRunner::new(
+      process_execution::local::CommandRunner::new(store.clone(), fs_pool.clone()),
+      16,
+    );
 
     let rule_graph = RuleGraph::new(&tasks, root_subject_types);
 
@@ -80,7 +83,7 @@ impl Core {
       vfs: PosixFS::new(build_root, fs_pool, ignore_patterns).unwrap_or_else(|e| {
         panic!("Could not initialize VFS: {:?}", e);
       }),
-      command_runner: Arc::new(command_runner),
+      command_runner: command_runner,
     }
   }
 

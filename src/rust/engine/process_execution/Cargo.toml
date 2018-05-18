@@ -4,6 +4,7 @@ name = "process_execution"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
 [dependencies]
+async_semaphore = { path = "../async_semaphore" }
 bazel_protos = { path = "bazel_protos" }
 boxfuture = { path = "../boxfuture" }
 bytes = "0.4.5"

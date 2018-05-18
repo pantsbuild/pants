@@ -1,3 +1,4 @@
+extern crate async_semaphore;
 extern crate bazel_protos;
 #[macro_use]
 extern crate boxfuture;
@@ -24,6 +25,9 @@ use boxfuture::BoxFuture;
 use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
+use std::sync::Arc;
+
+use async_semaphore::AsyncSemaphore;
 
 pub mod local;
 pub mod remote;
@@ -73,4 +77,32 @@ pub trait CommandRunner: Send + Sync {
   fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<ExecuteProcessResult, String>;
 
   fn reset_prefork(&self);
+}
+
+///
+/// A CommandRunner wrapper that limits the number of concurrent requests.
+///
+pub struct BoundedCommandRunner<T: CommandRunner + Send + Sync + 'static> {
+  inner: Arc<T>,
+  sema: AsyncSemaphore,
+}
+
+impl<T: CommandRunner + Send + Sync + 'static> BoundedCommandRunner<T> {
+  pub fn new(inner: T, bound: usize) -> BoundedCommandRunner<T> {
+    BoundedCommandRunner {
+      inner: Arc::new(inner),
+      sema: AsyncSemaphore::new(bound),
+    }
+  }
+}
+
+impl<T: CommandRunner + Send + Sync + 'static> CommandRunner for BoundedCommandRunner<T> {
+  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<ExecuteProcessResult, String> {
+    let inner = self.inner.clone();
+    self.sema.with_acquired(move || inner.run(req))
+  }
+
+  fn reset_prefork(&self) {
+    self.inner.reset_prefork();
+  }
 }

@@ -711,6 +711,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "process_execution"
 version = "0.0.1"
 dependencies = [
+ "async_semaphore 0.0.1",
  "bazel_protos 0.0.1",
  "boxfuture 0.0.1",
  "bytes 0.4.7 (registry+https://github.com/rust-lang/crates.io-index)",
