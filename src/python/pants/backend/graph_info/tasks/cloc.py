@@ -11,7 +11,7 @@ from pants.backend.graph_info.subsystems.cloc_binary import ClocBinary
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import FilesContent, PathGlobs, PathGlobsAndRoot, Snapshot
-from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
+from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_dir
 
@@ -78,14 +78,7 @@ class CountLinesOfCode(ConsoleTask):
     # The cloc script reaches into $PATH to look up perl. Let's assume it's in /usr/bin.
     env = ('PATH', '/usr/bin')
     req = ExecuteProcessRequest(cmd, env, directory_digest, ('ignored', 'report'))
-    with self.context.new_workunit(
-      name='cloc',
-      labels=[WorkUnitLabel.TOOL],
-      cmd=' '.join(cmd)
-    ):
-      # TODO: Work out how to nicely push stdout/stderr into the workunit, probably via a helper
-      # function on context.
-      exec_result = self.context._scheduler.product_request(ExecuteProcessResult, [req])[0]
+    exec_result = self.context.execute_process_synchronously(req, 'cloc', (WorkUnitLabel.TOOL,))
 
     # TODO: Remove this check when https://github.com/pantsbuild/pants/issues/5719 is resolved.
     if exec_result.exit_code != 0:
