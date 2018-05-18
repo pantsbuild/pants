@@ -192,7 +192,7 @@ class Script(BinaryToolBase):
   platform_dependent = False
 
   def hackily_snapshot(self, context):
-    bootstrapdir = self.__class__.global_instance().get_options().pants_bootstrapdir
+    bootstrapdir = self.get_options().pants_bootstrapdir
     script_relpath = os.path.relpath(self.select(context), bootstrapdir)
     snapshot = context._scheduler.capture_snapshots((
       PathGlobsAndRoot(
