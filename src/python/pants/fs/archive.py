@@ -12,7 +12,6 @@ from collections import OrderedDict
 from contextlib import contextmanager
 from zipfile import ZIP_DEFLATED
 
-from pants.base.deprecated import deprecated
 from pants.util.contextutil import open_tar, open_zip, temporary_dir
 from pants.util.dirutil import (is_executable, safe_concurrent_rename, safe_walk,
                                 split_basename_and_dirname)

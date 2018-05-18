@@ -15,7 +15,6 @@ from contextlib import contextmanager
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
