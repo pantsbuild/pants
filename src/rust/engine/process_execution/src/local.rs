@@ -25,10 +25,6 @@ impl super::CommandRunner for CommandRunner {
   ///
   /// Runs a command on this machine in the passed working directory.
   ///
-  /// This takes ownership of a TempDir rather than a Path to ensure that the TempDir can't be
-  /// dropped, and thus the underlying directory deleted, while we need a reference to it. If we
-  /// switch to not use TempDir, we should ensure that this guarantee still holds.
-  ///
   fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<ExecuteProcessResult, String> {
     let workdir = try_future!(
       tempdir::TempDir::new("process-execution").map_err(|err| format!(
