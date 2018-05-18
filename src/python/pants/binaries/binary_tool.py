@@ -199,7 +199,7 @@ class Script(BinaryToolBase):
         PathGlobs((script_relpath,), ()),
         bootstrapdir,
       ),
-    ))
+    ))[0]
     return (script_relpath, snapshot)
 
 
