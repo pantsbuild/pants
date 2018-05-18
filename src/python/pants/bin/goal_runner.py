@@ -12,7 +12,7 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.engine_initializer import EngineInitializer
 from pants.bin.repro import Reproducer
-from pants.binaries.binary_util import BinaryUtilPrivate
+from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.engine.native import Native
 from pants.engine.round_engine import RoundEngine
@@ -236,7 +236,7 @@ class GoalRunner(object):
       Reproducer,
       RunTracker,
       Changed,
-      BinaryUtilPrivate.Factory,
+      BinaryUtil.Factory,
       Subprocess.Factory
     }
 

@@ -11,7 +11,7 @@ import os
 import mock
 
 from pants.binaries.binary_util import (BinaryRequest, BinaryToolFetcher, BinaryToolUrlGenerator,
-                                        BinaryUtilPrivate)
+                                        BinaryUtil)
 from pants.net.http.fetcher import Fetcher
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
@@ -83,7 +83,7 @@ class BinaryUtilTest(BaseTest):
   @classmethod
   def _gen_binary_util(cls, baseurls=[], path_by_id=None, allow_external_binary_tool_downloads=True,
                        uname_func=None, **kwargs):
-    return BinaryUtilPrivate(
+    return BinaryUtil(
       baseurls=baseurls,
       binary_tool_fetcher=cls._gen_binary_tool_fetcher(**kwargs),
       path_by_id=path_by_id,
@@ -114,11 +114,11 @@ class BinaryUtilTest(BaseTest):
     """Tests exception handling if build support urls are improperly specified."""
     binary_util = self._gen_binary_util()
 
-    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+    with self.assertRaises(BinaryUtil.BinaryResolutionError) as cm:
       binary_util.select_script("supportdir", "version", "name")
     the_raised_exception_message = str(cm.exception)
 
-    self.assertIn(BinaryUtilPrivate.NoBaseUrlsError.__name__, the_raised_exception_message)
+    self.assertIn(BinaryUtil.NoBaseUrlsError.__name__, the_raised_exception_message)
     expected_msg = (
       "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
       "name=name, platform_dependent=False, external_url_generator=None, archiver=None): "
@@ -221,12 +221,12 @@ class BinaryUtilTest(BaseTest):
 
     binary_util = self._gen_binary_util(uname_func=uname_func)
 
-    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+    with self.assertRaises(BinaryUtil.BinaryResolutionError) as cm:
       binary_util.select_binary("supportdir", "version", "name")
 
     the_raised_exception_message = str(cm.exception)
 
-    self.assertIn(BinaryUtilPrivate.MissingMachineInfo.__name__, the_raised_exception_message)
+    self.assertIn(BinaryUtil.MissingMachineInfo.__name__, the_raised_exception_message)
     expected_msg = (
       "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
       "name=name, platform_dependent=True, external_url_generator=None, archiver=None): "
@@ -240,11 +240,11 @@ class BinaryUtilTest(BaseTest):
 
     binary_util = self._gen_binary_util(uname_func=uname_func)
 
-    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+    with self.assertRaises(BinaryUtil.BinaryResolutionError) as cm:
       binary_util.select_binary("mysupportdir", "myversion", "myname")
     the_raised_exception_message = str(cm.exception)
 
-    self.assertIn(BinaryUtilPrivate.MissingMachineInfo.__name__, the_raised_exception_message)
+    self.assertIn(BinaryUtil.MissingMachineInfo.__name__, the_raised_exception_message)
     expected_msg = (
       "Error resolving binary request BinaryRequest(supportdir=mysupportdir, version=myversion, "
       "name=myname, platform_dependent=True, external_url_generator=None, archiver=None): Pants could not "
@@ -258,11 +258,11 @@ class BinaryUtilTest(BaseTest):
 
     binary_util = self._gen_binary_util(uname_func=uname_func)
 
-    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+    with self.assertRaises(BinaryUtil.BinaryResolutionError) as cm:
       binary_util.select_script("mysupportdir", "myversion", "myname")
     the_raised_exception_message = str(cm.exception)
 
-    self.assertIn(BinaryUtilPrivate.MissingMachineInfo.__name__, the_raised_exception_message)
+    self.assertIn(BinaryUtil.MissingMachineInfo.__name__, the_raised_exception_message)
     expected_msg = (
       "Error resolving binary request BinaryRequest(supportdir=mysupportdir, version=myversion, "
       # platform_dependent=False when doing select_script()
@@ -295,7 +295,7 @@ class BinaryUtilTest(BaseTest):
       # TODO: test archiver!
       archiver=None)
 
-    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+    with self.assertRaises(BinaryUtil.BinaryResolutionError) as cm:
       binary_util.select(binary_request)
     the_raised_exception_message = str(cm.exception)
 
@@ -322,11 +322,11 @@ class BinaryUtilTest(BaseTest):
       # TODO: test archiver!
       archiver=None)
 
-    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+    with self.assertRaises(BinaryUtil.BinaryResolutionError) as cm:
       binary_util.select(binary_request)
     the_raised_exception_message = str(cm.exception)
 
-    self.assertIn(BinaryUtilPrivate.NoBaseUrlsError.__name__, the_raised_exception_message)
+    self.assertIn(BinaryUtil.NoBaseUrlsError.__name__, the_raised_exception_message)
     expected_msg = (
       "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
       "name=name, platform_dependent=False, "

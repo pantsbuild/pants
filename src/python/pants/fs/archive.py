@@ -253,13 +253,6 @@ TYPE_NAMES_NO_PRESERVE_SYMLINKS = frozenset(['zip'])
 TYPE_NAMES_PRESERVE_SYMLINKS = TYPE_NAMES - TYPE_NAMES_NO_PRESERVE_SYMLINKS
 
 
-# Pretty much every caller of this method is going to want to put the return value into a variable
-# named `archiver`.
-@deprecated(removal_version='1.8.0.dev0', hint_message='Use the create_archiver method instead.')
-def archiver(typename):
-  return create_archiver(typename)
-
-
 def create_archiver(typename):
   """Returns Archivers in common configurations.
 

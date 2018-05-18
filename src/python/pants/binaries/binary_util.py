@@ -237,7 +237,7 @@ class BinaryToolFetcher(object):
     return bootstrapped_binary_path
 
 
-class BinaryUtilPrivate(object):
+class BinaryUtil(object):
   """Wraps utility methods for finding binary executables."""
 
   class Factory(Subsystem):
@@ -251,7 +251,7 @@ class BinaryUtilPrivate(object):
 
     @classmethod
     def create(cls):
-      return cls._create_for_cls(BinaryUtilPrivate)
+      return cls._create_for_cls(BinaryUtil)
 
     @classmethod
     def _create_for_cls(cls, binary_util_cls):
@@ -278,7 +278,7 @@ class BinaryUtilPrivate(object):
     """Raised to wrap other exceptions raised in the select() method to provide context."""
 
     def __init__(self, binary_request, base_exception):
-      super(BinaryUtilPrivate.BinaryResolutionError, self).__init__(
+      super(BinaryUtil.BinaryResolutionError, self).__init__(
         "Error resolving binary request {}: {}".format(binary_request, base_exception),
         base_exception)
 
@@ -441,27 +441,3 @@ class BinaryUtilPrivate(object):
   def select_script(self, supportdir, version, name):
     binary_request = self._make_deprecated_script_request(supportdir, version, name)
     return self.select(binary_request)
-
-
-class BinaryUtil(BinaryUtilPrivate):
-  """A temporary stub to express the fact that public access to BinaryUtil is now deprecated.
-
-  After deprecation is complete, the base class will be renamed BinaryUtil, and it will not
-  be considered part of the public Pants API.
-
-  :API: public
-  """
-
-  @deprecated(removal_version='1.8.0.dev0', hint_message='Use NativeTool or Script instead.')
-  def __init__(self, *args, **kwargs):
-    super(BinaryUtil, self).__init__(*args, **kwargs)
-
-  class Factory(BinaryUtilPrivate.Factory):
-    """
-    :API: public
-    """
-
-    @classmethod
-    @deprecated(removal_version='1.8.0.dev0', hint_message='Use NativeTool or Script instead.')
-    def create(cls):
-      return cls._create_for_cls(BinaryUtilPrivate)

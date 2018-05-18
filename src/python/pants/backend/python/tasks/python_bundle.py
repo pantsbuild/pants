@@ -54,7 +54,7 @@ class PythonBundle(BundleMixin, Task):
       for vt in invalidation_check.all_vts:
         bundle_dir = self.get_bundle_dir(vt.target.id, vt.results_dir)
         archive_format = self.resolved_option(self.get_options(), vt.target, 'archive')
-        archiver = archive.archiver(archive_format) if archive_format else None
+        archiver = archive.create_archiver(archive_format) if archive_format else None
         archive_path = self._get_archive_path(vt, archive_format)
 
         if not vt.valid:  # Only recreate the bundle/archive if it's changed
