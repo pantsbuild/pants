@@ -103,10 +103,11 @@ impl CommandRunner {
     let execution_client2 = execution_client.clone();
     let operations_client = self.operations_client.clone();
 
-    let req_timeout = req.timeout;
-    let req_description = req.description.clone();
     let store = self.store.clone();
     let execute_request_result = make_execute_request(&req);
+
+    let req_description = req.description;
+    let req_timeout = req.timeout;
 
     match execute_request_result {
       Ok((command, execute_request)) => {
@@ -127,8 +128,6 @@ impl CommandRunner {
           })
           .and_then(move |(execute_request, operation)| {
             let start_time = SystemTime::now();
-            let timeout: Duration = req_timeout;
-            let req_description = req_description.clone();
 
             future::loop_fn((operation, 0), move |(operation, iter_num)| {
               let req_description = req_description.clone();
@@ -172,41 +171,32 @@ impl CommandRunner {
                         (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS,
                       );
 
+
                       let grpc_result =
                         map_grpc_result(operations_client.get().get_operation(&operation_request));
+                      let operation = try_future!(grpc_result);
+
                       // take the grpc result and cancel the op if too much time has passed.
-                      match grpc_result {
-                        Ok(operation) => {
-                          match start_time.elapsed() {
-                            Ok(elapsed) => {
-                              if elapsed > timeout {
-                                future::err(format!(
-                                  "Exceeded time out of {:?} with {:?} for operation {}, {}",
-                                  timeout, elapsed, operation_name, req_description
-                                )).to_boxed() as BoxFuture<_, _>
-                              } else {
-                                // maybe the delay here should be the min of remaining time and the backoff period
-                                Delay::new(Duration::from_millis(backoff_period))
-                                  .map_err(move |e| {
-                                    format!(
-                                          // could this message be better?
-                                          "Future-Delay errored at operation result polling for {}, {}: {}",
-                                            operation_name, req_description, e)
-                                  })
-                                  .and_then(move |_| {
-                                    future::ok(future::Loop::Continue((operation, iter_num + 1)))
-                                      .to_boxed()
-                                  })
-                                  .to_boxed()
-                              }
-                            }
-                            Err(err) => {
-                              future::err(format!("Something weird happened with time {:?}", err))
-                                .to_boxed() as BoxFuture<_, _>
-                            }
-                          }
-                        }
-                        Err(err) => future::err(err).to_boxed() as BoxFuture<_, _>,
+                      let elapsed = try_future!(start_time.elapsed().map_err(|err| format!("Something weird happened with time {:?}", err)));
+                      if elapsed > req_timeout {
+                        future::err(format!(
+                          "Exceeded time out of {:?} with {:?} for operation {}, {}",
+                          req_timeout, elapsed, operation_name, req_description
+                        )).to_boxed()
+                      } else {
+                        // maybe the delay here should be the min of remaining time and the backoff period
+                        Delay::new(Duration::from_millis(backoff_period))
+                          .map_err(move |e| {
+                            format!(
+                                  // could this message be better?
+                                  "Future-Delay errored at operation result polling for {}, {}: {}",
+                                    operation_name, req_description, e)
+                          })
+                          .and_then(move |_| {
+                            future::ok(future::Loop::Continue((operation, iter_num + 1)))
+                              .to_boxed()
+                          })
+                          .to_boxed()
                       }
                     }
                   }
@@ -1197,6 +1187,11 @@ mod tests {
       description: "echo a foo".to_string(),
     }
   }
+
+  // NB: The following helper functions return tuples of Operation and an optional Duration in
+  // order to make setting up the operations for a test execution server easier to read.
+  // The test execution server uses the duration to introduce a delay so that we can test
+  // timeouts.
 
   fn make_incomplete_operation(
     operation_name: &str,

@@ -31,7 +31,7 @@ pub mod remote;
 ///
 /// A process to be executed.
 ///
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ExecuteProcessRequest {
   ///
   /// The arguments to execute.
@@ -57,23 +57,6 @@ pub struct ExecuteProcessRequest {
   pub timeout: std::time::Duration,
 
   pub description: String,
-}
-
-impl PartialEq for ExecuteProcessRequest {
-  fn eq(&self, other: &ExecuteProcessRequest) -> bool {
-    self.argv == other.argv && self.env == other.env && self.input_files == other.input_files
-      && self.timeout == other.timeout
-  }
-}
-impl Eq for ExecuteProcessRequest {}
-
-impl Hash for ExecuteProcessRequest {
-  fn hash<H: Hasher>(&self, state: &mut H) {
-    self.argv.hash(state);
-    self.env.hash(state);
-    self.input_files.hash(state);
-    self.timeout.hash(state);
-  }
 }
 
 ///
