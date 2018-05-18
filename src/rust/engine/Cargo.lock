@@ -23,6 +23,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "async_semaphore"
+version = "0.0.1"
+dependencies = [
+ "futures 0.1.21 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
