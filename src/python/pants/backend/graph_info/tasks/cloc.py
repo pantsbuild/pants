@@ -68,6 +68,7 @@ class CountLinesOfCode(ConsoleTask):
     ))
 
     cmd = (
+      '/usr/bin/perl',
       cloc_path,
       '--skip-uniqueness',
       '--ignored=ignored',
@@ -76,8 +77,7 @@ class CountLinesOfCode(ConsoleTask):
     )
 
     # The cloc script reaches into $PATH to look up perl. Let's assume it's in /usr/bin.
-    env = ('PATH', '/usr/bin')
-    req = ExecuteProcessRequest(cmd, env, directory_digest, ('ignored', 'report'))
+    req = ExecuteProcessRequest(cmd, (), directory_digest, ('ignored', 'report'))
     exec_result = self.context.execute_process_synchronously(req, 'cloc', (WorkUnitLabel.TOOL,))
 
     # TODO: Remove this check when https://github.com/pantsbuild/pants/issues/5719 is resolved.
