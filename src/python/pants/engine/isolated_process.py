@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 
 from pants.engine.fs import EMPTY_SNAPSHOT, DirectoryDigest
+from pants.engine.rules import RootRule
 from pants.util.objects import TypeCheckError, datatype
 
 
@@ -50,3 +51,10 @@ class ExecuteProcessRequest(datatype([
 
 class ExecuteProcessResult(datatype(['stdout', 'stderr', 'exit_code', 'output_directory_digest'])):
   pass
+
+
+def create_process_rules():
+  """Creates rules that consume the intrinsic filesystem types."""
+  return [
+    RootRule(ExecuteProcessRequest),
+  ]

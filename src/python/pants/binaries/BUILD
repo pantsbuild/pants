@@ -7,6 +7,8 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:isolated_process',
     'src/python/pants/fs',
     'src/python/pants/net',
     'src/python/pants/option',
