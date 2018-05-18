@@ -49,7 +49,7 @@ class CountLinesOfCode(ConsoleTask):
       list_file_snapshot = self.context._scheduler.capture_snapshots((
         PathGlobsAndRoot(
           PathGlobs(('input_files_list',), ()),
-          tmpdir,
+          str(tmpdir),
         ),
       ))[0]
 

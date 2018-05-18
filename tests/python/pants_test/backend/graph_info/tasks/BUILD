@@ -11,6 +11,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',
+    'tests/python/pants_test/engine:scheduler_test_base',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )

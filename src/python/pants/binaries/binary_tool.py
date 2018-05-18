@@ -197,7 +197,7 @@ class Script(BinaryToolBase):
     snapshot = context._scheduler.capture_snapshots((
       PathGlobsAndRoot(
         PathGlobs((script_relpath,), ()),
-        bootstrapdir,
+        str(bootstrapdir),
       ),
     ))[0]
     return (script_relpath, snapshot)
