@@ -371,7 +371,8 @@ def _eager_fileset_with_spec(sources_expansion, include_dirs=False):
   filespec = sources_expansion.filespecs
   rel_include_globs = filespec['globs']
 
-  _warn_error_glob_expansion_failure(sources_expansion)
+  if sources_expansion.glob_match_error_behavior.should_compute_matching_files():
+    _warn_error_glob_expansion_failure(sources_expansion)
 
   relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(rel_include_globs, spec_path)
   if filespec.has_key('exclude'):
@@ -450,15 +451,23 @@ class SourcesFieldExpansionResult(datatype([
 def hydrate_sources(sources_field, glob_match_error_behavior):
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec."""
 
-  snapshot_with_match_data = yield Get(SnapshotWithMatchData, PathGlobs, sources_field.path_globs)
-  # logger.debug("snapshot_with_match_data: {}".format(snapshot_with_match_data))
+  # TODO: should probably do this conditional in an @rule or intrinsic somewhere instead of
+  # explicitly.
+  # TODO: should definitely test this.
+  if glob_match_error_behavior.should_compute_matching_files():
+    snapshot_with_match_data = yield Get(SnapshotWithMatchData, PathGlobs, sources_field.path_globs)
+    snapshot = snapshot_with_match_data.snapshot
+    match_data = snapshot_with_match_data.match_data
+  else:
+    snapshot = yield Get(Snapshot, PathGlobs, sources_field.path_globs)
+    match_data = None
   sources_expansion = SourcesFieldExpansionResult(
     spec_path=sources_field.address.spec_path,
     target_address=sources_field.address,
     filespecs=sources_field.filespecs,
     base_globs=sources_field.base_globs,
-    snapshot=snapshot_with_match_data.snapshot,
-    match_data=snapshot_with_match_data.match_data,
+    snapshot=snapshot,
+    match_data=match_data,
     keyword_argument_name='sources',
     glob_match_error_behavior=glob_match_error_behavior,
   )
@@ -469,7 +478,18 @@ def hydrate_sources(sources_field, glob_match_error_behavior):
 @rule(HydratedField, [Select(BundlesField), Select(GlobMatchErrorBehavior)])
 def hydrate_bundles(bundles_field, glob_match_error_behavior):
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
-  snapshot_matches = yield [Get(SnapshotWithMatchData, PathGlobs, pg) for pg in bundles_field.path_globs_list]
+
+  if glob_match_error_behavior.should_compute_matching_files():
+    snapshot_matches = yield [
+      Get(SnapshotWithMatchData, PathGlobs, pg) for pg in bundles_field.path_globs_list
+    ]
+  else:
+    snapshots = yield [
+      Get(Snapshot, PathGlobs, pg) for pg in bundles_field.path_globs_list
+    ]
+    snapshot_matches = [
+      SnapshotWithMatchData(snapshot=snapshot, match_data=None) for snapshot in snapshots
+    ]
 
   spec_path = bundles_field.address.spec_path
 
@@ -483,6 +503,7 @@ def hydrate_bundles(bundles_field, glob_match_error_behavior):
     # to trigger a (deprecated) default inclusion of their recursive contents. See the related
     # deprecation in `pants.backend.jvm.tasks.bundle_create`.
     spec_path = getattr(bundle, 'rel_path', spec_path)
+
     sources_expansion = SourcesFieldExpansionResult(
       spec_path=spec_path,
       target_address=bundles_field.address,

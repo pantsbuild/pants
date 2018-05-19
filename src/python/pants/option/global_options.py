@@ -43,6 +43,9 @@ class GlobMatchErrorBehavior(datatype([('failure_behavior', str)])):
 
     return this_object
 
+  def should_compute_matching_files(self):
+    return self.failure_behavior != 'ignore'
+
   def should_log_warn_on_error(self):
     if self.failure_behavior in ['warn', 'error']:
       return True
