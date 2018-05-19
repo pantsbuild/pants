@@ -419,7 +419,8 @@ pub struct SingleExpansionResult {
 struct PathGlobsExpansion<T: Sized> {
   context: T,
   // Globs that have yet to be expanded, in order.
-  todo: Vec<PathGlob>,
+  // TODO: profile/trace to see if this affects perf over a Vec.
+  todo: IndexSet<PathGlob>,
   // Paths to exclude.
   exclude: Arc<Gitignore>,
   // Globs that have already been expanded.
@@ -834,7 +835,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     // let start = Instant::now();
     let init = PathGlobsExpansion {
       context: self.clone(),
-      todo: path_globs.include.clone(),
+      todo: IndexSet::from(path_globs.include.clone().into_iter().collect()),
       exclude: path_globs.exclude.clone(),
       completed: HashMap::default(),
       outputs: IndexSet::default(),
