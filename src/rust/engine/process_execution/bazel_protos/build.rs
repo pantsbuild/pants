@@ -59,6 +59,7 @@ fn main() {
     pub_mod_stmts.join("\n")
   );
 
-  let mut module = File::create(gen_dir.join("mod.rs")).unwrap();
-  module.write_all(contents.as_bytes()).unwrap();
+  File::create(gen_dir.join("mod.rs"))
+    .and_then(|mut f| f.write_all(contents.as_bytes()))
+    .expect("Failed to write mod.rs")
 }

@@ -13,7 +13,7 @@ build-support/bin/native/
   src/                 - rust stdlib sources (generated)
   <remaining symlinks> - symlinks to the remaining $CARGO_HOME/bin tools (generated)
 ```
-Some explanation of the checked-in bootstrsap scripts is in order:
+Some explanation of the checked-in bootstrap scripts is in order:
 
 + `bootstrap_code.sh`
 
@@ -23,9 +23,9 @@ Some explanation of the checked-in bootstrsap scripts is in order:
 
 + `cargo.sh`
 
-  These serve as a replacement for a vanilla cargo, wrapping execution of an underlying pristine
-  cargo with environment setup required by Pants rust code, generated code and dependencies. They
-  rely on `bootstrap_rust.sh`.
+  This serves as a replacement for a vanilla cargo, wrapping execution of an underlying pristine
+  cargo with environment setup required by Pants rust code, generated code and dependencies. It
+  relies on `bootstrap_rust.sh`.
 
 + `bootstrap_rust.sh`
 

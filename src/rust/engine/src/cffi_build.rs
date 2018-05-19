@@ -81,7 +81,7 @@ fn main() {
   let mut config = cc::Build::new();
 
   config.file(c_path.to_str().unwrap());
-  for flag in make_flags(env_script_path).unwrap() {
+  for flag in make_flags(&env_script_path).unwrap() {
     config.flag(flag.as_str());
   }
 
@@ -98,7 +98,7 @@ fn mark_for_change_detection(path: PathBuf) -> PathBuf {
   path
 }
 
-fn make_flags(env_script_path: PathBuf) -> Result<Vec<String>> {
+fn make_flags(env_script_path: &Path) -> Result<Vec<String>> {
   let mut contents = String::new();
   fs::File::open(env_script_path)?.read_to_string(&mut contents)?;
   // It would be a shame if someone were to include a space in an actual quoted value.

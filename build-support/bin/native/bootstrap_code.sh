@@ -55,7 +55,7 @@ function _build_native_code() {
   # Builds the native code, and echos the path of the built binary.
 
   "${REPO_ROOT}/build-support/bin/native/cargo" build ${MODE_FLAG} \
-    --manifest-path ${NATIVE_ROOT}/Cargo.toml || die
+    --manifest-path "${NATIVE_ROOT}/Cargo.toml" || die
   echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 }
 
