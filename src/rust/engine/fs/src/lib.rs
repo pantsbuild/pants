@@ -41,6 +41,7 @@ use std::collections::HashSet;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
+use std::time::Instant;
 use std::{fmt, fs};
 use std::io::{self, Read};
 use std::cmp::min;
@@ -49,7 +50,7 @@ use bytes::Bytes;
 use futures::future::{self, Future};
 use glob::Pattern;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 
 use boxfuture::{BoxFuture, Boxable};
 
@@ -82,7 +83,7 @@ pub struct File {
   pub is_executable: bool,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub enum PathStat {
   Dir {
     // The symbolic name of some filesystem Path, which is context specific.
@@ -121,6 +122,15 @@ impl PathStat {
   }
 }
 
+impl fmt::Debug for PathStat {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    match self {
+      &PathStat::Dir { ref path, .. } => write!(f, "Dir(path={:?})", path),
+      &PathStat::File { ref path, .. } => write!(f, "File(path={:?})", path),
+    }
+  }
+}
+
 lazy_static! {
   static ref PARENT_DIR: &'static str = "..";
 
@@ -132,7 +142,7 @@ lazy_static! {
   static ref EMPTY_IGNORE: Arc<Gitignore> = Arc::new(Gitignore::empty());
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub enum PathGlob {
   Wildcard {
     canonical_dir: Dir,
@@ -293,6 +303,35 @@ impl PathGlob {
           parts[1..].to_vec(),
         ),
       ])
+    }
+  }
+}
+
+impl fmt::Debug for PathGlob {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    match self {
+      &PathGlob::Wildcard {
+        ref symbolic_path,
+        ref wildcard,
+        ..
+      } => write!(
+        f,
+        "Wildcard(path={:?}, wildcard={:?})",
+        symbolic_path,
+        wildcard.as_str()
+      ),
+      &PathGlob::DirWildcard {
+        ref symbolic_path,
+        ref wildcard,
+        ref remainder,
+        ..
+      } => write!(
+        f,
+        "DirWildcard(path={:?}, wildcard={:?}, remainder={:?})",
+        symbolic_path,
+        wildcard.as_str(),
+        remainder.iter().map(|pat| pat.as_str()).collect::<Vec<_>>(),
+      ),
     }
   }
 }
@@ -654,6 +693,8 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     let context = self.clone();
     let exclude = exclude.clone();
 
+    // eprintln!("directory_listing: symbolic_path={:?}, wildcard={:?}", symbolic_path, wildcard);
+
     self
       .scandir(canonical_dir)
       .and_then(move |dir_listing| {
@@ -714,6 +755,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
       return future::ok(vec![]).to_boxed();
     }
 
+    let start = Instant::now();
     let init = PathGlobsExpansion {
       context: self.clone(),
       todo: path_globs.include,
@@ -749,9 +791,19 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
           future::Loop::Continue(expansion)
         }
       })
-    }).map(|expansion_outputs| {
+    }).map(move |expansion_outputs| {
       // Finally, capture the resulting PathStats from the expansion.
-      expansion_outputs.into_iter().map(|(k, _)| k).collect()
+      let outputs = expansion_outputs
+        .into_iter()
+        .map(|(k, _)| k)
+        .collect::<Vec<_>>();
+      let computation_time = start.elapsed();
+      eprintln!(
+        "computation_time: {:?}, all_outputs: {:?}",
+        computation_time,
+        outputs.iter().collect::<IndexSet<_>>(),
+      );
+      outputs
     })
       .to_boxed()
   }
