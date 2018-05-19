@@ -31,6 +31,15 @@ API Changes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* cloc uses v2 process execution (#5840)
+  `PR #5840 <https://github.com/pantsbuild/pants/pull/5840>`_
+
+* Remove extra workunit from coursier resolve (#5837)
+  `PR #5837 <https://github.com/pantsbuild/pants/pull/5837>`_
+
+* Remove stale comment (#5839)
+  `PR #5839 <https://github.com/pantsbuild/pants/pull/5839>`_
+
 * Script BinaryUtils can be captured as snapshots (#5835)
   `PR #5835 <https://github.com/pantsbuild/pants/pull/5835>`_
 
