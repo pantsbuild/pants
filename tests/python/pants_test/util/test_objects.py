@@ -476,7 +476,7 @@ field 'an_int' was invalid: value 'asdf' (with type 'str') must satisfy this typ
 value is negative: -3.""")
     self.assertEqual(str(cm.exception), expected_msg)
 
-    with self.assertRaises(TypeCheckError) as cm:
+    with self.assertRaises(TypeError) as cm:
       WithSubclassTypeConstraint(3)
     expected_msg = (
       """error: in constructor of type WithSubclassTypeConstraint: type check error:
