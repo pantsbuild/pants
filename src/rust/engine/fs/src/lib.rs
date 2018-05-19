@@ -37,14 +37,14 @@ extern crate tempdir;
 #[cfg(test)]
 extern crate testutil;
 
-use std::collections::HashSet;
+use std::cmp::min;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::io::{self, Read};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 use std::{fmt, fs};
-use std::io::{self, Read};
-use std::cmp::min;
 
 use bytes::Bytes;
 use futures::future::{self, Future};
@@ -133,12 +133,9 @@ impl fmt::Debug for PathStat {
 
 lazy_static! {
   static ref PARENT_DIR: &'static str = "..";
-
   static ref SINGLE_STAR_GLOB: Pattern = Pattern::new("*").unwrap();
-
   static ref DOUBLE_STAR: &'static str = "**";
   static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new("**").unwrap();
-
   static ref EMPTY_IGNORE: Arc<Gitignore> = Arc::new(Gitignore::empty());
 }
 
@@ -365,6 +362,33 @@ impl PathGlobs {
 }
 
 #[derive(Debug)]
+pub enum PathGlobsExpansionRequest {
+  JustStats(PathGlobs),
+  StatsAndWhetherMatched(PathGlobs),
+}
+
+#[derive(Clone, Debug)]
+pub enum GlobMatch {
+  SuccessfullyMatchedSomeFiles,
+  DidNotMatchAnyFiles,
+}
+
+#[derive(Clone, Debug)]
+struct GlobExpansionCacheEntry {
+  path_stats: Vec<PathStat>,
+  globs: Vec<PathGlob>,
+  // TODO: mutate this in check for matches for ~memoization~
+  // matched: GlobMatch,
+}
+
+#[derive(Clone, Debug)]
+pub struct SingleExpansionResult {
+  path_glob: PathGlob,
+  path_stats: Vec<PathStat>,
+  globs: Vec<PathGlob>,
+}
+
+#[derive(Debug)]
 struct PathGlobsExpansion<T: Sized> {
   context: T,
   // Globs that have yet to be expanded, in order.
@@ -372,9 +396,15 @@ struct PathGlobsExpansion<T: Sized> {
   // Paths to exclude.
   exclude: Arc<Gitignore>,
   // Globs that have already been expanded.
-  completed: HashSet<PathGlob>,
+  completed: HashMap<PathGlob, GlobExpansionCacheEntry>,
   // Unique Paths that have been matched, in order.
-  outputs: IndexMap<PathStat, ()>,
+  outputs: IndexSet<PathStat>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PathGlobsExpansionResult {
+  path_stats: Vec<PathStat>,
+  found_files: HashMap<PathGlob, GlobMatch>,
 }
 
 fn create_ignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {
@@ -751,17 +781,36 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
   /// Recursively expands PathGlobs into PathStats while applying excludes.
   ///
   fn expand(&self, path_globs: PathGlobs) -> BoxFuture<Vec<PathStat>, E> {
+    let request = PathGlobsExpansionRequest::JustStats(path_globs);
+    self
+      .expand_globs(request)
+      .map(|expansion_result| expansion_result.path_stats)
+      .to_boxed()
+  }
+
+  fn expand_globs(
+    &self,
+    expansion_request: PathGlobsExpansionRequest,
+  ) -> BoxFuture<PathGlobsExpansionResult, E> {
+    let (do_check_for_matches, path_globs) = match expansion_request {
+      PathGlobsExpansionRequest::JustStats(path_globs) => (false, path_globs),
+      PathGlobsExpansionRequest::StatsAndWhetherMatched(path_globs) => (true, path_globs),
+    };
     if path_globs.include.is_empty() {
-      return future::ok(vec![]).to_boxed();
+      let result = PathGlobsExpansionResult {
+        path_stats: vec![],
+        found_files: HashMap::new(),
+      };
+      return future::ok(result).to_boxed();
     }
 
-    let start = Instant::now();
+    // let start = Instant::now();
     let init = PathGlobsExpansion {
       context: self.clone(),
-      todo: path_globs.include,
-      exclude: path_globs.exclude,
-      completed: HashSet::default(),
-      outputs: IndexMap::default(),
+      todo: path_globs.include.clone(),
+      exclude: path_globs.exclude.clone(),
+      completed: HashMap::default(),
+      outputs: IndexSet::default(),
     };
     future::loop_fn(init, |mut expansion| {
       // Request the expansion of all outstanding PathGlobs as a batch.
@@ -774,36 +823,81 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
           .map(|path_glob| context.expand_single(path_glob, exclude))
           .collect::<Vec<_>>()
       });
-      round.map(move |paths_and_globs| {
+      round.map(move |single_expansion_results| {
         // Collect distinct new PathStats and PathGlobs
-        for (paths, globs) in paths_and_globs.into_iter() {
-          expansion.outputs.extend(paths.into_iter().map(|p| (p, ())));
+        for exp in single_expansion_results.into_iter() {
+          let SingleExpansionResult {
+            path_glob,
+            path_stats,
+            globs,
+          } = exp;
+          expansion.outputs.extend(path_stats.clone());
           let completed = &mut expansion.completed;
+          completed
+            .entry(path_glob.clone())
+            .or_insert_with(|| GlobExpansionCacheEntry {
+              path_stats: path_stats.clone(),
+              globs: globs.clone(),
+            });
           expansion
             .todo
-            .extend(globs.into_iter().filter(|pg| completed.insert(pg.clone())));
+            .extend(globs.into_iter().filter(|pg| !completed.contains_key(pg)));
         }
 
         // If there were any new PathGlobs, continue the expansion.
         if expansion.todo.is_empty() {
-          future::Loop::Break(expansion.outputs)
+          future::Loop::Break(expansion)
         } else {
           future::Loop::Continue(expansion)
         }
       })
-    }).map(move |expansion_outputs| {
+    }).map(move |final_expansion_state| {
       // Finally, capture the resulting PathStats from the expansion.
-      let outputs = expansion_outputs
-        .into_iter()
-        .map(|(k, _)| k)
-        .collect::<Vec<_>>();
-      let computation_time = start.elapsed();
-      eprintln!(
-        "computation_time: {:?}, all_outputs: {:?}",
-        computation_time,
-        outputs.iter().collect::<IndexSet<_>>(),
-      );
-      outputs
+      let PathGlobsExpansion {
+        outputs, completed, ..
+      } = final_expansion_state;
+      let all_outputs = outputs.into_iter().collect::<Vec<_>>();
+      // let computation_time = start.elapsed();
+      // eprintln!(
+      //   "computation_time: {:?}, all_outputs: {:?}",
+      //   computation_time,
+      //   all_outputs.iter().collect::<IndexSet<_>>(),
+      // );
+
+      let mut found_files = HashMap::default();
+
+      if do_check_for_matches {
+        for root_glob in path_globs.include {
+          let mut q: VecDeque<&PathGlob> = VecDeque::default();
+          q.push_back(&root_glob);
+
+          let mut found: bool = false;
+          while !found && !q.is_empty() {
+            let cur_glob = q.pop_front().unwrap();
+            let &GlobExpansionCacheEntry {
+              ref path_stats,
+              ref globs,
+            } = completed.get(&cur_glob).unwrap();
+
+            if !path_stats.is_empty() {
+              found = true;
+              break;
+            } else {
+              q.extend(globs);
+            }
+          }
+          if found {
+            found_files
+              .entry(root_glob.clone())
+              .or_insert(GlobMatch::SuccessfullyMatchedSomeFiles);
+          }
+        }
+      }
+
+      PathGlobsExpansionResult {
+        path_stats: all_outputs,
+        found_files,
+      }
     })
       .to_boxed()
   }
@@ -816,12 +910,17 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     &self,
     path_glob: PathGlob,
     exclude: &Arc<Gitignore>,
-  ) -> BoxFuture<(Vec<PathStat>, Vec<PathGlob>), E> {
+  ) -> BoxFuture<SingleExpansionResult, E> {
+    let cloned_glob = path_glob.clone();
     match path_glob {
       PathGlob::Wildcard { canonical_dir, symbolic_path, wildcard } =>
         // Filter directory listing to return PathStats, with no continuation.
         self.directory_listing(canonical_dir, symbolic_path, wildcard, exclude)
-          .map(|path_stats| (path_stats, vec![]))
+        .map(move |path_stats| SingleExpansionResult {
+          path_glob: cloned_glob.clone(),
+          path_stats,
+          globs: vec![],
+        })
           .to_boxed(),
       PathGlob::DirWildcard { canonical_dir, symbolic_path, wildcard, remainder } =>
         // Filter directory listing and request additional PathGlobs for matched Dirs.
@@ -838,12 +937,16 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
               })
               .collect::<Result<Vec<_>, E>>()
           })
-          .map(|path_globs| {
+          .map(move |path_globs| {
             let flattened =
               path_globs.into_iter()
                 .flat_map(|path_globs| path_globs.into_iter())
-                .collect();
-            (vec![], flattened)
+              .collect();
+            SingleExpansionResult {
+              path_glob: cloned_glob.clone(),
+              path_stats: vec![],
+              globs: flattened,
+            }
           })
           .to_boxed(),
     }
@@ -904,9 +1007,9 @@ mod posixfs_test {
   extern crate tempdir;
   extern crate testutil;
 
+  use self::testutil::make_file;
   use super::{Dir, File, Link, PathStat, PathStatGetter, PosixFS, ResettablePool, Stat};
   use futures::Future;
-  use self::testutil::make_file;
   use std;
   use std::path::{Path, PathBuf};
   use std::sync::Arc;
