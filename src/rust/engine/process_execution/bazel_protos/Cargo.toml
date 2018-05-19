@@ -13,7 +13,4 @@ protobuf = { version = "1.4.1", features = ["with-bytes"] }
 [build-dependencies]
 build_utils = { path = "../../build_utils" }
 grpcio-compiler = "0.2.0"
-
-# TODO(John Sirois): Use a released version when https://github.com/mtp401/protoc-grpcio/pull/5
-# is released.
-protoc-grpcio = { git = "https://github.com/jsirois/protoc-grpcio", rev = "e2687d0438da760fb411cd972f33a0d6e6048cd1" }
+protoc-grpcio = "0.1.1"
