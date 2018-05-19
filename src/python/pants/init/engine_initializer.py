@@ -24,8 +24,8 @@ from pants.engine.legacy.structs import (AppAdaptor, GoTargetAdaptor, JavaLibrar
 from pants.engine.mapper import AddressMapper
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
-from pants.engine.scheduler import Scheduler
 from pants.engine.rules import SingletonRule
+from pants.engine.scheduler import Scheduler
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.option.options_bootstrapper import OptionsBootstrapper
