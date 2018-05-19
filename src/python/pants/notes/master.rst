@@ -4,6 +4,96 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.8.0.dev0 (05/18/2018)
+-----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Invalidate all tasks on source root changes. (#5821)
+  `PR #5821 <https://github.com/pantsbuild/pants/pull/5821>`_
+
+New features
+~~~~~~~~~~~~
+
+* Allow alternate binaries download urls generation and convert GoDistribution and LLVM subsystems to use it (#5780)
+  `PR #5780 <https://github.com/pantsbuild/pants/pull/5780>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Remove SelectDependencies. (#5800)
+  `PR #5800 <https://github.com/pantsbuild/pants/pull/5800>`_
+
+* Zinc 1.0.0 upgrade: Python portion (#4729)
+  `PR #4729 <https://github.com/pantsbuild/pants/pull/4729>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Revert to non-forked grpcio-compiler (#5842)
+  `PR #5842 <https://github.com/pantsbuild/pants/pull/5842>`_
+
+* cloc uses v2 process execution (#5840)
+  `PR #5840 <https://github.com/pantsbuild/pants/pull/5840>`_
+
+* Remove extra workunit from coursier resolve (#5837)
+  `PR #5837 <https://github.com/pantsbuild/pants/pull/5837>`_
+
+* Remove stale comment (#5839)
+  `PR #5839 <https://github.com/pantsbuild/pants/pull/5839>`_
+
+* Script BinaryUtils can be captured as snapshots (#5835)
+  `PR #5835 <https://github.com/pantsbuild/pants/pull/5835>`_
+
+* CommandRunners implement a single trait (#5836)
+  `PR #5836 <https://github.com/pantsbuild/pants/pull/5836>`_
+
+* Directories can be merged synchronously (#5834)
+  `PR #5834 <https://github.com/pantsbuild/pants/pull/5834>`_
+
+* Allow arbitrary directories to be Snapshotted (#5801)
+  `PR #5801 <https://github.com/pantsbuild/pants/pull/5801>`_
+
+* Regression test for #4596 (#4608)
+  `PR #4608 <https://github.com/pantsbuild/pants/pull/4608>`_
+
+* Empty digest is always known (#5829)
+  `PR #5829 <https://github.com/pantsbuild/pants/pull/5829>`_
+
+* Local process execution can fetch output files (#5784)
+  `PR #5784 <https://github.com/pantsbuild/pants/pull/5784>`_
+
+* Fetch native stack traces if any cores were dumped (#5828)
+  `PR #5828 <https://github.com/pantsbuild/pants/pull/5828>`_
+
+* FileContents is gotten from DirectoryDigest not Snapshot (#5820)
+  `PR #5820 <https://github.com/pantsbuild/pants/pull/5820>`_
+
+* [release.sh] Use git configured gpg binary if one is set (#5826)
+  `PR #5826 <https://github.com/pantsbuild/pants/pull/5826>`_
+
+* [release-doc] rm explicit owner list in favor of just using -o (#5823)
+  `PR #5823 <https://github.com/pantsbuild/pants/pull/5823>`_
+
+* brfs: Sleep a bit after mounting the filesystem (#5819)
+  `PR #5819 <https://github.com/pantsbuild/pants/pull/5819>`_
+
+* Snapshot contains a DirectoryDigest (#5811)
+  `PR #5811 <https://github.com/pantsbuild/pants/pull/5811>`_
+
+* Add a facility for exposing metrics from the native engine (#5808)
+  `PR #5808 <https://github.com/pantsbuild/pants/pull/5808>`_
+
+* Expand engine readme (#5759)
+  `PR #5759 <https://github.com/pantsbuild/pants/pull/5759>`_
+
+* Document python_app target in Python readme. (#5816)
+  `PR #5816 <https://github.com/pantsbuild/pants/pull/5816>`_
+
+* [release-docs] Update step 0, linkify links (#5806)
+  `PR #5806 <https://github.com/pantsbuild/pants/pull/5806>`_
+
 1.7.0.rc0 (05/11/2018)
 ----------------------
 
