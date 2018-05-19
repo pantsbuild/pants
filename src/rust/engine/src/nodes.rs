@@ -514,19 +514,12 @@ impl Node for ExecuteProcess {
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0;
 
-    // TODO: Process pool management should likely move into the `process_execution` crate, which
-    // will have different strategies depending on remote/local execution.
-    let core = context.core.clone();
     context
       .core
-      .fs_pool
-      .spawn_fn(move || {
-        core
-          .command_runner
-          .run(request)
-          .map(|result| ProcessResult(result))
-          .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
-      })
+      .command_runner
+      .run(request)
+      .map(|result| ProcessResult(result))
+      .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
       .to_boxed()
   }
 }

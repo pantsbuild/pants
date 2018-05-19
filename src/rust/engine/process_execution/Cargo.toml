@@ -19,6 +19,8 @@ resettable = { path = "../resettable" }
 sha2 = "0.6.0"
 tempdir = "0.3.5"
 futures-timer = "0.1"
+# TODO: A master sha that is likely to be released as 0.2.1.
+tokio-process = { git = "https://github.com/alexcrichton/tokio-process", rev = "b50c293fb8dd5db5aaa5632d430497116c27d258" }
 
 [dev-dependencies]
 mock = { path = "../testutil/mock" }
