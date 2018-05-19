@@ -20,7 +20,7 @@ from pants.build_graph.app_base import AppBase, Bundle
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.fs import PathGlobs, Snapshot, SnapshotWithMatchData
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.rules import TaskRule, rule
 from pants.engine.selectors import Get, Select
@@ -432,14 +432,19 @@ def _get_globs_owning_files(rel_file_paths, rel_include_globs, base_globs, kwarg
   return owning_globs
 
 
-# class SourcesFieldExpansionRequest(datatype(['']))
+# class SourcesFieldExpansionRequest(datatype(['path_globs', ]))
+
+
+# class SourcesFieldExpansionResult(datatype(['snapshot', ]))
 
 
 @rule(HydratedField, [Select(SourcesField), Select(GlobMatchErrorBehavior)])
 def hydrate_sources(sources_field, glob_match_error_behavior):
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec."""
 
-  snapshot = yield Get(Snapshot, PathGlobs, sources_field.path_globs)
+  snapshot_with_match_data = yield Get(SnapshotWithMatchData, PathGlobs, sources_field.path_globs)
+  logger.debug("snapshot_with_match_data: {}".format(snapshot_with_match_data))
+  snapshot = snapshot_with_match_data.snapshot
   fileset_with_spec = _eager_fileset_with_spec(sources_field.address.spec_path,
                                                sources_field.filespecs,
                                                sources_field.base_globs,

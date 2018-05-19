@@ -178,13 +178,27 @@ impl PathGlob {
   }
 
   pub fn create(filespecs: &[String]) -> Result<Vec<PathGlob>, String> {
-    let mut path_globs = Vec::new();
+    let filespecs_globs = Self::create_from_filespecs(filespecs)?;
+    let all_globs: Vec<_> = filespecs_globs
+      .into_iter()
+      .flat_map(|(_, globs)| globs)
+      .collect();
+    Ok(all_globs)
+  }
+
+  pub fn create_from_filespecs(
+    filespecs: &[String],
+  ) -> Result<Vec<(String, Vec<PathGlob>)>, String> {
+    let mut spec_globs_map = Vec::new();
     for filespec in filespecs {
       let canonical_dir = Dir(PathBuf::new());
       let symbolic_path = PathBuf::new();
-      path_globs.extend(PathGlob::parse(canonical_dir, symbolic_path, filespec)?);
+      spec_globs_map.push((
+        filespec.clone(),
+        PathGlob::parse(canonical_dir, symbolic_path, filespec)?,
+      ));
     }
-    Ok(path_globs)
+    Ok(spec_globs_map)
   }
 
   ///
@@ -403,8 +417,8 @@ struct PathGlobsExpansion<T: Sized> {
 
 #[derive(Clone, Debug)]
 pub struct PathGlobsExpansionResult {
-  path_stats: Vec<PathStat>,
-  found_files: HashMap<PathGlob, GlobMatch>,
+  pub path_stats: Vec<PathStat>,
+  pub found_files: HashMap<PathGlob, GlobMatch>,
 }
 
 fn create_ignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {

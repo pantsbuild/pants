@@ -121,6 +121,9 @@ EMPTY_SNAPSHOT = Snapshot(
 )
 
 
+class SnapshotWithMatchData(datatype([('snapshot', Snapshot), 'match_data'])): pass
+
+
 def create_fs_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [

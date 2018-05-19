@@ -4,8 +4,8 @@
 extern crate bazel_protos;
 extern crate tempdir;
 
+use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
-use std::collections::BTreeMap;
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -18,8 +18,8 @@ use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
-use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDigest, VFS};
-use process_execution::{self, CommandRunner};
+use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathGlobsExpansionRequest,
+         PathGlobsExpansionResult,  PathStat, StoreFileByDigest, VFS};
 use hashing;
 use rule_graph;
 use selectors;
@@ -260,7 +260,12 @@ impl Select {
     }
   }
 
-  fn snapshot(&self, context: &Context, entry: &rule_graph::Entry) -> NodeFuture<fs::Snapshot> {
+  fn snapshot(
+    &self,
+    context: &Context,
+    entry: &rule_graph::Entry,
+    request_spec: SnapshotNodeRequestSpec,
+  ) -> NodeFuture<SnapshotNodeResult> {
     let ref edges = context
       .core
       .rule_graph
@@ -274,7 +279,9 @@ impl Select {
       self.variants.clone(),
       edges,
     ).run(context.clone())
-      .and_then(move |path_globs_val| context.get(Snapshot(externs::key_for(path_globs_val))))
+      .and_then(move |path_globs_val| {
+        context.get(Snapshot(externs::key_for(path_globs_val), request_spec))
+      })
       .to_boxed()
   }
 
@@ -326,13 +333,28 @@ impl Select {
             entry: Arc::new(entry.clone()),
           }),
           &rule_graph::Rule::Intrinsic(Intrinsic {
+            kind: IntrinsicKind::SnapshotWithMatchData,
+            ..
+          }) => {
+            let context = context.clone();
+            self
+              .snapshot(&context, &entry, SnapshotNodeRequestSpec::WithGlobMatchData)
+              .map(move |snapshot_result| {
+                Snapshot::store_snapshot_with_match_data(&context.core, &snapshot_result)
+              })
+              .to_boxed()
+          }
+          &rule_graph::Rule::Intrinsic(Intrinsic {
             kind: IntrinsicKind::Snapshot,
             ..
           }) => {
             let context = context.clone();
             self
-              .snapshot(&context, &entry)
-              .map(move |snapshot| Snapshot::store_snapshot(&context.core, &snapshot))
+              .snapshot(&context, &entry, SnapshotNodeRequestSpec::JustSnapshot)
+              .map(move |snapshot_result| {
+                let SnapshotNodeResult { snapshot, .. } = snapshot_result;
+                Snapshot::store_snapshot(&context.core, &snapshot)
+              })
               .to_boxed()
           }
           &rule_graph::Rule::Intrinsic(Intrinsic {
@@ -644,21 +666,45 @@ impl From<Scandir> for NodeKey {
 
 ///
 /// A Node that captures an fs::Snapshot for a PathGlobs subject.
+/// TODO: ???
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Snapshot(Key);
+pub struct Snapshot(Key, SnapshotNodeRequestSpec);
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum SnapshotNodeRequestSpec {
+  JustSnapshot,
+  WithGlobMatchData,
+}
+
+#[derive(Clone, Debug)]
+pub struct SnapshotNodeResult {
+  snapshot: fs::Snapshot,
+  found_files: HashMap<fs::PathGlob, fs::GlobMatch>,
+}
 
 impl Snapshot {
-  fn create(context: Context, path_globs: PathGlobs) -> NodeFuture<fs::Snapshot> {
+  fn create(
+    context: Context,
+    request: PathGlobsExpansionRequest,
+  ) -> NodeFuture<SnapshotNodeResult> {
     // Recursively expand PathGlobs into PathStats.
     // We rely on Context::expand tracking dependencies for scandirs,
     // and fs::Snapshot::from_path_stats tracking dependencies for file digests.
     context
-      .expand(path_globs)
+      .expand_globs(request)
       .map_err(|e| format!("PathGlobs expansion failed: {:?}", e))
-      .and_then(move |path_stats| {
+      .and_then(move |expansion_result| {
+        let PathGlobsExpansionResult {
+          path_stats,
+          found_files,
+        } = expansion_result;
         fs::Snapshot::from_path_stats(context.core.store.clone(), context.clone(), path_stats)
           .map_err(move |e| format!("Snapshot failed: {}", e))
+          .map(move |snapshot| SnapshotNodeResult {
+            snapshot,
+            found_files,
+          })
       })
       .map_err(|e| throw(&e))
       .to_boxed()
@@ -696,6 +742,22 @@ impl Snapshot {
       &[
         Self::store_directory(core, &item.digest),
         externs::store_tuple(&path_stats),
+      ],
+    )
+  }
+
+  // pub fn store_globs_dict() -> Value {}
+
+  pub fn store_snapshot_with_match_data(core: &Arc<Core>, item: &SnapshotNodeResult) -> Value {
+    let &SnapshotNodeResult { ref snapshot, ref found_files } = item;
+    let snapshot_value = Self::store_snapshot(core, snapshot);
+    let none_py_result = externs::PyResult::from(Ok(()));
+    let none_value: Value = Result::from(none_py_result).unwrap();
+    externs::unsafe_call(
+      &core.types.construct_snapshot_with_match_data,
+      &[
+        snapshot_value,
+        none_value,
       ],
     )
   }
@@ -749,11 +811,17 @@ impl Snapshot {
 }
 
 impl Node for Snapshot {
-  type Output = fs::Snapshot;
+  type Output = SnapshotNodeResult;
 
-  fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
+  fn run(self, context: Context) -> NodeFuture<SnapshotNodeResult> {
     match Self::lift_path_globs(&externs::val_for(&self.0)) {
-      Ok(pgs) => Self::create(context, pgs),
+      Ok(pgs) => {
+        let request = match self.1 {
+          SnapshotNodeRequestSpec::JustSnapshot => PathGlobsExpansionRequest::JustStats(pgs),
+          SnapshotNodeRequestSpec::WithGlobMatchData => PathGlobsExpansionRequest::StatsAndWhetherMatched(pgs),
+        };
+        Self::create(context, request)
+      }
       Err(e) => err(throw(&format!("Failed to parse PathGlobs: {}", e))),
     }
   }
@@ -978,7 +1046,7 @@ pub enum NodeResult {
   DirectoryListing(DirectoryListing),
   LinkDest(LinkDest),
   ProcessResult(ProcessResult),
-  Snapshot(fs::Snapshot),
+  Snapshot(SnapshotNodeResult),
   Value(Value),
 }
 
@@ -994,8 +1062,8 @@ impl From<Value> for NodeResult {
   }
 }
 
-impl From<fs::Snapshot> for NodeResult {
-  fn from(v: fs::Snapshot) -> Self {
+impl From<SnapshotNodeResult> for NodeResult {
+  fn from(v: SnapshotNodeResult) -> Self {
     NodeResult::Snapshot(v)
   }
 }
@@ -1077,7 +1145,7 @@ impl TryFrom<NodeResult> for Value {
   }
 }
 
-impl TryFrom<NodeResult> for fs::Snapshot {
+impl TryFrom<NodeResult> for SnapshotNodeResult {
   type Err = ();
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {

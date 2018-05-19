@@ -87,6 +87,11 @@ impl Tasks {
         input: types.path_globs,
       },
       Intrinsic {
+        kind: IntrinsicKind::SnapshotWithMatchData,
+        product: types.snapshot_with_match_data,
+        input: types.path_globs,
+      },
+      Intrinsic {
         kind: IntrinsicKind::FilesContent,
         product: types.files_content,
         input: types.directory_digest,
@@ -188,6 +193,7 @@ pub struct Intrinsic {
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub enum IntrinsicKind {
   Snapshot,
+  SnapshotWithMatchData,
   FilesContent,
   ProcessExecution,
 }
