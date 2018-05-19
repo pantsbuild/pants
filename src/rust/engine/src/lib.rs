@@ -47,8 +47,8 @@ use externs::{Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionE
               DropHandlesExtern, EqualsExtern, EvalExtern, ExternContext, Externs,
               GeneratorSendExtern, IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern,
               ProjectMultiExtern, PyResult, SatisfiedByExtern, SatisfiedByTypeExtern,
-              StoreBytesExtern, StoreI64Extern, StoreTupleExtern, TypeIdBuffer, TypeToStrExtern,
-              ValToStrExtern};
+              StoreBytesExtern, StoreDictExtern, StoreI64Extern, StoreTupleExtern, TypeIdBuffer,
+              TypeToStrExtern, ValToStrExtern};
 use futures::Future;
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
@@ -137,6 +137,7 @@ pub extern "C" fn externs_set(
   val_to_str: ValToStrExtern,
   satisfied_by: SatisfiedByExtern,
   satisfied_by_type: SatisfiedByTypeExtern,
+  store_dict: StoreDictExtern,
   store_tuple: StoreTupleExtern,
   store_bytes: StoreBytesExtern,
   store_i64: StoreI64Extern,
@@ -160,6 +161,7 @@ pub extern "C" fn externs_set(
     val_to_str,
     satisfied_by,
     satisfied_by_type,
+    store_dict,
     store_tuple,
     store_bytes,
     store_i64,

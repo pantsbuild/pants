@@ -154,6 +154,12 @@ pub enum PathGlob {
   },
 }
 
+#[derive(Clone, Debug)]
+pub struct PathGlobIncludeEntry {
+  pub input: String,
+  pub globs: Vec<PathGlob>,
+}
+
 impl PathGlob {
   fn wildcard(canonical_dir: Dir, symbolic_path: PathBuf, wildcard: Pattern) -> PathGlob {
     PathGlob::Wildcard {
@@ -178,25 +184,24 @@ impl PathGlob {
   }
 
   pub fn create(filespecs: &[String]) -> Result<Vec<PathGlob>, String> {
-    let filespecs_globs = Self::create_from_filespecs(filespecs)?;
-    let all_globs: Vec<_> = filespecs_globs
-      .into_iter()
-      .flat_map(|(_, globs)| globs)
-      .collect();
+    let filespecs_globs = Self::spread_filespecs(filespecs)?;
+    let all_globs = Self::flatten_entries(filespecs_globs);
     Ok(all_globs)
   }
 
-  pub fn create_from_filespecs(
-    filespecs: &[String],
-  ) -> Result<Vec<(String, Vec<PathGlob>)>, String> {
+  pub fn flatten_entries(entries: Vec<PathGlobIncludeEntry>) -> Vec<PathGlob> {
+    entries.into_iter().flat_map(|entry| entry.globs).collect()
+  }
+
+  pub fn spread_filespecs(filespecs: &[String]) -> Result<Vec<PathGlobIncludeEntry>, String> {
     let mut spec_globs_map = Vec::new();
     for filespec in filespecs {
       let canonical_dir = Dir(PathBuf::new());
       let symbolic_path = PathBuf::new();
-      spec_globs_map.push((
-        filespec.clone(),
-        PathGlob::parse(canonical_dir, symbolic_path, filespec)?,
-      ));
+      spec_globs_map.push(PathGlobIncludeEntry {
+        input: filespec.clone(),
+        globs: PathGlob::parse(canonical_dir, symbolic_path, filespec)?,
+      });
     }
     Ok(spec_globs_map)
   }
@@ -355,6 +360,14 @@ pub struct PathGlobs {
 
 impl PathGlobs {
   pub fn create(include: &[String], exclude: &[String]) -> Result<PathGlobs, String> {
+    let include_globs = PathGlob::create(include)?;
+    Self::create_with_include_globs(include_globs, exclude)
+  }
+
+  pub fn create_with_include_globs(
+    include_globs: Vec<PathGlob>,
+    exclude: &[String],
+  ) -> Result<PathGlobs, String> {
     let ignore_for_exclude = if exclude.is_empty() {
       EMPTY_IGNORE.clone()
     } else {
@@ -362,7 +375,7 @@ impl PathGlobs {
         .map_err(|e| format!("Could not parse glob excludes {:?}: {:?}", exclude, e))?)
     };
     Ok(PathGlobs {
-      include: PathGlob::create(include)?,
+      include: include_globs,
       exclude: ignore_for_exclude,
     })
   }

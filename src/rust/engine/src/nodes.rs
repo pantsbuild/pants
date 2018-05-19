@@ -18,8 +18,8 @@ use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
-use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathGlobsExpansionRequest,
-         PathGlobsExpansionResult,  PathStat, StoreFileByDigest, VFS};
+use fs::{self, Dir, File, FileContent, GlobMatch, Link, PathGlob, PathGlobIncludeEntry, PathGlobs,
+         PathGlobsExpansionRequest, PathGlobsExpansionResult, PathStat, StoreFileByDigest, VFS};
 use hashing;
 use rule_graph;
 use selectors;
@@ -352,7 +352,10 @@ impl Select {
             self
               .snapshot(&context, &entry, SnapshotNodeRequestSpec::JustSnapshot)
               .map(move |snapshot_result| {
-                let SnapshotNodeResult { snapshot, .. } = snapshot_result;
+                let SnapshotNodeResult {
+                  expansion_result: SnapshotExpansionResult { snapshot, .. },
+                  ..
+                } = snapshot_result;
                 Snapshot::store_snapshot(&context.core, &snapshot)
               })
               .to_boxed()
@@ -678,16 +681,27 @@ pub enum SnapshotNodeRequestSpec {
 }
 
 #[derive(Clone, Debug)]
-pub struct SnapshotNodeResult {
+pub struct SnapshotExpansionResult {
   snapshot: fs::Snapshot,
-  found_files: HashMap<fs::PathGlob, fs::GlobMatch>,
+  found_files: HashMap<PathGlob, GlobMatch>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SnapshotNodeResult {
+  expansion_result: SnapshotExpansionResult,
+  include_entries: Vec<PathGlobIncludeEntry>,
+}
+
+pub struct PathGlobsLifted {
+  include_entries: Vec<PathGlobIncludeEntry>,
+  exclude: Vec<String>,
 }
 
 impl Snapshot {
   fn create(
     context: Context,
     request: PathGlobsExpansionRequest,
-  ) -> NodeFuture<SnapshotNodeResult> {
+  ) -> NodeFuture<SnapshotExpansionResult> {
     // Recursively expand PathGlobs into PathStats.
     // We rely on Context::expand tracking dependencies for scandirs,
     // and fs::Snapshot::from_path_stats tracking dependencies for file digests.
@@ -701,7 +715,7 @@ impl Snapshot {
         } = expansion_result;
         fs::Snapshot::from_path_stats(context.core.store.clone(), context.clone(), path_stats)
           .map_err(move |e| format!("Snapshot failed: {}", e))
-          .map(move |snapshot| SnapshotNodeResult {
+          .map(move |snapshot| SnapshotExpansionResult {
             snapshot,
             found_files,
           })
@@ -710,15 +724,33 @@ impl Snapshot {
       .to_boxed()
   }
 
-  pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
+  pub fn lift_path_globs_with_inputs(item: &Value) -> Result<PathGlobsLifted, String> {
     let include = externs::project_multi_strs(item, "include");
     let exclude = externs::project_multi_strs(item, "exclude");
-    PathGlobs::create(&include, &exclude).map_err(|e| {
+    let include_entries = PathGlob::spread_filespecs(&include)?;
+    Ok(PathGlobsLifted {
+      include_entries,
+      exclude,
+    })
+  }
+
+  pub fn extract_path_globs_from_lifted(lifted: &PathGlobsLifted) -> Result<PathGlobs, String> {
+    let &PathGlobsLifted {
+      ref include_entries,
+      ref exclude,
+    } = lifted;
+    let include = PathGlob::flatten_entries(include_entries.clone());
+    PathGlobs::create_with_include_globs(include.clone(), exclude).map_err(|e| {
       format!(
         "Failed to parse PathGlobs for include({:?}), exclude({:?}): {}",
         include, exclude, e
       )
     })
+  }
+
+  pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
+    let lifted = Self::lift_path_globs_with_inputs(item)?;
+    Self::extract_path_globs_from_lifted(&lifted)
   }
 
   pub fn store_directory(core: &Arc<Core>, item: &hashing::Digest) -> Value {
@@ -746,18 +778,49 @@ impl Snapshot {
     )
   }
 
-  // pub fn store_globs_dict() -> Value {}
+  fn store_globs_dict(
+    include_entries: &Vec<PathGlobIncludeEntry>,
+    found_files: &HashMap<PathGlob, GlobMatch>,
+  ) -> Value {
+    let dict_entries: Vec<_> = include_entries
+      .into_iter()
+      .map(|entry| {
+        let &PathGlobIncludeEntry { ref input, ref globs } = entry;
+        let match_found_for_input: bool = globs
+          .into_iter()
+          .filter_map(|cur_glob| found_files.get(&cur_glob))
+          .any(|glob_match| match glob_match {
+            &GlobMatch::SuccessfullyMatchedSomeFiles => true,
+            _ => false,
+          });
+
+        let match_found_py_result = externs::PyResult::from(match_found_for_input);
+        let match_found_value = Result::from(match_found_py_result).unwrap();
+
+        externs::DictEntry {
+          key: externs::store_bytes(input.as_bytes()),
+          value: match_found_value,
+        }
+      })
+      .collect();
+    externs::store_dict(dict_entries.as_slice())
+  }
 
   pub fn store_snapshot_with_match_data(core: &Arc<Core>, item: &SnapshotNodeResult) -> Value {
-    let &SnapshotNodeResult { ref snapshot, ref found_files } = item;
+    let &SnapshotNodeResult {
+      expansion_result:
+        SnapshotExpansionResult {
+          ref snapshot,
+          ref found_files,
+        },
+      ref include_entries,
+    } = item;
     let snapshot_value = Self::store_snapshot(core, snapshot);
-    let none_py_result = externs::PyResult::from(Ok(()));
-    let none_value: Value = Result::from(none_py_result).unwrap();
     externs::unsafe_call(
       &core.types.construct_snapshot_with_match_data,
       &[
         snapshot_value,
-        none_value,
+        Self::store_globs_dict(include_entries, found_files),
       ],
     )
   }
@@ -814,16 +877,39 @@ impl Node for Snapshot {
   type Output = SnapshotNodeResult;
 
   fn run(self, context: Context) -> NodeFuture<SnapshotNodeResult> {
-    match Self::lift_path_globs(&externs::val_for(&self.0)) {
-      Ok(pgs) => {
-        let request = match self.1 {
-          SnapshotNodeRequestSpec::JustSnapshot => PathGlobsExpansionRequest::JustStats(pgs),
-          SnapshotNodeRequestSpec::WithGlobMatchData => PathGlobsExpansionRequest::StatsAndWhetherMatched(pgs),
-        };
-        Self::create(context, request)
-      }
-      Err(e) => err(throw(&format!("Failed to parse PathGlobs: {}", e))),
-    }
+    let glob_lift_wrapped_result = future::result(
+      Self::lift_path_globs_with_inputs(&externs::val_for(&self.0))
+        .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e))),
+    );
+    glob_lift_wrapped_result
+      .and_then(move |lifted| {
+        let path_globs_result = future::result(
+          Self::extract_path_globs_from_lifted(&lifted)
+            .map_err(|e| throw(&format!("Failed to extract PathGlobs: {}", e))),
+        );
+
+        let PathGlobsLifted {
+          include_entries, ..
+        } = lifted;
+
+        path_globs_result
+          .and_then(move |path_globs| {
+            let request = match self.1 {
+              SnapshotNodeRequestSpec::JustSnapshot => {
+                PathGlobsExpansionRequest::JustStats(path_globs)
+              }
+              SnapshotNodeRequestSpec::WithGlobMatchData => {
+                PathGlobsExpansionRequest::StatsAndWhetherMatched(path_globs)
+              }
+            };
+            Self::create(context, request)
+          })
+          .map(move |expansion_result| SnapshotNodeResult {
+            expansion_result,
+            include_entries,
+          })
+      })
+      .to_boxed()
   }
 }
 

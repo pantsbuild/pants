@@ -442,9 +442,10 @@ def _get_globs_owning_files(rel_file_paths, rel_include_globs, base_globs, kwarg
 def hydrate_sources(sources_field, glob_match_error_behavior):
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec."""
 
-  snapshot_with_match_data = yield Get(SnapshotWithMatchData, PathGlobs, sources_field.path_globs)
-  logger.debug("snapshot_with_match_data: {}".format(snapshot_with_match_data))
-  snapshot = snapshot_with_match_data.snapshot
+  # snapshot_with_match_data = yield Get(SnapshotWithMatchData, PathGlobs, sources_field.path_globs)
+  # logger.debug("snapshot_with_match_data: {}".format(snapshot_with_match_data))
+  # snapshot = snapshot_with_match_data.snapshot
+  snapshot = yield Get(Snapshot, PathGlobs, sources_field.path_globs)
   fileset_with_spec = _eager_fileset_with_spec(sources_field.address.spec_path,
                                                sources_field.filespecs,
                                                sources_field.base_globs,

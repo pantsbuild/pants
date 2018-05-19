@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::ffi::OsString;
+use std::iter::Iterator;
 use std::mem;
 use std::os::raw;
 use std::os::unix::ffi::OsStringExt;
@@ -52,6 +53,29 @@ pub fn satisfied_by(constraint: &TypeConstraint, obj: &Value) -> bool {
 pub fn satisfied_by_type(constraint: &TypeConstraint, cls: &TypeId) -> bool {
   let interns = INTERNS.read().unwrap();
   with_externs(|e| (e.satisfied_by_type)(e.context, interns.get(&constraint.0), cls))
+}
+
+#[derive(Clone, Debug)]
+pub struct DictEntry {
+  pub key: Value,
+  pub value: Value,
+}
+
+pub fn store_dict(entries: &[DictEntry]) -> Value {
+  let pairs_for_dict: Vec<Value> = entries
+    .into_iter()
+    .map(|entry| {
+      let DictEntry { key, value } = entry.clone();
+      store_tuple(&[key, value])
+    })
+    .collect();
+  with_externs(|e| {
+    (e.store_dict)(
+      e.context,
+      pairs_for_dict.as_ptr(),
+      pairs_for_dict.len() as u64,
+    )
+  })
 }
 
 pub fn store_tuple(values: &[Value]) -> Value {
@@ -219,6 +243,7 @@ pub struct Externs {
   pub drop_handles: DropHandlesExtern,
   pub satisfied_by: SatisfiedByExtern,
   pub satisfied_by_type: SatisfiedByTypeExtern,
+  pub store_dict: StoreDictExtern,
   pub store_tuple: StoreTupleExtern,
   pub store_bytes: StoreBytesExtern,
   pub store_i64: StoreI64Extern,
@@ -250,6 +275,8 @@ pub type EqualsExtern = extern "C" fn(*const ExternContext, *const Value, *const
 pub type CloneValExtern = extern "C" fn(*const ExternContext, *const Value) -> Value;
 
 pub type DropHandlesExtern = extern "C" fn(*const ExternContext, *const Handle, u64);
+
+pub type StoreDictExtern = extern "C" fn(*const ExternContext, *const Value, u64) -> Value;
 
 pub type StoreTupleExtern = extern "C" fn(*const ExternContext, *const Value, u64) -> Value;
 
@@ -299,6 +326,13 @@ impl From<Result<Value, String>> for PyResult {
 impl From<Result<(), String>> for PyResult {
   fn from(res: Result<(), String>) -> Self {
     PyResult::from(res.map(|()| eval("None").unwrap()))
+  }
+}
+
+impl From<bool> for PyResult {
+  fn from(res: bool) -> Self {
+    let eval_str = if res { "True" } else { "False" };
+    PyResult::from(Ok(eval(eval_str).unwrap()))
   }
 }
 
