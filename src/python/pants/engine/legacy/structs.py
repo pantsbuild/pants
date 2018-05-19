@@ -314,6 +314,13 @@ class BaseGlobs(Locatable, AbstractClass):
     if kwargs:
       raise ValueError('kwargs not supported for {}. Got: {}'.format(type(self), kwargs))
 
+  def included_globs(self):
+    return zip(self._patterns, self._file_globs)
+
+  @property
+  def spec_path(self):
+    return self._spec_path
+
   @property
   def filespecs(self):
     """Return a filespecs dict representing both globs and excludes."""
