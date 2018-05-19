@@ -31,6 +31,9 @@ API Changes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Revert to non-forked grpcio-compiler (#5842)
+  `PR #5842 <https://github.com/pantsbuild/pants/pull/5842>`_
+
 * cloc uses v2 process execution (#5840)
   `PR #5840 <https://github.com/pantsbuild/pants/pull/5840>`_
 
