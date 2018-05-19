@@ -7,12 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import defaultdict
 
-from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_util import is_list_option
 from pants.option.parser import Parser
 from pants.option.parser_hierarchy import enclosing_scope
 from pants.option.ranked_value import RankedValue
+from pants.option.scope import GLOBAL_SCOPE
 
 
 class _FakeOptionValues(object):
@@ -105,7 +105,7 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
       return _FakeOptionValues(scoped_options)
 
     def for_global_scope(self):
-      return self.for_scope('')
+      return self.for_scope(GLOBAL_SCOPE)
 
     def passthru_args_for_scope(self, scope):
       return passthru_args or []

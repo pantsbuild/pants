@@ -16,6 +16,46 @@ from pants.option.custom_types import dir_option
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
+from pants.util.objects import datatype
+
+
+class GlobMatchErrorBehavior(datatype([('failure_behavior', str)])):
+
+  allowed_values = ['ignore', 'warn', 'error']
+
+  default_value = 'warn'
+
+  @classmethod
+  def create(cls, value=None):
+    if not value:
+      value = cls.default_value
+    if isinstance(value, cls):
+      return value
+    return cls(str(value))
+
+  def __new__(cls, *args, **kwargs):
+    this_object = super(GlobMatchErrorBehavior, cls).__new__(cls, *args, **kwargs)
+
+    if this_object.failure_behavior not in cls.allowed_values:
+      raise cls.make_type_error(
+        "Value {!r} for failure_behavior must be one of: {!r}."
+        .format(this_object.failure_behavior, cls.allowed_values))
+
+    return this_object
+
+  def should_log_warn_on_error(self):
+    if self.failure_behavior in ['warn', 'error']:
+      return True
+    else:
+      return False
+
+  def should_throw_on_error(self, warnings):
+    if not warnings:
+      return False
+    elif self.failure_behavior == 'error':
+      return True
+    else:
+      return False
 
 
 class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
@@ -244,3 +284,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
+    register('--glob-expansion-failure', type=str,
+             choices=GlobMatchErrorBehavior.allowed_values,
+             default=GlobMatchErrorBehavior.default_value,
+             help="Raise an exception if any targets declaring source files "
+                  "fail to match any glob provided in the 'sources' argument.")

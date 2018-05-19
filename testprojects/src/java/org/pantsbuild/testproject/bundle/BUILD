@@ -87,3 +87,14 @@ jvm_binary(
     'testprojects/tests/resources/org/pantsbuild/testproject/bundleresources:resources',
   ]
 )
+
+jvm_app(name='missing-bundle-fileset',
+  binary=':bundle-bin',
+  bundles=[
+    bundle(fileset=['a/b/file1.txt']),
+    bundle(fileset=rglobs('*.aaaa', '*.bbbb')),
+    bundle(fileset=globs('*.aaaa')),
+    bundle(fileset=zglobs('**/*.abab')),
+    bundle(fileset=['file1.aaaa', 'file2.aaaa']),
+  ],
+)

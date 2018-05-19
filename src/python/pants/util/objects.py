@@ -163,7 +163,7 @@ class TypedDatatypeClassConstructionError(Exception):
       full_msg, *args, **kwargs)
 
 
-class TypedDatatypeInstanceConstructionError(Exception):
+class TypedDatatypeInstanceConstructionError(TypeError):
 
   def __init__(self, type_name, msg, *args, **kwargs):
     full_msg = "error: in constructor of type {}: {}".format(type_name, msg)

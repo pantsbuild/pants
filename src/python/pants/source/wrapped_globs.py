@@ -162,7 +162,6 @@ class FilesetRelPathWrapper(AbstractClass):
     """
     :param rel_path: The relative path to create a FilesetWithSpec for.
     :param patterns: glob patterns to apply.
-    :param exclude: A list of {,r,z}globs objects, strings, or lists of strings to exclude.
     """
     for pattern in patterns:
       if not isinstance(pattern, string_types):

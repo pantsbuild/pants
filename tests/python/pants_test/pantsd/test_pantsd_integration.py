@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import functools
 import itertools
 import os
+import re
 import signal
 import threading
 import time
@@ -195,6 +196,10 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       for line in read_pantsd_log(workdir):
         # Ignore deprecation warning emissions.
         if 'DeprecationWarning' in line:
+          continue
+
+        # Ignore missing sources warnings.
+        if re.search(r"glob pattern '[^']+' did not match any files\.", line):
           continue
 
         self.assertNotRegexpMatches(line, r'^[WE].*')

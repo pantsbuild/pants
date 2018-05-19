@@ -24,6 +24,7 @@ from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.rules import TaskRule, rule
 from pants.engine.selectors import Get, Select
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import Collection, datatype
@@ -360,11 +361,22 @@ def hydrate_target(target_adaptor):
                         tuple(target_adaptor.dependencies))
 
 
-def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
+def _eager_fileset_with_spec(spec_path, filespec, base_globs, snapshot, kwarg_name,
+                             glob_match_failure, include_dirs=False, target_address=None):
   fds = snapshot.path_stats if include_dirs else snapshot.files
   files = tuple(fast_relpath(fd.path, spec_path) for fd in fds)
 
-  relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(filespec['globs'], spec_path)
+  rel_include_globs = filespec['globs']
+
+  # FIXME: uncomment this section after fixing it to use the new rust changes!!!
+  # _get_globs_owning_files(files,
+  #                         rel_include_globs,
+  #                         base_globs,
+  #                         kwarg_name,
+  #                         glob_match_failure,
+  #                         target_address=target_address)
+
+  relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(rel_include_globs, spec_path)
   if filespec.has_key('exclude'):
     relpath_adjusted_filespec['exclude'] = [FilesetRelPathWrapper.to_filespec(e['globs'], spec_path)
                                             for e in filespec['exclude']]
@@ -375,19 +387,71 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
                               files_hash=snapshot.directory_digest.fingerprint)
 
 
-@rule(HydratedField, [Select(SourcesField)])
-def hydrate_sources(sources_field):
+class SourcesGlobMatchError(Exception): pass
+
+
+def _get_globs_owning_files(rel_file_paths, rel_include_globs, base_globs, kwarg_name,
+                            glob_match_failure, target_address=None):
+  if not target_address:
+    # TODO(cosmicexplorer): `target_address` is never going to be None right now -- either require
+    # it or test this path.
+    target_addr_spec = '<no target>'
+  else:
+    target_addr_spec = target_address.spec
+  try:
+    owning_globs = assign_owning_globs(rel_file_paths, rel_include_globs)
+  except GlobPathMatchingError as e:
+    raise SourcesGlobMatchError(
+      "In target {spec} with {desc}={globs}: internal error matching globs: {err}"
+      .format(spec=target_addr_spec, desc=kwarg_name, globs=base_globs, err=e),
+      e)
+
+  warnings = []
+  for glob_matches in owning_globs:
+    if not glob_matches.matched_paths:
+      base_msg = "glob pattern '{}' did not match any files.".format(glob_matches.glob)
+      log_msg = (
+        "In target {spec} with {desc}={globs}: {msg}"
+        .format(spec=target_addr_spec, desc=kwarg_name, globs=base_globs, msg=base_msg))
+      if glob_match_failure.should_log_warn_on_error():
+        logger.warn(log_msg)
+      else:
+        logger.debug(log_msg)
+      warnings.append(base_msg)
+
+  # We will raise on the first sources field with a failed path glob expansion if the option is set,
+  # because we don't want to do any more fs traversals for a build that's going to fail with a
+  # readable error anyway.
+  if glob_match_failure.should_throw_on_error(warnings):
+    raise SourcesGlobMatchError(
+      "In target {spec} with {desc}={globs}: Some globs failed to match "
+      "and --glob-match-failure is set to {opt}. The failures were:\n{failures}"
+      .format(spec=target_addr_spec, desc=kwarg_name, globs=base_globs, opt=glob_match_failure,
+              failures='\n'.join(warnings)))
+
+  return owning_globs
+
+
+# class SourcesFieldExpansionRequest(datatype(['']))
+
+
+@rule(HydratedField, [Select(SourcesField), Select(GlobMatchErrorBehavior)])
+def hydrate_sources(sources_field, glob_match_error_behavior):
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec."""
 
   snapshot = yield Get(Snapshot, PathGlobs, sources_field.path_globs)
   fileset_with_spec = _eager_fileset_with_spec(sources_field.address.spec_path,
                                                sources_field.filespecs,
-                                               snapshot)
+                                               sources_field.base_globs,
+                                               snapshot,
+                                               'sources',
+                                               glob_match_error_behavior,
+                                               target_address=sources_field.address)
   yield HydratedField(sources_field.arg, fileset_with_spec)
 
 
-@rule(HydratedField, [Select(BundlesField)])
-def hydrate_bundles(bundles_field):
+@rule(HydratedField, [Select(BundlesField), Select(GlobMatchErrorBehavior)])
+def hydrate_bundles(bundles_field, glob_match_error_behavior):
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
   snapshot_list = yield [Get(Snapshot, PathGlobs, pg) for pg in bundles_field.path_globs_list]
 
@@ -403,8 +467,12 @@ def hydrate_bundles(bundles_field):
     # deprecation in `pants.backend.jvm.tasks.bundle_create`.
     kwargs['fileset'] = _eager_fileset_with_spec(getattr(bundle, 'rel_path', spec_path),
                                                  filespecs,
+                                                 bundle.fileset,
                                                  snapshot,
-                                                 include_dirs=True)
+                                                 'fileset',
+                                                 glob_match_error_behavior,
+                                                 include_dirs=True,
+                                                 target_address=bundles_field.address)
     bundles.append(BundleAdaptor(**kwargs))
   yield HydratedField('bundles', bundles)
 

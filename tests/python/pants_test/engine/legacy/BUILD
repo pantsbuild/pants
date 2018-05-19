@@ -101,9 +101,21 @@ python_tests(
     '3rdparty/python:requirements_files',
     'src/python/pants/bin',
     'src/python/pants/build_graph',
+    'src/python/pants/engine/legacy:graph',
     'src/python/pants/init',
+    'tests/python/pants_test:base_test',
     'tests/python/pants_test/engine:util',
   ]
+)
+
+python_tests(
+  name='graph_integration',
+  sources=['test_graph_integration.py'],
+  dependencies=[
+    'src/python/pants/engine/legacy:graph',
+    'src/python/pants/option',
+    'tests/python/pants_test:int-test',
+  ],
 )
 
 python_tests(
