@@ -58,7 +58,7 @@ function ensure_native_build_prerequisites() {
       # Kill potentially stale symlinks generated from an older or newer rust toolchain.
       git clean -fdx .
 
-      ln -fs "${RUSTUP}"
+      ln -fs "rust_toolchain.sh" rustup
       local -r cargo_bin_dir="$(dirname "$(cargo_bin)")"
       find "${cargo_bin_dir}" -type f | while read executable; do
         if [[ -x "${executable}" ]]; then
