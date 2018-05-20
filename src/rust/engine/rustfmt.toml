@@ -1,2 +1,5 @@
 tab_spaces = 2
-fn_args_density = "Tall"
+
+# As-of 1.25.0:
+# Warning: can't set `fn_args_density = Tall`, unstable features are only available in nightly channel.
+#fn_args_density = "Tall"

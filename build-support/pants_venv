@@ -24,6 +24,25 @@ function create_venv() {
   "${REPO_ROOT}/build-support/virtualenv" "$(venv_dir)"
 }
 
+function ensure_gcc() {
+  GCC_VERSION=$(gcc -v 2>&1)
+  if (( $? != 0 )); then
+    die "$(cat << MESSAGE
+ERROR: unable to execute 'gcc'. Please verify that your compiler is installed, in your
+       \$PATH and functional.
+
+Hint: on Mac OS X, you may need to accept the XCode EULA: 'sudo xcodebuild -license accept'.
+MESSAGE
+)"
+  fi
+  # Prevent bootstrapping failure due to unrecognized flag:
+  # https://github.com/pantsbuild/pants/issues/78
+  if [[ "$GCC_VERSION" == *503.0.38* ]]; then
+    # Required for clang version 503.0.38
+    export ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future
+  fi
+}
+
 function activate_pants_venv() {
   fingerprint=""
   for req in ${REQUIREMENTS[@]}; do
@@ -45,6 +64,10 @@ function activate_pants_venv() {
 
     create_venv || die "Failed to create venv."
     activate_venv || die "Failed to activate venv."
+
+    # Needed for compilation of native python distributions.
+    ensure_gcc
+
     for req in ${REQUIREMENTS[@]}; do
       pip install ${pip_extra} -r "${req}" || \
         die "Failed to install requirements from ${req}."

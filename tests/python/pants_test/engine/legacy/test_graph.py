@@ -42,15 +42,22 @@ class GraphTestBase(unittest.TestCase):
     return options
 
   @contextmanager
-  def graph_helper(self, build_file_aliases=None, build_file_imports_behavior='allow', include_trace_on_error=True):
+  def graph_helper(self,
+                   build_file_aliases=None,
+                   build_file_imports_behavior='allow',
+                   include_trace_on_error=True,
+                   path_ignore_patterns=None):
+
     with temporary_dir() as work_dir:
-      path_ignore_patterns = ['.*']
-      graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
-                                                          work_dir,
-                                                          build_file_imports_behavior,
-                                                          build_file_aliases=build_file_aliases,
-                                                          native=self._native,
-                                                          include_trace_on_error=include_trace_on_error)
+      path_ignore_patterns = path_ignore_patterns or []
+      graph_helper = EngineInitializer.setup_legacy_graph(
+        path_ignore_patterns,
+        work_dir,
+        build_file_imports_behavior,
+        build_file_aliases=build_file_aliases,
+        native=self._native,
+        include_trace_on_error=include_trace_on_error
+      )
       yield graph_helper
 
   @contextmanager
@@ -100,7 +107,11 @@ class GraphTargetScanFailureTests(GraphTestBase):
 
   def test_with_existing_directory_with_no_build_files_fails(self):
     with self.assertRaises(AddressLookupError) as cm:
-      with self.graph_helper() as graph_helper:
+      path_ignore_patterns=[
+        # This is a symlink that points out of the build root.
+        '/build-support/bin/native/src'
+      ]
+      with self.graph_helper(path_ignore_patterns=path_ignore_patterns) as graph_helper:
         self.create_graph_from_specs(graph_helper, ['build-support/bin::'])
 
     self.assertIn('does not match any targets.', str(cm.exception))
@@ -110,7 +121,7 @@ class GraphTargetScanFailureTests(GraphTestBase):
       with self.graph_helper() as graph_helper:
         graph, target_roots = self.create_graph_from_specs(graph_helper, ['3rdparty/python:'])
 
-        graph.inject_address_closure(Address('build-support/bin','wat'))
+        graph.inject_address_closure(Address('build-support/bin', 'wat'))
 
     self.assertIn('Path "build-support/bin" contains no BUILD files',
                   str(cm.exception))

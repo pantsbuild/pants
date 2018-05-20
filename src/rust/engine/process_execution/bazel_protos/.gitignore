@@ -1,4 +1,0 @@
-src/*.rs
-!src/conversions.rs
-!src/lib.rs
-!src/verification.rs

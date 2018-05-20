@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-source "${REPO_ROOT}/build-support/bin/native/bootstrap.sh"
 
 function usage() {
   echo "Checks formatting of rust files, optionally fixing mis-formatted files."
@@ -34,26 +33,25 @@ while getopts "hf" opt; do
   esac
 done
 
-ensure_native_build_prerequisites >/dev/null
+NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
 
 cmd=(
-  "${CARGO_HOME}/bin/rustfmt"
-  --config-path="${NATIVE_ROOT}/rustfmt.toml"
-)
-
-files=(
-  $(find "${NATIVE_ROOT}" \
-      -name '*.rs' -not -wholename '*/bazel_protos/*' -not -wholename '*/target/*')
-  "${NATIVE_ROOT}/process_execution/bazel_protos/src/verification.rs"
-  "${NATIVE_ROOT}/process_execution/bazel_protos/build.rs"
+  ${REPO_ROOT}/build-support/bin/native/cargo fmt --all --
 )
 
 bad_files=(
   $(
-    ${cmd[*]} --write-mode=${write_mode} ${files[*]} 2>/dev/null | \
+    cd "${NATIVE_ROOT}"
+
+    # Ensure generated code is present since `cargo fmt` needs to do enough parsing to follow use's
+    # and these will land in generated code.
+    echo >&2 "Ensuring generated code is present for downstream formatting checks..."
+    ${REPO_ROOT}/build-support/bin/native/cargo check -p bazel_protos
+
+    ${cmd[*]} --write-mode=${write_mode} | \
       awk '$0 ~ /^Diff in/ {print $3}' | \
       sort -u
-     exit ${PIPESTATUS[0]}
+    exit ${PIPESTATUS[0]}
   )
 )
 case $? in
@@ -70,10 +68,10 @@ case $? in
   *)
     cat << EOF >&2
 An error occurred while checking the formatting of rust files.
-Try running \`${cmd[*]} --write-mode=diff ${files[*]}\` to investigate.
+Try running \`(cd "${NATIVE_ROOT}" && ${cmd[*]} --write-mode=diff)\` to investigate.
 Its error is:
 EOF
-    ${cmd[*]} --write-mode=diff ${files[*]} >/dev/null
+    cd "${NATIVE_ROOT}" && ${cmd[*]} --write-mode=diff >/dev/null
     exit 1
     ;;
 esac

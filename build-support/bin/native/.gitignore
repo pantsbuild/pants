@@ -1,0 +1,7 @@
+# We only check-in the bootstrap scripts and the symlinked binaries Pants tooling needs;
+# other generated symlinks are re-generated.
+/*
+!/*.sh
+!/.gitignore
+!/cargo
+!/README.md
