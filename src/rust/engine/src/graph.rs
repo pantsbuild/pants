@@ -8,14 +8,14 @@ use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+use futures::future::{self, Future};
 use petgraph::Direction;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph, StableGraph};
-use futures::future::{self, Future};
 
-use externs;
 use boxfuture::Boxable;
 use context::ContextFactory;
 use core::{Failure, Noop, FNV};
+use externs;
 use hashing;
 use nodes::{DigestFile, Node, NodeFuture, NodeKey, NodeResult, TryInto};
 
@@ -341,7 +341,7 @@ impl InnerGraph {
     };
 
     try!(f.write_all(b"digraph plans {\n"));
-    try!(f.write_fmt(format_args!("  node[colorscheme={}];\n", viz_color_scheme),));
+    try!(f.write_fmt(format_args!("  node[colorscheme={}];\n", viz_color_scheme)));
     try!(f.write_all(b"  concentrate=true;\n"));
     try!(f.write_all(b"  rankdir=TB;\n"));
 
@@ -371,7 +371,7 @@ impl InnerGraph {
 
         // Write an entry per edge.
         let dep_str = dep_entry.format::<NodeKey>();
-        try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"\n", node_str, dep_str),));
+        try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"\n", node_str, dep_str)));
       }
     }
 

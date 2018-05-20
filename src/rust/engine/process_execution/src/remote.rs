@@ -8,8 +8,8 @@ use digest::{Digest as DigestTrait, FixedOutput};
 use fs::{self, Store};
 use futures::{future, Future};
 use futures_timer::Delay;
-use hashing::{Digest, Fingerprint};
 use grpcio;
+use hashing::{Digest, Fingerprint};
 use protobuf::{self, Message, ProtobufEnum};
 use resettable::Resettable;
 use sha2::Sha256;
@@ -268,10 +268,12 @@ impl CommandRunner {
             try_future!(
               precondition_failure
                 .merge_from_bytes(details.get_value())
-                .map_err(|e| ExecutionError::Fatal(format!(
-                  "Error deserializing FailedPrecondition proto: {:?}",
-                  e
-                )))
+                .map_err(|e| {
+                  ExecutionError::Fatal(format!(
+                    "Error deserializing FailedPrecondition proto: {:?}",
+                    e
+                  ))
+                })
             );
 
             let mut missing_digests =
@@ -464,14 +466,14 @@ mod tests {
   use futures::Future;
   use grpcio;
   use hashing::Digest;
-  use protobuf::{self, Message, ProtobufEnum};
   use mock;
+  use protobuf::{self, Message, ProtobufEnum};
   use tempdir::TempDir;
   use testutil::data::{TestData, TestDirectory};
   use testutil::{as_bytes, owned_string_vec};
 
-  use super::{CommandRunner, ExecuteProcessRequest, ExecuteProcessResult, ExecutionError};
   use super::super::CommandRunner as CommandRunnerTrait;
+  use super::{CommandRunner, ExecuteProcessRequest, ExecuteProcessResult, ExecutionError};
   use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
   use std::sync::Arc;
