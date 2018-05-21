@@ -14,8 +14,7 @@ use protobuf;
 pub struct MockExecution {
   name: String,
   execute_request: bazel_protos::remote_execution::ExecuteRequest,
-  operation_responses:
-    Arc<Mutex<VecDeque<(bazel_protos::operations::Operation, Option<Duration>)>>>,
+  operation_responses: Arc<Mutex<VecDeque<(bazel_protos::operations::Operation, Option<Duration>)>>>,
 }
 
 impl MockExecution {
