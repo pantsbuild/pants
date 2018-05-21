@@ -329,10 +329,14 @@ impl From<Result<(), String>> for PyResult {
   }
 }
 
-impl From<bool> for PyResult {
-  fn from(res: bool) -> Self {
-    let eval_str = if res { "True" } else { "False" };
-    PyResult::from(Ok(eval(eval_str).unwrap()))
+lazy_static! {
+  static ref PYTHON_TRUE: Value = eval("True").unwrap();
+  static ref PYTHON_FALSE: Value = eval("False").unwrap();
+}
+
+impl From<bool> for Value {
+  fn from(arg: bool) -> Self {
+    if arg { PYTHON_TRUE.clone() } else { PYTHON_FALSE.clone() }
   }
 }
 

@@ -794,12 +794,9 @@ impl Snapshot {
             _ => false,
           });
 
-        let match_found_py_result = externs::PyResult::from(match_found_for_input);
-        let match_found_value = Result::from(match_found_py_result).unwrap();
-
         externs::DictEntry {
           key: externs::store_bytes(input.as_bytes()),
-          value: match_found_value,
+          value: Value::from(match_found_for_input),
         }
       })
       .collect();
