@@ -402,10 +402,9 @@ pub enum GlobMatch {
 
 #[derive(Clone, Debug)]
 struct GlobExpansionCacheEntry {
-  path_stats: Vec<PathStat>,
+  // We could add `PathStat`s here if we need them for checking matches more deeply.
   globs: Vec<PathGlob>,
-  // TODO: mutate this in check for matches for ~memoization~
-  // matched: GlobMatch,
+  matched: GlobMatch,
 }
 
 #[derive(Clone, Debug)]
@@ -864,8 +863,12 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
           completed
             .entry(path_glob.clone())
             .or_insert_with(|| GlobExpansionCacheEntry {
-              path_stats: path_stats.clone(),
               globs: globs.clone(),
+              matched: if path_stats.is_empty() {
+                GlobMatch::DidNotMatchAnyFiles
+              } else {
+                GlobMatch::SuccessfullyMatchedSomeFiles
+              },
             });
           expansion
             .todo
@@ -903,15 +906,16 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
           while !found && !q.is_empty() {
             let cur_glob = q.pop_front().unwrap();
             let &GlobExpansionCacheEntry {
-              ref path_stats,
               ref globs,
+              ref matched,
             } = completed.get(&cur_glob).unwrap();
 
-            if !path_stats.is_empty() {
-              found = true;
-              break;
-            } else {
-              q.extend(globs);
+            match matched {
+              &GlobMatch::SuccessfullyMatchedSomeFiles => {
+                found = true;
+                break;
+              },
+              _ => q.extend(globs),
             }
           }
           if found {
