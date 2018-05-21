@@ -116,6 +116,8 @@ python_tests(
     'src/python/pants/option',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
+  timeout = 180,
 )
 
 python_tests(
