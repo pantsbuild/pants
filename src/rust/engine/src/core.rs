@@ -103,6 +103,10 @@ impl Key {
   pub fn type_id(&self) -> &TypeId {
     &self.type_id
   }
+
+  pub fn to_string(&self) -> String {
+    externs::key_to_str(&self)
+  }
 }
 
 ///

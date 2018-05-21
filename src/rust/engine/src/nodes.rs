@@ -674,7 +674,7 @@ impl From<Scandir> for NodeKey {
 /// A Node that captures an fs::Snapshot for a PathGlobs subject.
 /// TODO: ???
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Snapshot {
   key: Key,
   request_spec: SnapshotNodeRequestSpec,
@@ -684,6 +684,17 @@ pub struct Snapshot {
 pub enum SnapshotNodeRequestSpec {
   JustSnapshot,
   WithGlobMatchData,
+}
+
+impl fmt::Debug for Snapshot {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(
+      f,
+      "Snapshot(key={}, request_spec={:?})",
+      self.key.to_string(),
+      self.request_spec
+    )
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -1075,7 +1086,8 @@ impl NodeKey {
         keystr(&s.subject),
         typstr(&s.product)
       ),
-      &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.0)),
+      // TODO(cosmicexplorer): why aren't we implementing an fmt::Debug for all of these nodes?
+      &NodeKey::Snapshot(ref s) => format!("{:?}", s),
     }
   }
 
