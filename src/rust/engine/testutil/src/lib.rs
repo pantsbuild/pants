@@ -27,7 +27,7 @@ pub fn as_bytes(str: &str) -> Bytes {
 
 pub fn make_file(path: &Path, contents: &[u8], mode: u32) {
   let mut file = std::fs::File::create(&path).unwrap();
-  file.write(contents).unwrap();
+  file.write_all(contents).unwrap();
   let mut permissions = std::fs::metadata(path).unwrap().permissions();
   permissions.set_mode(mode);
   file.set_permissions(permissions).unwrap();
