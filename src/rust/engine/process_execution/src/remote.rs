@@ -140,6 +140,13 @@ impl super::CommandRunner for CommandRunner {
       Err(err) => future::err(err).to_boxed(),
     }
   }
+
+  fn reset_prefork(&self) {
+    self.channel.reset();
+    self.env.reset();
+    self.execution_client.reset();
+    self.operations_client.reset();
+  }
 }
 
 impl CommandRunner {
@@ -174,13 +181,6 @@ impl CommandRunner {
       operations_client,
       store,
     }
-  }
-
-  pub fn reset_prefork(&self) {
-    self.channel.reset();
-    self.env.reset();
-    self.execution_client.reset();
-    self.operations_client.reset();
   }
 
   fn upload_command(

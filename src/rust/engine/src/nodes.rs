@@ -18,7 +18,7 @@ use context::{Context, Core};
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
 use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDigest, VFS};
-use process_execution::{self, CommandRunner};
+use process_execution;
 use hashing;
 use rule_graph;
 use selectors;
@@ -514,10 +514,7 @@ impl Node for ExecuteProcess {
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0;
 
-    let command_runner = process_execution::local::CommandRunner::new(
-      context.core.store.clone(),
-      context.core.fs_pool.clone(),
-    );
+    let command_runner = context.core.command_runner.clone();
 
     // TODO: Process pool management should likely move into the `process_execution` crate, which
     // will have different strategies depending on remote/local execution.

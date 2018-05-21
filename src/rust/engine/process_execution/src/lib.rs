@@ -69,6 +69,8 @@ pub struct ExecuteProcessResult {
   pub output_directory: hashing::Digest,
 }
 
-pub trait CommandRunner {
+pub trait CommandRunner: Send + Sync {
   fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<ExecuteProcessResult, String>;
+
+  fn reset_prefork(&self);
 }
