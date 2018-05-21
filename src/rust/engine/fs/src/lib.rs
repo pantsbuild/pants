@@ -899,12 +899,18 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
 
       if do_check_for_matches {
         for root_glob in path_globs.include {
-          let mut q: VecDeque<&PathGlob> = VecDeque::default();
-          q.push_back(&root_glob);
+          let mut intermediate_globs: VecDeque<&PathGlob> = VecDeque::default();
+          intermediate_globs.push_back(&root_glob);
 
           let mut found: bool = false;
-          while !found && !q.is_empty() {
-            let cur_glob = q.pop_front().unwrap();
+          // TODO(cosmicexplorer): This is more ergonomically done with future::loop_fn() -- is
+          // there an equivalent for synchronous code? Should there be?
+          // TODO(cosmicexplorer): Is there a way to do something like:
+          // while !found && let Some(ref cur_glob) = intermediate_globs.pop_front() {...} ??? I
+          // don't know how to allow the mutable borrow with .extend() while immutably borrowing the
+          // result of .pop_front() within the if let clause.
+          while !found && !intermediate_globs.is_empty() {
+            let cur_glob = intermediate_globs.pop_front().unwrap();
             let &GlobExpansionCacheEntry {
               ref globs,
               ref matched,
@@ -915,7 +921,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
                 found = true;
                 break;
               }
-              _ => q.extend(globs),
+              _ => intermediate_globs.extend(globs),
             }
           }
           if found {
@@ -943,13 +949,17 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     path_glob: PathGlob,
     exclude: &Arc<Gitignore>,
   ) -> BoxFuture<SingleExpansionResult, E> {
-    let cloned_glob = path_glob.clone();
-    match path_glob {
+    // TODO(cosmicexplorer): I would love to do something like `glob @ PathGlob::Wildcard {...}`,
+    // but I can't, so we either clone the match argument here, or manually reconstruct the object
+    // when we return by typing out the exact same
+    // `PathGlob::Wildcard { canonical_dir, symbolic_path, wildcard }`
+    // again.
+    match path_glob.clone() {
       PathGlob::Wildcard { canonical_dir, symbolic_path, wildcard } =>
         // Filter directory listing to return PathStats, with no continuation.
         self.directory_listing(canonical_dir, symbolic_path, wildcard, exclude)
         .map(move |path_stats| SingleExpansionResult {
-          path_glob: cloned_glob.clone(),
+          path_glob,
           path_stats,
           globs: vec![],
         })
@@ -975,7 +985,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
                 .flat_map(|path_globs| path_globs.into_iter())
               .collect();
             SingleExpansionResult {
-              path_glob: cloned_glob.clone(),
+              path_glob,
               path_stats: vec![],
               globs: flattened,
             }

@@ -280,7 +280,10 @@ impl Select {
       edges,
     ).run(context.clone())
       .and_then(move |path_globs_val| {
-        context.get(Snapshot(externs::key_for(path_globs_val), request_spec))
+        context.get(Snapshot {
+          key: externs::key_for(path_globs_val),
+          request_spec,
+        })
       })
       .to_boxed()
   }
@@ -672,7 +675,10 @@ impl From<Scandir> for NodeKey {
 /// TODO: ???
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Snapshot(Key, SnapshotNodeRequestSpec);
+pub struct Snapshot {
+  key: Key,
+  request_spec: SnapshotNodeRequestSpec,
+}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum SnapshotNodeRequestSpec {
@@ -878,7 +884,7 @@ impl Node for Snapshot {
 
   fn run(self, context: Context) -> NodeFuture<SnapshotNodeResult> {
     let glob_lift_wrapped_result = future::result(
-      Self::lift_path_globs_with_inputs(&externs::val_for(&self.0))
+      Self::lift_path_globs_with_inputs(&externs::val_for(&self.key))
         .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e))),
     );
     glob_lift_wrapped_result
@@ -894,7 +900,7 @@ impl Node for Snapshot {
 
         path_globs_result
           .and_then(move |path_globs| {
-            let request = match self.1 {
+            let request = match self.request_spec {
               SnapshotNodeRequestSpec::JustSnapshot => {
                 PathGlobsExpansionRequest::JustStats(path_globs)
               }
