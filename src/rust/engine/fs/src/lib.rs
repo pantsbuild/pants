@@ -914,7 +914,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
               &GlobMatch::SuccessfullyMatchedSomeFiles => {
                 found = true;
                 break;
-              },
+              }
               _ => q.extend(globs),
             }
           }

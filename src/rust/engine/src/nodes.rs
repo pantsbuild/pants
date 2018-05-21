@@ -785,7 +785,10 @@ impl Snapshot {
     let dict_entries: Vec<_> = include_entries
       .into_iter()
       .map(|entry| {
-        let &PathGlobIncludeEntry { ref input, ref globs } = entry;
+        let &PathGlobIncludeEntry {
+          ref input,
+          ref globs,
+        } = entry;
         let match_found_for_input: bool = globs
           .into_iter()
           .filter_map(|cur_glob| found_files.get(&cur_glob))

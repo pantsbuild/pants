@@ -336,7 +336,11 @@ lazy_static! {
 
 impl From<bool> for Value {
   fn from(arg: bool) -> Self {
-    if arg { PYTHON_TRUE.clone() } else { PYTHON_FALSE.clone() }
+    if arg {
+      PYTHON_TRUE.clone()
+    } else {
+      PYTHON_FALSE.clone()
+    }
   }
 }
 
