@@ -69,6 +69,11 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['list', target_full])
 
     self.assert_success(pants_run)
+
+    # FIXME: this fails because we just report the string arguments passed to rglobs(), not the
+    # zsh-style globs that they expand to (as we did in the previous iteration of this). We should
+    # provide both the specific argument that failed, as well as the glob it expanded to for
+    # clarity.
     for glob_str, expected_globs in self._BUNDLE_ERR_MSGS:
       for as_zsh_glob in expected_globs:
         warning_msg = self._ERR_FMT.format(
