@@ -253,14 +253,14 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
         env=dict(),
         input_files='',
         output_files=(),
-        timeout=0.1,
+        timeout_seconds=0.1,
         description='')
     with self.assertRaisesRegexp(TypeCheckError, "input_files"):
       ExecuteProcessRequest(argv=('1',),
         env=dict(),
         input_files=3,
         output_files=(),
-        timeout=0.1,
+        timeout_seconds=0.1,
         description='')
     with self.assertRaisesRegexp(TypeCheckError, "output_files"):
       ExecuteProcessRequest(
@@ -268,7 +268,7 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
         env=tuple(),
         input_files=EMPTY_DIRECTORY_DIGEST,
         output_files=["blah"],
-        timeout=0.1,
+        timeout_seconds=0.1,
         description='')
     with self.assertRaisesRegexp(TypeCheckError, "timeout"):
       ExecuteProcessRequest(
@@ -276,7 +276,7 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
         env=tuple(),
         input_files=EMPTY_DIRECTORY_DIGEST,
         output_files=["blah"],
-        timeout=None,
+        timeout_seconds=None,
         description='')
 
 
@@ -356,7 +356,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       ("/bin/bash", "-c", "/bin/sleep 1; echo -n 'European Burmese'"),
       dict(),
       tuple(),
-      timeout=0.1,
+      timeout_seconds=0.1,
       description='sleepy-cat',
     )
 

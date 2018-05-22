@@ -497,7 +497,7 @@ impl ExecuteProcess {
       .map(|path: String| PathBuf::from(path))
       .collect();
 
-    let timeout_str = externs::project_str(&value, "timeout");
+    let timeout_str = externs::project_str(&value, "timeout_seconds");
     let timeout_in_seconds = timeout_str
       .parse::<f64>()
       .map_err(|err| format!("Timeout was not a float: {:?}", err))?;

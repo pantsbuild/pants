@@ -15,7 +15,7 @@ from pants.util.objects import Exactly, SubclassesOf, TypeCheckError, datatype
 
 logger = logging.getLogger(__name__)
 
-_default_timeout = 15 * 60
+_default_timeout_seconds = 15 * 60
 
 
 class ExecuteProcessRequest(datatype([
@@ -23,26 +23,27 @@ class ExecuteProcessRequest(datatype([
   ('env', tuple),
   ('input_files', DirectoryDigest),
   ('output_files', tuple),
-  ('timeout', Exactly(float, int)),
+  # NB: timeout_seconds covers the whole remote operation including queuing and setup.
+  ('timeout_seconds', Exactly(float, int)),
   ('description', SubclassesOf(*six.string_types)),
 ])):
   """Request for execution with args and snapshots to extract."""
 
   @classmethod
-  def create_from_snapshot(cls, argv, env, snapshot, output_files, timeout=_default_timeout, description='process'):
+  def create_from_snapshot(cls, argv, env, snapshot, output_files, timeout_seconds=_default_timeout_seconds, description='process'):
     cls._verify_env_is_dict(env)
     return ExecuteProcessRequest(
       argv=argv,
       env=tuple(env.items()),
       input_files=snapshot.directory_digest,
       output_files=output_files,
-      timeout=timeout,
+      timeout_seconds=timeout_seconds,
       description=description,
     )
 
   @classmethod
-  def create_with_empty_snapshot(cls, argv, env, output_files, timeout=_default_timeout, description='process'):
-    return cls.create_from_snapshot(argv, env, EMPTY_SNAPSHOT, output_files, timeout, description)
+  def create_with_empty_snapshot(cls, argv, env, output_files, timeout_seconds=_default_timeout_seconds, description='process'):
+    return cls.create_from_snapshot(argv, env, EMPTY_SNAPSHOT, output_files, timeout_seconds, description)
 
   @classmethod
   def _verify_env_is_dict(cls, env):
