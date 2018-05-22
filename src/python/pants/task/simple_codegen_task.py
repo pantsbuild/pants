@@ -297,7 +297,7 @@ class SimpleCodegenTask(Task):
         str(target_workdir),
       ),
     ))[0]
-    sources = SnapshotBackedEagerFilesetWithSpec(target_workdir, {'globs': ['**']}, snapshot)
+    sources = SnapshotBackedEagerFilesetWithSpec(target_workdir, {'globs': ['{}/**'.format(target_workdir)]}, snapshot)
 
     synthetic_target = self.context.add_new_target(
       address=self._get_synthetic_address(target, target_workdir),
