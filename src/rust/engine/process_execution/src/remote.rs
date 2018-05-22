@@ -380,7 +380,16 @@ impl CommandRunner {
         })
         .to_boxed()
     } else {
-      future::ok(Bytes::from(execute_response.get_result().get_stdout_raw())).to_boxed()
+      let stdout_raw = Bytes::from(execute_response.get_result().get_stdout_raw());
+      let stdout_copy = stdout_raw.clone();
+      self
+        .store
+        .store_file_bytes(stdout_raw, true)
+        .map_err(move |error| {
+          ExecutionError::Fatal(format!("Error storing raw stdout: {:?}", error))
+        })
+        .wait();
+      future::ok(stdout_copy).to_boxed()
     };
     return stdout;
   }
@@ -411,7 +420,16 @@ impl CommandRunner {
         })
         .to_boxed()
     } else {
-      future::ok(Bytes::from(execute_response.get_result().get_stderr_raw())).to_boxed()
+      let stderr_raw = Bytes::from(execute_response.get_result().get_stderr_raw());
+      let stderr_copy = stderr_raw.clone();
+      self
+        .store
+        .store_file_bytes(stderr_raw, true)
+        .map_err(move |error| {
+          ExecutionError::Fatal(format!("Error storing raw stderr: {:?}", error))
+        })
+        .wait();
+      future::ok(stderr_copy).to_boxed()
     };
     return stderr;
   }
