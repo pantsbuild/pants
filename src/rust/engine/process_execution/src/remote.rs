@@ -388,8 +388,8 @@ impl CommandRunner {
         .map_err(move |error| {
           ExecutionError::Fatal(format!("Error storing raw stdout: {:?}", error))
         })
-        .wait();
-      future::ok(stdout_copy).to_boxed()
+        .map(|_| stdout_copy)
+        .to_boxed()
     };
     return stdout;
   }
@@ -428,8 +428,8 @@ impl CommandRunner {
         .map_err(move |error| {
           ExecutionError::Fatal(format!("Error storing raw stderr: {:?}", error))
         })
-        .wait();
-      future::ok(stderr_copy).to_boxed()
+        .map(|_| stderr_copy)
+        .to_boxed()
     };
     return stderr;
   }
