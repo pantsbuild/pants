@@ -297,22 +297,22 @@ mod tests {
   #[test]
   fn output_files_many() {
     let result = run_command_locally_in_dir(ExecuteProcessRequest {
-        argv: vec![
-          find_bash(),
-          "-c".to_owned(),
-          format!(
-            "/bin/mkdir cats ; echo -n {} > cats/roland ; echo -n {} > treats",
-            TestData::roland().string(),
-            TestData::catnip().string()
-          ),
-        ],
-        env: BTreeMap::new(),
-        input_files: fs::EMPTY_DIGEST,
-        output_files: vec![PathBuf::from("cats/roland"), PathBuf::from("treats")]
-          .into_iter()
-          .collect(),
-        timeout: Duration::from_millis(1000),
-        description: "treats-roland".to_string(),
+      argv: vec![
+        find_bash(),
+        "-c".to_owned(),
+        format!(
+          "/bin/mkdir cats ; echo -n {} > cats/roland ; echo -n {} > treats",
+          TestData::roland().string(),
+          TestData::catnip().string()
+        ),
+      ],
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: vec![PathBuf::from("cats/roland"), PathBuf::from("treats")]
+        .into_iter()
+        .collect(),
+      timeout: Duration::from_millis(1000),
+      description: "treats-roland".to_string(),
     });
 
     assert_eq!(
@@ -329,20 +329,20 @@ mod tests {
   #[test]
   fn output_files_execution_failure() {
     let result = run_command_locally_in_dir(ExecuteProcessRequest {
-        argv: vec![
-          find_bash(),
-          "-c".to_owned(),
-          format!(
-            "echo -n {} > {} ; exit 1",
-            TestData::roland().string(),
-            "roland"
-          ),
-        ],
-        env: BTreeMap::new(),
-        input_files: fs::EMPTY_DIGEST,
-        output_files: vec![PathBuf::from("roland")].into_iter().collect(),
-        timeout: Duration::from_millis(1000),
-        description: "echo foo".to_string(),
+      argv: vec![
+        find_bash(),
+        "-c".to_owned(),
+        format!(
+          "echo -n {} > {} ; exit 1",
+          TestData::roland().string(),
+          "roland"
+        ),
+      ],
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: vec![PathBuf::from("roland")].into_iter().collect(),
+      timeout: Duration::from_millis(1000),
+      description: "echo foo".to_string(),
     });
 
     assert_eq!(

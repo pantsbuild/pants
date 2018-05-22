@@ -69,38 +69,44 @@ impl super::CommandRunner for CommandRunner {
     match execute_request_result {
       Ok((command, execute_request)) => {
         let command_runner = self.clone();
-        self.upload_command(&command, execute_request.get_action().get_command_digest().into())
-            .and_then(move |_| {
-              debug!("Executing remotely request: {:?} (command: {:?})", execute_request, command);
+        self
+          .upload_command(
+            &command,
+            execute_request.get_action().get_command_digest().into(),
+          )
+          .and_then(move |_| {
+            debug!(
+              "Executing remotely request: {:?} (command: {:?})",
+              execute_request, command
+            );
 
-              map_grpc_result(execution_client.get().execute(&execute_request))
-                  .map(|result| (Arc::new(execute_request), result))
-            })
-            .and_then(move |(execute_request, operation)| {
-              let start_time = SystemTime::now();
+            map_grpc_result(execution_client.get().execute(&execute_request))
+              .map(|result| (Arc::new(execute_request), result))
+          })
+          .and_then(move |(execute_request, operation)| {
+            let start_time = SystemTime::now();
 
-              future::loop_fn((operation, 0), move |(operation, iter_num)| {
-                let req_description = req_description.clone();
+            future::loop_fn((operation, 0), move |(operation, iter_num)| {
+              let req_description = req_description.clone();
 
-                let execute_request = execute_request.clone();
-                let execution_client2 = execution_client2.clone();
-                let store = store.clone();
-                let operations_client = operations_client.clone();
-                command_runner.extract_execute_response(operation)
-                    .map(|value|  future::Loop::Break(value))
-                    .or_else(move |value| {
-                      match value {
-                        ExecutionError::Fatal(err) => {
-                          future::err(err).to_boxed()
-                        },
-                        ExecutionError::MissingDigests(missing_digests) => {
-                          debug!(
-                            "Server reported missing digests; trying to upload: {:?}",
-                            missing_digests
-                          );
-                          let execute_request = execute_request.clone();
-                          let execution_client2 = execution_client2.clone();
-                          store.ensure_remote_has_recursive(missing_digests)
+              let execute_request = execute_request.clone();
+              let execution_client2 = execution_client2.clone();
+              let store = store.clone();
+              let operations_client = operations_client.clone();
+              command_runner
+                .extract_execute_response(operation)
+                .map(|value| future::Loop::Break(value))
+                .or_else(move |value| {
+                  match value {
+                    ExecutionError::Fatal(err) => future::err(err).to_boxed(),
+                    ExecutionError::MissingDigests(missing_digests) => {
+                      debug!(
+                        "Server reported missing digests; trying to upload: {:?}",
+                        missing_digests
+                      );
+                      let execute_request = execute_request.clone();
+                      let execution_client2 = execution_client2.clone();
+                      store.ensure_remote_has_recursive(missing_digests)
                               .and_then(move |()| {
                                 map_grpc_result(
                                   execution_client2.get().execute(
@@ -111,46 +117,54 @@ impl super::CommandRunner for CommandRunner {
                               // Reset `iter_num` on `MissingDigests`
                               .map(|operation| future::Loop::Continue((operation, 0)))
                               .to_boxed()
-                        },
-                        ExecutionError::NotFinished(operation_name) => {
-                          let mut operation_request =
-                            bazel_protos::operations::GetOperationRequest::new();
-                          operation_request.set_name(operation_name.clone());
-
-                          let backoff_period = min(
-                            CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
-                            (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS);
-
-
-                          let grpc_result = map_grpc_result(
-                            operations_client.get().get_operation(&operation_request));
-
-                        let operation = try_future!(grpc_result);
-
-                        // take the grpc result and cancel the op if too much time has passed.
-                        let elapsed = try_future!(start_time.elapsed().map_err(|err| format!("Something weird happened with time {:?}", err)));
-
-                        if elapsed > req_timeout {
-                          future::err(format!(
-                            "Exceeded time out of {:?} with {:?} for operation {}, {}",
-                            req_timeout, elapsed, operation_name, req_description
-                          )).to_boxed()
-                        } else {
-                          // maybe the delay here should be the min of remaining time and the backoff period
-                          Delay::new(Duration::from_millis(backoff_period))
-                              .map_err(move |e| format!(
-                                "Future-Delay errored at operation result polling for {}, {}: {}",
-                                operation_name, req_description, e))
-                              .and_then(move |_| {
-                                future::ok(
-                                  future::Loop::Continue(
-                                    (operation, iter_num + 1))).to_boxed()
-                              }).to_boxed()
-                        }},
                     }
-                  })
-              })
-            }).to_boxed()
+                    ExecutionError::NotFinished(operation_name) => {
+                      let mut operation_request =
+                        bazel_protos::operations::GetOperationRequest::new();
+                      operation_request.set_name(operation_name.clone());
+
+                      let backoff_period = min(
+                        CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
+                        (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS,
+                      );
+
+                      let grpc_result =
+                        map_grpc_result(operations_client.get().get_operation(&operation_request));
+
+                      let operation = try_future!(grpc_result);
+
+                      // take the grpc result and cancel the op if too much time has passed.
+                      let elapsed = try_future!(
+                        start_time
+                          .elapsed()
+                          .map_err(|err| format!("Something weird happened with time {:?}", err))
+                      );
+
+                      if elapsed > req_timeout {
+                        future::err(format!(
+                          "Exceeded time out of {:?} with {:?} for operation {}, {}",
+                          req_timeout, elapsed, operation_name, req_description
+                        )).to_boxed()
+                      } else {
+                        // maybe the delay here should be the min of remaining time and the backoff period
+                        Delay::new(Duration::from_millis(backoff_period))
+                          .map_err(move |e| {
+                            format!(
+                              "Future-Delay errored at operation result polling for {}, {}: {}",
+                              operation_name, req_description, e
+                            )
+                          })
+                          .and_then(move |_| {
+                            future::ok(future::Loop::Continue((operation, iter_num + 1))).to_boxed()
+                          })
+                          .to_boxed()
+                      }
+                    }
+                  }
+                })
+            })
+          })
+          .to_boxed()
       }
       Err(err) => future::err(err).to_boxed(),
     }
