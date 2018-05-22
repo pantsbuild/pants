@@ -138,7 +138,7 @@ class PageAdaptor(TargetAdaptor):
   @property
   def multiple_source_error_message(self):
     return (
-      'page only supports a single "source" argument, which should be a relative path to either a'
+      'page only supports a single "source" argument, which should be a relative path to either a '
       '.rst file or a .md file.'
     )
 
@@ -261,6 +261,15 @@ class PythonLibraryAdaptor(PythonTargetAdaptor):
   @property
   def default_sources_exclude_globs(self):
     return PythonTestsAdaptor.python_test_globs
+
+
+class PythonBinaryAdaptor(PythonTargetAdaptor):
+  @property
+  def multiple_source_error_message(self):
+    return (
+      'python_binary only supports a single "source" argument, which should be a relative path to '
+      'a .py file.'
+    )
 
 
 class PythonTestsAdaptor(PythonTargetAdaptor):

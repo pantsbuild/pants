@@ -35,7 +35,11 @@ class PythonBinary(PythonTarget):
   # TODO(wickman) Consider splitting pex options out into a separate PexInfo builder that can be
   # attached to the binary target.  Ideally the PythonBinary target is agnostic about pex mechanics
   def __init__(self,
+               # source is the literal value from the build file, and sources is the expanded
+               # EagerFilesetWithSpec populated by the engine.
+               # TODO: Just use sources when TargetAdaptors are more finalized.
                source=None,
+               sources=None,
                entry_point=None,
                inherit_path=False,        # pex option
                zip_safe=True,             # pex option
@@ -90,7 +94,6 @@ class PythonBinary(PythonTarget):
       'shebang': PrimitiveField(shebang),
     })
 
-    sources = [] if source is None else [source]
     super(PythonBinary, self).__init__(sources=sources, payload=payload, **kwargs)
 
     if source is None and entry_point is None:
