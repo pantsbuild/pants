@@ -690,11 +690,19 @@ mod tests {
 
     {
       assert_eq!(
-        cmd_runner.store.load_file_bytes_with(test_stdout.digest(), |v| v).wait().unwrap(),
+        cmd_runner
+          .store
+          .load_file_bytes_with(test_stdout.digest(), |v| v)
+          .wait()
+          .unwrap(),
         Some(test_stdout.bytes())
       );
       assert_eq!(
-        cmd_runner.store.load_file_bytes_with(test_stderr.digest(), |v| v).wait().unwrap(),
+        cmd_runner
+          .store
+          .load_file_bytes_with(test_stderr.digest(), |v| v)
+          .wait()
+          .unwrap(),
         Some(test_stderr.bytes())
       );
     }
