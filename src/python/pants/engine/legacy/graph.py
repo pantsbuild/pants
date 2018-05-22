@@ -356,7 +356,7 @@ def hydrate_target(target_adaptor):
                         tuple(target_adaptor.dependencies))
 
 
-def _snapshot_backed_eager_fileset_with_spec(spec_path, filespec, snapshot):
+def _snapshot_backed_eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
   relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(filespec['globs'], spec_path)
   if filespec.has_key('exclude'):
     relpath_adjusted_filespec['exclude'] = [FilesetRelPathWrapper.to_filespec(e['globs'], spec_path)
@@ -366,6 +366,7 @@ def _snapshot_backed_eager_fileset_with_spec(spec_path, filespec, snapshot):
     spec_path,
     relpath_adjusted_filespec,
     snapshot,
+    include_dirs,
   )
 
 
