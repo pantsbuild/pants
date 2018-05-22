@@ -195,5 +195,5 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       self.assertIn('Hello, world!', output)
     finally:
       if os.path.exists(pex):
-        # Cleanup
+        # Cleanup.
         os.remove(pex)
