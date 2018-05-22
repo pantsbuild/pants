@@ -17,11 +17,8 @@ from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-<<<<<<< HEAD
 from pants.backend.python.tasks.pex_build_util import _resolve_multi
 from pants.backend.python.tasks.setup_py import SetupPyInvocationEnvironment, SetupPyRunner
-=======
->>>>>>> 3797b24... Add debug logging at setup site dir time
 from pants.backend.python.tasks.pex_build_util import _resolve_multi
 from pants.backend.python.tasks.setup_py import SetupPyInvocationEnvironment, SetupPyRunner
 from pants.base.build_environment import get_buildroot
