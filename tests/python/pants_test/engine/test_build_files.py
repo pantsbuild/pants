@@ -14,13 +14,9 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import addressable, addressable_dict
 from pants.engine.build_files import (ResolvedTypeMismatchError, addresses_from_address_families,
                                       create_graph_rules, parse_address_family)
-<<<<<<< HEAD
 from pants.engine.fs import (DirectoryDigest, FileContent, FilesContent, Path, PathGlobs, Snapshot,
                              create_fs_rules)
-=======
-from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot, create_fs_rules
 from pants.engine.legacy.structs import TargetAdaptor
->>>>>>> fa72104... Resolved conflicts
 from pants.engine.mapper import AddressFamily, AddressMapper, ResolveError
 from pants.engine.nodes import Return, Throw
 from pants.engine.parser import SymbolTable
@@ -30,6 +26,11 @@ from pants_test.engine.examples.parsers import (JsonParser, PythonAssignmentsPar
                                                 PythonCallbacksParser)
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.engine.util import Target, run_rule
+
+
+<<<<<<< HEAD
+=======
+>>>>>>> fa72104... Resolved conflicts
 
 
 class ParseAddressFamilyTest(unittest.TestCase):
