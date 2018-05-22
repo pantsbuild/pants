@@ -17,7 +17,8 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
+from pants.engine.fs import PathGlobs, PathGlobsAndRoot
+from pants.source.wrapped_globs import SnapshotBackedEagerFilesetWithSpec
 from pants.task.task import Task
 from pants.util.dirutil import fast_relpath, safe_delete, safe_walk
 
@@ -222,6 +223,7 @@ class SimpleCodegenTask(Task):
             vt.update()
 
           self._inject_synthetic_target(
+            self.context._scheduler,
             vt.target,
             vt.results_dir,
             vt.cache_key,
@@ -250,25 +252,9 @@ class SimpleCodegenTask(Task):
     """
     return target_workdir
 
-  def _create_sources_with_fingerprint(self, target_workdir, fingerprint, files):
-    """Create an EagerFilesetWithSpec to pass to the sources argument for synthetic target injection.
-
-    We are creating and passing an EagerFilesetWithSpec to the synthetic target injection in the
-    hopes that it will save the time of having to refingerprint the sources.
-
-    :param target_workdir: The directory containing the generated code for the target.
-    :param fingerprint: the fingerprint of the VersionedTarget with which the EagerFilesetWithSpec
-           will be created.
-    :param files: a list of exact paths to generated sources.
-    """
-    results_dir_relpath = os.path.relpath(target_workdir, get_buildroot())
-    filespec = FilesetRelPathWrapper.to_filespec(
-      [os.path.join(results_dir_relpath, file) for file in files])
-    return EagerFilesetWithSpec(results_dir_relpath, filespec=filespec,
-      files=files, files_hash='{}.{}'.format(fingerprint.id, fingerprint.hash))
-
   def _inject_synthetic_target(
     self,
+    scheduler,
     target,
     target_workdir,
     fingerprint,
@@ -305,9 +291,13 @@ class SimpleCodegenTask(Task):
 
       copied_attributes['exports'] = sorted(union)
 
-    sources = list(self.find_sources(target, target_workdir))
-    if fingerprint:
-      sources = self._create_sources_with_fingerprint(target_workdir, fingerprint, sources)
+    snapshot = scheduler.capture_snapshots((
+      PathGlobsAndRoot(
+        PathGlobs(('**',), ()),
+        str(target_workdir),
+      ),
+    ))[0]
+    sources = SnapshotBackedEagerFilesetWithSpec(target_workdir, {'globs': ['**']}, snapshot)
 
     synthetic_target = self.context.add_new_target(
       address=self._get_synthetic_address(target, target_workdir),

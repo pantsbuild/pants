@@ -12,7 +12,7 @@ from pants.base.payload import Payload
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
-from pants.source.wrapped_globs import EagerFilesetWithSpec, Globs, LazyFilesetWithSpec, RGlobs
+from pants.source.wrapped_globs import Globs, LazyFilesetWithSpec, RGlobs
 from pants_test.base_test import BaseTest
 
 
@@ -230,24 +230,8 @@ class FilesetWithSpecTest(BaseTest):
     with self.assertRaises(ValueError):
       LazyFilesetWithSpec('foo', {'globs':['notfoo/a.txt']}, lambda: ['foo/a.txt'])
 
-  def test_eager_fileset_with_spec_fails_if_filespec_not_prefixed_by_relroot(self):
-    with self.assertRaises(ValueError):
-      EagerFilesetWithSpec('foo', {'globs':['notfoo/a.txt']}, files=['files'], files_hash='deadbeef')
-
   def test_lazy_fileset_with_spec_fails_if_exclude_filespec_not_prefixed_by_relroot(self):
     with self.assertRaises(ValueError):
       LazyFilesetWithSpec('foo',
                           {'globs': [], 'exclude': [{'globs': ['notfoo/a.txt']}]},
                           lambda: ['foo/a.txt'])
-
-  def test_eager_fileset_with_spec_fails_if_exclude_filespec_not_prefixed_by_relroot(self):
-    with self.assertRaises(ValueError):
-      EagerFilesetWithSpec('foo',
-                           {'globs': [], 'exclude': [{'globs': ['notfoo/a.txt']}]},
-                           files=['files'],
-                           files_hash='deadbeef')
-
-  def test_iter_relative_paths(self):
-    efws = EagerFilesetWithSpec('test_root', {'globs': []}, files=['a', 'b', 'c'], files_hash='deadbeef')
-    result = list(efws.paths_from_buildroot_iter())
-    self.assertEquals(result, ['test_root/a', 'test_root/b', 'test_root/c'])
