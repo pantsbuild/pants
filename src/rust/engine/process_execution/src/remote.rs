@@ -642,6 +642,65 @@ mod tests {
   }
 
   #[test]
+  fn ensure_inline_stdio_is_stored() {
+    let test_stdout = TestData::roland();
+    let test_stderr = TestData::catnip();
+
+    let mock_server = {
+      let op_name = "cat".to_owned();
+
+      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
+        op_name.clone(),
+        super::make_execute_request(&cat_roland_request())
+          .unwrap()
+          .1,
+        vec![
+          make_successful_operation(
+            &op_name.clone(),
+            StdoutType::Raw(test_stdout.string()),
+            StderrType::Raw(test_stderr.string()),
+            0,
+          ),
+        ],
+      ))
+    };
+
+    let store_dir = TempDir::new("store").unwrap();
+    let cas = mock::StubCAS::with_content(1024, vec![], vec![TestDirectory::containing_roland()]);
+    let store = fs::Store::with_remote(
+      store_dir,
+      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
+      cas.address(),
+      1,
+      10 * 1024 * 1024,
+      Duration::from_secs(1),
+    ).expect("Failed to make store");
+
+    let cmd_runner = CommandRunner::new(mock_server.address(), 1, store);
+    let result = cmd_runner.run(cat_roland_request()).wait();
+    assert_eq!(
+      result,
+      Ok(ExecuteProcessResult {
+        stdout: test_stdout.bytes(),
+        stderr: test_stderr.bytes(),
+        exit_code: 0,
+        output_directory: fs::EMPTY_DIGEST,
+      })
+    );
+
+    {
+      assert_eq!(
+        cmd_runner.store.load_file_bytes_with(test_stdout.digest(), |v| v).wait().unwrap(),
+        Some(test_stdout.bytes())
+      );
+      assert_eq!(
+        cmd_runner.store.load_file_bytes_with(test_stderr.digest(), |v| v).wait().unwrap(),
+        Some(test_stderr.bytes())
+      );
+    }
+  }
+
+  #[test]
   fn successful_execution_after_four_getoperations() {
     let execute_request = echo_foo_request();
 
