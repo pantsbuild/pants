@@ -134,6 +134,15 @@ class JvmBinaryAdaptor(TargetAdaptor):
     )
 
 
+class PageAdaptor(TargetAdaptor):
+  @property
+  def multiple_source_error_message(self):
+    return (
+      'page only supports a single "source" argument, which should be a relative path to either a'
+      '.rst file or a .md file.'
+    )
+
+
 class ScalaLibraryAdaptor(TargetAdaptor):
   @property
   def default_sources_globs(self):

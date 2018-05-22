@@ -18,9 +18,10 @@ from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTarge
                                        create_legacy_graph_tasks)
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (AppAdaptor, GoTargetAdaptor, JavaLibraryAdaptor,
-                                         JunitTestsAdaptor, JvmBinaryAdaptor, PythonLibraryAdaptor,
-                                         PythonTargetAdaptor, PythonTestsAdaptor,
-                                         RemoteSourcesAdaptor, ScalaLibraryAdaptor, TargetAdaptor)
+                                         JunitTestsAdaptor, JvmBinaryAdaptor, PageAdaptor,
+                                         PythonLibraryAdaptor, PythonTargetAdaptor,
+                                         PythonTestsAdaptor, RemoteSourcesAdaptor,
+                                         ScalaLibraryAdaptor, TargetAdaptor)
 from pants.engine.mapper import AddressMapper
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
@@ -65,6 +66,7 @@ class LegacySymbolTable(SymbolTable):
     self._table['python_tests'] = PythonTestsAdaptor
     self._table['python_binary'] = PythonTargetAdaptor
     self._table['remote_sources'] = RemoteSourcesAdaptor
+    self._table['page'] = PageAdaptor
 
   def aliases(self):
     return self._build_file_aliases

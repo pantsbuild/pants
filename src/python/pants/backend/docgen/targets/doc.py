@@ -80,7 +80,11 @@ class Page(Target):
   def __init__(self,
                address=None,
                payload=None,
+               # source is the literal value from the build file, and sources is the expanded
+               # EagerFilesetWithSpec populated by the engine.
+               # TODO: Just use sources when TargetAdaptors are more finalized.
                source=None,
+               sources=None,
                format=None,
                links=None,
                provides=None,
@@ -102,9 +106,7 @@ class Page(Target):
       else:
         format = 'md'
     payload.add_fields({
-      'sources': self.create_sources_field(sources=[source],
-                                           sources_rel_path=address.spec_path,
-                                           key_arg='sources'),
+      'sources': self.create_sources_field(sources, address.spec_path, key_arg='source'),
       'format': PrimitiveField(format),
       'links': PrimitiveField(links or []),
       'provides': self.ProvidesTupleField(provides or []),
