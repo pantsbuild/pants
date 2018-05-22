@@ -54,8 +54,11 @@ function calculate_current_hash() {
 function _build_native_code() {
   # Builds the native code, and echos the path of the built binary.
 
-  "${REPO_ROOT}/build-support/bin/native/cargo" build ${MODE_FLAG} \
-    --manifest-path "${NATIVE_ROOT}/Cargo.toml" || die
+  (
+    cd "${REPO_ROOT}"
+    "${REPO_ROOT}/build-support/bin/native/cargo" build ${MODE_FLAG} \
+      --manifest-path "${NATIVE_ROOT}/Cargo.toml" -p engine
+  ) || die
   echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 }
 
