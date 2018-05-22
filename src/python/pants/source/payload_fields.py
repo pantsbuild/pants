@@ -10,7 +10,7 @@ from hashlib import sha1
 from pants.base.payload_field import PayloadField
 from pants.source.filespec import matches_filespec
 from pants.source.source_root import SourceRootConfig
-from pants.source.wrapped_globs import FilesetWithSpec
+from pants.source.wrapped_globs import FilesetWithSpec, SnapshotBackedEagerFilesetWithSpec
 from pants.util.memo import memoized_property
 
 
@@ -63,6 +63,13 @@ class SourcesField(PayloadField):
   def address(self):
     """Returns the address this sources field refers to (used by some derived classes)"""
     return self._ref_address
+
+  @memoized_property
+  def snapshot(self):
+    if isinstance(self.sources, SnapshotBackedEagerFilesetWithSpec):
+      return self.sources.snapshot
+    else:
+      raise ValueError("Cannot get a snapshot for a non-snapshot-backed sources file (actually backed by {})".format(self.sources))
 
   def relative_to_buildroot(self):
     """All sources joined with their relative paths."""

@@ -24,8 +24,7 @@ from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.rules import TaskRule, rule
 from pants.engine.selectors import Get, Select
-from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
-from pants.util.dirutil import fast_relpath
+from pants.source.wrapped_globs import FilesetRelPathWrapper, SnapshotBackedEagerFilesetWithSpec
 from pants.util.objects import Collection, datatype
 
 
@@ -357,19 +356,17 @@ def hydrate_target(target_adaptor):
                         tuple(target_adaptor.dependencies))
 
 
-def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
-  fds = snapshot.path_stats if include_dirs else snapshot.files
-  files = tuple(fast_relpath(fd.path, spec_path) for fd in fds)
-
+def _snapshot_backed_eager_fileset_with_spec(spec_path, filespec, snapshot):
   relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(filespec['globs'], spec_path)
   if filespec.has_key('exclude'):
     relpath_adjusted_filespec['exclude'] = [FilesetRelPathWrapper.to_filespec(e['globs'], spec_path)
                                             for e in filespec['exclude']]
 
-  return EagerFilesetWithSpec(spec_path,
-                              relpath_adjusted_filespec,
-                              files=files,
-                              files_hash=snapshot.directory_digest.fingerprint)
+  return SnapshotBackedEagerFilesetWithSpec(
+    spec_path,
+    relpath_adjusted_filespec,
+    snapshot,
+  )
 
 
 @rule(HydratedField, [Select(SourcesField)])
@@ -377,7 +374,7 @@ def hydrate_sources(sources_field):
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec."""
 
   snapshot = yield Get(Snapshot, PathGlobs, sources_field.path_globs)
-  fileset_with_spec = _eager_fileset_with_spec(sources_field.address.spec_path,
+  fileset_with_spec = _snapshot_backed_eager_fileset_with_spec(sources_field.address.spec_path,
                                                sources_field.filespecs,
                                                snapshot)
   yield HydratedField(sources_field.arg, fileset_with_spec)
@@ -398,7 +395,7 @@ def hydrate_bundles(bundles_field):
     # NB: We `include_dirs=True` because bundle filesets frequently specify directories in order
     # to trigger a (deprecated) default inclusion of their recursive contents. See the related
     # deprecation in `pants.backend.jvm.tasks.bundle_create`.
-    kwargs['fileset'] = _eager_fileset_with_spec(getattr(bundle, 'rel_path', spec_path),
+    kwargs['fileset'] = _snapshot_backed_eager_fileset_with_spec(getattr(bundle, 'rel_path', spec_path),
                                                  filespecs,
                                                  snapshot,
                                                  include_dirs=True)
