@@ -198,7 +198,7 @@ class ConsoleTaskTestBase(TaskTestBase):
       return output.getvalue()
 
   def execute_console_task(self, targets=None, extra_targets=None, options=None,
-                           passthru_args=None, workspace=None):
+                           passthru_args=None, workspace=None, scheduler=None):
     """Creates a new task and executes it with the given config, command line args and targets.
 
     :API: public
@@ -214,7 +214,12 @@ class ConsoleTaskTestBase(TaskTestBase):
     """
     options = options or {}
     self.set_options(**options)
-    context = self.context(target_roots=targets, passthru_args=passthru_args, workspace=workspace)
+    context = self.context(
+      target_roots=targets,
+      passthru_args=passthru_args,
+      workspace=workspace,
+      scheduler=scheduler
+    )
     return self.execute_console_task_given_context(context, extra_targets=extra_targets)
 
   def execute_console_task_given_context(self, context, extra_targets=None):

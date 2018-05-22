@@ -56,6 +56,60 @@ Relevant Goals and Targets
 > Python code from `.thrift` source; a Python target that has this
 > target in its `dependencies` can `import` the generated Python code.
 
+Configure the Python Version
+----------------------------
+
+Pants allows users to select their Python interpreter by configuring "interpreter constraints."
+By default, pants uses `['CPython>=2.7,<3']` - notice how the requirements-style string specifies
+an interpreter (e.g.: `CPython`, `PyPy`) and version constraint, and that a list of constraints
+may be specified.
+
+The most common approach is to configure interpreter constraints for your whole repo.
+For example, to use python3 for the whole repo, update `pants.ini` as follows:
+
+```ini
+[python-setup]
+interpreter_constraints: ["CPython>=3.5"]
+```
+
+If you require more granularity, the `compatibility` parameter may be specified on
+[python_library](https://www.pantsbuild.org/build_dictionary.html#bdict_python_library) targets
+that require a particular interpreter. For example, a mixed python2/python3 repo may have library
+targets that are only compatible with a given interpreter version.
+
+[python_binary](https://www.pantsbuild.org/build_dictionary.html#bdict_python_binary) targets
+also have the `compatibility` parameter, allowing users to build a PEX binary targeting a given
+interpreter. For example, an environment with production machines running a mix of python2/python3
+might have two `python_binary` targets that build the same binary, but targeting different
+interpreters.
+
+To configure interpreter constraints for an individual Python target, update its build target:
+
+```python
+python_binary(
+    name='server-bin',
+    dependencies = [
+        'src/main/python/server',
+    ],
+    source='main.py',
+    # No need to set compatibility if it matches the default interpreter constraints.
+    #compatibility='CPython>=2.7,<3',
+)
+
+python_binary(
+    name='server-bin3',
+    dependencies = [
+        'src/main/python/server',
+    ],
+    source='main.py',
+    # This target will always use python3, even if the default interpreter constraint is python2.
+    compatibility='CPython>=3',
+)
+```
+
+For additional details, see `./pants python-setup --help-advanced` and read the
+`--python-setup-interpreter-constraints` docstring.
+
 BUILD for a Simple Binary
 -------------------------
 

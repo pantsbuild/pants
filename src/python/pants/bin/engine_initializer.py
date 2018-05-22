@@ -12,6 +12,7 @@ from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.specs import Specs
 from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import create_fs_rules
+from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTargets,
                                        create_legacy_graph_tasks)
@@ -188,6 +189,7 @@ class EngineInitializer(object):
     rules = (
       create_legacy_graph_tasks(symbol_table) +
       create_fs_rules() +
+      create_process_rules() +
       create_graph_rules(address_mapper, symbol_table) +
       rules
     )

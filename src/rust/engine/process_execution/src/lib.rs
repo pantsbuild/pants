@@ -20,9 +20,9 @@ extern crate tempdir;
 #[cfg(test)]
 extern crate testutil;
 
+use boxfuture::BoxFuture;
 use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet};
-use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 
 pub mod local;
@@ -71,4 +71,10 @@ pub struct ExecuteProcessResult {
   // It's unclear whether this should be a Snapshot or a digest of a Directory. A Directory digest
   // is handy, so let's try that out for now.
   pub output_directory: hashing::Digest,
+}
+
+pub trait CommandRunner: Send + Sync {
+  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<ExecuteProcessResult, String>;
+
+  fn reset_prefork(&self);
 }

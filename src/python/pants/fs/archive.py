@@ -12,7 +12,6 @@ from collections import OrderedDict
 from contextlib import contextmanager
 from zipfile import ZIP_DEFLATED
 
-from pants.base.deprecated import deprecated
 from pants.util.contextutil import open_tar, open_zip, temporary_dir
 from pants.util.dirutil import (is_executable, safe_concurrent_rename, safe_walk,
                                 split_basename_and_dirname)
@@ -251,13 +250,6 @@ archive_extensions = {
 TYPE_NAMES = frozenset(_ARCHIVER_BY_TYPE.keys())
 TYPE_NAMES_NO_PRESERVE_SYMLINKS = frozenset(['zip'])
 TYPE_NAMES_PRESERVE_SYMLINKS = TYPE_NAMES - TYPE_NAMES_NO_PRESERVE_SYMLINKS
-
-
-# Pretty much every caller of this method is going to want to put the return value into a variable
-# named `archiver`.
-@deprecated(removal_version='1.8.0.dev0', hint_message='Use the create_archiver method instead.')
-def archiver(typename):
-  return create_archiver(typename)
 
 
 def create_archiver(typename):

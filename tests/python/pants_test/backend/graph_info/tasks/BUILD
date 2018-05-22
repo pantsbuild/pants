@@ -11,8 +11,18 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',
+    'tests/python/pants_test/engine:scheduler_test_base',
     'tests/python/pants_test/tasks:task_test_base',
   ]
+)
+
+python_tests(
+  name='cloc_integration',
+  sources=['test_cloc_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
 )
 
 python_tests(

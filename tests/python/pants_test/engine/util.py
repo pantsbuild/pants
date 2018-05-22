@@ -10,7 +10,7 @@ import re
 from types import GeneratorType
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.binaries.binary_util import BinaryUtilPrivate
+from pants.binaries.binary_util import BinaryUtil
 from pants.engine.addressable import addressable_list
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
@@ -84,7 +84,7 @@ def run_rule(rule, *args):
 
 def init_native():
   """Initialize and return a `Native` instance."""
-  init_subsystem(BinaryUtilPrivate.Factory)
+  init_subsystem(BinaryUtil.Factory)
   opts = create_options_for_optionables([])
   return Native.create(opts.for_global_scope())
 

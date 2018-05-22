@@ -11,6 +11,7 @@ use fs::{safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
 use graph::{EntryId, Graph};
 use handles::maybe_drain_handles;
 use nodes::{Node, NodeFuture};
+use process_execution::{self, CommandRunner};
 use rule_graph::RuleGraph;
 use tasks::Tasks;
 use types::Types;
@@ -27,6 +28,7 @@ pub struct Core {
   pub fs_pool: Arc<ResettablePool>,
   pub store: Store,
   pub vfs: PosixFS,
+  pub command_runner: Arc<CommandRunner>,
 }
 
 impl Core {
@@ -41,7 +43,7 @@ impl Core {
     let mut snapshots_dir = PathBuf::from(work_dir);
     snapshots_dir.push("snapshots");
 
-    let pool = Arc::new(ResettablePool::new("io-".to_string()));
+    let fs_pool = Arc::new(ResettablePool::new("io-".to_string()));
 
     let store_path = match std::env::home_dir() {
       Some(home_dir) => home_dir.join(".cache").join("pants").join("lmdb_store"),
@@ -50,8 +52,11 @@ impl Core {
 
     let store = safe_create_dir_all_ioerror(&store_path)
       .map_err(|e| format!("{:?}", e))
-      .and_then(|()| Store::local_only(store_path, pool.clone()))
+      .and_then(|()| Store::local_only(store_path, fs_pool.clone()))
       .unwrap_or_else(|e| panic!("Could not initialize Store directory {:?}", e));
+
+    let command_runner =
+      process_execution::local::CommandRunner::new(store.clone(), fs_pool.clone());
 
     let rule_graph = RuleGraph::new(&tasks, root_subject_types);
 
@@ -60,19 +65,21 @@ impl Core {
       tasks: tasks,
       rule_graph: rule_graph,
       types: types,
-      fs_pool: pool.clone(),
+      fs_pool: fs_pool.clone(),
       store: store,
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(build_root, pool, ignore_patterns).unwrap_or_else(|e| {
+      vfs: PosixFS::new(build_root, fs_pool, ignore_patterns).unwrap_or_else(|e| {
         panic!("Could not initialize VFS: {:?}", e);
       }),
+      command_runner: Arc::new(command_runner),
     }
   }
 
   pub fn pre_fork(&self) {
     self.fs_pool.reset();
     self.store.reset_prefork();
+    self.command_runner.reset_prefork();
   }
 }
 

@@ -23,7 +23,7 @@ from pants.backend.jvm.tasks.coursier.coursier_subsystem import CoursierSubsyste
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
-from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.base.workunit import WorkUnitLabel
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.contextutil import temporary_file
@@ -337,24 +337,22 @@ class CoursierMixin(NailgunTask):
 
   def _call_coursier(self, cmd_args, coursier_jar, output_fn):
 
-    labels = [WorkUnitLabel.COMPILER] if self.get_options().report else [WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL]
+    labels = [WorkUnitLabel.COMPILER] if self.get_options().report else [WorkUnitLabel.TOOL]
 
-    with self.context.new_workunit(name='coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
-      return_code = self.runjava(
-        classpath=[coursier_jar],
-        main='coursier.cli.Coursier',
-        args=cmd_args,
-        jvm_options=self.get_options().jvm_options,
-        workunit_labels=labels
-      )
+    return_code = self.runjava(
+      classpath=[coursier_jar],
+      main='coursier.cli.Coursier',
+      args=cmd_args,
+      jvm_options=self.get_options().jvm_options,
+      workunit_name='coursier',
+      workunit_labels=labels,
+    )
 
-      workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
+    if return_code:
+      raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
 
-      if return_code:
-        raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
-
-      with open(output_fn) as f:
-        return json.loads(f.read())
+    with open(output_fn) as f:
+      return json.loads(f.read())
 
   @staticmethod
   def _construct_cmd_args(jars, common_args, global_excludes,

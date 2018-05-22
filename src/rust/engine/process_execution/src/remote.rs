@@ -37,47 +37,7 @@ enum ExecutionError {
   NotFinished(String),
 }
 
-impl CommandRunner {
-  const BACKOFF_INCR_WAIT_MILLIS: u64 = 500;
-  const BACKOFF_MAX_WAIT_MILLIS: u64 = 5000;
-
-  pub fn new(address: String, thread_count: usize, store: Store) -> CommandRunner {
-    let env = Resettable::new(Arc::new(move || {
-      Arc::new(grpcio::Environment::new(thread_count))
-    }));
-    let env2 = env.clone();
-    let channel = Resettable::new(Arc::new(move || {
-      grpcio::ChannelBuilder::new(env2.get()).connect(&address)
-    }));
-    let channel2 = channel.clone();
-    let channel3 = channel.clone();
-    let execution_client = Resettable::new(Arc::new(move || {
-      Arc::new(bazel_protos::remote_execution_grpc::ExecutionClient::new(
-        channel2.get(),
-      ))
-    }));
-    let operations_client = Resettable::new(Arc::new(move || {
-      Arc::new(bazel_protos::operations_grpc::OperationsClient::new(
-        channel3.get(),
-      ))
-    }));
-
-    CommandRunner {
-      channel,
-      env,
-      execution_client,
-      operations_client,
-      store,
-    }
-  }
-
-  pub fn reset_prefork(&self) {
-    self.channel.reset();
-    self.env.reset();
-    self.execution_client.reset();
-    self.operations_client.reset();
-  }
-
+impl super::CommandRunner for CommandRunner {
   ///
   /// Runs a command via a gRPC service implementing the Bazel Remote Execution API
   /// (https://docs.google.com/document/d/1AaGk7fOPByEvpAbqeXIyE8HX_A3_axxNnvroblTZ_6s/edit).
@@ -95,10 +55,7 @@ impl CommandRunner {
   /// Loops until the server gives a response, either successful or error. Does not have any
   /// timeout: polls in a tight loop.
   ///
-  pub fn run_command_remote(
-    &self,
-    req: ExecuteProcessRequest,
-  ) -> BoxFuture<ExecuteProcessResult, String> {
+  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<ExecuteProcessResult, String> {
     let execution_client = self.execution_client.clone();
     let execution_client2 = execution_client.clone();
     let operations_client = self.operations_client.clone();
@@ -130,7 +87,7 @@ impl CommandRunner {
                 let store = store.clone();
                 let operations_client = operations_client.clone();
                 command_runner.extract_execute_response(operation)
-                    .map(|value| future::Loop::Break(value))
+                    .map(|value|  future::Loop::Break(value))
                     .or_else(move |value| {
                       match value {
                         ExecutionError::Fatal(err) => {
@@ -172,6 +129,7 @@ impl CommandRunner {
 
                         // take the grpc result and cancel the op if too much time has passed.
                         let elapsed = try_future!(start_time.elapsed().map_err(|err| format!("Something weird happened with time {:?}", err)));
+
                         if elapsed > req_timeout {
                           future::err(format!(
                             "Exceeded time out of {:?} with {:?} for operation {}, {}",
@@ -182,20 +140,61 @@ impl CommandRunner {
                           Delay::new(Duration::from_millis(backoff_period))
                               .map_err(move |e| format!(
                                 "Future-Delay errored at operation result polling for {}, {}: {}",
-                                  operation_name, req_description, e))
+                                operation_name, req_description, e))
                               .and_then(move |_| {
                                 future::ok(
                                   future::Loop::Continue(
                                     (operation, iter_num + 1))).to_boxed()
                               }).to_boxed()
-                        }
-                      }
+                        }},
                     }
                   })
               })
             }).to_boxed()
       }
       Err(err) => future::err(err).to_boxed(),
+    }
+  }
+
+  fn reset_prefork(&self) {
+    self.channel.reset();
+    self.env.reset();
+    self.execution_client.reset();
+    self.operations_client.reset();
+  }
+}
+
+impl CommandRunner {
+  const BACKOFF_INCR_WAIT_MILLIS: u64 = 500;
+  const BACKOFF_MAX_WAIT_MILLIS: u64 = 5000;
+
+  pub fn new(address: String, thread_count: usize, store: Store) -> CommandRunner {
+    let env = Resettable::new(Arc::new(move || {
+      Arc::new(grpcio::Environment::new(thread_count))
+    }));
+    let env2 = env.clone();
+    let channel = Resettable::new(Arc::new(move || {
+      grpcio::ChannelBuilder::new(env2.get()).connect(&address)
+    }));
+    let channel2 = channel.clone();
+    let channel3 = channel.clone();
+    let execution_client = Resettable::new(Arc::new(move || {
+      Arc::new(bazel_protos::remote_execution_grpc::ExecutionClient::new(
+        channel2.get(),
+      ))
+    }));
+    let operations_client = Resettable::new(Arc::new(move || {
+      Arc::new(bazel_protos::operations_grpc::OperationsClient::new(
+        channel3.get(),
+      ))
+    }));
+
+    CommandRunner {
+      channel,
+      env,
+      execution_client,
+      operations_client,
+      store,
     }
   }
 
@@ -487,6 +486,7 @@ mod tests {
   use testutil::{as_bytes, owned_string_vec};
 
   use super::{CommandRunner, ExecuteProcessRequest, ExecuteProcessResult, ExecutionError};
+  use super::super::CommandRunner as CommandRunnerTrait;
   use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
   use std::sync::Arc;
@@ -878,7 +878,7 @@ mod tests {
       .expect("Saving file bytes to store");
 
     let result = CommandRunner::new(mock_server.address(), 1, store)
-      .run_command_remote(cat_roland_request())
+      .run(cat_roland_request())
       .wait();
     assert_eq!(
       result,
@@ -928,7 +928,7 @@ mod tests {
     ).expect("Failed to make store");
 
     let error = CommandRunner::new(mock_server.address(), 1, store)
-      .run_command_remote(cat_roland_request())
+      .run(cat_roland_request())
       .wait()
       .expect_err("Want error");
     assert_contains(&error, &format!("{}", missing_digest.0));
@@ -1278,7 +1278,7 @@ mod tests {
   ) -> Result<ExecuteProcessResult, String> {
     let cas = mock::StubCAS::with_roland_and_directory(1024);
     let command_runner = create_command_runner(address, &cas);
-    command_runner.run_command_remote(request).wait()
+    command_runner.run(request).wait()
   }
 
   fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {

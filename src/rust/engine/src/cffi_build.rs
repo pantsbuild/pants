@@ -1,3 +1,4 @@
+extern crate build_utils;
 extern crate cc;
 
 /*
@@ -21,6 +22,9 @@ native engine binary, allowing us to address it both as an importable python mod
 use std::fs;
 use std::io::{Read, Result};
 use std::path::{Path, PathBuf};
+use std::process::{exit, Command};
+
+use build_utils::BuildRoot;
 
 fn main() {
   // We depend on grpcio, which uses C++.
@@ -50,13 +54,31 @@ fn main() {
     println!("cargo:rustc-link-lib=static=stdc++");
   }
 
-  let mut config = cc::Build::new();
+  // Generate the cffi c sources.
+  let build_root = BuildRoot::find().unwrap();
+  let cffi_bootstrapper = build_root.join("build-support/bin/native/bootstrap_cffi.sh");
 
   // N.B. The filename of this source code - at generation time - must line up 1:1 with the
   // python import name, as python keys the initialization function name off of the import name.
   let cffi_dir = Path::new("src/cffi");
   let c_path = mark_for_change_detection(cffi_dir.join("native_engine.c"));
   let env_script_path = mark_for_change_detection(cffi_dir.join("native_engine.cflags"));
+
+  let result = Command::new(&cffi_bootstrapper)
+    .arg(cffi_dir)
+    .status()
+    .expect(&format!("Failed to execute {:?}", &cffi_bootstrapper));
+  if !result.success() {
+    let exit_code = result.code();
+    eprintln!(
+      "Execution of {:?} failed with exit code {:?}",
+      cffi_bootstrapper, exit_code
+    );
+    exit(exit_code.unwrap_or(1));
+  }
+
+  // Now compile the cffi c sources.
+  let mut config = cc::Build::new();
 
   config.file(c_path.to_str().unwrap());
   for flag in make_flags(&env_script_path).unwrap() {

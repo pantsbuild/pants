@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.binaries.binary_tool import BinaryToolBase
 from pants.binaries.binary_util import (BinaryToolFetcher, BinaryToolUrlGenerator,
-                                        BinaryUtilPrivate, HostPlatform)
+                                        BinaryUtil, HostPlatform)
 from pants.option.scope import GLOBAL_SCOPE
 from pants_test.base_test import BaseTest
 
@@ -34,7 +34,7 @@ class ReplacingLegacyOptionsTool(BinaryToolBase):
   replaces_name = 'old_tool_version'
 
 
-class BinaryUtilFakeUname(BinaryUtilPrivate):
+class BinaryUtilFakeUname(BinaryUtil):
 
   def _host_platform(self):
     return HostPlatform('xxx', 'yyy')
@@ -117,7 +117,7 @@ class BinaryToolBaseTest(BaseTest):
     default_version_tool = DefaultVersion.global_instance()
     self.assertIsNone(default_version_tool.get_external_url_generator())
 
-    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+    with self.assertRaises(BinaryUtil.BinaryResolutionError) as cm:
       default_version_tool.select()
     err_msg = str(cm.exception)
     self.assertIn(BinaryToolFetcher.BinaryNotFound.__name__, err_msg)
@@ -131,7 +131,7 @@ class BinaryToolBaseTest(BaseTest):
     custom_urls_tool = CustomUrls.global_instance()
     self.assertEqual(custom_urls_tool.version(), 'v2.3')
 
-    with self.assertRaises(BinaryUtilPrivate.BinaryResolutionError) as cm:
+    with self.assertRaises(BinaryUtil.BinaryResolutionError) as cm:
       custom_urls_tool.select()
     err_msg = str(cm.exception)
     self.assertIn(BinaryToolFetcher.BinaryNotFound.__name__, err_msg)

@@ -13,10 +13,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures::future::{self, Future};
-use tempdir::TempDir;
 
 use boxfuture::{BoxFuture, Boxable};
-use context::Context;
+use context::{Context, Core};
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
 use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDigest, VFS};
@@ -333,7 +332,7 @@ impl Select {
             let context = context.clone();
             self
               .snapshot(&context, &entry)
-              .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
+              .map(move |snapshot| Snapshot::store_snapshot(&context.core, &snapshot))
               .to_boxed()
           }
           &rule_graph::Rule::Intrinsic(Intrinsic {
@@ -381,7 +380,6 @@ impl Select {
             ..
           }) => {
             let context = context.clone();
-            let context2 = context.clone();
             self
               .execute_process(&context, &entry)
               .map(move |result| {
@@ -391,7 +389,7 @@ impl Select {
                     externs::store_bytes(&result.0.stdout),
                     externs::store_bytes(&result.0.stderr),
                     externs::store_i64(result.0.exit_code as i64),
-                    Snapshot::store_directory(&context2, &result.0.output_directory),
+                    Snapshot::store_directory(&context.core, &result.0.output_directory),
                   ],
                 )
               })
@@ -457,7 +455,7 @@ impl From<Select> for NodeKey {
   }
 }
 
-fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
+pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
   let fingerprint = externs::project_str(&digest, "fingerprint");
   let digest_length = externs::project_str(&digest, "serialized_bytes_length");
   let digest_length_as_usize = digest_length
@@ -525,12 +523,8 @@ impl Node for ExecuteProcess {
 
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0;
-    let context2 = context.clone();
 
-    let command_runner = process_execution::local::CommandRunner::new(
-      context.core.store.clone(),
-      context.core.fs_pool.clone(),
-    );
+    let command_runner = context.core.command_runner.clone();
 
     // TODO: Process pool management should likely move into the `process_execution` crate, which
     // will have different strategies depending on remote/local execution.
@@ -538,13 +532,8 @@ impl Node for ExecuteProcess {
       .core
       .fs_pool
       .spawn_fn(move || {
-        let tmpdir = TempDir::new("process-execution").unwrap();
-        let dir = tmpdir.path().to_owned();
-        context2
-          .core
-          .store
-          .materialize_directory(dir.clone(), request.input_files)
-          .and_then(move |()| command_runner.run(request, tmpdir))
+        command_runner
+          .run(request)
           .map(|result| ProcessResult(result))
           .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
       })
@@ -682,7 +671,7 @@ impl Snapshot {
       .to_boxed()
   }
 
-  fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
+  pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
     let include = externs::project_multi_strs(item, "include");
     let exclude = externs::project_multi_strs(item, "exclude");
     PathGlobs::create(&include, &exclude).map_err(|e| {
@@ -693,9 +682,9 @@ impl Snapshot {
     })
   }
 
-  fn store_directory(context: &Context, item: &hashing::Digest) -> Value {
+  pub fn store_directory(core: &Arc<Core>, item: &hashing::Digest) -> Value {
     externs::unsafe_call(
-      &context.core.types.construct_directory_digest,
+      &core.types.construct_directory_digest,
       &[
         externs::store_bytes(item.0.to_hex().as_bytes()),
         externs::store_i64(item.1 as i64),
@@ -703,16 +692,16 @@ impl Snapshot {
     )
   }
 
-  fn store_snapshot(context: &Context, item: &fs::Snapshot) -> Value {
+  pub fn store_snapshot(core: &Arc<Core>, item: &fs::Snapshot) -> Value {
     let path_stats: Vec<_> = item
       .path_stats
       .iter()
-      .map(|ps| Self::store_path_stat(context, ps))
+      .map(|ps| Self::store_path_stat(core, ps))
       .collect();
     externs::unsafe_call(
-      &context.core.types.construct_snapshot,
+      &core.types.construct_snapshot,
       &[
-        Self::store_directory(context, &item.digest),
+        Self::store_directory(core, &item.digest),
         externs::store_tuple(&path_stats),
       ],
     )
@@ -722,26 +711,26 @@ impl Snapshot {
     externs::store_bytes(item.as_os_str().as_bytes())
   }
 
-  fn store_dir(context: &Context, item: &Dir) -> Value {
+  fn store_dir(core: &Arc<Core>, item: &Dir) -> Value {
     let args = [Self::store_path(item.0.as_path())];
-    externs::unsafe_call(&context.core.types.construct_dir, &args)
+    externs::unsafe_call(&core.types.construct_dir, &args)
   }
 
-  fn store_file(context: &Context, item: &File) -> Value {
+  fn store_file(core: &Arc<Core>, item: &File) -> Value {
     let args = [Self::store_path(item.path.as_path())];
-    externs::unsafe_call(&context.core.types.construct_file, &args)
+    externs::unsafe_call(&core.types.construct_file, &args)
   }
 
-  fn store_path_stat(context: &Context, item: &PathStat) -> Value {
+  fn store_path_stat(core: &Arc<Core>, item: &PathStat) -> Value {
     let args = match item {
       &PathStat::Dir { ref path, ref stat } => {
-        vec![Self::store_path(path), Self::store_dir(context, stat)]
+        vec![Self::store_path(path), Self::store_dir(core, stat)]
       }
       &PathStat::File { ref path, ref stat } => {
-        vec![Self::store_path(path), Self::store_file(context, stat)]
+        vec![Self::store_path(path), Self::store_file(core, stat)]
       }
     };
-    externs::unsafe_call(&context.core.types.construct_path_stat, &args)
+    externs::unsafe_call(&core.types.construct_path_stat, &args)
   }
 
   fn store_file_content(context: &Context, item: &FileContent) -> Value {

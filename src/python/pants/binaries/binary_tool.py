@@ -8,7 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
-from pants.binaries.binary_util import BinaryRequest, BinaryUtilPrivate
+from pants.binaries.binary_util import BinaryRequest, BinaryUtil
+from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.fs.archive import XZCompressedTarArchiver, create_archiver
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
@@ -49,7 +50,7 @@ class BinaryToolBase(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    sub_deps = super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtilPrivate.Factory,)
+    sub_deps = super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
 
     # TODO(cosmicexplorer): if we need to do more conditional subsystem dependencies, do it
     # declaratively with a dict class field so that we only try to create or access it if we
@@ -147,7 +148,7 @@ class BinaryToolBase(Subsystem):
 
   @memoized_property
   def _binary_util(self):
-    return BinaryUtilPrivate.Factory.create()
+    return BinaryUtil.Factory.create()
 
   @classmethod
   def _get_name(cls):
@@ -189,6 +190,17 @@ class Script(BinaryToolBase):
   :API: public
   """
   platform_dependent = False
+
+  def hackily_snapshot(self, context):
+    bootstrapdir = self.get_options().pants_bootstrapdir
+    script_relpath = os.path.relpath(self.select(context), bootstrapdir)
+    snapshot = context._scheduler.capture_snapshots((
+      PathGlobsAndRoot(
+        PathGlobs((script_relpath,), ()),
+        str(bootstrapdir),
+      ),
+    ))[0]
+    return (script_relpath, snapshot)
 
 
 class ExecutablePathProvider(object):

@@ -312,7 +312,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         }?;
         match proto_bytes {
           Some(bytes) => {
-            io::stdout().write(&bytes).unwrap();
+            io::stdout().write_all(&bytes).unwrap();
             Ok(())
           }
           None => Err(ExitError(

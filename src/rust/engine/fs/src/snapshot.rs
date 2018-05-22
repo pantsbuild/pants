@@ -175,7 +175,7 @@ impl Snapshot {
       uniq_paths.into_iter().map(|(_, v)| v).collect()
     };
     // Recursively merge the Digests in the Snapshots.
-    Self::merge_helper(store, snapshots.iter().map(|s| s.digest).collect())
+    Self::merge_directories(store, snapshots.iter().map(|s| s.digest).collect())
       .map(move |root_digest| Snapshot {
         digest: root_digest,
         path_stats: path_stats,
@@ -187,7 +187,7 @@ impl Snapshot {
   /// Given Digest(s) representing Directory instances, merge them recursively into a single
   /// output Directory Digest. Fails for collisions.
   ///
-  fn merge_helper(store: Store, dir_digests: Vec<Digest>) -> BoxFuture<Digest, String> {
+  pub fn merge_directories(store: Store, dir_digests: Vec<Digest>) -> BoxFuture<Digest, String> {
     if dir_digests.is_empty() {
       return future::ok(EMPTY_DIGEST).to_boxed();
     } else if dir_digests.len() == 1 {
@@ -219,6 +219,26 @@ impl Snapshot {
             .collect(),
         ));
         out_dir.mut_files().sort_by(|a, b| a.name.cmp(&b.name));
+        let unique_count = out_dir
+          .mut_files()
+          .iter()
+          .map(|v| v.get_name())
+          .dedup()
+          .count();
+        if unique_count != out_dir.get_files().len() {
+          let groups = out_dir
+            .get_files()
+            .iter()
+            .group_by(|f| f.get_name().to_owned());
+          for (file_name, group) in groups.into_iter() {
+            if group.count() > 1 {
+              return future::err(format!(
+                "Can only merge Directories with no duplicates, but found duplicate files: {}",
+                file_name
+              )).to_boxed();
+            }
+          }
+        }
 
         // Group and recurse for DirectoryNodes.
         let sorted_child_directories = {
@@ -237,7 +257,7 @@ impl Snapshot {
             .group_by(|d| d.name.clone())
             .into_iter()
             .map(move |(child_name, group)| {
-              Self::merge_helper(
+              Self::merge_directories(
                 store2.clone(),
                 group.map(|d| d.get_digest().into()).collect(),
               ).map(move |merged_digest| {
@@ -340,6 +360,7 @@ mod tests {
   use hashing::{Digest, Fingerprint};
   use tempdir::TempDir;
   use self::testutil::make_file;
+  use self::testutil::data::TestDirectory;
 
   use super::OneOffStoreFileByDigest;
   use super::super::{Dir, File, Path, PathGlobs, PathStat, PosixFS, ResettablePool, Snapshot,
@@ -440,6 +461,62 @@ mod tests {
         ),
         path_stats: unsorted_path_stats,
       }
+    );
+  }
+
+  #[test]
+  fn merge_directories_two_files() {
+    let (store, _, _, _) = setup();
+
+    let containing_roland = TestDirectory::containing_roland();
+    let containing_treats = TestDirectory::containing_treats();
+
+    store
+      .record_directory(&containing_roland.directory(), false)
+      .wait()
+      .expect("Storing roland directory");
+    store
+      .record_directory(&containing_treats.directory(), false)
+      .wait()
+      .expect("Storing treats directory");
+
+    let result = Snapshot::merge_directories(
+      store,
+      vec![containing_treats.digest(), containing_roland.digest()],
+    ).wait();
+
+    assert_eq!(
+      result,
+      Ok(TestDirectory::containing_roland_and_treats().digest())
+    );
+  }
+
+  #[test]
+  fn merge_directories_clashing_files() {
+    let (store, _, _, _) = setup();
+
+    let containing_roland = TestDirectory::containing_roland();
+    let containing_wrong_roland = TestDirectory::containing_wrong_roland();
+
+    store
+      .record_directory(&containing_roland.directory(), false)
+      .wait()
+      .expect("Storing roland directory");
+    store
+      .record_directory(&containing_wrong_roland.directory(), false)
+      .wait()
+      .expect("Storing wrong roland directory");
+
+    let err = Snapshot::merge_directories(
+      store,
+      vec![containing_roland.digest(), containing_wrong_roland.digest()],
+    ).wait()
+      .expect_err("Want error merging");
+
+    assert!(
+      err.contains("roland"),
+      "Want error message to contain roland but was: {}",
+      err
     );
   }
 

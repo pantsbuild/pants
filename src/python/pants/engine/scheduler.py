@@ -14,7 +14,8 @@ from types import GeneratorType
 from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
-from pants.engine.fs import DirectoryDigest, FileContent, FilesContent, Path, PathGlobs, Snapshot
+from pants.engine.fs import (DirectoryDigest, FileContent, FilesContent, Path, PathGlobs,
+                             PathGlobsAndRoot, Snapshot)
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
@@ -22,7 +23,7 @@ from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import Select, SelectVariant, constraint_for
 from pants.engine.struct import HasProducts, Variants
 from pants.util.contextutil import temporary_file_path
-from pants.util.objects import SubclassesOf, datatype
+from pants.util.objects import Collection, SubclassesOf, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -158,6 +159,13 @@ class Scheduler(object):
   def _from_value(self, val):
     return self._native.context.from_value(val)
 
+  def _raise_or_return(self, pyresult):
+    value = self._from_value(pyresult.value)
+    if pyresult.is_throw:
+      raise value
+    else:
+      return value
+
   def _to_id(self, typ):
     return self._native.context.to_id(typ)
 
@@ -279,8 +287,7 @@ class Scheduler(object):
                                                      execution_request,
                                                      self._to_key(subject),
                                                      self._to_constraint(product))
-    if res.is_throw:
-      raise self._from_value(res.value)
+    self._raise_or_return(res)
 
   def visualize_to_dir(self):
     return self._native.visualize_to_dir
@@ -309,6 +316,33 @@ class Scheduler(object):
       self._native.lib.nodes_destroy(raw_roots)
     return roots
 
+  def capture_snapshots(self, path_globs_and_roots):
+    """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root directory.
+
+    This is a blocking operation, and should be avoided where possible.
+
+    :param path_globs_and_roots tuple<PathGlobsAndRoot>: The PathGlobs to capture, and the root
+           directory relative to which each should be captured.
+    :returns: A tuple of Snapshots.
+    """
+    result = self._native.lib.capture_snapshots(
+      self._scheduler,
+      self._to_value(_PathGlobsAndRootCollection(path_globs_and_roots)),
+    )
+    return self._raise_or_return(result)
+
+  def merge_directories(self, directory_digests):
+    """Merges any number of directories.
+
+    :param directory_digests: Tuple of DirectoryDigests.
+    :return: A DirectoryDigest.
+    """
+    result = self._native.lib.merge_directories(
+      self._scheduler,
+      self._to_value(_DirectoryDigests(directory_digests)),
+    )
+    return self._raise_or_return(result)
+
   def lease_files_in_graph(self):
     self._native.lib.lease_files_in_graph(self._scheduler)
 
@@ -318,6 +352,12 @@ class Scheduler(object):
   def new_session(self):
     """Creates a new SchedulerSession for this Scheduler."""
     return SchedulerSession(self, self._native.new_session(self._scheduler))
+
+
+_PathGlobsAndRootCollection = Collection.of(PathGlobsAndRoot)
+
+
+_DirectoryDigests = Collection.of(DirectoryDigest)
 
 
 class SchedulerSession(object):
@@ -480,6 +520,20 @@ class SchedulerSession(object):
     :returns: A list of the requested products, with length match len(subjects).
     """
     return self.products_request([product], subjects)[product]
+
+  def capture_snapshots(self, path_globs_and_roots):
+    """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root directory.
+
+    This is a blocking operation, and should be avoided where possible.
+
+    :param path_globs_and_roots tuple<PathGlobsAndRoot>: The PathGlobs to capture, and the root
+           directory relative to which each should be captured.
+    :returns: A tuple of Snapshots.
+    """
+    return self._scheduler.capture_snapshots(path_globs_and_roots)
+
+  def merge_directories(self, directory_digests):
+    return self._scheduler.merge_directories(directory_digests)
 
   def lease_files_in_graph(self):
     self._scheduler.lease_files_in_graph()

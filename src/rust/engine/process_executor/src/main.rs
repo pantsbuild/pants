@@ -5,12 +5,10 @@ extern crate fs;
 extern crate futures;
 extern crate hashing;
 extern crate process_execution;
-extern crate tempdir;
 
 use clap::{App, AppSettings, Arg};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
-use tempdir::TempDir;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter::Iterator;
 use std::process::exit;
@@ -133,23 +131,17 @@ fn main() {
     description: "process_executor".to_string(),
   };
 
-  let result = match server_arg {
-    Some(address) => process_execution::remote::CommandRunner::new(address.to_owned(), 1, store)
-      .run_command_remote(request)
-      .wait()
-      .expect("Error executing remotely"),
-    None => {
-      let dir = TempDir::new("process-execution").expect("Error making temporary directory");
-      store
-        .materialize_directory(dir.path().to_owned(), request.input_files)
-        .wait()
-        .expect("Error materializing directory");
-      process_execution::local::CommandRunner::new(store, pool)
-        .run(request, dir)
-        .wait()
-        .expect("Error executing locally")
-    }
+  let runner: Box<process_execution::CommandRunner> = match server_arg {
+    Some(address) => Box::new(process_execution::remote::CommandRunner::new(
+      address.to_owned(),
+      1,
+      store,
+    )),
+    None => Box::new(process_execution::local::CommandRunner::new(store, pool)),
   };
+
+  let result = runner.run(request).wait().expect("Error executing");
+
   print!("{}", String::from_utf8(result.stdout.to_vec()).unwrap());
   eprint!("{}", String::from_utf8(result.stderr.to_vec()).unwrap());
   exit(result.exit_code);

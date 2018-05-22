@@ -19,75 +19,89 @@ impl CommandRunner {
   pub fn new(store: fs::Store, fs_pool: Arc<fs::ResettablePool>) -> CommandRunner {
     CommandRunner { store, fs_pool }
   }
+}
 
+impl super::CommandRunner for CommandRunner {
   ///
   /// Runs a command on this machine in the passed working directory.
   ///
-  /// This takes ownership of a TempDir rather than a Path to ensure that the TempDir can't be
-  /// dropped, and thus the underlying directory deleted, while we need a reference to it. If we
-  /// switch to not use TempDir, we should ensure that this guarantee still holds.
-  ///
-  pub fn run(
-    &self,
-    req: ExecuteProcessRequest,
-    workdir: tempdir::TempDir,
-  ) -> BoxFuture<ExecuteProcessResult, String> {
-    let env = req.env;
-    let output_file_paths = req.output_files;
-    let output = try_future!(
-      Command::new(&req.argv[0])
-        .args(&req.argv[1..])
-        .current_dir(workdir.path())
-        .env_clear()
-        // It would be really nice not to have to manually set PATH but this is sadly the only way
-        // to stop automatic PATH searching.
-        .env("PATH", "")
-        .envs(env)
-        .output().map_err(|e| format!("Error executing process: {:?}", e))
+  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<ExecuteProcessResult, String> {
+    let workdir = try_future!(
+      tempdir::TempDir::new("process-execution").map_err(|err| format!(
+        "Error making tempdir for local process execution: {:?}",
+        err
+      ))
     );
 
-    let output_snapshot = if output_file_paths.is_empty() {
-      future::ok(fs::Snapshot::empty()).to_boxed()
-    } else {
-      let store = self.store.clone();
-      // Use no ignore patterns, because we are looking for explicitly listed paths.
-      future::done(fs::PosixFS::new(
-        workdir.path(),
-        self.fs_pool.clone(),
-        vec![],
-      )).map_err(|err| {
-        format!(
-          "Error making posix_fs to fetch local process execution output files: {}",
-          err
-        )
+    let store = self.store.clone();
+    let fs_pool = self.fs_pool.clone();
+    let env = req.env;
+    let output_file_paths = req.output_files;
+    let argv = req.argv;
+    self
+      .store
+      .materialize_directory(workdir.path().to_owned(), req.input_files)
+      .and_then(move |()| {
+        Command::new(&argv[0])
+                  .args(&argv[1..])
+                  .current_dir(workdir.path())
+                  .env_clear()
+                  // It would be really nice not to have to manually set PATH but this is sadly the only way
+                  // to stop automatic PATH searching.
+                  .env("PATH", "")
+                  .envs(env)
+                  .output().map_err(|e| format!("Error executing process: {:?}", e))
+                  .map(|output| (output, workdir))
       })
-        .map(|posix_fs| Arc::new(posix_fs))
-        .and_then(|posix_fs| {
-          posix_fs
-            .path_stats(output_file_paths.into_iter().collect())
-            .map_err(|e| format!("Error stating output files: {}", e))
-            .and_then(move |paths| {
-              fs::Snapshot::from_path_stats(
-                store.clone(),
-                fs::OneOffStoreFileByDigest::new(store, posix_fs),
-                paths.into_iter().filter_map(|v| v).collect(),
-              )
-            })
-        })
-          // Force workdir not to get dropped until after we've ingested the outputs
-          .map(|result| (result, workdir))
-          .map(|(result, _workdir)| result)
-        .to_boxed()
-    };
+      .and_then(|(output, workdir)| {
+        let output_snapshot = if output_file_paths.is_empty() {
+          future::ok(fs::Snapshot::empty()).to_boxed()
+        } else {
+          // Use no ignore patterns, because we are looking for explicitly listed paths.
+          future::done(fs::PosixFS::new(
+                  workdir.path(),
+                  fs_pool,
+                  vec![],
+              )).map_err(|err| {
+                  format!(
+                      "Error making posix_fs to fetch local process execution output files: {}",
+                      err
+                  )
+              })
+                  .map(|posix_fs| Arc::new(posix_fs))
+                  .and_then(|posix_fs| {
+                      posix_fs
+                          .path_stats(output_file_paths.into_iter().collect())
+                          .map_err(|e| format!("Error stating output files: {}", e))
+                          .and_then(move |paths| {
+                              fs::Snapshot::from_path_stats(
+                                  store.clone(),
+                                  fs::OneOffStoreFileByDigest::new(store, posix_fs),
+                                  paths.into_iter().filter_map(|v| v).collect(),
+                              )
+                          })
+                  })
+                  // Force workdir not to get dropped until after we've ingested the outputs
+                  .map(|result| (result, workdir))
+                  .map(|(result, _workdir)| result)
+                  .to_boxed()
+        };
 
-    output_snapshot
-      .map(|snapshot| ExecuteProcessResult {
-        stdout: Bytes::from(output.stdout),
-        stderr: Bytes::from(output.stderr),
-        exit_code: output.status.code().unwrap(),
-        output_directory: snapshot.digest,
+        output_snapshot
+          .map(|snapshot| ExecuteProcessResult {
+            stdout: Bytes::from(output.stdout),
+            stderr: Bytes::from(output.stderr),
+            exit_code: output.status.code().unwrap(),
+            output_directory: snapshot.digest,
+          })
+          .to_boxed()
       })
       .to_boxed()
+  }
+
+  fn reset_prefork(&self) {
+    self.store.reset_prefork();
+    self.fs_pool.reset();
   }
 }
 
@@ -99,6 +113,7 @@ mod tests {
   use fs;
   use futures::Future;
   use super::{ExecuteProcessRequest, ExecuteProcessResult};
+  use super::super::CommandRunner as CommandRunnerTrait;
   use std;
   use std::collections::{BTreeMap, BTreeSet};
   use std::time::Duration;
@@ -281,8 +296,7 @@ mod tests {
 
   #[test]
   fn output_files_many() {
-    let result = run_command_locally_in_dir(
-      ExecuteProcessRequest {
+    let result = run_command_locally_in_dir(ExecuteProcessRequest {
         argv: vec![
           find_bash(),
           "-c".to_owned(),
@@ -299,9 +313,7 @@ mod tests {
           .collect(),
         timeout: Duration::from_millis(1000),
         description: "treats-roland".to_string(),
-      },
-      TempDir::new("working").unwrap(),
-    );
+    });
 
     assert_eq!(
       result.unwrap(),
@@ -316,8 +328,7 @@ mod tests {
 
   #[test]
   fn output_files_execution_failure() {
-    let result = run_command_locally_in_dir(
-      ExecuteProcessRequest {
+    let result = run_command_locally_in_dir(ExecuteProcessRequest {
         argv: vec![
           find_bash(),
           "-c".to_owned(),
@@ -332,9 +343,7 @@ mod tests {
         output_files: vec![PathBuf::from("roland")].into_iter().collect(),
         timeout: Duration::from_millis(1000),
         description: "echo foo".to_string(),
-      },
-      TempDir::new("working").unwrap(),
-    );
+    });
 
     assert_eq!(
       result.unwrap(),
@@ -349,23 +358,20 @@ mod tests {
 
   #[test]
   fn output_files_partial_output() {
-    let result = run_command_locally_in_dir(
-      ExecuteProcessRequest {
-        argv: vec![
-          find_bash(),
-          "-c".to_owned(),
-          format!("echo -n {} > {}", TestData::roland().string(), "roland"),
-        ],
-        env: BTreeMap::new(),
-        input_files: fs::EMPTY_DIGEST,
-        output_files: vec![PathBuf::from("roland"), PathBuf::from("susannah")]
-          .into_iter()
-          .collect(),
-        timeout: Duration::from_millis(1000),
-        description: "echo-roland".to_string(),
-      },
-      TempDir::new("working").unwrap(),
-    );
+    let result = run_command_locally_in_dir(ExecuteProcessRequest {
+      argv: vec![
+        find_bash(),
+        "-c".to_owned(),
+        format!("echo -n {} > {}", TestData::roland().string(), "roland"),
+      ],
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: vec![PathBuf::from("roland"), PathBuf::from("susannah")]
+        .into_iter()
+        .collect(),
+      timeout: Duration::from_millis(1000),
+      description: "echo-roland".to_string(),
+    });
 
     assert_eq!(
       result.unwrap(),
@@ -379,15 +385,11 @@ mod tests {
   }
 
   fn run_command_locally(req: ExecuteProcessRequest) -> Result<ExecuteProcessResult, String> {
-    run_command_locally_in_dir(
-      req,
-      TempDir::new("process-execution").expect("Creating tempdir"),
-    )
+    run_command_locally_in_dir(req)
   }
 
   fn run_command_locally_in_dir(
     req: ExecuteProcessRequest,
-    workdir: tempdir::TempDir,
   ) -> Result<ExecuteProcessResult, String> {
     let store_dir = TempDir::new("store").unwrap();
     let pool = Arc::new(fs::ResettablePool::new("test-pool-".to_owned()));
@@ -396,7 +398,7 @@ mod tests {
       store: store,
       fs_pool: pool,
     };
-    runner.run(req, workdir).wait()
+    runner.run(req).wait()
   }
 
   fn find_bash() -> String {

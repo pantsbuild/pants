@@ -15,6 +15,7 @@ mod selectors;
 mod tasks;
 mod types;
 
+#[macro_use]
 extern crate boxfuture;
 #[macro_use]
 extern crate enum_primitive;
@@ -46,6 +47,7 @@ use externs::{Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionE
               ProjectMultiExtern, PyResult, SatisfiedByExtern, SatisfiedByTypeExtern,
               StoreBytesExtern, StoreI64Extern, StoreTupleExtern, TypeIdBuffer, TypeToStrExtern,
               ValToStrExtern};
+use futures::Future;
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
 use tasks::Tasks;
@@ -565,6 +567,74 @@ pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler) {
       Err(err) => error!("{}", &err),
     }
   });
+}
+
+#[no_mangle]
+pub extern "C" fn capture_snapshots(
+  scheduler_ptr: *mut Scheduler,
+  path_globs_and_root_tuple_wrapper: Value,
+) -> PyResult {
+  let values = externs::project_multi(&path_globs_and_root_tuple_wrapper, "dependencies");
+  let path_globs_and_roots_result: Result<Vec<(fs::PathGlobs, PathBuf)>, String> = values
+    .iter()
+    .map(|value| {
+      let root = PathBuf::from(externs::project_str(&value, "root"));
+      let path_globs =
+        nodes::Snapshot::lift_path_globs(&externs::project_ignoring_type(&value, "path_globs"));
+      path_globs.map(|path_globs| (path_globs, root))
+    })
+    .collect();
+
+  let path_globs_and_roots = match path_globs_and_roots_result {
+    Ok(v) => v,
+    Err(err) => {
+      let e: Result<Value, String> = Err(err);
+      return e.into();
+    }
+  };
+
+  with_scheduler(scheduler_ptr, |scheduler| {
+    let core = scheduler.core.clone();
+    futures::future::join_all(
+      path_globs_and_roots
+        .into_iter()
+        .map(|(path_globs, root)| {
+          let core = core.clone();
+          scheduler
+            .capture_snapshot_from_arbitrary_root(root, path_globs)
+            .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
+        })
+        .collect::<Vec<_>>(),
+    )
+  }).map(|values| externs::store_tuple(&values))
+    .wait()
+    .into()
+}
+
+#[no_mangle]
+pub extern "C" fn merge_directories(
+  scheduler_ptr: *mut Scheduler,
+  directories_value: Value,
+) -> PyResult {
+  let digests_result: Result<Vec<hashing::Digest>, String> =
+    externs::project_multi(&directories_value, "dependencies")
+      .iter()
+      .map(|v| nodes::lift_digest(v))
+      .collect();
+  let digests = match digests_result {
+    Ok(d) => d,
+    Err(err) => {
+      let e: Result<Value, String> = Err(err);
+      return e.into();
+    }
+  };
+
+  with_scheduler(scheduler_ptr, |scheduler| {
+    fs::Snapshot::merge_directories(scheduler.core.store.clone(), digests)
+      .wait()
+      .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
+      .into()
+  })
 }
 
 fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {

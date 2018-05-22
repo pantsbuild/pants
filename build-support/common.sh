@@ -1,6 +1,7 @@
-#!/usr/bin/env bash
+CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
 
 TRAVIS_FOLD_STATE="/tmp/.travis_fold_current"
+
 CLEAR_LINE="\x1b[K"
 COLOR_BLUE="\x1b[34m"
 COLOR_RED="\x1b[31m"
@@ -58,27 +59,5 @@ function end_travis_section() {
 }
 
 function fingerprint_data() {
-  openssl sha1 | cut -d' ' -f2
+  git hash-object -t blob --stdin
 }
-
-function ensure_file_exists() {
-  if [ ! -s "${1}" ]; then
-    die "ERROR: ${1} does not exist!"
-  fi
-}
-
-# Prevent bootstrapping failure due to unrecognized flag:
-# https://github.com/pantsbuild/pants/issues/78
-function set_archflags() {
-  GCC_VERSION=$(gcc -v 2>&1)
-  if [ $? -ne 0 ]; then
-    die "ERROR: unable to execute 'gcc'. Please verify that your compiler is installed, in your\n" \
-        "      \$PATH and functional.\n\n" \
-        "      Hint: on Mac OS X, you may need to accept the XCode EULA: 'sudo xcodebuild -license accept'."
-  fi
-  if [[ "$GCC_VERSION" == *503.0.38* ]]; then
-    # Required for clang version 503.0.38
-    export set ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future
-  fi
-}
-set_archflags

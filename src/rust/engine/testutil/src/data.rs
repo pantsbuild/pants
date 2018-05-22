@@ -84,6 +84,21 @@ impl TestDirectory {
 
   // Directory structure:
   //
+  // /treats
+  pub fn containing_treats() -> TestDirectory {
+    let mut directory = bazel_protos::remote_execution::Directory::new();
+    directory.mut_files().push({
+      let mut file = bazel_protos::remote_execution::FileNode::new();
+      file.set_name("treats".to_owned());
+      file.set_digest((&TestData::catnip().digest()).into());
+      file.set_is_executable(false);
+      file
+    });
+    TestDirectory { directory }
+  }
+
+  // Directory structure:
+  //
   // /cats/roland
   pub fn nested() -> TestDirectory {
     let mut directory = bazel_protos::remote_execution::Directory::new();
@@ -105,6 +120,44 @@ impl TestDirectory {
       let mut file = bazel_protos::remote_execution::FileNode::new();
       file.set_name("dnalor".to_owned());
       file.set_digest((&TestData::roland().digest()).into());
+      file.set_is_executable(false);
+      file
+    });
+    TestDirectory { directory }
+  }
+
+  // Directory structure:
+  //
+  // /roland
+  pub fn containing_wrong_roland() -> TestDirectory {
+    let mut directory = bazel_protos::remote_execution::Directory::new();
+    directory.mut_files().push({
+      let mut file = bazel_protos::remote_execution::FileNode::new();
+      file.set_name("roland".to_owned());
+      file.set_digest((&TestData::catnip().digest()).into());
+      file.set_is_executable(false);
+      file
+    });
+    TestDirectory { directory }
+  }
+
+  // Directory structure:
+  //
+  // /roland
+  // /treats
+  pub fn containing_roland_and_treats() -> TestDirectory {
+    let mut directory = bazel_protos::remote_execution::Directory::new();
+    directory.mut_files().push({
+      let mut file = bazel_protos::remote_execution::FileNode::new();
+      file.set_name("roland".to_owned());
+      file.set_digest((&TestData::roland().digest()).into());
+      file.set_is_executable(false);
+      file
+    });
+    directory.mut_files().push({
+      let mut file = bazel_protos::remote_execution::FileNode::new();
+      file.set_name("treats".to_owned());
+      file.set_digest((&TestData::catnip().digest()).into());
       file.set_is_executable(false);
       file
     });

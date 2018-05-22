@@ -184,11 +184,6 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='If true, generate an html summary report of tests that were run.')
     register('--open', type=bool,
              help='Attempt to open the html summary report in a browser (implies --html-report)')
-    register('--legacy-report-layout', type=bool, default=False, advanced=True,
-             help='Used to link JUnit and coverage reports to the legacy location; now does '
-                  'nothing.',
-             removal_version='1.8.0.dev0',
-             removal_hint='This option is no longer used and can be safely removed.')
 
     # TODO(jtrobec): Remove direct register when coverage steps are moved to their own subsystem.
     CodeCoverage.register_junit_options(register, cls.register_jvm_tool)
