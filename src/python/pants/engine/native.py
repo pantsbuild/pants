@@ -109,7 +109,6 @@ typedef Buffer              (*extern_ptr_type_to_str)(ExternContext*, TypeId);
 typedef Buffer              (*extern_ptr_val_to_str)(ExternContext*, Value*);
 typedef _Bool               (*extern_ptr_satisfied_by)(ExternContext*, Value*, Value*);
 typedef _Bool               (*extern_ptr_satisfied_by_type)(ExternContext*, Value*, TypeId*);
-typedef Value               (*extern_ptr_store_dict)(ExternContext*, Value*, uint64_t);
 typedef Value               (*extern_ptr_store_tuple)(ExternContext*, Value*, uint64_t);
 typedef Value               (*extern_ptr_store_bytes)(ExternContext*, uint8_t*, uint64_t);
 typedef Value               (*extern_ptr_store_i64)(ExternContext*, int64_t);
@@ -155,7 +154,6 @@ void externs_set(ExternContext*,
                  extern_ptr_val_to_str,
                  extern_ptr_satisfied_by,
                  extern_ptr_satisfied_by_type,
-                 extern_ptr_store_dict,
                  extern_ptr_store_tuple,
                  extern_ptr_store_bytes,
                  extern_ptr_store_i64,
@@ -186,8 +184,6 @@ Scheduler* scheduler_create(Tasks*,
                             Function,
                             Function,
                             Function,
-                            Function,
-                            TypeConstraint,
                             TypeConstraint,
                             TypeConstraint,
                             TypeConstraint,
@@ -259,7 +255,6 @@ extern "Python" {
   Buffer              extern_val_to_str(ExternContext*, Value*);
   _Bool               extern_satisfied_by(ExternContext*, Value*, Value*);
   _Bool               extern_satisfied_by_type(ExternContext*, Value*, TypeId*);
-  Value               extern_store_dict(ExternContext*, Value*, uint64_t);
   Value               extern_store_tuple(ExternContext*, Value*, uint64_t);
   Value               extern_store_bytes(ExternContext*, uint8_t*, uint64_t);
   Value               extern_store_i64(ExternContext*, int64_t);
@@ -410,15 +405,6 @@ def _initialize_externs(ffi):
     c = ffi.from_handle(context_handle)
     constraint = ffi.from_handle(constraint_val.handle)
     return constraint.satisfied_by_type(c.from_id(cls_id.id_))
-
-  @ffi.def_extern()
-  def extern_store_dict(context_handle, vals_ptr, vals_len):
-    """Given storage and an array of Values (which each are two-tuples for a dict key and value),
-    return a new Value to represent the dict.
-    # TODO: ???
-    """
-    c = ffi.from_handle(context_handle)
-    return c.to_value(dict(c.from_value(val) for val in ffi.unpack(vals_ptr, vals_len)))
 
   @ffi.def_extern()
   def extern_store_tuple(context_handle, vals_ptr, vals_len):
@@ -688,7 +674,6 @@ class Native(object):
                            self.ffi_lib.extern_val_to_str,
                            self.ffi_lib.extern_satisfied_by,
                            self.ffi_lib.extern_satisfied_by_type,
-                           self.ffi_lib.extern_store_dict,
                            self.ffi_lib.extern_store_tuple,
                            self.ffi_lib.extern_store_bytes,
                            self.ffi_lib.extern_store_i64,
@@ -739,7 +724,6 @@ class Native(object):
                     remote_execution_server,
                     construct_directory_digest,
                     construct_snapshot,
-                    construct_snapshot_with_match_data,
                     construct_file_content,
                     construct_files_content,
                     construct_path_stat,
@@ -753,7 +737,6 @@ class Native(object):
                     constraint_path_globs,
                     constraint_directory_digest,
                     constraint_snapshot,
-                    constraint_snapshot_with_match_data,
                     constraint_files_content,
                     constraint_dir,
                     constraint_file,
@@ -773,7 +756,6 @@ class Native(object):
         # Constructors/functions.
         func(construct_directory_digest),
         func(construct_snapshot),
-        func(construct_snapshot_with_match_data),
         func(construct_file_content),
         func(construct_files_content),
         func(construct_path_stat),
@@ -788,7 +770,6 @@ class Native(object):
         tc(constraint_path_globs),
         tc(constraint_directory_digest),
         tc(constraint_snapshot),
-        tc(constraint_snapshot_with_match_data),
         tc(constraint_files_content),
         tc(constraint_dir),
         tc(constraint_file),

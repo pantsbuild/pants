@@ -21,7 +21,7 @@ from pants.build_graph.app_base import AppBase, Bundle
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.fs import PathGlobs, Snapshot, SnapshotWithMatchData
+from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import (BaseGlobs, BundleAdaptor, BundlesField, SourcesField,
                                          TargetAdaptor)
 from pants.engine.rules import TaskRule, rule
@@ -372,9 +372,6 @@ def _eager_fileset_with_spec(sources_expansion, include_dirs=False):
   filespec = sources_expansion.filespecs
   rel_include_globs = filespec['globs']
 
-  if sources_expansion.glob_match_error_behavior.should_compute_matching_files():
-    _warn_error_glob_expansion_failure(sources_expansion)
-
   relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(rel_include_globs, spec_path)
   if filespec.has_key('exclude'):
     relpath_adjusted_filespec['exclude'] = [FilesetRelPathWrapper.to_filespec(e['globs'], spec_path)
@@ -389,89 +386,24 @@ def _eager_fileset_with_spec(sources_expansion, include_dirs=False):
 class SourcesGlobMatchError(Exception): pass
 
 
-def _warn_error_glob_expansion_failure(sources_expansion):
-  target_addr_spec = sources_expansion.target_address.spec
-
-  kwarg_name = sources_expansion.keyword_argument_name
-  base_globs = sources_expansion.base_globs
-  spec_path = base_globs.spec_path
-  glob_match_error_behavior = sources_expansion.glob_match_error_behavior
-
-  match_data = sources_expansion.match_data
-  if not match_data:
-    raise SourcesGlobMatchError(
-      "In target {spec} with {desc}={globs}: internal error: match_data must be provided."
-      .format(spec=target_addr_spec, desc=kwarg_name, globs=base_globs))
-
-  warnings = []
-  for (source_pattern, source_glob) in base_globs.included_globs():
-    # FIXME: need to ensure globs in output match those in input!!!!
-    rel_source_glob = os.path.join(spec_path, source_glob)
-    matched_result = match_data.get(rel_source_glob, None)
-    if matched_result is None:
-      raise SourcesGlobMatchError(
-        "In target {spec} with {desc}={globs}: internal error: no match data "
-        "for source glob {src}. match_data was: {match_data}."
-        .format(spec=target_addr_spec, desc=kwarg_name, globs=base_globs, src=source_glob,
-                match_data=match_data))
-    if not matched_result:
-      base_msg = "glob pattern '{}' did not match any files.".format(source_pattern)
-      log_msg = (
-        "In target {spec} with {desc}={globs}: {msg}"
-        .format(spec=target_addr_spec, desc=kwarg_name, globs=base_globs, msg=base_msg))
-      if glob_match_error_behavior.should_log_warn_on_error():
-        logger.warn(log_msg)
-      else:
-        logger.debug(log_msg)
-      warnings.append(base_msg)
-
-  # We will raise on the first sources field with a failed path glob expansion if the option is set,
-  # because we don't want to do any more fs traversals for a build that's going to fail with a
-  # readable error anyway.
-  if glob_match_error_behavior.should_throw_on_error(warnings):
-    raise SourcesGlobMatchError(
-      "In target {spec} with {desc}={globs}: Some globs failed to match "
-      "and --glob-match-failure is set to {opt}. The failures were:\n{failures}"
-      .format(spec=target_addr_spec, desc=kwarg_name, globs=base_globs,
-              opt=glob_match_error_behavior, failures='\n'.join(warnings)))
-
-
 class SourcesFieldExpansionResult(datatype([
     'spec_path',
-    'target_address',
     'filespecs',
-    ('base_globs', SubclassesOf(BaseGlobs)),
     ('snapshot', Snapshot),
-    'match_data',
-    'keyword_argument_name',
-    ('glob_match_error_behavior', GlobMatchErrorBehavior),
 ])): pass
 
 
 @rule(HydratedField, [Select(SourcesField), Select(GlobMatchErrorBehavior)])
 def hydrate_sources(sources_field, glob_match_error_behavior):
-  """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec."""
+  """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
+  """
 
-  # TODO: should probably do this conditional in an @rule or intrinsic somewhere instead of
-  # explicitly.
-  # TODO: should definitely test this.
-  if glob_match_error_behavior.should_compute_matching_files():
-    snapshot_with_match_data = yield Get(SnapshotWithMatchData, PathGlobs, sources_field.path_globs)
-    snapshot = snapshot_with_match_data.snapshot
-    match_data = snapshot_with_match_data.match_data
-  else:
-    snapshot = yield Get(Snapshot, PathGlobs, sources_field.path_globs)
-    match_data = None
+  path_globs = sources_field.path_globs.with_match_error_behavior(glob_match_error_behavior)
+  snapshot = yield Get(Snapshot, PathGlobs, path_globs)
   sources_expansion = SourcesFieldExpansionResult(
     spec_path=sources_field.address.spec_path,
-    target_address=sources_field.address,
     filespecs=sources_field.filespecs,
-    base_globs=sources_field.base_globs,
-    snapshot=snapshot,
-    match_data=match_data,
-    keyword_argument_name='sources',
-    glob_match_error_behavior=glob_match_error_behavior,
-  )
+    snapshot=snapshot)
   fileset_with_spec = _eager_fileset_with_spec(sources_expansion)
   yield HydratedField(sources_field.arg, fileset_with_spec)
 
@@ -479,26 +411,20 @@ def hydrate_sources(sources_field, glob_match_error_behavior):
 @rule(HydratedField, [Select(BundlesField), Select(GlobMatchErrorBehavior)])
 def hydrate_bundles(bundles_field, glob_match_error_behavior):
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
-
-  if glob_match_error_behavior.should_compute_matching_files():
-    snapshot_matches = yield [
-      Get(SnapshotWithMatchData, PathGlobs, pg) for pg in bundles_field.path_globs_list
-    ]
-  else:
-    snapshots = yield [
-      Get(Snapshot, PathGlobs, pg) for pg in bundles_field.path_globs_list
-    ]
-    snapshot_matches = [
-      SnapshotWithMatchData(snapshot=snapshot, match_data=None) for snapshot in snapshots
-    ]
+  logger.debug("glob_match_error_behavior={}".format(glob_match_error_behavior))
+  snapshots = yield [
+    Get(Snapshot, PathGlobs, pg.with_match_error_behavior(glob_match_error_behavior))
+    for pg
+    in bundles_field.path_globs_list
+  ]
 
   spec_path = bundles_field.address.spec_path
 
   bundles = []
   zipped = zip(bundles_field.bundles,
                bundles_field.filespecs_list,
-               snapshot_matches)
-  for bundle, filespecs, snapshot_with_match_data in zipped:
+               snapshots)
+  for bundle, filespecs, snapshot in zipped:
     kwargs = bundle.kwargs()
     # NB: We `include_dirs=True` because bundle filesets frequently specify directories in order
     # to trigger a (deprecated) default inclusion of their recursive contents. See the related
@@ -507,14 +433,8 @@ def hydrate_bundles(bundles_field, glob_match_error_behavior):
 
     sources_expansion = SourcesFieldExpansionResult(
       spec_path=spec_path,
-      target_address=bundles_field.address,
       filespecs=filespecs,
-      base_globs=BaseGlobs.from_sources_field(bundle.fileset, spec_path=spec_path),
-      snapshot=snapshot_with_match_data.snapshot,
-      match_data=snapshot_with_match_data.match_data,
-      keyword_argument_name='fileset',
-      glob_match_error_behavior=glob_match_error_behavior,
-    )
+      snapshot=snapshot)
     kwargs['fileset'] = _eager_fileset_with_spec(sources_expansion, include_dirs=True)
     bundles.append(BundleAdaptor(**kwargs))
   yield HydratedField('bundles', bundles)

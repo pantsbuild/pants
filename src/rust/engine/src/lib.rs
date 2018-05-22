@@ -47,7 +47,7 @@ use externs::{Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionE
               DropHandlesExtern, EqualsExtern, EvalExtern, ExternContext, Externs,
               GeneratorSendExtern, IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern,
               ProjectMultiExtern, PyResult, SatisfiedByExtern, SatisfiedByTypeExtern,
-              StoreBytesExtern, StoreDictExtern, StoreI64Extern, StoreTupleExtern, TypeIdBuffer,
+              StoreBytesExtern, StoreI64Extern, StoreTupleExtern, TypeIdBuffer,
               TypeToStrExtern, ValToStrExtern};
 use futures::Future;
 use rule_graph::{GraphMaker, RuleGraph};
@@ -137,7 +137,6 @@ pub extern "C" fn externs_set(
   val_to_str: ValToStrExtern,
   satisfied_by: SatisfiedByExtern,
   satisfied_by_type: SatisfiedByTypeExtern,
-  store_dict: StoreDictExtern,
   store_tuple: StoreTupleExtern,
   store_bytes: StoreBytesExtern,
   store_i64: StoreI64Extern,
@@ -161,7 +160,6 @@ pub extern "C" fn externs_set(
     val_to_str,
     satisfied_by,
     satisfied_by_type,
-    store_dict,
     store_tuple,
     store_bytes,
     store_i64,
@@ -193,7 +191,6 @@ pub extern "C" fn scheduler_create(
   tasks_ptr: *mut Tasks,
   construct_directory_digest: Function,
   construct_snapshot: Function,
-  construct_snapshot_with_match_data: Function,
   construct_file_content: Function,
   construct_files_content: Function,
   construct_path_stat: Function,
@@ -207,7 +204,6 @@ pub extern "C" fn scheduler_create(
   type_path_globs: TypeConstraint,
   type_directory_digest: TypeConstraint,
   type_snapshot: TypeConstraint,
-  type_snapshot_with_match_data: TypeConstraint,
   type_files_content: TypeConstraint,
   type_dir: TypeConstraint,
   type_file: TypeConstraint,
@@ -231,7 +227,6 @@ pub extern "C" fn scheduler_create(
   let types = Types {
     construct_directory_digest,
     construct_snapshot,
-    construct_snapshot_with_match_data,
     construct_file_content,
     construct_files_content,
     construct_path_stat,
@@ -245,7 +240,6 @@ pub extern "C" fn scheduler_create(
     path_globs: type_path_globs,
     directory_digest: type_directory_digest,
     snapshot: type_snapshot,
-    snapshot_with_match_data: type_snapshot_with_match_data,
     files_content: type_files_content,
     dir: type_dir,
     file: type_file,

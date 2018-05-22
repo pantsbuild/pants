@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import collections
 import functools
+import logging
 from os.path import dirname, join
 
 import six
@@ -27,6 +28,9 @@ from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.objects import TypeConstraintError, datatype
 
 
+logger = logging.getLogger(__name__)
+
+
 class ResolvedTypeMismatchError(ResolveError):
   """Indicates a resolved object was not of the expected type."""
 
@@ -42,7 +46,9 @@ def parse_address_family(address_mapper, directory):
 
   The AddressFamily may be empty, but it will not be None.
   """
+  logger.debug("directory: {}".format(directory))
   patterns = tuple(join(directory.path, p) for p in address_mapper.build_patterns)
+  logger.debug("patterns: {}".format(patterns))
   path_globs = PathGlobs.create('',
                                 include=patterns,
                                 exclude=address_mapper.build_ignore_patterns)

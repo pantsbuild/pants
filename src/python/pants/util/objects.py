@@ -134,12 +134,12 @@ def datatype(field_decls, superclass_name=None, **kwargs):
         field_value = getattr(self, field_name)
         if not constraint_for_field:
           elements_formatted.append(
-            "{field_name}={field_value}"
+            "{field_name}={field_value!r}"
             .format(field_name=field_name,
                     field_value=field_value))
         else:
           elements_formatted.append(
-            "{field_name}<{type_constraint}>={field_value}"
+            "{field_name}<{type_constraint}>={field_value!r}"
             .format(field_name=field_name,
                     type_constraint=constraint_for_field,
                     field_value=field_value))

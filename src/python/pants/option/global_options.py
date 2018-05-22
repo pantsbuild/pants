@@ -23,7 +23,9 @@ class GlobMatchErrorBehavior(datatype([('failure_behavior', str)])):
 
   allowed_values = ['ignore', 'warn', 'error']
 
-  default_value = 'warn'
+  default_value = 'ignore'
+
+  default_option_value = 'warn'
 
   @classmethod
   def create(cls, value=None):
@@ -42,24 +44,6 @@ class GlobMatchErrorBehavior(datatype([('failure_behavior', str)])):
         .format(this_object.failure_behavior, cls.allowed_values))
 
     return this_object
-
-  def should_compute_matching_files(self):
-    return self.failure_behavior != 'ignore'
-
-  def should_log_warn_on_error(self):
-    if self.failure_behavior in ['warn', 'error']:
-      return True
-    else:
-      return False
-
-  def should_throw_on_error(self, warnings):
-    if not warnings:
-      return False
-    elif self.failure_behavior == 'error':
-      return True
-    else:
-      return False
-
 
 class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
   options_scope = GLOBAL_SCOPE
@@ -291,6 +275,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # option like this from a datatype somehow?
     register('--glob-expansion-failure', type=str,
              choices=GlobMatchErrorBehavior.allowed_values,
-             default=GlobMatchErrorBehavior.default_value,
+             default=GlobMatchErrorBehavior.default_option_value,
              help="Raise an exception if any targets declaring source files "
                   "fail to match any glob provided in the 'sources' argument.")
