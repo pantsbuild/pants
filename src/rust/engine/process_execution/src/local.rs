@@ -267,21 +267,18 @@ mod tests {
 
   #[test]
   fn output_files_one() {
-    let result = run_command_locally_in_dir(
-      ExecuteProcessRequest {
-        argv: vec![
-          find_bash(),
-          "-c".to_owned(),
-          format!("echo -n {} > {}", TestData::roland().string(), "roland"),
-        ],
-        env: BTreeMap::new(),
-        input_files: fs::EMPTY_DIGEST,
-        output_files: vec![PathBuf::from("roland")].into_iter().collect(),
-        timeout: Duration::from_millis(1000),
-        description: "bash".to_string(),
-      },
-      TempDir::new("working").unwrap(),
-    );
+    let result = run_command_locally_in_dir(ExecuteProcessRequest {
+      argv: vec![
+        find_bash(),
+        "-c".to_owned(),
+        format!("echo -n {} > {}", TestData::roland().string(), "roland"),
+      ],
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: vec![PathBuf::from("roland")].into_iter().collect(),
+      timeout: Duration::from_millis(1000),
+      description: "bash".to_string(),
+    });
 
     assert_eq!(
       result.unwrap(),
