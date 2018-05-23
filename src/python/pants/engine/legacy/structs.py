@@ -173,6 +173,9 @@ class AppAdaptor(TargetAdaptor):
       rel_root = getattr(bundle, 'rel_path', self.address.spec_path)
 
       base_globs = BaseGlobs.from_sources_field(bundle.fileset, rel_root)
+      # TODO: we want to have this field set from the global option --glob-expansion-failure, or
+      # something set on the target. Should we move --glob-expansion-failure to be a bootstrap
+      # option?
       path_globs = base_globs.to_path_globs(rel_root)
 
       filespecs_list.append(base_globs.filespecs)

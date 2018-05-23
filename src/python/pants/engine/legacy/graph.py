@@ -412,11 +412,11 @@ def hydrate_sources(sources_field, glob_match_error_behavior):
 def hydrate_bundles(bundles_field, glob_match_error_behavior):
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
   logger.debug("glob_match_error_behavior={}".format(glob_match_error_behavior))
-  snapshots = yield [
-    Get(Snapshot, PathGlobs, pg.with_match_error_behavior(glob_match_error_behavior))
-    for pg
-    in bundles_field.path_globs_list
+  path_globs_with_match_errors = [
+    pg.with_match_error_behavior(glob_match_error_behavior)
+    for pg in bundles_field.path_globs_list
   ]
+  snapshots = yield [Get(Snapshot, PathGlobs, pg) for pg in path_globs_with_match_errors]
 
   spec_path = bundles_field.address.spec_path
 

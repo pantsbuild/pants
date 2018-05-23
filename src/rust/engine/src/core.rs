@@ -4,8 +4,8 @@
 use fnv::FnvHasher;
 
 use std::collections::HashMap;
-use std::{fmt, hash};
 use std::ops::Drop;
+use std::{fmt, hash};
 
 use externs;
 use handles::{enqueue_drop_handle, Handle};
@@ -71,10 +71,16 @@ pub struct Function(pub Key);
 /// Wraps a type id for use as a key in HashMaps and sets.
 ///
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct Key {
   id: Id,
   type_id: TypeId,
+}
+
+impl fmt::Debug for Key {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "Key(val={:?})", externs::key_to_str(self))
+  }
 }
 
 impl Eq for Key {}

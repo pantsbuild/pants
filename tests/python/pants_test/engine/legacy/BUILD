@@ -112,6 +112,7 @@ python_tests(
   name='graph_integration',
   sources=['test_graph_integration.py'],
   dependencies=[
+    'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/option',
     'tests/python/pants_test:int-test',

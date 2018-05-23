@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.option.errors import ParseError
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -99,9 +101,21 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
       },
     })
     self.assert_failure(pants_run)
-    self.assertIn(
-      """SourcesGlobMatchError: In target testprojects/src/python/sources:some-missing-some-not with sources=globs('*.txt', '*.rs'): Some globs failed to match and --glob-match-failure is set to GlobMatchErrorBehavior(failure_behavior<=str>=error). The failures were:
-            glob pattern '*.rs' did not match any files.""", pants_run.stderr_data)
+    self.assertIn(AddressLookupError.__name__, pants_run.stderr_data)
+    expected_msg = """
+Exception message: Build graph construction failed: ExecutionError Received unexpected Throw state(s):
+Computing Select(Specs(dependencies=(SingleAddress(directory=u\'testprojects/src/python/sources\', name=u\'some-missing-some-not\'),)), =TransitiveHydratedTargets)
+  Computing Task(transitive_hydrated_targets, Specs(dependencies=(SingleAddress(directory=u\'testprojects/src/python/sources\', name=u\'some-missing-some-not\'),)), =TransitiveHydratedTargets)
+    Computing Task(transitive_hydrated_target, testprojects/src/python/sources:some-missing-some-not, =TransitiveHydratedTarget)
+      Computing Task(hydrate_target, testprojects/src/python/sources:some-missing-some-not, =HydratedTarget)
+        Computing Task(hydrate_sources, SourcesField(address=BuildFileAddress(testprojects/src/python/sources/BUILD, some-missing-some-not), arg=sources, filespecs={u\'exclude\': [], u\'globs\': [u\'*.txt\', u\'*.rs\']}), =HydratedField)
+          Computing Snapshot(Key(val="PathGlobs(include=(u\\\'testprojects/src/python/sources/*.txt\\\', u\\\'testprojects/src/python/sources/*.rs\\\'), exclude=(), glob_match_error_behavior=\\\'error\\\')"))
+            Throw(PathGlobs expansion failed: Throw(Globs did not match. Excludes were: []. Unmatched globs were: ["testprojects/src/python/sources/*.rs"]., "<pants native internals>"))
+              Traceback (no traceback):
+                <pants native internals>
+              Exception: PathGlobs expansion failed: Throw(Globs did not match. Excludes were: []. Unmatched globs were: ["testprojects/src/python/sources/*.rs"]., "<pants native internals>")
+"""
+    self.assertIn(expected_msg, pants_run.stderr_data)
 
     bundle_target_full = '{}:{}'.format(self._BUNDLE_TARGET_BASE, self._BUNDLE_TARGET_NAME)
 
@@ -111,15 +125,31 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
       },
     })
     self.assert_failure(pants_run)
-    self.assertIn(
-      """SourcesGlobMatchError: In target testprojects/src/java/org/pantsbuild/testproject/bundle:missing-bundle-fileset with fileset=rglobs('*.aaaa', '*.bbbb'): Some globs failed to match and --glob-match-failure is set to GlobMatchErrorBehavior(failure_behavior<=str>=error). The failures were:
-            glob pattern '**/*.aaaa' did not match any files.
-            glob pattern '**/*.bbbb' did not match any files.""", pants_run.stderr_data)
+    self.assertIn(AddressLookupError.__name__, pants_run.stderr_data)
+    # TODO: this is passing, but glob_match_error_behavior='ignore' in the target. We should have a
+    # field which targets with bundles (and/or sources) can override which is the same as the global
+    # option.
+    expected_msg = """
+Exception message: Build graph construction failed: ExecutionError Received unexpected Throw state(s):
+Computing Select(Specs(dependencies=(SingleAddress(directory=u\'testprojects/src/java/org/pantsbuild/testproject/bundle\', name=u\'missing-bundle-fileset\'),)), =TransitiveHydratedTargets)
+  Computing Task(transitive_hydrated_targets, Specs(dependencies=(SingleAddress(directory=u\'testprojects/src/java/org/pantsbuild/testproject/bundle\', name=u\'missing-bundle-fileset\'),)), =TransitiveHydratedTargets)
+    Computing Task(transitive_hydrated_target, testprojects/src/java/org/pantsbuild/testproject/bundle:missing-bundle-fileset, =TransitiveHydratedTarget)
+      Computing Task(hydrate_target, testprojects/src/java/org/pantsbuild/testproject/bundle:missing-bundle-fileset, =HydratedTarget)
+        Computing Task(hydrate_bundles, BundlesField(address=BuildFileAddress(testprojects/src/java/org/pantsbuild/testproject/bundle/BUILD, missing-bundle-fileset), bundles=[BundleAdaptor(fileset=[\'a/b/file1.txt\']), BundleAdaptor(fileset=RGlobs(\'*.aaaa\', \'*.bbbb\')), BundleAdaptor(fileset=Globs(\'*.aaaa\')), BundleAdaptor(fileset=ZGlobs(\'**/*.abab\')), BundleAdaptor(fileset=[\'file1.aaaa\', \'file2.aaaa\'])], filespecs_list=[{u\'exclude\': [], u\'globs\': [u\'a/b/file1.txt\']}, {u\'exclude\': [], u\'globs\': [u\'**/*.aaaa\', u\'**/*.bbbb\']}, {u\'exclude\': [], u\'globs\': [u\'*.aaaa\']}, {u\'exclude\': [], u\'globs\': [u\'**/*.abab\']}, {u\'exclude\': [], u\'globs\': [u\'file1.aaaa\', u\'file2.aaaa\']}], path_globs_list=[PathGlobs(include=(u\'testprojects/src/java/org/pantsbuild/testproject/bundle/a/b/file1.txt\',), exclude=(), glob_match_error_behavior=\'ignore\'), PathGlobs(include=(u\'testprojects/src/java/org/pantsbuild/testproject/bundle/**/*.aaaa\', u\'testprojects/src/java/org/pantsbuild/testproject/bundle/**/*.bbbb\'), exclude=(), glob_match_error_behavior=\'ignore\'), PathGlobs(include=(u\'testprojects/src/java/org/pantsbuild/testproject/bundle/*.aaaa\',), exclude=(), glob_match_error_behavior=\'ignore\'), PathGlobs(include=(u\'testprojects/src/java/org/pantsbuild/testproject/bundle/**/*.abab\',), exclude=(), glob_match_error_behavior=\'ignore\'), PathGlobs(include=(u\'testprojects/src/java/org/pantsbuild/testproject/bundle/file1.aaaa\', u\'testprojects/src/java/org/pantsbuild/testproject/bundle/file2.aaaa\'), exclude=(), glob_match_error_behavior=\'ignore\')]), =HydratedField)
+          Computing Snapshot(Key(val="PathGlobs(include=(u\\\'testprojects/src/java/org/pantsbuild/testproject/bundle/*.aaaa\\\',), exclude=(), glob_match_error_behavior=\\\'error\\\')"))
+            Throw(PathGlobs expansion failed: Throw(Globs did not match. Excludes were: []. Unmatched globs were: ["testprojects/src/java/org/pantsbuild/testproject/bundle/*.aaaa"]., "<pants native internals>"))
+              Traceback (no traceback):
+                <pants native internals>
+              Exception: PathGlobs expansion failed: Throw(Globs did not match. Excludes were: []. Unmatched globs were: ["testprojects/src/java/org/pantsbuild/testproject/bundle/*.aaaa"]., "<pants native internals>")
+"""
+    self.assertIn(expected_msg, pants_run.stderr_data)
 
   def test_exception_invalid_option_value(self):
     # NB: 'allow' is not a valid value for --glob-expansion-failure.
-    pants_run = self.run_pants(['list', '--glob-expansion-failure=allow'])
+    pants_run = self.run_pants(['--glob-expansion-failure=allow'])
     self.assert_failure(pants_run)
-    self.assertIn(
-      "Exception message: Unrecognized command line flags on scope 'list': --glob-expansion-failure",
-      pants_run.stderr_data)
+    self.assertIn(ParseError.__name__, pants_run.stderr_data)
+    expected_msg = (
+      "`allow` is not an allowed value for option glob_expansion_failure in global scope. "
+      "Must be one of: [u'ignore', u'warn', u'error']")
+    self.assertIn(expected_msg, pants_run.stderr_data)
