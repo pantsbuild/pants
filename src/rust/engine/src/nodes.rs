@@ -907,6 +907,8 @@ impl NodeKey {
     fn typstr(tc: &TypeConstraint) -> String {
       externs::key_to_str(&tc.0)
     }
+    // FIXME(cosmicexplorer): these should all be converted to fmt::Debug implementations, and then
+    // this method can go away in favor of the auto-derived Debug for this type.
     match self {
       &NodeKey::DigestFile(ref s) => format!("DigestFile({:?})", s.0),
       &NodeKey::ExecuteProcess(ref s) => format!("ExecuteProcess({:?}", s.0),
@@ -923,8 +925,7 @@ impl NodeKey {
         keystr(&s.subject),
         typstr(&s.product)
       ),
-      // TODO(cosmicexplorer): why aren't we implementing an fmt::Debug for all of these nodes?
-      &NodeKey::Snapshot(ref s) => format!("{:?}", s),
+      &NodeKey::Snapshot(ref s) => format!("Snapshot({:?})", s.0),
     }
   }
 
