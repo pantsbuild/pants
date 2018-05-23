@@ -163,13 +163,13 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     # Validate that setup_requires dependencies are present and functional.
     # PANTS_TEST_SETUP_REQUIRES triggers test functionality in this particular setup.py.
     with environment_as(PANTS_TEST_SETUP_REQUIRES='1'):
-        command=['run', '{}:main'.format(self.hello_setup_requires)]
-        pants_run = self.run_pants(command=command)
-        self.assertRaises(Exception)
-        # Indicates the pycountry package is available to setup.py script.
-        self.assertIn('current/setup_requires_site/pycountry/__init__.py', pants_run.stderr_data)
-        # Indicates that the pycountry wheel has been installed on PYTHONPATH correctly.
-        self.assertIn('pycountry-18.5.20.dist-info', pants_run.stderr_data)
+      command=['run', '{}:main'.format(self.hello_setup_requires)]
+      pants_run = self.run_pants(command=command)
+      self.assertRaises(Exception)
+      # Indicates the pycountry package is available to setup.py script.
+      self.assertIn('current/setup_requires_site/pycountry/__init__.py', pants_run.stderr_data)
+      # Indicates that the pycountry wheel has been installed on PYTHONPATH correctly.
+      self.assertIn('pycountry-18.5.20.dist-info', pants_run.stderr_data)
 
     # Valdiate the run task. Use clean-all to invalidate cached python_dist wheels from
     # previous test run. Use -ldebug to get debug info on setup_requires functionality.
