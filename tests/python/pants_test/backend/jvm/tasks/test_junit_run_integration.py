@@ -137,7 +137,7 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['clean-all',
                                 'test.junit',
                                 '--timeouts',
-                                '--timeout-default=1',
+                                '--timeout-default=5',
                                 '--timeout-terminate-wait=1',
                                 '--test=org.pantsbuild.testproject.timeout.ShortSleeperTest',
                                 sleeping_target])
@@ -149,7 +149,7 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['clean-all',
                                 'test.junit',
                                 '--timeouts',
-                                '--timeout-default=1',
+                                '--timeout-default=5',
                                 '--timeout-terminate-wait=1',
                                 '--test=org.pantsbuild.testproject.timeout.LongSleeperTest',
                                 sleeping_target])
@@ -160,7 +160,7 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     self.assertLess(end - start, 120)
 
     # Ensure that the timeout triggered.
-    self.assertIn(" timed out after 1 seconds", pants_run.stdout_data)
+    self.assertIn(" timed out after 5 seconds", pants_run.stdout_data)
 
   def test_junit_tests_using_cucumber(self):
     test_spec = 'testprojects/tests/java/org/pantsbuild/testproject/cucumber'
