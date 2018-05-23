@@ -154,25 +154,22 @@ impl CommandRunner {
   const BACKOFF_MAX_WAIT_MILLIS: u64 = 5000;
 
   pub fn new(address: String, thread_count: usize, store: Store) -> CommandRunner {
-    let env = Resettable::new(Arc::new(move || {
-      Arc::new(grpcio::Environment::new(thread_count))
-    }));
+    let env = Resettable::new(move || Arc::new(grpcio::Environment::new(thread_count)));
     let env2 = env.clone();
-    let channel = Resettable::new(Arc::new(move || {
-      grpcio::ChannelBuilder::new(env2.get()).connect(&address)
-    }));
+    let channel =
+      Resettable::new(move || grpcio::ChannelBuilder::new(env2.get()).connect(&address));
     let channel2 = channel.clone();
     let channel3 = channel.clone();
-    let execution_client = Resettable::new(Arc::new(move || {
+    let execution_client = Resettable::new(move || {
       Arc::new(bazel_protos::remote_execution_grpc::ExecutionClient::new(
         channel2.get(),
       ))
-    }));
-    let operations_client = Resettable::new(Arc::new(move || {
+    });
+    let operations_client = Resettable::new(move || {
       Arc::new(bazel_protos::operations_grpc::OperationsClient::new(
         channel3.get(),
       ))
-    }));
+    });
 
     CommandRunner {
       channel,

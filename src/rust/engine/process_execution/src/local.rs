@@ -6,6 +6,8 @@ use futures::{future, Future};
 use std::process::Command;
 use std::sync::Arc;
 
+use tokio_process::CommandExt;
+
 use super::{ExecuteProcessRequest, ExecuteProcessResult};
 
 use bytes::Bytes;
@@ -50,7 +52,8 @@ impl super::CommandRunner for CommandRunner {
                   // to stop automatic PATH searching.
                   .env("PATH", "")
                   .envs(env)
-                  .output().map_err(|e| format!("Error executing process: {:?}", e))
+                  .output_async()
+                  .map_err(|e| format!("Error executing process: {:?}", e))
                   .map(|output| (output, workdir))
       })
       .and_then(|(output, workdir)| {

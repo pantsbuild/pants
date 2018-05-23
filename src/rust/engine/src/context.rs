@@ -5,13 +5,16 @@ use std;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use tokio::runtime::Runtime;
+
 use core::TypeId;
 use externs;
 use fs::{safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
 use graph::{EntryId, Graph};
 use handles::maybe_drain_handles;
 use nodes::{Node, NodeFuture};
-use process_execution::{self, CommandRunner};
+use process_execution::{self, BoundedCommandRunner, CommandRunner};
+use resettable::Resettable;
 use rule_graph::RuleGraph;
 use tasks::Tasks;
 use types::Types;
@@ -20,15 +23,20 @@ use types::Types;
 /// The core context shared (via Arc) between the Scheduler and the Context objects of
 /// all running Nodes.
 ///
+/// Over time, most usage of `ResettablePool` (which wraps use of blocking APIs) should migrate
+/// to the Tokio `Runtime`. The next candidate is likely to be migrating PosixFS to tokio-fs once
+/// https://github.com/tokio-rs/tokio/issues/369 is resolved.
+///
 pub struct Core {
   pub graph: Graph,
   pub tasks: Tasks,
   pub rule_graph: RuleGraph,
   pub types: Types,
   pub fs_pool: Arc<ResettablePool>,
+  pub runtime: Resettable<Arc<Runtime>>,
   pub store: Store,
   pub vfs: PosixFS,
-  pub command_runner: Arc<CommandRunner>,
+  pub command_runner: BoundedCommandRunner<process_execution::local::CommandRunner>,
 }
 
 impl Core {
@@ -44,6 +52,9 @@ impl Core {
     snapshots_dir.push("snapshots");
 
     let fs_pool = Arc::new(ResettablePool::new("io-".to_string()));
+    let runtime = Resettable::new(|| {
+      Arc::new(Runtime::new().unwrap_or_else(|e| panic!("Could not initialize Runtime: {:?}", e)))
+    });
 
     let store_path = match std::env::home_dir() {
       Some(home_dir) => home_dir.join(".cache").join("pants").join("lmdb_store"),
@@ -53,10 +64,13 @@ impl Core {
     let store = safe_create_dir_all_ioerror(&store_path)
       .map_err(|e| format!("{:?}", e))
       .and_then(|()| Store::local_only(store_path, fs_pool.clone()))
-      .unwrap_or_else(|e| panic!("Could not initialize Store directory {:?}", e));
+      .unwrap_or_else(|e| panic!("Could not initialize Store directory: {:?}", e));
 
-    let command_runner =
-      process_execution::local::CommandRunner::new(store.clone(), fs_pool.clone());
+    // TODO: Allow configuration of process concurrency.
+    let command_runner = BoundedCommandRunner::new(
+      process_execution::local::CommandRunner::new(store.clone(), fs_pool.clone()),
+      16,
+    );
 
     let rule_graph = RuleGraph::new(&tasks, root_subject_types);
 
@@ -66,19 +80,21 @@ impl Core {
       rule_graph: rule_graph,
       types: types,
       fs_pool: fs_pool.clone(),
+      runtime: runtime,
       store: store,
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
       vfs: PosixFS::new(build_root, fs_pool, ignore_patterns).unwrap_or_else(|e| {
         panic!("Could not initialize VFS: {:?}", e);
       }),
-      command_runner: Arc::new(command_runner),
+      command_runner: command_runner,
     }
   }
 
   pub fn pre_fork(&self) {
     self.fs_pool.reset();
     self.store.reset_prefork();
+    self.runtime.reset();
     self.command_runner.reset_prefork();
   }
 }

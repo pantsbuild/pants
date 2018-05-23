@@ -25,6 +25,7 @@ cc = "1.0"
 # (e.g. fs_util) won't be included when we build/test things.
 members = [
   ".",
+  "async_semaphore",
   "boxfuture",
   "fs",
   "fs/brfs",
@@ -48,6 +49,7 @@ members = [
 # On Ubuntu, that means installing libfuse-dev. On OSX, that means installing OSXFUSE.
 default-members = [
   ".",
+  "async_semaphore",
   "boxfuture",
   "fs",
   "fs/fs_util",
@@ -66,10 +68,12 @@ boxfuture = { path = "boxfuture" }
 enum_primitive = "0.1.1"
 fnv = "1.0.5"
 fs = { path = "fs" }
-futures = "0.1.16"
+futures = "^0.1.16"
 hashing = { path = "hashing" }
 lazy_static = "0.2.2"
 log = "0.4"
 petgraph = "0.4.5"
 process_execution = { path = "process_execution" }
+resettable = { path = "resettable" }
+tokio = "0.1"
 tempdir = "0.3.5"

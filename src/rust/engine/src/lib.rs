@@ -29,7 +29,9 @@ extern crate lazy_static;
 extern crate log;
 extern crate petgraph;
 extern crate process_execution;
+extern crate resettable;
 extern crate tempdir;
+extern crate tokio;
 
 use std::ffi::CStr;
 use std::fs::File;

@@ -1,6 +1,6 @@
 [package]
 version = "0.0.1"
-name = "boxfuture"
+name = "async_semaphore"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
 [dependencies]
