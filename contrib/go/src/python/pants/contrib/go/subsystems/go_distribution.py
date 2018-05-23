@@ -20,7 +20,7 @@ class GoReleaseUrlGenerator(BinaryToolUrlGenerator):
   _DIST_URL_FMT = 'https://storage.googleapis.com/golang/go{version}.{system_id}.tar.gz'
 
   _SYSTEM_ID = {
-    'darwin': 'darwin-amd64',
+    'mac': 'darwin-amd64',
     'linux': 'linux-amd64',
   }
 
