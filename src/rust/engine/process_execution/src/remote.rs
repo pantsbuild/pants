@@ -651,7 +651,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request())
+        super::make_execute_request(&echo_roland_request())
           .unwrap()
           .1,
         vec![
@@ -666,9 +666,11 @@ mod tests {
     };
 
     let store_dir = TempDir::new("store").unwrap();
-    let cas = mock::StubCAS::with_content(1024, vec![], vec![TestDirectory::containing_roland()]);
+    let store_dir_path = store_dir.path();
+
+    let cas = mock::StubCAS::empty();
     let store = fs::Store::with_remote(
-      store_dir,
+      &store_dir_path,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       cas.address(),
       1,
@@ -677,7 +679,7 @@ mod tests {
     ).expect("Failed to make store");
 
     let cmd_runner = CommandRunner::new(mock_server.address(), 1, store);
-    let result = cmd_runner.run(cat_roland_request()).wait();
+    let result = cmd_runner.run(echo_roland_request()).wait();
     assert_eq!(
       result,
       Ok(ExecuteProcessResult {
@@ -688,18 +690,20 @@ mod tests {
       })
     );
 
+    let local_store = fs::Store::local_only(
+      &store_dir_path,
+      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
+    ).expect("Error creating local store");
     {
       assert_eq!(
-        cmd_runner
-          .store
+        local_store
           .load_file_bytes_with(test_stdout.digest(), |v| v)
           .wait()
           .unwrap(),
         Some(test_stdout.bytes())
       );
       assert_eq!(
-        cmd_runner
-          .store
+        local_store
           .load_file_bytes_with(test_stderr.digest(), |v| v)
           .wait()
           .unwrap(),
@@ -1437,6 +1441,15 @@ mod tests {
       output_files: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "cat a roland".to_string(),
+    }
+  }
+
+  fn echo_roland_request() -> ExecuteProcessRequest {
+    ExecuteProcessRequest {
+      argv: owned_string_vec(&["/bin/echo", "meoooow"]),
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: BTreeSet::new(),
     }
   }
 }
