@@ -353,7 +353,7 @@ impl StrictGlobMatching {
 
 #[derive(Debug)]
 pub struct PathGlobs {
-  include: Vec<PathGlob>,
+  include_entries: Vec<PathGlobIncludeEntry>,
   exclude: Arc<Gitignore>,
   strict_match_behavior: StrictGlobMatching,
 }
@@ -368,12 +368,12 @@ impl PathGlobs {
     exclude: &[String],
     strict_match_behavior: StrictGlobMatching,
   ) -> Result<PathGlobs, String> {
-    let include_globs = PathGlob::create(include)?;
-    Self::create_with_globs_and_match_behavior(include_globs, exclude, strict_match_behavior)
+    let include_entries = PathGlob::spread_filespecs(include)?;
+    Self::create_with_globs_and_match_behavior(include_entries, exclude, strict_match_behavior)
   }
 
   fn create_with_globs_and_match_behavior(
-    include_globs: Vec<PathGlob>,
+    include_entries: Vec<PathGlobIncludeEntry>,
     exclude: &[String],
     strict_match_behavior: StrictGlobMatching,
   ) -> Result<PathGlobs, String> {
@@ -384,15 +384,27 @@ impl PathGlobs {
         .map_err(|e| format!("Could not parse glob excludes {:?}: {:?}", exclude, e))?)
     };
     Ok(PathGlobs {
-      include: include_globs,
+      include_entries,
       exclude: ignore_for_exclude,
       strict_match_behavior,
     })
   }
 
   pub fn from_globs(include: Vec<PathGlob>) -> Result<PathGlobs, String> {
+    let include_entries = include
+      .into_iter()
+      .map(|glob| PathGlobIncludeEntry { input: String::from("???"), globs: vec![glob] })
+      .collect();
     // An empty exclude becomes EMPTY_IGNORE.
-    PathGlobs::create_with_globs_and_match_behavior(include, &vec![], StrictGlobMatching::Ignore)
+    PathGlobs::create_with_globs_and_match_behavior(include_entries, &vec![], StrictGlobMatching::Ignore)
+  }
+
+  pub fn all_globs(&self) -> Vec<PathGlob> {
+    self.include_entries
+      .clone()
+      .into_iter()
+      .flat_map(|entry| entry.globs)
+      .collect()
   }
 }
 
@@ -421,7 +433,7 @@ struct PathGlobsExpansion<T: Sized> {
   context: T,
   // Globs that have yet to be expanded, in order.
   // TODO: profile/trace to see if this affects perf over a Vec.
-  todo: IndexSet<PathGlob>,
+  todo: Vec<PathGlob>,
   // Paths to exclude.
   exclude: Arc<Gitignore>,
   // Globs that have already been expanded.
@@ -806,14 +818,14 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
   /// Recursively expands PathGlobs into PathStats while applying excludes.
   ///
   fn expand(&self, path_globs: PathGlobs) -> BoxFuture<Vec<PathStat>, E> {
-    if path_globs.include.is_empty() {
+    if path_globs.include_entries.is_empty() {
       return future::ok(vec![]).to_boxed();
     }
 
     // let start = Instant::now();
     let init = PathGlobsExpansion {
       context: self.clone(),
-      todo: IndexSet::from(path_globs.include.clone().into_iter().collect()),
+      todo: path_globs.all_globs(),
       exclude: path_globs.exclude.clone(),
       completed: HashMap::default(),
       outputs: IndexSet::default(),
@@ -831,7 +843,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
       });
       round.map(move |single_expansion_results| {
         // Collect distinct new PathStats and PathGlobs
-        for exp in single_expansion_results.into_iter() {
+        for exp in single_expansion_results {
           let SingleExpansionResult {
             path_glob,
             path_stats,
@@ -869,15 +881,9 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
 
       let match_results: Vec<_> = outputs.into_iter().collect();
 
-      let PathGlobs {
-        include,
-        exclude,
-        strict_match_behavior,
-      } = path_globs;
-
-      if strict_match_behavior.should_check_initial_glob_matches() {
+      if path_globs.strict_match_behavior.should_check_initial_glob_matches() {
         let mut non_matching_inputs: Vec<PathGlob> = Vec::new();
-        for root_glob in include {
+        for root_glob in path_globs.all_globs() {
           let mut intermediate_globs: VecDeque<&PathGlob> = VecDeque::default();
           intermediate_globs.push_back(&root_glob);
 
@@ -912,9 +918,9 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
           // TODO: explain what global option to set to modify this behavior!
           let msg = format!(
             "???/globs with exclude patterns {:?} did not match: {:?}",
-            exclude, non_matching_inputs
+            path_globs.exclude, non_matching_inputs
           );
-          if strict_match_behavior.should_throw_on_error() {
+          if path_globs.strict_match_behavior.should_throw_on_error() {
             return future::err(Self::mk_error(&msg));
           } else {
             // FIXME: doesn't seem to do anything?
