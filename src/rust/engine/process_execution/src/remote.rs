@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
@@ -16,7 +17,6 @@ use sha2::Sha256;
 
 use super::{ExecuteProcessRequest, ExecuteProcessResult};
 use std::cmp::min;
-use std::time::Duration;
 
 #[derive(Clone)]
 pub struct CommandRunner {
@@ -63,42 +63,50 @@ impl super::CommandRunner for CommandRunner {
     let store = self.store.clone();
     let execute_request_result = make_execute_request(&req);
 
+    let req_description = req.description;
+    let req_timeout = req.timeout;
+
     match execute_request_result {
       Ok((command, execute_request)) => {
         let command_runner = self.clone();
-        self.upload_command(&command, execute_request.get_action().get_command_digest().into())
-            .and_then(move |_| {
-              debug!("Executing remotely request: {:?} (command: {:?})", execute_request, command);
+        self
+          .upload_command(
+            &command,
+            execute_request.get_action().get_command_digest().into(),
+          )
+          .and_then(move |_| {
+            debug!(
+              "Executing remotely request: {:?} (command: {:?})",
+              execute_request, command
+            );
 
-              map_grpc_result(execution_client.get().execute(&execute_request))
-                  .map(|result| (Arc::new(execute_request), result))
-            })
+            map_grpc_result(execution_client.get().execute(&execute_request))
+              .map(|result| (Arc::new(execute_request), result))
+          })
+          .and_then(move |(execute_request, operation)| {
+            let start_time = SystemTime::now();
 
-            // TODO: Add a timeout of some kind.
-            // https://github.com/pantsbuild/pants/issues/5504
+            future::loop_fn((operation, 0), move |(operation, iter_num)| {
+              let req_description = req_description.clone();
 
-            .and_then(move |(execute_request, operation)| {
-              future::loop_fn((operation, 0), move |(operation, iter_num)| {
-
-                let execute_request = execute_request.clone();
-                let execution_client2 = execution_client2.clone();
-                let store = store.clone();
-                let operations_client = operations_client.clone();
-                command_runner.extract_execute_response(operation)
-                    .map(|value|  future::Loop::Break(value))
-                    .or_else(move |value| {
-                      match value {
-                        ExecutionError::Fatal(err) => {
-                          future::err(err).to_boxed()
-                        },
-                        ExecutionError::MissingDigests(missing_digests) => {
-                          debug!(
-                            "Server reported missing digests; trying to upload: {:?}",
-                            missing_digests
-                          );
-                          let execute_request = execute_request.clone();
-                          let execution_client2 = execution_client2.clone();
-                          store.ensure_remote_has_recursive(missing_digests)
+              let execute_request = execute_request.clone();
+              let execution_client2 = execution_client2.clone();
+              let store = store.clone();
+              let operations_client = operations_client.clone();
+              command_runner
+                .extract_execute_response(operation)
+                .map(|value| future::Loop::Break(value))
+                .or_else(move |value| {
+                  match value {
+                    ExecutionError::Fatal(err) => future::err(err).to_boxed(),
+                    ExecutionError::MissingDigests(missing_digests) => {
+                      debug!(
+                        "Server reported missing digests; trying to upload: {:?}",
+                        missing_digests
+                      );
+                      let execute_request = execute_request.clone();
+                      let execution_client2 = execution_client2.clone();
+                      store.ensure_remote_has_recursive(missing_digests)
                               .and_then(move |()| {
                                 map_grpc_result(
                                   execution_client2.get().execute(
@@ -109,33 +117,54 @@ impl super::CommandRunner for CommandRunner {
                               // Reset `iter_num` on `MissingDigests`
                               .map(|operation| future::Loop::Continue((operation, 0)))
                               .to_boxed()
-                        },
-                        ExecutionError::NotFinished(operation_name) => {
-                          let mut operation_request =
-                            bazel_protos::operations::GetOperationRequest::new();
-                          operation_request.set_name(operation_name.clone());
+                    }
+                    ExecutionError::NotFinished(operation_name) => {
+                      let mut operation_request =
+                        bazel_protos::operations::GetOperationRequest::new();
+                      operation_request.set_name(operation_name.clone());
 
-                          let backoff_period = min(
-                            CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
-                            (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS);
+                      let backoff_period = min(
+                        CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
+                        (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS,
+                      );
 
-                          let grpc_result = map_grpc_result(
-                            operations_client.get().get_operation(&operation_request));
+                      let grpc_result =
+                        map_grpc_result(operations_client.get().get_operation(&operation_request));
 
-                          Delay::new(Duration::from_millis(backoff_period))
-                              .map_err(move |e| format!(
-                                "Future-Delay errored at operation result polling for {}: {}",
-                                operation_name, e))
-                              .and_then(move |_| {
-                                future::ok(
-                                  future::Loop::Continue(
-                                    (try_future!(grpc_result), iter_num + 1))).to_boxed()
-                              }).to_boxed()
-                        },
+                      let operation = try_future!(grpc_result);
+
+                      // take the grpc result and cancel the op if too much time has passed.
+                      let elapsed = try_future!(
+                        start_time
+                          .elapsed()
+                          .map_err(|err| format!("Something weird happened with time {:?}", err))
+                      );
+
+                      if elapsed > req_timeout {
+                        future::err(format!(
+                          "Exceeded time out of {:?} with {:?} for operation {}, {}",
+                          req_timeout, elapsed, operation_name, req_description
+                        )).to_boxed()
+                      } else {
+                        // maybe the delay here should be the min of remaining time and the backoff period
+                        Delay::new(Duration::from_millis(backoff_period))
+                          .map_err(move |e| {
+                            format!(
+                              "Future-Delay errored at operation result polling for {}, {}: {}",
+                              operation_name, req_description, e
+                            )
+                          })
+                          .and_then(move |_| {
+                            future::ok(future::Loop::Continue((operation, iter_num + 1))).to_boxed()
+                          })
+                          .to_boxed()
                       }
-                    })
-              })
-            }).to_boxed()
+                    }
+                  }
+                })
+            })
+          })
+          .to_boxed()
       }
       Err(err) => future::err(err).to_boxed(),
     }
@@ -472,8 +501,7 @@ mod tests {
   use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
   use std::sync::Arc;
-  use std::time::Duration;
-  use std::time::SystemTime;
+  use std::time::{Duration, SystemTime};
 
   #[derive(Debug, PartialEq)]
   enum StdoutType {
@@ -499,6 +527,8 @@ mod tests {
           env: BTreeMap::new(),
           input_files: fs::EMPTY_DIGEST,
           output_files: BTreeSet::new(),
+          timeout: Duration::from_millis(1000),
+          description: "wrong command".to_string(),
         }).unwrap()
           .1,
         vec![],
@@ -553,12 +583,14 @@ mod tests {
     let testdata = TestData::roland();
     let testdata_empty = TestData::empty();
     assert_eq!(
-      extract_execute_response(make_successful_operation(
-        &op_name,
-        StdoutType::Digest(testdata.digest()),
-        StderrType::Raw(testdata_empty.string()),
-        0,
-      )),
+      extract_execute_response(
+        make_successful_operation(
+          &op_name,
+          StdoutType::Digest(testdata.digest()),
+          StderrType::Raw(testdata_empty.string()),
+          0,
+        ).0
+      ),
       Ok(ExecuteProcessResult {
         stdout: testdata.bytes(),
         stderr: testdata_empty.bytes(),
@@ -574,12 +606,14 @@ mod tests {
     let testdata = TestData::roland();
     let testdata_empty = TestData::empty();
     assert_eq!(
-      extract_execute_response(make_successful_operation(
-        &op_name,
-        StdoutType::Raw(testdata_empty.string()),
-        StderrType::Digest(testdata.digest()),
-        0,
-      )),
+      extract_execute_response(
+        make_successful_operation(
+          &op_name,
+          StdoutType::Raw(testdata_empty.string()),
+          StderrType::Digest(testdata.digest()),
+          0,
+        ).0
+      ),
       Ok(ExecuteProcessResult {
         stdout: testdata_empty.bytes(),
         stderr: testdata.bytes(),
@@ -626,6 +660,39 @@ mod tests {
   }
 
   #[test]
+  fn timeout_after_sufficiently_delayed_getoperations() {
+    let request_timeout = Duration::new(4, 0);
+    let delayed_operation_time = Duration::new(5, 0);
+
+    let execute_request = ExecuteProcessRequest {
+      argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: BTreeSet::new(),
+      timeout: request_timeout,
+      description: "echo-a-foo".to_string(),
+    };
+
+    let mock_server = {
+      let op_name = "gimme-foo".to_string();
+
+      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
+        op_name.clone(),
+        super::make_execute_request(&execute_request).unwrap().1,
+        vec![
+          make_incomplete_operation(&op_name),
+          make_delayed_incomplete_operation(&op_name, delayed_operation_time),
+        ],
+      ))
+    };
+
+    let error_msg = run_command_remote(mock_server.address(), execute_request)
+      .expect_err("Timeout did not cause failure.");
+    assert_contains(&error_msg, "Exceeded time out");
+    assert_contains(&error_msg, "echo-a-foo");
+  }
+
+  #[test]
   fn bad_result_bytes() {
     let execute_request = echo_foo_request();
 
@@ -652,7 +719,7 @@ mod tests {
               response_wrapper.set_value(vec![0x00, 0x00, 0x00]);
               response_wrapper
             });
-            op
+            (op, None)
           },
         ],
       ))
@@ -682,7 +749,7 @@ mod tests {
               error.set_message("Something went wrong".to_string());
               error
             });
-            op
+            (op, None)
           },
         ],
       ))
@@ -715,7 +782,7 @@ mod tests {
               error.set_message("Something went wrong".to_string());
               error
             });
-            op
+            (op, None)
           },
         ],
       ))
@@ -741,7 +808,7 @@ mod tests {
             let mut op = bazel_protos::operations::Operation::new();
             op.set_name(op_name.to_string());
             op.set_done(true);
-            op
+            (op, None)
           },
         ],
       ))
@@ -768,7 +835,7 @@ mod tests {
             let mut op = bazel_protos::operations::Operation::new();
             op.set_name(op_name.to_string());
             op.set_done(true);
-            op
+            (op, None)
           },
         ],
       ))
@@ -952,7 +1019,7 @@ mod tests {
       .map(missing_preconditionfailure_violation)
       .collect();
 
-    let operation = make_precondition_failure_operation(missing);
+    let (operation, _duration) = make_precondition_failure_operation(missing);
 
     assert_eq!(
       extract_execute_response(operation),
@@ -972,7 +1039,7 @@ mod tests {
       },
     ];
 
-    let operation = make_precondition_failure_operation(missing);
+    let (operation, _duration) = make_precondition_failure_operation(missing);
 
     match extract_execute_response(operation) {
       Err(ExecutionError::Fatal(err)) => assert_contains(&err, "monkeys"),
@@ -990,7 +1057,7 @@ mod tests {
       },
     ];
 
-    let operation = make_precondition_failure_operation(missing);
+    let (operation, _duration) = make_precondition_failure_operation(missing);
 
     match extract_execute_response(operation) {
       Err(ExecutionError::Fatal(err)) => assert_contains(&err, "OUT_OF_CAPACITY"),
@@ -1002,7 +1069,7 @@ mod tests {
   fn extract_execute_response_missing_without_list() {
     let missing = vec![];
 
-    let operation = make_precondition_failure_operation(missing);
+    let (operation, _duration) = make_precondition_failure_operation(missing);
 
     match extract_execute_response(operation) {
       Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_lowercase(), "precondition"),
@@ -1117,14 +1184,33 @@ mod tests {
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
       output_files: BTreeSet::new(),
+      timeout: Duration::from_millis(5000),
+      description: "echo a foo".to_string(),
     }
   }
 
-  fn make_incomplete_operation(operation_name: &str) -> bazel_protos::operations::Operation {
+  // NB: The following helper functions return tuples of Operation and an optional Duration in
+  // order to make setting up the operations for a test execution server easier to read.
+  // The test execution server uses the duration to introduce a delay so that we can test
+  // timeouts.
+
+  fn make_incomplete_operation(
+    operation_name: &str,
+  ) -> (bazel_protos::operations::Operation, Option<Duration>) {
     let mut op = bazel_protos::operations::Operation::new();
     op.set_name(operation_name.to_string());
     op.set_done(false);
-    op
+    (op, None)
+  }
+
+  fn make_delayed_incomplete_operation(
+    operation_name: &str,
+    delay: Duration,
+  ) -> (bazel_protos::operations::Operation, Option<Duration>) {
+    let mut op = bazel_protos::operations::Operation::new();
+    op.set_name(operation_name.to_string());
+    op.set_done(false);
+    (op, Some(delay))
   }
 
   fn make_successful_operation(
@@ -1132,7 +1218,7 @@ mod tests {
     stdout: StdoutType,
     stderr: StderrType,
     exit_code: i32,
-  ) -> bazel_protos::operations::Operation {
+  ) -> (bazel_protos::operations::Operation, Option<Duration>) {
     let mut op = bazel_protos::operations::Operation::new();
     op.set_name(operation_name.to_string());
     op.set_done(true);
@@ -1169,12 +1255,12 @@ mod tests {
       response_wrapper.set_value(response_proto_bytes);
       response_wrapper
     });
-    op
+    (op, None)
   }
 
   fn make_precondition_failure_operation(
     violations: Vec<bazel_protos::error_details::PreconditionFailure_Violation>,
-  ) -> bazel_protos::operations::Operation {
+  ) -> (bazel_protos::operations::Operation, Option<Duration>) {
     let mut operation = bazel_protos::operations::Operation::new();
     operation.set_name("cat".to_owned());
     operation.set_done(true);
@@ -1194,7 +1280,7 @@ mod tests {
       });
       response
     }));
-    operation
+    (operation, None)
   }
 
   fn run_command_remote(
@@ -1264,6 +1350,8 @@ mod tests {
       env: BTreeMap::new(),
       input_files: TestDirectory::containing_roland().digest(),
       output_files: BTreeSet::new(),
+      timeout: Duration::from_millis(1000),
+      description: "cat a roland".to_string(),
     }
   }
 }

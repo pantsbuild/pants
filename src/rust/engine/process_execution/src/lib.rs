@@ -58,6 +58,10 @@ pub struct ExecuteProcessRequest {
   pub input_files: hashing::Digest,
 
   pub output_files: BTreeSet<PathBuf>,
+
+  pub timeout: std::time::Duration,
+
+  pub description: String,
 }
 
 ///

@@ -10,6 +10,7 @@ use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures::future::{self, Future};
 
@@ -496,11 +497,20 @@ impl ExecuteProcess {
       .map(|path: String| PathBuf::from(path))
       .collect();
 
+    let timeout_str = externs::project_str(&value, "timeout_seconds");
+    let timeout_in_seconds = timeout_str
+      .parse::<f64>()
+      .map_err(|err| format!("Timeout was not a float: {:?}", err))?;
+
+    let description = externs::project_str(&value, "description");
+
     Ok(ExecuteProcess(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
       input_files: digest,
       output_files: output_files,
+      timeout: Duration::from_millis((timeout_in_seconds * 1000.0) as u64),
+      description: description,
     }))
   }
 }
