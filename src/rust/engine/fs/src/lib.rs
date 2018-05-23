@@ -128,7 +128,7 @@ lazy_static! {
   static ref DOUBLE_STAR: &'static str = "**";
   static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new(*DOUBLE_STAR).unwrap();
   static ref EMPTY_IGNORE: Arc<Gitignore> = Arc::new(Gitignore::empty());
-  static ref MISSING_GLOB_SOURCE: GlobParseSource = GlobParseSource {
+  static ref MISSING_GLOB_SOURCE: GlobParsedSource = GlobParsedSource {
     gitignore_style_glob: String::from(""),
   };
 }
@@ -149,13 +149,13 @@ pub enum PathGlob {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct GlobParseSource {
+pub struct GlobParsedSource {
   gitignore_style_glob: String,
 }
 
 #[derive(Clone, Debug)]
 pub struct PathGlobIncludeEntry {
-  pub input: GlobParseSource,
+  pub input: GlobParsedSource,
   pub globs: Vec<PathGlob>,
 }
 
@@ -167,7 +167,7 @@ impl PathGlobIncludeEntry {
       .into_iter()
       .map(|path_glob| GlobWithSource {
         path_glob,
-        source: self.input.clone(),
+        source: GlobSource::ParsedInput(self.input.clone()),
       })
       .collect()
   }
@@ -212,7 +212,7 @@ impl PathGlob {
       let canonical_dir = Dir(PathBuf::new());
       let symbolic_path = PathBuf::new();
       spec_globs_map.push(PathGlobIncludeEntry {
-        input: GlobParseSource {
+        input: GlobParsedSource {
           gitignore_style_glob: filespec.clone(),
         },
         globs: PathGlob::parse(canonical_dir, symbolic_path, filespec)?,
@@ -432,9 +432,15 @@ impl PathGlobs {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum GlobSource {
+  ParsedInput(GlobParsedSource),
+  ParentGlob(PathGlob),
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct GlobWithSource {
   path_glob: PathGlob,
-  source: GlobParseSource,
+  source: GlobSource,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -448,6 +454,7 @@ struct GlobExpansionCacheEntry {
   // We could add `PathStat`s here if we need them for checking matches more deeply.
   globs: Vec<PathGlob>,
   matched: GlobMatch,
+  sources: Vec<GlobSource>,
 }
 
 #[derive(Clone, Debug)]
@@ -466,77 +473,9 @@ struct PathGlobsExpansion<T: Sized> {
   // Paths to exclude.
   exclude: Arc<Gitignore>,
   // Globs that have already been expanded.
-  completed: HashMap<PathGlob, GlobExpansionCacheEntry>,
-  sources: HashMap<GlobParseSource, GlobMatch>,
+  completed: IndexMap<PathGlob, GlobExpansionCacheEntry>,
   // Unique Paths that have been matched, in order.
   outputs: IndexSet<PathStat>,
-}
-
-impl<T> PathGlobsExpansion<T> {
-  fn get_frontier_new_globs(
-    &mut self,
-    source: GlobParseSource,
-    new_globs: Vec<PathGlob>,
-  ) -> Vec<GlobWithSource> {
-    let entry_for_source = self
-      .sources
-      .entry(source.clone())
-      .or_insert(GlobMatch::DidNotMatchAnyFiles);
-
-    match entry_for_source.clone() {
-      GlobMatch::SuccessfullyMatchedSomeFiles => vec![],
-      GlobMatch::DidNotMatchAnyFiles => {
-        let mut new_globs_frontier: IndexSet<PathGlob> = IndexSet::default();
-        let mut new_globs_queue: VecDeque<PathGlob> = VecDeque::from(new_globs);
-
-        // TODO(cosmicexplorer): This is more ergonomically done with future::loop_fn() -- is
-        // there an equivalent for synchronous code? Should therefore be?
-        // TODO(cosmicexplorer): Is there a way to do something like:
-        // while !found && let Some(ref cur_glob) = intermediate_globs.pop_front() {...} ??? I
-        // don't know how to allow the mutable borrow with .extend() while immutably borrowing the
-        // result of .pop_front() within the if let clause.
-        let mut found: bool = false;
-        while !found && !new_globs_queue.is_empty() {
-          let cur_new_glob = new_globs_queue.pop_front().unwrap();
-
-          if new_globs_frontier.contains(&cur_new_glob) {
-            continue;
-          }
-
-          match self.completed.get(&cur_new_glob) {
-            None => {
-              new_globs_frontier.insert(cur_new_glob.clone());
-            }
-            Some(&GlobExpansionCacheEntry {
-              ref globs,
-              ref matched,
-            }) => match matched {
-              &GlobMatch::DidNotMatchAnyFiles => {
-                new_globs_queue.extend(globs.clone());
-              }
-              &GlobMatch::SuccessfullyMatchedSomeFiles => {
-                found = true;
-                break;
-              }
-            },
-          }
-        }
-
-        if found {
-          *entry_for_source = GlobMatch::SuccessfullyMatchedSomeFiles;
-          vec![]
-        } else {
-          new_globs_frontier
-            .into_iter()
-            .map(|path_glob| GlobWithSource {
-              path_glob,
-              source: source.clone(),
-            })
-            .collect()
-        }
-      }
-    }
-  }
 }
 
 fn create_ignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {
@@ -928,8 +867,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
         .flat_map(|entry| entry.to_sourced_globs())
         .collect(),
       exclude: path_globs.exclude.clone(),
-      completed: HashMap::default(),
-      sources: HashMap::default(),
+      completed: IndexMap::default(),
       outputs: IndexSet::default(),
     };
     future::loop_fn(init, |mut expansion| {
@@ -964,10 +902,29 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
               } else {
                 GlobMatch::SuccessfullyMatchedSomeFiles
               },
-            });
+              sources: vec![],
+            })
+            .sources
+            .push(source);
 
-          let new_globs_frontier = expansion.get_frontier_new_globs(source, globs);
-          expansion.todo.extend(new_globs_frontier);
+          // TODO(cosmicexplorer): is cloning these so many times as `GlobSource`s something we can
+          // bypass by using `Arc`s?
+          let source_for_children = GlobSource::ParentGlob(path_glob);
+          for child_glob in globs {
+            if expansion.completed.contains_key(&child_glob) {
+              expansion
+                .completed
+                .get_mut(&child_glob)
+                .unwrap()
+                .sources
+                .push(source_for_children.clone());
+            } else {
+              expansion.todo.push(GlobWithSource {
+                path_glob: child_glob,
+                source: source_for_children.clone(),
+              });
+            }
+          }
         }
 
         // If there were any new PathGlobs, continue the expansion.
@@ -980,7 +937,9 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     }).and_then(move |final_expansion| {
       // Finally, capture the resulting PathStats from the expansion.
       let PathGlobsExpansion {
-        outputs, sources, ..
+        outputs,
+        mut completed,
+        ..
       } = final_expansion;
 
       let match_results: Vec<_> = outputs.into_iter().collect();
@@ -992,12 +951,39 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
       } = path_globs;
 
       if strict_match_behavior.should_check_initial_glob_matches() {
-        let non_matching_inputs: Vec<GlobParseSource> = include_entries
+        let mut inputs_with_matches: HashSet<GlobParsedSource> = HashSet::new();
+
+        let all_globs: Vec<PathGlob> = completed.keys().rev().map(|pg| pg.clone()).collect();
+        for cur_glob in all_globs {
+          let new_matched_source_globs = match completed.get(&cur_glob).unwrap() {
+            &GlobExpansionCacheEntry {
+              ref matched,
+              ref sources,
+              ..
+            } => match matched {
+              &GlobMatch::DidNotMatchAnyFiles => vec![],
+              &GlobMatch::SuccessfullyMatchedSomeFiles => sources
+                .iter()
+                .filter_map(|src| match src {
+                  &GlobSource::ParentGlob(ref path_glob) => Some(path_glob.clone()),
+                  &GlobSource::ParsedInput(ref parsed_source) => {
+                    inputs_with_matches.insert(parsed_source.clone());
+                    None
+                  }
+                })
+                .collect(),
+            },
+          };
+          new_matched_source_globs.into_iter().for_each(|path_glob| {
+            let entry = completed.get_mut(&path_glob).unwrap();
+            entry.matched = GlobMatch::SuccessfullyMatchedSomeFiles;
+          });
+        }
+
+        let non_matching_inputs: Vec<GlobParsedSource> = include_entries
           .into_iter()
-          .filter_map(|entry| match sources.get(&entry.input).unwrap() {
-            &GlobMatch::DidNotMatchAnyFiles => Some(entry.input),
-            &GlobMatch::SuccessfullyMatchedSomeFiles => None,
-          })
+          .map(|entry| entry.input)
+          .filter(|parsed_source| !inputs_with_matches.contains(parsed_source))
           .collect();
 
         if !non_matching_inputs.is_empty() {
