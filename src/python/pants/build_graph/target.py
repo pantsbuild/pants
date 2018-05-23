@@ -23,6 +23,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
+from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.source.payload_fields import SourcesField
 from pants.source.wrapped_globs import Files, FilesetWithSpec, Globs
 from pants.subsystem.subsystem import Subsystem
@@ -513,6 +514,12 @@ class Target(AbstractTarget):
       for source in self.sources_relative_to_buildroot():
         abs_source = os.path.join(get_buildroot(), source)
         yield os.path.relpath(abs_source, abs_source_root)
+
+  def sources_snapshot(self):
+    if self.has_sources():
+      return self._sources_field.snapshot
+    else:
+      return EMPTY_SNAPSHOT
 
   def globs_relative_to_buildroot(self):
     """

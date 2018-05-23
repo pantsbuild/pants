@@ -10,7 +10,7 @@ import os
 from pants.backend.graph_info.subsystems.cloc_binary import ClocBinary
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.engine.fs import FilesContent, PathGlobs, PathGlobsAndRoot, Snapshot
+from pants.engine.fs import FilesContent, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_dir
@@ -40,8 +40,10 @@ class CountLinesOfCode(ConsoleTask):
     with temporary_dir() as tmpdir:
       list_file = os.path.join(tmpdir, 'input_files_list')
       input_files = set()
+      sources_snapshots = set()
       with open(list_file, 'w') as list_file_out:
         for target in targets:
+          sources_snapshots.add(target.sources_snapshot())
           for source in target.sources_relative_to_buildroot():
             input_files.add(source)
             list_file_out.write(source)
@@ -55,16 +57,10 @@ class CountLinesOfCode(ConsoleTask):
 
     cloc_path, cloc_snapshot = ClocBinary.global_instance().hackily_snapshot(self.context)
 
-    # TODO: This should use an input file snapshot which should be provided on the Target object,
-    # rather than hackily re-snapshotting each of the input files.
-    # See https://github.com/pantsbuild/pants/issues/5762
-    input_pathglobs = PathGlobs(tuple(input_files), ())
-    input_snapshot = self.context._scheduler.product_request(Snapshot, [input_pathglobs])[0]
-
-    directory_digest = self.context._scheduler.merge_directories((
-      cloc_snapshot.directory_digest,
-      input_snapshot.directory_digest,
-      list_file_snapshot.directory_digest,
+    sources_snapshots.add(cloc_snapshot)
+    sources_snapshots.add(list_file_snapshot)
+    directory_digest = self.context._scheduler.merge_directories(tuple(
+      snapshot.directory_digest for snapshot in sources_snapshots
     ))
 
     cmd = (

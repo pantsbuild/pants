@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.source.payload_fields import SourcesField
-from pants.source.wrapped_globs import EagerFilesetWithSpec, Globs, LazyFilesetWithSpec
+from pants.source.wrapped_globs import Globs, LazyFilesetWithSpec
 from pants_test.base_test import BaseTest
 
 
@@ -68,17 +68,18 @@ class PayloadTest(BaseTest):
     self.assertIs(fileset, sf.sources)
     self.assertEqual(['foo/a.txt'], list(sf.source_paths))
 
-  def test_passes_eager_fileset_with_spec_through(self):
-    self.create_file('foo/a.txt', 'a_contents')
-
-    fileset = EagerFilesetWithSpec(rel_root='foo',
-                                   # Glob spec is relative to build root
-                                   filespec={'globs': ['foo/foo/a.txt']},
-                                   # files are relative to `rel_root`
-                                   files=['foo/a.txt'],
-                                   files_hash={'foo/a.txt': b'12345'})
-    sf = SourcesField(sources=fileset)
-
-    self.assertIs(fileset, sf.sources)
-    self.assertEqual(['foo/a.txt'], list(sf.source_paths))
-    self.assertEqual(['foo/foo/a.txt'], list(sf.relative_to_buildroot()))
+  # TODO: Replace this with a more mock-y test (and add snapshot proxying)
+  # def test_passes_eager_fileset_with_spec_through(self):
+  #   self.create_file('foo/a.txt', 'a_contents')
+  #
+  #   fileset = EagerFilesetWithSpec(rel_root='foo',
+  #                                  # Glob spec is relative to build root
+  #                                  filespec={'globs': ['foo/foo/a.txt']},
+  #                                  # files are relative to `rel_root`
+  #                                  files=['foo/a.txt'],
+  #                                  files_hash={'foo/a.txt': b'12345'})
+  #   sf = SourcesField(sources=fileset)
+  #
+  #   self.assertIs(fileset, sf.sources)
+  #   self.assertEqual(['foo/a.txt'], list(sf.source_paths))
+  #   self.assertEqual(['foo/foo/a.txt'], list(sf.relative_to_buildroot()))
