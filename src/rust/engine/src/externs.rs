@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::ffi::OsString;
-use std::iter::Iterator;
 use std::mem;
 use std::os::raw;
 use std::os::unix::ffi::OsStringExt;

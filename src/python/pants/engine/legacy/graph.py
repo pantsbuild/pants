@@ -363,13 +363,10 @@ def hydrate_target(target_adaptor):
                         tuple(target_adaptor.dependencies))
 
 
-def _eager_fileset_with_spec(sources_expansion, include_dirs=False):
-  snapshot = sources_expansion.snapshot
-  spec_path = sources_expansion.spec_path
+def _eager_fileset_with_spec(spec_path, snapshot, filespec, include_dirs=False):
   fds = snapshot.path_stats if include_dirs else snapshot.files
   files = tuple(fast_relpath(fd.path, spec_path) for fd in fds)
 
-  filespec = sources_expansion.filespecs
   rel_include_globs = filespec['globs']
 
   relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(rel_include_globs, spec_path)
@@ -383,35 +380,24 @@ def _eager_fileset_with_spec(sources_expansion, include_dirs=False):
                               files_hash=snapshot.directory_digest.fingerprint)
 
 
-class SourcesGlobMatchError(Exception): pass
-
-
-class SourcesFieldExpansionResult(datatype([
-    'spec_path',
-    'filespecs',
-    ('snapshot', Snapshot),
-])): pass
-
-
 @rule(HydratedField, [Select(SourcesField), Select(GlobMatchErrorBehavior)])
 def hydrate_sources(sources_field, glob_match_error_behavior):
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
   """
-
   path_globs = sources_field.path_globs.with_match_error_behavior(glob_match_error_behavior)
   snapshot = yield Get(Snapshot, PathGlobs, path_globs)
-  sources_expansion = SourcesFieldExpansionResult(
-    spec_path=sources_field.address.spec_path,
-    filespecs=sources_field.filespecs,
-    snapshot=snapshot)
-  fileset_with_spec = _eager_fileset_with_spec(sources_expansion)
+  fileset_with_spec = _eager_fileset_with_spec(
+    sources_field.address.spec_path,
+    snapshot,
+    sources_field.filespecs)
   yield HydratedField(sources_field.arg, fileset_with_spec)
 
 
 @rule(HydratedField, [Select(BundlesField), Select(GlobMatchErrorBehavior)])
 def hydrate_bundles(bundles_field, glob_match_error_behavior):
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
-  logger.debug("glob_match_error_behavior={}".format(glob_match_error_behavior))
+  # TODO(cosmicexplorer): merge the target's selection of --glob-expansion-failure (which doesn't
+  # exist yet) with the global default!
   path_globs_with_match_errors = [
     pg.with_match_error_behavior(glob_match_error_behavior)
     for pg in bundles_field.path_globs_list
@@ -430,12 +416,7 @@ def hydrate_bundles(bundles_field, glob_match_error_behavior):
     # to trigger a (deprecated) default inclusion of their recursive contents. See the related
     # deprecation in `pants.backend.jvm.tasks.bundle_create`.
     spec_path = getattr(bundle, 'rel_path', spec_path)
-
-    sources_expansion = SourcesFieldExpansionResult(
-      spec_path=spec_path,
-      filespecs=filespecs,
-      snapshot=snapshot)
-    kwargs['fileset'] = _eager_fileset_with_spec(sources_expansion, include_dirs=True)
+    kwargs['fileset'] = _eager_fileset_with_spec(spec_path, snapshot, filespeces, include_dirs=True)
     bundles.append(BundleAdaptor(**kwargs))
   yield HydratedField('bundles', bundles)
 

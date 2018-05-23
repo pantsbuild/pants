@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import collections
 import functools
-import logging
 from os.path import dirname, join
 
 import six
@@ -26,9 +25,6 @@ from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.objects import TypeConstraintError, datatype
-
-
-logger = logging.getLogger(__name__)
 
 
 class ResolvedTypeMismatchError(ResolveError):
