@@ -10,7 +10,7 @@ boxfuture = { path = "../boxfuture" }
 bytes = "0.4.5"
 digest = "0.6.2"
 fs = { path = "../fs" }
-futures = "0.1"
+futures = "^0.1.16"
 grpcio = { version = "0.2.0", features = ["secure"] }
 hashing = { path = "../hashing" }
 log = "0.4"
@@ -19,8 +19,7 @@ resettable = { path = "../resettable" }
 sha2 = "0.6.0"
 tempdir = "0.3.5"
 futures-timer = "0.1"
-# TODO: A master sha that is likely to be released as 0.2.1.
-tokio-process = { git = "https://github.com/alexcrichton/tokio-process", rev = "b50c293fb8dd5db5aaa5632d430497116c27d258" }
+tokio-process = "0.2.1"
 
 [dev-dependencies]
 mock = { path = "../testutil/mock" }

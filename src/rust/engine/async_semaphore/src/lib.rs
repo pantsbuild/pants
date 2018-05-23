@@ -28,18 +28,6 @@ impl AsyncSemaphore {
   }
 
   ///
-  /// Returns a Future that resolves to a Permit for the semaphore. The semaphore remains acquired
-  /// until the Permit is dropped.
-  ///
-  /// You should generally prefer to use `with_acquired`, as it is less error prone.
-  ///
-  fn acquire(&self) -> PermitFuture {
-    PermitFuture {
-      inner: Some(self.inner.clone()),
-    }
-  }
-
-  ///
   /// Runs the given Future-creating function (and the Future it returns) under the semaphore.
   ///
   pub fn with_acquired<F, B, T, E>(&self, f: F) -> Box<Future<Item = T, Error = E> + Send>
@@ -47,9 +35,11 @@ impl AsyncSemaphore {
     F: FnOnce() -> B + Send + 'static,
     B: Future<Item = T, Error = E> + Send + 'static,
   {
+    let permit = PermitFuture {
+      inner: Some(self.inner.clone()),
+    };
     Box::new(
-      self
-        .acquire()
+      permit
         .map_err(|()| panic!("Acquisition is infalliable."))
         .and_then(|permit| {
           f().map(move |t| {
@@ -166,7 +156,7 @@ mod tests {
     });
 
     // thread2 should not signal until we unblock thread1.
-    match acquired_thread2.recv_timeout(Duration::from_millis(500)) {
+    match acquired_thread2.recv_timeout(Duration::from_millis(100)) {
       Err(_) => (),
       Ok(_) => panic!("thread2 should not have acquired while thread1 was holding."),
     }

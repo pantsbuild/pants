@@ -23,6 +23,10 @@ use types::Types;
 /// The core context shared (via Arc) between the Scheduler and the Context objects of
 /// all running Nodes.
 ///
+/// Over time, most usage of `ResettablePool` (which wraps use of blocking APIs) should migrate
+/// to the Tokio `Runtime`. The next candidate is likely to be migrating PosixFS to tokio-fs once
+/// https://github.com/tokio-rs/tokio/issues/369 is resolved.
+///
 pub struct Core {
   pub graph: Graph,
   pub tasks: Tasks,

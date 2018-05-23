@@ -21,9 +21,6 @@ impl<T> Resettable<T>
 where
   T: Clone + Send + Sync,
 {
-  // Sadly there is no way to accept an Fn() -> T because it's not Sized, so we need to accept an
-  // Arc of one. This is not at all ergonomic, but at some point "impl trait" will come along and
-  // allow us to remove this monstrosity.
   pub fn new<F: Fn() -> T + 'static>(make: F) -> Resettable<T> {
     Resettable {
       val: Arc::new(RwLock::new(None)),

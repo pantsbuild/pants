@@ -758,7 +758,7 @@ dependencies = [
  "sha2 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempdir 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "testutil 0.0.1",
- "tokio-process 0.2.1 (git+https://github.com/alexcrichton/tokio-process?rev=b50c293fb8dd5db5aaa5632d430497116c27d258)",
+ "tokio-process 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1098,7 +1098,7 @@ dependencies = [
 [[package]]
 name = "tokio-process"
 version = "0.2.1"
-source = "git+https://github.com/alexcrichton/tokio-process?rev=b50c293fb8dd5db5aaa5632d430497116c27d258#b50c293fb8dd5db5aaa5632d430497116c27d258"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "futures 0.1.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.40 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1404,7 +1404,7 @@ dependencies = [
 "checksum tokio-executor 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "8cac2a7883ff3567e9d66bb09100d09b33d90311feca0206c7ca034bc0c55113"
 "checksum tokio-fs 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "76766830bbf9a2d5bfb50c95350d56a2e79e2c80f675967fff448bc615899708"
 "checksum tokio-io 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "6af9eb326f64b2d6b68438e1953341e00ab3cf54de7e35d92bfc73af8555313a"
-"checksum tokio-process 0.2.1 (git+https://github.com/alexcrichton/tokio-process?rev=b50c293fb8dd5db5aaa5632d430497116c27d258)" = "<none>"
+"checksum tokio-process 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "81de38febefe683adab7070c0f705afd6247582d0b1780d9eb745c77a0d4e88b"
 "checksum tokio-reactor 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b3cedc8e5af5131dc3423ffa4f877cce78ad25259a9a62de0613735a13ebc64b"
 "checksum tokio-signal 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6a5bf935a0151cc8899aa806ce6a425bdaec79ed4034de1a1e6bfa247e2def"
 "checksum tokio-tcp 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ec9b094851aadd2caf83ba3ad8e8c4ce65a42104f7b94d9e6550023f0407853f"
