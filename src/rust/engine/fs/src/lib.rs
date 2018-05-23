@@ -121,12 +121,60 @@ impl PathStat {
   }
 }
 
+#[derive(Clone, Debug)]
+pub struct GitignoreStyleExcludes {
+  patterns: Vec<String>,
+  gitignore: Gitignore,
+}
+
+impl GitignoreStyleExcludes {
+  fn create(patterns: &[String]) -> Result<Arc<Self>, String> {
+    if patterns.is_empty() {
+      return Ok(EMPTY_IGNORE.clone());
+    }
+
+    let gitignore = Self::create_gitignore(patterns)
+      .map_err(|e| format!("Could not parse glob excludes {:?}: {:?}", patterns, e))?;
+
+    Ok(Arc::new(Self {
+      patterns: patterns.to_vec(),
+      gitignore,
+    }))
+  }
+
+  fn create_gitignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {
+    let mut ignore_builder = GitignoreBuilder::new("");
+    for pattern in patterns {
+      ignore_builder.add_line(None, pattern.as_str())?;
+    }
+    ignore_builder.build()
+  }
+
+  fn exclude_patterns(&self) -> &[String] {
+    self.patterns.as_slice()
+  }
+
+  fn is_ignored(&self, stat: &Stat) -> bool {
+    let is_dir = match stat {
+      &Stat::Dir(_) => true,
+      _ => false,
+    };
+    match self.gitignore.matched(stat.path(), is_dir) {
+      ignore::Match::None | ignore::Match::Whitelist(_) => false,
+      ignore::Match::Ignore(_) => true,
+    }
+  }
+}
+
 lazy_static! {
   static ref PARENT_DIR: &'static str = "..";
   static ref SINGLE_STAR_GLOB: Pattern = Pattern::new("*").unwrap();
   static ref DOUBLE_STAR: &'static str = "**";
   static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new(*DOUBLE_STAR).unwrap();
-  static ref EMPTY_IGNORE: Arc<Gitignore> = Arc::new(Gitignore::empty());
+  static ref EMPTY_IGNORE: Arc<GitignoreStyleExcludes> = Arc::new(GitignoreStyleExcludes {
+    patterns: vec![],
+    gitignore: Gitignore::empty(),
+  });
   static ref MISSING_GLOB_SOURCE: GlobParsedSource = GlobParsedSource {
     gitignore_style_glob: String::from(""),
   };
@@ -377,7 +425,7 @@ impl StrictGlobMatching {
 #[derive(Debug)]
 pub struct PathGlobs {
   include_entries: Vec<PathGlobIncludeEntry>,
-  exclude: Arc<Gitignore>,
+  exclude: Arc<GitignoreStyleExcludes>,
   strict_match_behavior: StrictGlobMatching,
 }
 
@@ -400,15 +448,10 @@ impl PathGlobs {
     exclude: &[String],
     strict_match_behavior: StrictGlobMatching,
   ) -> Result<PathGlobs, String> {
-    let ignore_for_exclude = if exclude.is_empty() {
-      EMPTY_IGNORE.clone()
-    } else {
-      Arc::new(create_ignore(exclude)
-        .map_err(|e| format!("Could not parse glob excludes {:?}: {:?}", exclude, e))?)
-    };
+    let gitignore_excludes = GitignoreStyleExcludes::create(exclude)?;
     Ok(PathGlobs {
       include_entries,
-      exclude: ignore_for_exclude,
+      exclude: gitignore_excludes,
       strict_match_behavior,
     })
   }
@@ -470,30 +513,11 @@ struct PathGlobsExpansion<T: Sized> {
   // TODO: profile/trace to see if this affects perf over a Vec.
   todo: Vec<GlobWithSource>,
   // Paths to exclude.
-  exclude: Arc<Gitignore>,
+  exclude: Arc<GitignoreStyleExcludes>,
   // Globs that have already been expanded.
   completed: IndexMap<PathGlob, GlobExpansionCacheEntry>,
   // Unique Paths that have been matched, in order.
   outputs: IndexSet<PathStat>,
-}
-
-fn create_ignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {
-  let mut ignore_builder = GitignoreBuilder::new("");
-  for pattern in patterns {
-    ignore_builder.add_line(None, pattern.as_str())?;
-  }
-  ignore_builder.build()
-}
-
-fn is_ignored(ignore: &Gitignore, stat: &Stat) -> bool {
-  let is_dir = match stat {
-    &Stat::Dir(_) => true,
-    _ => false,
-  };
-  match ignore.matched(stat.path(), is_dir) {
-    ignore::Match::None | ignore::Match::Whitelist(_) => false,
-    ignore::Match::Ignore(_) => true,
-  }
 }
 
 ///
@@ -502,7 +526,7 @@ fn is_ignored(ignore: &Gitignore, stat: &Stat) -> bool {
 pub struct PosixFS {
   root: Dir,
   pool: Arc<ResettablePool>,
-  ignore: Gitignore,
+  ignore: Arc<GitignoreStyleExcludes>,
 }
 
 impl PosixFS {
@@ -528,7 +552,7 @@ impl PosixFS {
       })
       .map_err(|e| format!("Could not canonicalize root {:?}: {:?}", root, e))?;
 
-    let ignore = create_ignore(&ignore_patterns).map_err(|e| {
+    let ignore = GitignoreStyleExcludes::create(&ignore_patterns).map_err(|e| {
       format!(
         "Could not parse build ignore inputs {:?}: {:?}",
         ignore_patterns, e
@@ -561,7 +585,7 @@ impl PosixFS {
   }
 
   pub fn is_ignored(&self, stat: &Stat) -> bool {
-    is_ignored(&self.ignore, stat)
+    self.ignore.is_ignored(stat)
   }
 
   pub fn read_file(&self, file: &File) -> BoxFuture<FileContent, io::Error> {
@@ -791,7 +815,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     canonical_dir: Dir,
     symbolic_path: PathBuf,
     wildcard: Pattern,
-    exclude: &Arc<Gitignore>,
+    exclude: &Arc<GitignoreStyleExcludes>,
   ) -> BoxFuture<Vec<PathStat>, E> {
     // List the directory.
     let context = self.clone();
@@ -825,7 +849,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
               // context, or by local excludes. Note that we apply context ignore patterns to both
               // the symbolic and canonical names of Links, but only apply local excludes to their
               // symbolic names.
-              if context.is_ignored(&stat) || is_ignored(&exclude, &stat) {
+              if context.is_ignored(&stat) || exclude.is_ignored(&stat) {
                 future::ok(None).to_boxed()
               } else {
                 match stat {
@@ -857,7 +881,6 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
       return future::ok(vec![]).to_boxed();
     }
 
-    // let start = Instant::now();
     let init = PathGlobsExpansion {
       context: self.clone(),
       todo: path_globs
@@ -988,13 +1011,19 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
         if !non_matching_inputs.is_empty() {
           // TODO: explain what global option to set to modify this behavior!
           let msg = format!(
-            "???/globs with exclude patterns {:?} did not match: {:?}",
-            exclude, non_matching_inputs
+            "Globs did not match. Excludes were: {:?}. Unmatched globs were: {:?}.",
+            exclude.exclude_patterns(),
+            non_matching_inputs
+              .iter()
+              .map(|parsed_source| parsed_source.gitignore_style_glob.clone())
+              .collect::<Vec<_>>(),
           );
           if strict_match_behavior.should_throw_on_error() {
             return future::err(Self::mk_error(&msg));
           } else {
             // FIXME: doesn't seem to do anything?
+            // TODO(cosmicexplorer): this doesn't have any useful context (the stack trace) without
+            // being thrown -- this needs to be provided, otherwise this is unusable.
             warn!("{}", msg);
           }
         }
@@ -1012,7 +1041,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
   fn expand_single(
     &self,
     sourced_glob: GlobWithSource,
-    exclude: &Arc<Gitignore>,
+    exclude: &Arc<GitignoreStyleExcludes>,
   ) -> BoxFuture<SingleExpansionResult, E> {
     // If we were to match on &path_glob (which I just tried), it seems like it's impossible to move
     // something while borrowing it, even if the move happens at the end of the borrowed scope. That

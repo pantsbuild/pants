@@ -21,6 +21,7 @@ use externs;
 use fs::{self, Dir, File, FileContent, Link, PathGlobs,
          PathStat, StrictGlobMatching, StoreFileByDigest, VFS};
 use hashing;
+use process_execution;
 use rule_graph;
 use selectors;
 use tasks::{self, Intrinsic, IntrinsicKind};
