@@ -128,6 +128,9 @@ lazy_static! {
   static ref DOUBLE_STAR: &'static str = "**";
   static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new(*DOUBLE_STAR).unwrap();
   static ref EMPTY_IGNORE: Arc<Gitignore> = Arc::new(Gitignore::empty());
+  static ref MISSING_GLOB_SOURCE: GlobParseSource = GlobParseSource {
+    gitignore_style_glob: String::from(""),
+  };
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -145,10 +148,29 @@ pub enum PathGlob {
   },
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct GlobParseSource {
+  gitignore_style_glob: String,
+}
+
 #[derive(Clone, Debug)]
 pub struct PathGlobIncludeEntry {
-  pub input: String,
+  pub input: GlobParseSource,
   pub globs: Vec<PathGlob>,
+}
+
+impl PathGlobIncludeEntry {
+  fn to_sourced_globs(&self) -> Vec<GlobWithSource> {
+    self
+      .globs
+      .clone()
+      .into_iter()
+      .map(|path_glob| GlobWithSource {
+        path_glob,
+        source: self.input.clone(),
+      })
+      .collect()
+  }
 }
 
 impl PathGlob {
@@ -190,7 +212,9 @@ impl PathGlob {
       let canonical_dir = Dir(PathBuf::new());
       let symbolic_path = PathBuf::new();
       spec_globs_map.push(PathGlobIncludeEntry {
-        input: filespec.clone(),
+        input: GlobParseSource {
+          gitignore_style_glob: filespec.clone(),
+        },
         globs: PathGlob::parse(canonical_dir, symbolic_path, filespec)?,
       });
     }
@@ -393,22 +417,27 @@ impl PathGlobs {
   pub fn from_globs(include: Vec<PathGlob>) -> Result<PathGlobs, String> {
     let include_entries = include
       .into_iter()
-      .map(|glob| PathGlobIncludeEntry { input: String::from("???"), globs: vec![glob] })
+      .map(|glob| PathGlobIncludeEntry {
+        input: MISSING_GLOB_SOURCE.clone(),
+        globs: vec![glob],
+      })
       .collect();
     // An empty exclude becomes EMPTY_IGNORE.
-    PathGlobs::create_with_globs_and_match_behavior(include_entries, &vec![], StrictGlobMatching::Ignore)
-  }
-
-  pub fn all_globs(&self) -> Vec<PathGlob> {
-    self.include_entries
-      .clone()
-      .into_iter()
-      .flat_map(|entry| entry.globs)
-      .collect()
+    PathGlobs::create_with_globs_and_match_behavior(
+      include_entries,
+      &vec![],
+      StrictGlobMatching::Ignore,
+    )
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct GlobWithSource {
+  path_glob: PathGlob,
+  source: GlobParseSource,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum GlobMatch {
   SuccessfullyMatchedSomeFiles,
   DidNotMatchAnyFiles,
@@ -423,7 +452,7 @@ struct GlobExpansionCacheEntry {
 
 #[derive(Clone, Debug)]
 pub struct SingleExpansionResult {
-  path_glob: PathGlob,
+  sourced_glob: GlobWithSource,
   path_stats: Vec<PathStat>,
   globs: Vec<PathGlob>,
 }
@@ -433,13 +462,81 @@ struct PathGlobsExpansion<T: Sized> {
   context: T,
   // Globs that have yet to be expanded, in order.
   // TODO: profile/trace to see if this affects perf over a Vec.
-  todo: Vec<PathGlob>,
+  todo: Vec<GlobWithSource>,
   // Paths to exclude.
   exclude: Arc<Gitignore>,
   // Globs that have already been expanded.
   completed: HashMap<PathGlob, GlobExpansionCacheEntry>,
+  sources: HashMap<GlobParseSource, GlobMatch>,
   // Unique Paths that have been matched, in order.
   outputs: IndexSet<PathStat>,
+}
+
+impl<T> PathGlobsExpansion<T> {
+  fn get_frontier_new_globs(
+    &mut self,
+    source: GlobParseSource,
+    new_globs: Vec<PathGlob>,
+  ) -> Vec<GlobWithSource> {
+    let entry_for_source = self
+      .sources
+      .entry(source.clone())
+      .or_insert(GlobMatch::DidNotMatchAnyFiles);
+
+    match entry_for_source.clone() {
+      GlobMatch::SuccessfullyMatchedSomeFiles => vec![],
+      GlobMatch::DidNotMatchAnyFiles => {
+        let mut new_globs_frontier: IndexSet<PathGlob> = IndexSet::default();
+        let mut new_globs_queue: VecDeque<PathGlob> = VecDeque::from(new_globs);
+
+        // TODO(cosmicexplorer): This is more ergonomically done with future::loop_fn() -- is
+        // there an equivalent for synchronous code? Should therefore be?
+        // TODO(cosmicexplorer): Is there a way to do something like:
+        // while !found && let Some(ref cur_glob) = intermediate_globs.pop_front() {...} ??? I
+        // don't know how to allow the mutable borrow with .extend() while immutably borrowing the
+        // result of .pop_front() within the if let clause.
+        let mut found: bool = false;
+        while !found && !new_globs_queue.is_empty() {
+          let cur_new_glob = new_globs_queue.pop_front().unwrap();
+
+          if new_globs_frontier.contains(&cur_new_glob) {
+            continue;
+          }
+
+          match self.completed.get(&cur_new_glob) {
+            None => {
+              new_globs_frontier.insert(cur_new_glob.clone());
+            }
+            Some(&GlobExpansionCacheEntry {
+              ref globs,
+              ref matched,
+            }) => match matched {
+              &GlobMatch::DidNotMatchAnyFiles => {
+                new_globs_queue.extend(globs.clone());
+              }
+              &GlobMatch::SuccessfullyMatchedSomeFiles => {
+                found = true;
+                break;
+              }
+            },
+          }
+        }
+
+        if found {
+          *entry_for_source = GlobMatch::SuccessfullyMatchedSomeFiles;
+          vec![]
+        } else {
+          new_globs_frontier
+            .into_iter()
+            .map(|path_glob| GlobWithSource {
+              path_glob,
+              source: source.clone(),
+            })
+            .collect()
+        }
+      }
+    }
+  }
 }
 
 fn create_ignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {
@@ -825,9 +922,14 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     // let start = Instant::now();
     let init = PathGlobsExpansion {
       context: self.clone(),
-      todo: path_globs.all_globs(),
+      todo: path_globs
+        .include_entries
+        .iter()
+        .flat_map(|entry| entry.to_sourced_globs())
+        .collect(),
       exclude: path_globs.exclude.clone(),
       completed: HashMap::default(),
+      sources: HashMap::default(),
       outputs: IndexSet::default(),
     };
     future::loop_fn(init, |mut expansion| {
@@ -838,20 +940,22 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
         expansion
           .todo
           .drain(..)
-          .map(|path_glob| context.expand_single(path_glob, exclude))
+          .map(|sourced_glob| context.expand_single(sourced_glob, exclude))
           .collect::<Vec<_>>()
       });
       round.map(move |single_expansion_results| {
         // Collect distinct new PathStats and PathGlobs
         for exp in single_expansion_results {
           let SingleExpansionResult {
-            path_glob,
+            sourced_glob: GlobWithSource { path_glob, source },
             path_stats,
             globs,
           } = exp;
+
           expansion.outputs.extend(path_stats.clone());
-          let completed = &mut expansion.completed;
-          completed
+
+          expansion
+            .completed
             .entry(path_glob.clone())
             .or_insert_with(|| GlobExpansionCacheEntry {
               globs: globs.clone(),
@@ -861,9 +965,9 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
                 GlobMatch::SuccessfullyMatchedSomeFiles
               },
             });
-          expansion
-            .todo
-            .extend(globs.into_iter().filter(|pg| !completed.contains_key(pg)));
+
+          let new_globs_frontier = expansion.get_frontier_new_globs(source, globs);
+          expansion.todo.extend(new_globs_frontier);
         }
 
         // If there were any new PathGlobs, continue the expansion.
@@ -876,51 +980,33 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     }).and_then(move |final_expansion| {
       // Finally, capture the resulting PathStats from the expansion.
       let PathGlobsExpansion {
-        completed, outputs, ..
+        outputs, sources, ..
       } = final_expansion;
 
       let match_results: Vec<_> = outputs.into_iter().collect();
 
-      if path_globs.strict_match_behavior.should_check_initial_glob_matches() {
-        let mut non_matching_inputs: Vec<PathGlob> = Vec::new();
-        for root_glob in path_globs.all_globs() {
-          let mut intermediate_globs: VecDeque<&PathGlob> = VecDeque::default();
-          intermediate_globs.push_back(&root_glob);
+      let PathGlobs {
+        include_entries,
+        exclude,
+        strict_match_behavior,
+      } = path_globs;
 
-          let mut found: bool = false;
-          // TODO(cosmicexplorer): This is more ergonomically done with future::loop_fn() -- is
-          // there an equivalent for synchronous code? Should there be?
-          // TODO(cosmicexplorer): Is there a way to do something like:
-          // while !found && let Some(ref cur_glob) = intermediate_globs.pop_front() {...} ??? I
-          // don't know how to allow the mutable borrow with .extend() while immutably borrowing the
-          // result of .pop_front() within the if let clause.
-          while !found && !intermediate_globs.is_empty() {
-            let cur_glob = intermediate_globs.pop_front().unwrap();
-            let &GlobExpansionCacheEntry {
-              ref globs,
-              ref matched,
-            } = completed.get(&cur_glob).unwrap();
-
-            match matched {
-              &GlobMatch::SuccessfullyMatchedSomeFiles => {
-                found = true;
-                break;
-              }
-              _ => intermediate_globs.extend(globs),
-            }
-          }
-          if !found {
-            non_matching_inputs.push(root_glob.clone());
-          }
-        }
+      if strict_match_behavior.should_check_initial_glob_matches() {
+        let non_matching_inputs: Vec<GlobParseSource> = include_entries
+          .into_iter()
+          .filter_map(|entry| match sources.get(&entry.input).unwrap() {
+            &GlobMatch::DidNotMatchAnyFiles => Some(entry.input),
+            &GlobMatch::SuccessfullyMatchedSomeFiles => None,
+          })
+          .collect();
 
         if !non_matching_inputs.is_empty() {
           // TODO: explain what global option to set to modify this behavior!
           let msg = format!(
             "???/globs with exclude patterns {:?} did not match: {:?}",
-            path_globs.exclude, non_matching_inputs
+            exclude, non_matching_inputs
           );
-          if path_globs.strict_match_behavior.should_throw_on_error() {
+          if strict_match_behavior.should_throw_on_error() {
             return future::err(Self::mk_error(&msg));
           } else {
             // FIXME: doesn't seem to do anything?
@@ -940,7 +1026,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
   ///
   fn expand_single(
     &self,
-    path_glob: PathGlob,
+    sourced_glob: GlobWithSource,
     exclude: &Arc<Gitignore>,
   ) -> BoxFuture<SingleExpansionResult, E> {
     // If we were to match on &path_glob (which I just tried), it seems like it's impossible to move
@@ -948,12 +1034,12 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     // seems like it doesn't need to happen? I think there is no way to avoid the clone here,
     // however, because directory_listing() returns a future and therefore can use only static
     // references.
-    match path_glob.clone() {
+    match sourced_glob.path_glob.clone() {
       PathGlob::Wildcard { canonical_dir, symbolic_path, wildcard } =>
         // Filter directory listing to return PathStats, with no continuation.
         self.directory_listing(canonical_dir, symbolic_path, wildcard, exclude)
         .map(move |path_stats| SingleExpansionResult {
-          path_glob,
+          sourced_glob,
           path_stats,
           globs: vec![],
         })
@@ -974,12 +1060,12 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
               .collect::<Result<Vec<_>, E>>()
           })
           .map(move |path_globs| {
-            let flattened =
-              path_globs.into_iter()
-                .flat_map(|path_globs| path_globs.into_iter())
+            let flattened = path_globs
+              .into_iter()
+              .flat_map(|path_globs| path_globs.into_iter())
               .collect();
             SingleExpansionResult {
-              path_glob,
+              sourced_glob,
               path_stats: vec![],
               globs: flattened,
             }
