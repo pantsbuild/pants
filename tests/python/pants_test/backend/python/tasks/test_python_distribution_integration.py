@@ -9,9 +9,9 @@ import glob
 import os
 import sys
 
-from pants.util.contextutil import temporary_dir
+from pants.base.build_environment import get_buildroot
+from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.process_handler import subprocess
-from pants.util.contextutil import environment_as
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 

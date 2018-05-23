@@ -19,8 +19,6 @@ from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.pex_build_util import _resolve_multi
 from pants.backend.python.tasks.setup_py import SetupPyInvocationEnvironment, SetupPyRunner
-from pants.backend.python.tasks.pex_build_util import _resolve_multi
-from pants.backend.python.tasks.setup_py import SetupPyInvocationEnvironment, SetupPyRunner
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
