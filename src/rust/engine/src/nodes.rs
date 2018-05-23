@@ -4,7 +4,7 @@
 extern crate bazel_protos;
 extern crate tempdir;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
@@ -18,7 +18,7 @@ use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
-use fs::{self, Dir, File, FileContent, GlobMatch, Link, PathGlob, PathGlobIncludeEntry, PathGlobs,
+use fs::{self, Dir, File, FileContent, Link, PathGlobs,
          PathStat, StrictGlobMatching, StoreFileByDigest, VFS};
 use hashing;
 use rule_graph;

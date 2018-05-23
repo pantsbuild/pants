@@ -38,12 +38,11 @@ extern crate tempdir;
 extern crate testutil;
 
 use std::cmp::min;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashSet;
 use std::io::{self, Read};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
-use std::time::Instant;
 use std::{fmt, fs};
 
 use bytes::Bytes;
