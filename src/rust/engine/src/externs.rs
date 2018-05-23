@@ -303,21 +303,6 @@ impl From<Result<(), String>> for PyResult {
   }
 }
 
-lazy_static! {
-  static ref PYTHON_TRUE: Value = eval("True").unwrap();
-  static ref PYTHON_FALSE: Value = eval("False").unwrap();
-}
-
-impl From<bool> for Value {
-  fn from(arg: bool) -> Self {
-    if arg {
-      PYTHON_TRUE.clone()
-    } else {
-      PYTHON_FALSE.clone()
-    }
-  }
-}
-
 // Only constructed from the python side.
 #[allow(dead_code)]
 #[repr(u8)]
