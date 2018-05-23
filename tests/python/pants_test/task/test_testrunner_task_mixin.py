@@ -203,8 +203,9 @@ class TestRunnerTaskMixinSimpleTimeoutTest(TaskTestBase):
 
 class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
 
-  def create_process_handler(self, poll_returns):
+  def create_process_handler(self, poll_returns, wait_succeeds):
     poll_return_values = iter(poll_returns)
+    wait_succeeds_values = iter(wait_succeeds)
 
     class FakeProcessHandler(ProcessHandler):
       call_list = []
@@ -212,7 +213,10 @@ class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
 
       def wait(self, timeout=None):
         self.call_list.append(['process_handler.wait'])
-        raise subprocess.TimeoutExpired(cmd='', timeout=timeout)
+        if next(wait_succeeds_values):
+          return 0
+        else:
+          raise subprocess.TimeoutExpired(cmd='', timeout=timeout)
 
       def kill(self):
         self.call_list.append(['process_handler.kill'])
@@ -273,8 +277,9 @@ class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
 
       yield
 
-  def test_graceful_terminate_if_poll_is_none(self):
-    self.process_handler = self.create_process_handler(poll_returns=[None, -1])
+  def test_graceful_kill_if_terminate_expires(self):
+    self.process_handler = self.create_process_handler(poll_returns=[None],
+                                                       wait_succeeds=[False, False])
     self.set_options(timeouts=True)
     task = self.create_task(self.context())
 
@@ -287,11 +292,12 @@ class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
                      [[u'process_handler.wait'],
                       [u'process_handler.poll'],
                       [u'process_handler.terminate'],
-                      [u'process_handler.poll'],
+                      [u'process_handler.wait'],
                       [u'process_handler.kill']])
 
-  def test_graceful_terminate_if_poll_is_zero(self):
-    self.process_handler = self.create_process_handler(poll_returns=[-1, 0])
+  def test_graceful_terminate(self):
+    self.process_handler = self.create_process_handler(poll_returns=[None],
+                                                       wait_succeeds=[False, True])
 
     self.set_options(timeouts=True)
     task = self.create_task(self.context())
@@ -305,7 +311,7 @@ class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
                      [[u'process_handler.wait'],
                       [u'process_handler.poll'],
                       [u'process_handler.terminate'],
-                      [u'process_handler.poll']])
+                      [u'process_handler.wait']])
 
 
 class TestRunnerTaskMixinMultipleTargets(TaskTestBase):
@@ -319,14 +325,14 @@ class TestRunnerTaskMixinMultipleTargets(TaskTestBase):
         self._spawn_and_wait()
 
       def _spawn(self, *args, **kwargs):
-        timeouts = self.get_options().timeouts
+        terminate_wait = self.get_options().timeout_terminate_wait
 
         class FakeProcessHandler(ProcessHandler):
           def wait(_, timeout=None):
-            self.wait_time = timeout
-            if timeouts and timeout:
-              raise subprocess.TimeoutExpired(cmd='', timeout=timeout)
-            return 0
+            # If this is not a call to `wait` for the termination timeout, count it.
+            if timeout != terminate_wait:
+              self.wait_time = timeout
+            raise subprocess.TimeoutExpired(cmd='', timeout=timeout)
 
           def kill(_):
             pass
@@ -351,13 +357,8 @@ class TestRunnerTaskMixinMultipleTargets(TaskTestBase):
     return TestRunnerTaskMixinMultipleTargetsTask
 
   def test_multiple_targets(self):
-    self.set_options(timeouts=True)
+    self.set_options(timeouts=True, timeout_terminate_wait=1337)
     task = self.create_task(self.context())
-
-    # The targetA has a `None` timeout which disables all timeouts for this batch.
-    task.current_targets = [targetA, targetB, targetC]
-    task.execute()
-    self.assertEqual(None, task.wait_time)
 
     task.current_targets = [targetB]
     with self.assertRaises(ErrorWhileTesting) as cm:

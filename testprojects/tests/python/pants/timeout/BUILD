@@ -10,3 +10,8 @@ python_tests(
   name = 'ignores_terminate',
   sources = ['test_ignores_terminate.py']
 )
+
+python_tests(
+  name = 'terminates_self',
+  sources = ['test_terminates_self.py']
+)

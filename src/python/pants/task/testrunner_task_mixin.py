@@ -9,7 +9,6 @@ import os
 import re
 import xml.etree.ElementTree as ET
 from abc import abstractmethod
-from threading import Timer
 
 from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.build_graph.files import Files
@@ -260,21 +259,19 @@ class TestRunnerTaskMixin(object):
     process_handler = self._spawn(*args, **kwargs)
 
     def maybe_terminate(wait_time):
-      if process_handler.poll() < 0:
+      polled_result = process_handler.poll()
+      if polled_result is None:
         process_handler.terminate()
 
-        def kill_if_not_terminated():
-          if process_handler.poll() < 0:
-            # We can't use the context logger because it might not exist when this delayed function
-            # is executed by the Timer below.
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warn('Timed out test did not terminate gracefully after {} seconds, killing...'
-                        .format(wait_time))
-            process_handler.kill()
+        try:
+          process_handler.wait(timeout=wait_time)
+        except subprocess.TimeoutExpired:
+          self.context.log.warn(
+            'Timed out test did not terminate gracefully after {} seconds, killing...'.format(wait_time))
+          process_handler.kill()
 
-        timer = Timer(wait_time, kill_if_not_terminated)
-        timer.start()
+      elif polled_result < 0:
+        self.context.log.error('FAILURE: Test was killed by signal {}.'.format(-polled_result))
 
     try:
       return process_handler.wait(timeout=timeout)

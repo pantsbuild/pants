@@ -61,6 +61,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/python/pants/dummies:failing_target',
       'testprojects/tests/scala/org/pantsbuild/testproject/non_exports:C',
       'testprojects/src/scala/org/pantsbuild/testproject/exclude_direct_dep',
+      'testprojects/tests/python/pants/timeout:terminates_self',
       # These don't pass without special config.
       'testprojects/tests/java/org/pantsbuild/testproject/depman:new-tests',
       'testprojects/tests/java/org/pantsbuild/testproject/depman:old-tests',
