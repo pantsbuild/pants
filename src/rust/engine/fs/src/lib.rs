@@ -775,8 +775,6 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     let context = self.clone();
     let exclude = exclude.clone();
 
-    // eprintln!("directory_listing: symbolic_path={:?}, wildcard={:?}", symbolic_path, wildcard);
-
     self
       .scandir(canonical_dir)
       .and_then(move |dir_listing| {
@@ -890,14 +888,6 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
       })
     }).and_then(move |final_expansion| {
       // Finally, capture the resulting PathStats from the expansion.
-      // FIXME: do the expansion checking here, if the path_globs says to
-      // let computation_time = start.elapsed();
-      // eprintln!(
-      //   "computation_time: {:?}, all_outputs: {:?}",
-      //   computation_time,
-      //   all_outputs.iter().collect::<IndexSet<_>>(),
-      // );
-
       let PathGlobsExpansion {
         completed, outputs, ..
       } = final_expansion;
@@ -943,7 +933,6 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
           }
         }
 
-        eprintln!("non_matching_inputs: {:?}", non_matching_inputs);
         if !non_matching_inputs.is_empty() {
           let zsh_style_globs: Vec<_> = non_matching_inputs
             .into_iter()
@@ -954,7 +943,6 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
             "???/globs with exclude patterns {:?} did not match: {:?}",
             exclude, zsh_style_globs
           );
-          eprintln!("msg: {}", msg);
           if strict_match_behavior.should_throw_on_error() {
             return future::err(Self::mk_error(&msg));
           } else {

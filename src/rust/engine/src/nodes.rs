@@ -669,9 +669,7 @@ impl Snapshot {
     let include = externs::project_multi_strs(item, "include");
     let exclude = externs::project_multi_strs(item, "exclude");
     let glob_match_error_behavior = externs::project_str(item, "glob_match_error_behavior");
-    eprintln!("glob_match_error_behavior: {:?}", glob_match_error_behavior);
     let strict_glob_matching = StrictGlobMatching::create(glob_match_error_behavior)?;
-    eprintln!("strict_glob_matching: {:?}", strict_glob_matching);
     PathGlobs::create_with_match_behavior(
       &include,
       &exclude,
