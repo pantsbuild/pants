@@ -83,7 +83,7 @@ pub struct File {
   pub is_executable: bool,
 }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum PathStat {
   Dir {
     // The symbolic name of some filesystem Path, which is context specific.
@@ -122,15 +122,6 @@ impl PathStat {
   }
 }
 
-impl fmt::Debug for PathStat {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    match self {
-      &PathStat::Dir { ref path, .. } => write!(f, "Dir(path={:?})", path),
-      &PathStat::File { ref path, .. } => write!(f, "File(path={:?})", path),
-    }
-  }
-}
-
 lazy_static! {
   static ref PARENT_DIR: &'static str = "..";
   static ref SINGLE_STAR_GLOB: Pattern = Pattern::new("*").unwrap();
@@ -152,17 +143,12 @@ pub enum PathGlob {
     wildcard: Pattern,
     remainder: Vec<Pattern>,
   },
-  RecursiveWildcard {
-    canonical_dir: Dir,
-    symbolic_path: PathBuf,
-    remainder: Vec<Pattern>,
-  },
 }
 
 #[derive(Clone, Debug)]
 pub struct PathGlobIncludeEntry {
   pub input: String,
-  pub glob: PathGlob,
+  pub globs: Vec<PathGlob>,
 }
 
 impl PathGlob {
@@ -189,14 +175,26 @@ impl PathGlob {
   }
 
   pub fn create(filespecs: &[String]) -> Result<Vec<PathGlob>, String> {
-    filespecs
-      .iter()
-      .filter_map(|filespec| {
-        let canonical_dir = Dir(PathBuf::new());
-        let symbolic_path = PathBuf::new();
-        Some(PathGlob::parse(canonical_dir, symbolic_path, filespec))
-      })
-      .collect()
+    let filespecs_globs = Self::spread_filespecs(filespecs)?;
+    let all_globs = Self::flatten_entries(filespecs_globs);
+    Ok(all_globs)
+  }
+
+  pub fn flatten_entries(entries: Vec<PathGlobIncludeEntry>) -> Vec<PathGlob> {
+    entries.into_iter().flat_map(|entry| entry.globs).collect()
+  }
+
+  pub fn spread_filespecs(filespecs: &[String]) -> Result<Vec<PathGlobIncludeEntry>, String> {
+    let mut spec_globs_map = Vec::new();
+    for filespec in filespecs {
+      let canonical_dir = Dir(PathBuf::new());
+      let symbolic_path = PathBuf::new();
+      spec_globs_map.push(PathGlobIncludeEntry {
+        input: filespec.clone(),
+        globs: PathGlob::parse(canonical_dir, symbolic_path, filespec)?,
+      });
+    }
+    Ok(spec_globs_map)
   }
 
   ///
@@ -204,7 +202,11 @@ impl PathGlob {
   /// while eliminating consecutive '**'s (to avoid repetitive traversing), and parse it to a
   /// series of PathGlob objects.
   ///
-  fn parse(canonical_dir: Dir, symbolic_path: PathBuf, filespec: &str) -> Result<PathGlob, String> {
+  fn parse(
+    canonical_dir: Dir,
+    symbolic_path: PathBuf,
+    filespec: &str,
+  ) -> Result<Vec<PathGlob>, String> {
     let mut parts = Vec::new();
     let mut prev_was_doublestar = false;
     for component in Path::new(filespec).components() {
@@ -229,40 +231,57 @@ impl PathGlob {
         .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", filespec, e))?);
     }
 
-    PathGlob::parse_glob(canonical_dir, symbolic_path, &parts)
+    PathGlob::parse_globs(canonical_dir, symbolic_path, &parts)
   }
 
   ///
   /// Given a filespec as Patterns, create a series of PathGlob objects.
   ///
-  // FIXME: add as_zsh_glob() method which generates a string from the available PathGlob info, and
-  // then run tests to ensure that parse() and as_zsh_globs() match up!!!!
-  fn parse_glob(
+  fn parse_globs(
     canonical_dir: Dir,
     symbolic_path: PathBuf,
     parts: &[Pattern],
-  ) -> Result<PathGlob, String> {
-    // Slice pattern syntax would make this really nice.
+  ) -> Result<Vec<PathGlob>, String> {
     if parts.is_empty() {
-      return Err(String::from("???/this should never happen"));
-    }
-    let first_component = &parts[0];
-    let remainder = &parts[1..];
+      Ok(vec![])
+    } else if *DOUBLE_STAR == parts[0].as_str() {
+      if parts.len() == 1 {
+        // Per https://git-scm.com/docs/gitignore:
+        //  "A trailing '/**' matches everything inside. For example, 'abc/**' matches all files
+        //  inside directory "abc", relative to the location of the .gitignore file, with infinite
+        //  depth."
+        return Ok(vec![
+          PathGlob::dir_wildcard(
+            canonical_dir.clone(),
+            symbolic_path.clone(),
+            SINGLE_STAR_GLOB.clone(),
+            vec![DOUBLE_STAR_GLOB.clone()],
+          ),
+          PathGlob::wildcard(canonical_dir, symbolic_path, SINGLE_STAR_GLOB.clone()),
+        ]);
+      }
 
-    // Syntax for variable string expressions in matches would be nice too.
-    if *DOUBLE_STAR == first_component.as_str() {
-      let non_recursive_remainder: Vec<_> = remainder
-        .to_vec()
-        .clone()
-        .into_iter()
-        .skip_while(|part| *DOUBLE_STAR == part.as_str())
-        .collect();
-      Ok(PathGlob::RecursiveWildcard {
-        canonical_dir,
-        symbolic_path,
-        remainder: non_recursive_remainder,
-      })
-    } else if *PARENT_DIR == first_component.as_str() {
+      // There is a double-wildcard in a dirname of the path: double wildcards are recursive,
+      // so there are two remainder possibilities: one with the double wildcard included, and the
+      // other without.
+      let pathglob_with_doublestar = PathGlob::dir_wildcard(
+        canonical_dir.clone(),
+        symbolic_path.clone(),
+        SINGLE_STAR_GLOB.clone(),
+        parts[0..].to_vec(),
+      );
+      let pathglob_no_doublestar = if parts.len() == 2 {
+        PathGlob::wildcard(canonical_dir, symbolic_path, parts[1].clone())
+      } else {
+        PathGlob::dir_wildcard(
+          canonical_dir,
+          symbolic_path,
+          parts[1].clone(),
+          parts[2..].to_vec(),
+        )
+      };
+      Ok(vec![pathglob_with_doublestar, pathglob_no_doublestar])
+    } else if *PARENT_DIR == parts[0].as_str() {
       // A request for the parent of `canonical_dir`: since we've already expanded the directory
       // to make it canonical, we can safely drop it directly and recurse without this component.
       // The resulting symbolic path will continue to contain a literal `..`.
@@ -275,67 +294,22 @@ impl PathGlob {
         ));
       }
       symbolic_path_parent.push(Path::new(*PARENT_DIR));
-      PathGlob::parse_glob(canonical_dir_parent, symbolic_path_parent, remainder)
-    } else if remainder.is_empty() {
+      PathGlob::parse_globs(canonical_dir_parent, symbolic_path_parent, &parts[1..])
+    } else if parts.len() == 1 {
       // This is the path basename.
-      Ok(PathGlob::wildcard(
-        canonical_dir,
-        symbolic_path,
-        first_component.clone(),
-      ))
+      Ok(vec![
+        PathGlob::wildcard(canonical_dir, symbolic_path, parts[0].clone()),
+      ])
     } else {
       // This is a path dirname.
-      Ok(PathGlob::dir_wildcard(
-        canonical_dir,
-        symbolic_path,
-        first_component.clone(),
-        remainder.to_vec(),
-      ))
-    }
-  }
-
-  // FIXME: make this!!!
-  fn as_zsh_style_glob(&self) -> String {
-    match self {
-      &PathGlob::Wildcard {
-        ref symbolic_path,
-        ref wildcard,
-        ..
-      } => {
-        let wildcard_path = Path::new(wildcard.as_str());
-        format!("{:?}", symbolic_path.join(wildcard_path))
-      }
-      &PathGlob::DirWildcard {
-        ref symbolic_path,
-        ref wildcard,
-        ref remainder,
-        ..
-      } => {
-        let wildcard_path = Path::new(wildcard.as_str());
-        let pattern_path = remainder.into_iter().fold(
-          symbolic_path.join(wildcard_path),
-          |cur_path, cur_pattern| {
-            let cur_pattern_path = Path::new(cur_pattern.as_str());
-            cur_path.join(cur_pattern_path)
-          },
-        );
-        format!("{:?}", pattern_path)
-      }
-      &PathGlob::RecursiveWildcard {
-        ref symbolic_path,
-        ref remainder,
-        ..
-      } => {
-        let wildcard_path = Path::new(*DOUBLE_STAR);
-        let pattern_path = remainder.into_iter().fold(
-          symbolic_path.join(wildcard_path),
-          |cur_path, cur_pattern| {
-            let cur_pattern_path = Path::new(cur_pattern.as_str());
-            cur_path.join(cur_pattern_path)
-          },
-        );
-        format!("{:?}", pattern_path)
-      }
+      Ok(vec![
+        PathGlob::dir_wildcard(
+          canonical_dir,
+          symbolic_path,
+          parts[0].clone(),
+          parts[1..].to_vec(),
+        ),
+      ])
     }
   }
 }
@@ -417,6 +391,7 @@ impl PathGlobs {
   }
 
   pub fn from_globs(include: Vec<PathGlob>) -> Result<PathGlobs, String> {
+    // An empty exclude becomes EMPTY_IGNORE.
     PathGlobs::create_with_globs_and_match_behavior(include, &vec![], StrictGlobMatching::Ignore)
   }
 }
@@ -934,18 +909,15 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
         }
 
         if !non_matching_inputs.is_empty() {
-          let zsh_style_globs: Vec<_> = non_matching_inputs
-            .into_iter()
-            .map(|glob| glob.as_zsh_style_glob())
-            .collect();
           // TODO: explain what global option to set to modify this behavior!
           let msg = format!(
             "???/globs with exclude patterns {:?} did not match: {:?}",
-            exclude, zsh_style_globs
+            exclude, non_matching_inputs
           );
           if strict_match_behavior.should_throw_on_error() {
             return future::err(Self::mk_error(&msg));
           } else {
+            // FIXME: doesn't seem to do anything?
             warn!("{}", msg);
           }
         }
@@ -972,7 +944,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     // references.
     match path_glob.clone() {
       PathGlob::Wildcard { canonical_dir, symbolic_path, wildcard } =>
-      // Filter directory listing to return PathStats, with no continuation.
+        // Filter directory listing to return PathStats, with no continuation.
         self.directory_listing(canonical_dir, symbolic_path, wildcard, exclude)
         .map(move |path_stats| SingleExpansionResult {
           path_glob,
@@ -983,66 +955,30 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
       PathGlob::DirWildcard { canonical_dir, symbolic_path, wildcard, remainder } =>
         // Filter directory listing and request additional PathGlobs for matched Dirs.
         self.directory_listing(canonical_dir, symbolic_path, wildcard, exclude)
-        .and_then(move |path_stats| {
-          let new_globs = path_stats
-            .clone()
-            .into_iter()
-            .filter_map(|ps| match ps {
-              PathStat::Dir { path, stat } =>
-                Some(
-                  PathGlob::parse_glob(stat, path, &remainder)
-                    .map_err(|e| Self::mk_error(e.as_str()))
-                ),
-              PathStat::File { .. } => None,
-            })
-            .collect::<Result<Vec<_>, E>>();
-          future::result(new_globs)
-            .map(move |globs| SingleExpansionResult {
+          .and_then(move |path_stats| {
+            path_stats.into_iter()
+              .filter_map(|ps| match ps {
+                PathStat::Dir { path, stat } =>
+                  Some(
+                    PathGlob::parse_globs(stat, path, &remainder)
+                      .map_err(|e| Self::mk_error(e.as_str()))
+                  ),
+                PathStat::File { .. } => None,
+              })
+              .collect::<Result<Vec<_>, E>>()
+          })
+          .map(move |path_globs| {
+            let flattened =
+              path_globs.into_iter()
+                .flat_map(|path_globs| path_globs.into_iter())
+              .collect();
+            SingleExpansionResult {
               path_glob,
               path_stats: vec![],
-              globs,
+              globs: flattened,
+            }
           })
-        })
-        .to_boxed(),
-      PathGlob::RecursiveWildcard { canonical_dir, symbolic_path, remainder } => {
-        self.directory_listing(canonical_dir, symbolic_path, SINGLE_STAR_GLOB.clone(), exclude)
-        .and_then(move |path_stats| {
-          let new_globs = path_stats
-            .clone()
-            .into_iter()
-            .filter_map(|ps| match ps {
-              PathStat::Dir { path, stat } => {
-                let mut remainder_with_doublestar = Vec::new();
-                remainder_with_doublestar.push(DOUBLE_STAR_GLOB.clone());
-                remainder_with_doublestar.extend(remainder.clone());
-
-                let results = vec![
-                  PathGlob::parse_glob(stat.clone(), path.clone(), &remainder),
-                  Ok(PathGlob::RecursiveWildcard {
-                    canonical_dir: stat.clone(),
-                    symbolic_path: path.clone(),
-                    remainder: remainder.clone(),
-                  }),
-                ];
-                let joined = results
-                   .into_iter()
-                   .map(|parsed| parsed.map_err(|e| Self::mk_error(e.as_str())))
-                   .filter_map(|ps| Some(ps))
-                   .collect::<Result<Vec<_>, E>>();
-                Some(joined)
-              },
-              PathStat::File { .. } => None,
-            })
-            .collect::<Result<Vec<_>, E>>();
-          future::result(new_globs)
-            .map(|all_globs| all_globs.into_iter().flat_map(|ps| ps).collect())
-            .map(move |globs| SingleExpansionResult {
-              path_glob,
-              path_stats: vec![],
-              globs,
-          })
-        }).to_boxed()
-      }
+          .to_boxed(),
     }
   }
 }
