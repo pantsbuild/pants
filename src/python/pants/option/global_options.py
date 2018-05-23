@@ -16,34 +16,45 @@ from pants.option.custom_types import dir_option
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
+from pants.util.memo import memoized_method
 from pants.util.objects import datatype
 
 
-class GlobMatchErrorBehavior(datatype([('failure_behavior', str)])):
+class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
 
-  allowed_values = ['ignore', 'warn', 'error']
+  IGNORE = 'ignore'
+  WARN = 'warn'
+  ERROR = 'error'
 
-  default_value = 'ignore'
+  ranked_values = [IGNORE, WARN, ERROR]
 
-  default_option_value = 'warn'
+  default_value = IGNORE
+
+  default_option_value = WARN
+
+  # FIXME(cosmicexplorer): add helpers in pants.util.memo for class properties and memoized class
+  # properties!
+  @classmethod
+  @memoized_method
+  def _singletons(cls):
+    ret = {}
+    for idx, behavior in enumerate(cls.ranked_values):
+      ret[behavior] = {
+        'singleton_object': cls(behavior),
+        # FIXME(cosmicexplorer): use this 'priority' field to implement a method of per-target
+        # selection of this behavior as well as the command-line.
+        'priority': idx,
+      }
+    return ret
 
   @classmethod
   def create(cls, value=None):
-    if not value:
-      value = cls.default_value
     if isinstance(value, cls):
       return value
-    return cls(str(value))
+    if not value:
+      value = cls.default_value
+    return cls._singletons()[value]['singleton_object']
 
-  def __new__(cls, *args, **kwargs):
-    this_object = super(GlobMatchErrorBehavior, cls).__new__(cls, *args, **kwargs)
-
-    if this_object.failure_behavior not in cls.allowed_values:
-      raise cls.make_type_error(
-        "Value {!r} for failure_behavior must be one of: {!r}."
-        .format(this_object.failure_behavior, cls.allowed_values))
-
-    return this_object
 
 class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
   options_scope = GLOBAL_SCOPE
@@ -272,9 +283,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
     # TODO(cosmicexplorer): Make a custom type abstract class to automate the production of an
-    # option with specific allowed values from a datatype.
+    # option with specific allowed values from a datatype. Also consider whether "ranking" as in
+    # GlobMatchErrorBehavior is something that should be generalized.
     register('--glob-expansion-failure', type=str,
-             choices=GlobMatchErrorBehavior.allowed_values,
+             choices=GlobMatchErrorBehavior.ranked_values,
              default=GlobMatchErrorBehavior.default_option_value,
              help="Raise an exception if any targets declaring source files "
                   "fail to match any glob provided in the 'sources' argument.")

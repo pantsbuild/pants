@@ -46,9 +46,7 @@ def parse_address_family(address_mapper, directory):
 
   The AddressFamily may be empty, but it will not be None.
   """
-  logger.debug("directory: {}".format(directory))
   patterns = tuple(join(directory.path, p) for p in address_mapper.build_patterns)
-  logger.debug("patterns: {}".format(patterns))
   path_globs = PathGlobs.create('',
                                 include=patterns,
                                 exclude=address_mapper.build_ignore_patterns)
