@@ -18,8 +18,8 @@ use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
-use fs::{self, Dir, File, FileContent, Link, PathGlobs,
-         PathStat, StrictGlobMatching, StoreFileByDigest, VFS};
+use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDigest,
+         StrictGlobMatching, VFS};
 use hashing;
 use process_execution::{self, CommandRunner};
 use rule_graph;
@@ -669,13 +669,11 @@ impl Snapshot {
   pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
     let include = externs::project_multi_strs(item, "include");
     let exclude = externs::project_multi_strs(item, "exclude");
-    let glob_match_error_behavior = externs::project_str(item, "glob_match_error_behavior");
-    let strict_glob_matching = StrictGlobMatching::create(glob_match_error_behavior)?;
-    PathGlobs::create_with_match_behavior(
-      &include,
-      &exclude,
-      strict_glob_matching,
-    ).map_err(|e| {
+    let glob_match_error_behavior =
+      externs::project_ignoring_type(item, "glob_match_error_behavior");
+    let failure_behavior = externs::project_str(&glob_match_error_behavior, "failure_behavior");
+    let strict_glob_matching = StrictGlobMatching::create(failure_behavior)?;
+    PathGlobs::create_with_match_behavior(&include, &exclude, strict_glob_matching).map_err(|e| {
       format!(
         "Failed to parse PathGlobs for include({:?}), exclude({:?}): {}",
         include, exclude, e

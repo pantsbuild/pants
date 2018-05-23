@@ -33,7 +33,7 @@ class Path(datatype(['path', 'stat'])):
 class PathGlobs(datatype([
     'include',
     'exclude',
-    'glob_match_error_behavior',
+    ('glob_match_error_behavior', GlobMatchErrorBehavior),
 ])):
   """A wrapper around sets of filespecs to include and exclude.
 
@@ -45,8 +45,7 @@ class PathGlobs(datatype([
       cls,
       include,
       exclude,
-      # TODO: ???/ensures it's a valid string value
-      GlobMatchErrorBehavior.create(glob_match_error_behavior).failure_behavior)
+      GlobMatchErrorBehavior.create(glob_match_error_behavior))
 
   def with_match_error_behavior(self, glob_match_error_behavior):
     return PathGlobs(
