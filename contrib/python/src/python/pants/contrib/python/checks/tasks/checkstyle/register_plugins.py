@@ -18,9 +18,9 @@ from pants.contrib.python.checks.tasks.checkstyle.missing_contextmanager_subsyst
 from pants.contrib.python.checks.tasks.checkstyle.new_style_classes_subsystem import \
   NewStyleClassesSubsystem
 from pants.contrib.python.checks.tasks.checkstyle.newlines_subsystem import NewlinesSubsystem
-from pants.contrib.python.checks.tasks.checkstyle.pep8_subsystem import PEP8Subsystem
 from pants.contrib.python.checks.tasks.checkstyle.print_statements_subsystem import \
   PrintStatementsSubsystem
+from pants.contrib.python.checks.tasks.checkstyle.pycodestyle_subsystem import PyCodeStyleSubsystem
 from pants.contrib.python.checks.tasks.checkstyle.pyflakes_subsystem import FlakeCheckSubsystem
 from pants.contrib.python.checks.tasks.checkstyle.trailing_whitespace_subsystem import \
   TrailingWhitespaceSubsystem
@@ -41,4 +41,4 @@ def register_plugins(task):
   task.register_plugin('pyflakes', FlakeCheckSubsystem)
   task.register_plugin('trailing-whitespace', TrailingWhitespaceSubsystem)
   task.register_plugin('variable-names', VariableNamesSubsystem)
-  task.register_plugin('pep8', PEP8Subsystem)
+  task.register_plugin('pycodestyle', PyCodeStyleSubsystem)

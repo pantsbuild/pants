@@ -11,7 +11,7 @@ from pants.contrib.python.checks.tasks.checkstyle.common import CheckstylePlugin
 
 
 # TODO(wickman) Update this to sanitize line continuation styling as we have
-# disabled it from pep8.py due to mismatched indentation styles.
+# disabled it from pycodestyle.py due to mismatched indentation styles.
 class Indentation(CheckstylePlugin):
   """Enforce proper indentation."""
   INDENT_LEVEL = 2  # the one true way

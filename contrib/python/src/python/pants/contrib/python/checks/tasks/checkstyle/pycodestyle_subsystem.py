@@ -8,10 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import PluginSubsystemBase
 
 
-class PEP8Subsystem(PluginSubsystemBase):
-  options_scope = 'pycheck-pep8'
+class PyCodeStyleSubsystem(PluginSubsystemBase):
+  options_scope = 'pycheck-pycodestyle'
 
-  # Code reference is here: https://pep8.readthedocs.io/en/latest/intro.html#error-codes
+  deprecated_options_scope = 'pycheck-pep8'
+  deprecated_options_scope_removal_version = '1.10.0.dev0'
+
+  # Code reference is here: https://pycodestyle.readthedocs.io/en/latest/intro.html#error-codes
   DEFAULT_IGNORE_CODES = (
     # continuation_line_indentation
     'E121', # continuation line under-indented for hanging indent
@@ -36,7 +39,7 @@ class PEP8Subsystem(PluginSubsystemBase):
     #     class Error(Exception): pass
     #     class DerpError(Error): pass
     #     class HerpError(Error): pass
-    # We disable the pep8.py checking for these and instead have a more lenient filter
+    # We disable the pycodestyle.py checking for these and instead have a more lenient filter
     # in the whitespace checker.
     'E701', # multiple statements on one line (colon)
     'E301', # expected 1 blank line, found 0
@@ -46,12 +49,12 @@ class PEP8Subsystem(PluginSubsystemBase):
 
   @classmethod
   def register_options(cls, register):
-    super(PEP8Subsystem, cls).register_options(register)
+    super(PyCodeStyleSubsystem, cls).register_options(register)
     register('--ignore', fingerprint=True, type=list, default=cls.DEFAULT_IGNORE_CODES,
              help='Prevent test failure but still produce output for problems.')
     register('--max-length', fingerprint=True, type=int, default=100,
-             help='Max line length to use for PEP8 checks.')
+             help='Max line length to use for pycodestyle checks.')
 
   def get_plugin_type(self):
-    from pants.contrib.python.checks.tasks.checkstyle.pep8 import PEP8Checker
-    return PEP8Checker
+    from pants.contrib.python.checks.tasks.checkstyle.pycodestyle import PyCodeStyleChecker
+    return PyCodeStyleChecker
