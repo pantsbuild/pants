@@ -23,8 +23,8 @@ class WireGenTest(TaskTestBase):
   def task_type(cls):
     return WireGen
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return register_core().merge(register_codegen())
 
   def _create_fake_wire_tool(self, version='1.8.0'):

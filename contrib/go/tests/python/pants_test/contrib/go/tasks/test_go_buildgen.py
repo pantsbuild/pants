@@ -43,8 +43,8 @@ class GoBuildgenTest(TaskTestBase):
     task.get_fetcher_factory = types.MethodType(lambda s: FakeFetcherFactory(), task)
     return task
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     # Needed for test_stitch_deps_remote_existing_rev_respected which re-loads a synthetic target
     # from a generated BUILD file on disk that needs access to Go target aliases
     return register.build_file_aliases()

@@ -17,7 +17,6 @@ from textwrap import dedent
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
-from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.target_roots import TargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -32,6 +31,7 @@ from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin
 from pants.util.dirutil import (recursive_dirname, relative_symlink, safe_mkdir, safe_open,
                                 safe_rmtree)
+from pants.util.memo import memoized_method
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.engine.util import init_native
 from pants_test.option.util.fakes import create_options_for_optionables
@@ -74,6 +74,10 @@ class TestBase(unittest.TestCase):
 
   :API: public
   """
+
+  _scheduler = None
+  _build_graph = None
+  _address_mapper = None
 
   def build_path(self, relpath):
     """Returns the canonical BUILD file path for the given relative build path.
@@ -231,26 +235,12 @@ class TestBase(unittest.TestCase):
 
     return target
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     """
     :API: public
     """
     return BuildFileAliases(targets={'target': Target})
-
-  @property
-  def pants_ignore_patterns(self):
-    """
-    :API: public
-    """
-    return None
-
-  @property
-  def build_ignore_patterns(self):
-    """
-    :API: public
-    """
-    return None
 
   def setUp(self):
     """
@@ -260,14 +250,16 @@ class TestBase(unittest.TestCase):
     # Avoid resetting the Runtracker here, as that is specific to fork'd process cleanup.
     clean_global_runtime_state(reset_subsystem=True)
 
-    self.real_build_root = BuildRoot().path
+    self.addCleanup(self._reset_engine)
 
-    self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
-    self.subprocess_dir = os.path.join(self.build_root, '.pids')
+    safe_mkdir(self.build_root, clean=True)
+    safe_mkdir(self.pants_workdir)
     self.addCleanup(safe_rmtree, self.build_root)
 
-    self.pants_workdir = os.path.join(self.build_root, '.pants.d')
-    safe_mkdir(self.pants_workdir)
+    BuildRoot().path = self.build_root
+    self.addCleanup(BuildRoot().reset)
+
+    self.subprocess_dir = os.path.join(self.build_root, '.pids')
 
     self.options = defaultdict(dict)  # scope -> key-value mapping.
     self.options[''] = {
@@ -283,15 +275,9 @@ class TestBase(unittest.TestCase):
       'write_to': [],
     }
 
-    BuildRoot().path = self.build_root
-    self.addCleanup(BuildRoot().reset)
-
     self._build_configuration = BuildConfiguration()
-    self._build_configuration.register_aliases(self.alias_groups)
+    self._build_configuration.register_aliases(self.alias_groups())
     self._build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
-    self.project_tree = FileSystemProjectTree(self.build_root)
-
-    self._reset_engine()
 
   def buildroot_files(self, relpath=None):
     """Returns the set of all files under the test build root.
@@ -309,42 +295,65 @@ class TestBase(unittest.TestCase):
     return set(scan())
 
   def _reset_engine(self):
-    scheduler = getattr(self, '_scheduler', None)
-    if scheduler is not None:
+    if self._scheduler is not None:
+      self._build_graph.reset()
       # Eagerly free file handles, threads, connections, etc, held by the scheduler. In theory,
       # dropping the scheduler is equivalent, but it's easy for references to the scheduler to leak.
-      scheduler.pre_fork()
+      self._scheduler.pre_fork()
 
-    self._scheduler = None
-    self._build_graph = None
-    self._address_mapper = None
+  @property
+  def build_root(self):
+    return self._build_root()
 
-  def _initialize_engine(self):
-    graph_helper = EngineInitializer.setup_legacy_graph(
-        self.pants_ignore_patterns,
-        self.pants_workdir,
-        build_file_imports_behavior='allow',
-        native=init_native(),
-        build_file_aliases=self.alias_groups,
-        build_ignore_patterns=self.build_ignore_patterns,
-      ).new_session()
+  @property
+  def pants_workdir(self):
+    return self._pants_workdir()
 
-    self._scheduler = graph_helper.scheduler_session
-    self._build_graph, self._address_mapper = graph_helper.create_build_graph(
-        TargetRoots([]),
-        self.build_root,
+  @classmethod
+  @memoized_method
+  def _build_root(cls):
+    cls.real_build_root = BuildRoot().path
+    return os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
+
+  @classmethod
+  @memoized_method
+  def _pants_workdir(cls):
+    return os.path.join(cls._build_root(), '.pants.d')
+
+  @classmethod
+  def _init_engine(cls):
+    if cls._scheduler is not None:
+      return
+
+    graph_session = EngineInitializer.setup_legacy_graph(
+      pants_ignore_patterns=None,
+      workdir=cls._pants_workdir(),
+      build_file_imports_behavior='allow',
+      native=init_native(),
+      build_file_aliases=cls.alias_groups(),
+      build_ignore_patterns=None,
+    ).new_session()
+    cls._scheduler = graph_session.scheduler_session
+    cls._build_graph, cls._address_mapper = graph_session.create_build_graph(
+        TargetRoots([]), cls._build_root()
       )
+
+  @property
+  def scheduler(self):
+    if self._scheduler is None:
+      self._init_engine()
+    return self._scheduler
 
   @property
   def address_mapper(self):
     if self._address_mapper is None:
-      self._initialize_engine()
+      self._init_engine()
     return self._address_mapper
 
   @property
   def build_graph(self):
     if self._build_graph is None:
-      self._initialize_engine()
+      self._init_engine()
     return self._build_graph
 
   def reset_build_graph(self, reset_build_files=False, delete_build_files=False):
@@ -356,7 +365,7 @@ class TestBase(unittest.TestCase):
           os.remove(os.path.join(self.build_root, f))
       self._invalidate_for(*files)
     if self._build_graph is not None:
-      self._build_graph = self._build_graph.clone_new()
+      self._build_graph.reset()
 
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
@@ -427,7 +436,6 @@ class TestBase(unittest.TestCase):
     """
     super(TestBase, self).tearDown()
     Subsystem.reset()
-    self._reset_engine()
 
   def target(self, spec):
     """Resolves the given target address to a Target object.
