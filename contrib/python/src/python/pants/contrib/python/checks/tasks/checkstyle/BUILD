@@ -5,7 +5,7 @@ python_library(
   name='all',
   sources=rglobs('*.py'),
   dependencies=[
-    '3rdparty/python:pep8',
+    '3rdparty/python:pycodestyle',
     '3rdparty/python:pyflakes',
     '3rdparty/python:pex',
     'src/python/pants/backend/python/targets:python',
