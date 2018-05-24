@@ -258,7 +258,7 @@ class AppBase(Target):
 
   @classmethod
   def binary_target_type(cls):
-    raise NotImplemented('Must implement in subclass (e.g.: `return PythonBinary`)')
+    raise NotImplementedError('Must implement in subclass (e.g.: `return PythonBinary`)')
 
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):
