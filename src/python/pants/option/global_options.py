@@ -31,7 +31,7 @@ class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
   WARN = 'warn'
   ERROR = 'error'
 
-  ranked_values = [IGNORE, WARN, ERROR]
+  allowed_values = [IGNORE, WARN, ERROR]
 
   default_value = IGNORE
 
@@ -42,7 +42,7 @@ class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
   @classmethod
   @memoized_method
   def _singletons(cls):
-    return { behavior: cls(behavior) for behavior in cls.ranked_values }
+    return { behavior: cls(behavior) for behavior in cls.allowed_values }
 
   @classmethod
   def create(cls, value=None):
@@ -51,6 +51,15 @@ class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
     if not value:
       value = cls.default_value
     return cls._singletons()[value]
+
+  def __new__(cls, *args, **kwargs):
+    this_object = super(GlobMatchErrorBehavior, cls).__new__(cls, *args, **kwargs)
+
+    if this_object.failure_behavior not in cls.allowed_values:
+      raise cls.make_type_error("Value {!r} for failure_behavior must be one of: {!r}."
+                                .format(this_object.failure_behavior, cls.allowed_values))
+
+    return this_object
 
 
 class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
@@ -282,7 +291,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # TODO(cosmicexplorer): Make a custom type abstract class to automate the production of an
     # option with specific allowed values from a datatype.
     register('--glob-expansion-failure', type=str,
-             choices=GlobMatchErrorBehavior.ranked_values,
+             choices=GlobMatchErrorBehavior.allowed_values,
              default=GlobMatchErrorBehavior.default_option_value,
              help="Raise an exception if any targets declaring source files "
                   "fail to match any glob provided in the 'sources' argument.")

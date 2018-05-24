@@ -178,12 +178,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       checker.assert_started()
 
   def test_pantsd_run(self):
-    with self.pantsd_successful_run_context('debug', extra_config={
-        GLOBAL_SCOPE_CONFIG_SECTION: {
-          # We don't want any warnings in this test.
-          'glob_expansion_failure': 'ignore',
-        }
-    }) as (pantsd_run, checker, workdir):
+    with self.pantsd_successful_run_context('debug') as (pantsd_run, checker, workdir):
       pantsd_run(['list', '3rdparty:'])
       checker.assert_started()
 

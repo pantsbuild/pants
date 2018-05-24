@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.option.global_options import GlobMatchErrorBehavior
+from pants.util.objects import TypeCheckError
 from pants_test.base_test import BaseTest
 
 
@@ -13,7 +14,7 @@ class GlobalOptionsTest(BaseTest):
 
   def test_exception_glob_match_constructor(self):
     # NB: 'allow' is not a valid value for GlobMatchErrorBehavior.
-    with self.assertRaises(TypeError) as cm:
+    with self.assertRaises(TypeCheckError) as cm:
       GlobMatchErrorBehavior(str('allow'))
     expected_msg = (
       """error: in constructor of type GlobMatchErrorBehavior: type check error:
