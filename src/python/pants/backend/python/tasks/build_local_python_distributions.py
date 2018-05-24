@@ -11,11 +11,13 @@ import shutil
 from contextlib import contextmanager
 
 from pex.interpreter import PythonInterpreter
+from wheel.install import WheelFile
 
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
+from pants.backend.python.tasks.pex_build_util import _resolve_multi
 from pants.backend.python.tasks.setup_py import SetupPyInvocationEnvironment, SetupPyRunner
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
@@ -45,7 +47,7 @@ class BuildLocalPythonDistributions(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(BuildLocalPythonDistributions, cls).implementation_version() + [('BuildLocalPythonDistributions', 1)]
+    return super(BuildLocalPythonDistributions, cls).implementation_version() + [('BuildLocalPythonDistributions', 2)]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -63,6 +65,38 @@ class BuildLocalPythonDistributions(Task):
   def filter_target(tgt):
     return type(tgt) is PythonDistribution
 
+  def _ensure_setup_requires_site_dir(self, dist_targets, interpreter, site_dir):
+    reqs_to_resolve = set()
+
+    for tgt in dist_targets:
+      for setup_req_lib_addr in tgt.setup_requires:
+        for req_lib in self.context.build_graph.resolve(setup_req_lib_addr):
+          for req in req_lib.requirements:
+            reqs_to_resolve.add(req)
+
+    if not reqs_to_resolve:
+      return None
+    self.context.log.debug('python_dist target(s) with setup_requires detected. '
+                           'Installing setup requirements: {}\n\n'
+                           .format([req.key for req in reqs_to_resolve]))
+
+    setup_requires_dists = _resolve_multi(interpreter, reqs_to_resolve, ['current'], None)
+
+    overrides = {
+      'purelib': site_dir,
+      'headers': os.path.join(site_dir, 'headers'),
+      'scripts': os.path.join(site_dir, 'bin'),
+      'platlib': site_dir,
+      'data': site_dir
+    }
+
+    # The `python_dist` target builds for the current platform only.
+    for obj in setup_requires_dists['current']:
+      wf = WheelFile(obj.location)
+      wf.install(overrides=overrides, force=True)
+
+    return site_dir
+
   def execute(self):
     dist_targets = self.context.targets(self.filter_target)
 
@@ -79,7 +113,9 @@ class BuildLocalPythonDistributions(Task):
                          'List any 3rd party requirements in the install_requirements argument '
                          'of your setup function.'
             )
-          self._create_dist(vt.target, vt.results_dir, interpreter)
+          setup_req_dir = os.path.join(vt.results_dir, 'setup_requires_site')
+          pythonpath = self._ensure_setup_requires_site_dir(dist_targets, interpreter, setup_req_dir)
+          self._create_dist(vt.target, vt.results_dir, interpreter, pythonpath)
 
         local_wheel_products = self.context.products.get('local_wheels')
         for vt in invalidation_check.all_vts:
@@ -117,20 +153,25 @@ class BuildLocalPythonDistributions(Task):
   # setup.py to be able to invoke our toolchain on hosts that already have a
   # compiler installed. Right now we just put our tools at the end of the PATH.
   @contextmanager
-  def _setup_py_invocation_environment(self):
+  def _setup_py_invocation_environment(self, pythonpath):
     setup_py_env = self._request_single(
       SetupPyInvocationEnvironment, self._native_toolchain_instance())
-    with environment_as(**setup_py_env.as_env_dict()):
+    env = setup_py_env.as_env_dict()
+    if pythonpath:
+      self.context.log.debug('Setting PYTHONPATH with setup_requires site directory: {}'
+                             .format(pythonpath))
+      env['PYTHONPATH'] = pythonpath
+    with environment_as(**env):
       yield
 
-  def _create_dist(self, dist_tgt, dist_target_dir, interpreter):
+  def _create_dist(self, dist_tgt, dist_target_dir, interpreter, pythonpath):
     """Create a .whl file for the specified python_distribution target."""
     self._copy_sources(dist_tgt, dist_target_dir)
 
     # TODO(cosmicexplorer): don't invoke the native toolchain unless the current
     # dist_tgt.has_native_sources? Would need some way to check whether the
     # toolchain is invoked in an integration test.
-    with self._setup_py_invocation_environment():
+    with self._setup_py_invocation_environment(pythonpath=pythonpath):
       # Build a whl using SetupPyRunner and return its absolute path.
       setup_runner = SetupPyRunner(dist_target_dir, 'bdist_wheel', interpreter=interpreter)
       setup_runner.run()
