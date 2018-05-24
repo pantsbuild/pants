@@ -17,6 +17,7 @@ from contextlib import contextmanager
 from colors import bold, cyan, magenta
 from concurrent.futures import ThreadPoolExecutor
 
+from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.pantsd.process_manager import ProcessManager
 from pants.util.collections import combined_dict
 from pants.util.contextutil import environment_as, temporary_dir
@@ -178,7 +179,12 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       checker.assert_started()
 
   def test_pantsd_run(self):
-    with self.pantsd_successful_run_context('debug') as (pantsd_run, checker, workdir):
+    with self.pantsd_successful_run_context('debug', extra_config={
+        GLOBAL_SCOPE_CONFIG_SECTION: {
+          # We don't want any warnings in this test.
+          'glob_expansion_failure': 'ignore',
+        }
+    }) as (pantsd_run, checker, workdir):
       pantsd_run(['list', '3rdparty:'])
       checker.assert_started()
 
@@ -198,10 +204,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         if 'DeprecationWarning' in line:
           continue
 
-        # Ignore missing sources warnings.
-        if re.search(r"glob pattern '[^']+' did not match any files\.", line):
-          continue
-
+        # Check if the line begins with W or E to check if it is a warning or error line.
         self.assertNotRegexpMatches(line, r'^[WE].*')
 
   def test_pantsd_broken_pipe(self):

@@ -1021,9 +1021,9 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
           if strict_match_behavior.should_throw_on_error() {
             return future::err(Self::mk_error(&msg));
           } else {
-            // FIXME: doesn't seem to do anything?
+            // FIXME: doesn't seem to do anything? See #5863.
             // TODO(cosmicexplorer): this doesn't have any useful context (the stack trace) without
-            // being thrown -- this needs to be provided, otherwise this is unusable.
+            // being thrown -- this needs to be provided, otherwise this is unusable. See #5863.
             warn!("{}", msg);
           }
         }

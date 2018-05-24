@@ -62,12 +62,12 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
         as_zsh_glob=as_zsh_glob)
       self.assertIn(warning_msg, pants_run.stderr_data)
 
-  @unittest.skip('Skipped to expedite landing #5769.')
+  @unittest.skip('Skipped to expedite landing #5769: see #5863')
   def test_missing_sources_warnings(self):
     for target_name in self._SOURCES_ERR_MSGS.keys():
       self._list_target_check_warnings(target_name)
 
-  @unittest.skip('Skipped to expedite landing #5769.')
+  @unittest.skip('Skipped to expedite landing #5769: see #5863')
   def test_existing_sources(self):
     target_full = '{}:text'.format(self._SOURCES_TARGET_BASE)
     pants_run = self.run_pants(['list', target_full], config={
@@ -78,7 +78,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     self.assertNotIn("WARN]", pants_run.stderr_data)
 
-  @unittest.skip('Skipped to expedite landing #5769.')
+  @unittest.skip('Skipped to expedite landing #5769: see #5863')
   def test_missing_bundles_warnings(self):
     target_full = '{}:{}'.format(self._BUNDLE_TARGET_BASE, self._BUNDLE_TARGET_NAME)
     pants_run = self.run_pants(['list', target_full], config={
@@ -103,7 +103,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
           as_zsh_glob=as_zsh_glob)
         self.assertIn(warning_msg, pants_run.stderr_data)
 
-  @unittest.skip('Skipped to expedite landing #5769.')
+  @unittest.skip('Skipped to expedite landing #5769: see #5863')
   def test_existing_bundles(self):
     target_full = '{}:mapper'.format(self._BUNDLE_TARGET_BASE)
     pants_run = self.run_pants(['list', target_full], config={
