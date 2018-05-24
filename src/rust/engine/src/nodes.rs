@@ -645,7 +645,6 @@ impl From<Scandir> for NodeKey {
 
 ///
 /// A Node that captures an fs::Snapshot for a PathGlobs subject.
-/// TODO: ???
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Snapshot(Key);
@@ -758,7 +757,8 @@ impl Node for Snapshot {
   type Output = fs::Snapshot;
 
   fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
-    future::result(Self::lift_path_globs(&externs::val_for(&self.0)))
+    let lifted_path_globs = Self::lift_path_globs(&externs::val_for(&self.0));
+    future::result(lifted_path_globs)
       .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))
       .and_then(move |path_globs| Self::create(context, path_globs))
       .to_boxed()

@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import functools
 import itertools
 import os
-import re
 import signal
 import threading
 import time
