@@ -10,6 +10,8 @@ from abc import abstractproperty
 
 from six import string_types
 
+from pants.base.exceptions import TargetDefinitionException
+from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_list
 from pants.engine.fs import PathGlobs
 from pants.engine.objects import Locatable
@@ -36,13 +38,27 @@ class TargetAdaptor(StructWithDeps):
     refactor how deferred sources are implemented.
       see: https://github.com/pantsbuild/pants/issues/2997
     """
+
     sources = getattr(self, 'sources', None)
+    source = getattr(self, 'source', None)
+
+    if self.multiple_source_error_message:
+      if sources is not None:
+        raise Target.IllegalArgument(self.address.to_address(), self.multiple_source_error_message)
+      if source:
+        if not isinstance(source, string_types):
+          raise TargetDefinitionException(self, 'source must be a single relative file path')
+        sources = [source]
+
+    # We ignore the source argument if sources is allowed, regardless of whether it is set.
+
     # N.B. Here we check specifically for `sources is None`, as it's possible for sources
     # to be e.g. an explicit empty list (sources=[]).
-    if sources is None and self.default_sources_globs is not None:
-      return Globs(*self.default_sources_globs,
-                    spec_path=self.address.spec_path,
-                    exclude=self.default_sources_exclude_globs or [])
+    if sources is None:
+      if self.default_sources_globs is not None:
+        return Globs(*self.default_sources_globs,
+                      spec_path=self.address.spec_path,
+                      exclude=self.default_sources_exclude_globs or [])
     return sources
 
   @property
@@ -62,6 +78,10 @@ class TargetAdaptor(StructWithDeps):
 
   @property
   def default_sources_exclude_globs(self):
+    return None
+
+  @property
+  def multiple_source_error_message(self):
     return None
 
 
@@ -102,6 +122,25 @@ class JavaLibraryAdaptor(TargetAdaptor):
   @property
   def default_sources_exclude_globs(self):
     return JunitTestsAdaptor.java_test_globs
+
+
+class JvmBinaryAdaptor(TargetAdaptor):
+  @property
+  def multiple_source_error_message(self):
+    return (
+      'jvm_binary only supports a single "source" argument, typically used to specify a main '
+      'class source file. Other sources should instead be placed in a java_library, which '
+      'should be referenced in the jvm_binary\'s dependencies.'
+    )
+
+
+class PageAdaptor(TargetAdaptor):
+  @property
+  def multiple_source_error_message(self):
+    return (
+      'page only supports a single "source" argument, which should be a relative path to either a '
+      '.rst file or a .md file.'
+    )
 
 
 class ScalaLibraryAdaptor(TargetAdaptor):
@@ -222,6 +261,15 @@ class PythonLibraryAdaptor(PythonTargetAdaptor):
   @property
   def default_sources_exclude_globs(self):
     return PythonTestsAdaptor.python_test_globs
+
+
+class PythonBinaryAdaptor(PythonTargetAdaptor):
+  @property
+  def multiple_source_error_message(self):
+    return (
+      'python_binary only supports a single "source" argument, which should be a relative path to '
+      'a .py file.'
+    )
 
 
 class PythonTestsAdaptor(PythonTargetAdaptor):
