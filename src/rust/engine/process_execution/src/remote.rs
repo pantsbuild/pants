@@ -380,7 +380,16 @@ impl CommandRunner {
         })
         .to_boxed()
     } else {
-      future::ok(Bytes::from(execute_response.get_result().get_stdout_raw())).to_boxed()
+      let stdout_raw = Bytes::from(execute_response.get_result().get_stdout_raw());
+      let stdout_copy = stdout_raw.clone();
+      self
+        .store
+        .store_file_bytes(stdout_raw, true)
+        .map_err(move |error| {
+          ExecutionError::Fatal(format!("Error storing raw stdout: {:?}", error))
+        })
+        .map(|_| stdout_copy)
+        .to_boxed()
     };
     return stdout;
   }
@@ -411,7 +420,16 @@ impl CommandRunner {
         })
         .to_boxed()
     } else {
-      future::ok(Bytes::from(execute_response.get_result().get_stderr_raw())).to_boxed()
+      let stderr_raw = Bytes::from(execute_response.get_result().get_stderr_raw());
+      let stderr_copy = stderr_raw.clone();
+      self
+        .store
+        .store_file_bytes(stderr_raw, true)
+        .map_err(move |error| {
+          ExecutionError::Fatal(format!("Error storing raw stderr: {:?}", error))
+        })
+        .map(|_| stderr_copy)
+        .to_boxed()
     };
     return stderr;
   }
@@ -621,6 +639,77 @@ mod tests {
         output_directory: fs::EMPTY_DIGEST,
       })
     );
+  }
+
+  #[test]
+  fn ensure_inline_stdio_is_stored() {
+    let test_stdout = TestData::roland();
+    let test_stderr = TestData::catnip();
+
+    let mock_server = {
+      let op_name = "cat".to_owned();
+
+      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
+        op_name.clone(),
+        super::make_execute_request(&echo_roland_request())
+          .unwrap()
+          .1,
+        vec![
+          make_successful_operation(
+            &op_name.clone(),
+            StdoutType::Raw(test_stdout.string()),
+            StderrType::Raw(test_stderr.string()),
+            0,
+          ),
+        ],
+      ))
+    };
+
+    let store_dir = TempDir::new("store").unwrap();
+    let store_dir_path = store_dir.path();
+
+    let cas = mock::StubCAS::empty();
+    let store = fs::Store::with_remote(
+      &store_dir_path,
+      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
+      cas.address(),
+      1,
+      10 * 1024 * 1024,
+      Duration::from_secs(1),
+    ).expect("Failed to make store");
+
+    let cmd_runner = CommandRunner::new(mock_server.address(), 1, store);
+    let result = cmd_runner.run(echo_roland_request()).wait();
+    assert_eq!(
+      result,
+      Ok(ExecuteProcessResult {
+        stdout: test_stdout.bytes(),
+        stderr: test_stderr.bytes(),
+        exit_code: 0,
+        output_directory: fs::EMPTY_DIGEST,
+      })
+    );
+
+    let local_store = fs::Store::local_only(
+      &store_dir_path,
+      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
+    ).expect("Error creating local store");
+    {
+      assert_eq!(
+        local_store
+          .load_file_bytes_with(test_stdout.digest(), |v| v)
+          .wait()
+          .unwrap(),
+        Some(test_stdout.bytes())
+      );
+      assert_eq!(
+        local_store
+          .load_file_bytes_with(test_stderr.digest(), |v| v)
+          .wait()
+          .unwrap(),
+        Some(test_stderr.bytes())
+      );
+    }
   }
 
   #[test]
@@ -1352,6 +1441,17 @@ mod tests {
       output_files: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "cat a roland".to_string(),
+    }
+  }
+
+  fn echo_roland_request() -> ExecuteProcessRequest {
+    ExecuteProcessRequest {
+      argv: owned_string_vec(&["/bin/echo", "meoooow"]),
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: BTreeSet::new(),
+      timeout: Duration::from_millis(1000),
+      description: "unleash a roaring meow".to_string(),
     }
   }
 }
