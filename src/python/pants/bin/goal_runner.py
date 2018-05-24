@@ -247,7 +247,7 @@ class GoalRunner(object):
     }
 
   def _execute_engine(self):
-    workdir = self._global_options.pants_workdir
+    workdir = self._context.options.for_global_scope().pants_workdir
     if not workdir.endswith('.pants.d'):
       self._context.log.error('Pants working directory should end with \'.pants.d\', currently it is {}\n'
                               .format(workdir))

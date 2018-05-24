@@ -47,8 +47,8 @@ use externs::{Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionE
               DropHandlesExtern, EqualsExtern, EvalExtern, ExternContext, Externs,
               GeneratorSendExtern, IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern,
               ProjectMultiExtern, PyResult, SatisfiedByExtern, SatisfiedByTypeExtern,
-              StoreBytesExtern, StoreI64Extern, StoreTupleExtern, TypeIdBuffer,
-              TypeToStrExtern, ValToStrExtern};
+              StoreBytesExtern, StoreI64Extern, StoreTupleExtern, TypeIdBuffer, TypeToStrExtern,
+              ValToStrExtern};
 use futures::Future;
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
