@@ -63,7 +63,6 @@ class TestCobertura(TestBase):
   def setUp(self):
     super(TestCobertura, self).setUp()
 
-    self.pants_workdir = 'workdir'
     self.conf = 'default'
     self.factory = Cobertura.Factory("test_scope", [])
 

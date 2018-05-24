@@ -38,7 +38,7 @@ class CheckPublishedDepsTest(ConsoleTaskTestBase):
         'scala_jar': ScalaJarDependency,
         'repo': Repository(name='repo',
                            url='http://www.www.com',
-                           push_db_basedir=os.path.join(cls.build_root, 'repo')),
+                           push_db_basedir=os.path.join(cls._build_root(), 'repo')),
       }
     )
 

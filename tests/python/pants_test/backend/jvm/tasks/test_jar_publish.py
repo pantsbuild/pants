@@ -39,7 +39,7 @@ class JarPublishTest(TaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    cls.push_db_basedir = os.path.join(cls.build_root, "pushdb")
+    cls.push_db_basedir = os.path.join(cls._build_root(), "pushdb")
     safe_mkdir(cls.push_db_basedir)
 
     return BuildFileAliases(
