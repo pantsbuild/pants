@@ -363,7 +363,7 @@ def hydrate_target(target_adaptor):
                         tuple(target_adaptor.dependencies))
 
 
-def _eager_fileset_with_spec(spec_path, snapshot, filespec, include_dirs=False):
+def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
   fds = snapshot.path_stats if include_dirs else snapshot.files
   files = tuple(fast_relpath(fd.path, spec_path) for fd in fds)
 
@@ -388,8 +388,8 @@ def hydrate_sources(sources_field, glob_match_error_behavior):
   snapshot = yield Get(Snapshot, PathGlobs, path_globs)
   fileset_with_spec = _eager_fileset_with_spec(
     sources_field.address.spec_path,
-    snapshot,
-    sources_field.filespecs)
+    sources_field.filespecs,
+    shapshot)
   yield HydratedField(sources_field.arg, fileset_with_spec)
 
 
@@ -402,21 +402,24 @@ def hydrate_bundles(bundles_field, glob_match_error_behavior):
     pg.with_match_error_behavior(glob_match_error_behavior)
     for pg in bundles_field.path_globs_list
   ]
-  snapshots = yield [Get(Snapshot, PathGlobs, pg) for pg in path_globs_with_match_errors]
+  snapshot_list = yield [Get(Snapshot, PathGlobs, pg) for pg in path_globs_with_match_errors]
 
   spec_path = bundles_field.address.spec_path
 
   bundles = []
   zipped = zip(bundles_field.bundles,
                bundles_field.filespecs_list,
-               snapshots)
+               snapshot_list)
   for bundle, filespecs, snapshot in zipped:
+    rel_spec_path = getattr(bundle, 'rel_path', spec_path)
     kwargs = bundle.kwargs()
     # NB: We `include_dirs=True` because bundle filesets frequently specify directories in order
     # to trigger a (deprecated) default inclusion of their recursive contents. See the related
     # deprecation in `pants.backend.jvm.tasks.bundle_create`.
-    spec_path = getattr(bundle, 'rel_path', spec_path)
-    kwargs['fileset'] = _eager_fileset_with_spec(spec_path, snapshot, filespeces, include_dirs=True)
+    kwargs['fileset'] = _eager_fileset_with_spec(rel_spec_path,
+                                                 filespecs,
+                                                 snapshot,
+                                                 include_dirs=True)
     bundles.append(BundleAdaptor(**kwargs))
   yield HydratedField('bundles', bundles)
 

@@ -9,7 +9,8 @@ import copy
 import pickle
 from abc import abstractmethod
 
-from pants.util.objects import Exactly, SubclassesOf, SuperclassesOf, datatype
+from pants.util.objects import (Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
+                                TypedDatatypeInstanceConstructionError, datatype)
 from pants_test.base_test import BaseTest
 
 
@@ -423,7 +424,7 @@ class TypedDatatypeTest(BaseTest):
     expected_msg = "__new__() takes exactly 2 arguments (3 given)"
     self.assertEqual(str(cm.exception), expected_msg)
 
-    with self.assertRaises(TypeError) as cm:
+    with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
       CamelCaseWrapper(nonneg_int=3)
     expected_msg = (
       """error: in constructor of type CamelCaseWrapper: type check error:
@@ -438,7 +439,7 @@ field 'nonneg_int' was invalid: value 3 (with type 'int') must satisfy this type
 
   def test_type_check_errors(self):
     # single type checking failure
-    with self.assertRaises(TypeError) as cm:
+    with self.assertRaises(TypeCheckError) as cm:
       SomeTypedDatatype([])
     expected_msg = (
       """error: in constructor of type SomeTypedDatatype: type check error:
@@ -446,7 +447,7 @@ field 'val' was invalid: value [] (with type 'list') must satisfy this type cons
     self.assertEqual(str(cm.exception), expected_msg)
 
     # type checking failure with multiple arguments (one is correct)
-    with self.assertRaises(TypeError) as cm:
+    with self.assertRaises(TypeCheckError) as cm:
       AnotherTypedDatatype(str('correct'), str('should be list'))
     expected_msg = (
       """error: in constructor of type AnotherTypedDatatype: type check error:
@@ -454,7 +455,7 @@ field 'elements' was invalid: value 'should be list' (with type 'str') must sati
     self.assertEqual(str(cm.exception), expected_msg)
 
     # type checking failure on both arguments
-    with self.assertRaises(TypeError) as cm:
+    with self.assertRaises(TypeCheckError) as cm:
       AnotherTypedDatatype(3, str('should be list'))
     expected_msg = (
       """error: in constructor of type AnotherTypedDatatype: type check error:
@@ -462,21 +463,21 @@ field 'string' was invalid: value 3 (with type 'int') must satisfy this type con
 field 'elements' was invalid: value 'should be list' (with type 'str') must satisfy this type constraint: Exactly(list).""")
     self.assertEqual(str(cm.exception), expected_msg)
 
-    with self.assertRaises(TypeError) as cm:
+    with self.assertRaises(TypeCheckError) as cm:
       NonNegativeInt(str('asdf'))
     expected_msg = (
       """error: in constructor of type NonNegativeInt: type check error:
 field 'an_int' was invalid: value 'asdf' (with type 'str') must satisfy this type constraint: Exactly(int).""")
     self.assertEqual(str(cm.exception), expected_msg)
 
-    with self.assertRaises(TypeError) as cm:
+    with self.assertRaises(TypeCheckError) as cm:
       NonNegativeInt(-3)
     expected_msg = (
       """error: in constructor of type NonNegativeInt: type check error:
 value is negative: -3.""")
     self.assertEqual(str(cm.exception), expected_msg)
 
-    with self.assertRaises(TypeError) as cm:
+    with self.assertRaises(TypeCheckError) as cm:
       WithSubclassTypeConstraint(3)
     expected_msg = (
       """error: in constructor of type WithSubclassTypeConstraint: type check error:

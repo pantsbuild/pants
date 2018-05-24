@@ -134,12 +134,14 @@ def datatype(field_decls, superclass_name=None, **kwargs):
         field_value = getattr(self, field_name)
         if not constraint_for_field:
           elements_formatted.append(
-            "{field_name}={field_value!r}"
+            # FIXME(cosmicexplorer): use {field_value!r} in this method, even though this is
+            # __str__()!
+            "{field_name}={field_value}"
             .format(field_name=field_name,
                     field_value=field_value))
         else:
           elements_formatted.append(
-            "{field_name}<{type_constraint}>={field_value!r}"
+            "{field_name}<{type_constraint}>={field_value}"
             .format(field_name=field_name,
                     type_constraint=constraint_for_field,
                     field_value=field_value))
@@ -163,7 +165,8 @@ class TypedDatatypeClassConstructionError(Exception):
       full_msg, *args, **kwargs)
 
 
-class TypedDatatypeInstanceConstructionError(TypeError):
+# FIXME(cosmicexplorer): make this subclass TypeError!
+class TypedDatatypeInstanceConstructionError(Exception):
 
   def __init__(self, type_name, msg, *args, **kwargs):
     full_msg = "error: in constructor of type {}: {}".format(type_name, msg)
