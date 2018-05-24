@@ -1450,6 +1450,8 @@ mod tests {
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
       output_files: BTreeSet::new(),
+      timeout: Duration::from_millis(1000),
+      description: "unleash a roaring meow".to_string(),
     }
   }
 }
