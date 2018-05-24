@@ -29,8 +29,8 @@ class ProtobufGenTest(TaskTestBase):
   def task_type(cls):
     return ProtobufGen
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return register_core().merge(register_jvm()).merge(register_codegen())
 
   def test_default_javadeps(self):

@@ -35,8 +35,8 @@ class GoLocalSourceTestBase(AbstractClass):
   def target_type(self):
     """Subclasses should return a GoLocalSource target subclass."""
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return build_file_aliases()
 
   def test_default_name_and_sources(self):

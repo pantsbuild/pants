@@ -29,9 +29,9 @@ class JarCreateTestBase(JarTaskTestBase):
   def task_type(cls):
     return JarCreate
 
-  @property
-  def alias_groups(self):
-    return super(JarCreateTestBase, self).alias_groups.merge(BuildFileAliases(
+  @classmethod
+  def alias_groups(cls):
+    return super(JarCreateTestBase, cls).alias_groups().merge(BuildFileAliases(
       targets={
         'java_library': JavaLibrary,
         'java_thrift_library': JavaThriftLibrary,

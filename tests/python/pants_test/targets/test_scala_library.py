@@ -17,8 +17,8 @@ from pants_test.test_base import TestBase
 
 
 class ScalaLibraryTest(TestBase):
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'scala_library': ScalaLibrary,

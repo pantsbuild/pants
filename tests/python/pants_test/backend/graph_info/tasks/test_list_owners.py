@@ -21,8 +21,8 @@ class ListOwnersTest(ConsoleTaskTestBase):
   def task_type(cls):
     return ListOwners
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(targets={'python_library': PythonLibrary})
 
   def setUp(self):

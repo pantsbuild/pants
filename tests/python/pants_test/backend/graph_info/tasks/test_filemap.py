@@ -15,8 +15,8 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class FilemapTest(ConsoleTaskTestBase):
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'python_library': PythonLibrary,

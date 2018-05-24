@@ -18,8 +18,8 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 class FileDepsTest(ConsoleTaskTestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return register_core().merge(register_jvm()).merge(register_codegen())
 
   @classmethod

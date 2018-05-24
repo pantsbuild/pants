@@ -22,8 +22,8 @@ class GoRemoteLibraryTest(TestBase):
     # Force setup of SourceRootConfig subsystem, as go targets do computation on source roots.
     self.context()
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return build_file_aliases()
 
   def test_default_package(self):

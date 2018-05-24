@@ -13,8 +13,8 @@ from pants_test.test_base import TestBase
 
 
 class PantsRequirementTest(TestBase):
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     # NB: We use aliases and BUILD files to test proper registration of the pants_requirement macro.
     return build_file_aliases()
 

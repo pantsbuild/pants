@@ -21,8 +21,8 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 # TODO: This test should create some dummy target types, instead of depending on other backends.
 class BaseFilterTest(ConsoleTaskTestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'target': Target,

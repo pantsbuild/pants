@@ -137,12 +137,12 @@ class TestSetupPy(SetupPyTestBase):
     super(TestSetupPy, self).setUp()
     self.dependency_calculator = SetupPy.DependencyCalculator(self.build_graph)
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     extra_aliases = BuildFileAliases(targets={'prep_command': PrepCommand,
                                               'resources': Resources,
                                               'target': Target})
-    return super(TestSetupPy, self).alias_groups.merge(extra_aliases)
+    return super(TestSetupPy, cls).alias_groups().merge(extra_aliases)
 
   def create_dependencies(self, depmap):
     target_map = {}

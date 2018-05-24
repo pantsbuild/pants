@@ -36,8 +36,8 @@ class ListTargetsTestEmpty(BaseListTargetsTest):
 
 class ListTargetsTest(BaseListTargetsTest):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'target': Target,

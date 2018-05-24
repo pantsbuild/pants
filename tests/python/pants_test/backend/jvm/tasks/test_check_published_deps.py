@@ -23,8 +23,8 @@ from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 class CheckPublishedDepsTest(ConsoleTaskTestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'target': Target,
@@ -38,7 +38,7 @@ class CheckPublishedDepsTest(ConsoleTaskTestBase):
         'scala_jar': ScalaJarDependency,
         'repo': Repository(name='repo',
                            url='http://www.www.com',
-                           push_db_basedir=os.path.join(self.build_root, 'repo')),
+                           push_db_basedir=os.path.join(cls.build_root, 'repo')),
       }
     )
 

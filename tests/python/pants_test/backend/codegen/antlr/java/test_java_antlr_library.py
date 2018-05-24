@@ -15,8 +15,8 @@ from pants_test.test_base import TestBase
 
 class JavaAntlrLibraryTest(TestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(targets={'java_antlr_library': JavaAntlrLibrary})
 
   def test_empty(self):

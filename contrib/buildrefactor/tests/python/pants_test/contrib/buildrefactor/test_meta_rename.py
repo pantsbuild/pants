@@ -22,8 +22,8 @@ class MetaRenameTest(TaskTestBase):
   def task_type(cls):
     return MetaRename
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(targets={ 'java_library': JavaLibrary })
 
   def setUp(self):

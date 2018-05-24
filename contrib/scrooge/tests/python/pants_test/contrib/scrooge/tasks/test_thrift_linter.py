@@ -20,8 +20,8 @@ class ThriftLinterTest(TaskTestBase):
     task.tool_classpath = Mock(return_value='foo_classpath')
     task.runjava = self._run_java_mock
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'java_thrift_library': JavaThriftLibrary,

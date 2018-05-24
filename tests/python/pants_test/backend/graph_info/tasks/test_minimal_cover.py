@@ -25,8 +25,8 @@ class MinimalCoverEmptyTest(BaseMinimalCovertTest):
 
 
 class MinimalCoverTest(BaseMinimalCovertTest):
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(targets={'python_library': PythonLibrary})
 
   def setUp(self):

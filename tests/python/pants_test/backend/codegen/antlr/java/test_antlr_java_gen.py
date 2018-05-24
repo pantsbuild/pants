@@ -26,9 +26,9 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
   def task_type(cls):
     return AntlrJavaGen
 
-  @property
-  def alias_groups(self):
-    return super(AntlrJavaGenTest, self).alias_groups.merge(BuildFileAliases(
+  @classmethod
+  def alias_groups(cls):
+    return super(AntlrJavaGenTest, cls).alias_groups().merge(BuildFileAliases(
       targets={
         'java_antlr_library': JavaAntlrLibrary,
       },

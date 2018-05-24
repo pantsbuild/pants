@@ -19,8 +19,8 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
   :API: public
   """
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     """
     :API: public
     """

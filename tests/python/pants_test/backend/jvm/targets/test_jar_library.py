@@ -22,8 +22,8 @@ jar2 = JarDependency(org='testOrg2', name='testName2', rev='456')
 
 class JarLibraryTest(TestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(targets={'jar_library': JarLibrary},
                             objects={'jar': JarDependency})
 

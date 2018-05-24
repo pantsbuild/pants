@@ -45,8 +45,8 @@ def do_nothing(*args, **kwards):
 
 class IvyUtilsTestBase(TestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return register_core().merge(register_jvm())
 
 

@@ -42,8 +42,8 @@ class RunPrepCommandTest(TaskTestBase):
   def task_type(cls):
     return FakeRunPrepCommand
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'prep_command': PrepCommand,

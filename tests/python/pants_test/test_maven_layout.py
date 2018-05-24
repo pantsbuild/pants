@@ -17,8 +17,8 @@ from pants_test.test_base import TestBase
 # Note: There is no longer any special maven_layout directive.  Maven layouts should just
 # work out of the box.  This test exists just to prove that statement true.
 class MavenLayoutTest(TestBase):
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'java_library': JavaLibrary,

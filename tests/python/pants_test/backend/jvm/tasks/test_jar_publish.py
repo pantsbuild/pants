@@ -37,10 +37,10 @@ class JarPublishTest(TaskTestBase):
       task = self.create_task(self.context())
       task.execute()
 
-  @property
-  def alias_groups(self):
-    self.push_db_basedir = os.path.join(self.build_root, "pushdb")
-    safe_mkdir(self.push_db_basedir)
+  @classmethod
+  def alias_groups(cls):
+    cls.push_db_basedir = os.path.join(cls.build_root, "pushdb")
+    safe_mkdir(cls.push_db_basedir)
 
     return BuildFileAliases(
       targets={
@@ -52,7 +52,7 @@ class JarPublishTest(TaskTestBase):
         'artifact': Artifact,
         'scala_artifact': ScalaArtifact,
         'internal': Repository(name='internal', url='http://example.com',
-                               push_db_basedir=self.push_db_basedir),
+                               push_db_basedir=cls.push_db_basedir),
       },
     )
 

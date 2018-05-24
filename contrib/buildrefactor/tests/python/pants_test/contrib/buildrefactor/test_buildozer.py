@@ -20,8 +20,8 @@ from pants.contrib.buildrefactor.buildozer import Buildozer
 class BuildozerTest(TaskTestBase):
   """Test the buildozer tool"""
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(targets={ 'java_library': JavaLibrary })
 
   @classmethod

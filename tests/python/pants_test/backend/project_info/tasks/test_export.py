@@ -45,8 +45,8 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
   def task_type(cls):
     return Export
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return register_core().merge(register_jvm()).merge(register_python())
 
   def setUp(self):

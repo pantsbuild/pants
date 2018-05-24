@@ -22,8 +22,8 @@ class SourceMapperTest(object):
   def get_mapper(self):
     return self._mapper
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'java_library': JavaLibrary,

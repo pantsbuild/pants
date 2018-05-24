@@ -28,8 +28,8 @@ class DummyTarget(Target):
 
 class FilesetRelPathWrapperTest(TestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'dummy_target': DummyTarget,

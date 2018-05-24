@@ -28,8 +28,8 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
   :API: public
   """
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     """
     :API: public
     """

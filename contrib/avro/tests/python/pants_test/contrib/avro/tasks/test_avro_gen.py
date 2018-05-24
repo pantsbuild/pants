@@ -30,9 +30,9 @@ class AvroJavaGenTest(NailgunTaskTestBase):
   def task_type(cls):
     return MockAvroJavaGenTest
 
-  @property
-  def alias_groups(self):
-    return super(AvroJavaGenTest, self).alias_groups.merge(
+  @classmethod
+  def alias_groups(cls):
+    return super(AvroJavaGenTest, cls).alias_groups().merge(
       BuildFileAliases(targets={'java_avro_library': JavaAvroLibrary}))
 
   def _test_avro(self, target_spec):
