@@ -59,9 +59,9 @@ class PathGlobs(datatype([
 
     :param relative_to: The path that all patterns are relative to (which will itself be relative
       to the buildroot).
-    :param included: A list of filespecs to include.
-    :param excluded: A list of filespecs to exclude.
-    # TODO: ???
+    :param include: A list of filespecs to include.
+    :param exclude: A list of filespecs to exclude.
+    :param glob_match_error_behavior: The value to pass to GlobMatchErrorBehavior.create()
     :rtype: :class:`PathGlobs`
     """
     encoded_reldir = relative_to.decode('utf-8')

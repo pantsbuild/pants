@@ -107,7 +107,7 @@ class GoalRunnerFactory(object):
         pants_ignore_patterns,
         workdir,
         self._global_options.build_file_imports,
-        glob_match_error_behavior=GlobMatchErrorBehavior(
+        glob_match_error_behavior=GlobMatchErrorBehavior.create(
           self._global_options.glob_expansion_failure),
         native=native,
         build_file_aliases=self._build_config.registered_aliases(),
