@@ -16,7 +16,6 @@ from contextlib import contextmanager
 from colors import bold, cyan, magenta
 from concurrent.futures import ThreadPoolExecutor
 
-from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.pantsd.process_manager import ProcessManager
 from pants.util.collections import combined_dict
 from pants.util.contextutil import environment_as, temporary_dir
