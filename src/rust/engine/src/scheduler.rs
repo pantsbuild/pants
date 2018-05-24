@@ -11,7 +11,7 @@ use futures::sync::oneshot;
 
 use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
-use core::{Failure, Key, TypeConstraint, TypeId, Value, Variants};
+use core::{Failure, Key, Params, TypeConstraint, TypeId, Value};
 use fs::{self, GlobMatching, PosixFS};
 use graph::{EntryId, Graph, Node, NodeContext};
 use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
@@ -111,7 +111,7 @@ impl Scheduler {
     )?;
     request
       .roots
-      .push(Select::new(product, subject, Variants::default(), &edges));
+      .push(Select::new(product, Params::new(vec![subject]), &edges));
     Ok(())
   }
 
@@ -258,7 +258,7 @@ impl Scheduler {
       .roots
       .iter()
       .zip(results.into_iter())
-      .map(|(s, r)| (&s.subject, &s.selector.product, r))
+      .map(|(s, r)| (s.params.expect_single(), &s.selector.product, r))
       .collect()
   }
 
