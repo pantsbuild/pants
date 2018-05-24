@@ -384,20 +384,20 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
 def hydrate_sources(sources_field, glob_match_error_behavior):
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
   """
+  # TODO(cosmicexplorer): merge the target's selection of --glob-expansion-failure (which doesn't
+  # exist yet) with the global default! See #5864.
   path_globs = sources_field.path_globs.with_match_error_behavior(glob_match_error_behavior)
   snapshot = yield Get(Snapshot, PathGlobs, path_globs)
   fileset_with_spec = _eager_fileset_with_spec(
     sources_field.address.spec_path,
     sources_field.filespecs,
-    shapshot)
+    snapshot)
   yield HydratedField(sources_field.arg, fileset_with_spec)
 
 
 @rule(HydratedField, [Select(BundlesField), Select(GlobMatchErrorBehavior)])
 def hydrate_bundles(bundles_field, glob_match_error_behavior):
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
-  # TODO(cosmicexplorer): merge the target's selection of --glob-expansion-failure (which doesn't
-  # exist yet) with the global default!
   path_globs_with_match_errors = [
     pg.with_match_error_behavior(glob_match_error_behavior)
     for pg in bundles_field.path_globs_list

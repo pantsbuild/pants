@@ -244,16 +244,18 @@ impl PathGlob {
   }
 
   pub fn create(filespecs: &[String]) -> Result<Vec<PathGlob>, String> {
+    // Getting a Vec<PathGlob> per filespec is needed to create a `PathGlobs`, but we don't need
+    // that here.
     let filespecs_globs = Self::spread_filespecs(filespecs)?;
     let all_globs = Self::flatten_entries(filespecs_globs);
     Ok(all_globs)
   }
 
-  pub fn flatten_entries(entries: Vec<PathGlobIncludeEntry>) -> Vec<PathGlob> {
+  fn flatten_entries(entries: Vec<PathGlobIncludeEntry>) -> Vec<PathGlob> {
     entries.into_iter().flat_map(|entry| entry.globs).collect()
   }
 
-  pub fn spread_filespecs(filespecs: &[String]) -> Result<Vec<PathGlobIncludeEntry>, String> {
+  fn spread_filespecs(filespecs: &[String]) -> Result<Vec<PathGlobIncludeEntry>, String> {
     let mut spec_globs_map = Vec::new();
     for filespec in filespecs {
       let canonical_dir = Dir(PathBuf::new());
@@ -493,7 +495,6 @@ pub enum GlobMatch {
 
 #[derive(Clone, Debug)]
 struct GlobExpansionCacheEntry {
-  // We could add `PathStat`s here if we need them for checking matches more deeply.
   globs: Vec<PathGlob>,
   matched: GlobMatch,
   sources: Vec<GlobSource>,
@@ -510,7 +511,6 @@ pub struct SingleExpansionResult {
 struct PathGlobsExpansion<T: Sized> {
   context: T,
   // Globs that have yet to be expanded, in order.
-  // TODO: profile/trace to see if this affects perf over a Vec.
   todo: Vec<GlobWithSource>,
   // Paths to exclude.
   exclude: Arc<GitignoreStyleExcludes>,
@@ -930,7 +930,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
             .push(source);
 
           // TODO(cosmicexplorer): is cloning these so many times as `GlobSource`s something we can
-          // bypass by using `Arc`s?
+          // bypass by using `Arc`s? Profile first.
           let source_for_children = GlobSource::ParentGlob(path_glob);
           for child_glob in globs {
             if expansion.completed.contains_key(&child_glob) {
@@ -1009,7 +1009,8 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
           .collect();
 
         if !non_matching_inputs.is_empty() {
-          // TODO: explain what global option to set to modify this behavior!
+          // TODO(cosmicexplorer): explain what global and/or target-specific option to set to
+          // modify this behavior! See #5864.
           let msg = format!(
             "Globs did not match. Excludes were: {:?}. Unmatched globs were: {:?}.",
             exclude.exclude_patterns(),
@@ -1043,11 +1044,6 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     sourced_glob: GlobWithSource,
     exclude: &Arc<GitignoreStyleExcludes>,
   ) -> BoxFuture<SingleExpansionResult, E> {
-    // If we were to match on &path_glob (which I just tried), it seems like it's impossible to move
-    // something while borrowing it, even if the move happens at the end of the borrowed scope. That
-    // seems like it doesn't need to happen? I think there is no way to avoid the clone here,
-    // however, because directory_listing() returns a future and therefore can use only static
-    // references.
     match sourced_glob.path_glob.clone() {
       PathGlob::Wildcard { canonical_dir, symbolic_path, wildcard } =>
         // Filter directory listing to return PathStats, with no continuation.

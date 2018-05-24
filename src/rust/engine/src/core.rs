@@ -77,6 +77,7 @@ pub struct Key {
   type_id: TypeId,
 }
 
+// This is consumed in user-facing error messages, such as for --glob-expansion-failure=error.
 impl fmt::Debug for Key {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "Key(val={:?})", externs::key_to_str(self))
@@ -108,10 +109,6 @@ impl Key {
 
   pub fn type_id(&self) -> &TypeId {
     &self.type_id
-  }
-
-  pub fn to_string(&self) -> String {
-    externs::key_to_str(&self)
   }
 }
 

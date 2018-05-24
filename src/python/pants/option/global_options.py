@@ -21,6 +21,11 @@ from pants.util.objects import datatype
 
 
 class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
+  """Describe the action to perform when matching globs in BUILD files to source files.
+
+  NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
+  be aware of any changes to this object's definition.
+  """
 
   IGNORE = 'ignore'
   WARN = 'warn'
@@ -37,15 +42,7 @@ class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
   @classmethod
   @memoized_method
   def _singletons(cls):
-    ret = {}
-    for idx, behavior in enumerate(cls.ranked_values):
-      ret[behavior] = {
-        'singleton_object': cls(behavior),
-        # FIXME(cosmicexplorer): use this 'priority' field to implement a method of per-target
-        # selection of this behavior as well as the command-line.
-        'priority': idx,
-      }
-    return ret
+    return { behavior: cls(behavior) for behavior in cls.ranked_values }
 
   @classmethod
   def create(cls, value=None):
@@ -53,7 +50,7 @@ class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
       return value
     if not value:
       value = cls.default_value
-    return cls._singletons()[value]['singleton_object']
+    return cls._singletons()[value]
 
 
 class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
@@ -283,8 +280,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
     # TODO(cosmicexplorer): Make a custom type abstract class to automate the production of an
-    # option with specific allowed values from a datatype. Also consider whether "ranking" as in
-    # GlobMatchErrorBehavior is something that should be generalized.
+    # option with specific allowed values from a datatype.
     register('--glob-expansion-failure', type=str,
              choices=GlobMatchErrorBehavior.ranked_values,
              default=GlobMatchErrorBehavior.default_option_value,
