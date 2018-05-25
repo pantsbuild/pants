@@ -27,7 +27,7 @@ from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_delete
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
+from pants_test.task_test_base import TaskTestBase, ensure_cached
 
 
 def strip_workdir(dir, classpath):

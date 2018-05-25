@@ -8,7 +8,7 @@ python_tests(
   dependencies=[
     '3rdparty/python:mock',
     'src/python/pants/core_tasks',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -31,7 +31,7 @@ python_tests(
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
     'src/python/pants/task',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 
@@ -56,7 +56,7 @@ python_tests(
     'src/python/pants/core_tasks',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -68,7 +68,7 @@ python_tests(
     'src/python/pants/core_tasks',
     'src/python/pants/source',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 

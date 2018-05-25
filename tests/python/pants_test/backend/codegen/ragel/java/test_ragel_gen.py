@@ -12,7 +12,7 @@ from pants.backend.codegen.ragel.java.java_ragel_library import JavaRagelLibrary
 from pants.backend.codegen.ragel.java.ragel_gen import RagelGen, calculate_genfile
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdtemp
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 ragel_file_contents = dedent("""

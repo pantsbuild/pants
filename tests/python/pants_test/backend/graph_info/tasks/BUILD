@@ -12,7 +12,7 @@ python_tests(
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',
     'tests/python/pants_test/engine:scheduler_test_base',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -36,7 +36,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -47,7 +47,7 @@ python_tests(
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 
@@ -61,7 +61,7 @@ python_tests(
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 
@@ -76,7 +76,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/backend/python/targets:python',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 
@@ -88,7 +88,7 @@ python_tests(
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 
@@ -99,7 +99,7 @@ python_tests(
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 
@@ -109,7 +109,7 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/base:exceptions',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -129,7 +129,7 @@ python_tests(
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 
@@ -139,6 +139,6 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )

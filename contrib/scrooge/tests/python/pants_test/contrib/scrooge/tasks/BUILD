@@ -7,7 +7,7 @@ python_tests(
   dependencies=[
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:java_thrift_library_fingerprint_strategy',
     'src/python/pants/backend/codegen/thrift/java',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -55,7 +55,7 @@ python_tests(
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:thrift_util',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
     'tests/python/pants_test/testutils:mock_logger',
   ],
 )

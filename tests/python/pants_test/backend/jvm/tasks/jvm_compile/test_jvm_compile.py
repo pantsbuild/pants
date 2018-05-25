@@ -10,7 +10,7 @@ import os
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class DummyJvmCompile(JvmCompile):

@@ -8,6 +8,6 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )

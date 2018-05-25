@@ -9,7 +9,7 @@ from mock import Mock, patch
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.scrooge.tasks.thrift_linter import ThriftLinter
 

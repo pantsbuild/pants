@@ -37,7 +37,7 @@ from pants.util.dirutil import chmod_plus_x, safe_open
 from pants.util.osutil import get_os_name, normalize_os_name
 from pants_test.backend.python.tasks.interpreter_cache_test_mixin import InterpreterCacheTestMixin
 from pants_test.subsystem.subsystem_util import init_subsystems
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):

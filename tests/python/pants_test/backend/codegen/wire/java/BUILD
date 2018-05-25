@@ -15,7 +15,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 

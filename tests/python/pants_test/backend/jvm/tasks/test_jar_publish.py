@@ -22,7 +22,7 @@ from pants.build_graph.target import Target
 from pants.scm.scm import Scm
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class JarPublishTest(TaskTestBase):

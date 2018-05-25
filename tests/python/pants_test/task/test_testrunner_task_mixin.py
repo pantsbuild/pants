@@ -19,7 +19,7 @@ from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
 from pants.util.process_handler import ProcessHandler, subprocess
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class DummyTestTarget(object):

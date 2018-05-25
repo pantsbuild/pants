@@ -12,7 +12,7 @@ from pants.backend.graph_info.tasks.list_owners import ListOwners
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class ListOwnersTest(ConsoleTaskTestBase):

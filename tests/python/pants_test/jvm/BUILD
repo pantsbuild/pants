@@ -58,6 +58,6 @@ python_library(
   dependencies=[
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )

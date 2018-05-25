@@ -16,7 +16,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class BaseListTargetsTest(ConsoleTaskTestBase):

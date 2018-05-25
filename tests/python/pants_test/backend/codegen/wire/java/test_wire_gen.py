@@ -11,7 +11,7 @@ from pants.backend.codegen.wire.java.wire_gen import WireGen
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class WireGenTest(TaskTestBase):

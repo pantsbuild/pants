@@ -9,7 +9,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks/jvm_compile:jvm_classpath_publisher',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 
@@ -19,7 +19,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm/tasks/jvm_compile',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 

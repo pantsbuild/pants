@@ -12,7 +12,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_dependency_usage import DependencyUsageGraph, JvmDependencyUsage
 from pants.util.dirutil import safe_mkdir, touch
-from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
+from pants_test.task_test_base import TaskTestBase, ensure_cached
 
 
 class TestJvmDependencyUsage(TaskTestBase):

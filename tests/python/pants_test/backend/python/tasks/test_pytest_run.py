@@ -13,6 +13,7 @@ from textwrap import dedent
 import coverage
 from six.moves import configparser
 
+from pants.backend.python.register import build_file_aliases as register_python
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
@@ -21,13 +22,95 @@ from pants.backend.python.tasks.pytest_run import PytestResult, PytestRun
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.exceptions import ErrorWhileTesting, TaskError
+from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.source.source_root import SourceRootConfig
 from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
+from pants_test.backend.python.tasks.interpreter_cache_test_mixin import InterpreterCacheTestMixin
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.tasks.task_test_base import ensure_cached
+from pants_test.task_test_base import ensure_cached
+from pants_test.tasks.task_test_base import TaskTestBase
+
+
+class DeprecatedPythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
+  """
+  TODO: This is a copy of `PythonTaskTestBase` that extends the deprecated TaskTestBase
+  instance, because it was the last test blocking migration.
+
+  See https://github.com/pantsbuild/pants/issues/5870
+  """
+
+  @classmethod
+  def alias_groups(cls):
+    """
+    :API: public
+    """
+    return register_python()
+
+  def create_python_library(self, relpath, name, source_contents_map=None,
+                            dependencies=(), provides=None):
+    """
+    :API: public
+    """
+    sources = None if source_contents_map is None else ['__init__.py'] + source_contents_map.keys()
+    sources_strs = ["'{0}'".format(s) for s in sources] if sources else None
+    self.add_to_build_file(relpath=relpath, target=dedent("""
+    python_library(
+      name='{name}',
+      {sources_clause}
+      dependencies=[
+        {dependencies}
+      ],
+      {provides_clause}
+    )
+    """).format(
+      name=name,
+      sources_clause='sources=[{0}],'.format(','.join(sources_strs)) if sources_strs else '',
+      dependencies=','.join(map(repr, dependencies)),
+      provides_clause='provides={0},'.format(provides) if provides else ''))
+    if source_contents_map:
+      self.create_file(relpath=os.path.join(relpath, '__init__.py'))
+      for source, contents in source_contents_map.items():
+        self.create_file(relpath=os.path.join(relpath, source), contents=contents)
+    return self.target(Address(relpath, name).spec)
+
+  def create_python_binary(self, relpath, name, entry_point, dependencies=(), provides=None, shebang=None):
+    """
+    :API: public
+    """
+    self.add_to_build_file(relpath=relpath, target=dedent("""
+    python_binary(
+      name='{name}',
+      entry_point='{entry_point}',
+      dependencies=[
+        {dependencies}
+      ],
+      {provides_clause}
+      {shebang_clause}
+    )
+    """).format(name=name, entry_point=entry_point, dependencies=','.join(map(repr, dependencies)),
+                provides_clause='provides={0},'.format(provides) if provides else '',
+                shebang_clause='shebang={!r},'.format(shebang) if shebang else ''))
+    return self.target(Address(relpath, name).spec)
+
+  def create_python_requirement_library(self, relpath, name, requirements):
+    """
+    :API: public
+    """
+    def make_requirement(req):
+      return 'python_requirement("{}")'.format(req)
+
+    self.add_to_build_file(relpath=relpath, target=dedent("""
+    python_requirement_library(
+      name='{name}',
+      requirements=[
+        {requirements}
+      ]
+    )
+    """).format(name=name, requirements=','.join(map(make_requirement, requirements))))
+    return self.target(Address(relpath, name).spec)
 
 
 class PytestTestBase(PythonTaskTestBase):

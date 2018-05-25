@@ -12,7 +12,7 @@ python_tests(
     'src/python/pants/backend/docgen/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
   coverage = [
     'pants.backend.docgen.tasks.markdown_to_html',

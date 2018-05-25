@@ -12,7 +12,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher import RuntimeClasspathPublisher
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open, touch
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class RuntimeClasspathPublisherTest(TaskTestBase):

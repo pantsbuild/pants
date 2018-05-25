@@ -13,7 +13,7 @@ from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.project_info.tasks.filedeps import FileDeps
 from pants.build_graph.register import build_file_aliases as register_core
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class FileDepsTest(ConsoleTaskTestBase):

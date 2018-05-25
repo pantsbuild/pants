@@ -9,7 +9,7 @@ import os
 
 from pants.base.build_environment import get_buildroot
 from pants.core_tasks.roots import ListRoots
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class ListRootsTest(ConsoleTaskTestBase):

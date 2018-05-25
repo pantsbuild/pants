@@ -47,7 +47,7 @@ python_tests(
     'src/python/pants/base:payload',
     'src/python/pants/build_graph:build_graph',
     'src/python/pants/cache:cache',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 
@@ -58,7 +58,7 @@ python_tests(
     'src/python/pants/task:task',
     'src/python/pants/cache:cache',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 

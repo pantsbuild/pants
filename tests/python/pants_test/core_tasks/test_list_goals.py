@@ -12,7 +12,7 @@ from pants.goal.error import GoalError
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
 from pants.task.task import Task
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class ListGoalsTest(ConsoleTaskTestBase):

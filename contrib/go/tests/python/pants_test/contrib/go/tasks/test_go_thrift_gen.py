@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.codegen.thrift.lib.thrift import Thrift
 from pants.base.exceptions import TaskError
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.go.tasks.go_thrift_gen import GoThriftGen
 

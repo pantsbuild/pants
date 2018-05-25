@@ -13,7 +13,7 @@ python_library(
     ':interpreter_cache_test_mixin',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base'
+    'tests/python/pants_test:task_test_base'
   ]
 )
 
@@ -46,6 +46,7 @@ python_tests(
     'src/python/pants/util:process_handler',
     'tests/python/pants_test/engine:scheduler_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test:task_test_base',
     'tests/python/pants_test/tasks:task_test_base',
   ],
   timeout=600
@@ -85,7 +86,7 @@ python_tests(
     'src/python/pants/util:process_handler',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
   timeout=300
 )

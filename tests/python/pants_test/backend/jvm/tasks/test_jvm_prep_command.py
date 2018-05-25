@@ -9,7 +9,7 @@ from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
 from pants.backend.jvm.tasks.run_jvm_prep_command import RunJvmPrepCommandBase
 from pants.base.exceptions import TargetDefinitionException
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class FakeRunJvmPrepCommand(RunJvmPrepCommandBase):

@@ -10,7 +10,7 @@ import os
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.contrib.buildrefactor.buildozer_util import prepare_dependencies
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.buildrefactor.meta_rename import MetaRename
 

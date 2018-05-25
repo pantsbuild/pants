@@ -17,7 +17,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -31,7 +31,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 

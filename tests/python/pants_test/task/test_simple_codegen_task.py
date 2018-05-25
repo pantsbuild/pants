@@ -15,7 +15,7 @@ from pants.build_graph.target import Target
 from pants.invalidation.build_invalidator import CacheKey
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdtemp
-from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
+from pants_test.task_test_base import TaskTestBase, ensure_cached
 
 
 # A dummy target with sources= and copied= fields.

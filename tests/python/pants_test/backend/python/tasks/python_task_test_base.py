@@ -11,7 +11,7 @@ from textwrap import dedent
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.build_graph.address import Address
 from pants_test.backend.python.tasks.interpreter_cache_test_mixin import InterpreterCacheTestMixin
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):

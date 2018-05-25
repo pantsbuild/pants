@@ -13,7 +13,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class DependenciesEmptyTest(ConsoleTaskTestBase):
