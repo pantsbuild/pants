@@ -197,7 +197,7 @@ class SimpleCodegenTask(Task):
     return True
 
   def _get_synthetic_address(self, target, target_workdir):
-    synthetic_name = target.name
+    synthetic_name = target.id
     sources_rel_path = os.path.relpath(target_workdir, get_buildroot())
     synthetic_address = Address(sources_rel_path, synthetic_name)
     return synthetic_address

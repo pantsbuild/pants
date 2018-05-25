@@ -103,7 +103,7 @@ class GoCompile(GoWorkspaceTask):
     result, go_cmd = self.go_dist.execute_go_cmd(
       'install', gopath=gopath, args=args,
       workunit_factory=self.context.new_workunit,
-      workunit_name='install {}'.format(target.address.spec),
+      workunit_name='install {}'.format(target.import_path),
       workunit_labels=[WorkUnitLabel.COMPILER])
     if result != 0:
       raise TaskError('{} failed with exit code {}'.format(go_cmd, result))
