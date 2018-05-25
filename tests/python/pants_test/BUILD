@@ -97,6 +97,19 @@ python_library(
   ]
 )
 
+python_library(
+  name = 'task_test_base',
+  sources = ['task_test_base.py'],
+  dependencies = [
+    'src/python/pants/goal:context',
+    'src/python/pants/ivy',
+    'src/python/pants/task',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:process_handler',
+    'tests/python/pants_test:test_base',
+  ]
+)
+
 python_tests(
   name = 'test_maven_layout',
   sources = ['test_maven_layout.py'],
