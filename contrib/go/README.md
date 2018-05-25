@@ -279,6 +279,31 @@ You can run your Go tests with `./pants test [go targets]`. Any
 [standard Go tests](https://golang.org/pkg/testing/) found amongst the targets will be compiled and 
 run with output sent to the console.
 
+## Protocol Buffers
+
+Pants integrates [Go support for protocol buffers](https://github.com/golang/protobuf) with the
+`go_protobuf_library` target.
+
+Go targets may depend on a `go_protobuf_library` targets as if it were a `go_library` target.
+Behind the scenes, Pants will generate Go code from the protobuf sources and exposes it as if it
+were a regular Go library.
+
+For example,
+[`contrib/go/examples/src/protobuf/org/pantsbuild/example/route/BUILD`](https://github.com/pantsbuild/pants/blob/master/contrib/go/examples/src/protobuf/org/pantsbuild/example/route/BUILD)
+defines a `go_protobuf_library` target. Notice how it depends on another `go_protobuf_library`
+to satisfy imports in the IDL file.
+
+!inc[start-at=go_protobuf_library](examples/src/protobuf/org/pantsbuild/example/route/BUILD)
+
+[`contrib/go/examples/src/go/distance/BUILD`](https://github.com/pantsbuild/pants/blob/master/contrib/go/examples/src/go/distance/BUILD)
+depends on the `go_protobuf_library`, which transitively depends on another protobuf library.
+
+!inc[start-at=go_binary](examples/src/go/distance/BUILD)
+
+In Go, we can import and use the protobuf generated code as it were regular Go code.
+
+!inc[start-at=main](examples/src/go/distance/main.go)
+
 ## Working with other Go ecosystem tools
 
 Go and the Go ecosystem provide rich tool support. From native Go tools like `go list` and `go vet`

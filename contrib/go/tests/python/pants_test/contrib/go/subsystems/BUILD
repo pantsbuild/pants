@@ -29,3 +29,14 @@ python_tests(
       'contrib/go/src/python/pants/contrib/go/subsystems',
     ]
 )
+
+python_tests(
+  name='integration',
+  sources = globs('test_*_integration.py'),
+  dependencies=[
+    'contrib/go/src/python/pants/contrib/go/subsystems',
+    'tests/python/pants_test:int-test',
+  ],
+  tags={'integration'},
+  timeout=180,
+)
