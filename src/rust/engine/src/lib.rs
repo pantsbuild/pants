@@ -752,7 +752,7 @@ fn graph_sub(
   product_type: TypeConstraint,
 ) -> RuleGraph {
   let graph_maker = GraphMaker::new(&scheduler.core.tasks, vec![subject_type]);
-  graph_maker.sub_graph(subject_type, &product_type)
+  graph_maker.sub_graph(&subject_type, &product_type)
 }
 
 fn write_to_file(path: &Path, graph: &RuleGraph) -> io::Result<()> {

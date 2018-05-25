@@ -106,10 +106,11 @@ impl Select {
   pub fn new(product: TypeConstraint, params: Params, edges: &rule_graph::RuleEdges) -> Select {
     let selector = selectors::Select::without_variant(product);
     let select_key = rule_graph::SelectKey::JustSelect(selector.clone());
+    let entries = edges.entries_for(&select_key, &params);
     Select {
       selector: selector,
       params: params,
-      entries: edges.entries_for(&select_key),
+      entries: entries,
     }
   }
 
@@ -131,16 +132,14 @@ impl Select {
     params: Params,
     edges: &rule_graph::RuleEdges,
   ) -> Select {
-    let subject_type_id = params.expect_single().type_id().clone();
     let select_key = rule_graph::SelectKey::JustSelect(selector.clone());
+    // TODO: We should know statically which entries are valid, right? It's not clear why this
+    // method needs to filter... can maybe remove SelectKey.
+    let entries = edges.entries_for(&select_key, &params);
     Select {
       selector: selector,
       params: params,
-      entries: edges
-        .entries_for(&select_key)
-        .into_iter()
-        .filter(|e| e.matches_subject_type(subject_type_id))
-        .collect(),
+      entries: entries,
     }
   }
 
@@ -746,16 +745,22 @@ impl Task {
     let get_futures = gets
       .into_iter()
       .map(|externs::Get(product, subject)| {
+        // TODO: The subject of the get is a new parameter, but params from the context should be
+        // included as well.
+        let params = Params::new(vec![subject]);
         let entries = context
           .core
           .rule_graph
           .edges_for_inner(entry)
           .expect("edges for task exist.")
-          .entries_for(&rule_graph::SelectKey::JustGet(selectors::Get {
-            product: product,
-            subject: *subject.type_id(),
-          }));
-        Select::new_with_entries(product, Params::new(vec![subject]), entries)
+          .entries_for(
+            &rule_graph::SelectKey::JustGet(selectors::Get {
+              product: product,
+              subject: *subject.type_id(),
+            }),
+            &params,
+          );
+        Select::new_with_entries(product, params, entries)
           .run(context.clone())
           .map_err(was_required)
       })

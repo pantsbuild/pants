@@ -67,6 +67,14 @@ impl Tasks {
     self.tasks.values().flat_map(|tasks| tasks).collect()
   }
 
+  pub fn singleton_types(&self) -> Vec<TypeId> {
+    self
+      .singletons
+      .values()
+      .map(|&(k, _)| *k.type_id())
+      .collect()
+  }
+
   pub fn gen_singleton(&self, product: &TypeConstraint) -> Option<&(Key, Value)> {
     self.singletons.get(product)
   }

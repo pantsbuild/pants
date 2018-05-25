@@ -44,8 +44,15 @@ impl Params {
     &self.0[0]
   }
 
+  ///
+  /// Returns the given TypeId if it is represented in this set of Params.
+  ///
   pub fn find(&self, type_id: TypeId) -> Option<&Key> {
-    self.0.iter().find(|k| k.type_id() == &type_id)
+    self
+      .0
+      .binary_search_by(|probe| probe.type_id().cmp(&type_id))
+      .ok()
+      .map(|idx| &self.0[idx])
   }
 }
 

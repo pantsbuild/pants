@@ -82,7 +82,7 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
                        (A, (Select(B),), noop):
-                         no rule was available to compute B for subject type SubA
+                         no rule was available to compute B with parameter type SubA
                      """).strip(),
                                     str(cm.exception))
 
@@ -94,8 +94,8 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
                        (A, (Select(B), Select(C)), noop):
-                         no rule was available to compute B for subject type SubA
-                         no rule was available to compute C for subject type SubA
+                         no rule was available to compute B with parameter type SubA
+                         no rule was available to compute C with parameter type SubA
                      """).strip(),
       str(cm.exception))
 
@@ -115,9 +115,9 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                       Rules with errors: 2
                                         (A, (Select(B),), noop):
-                                          no rule was available to compute B for subject type C
+                                          no rule was available to compute B with parameter type C
                                         (B, (Select(SubA),), noop):
-                                          no rule was available to compute SubA for subject type C
+                                          no rule was available to compute SubA with parameter type C
                                       """).strip(),
                                     str(cm.exception))
 
@@ -142,7 +142,7 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                       Rules with errors: 1
                                         (D, (Select(C),), noop):
-                                          no rule was available to compute C for subject type A
+                                          no rule was available to compute C with parameter type A
                                       """).strip(),
                                     str(cm.exception))
 
@@ -161,9 +161,9 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                       Rules with errors: 2
                         (B, (Select(D),), noop):
-                          no rule was available to compute D for subject type SubA
+                          no rule was available to compute D with parameter type SubA
                         (D, (Select(A), Select(SubA)), [Get(A, C)], noop):
-                          no rule was available to compute A for subject type C
+                          no rule was available to compute A with parameter type C
                       """).strip(),
         str(cm.exception))
 
@@ -188,7 +188,7 @@ class RuleGraphMakerTest(unittest.TestCase):
                          "Select(A) for SubA" [color=blue]
                          "Select(A) for SubA" -> {"(A, (Select(SubA),), noop) of SubA"}
                        // internal entries
-                         "(A, (Select(SubA),), noop) of SubA" -> {"SubjectIsProduct(SubA)"}
+                         "(A, (Select(SubA),), noop) of SubA" -> {"Param(SubA)"}
                      }""").strip(), fullgraph)
 
   def test_full_graph_for_planner_example(self):
@@ -237,7 +237,7 @@ class RuleGraphMakerTest(unittest.TestCase):
                        // root subject types: A, SubA
                        // root entries
                          "Select(A) for A" [color=blue]
-                         "Select(A) for A" -> {"SubjectIsProduct(A)"}
+                         "Select(A) for A" -> {"Param(A)"}
                          "Select(A) for SubA" [color=blue]
                          "Select(A) for SubA" -> {"(A, (Select(SubA),), noop) of SubA"}
                          "Select(B) for A" [color=blue]
@@ -245,8 +245,8 @@ class RuleGraphMakerTest(unittest.TestCase):
                          "Select(B) for SubA" [color=blue]
                          "Select(B) for SubA" -> {"(B, (Select(A),), noop) of SubA"}
                        // internal entries
-                         "(A, (Select(SubA),), noop) of SubA" -> {"SubjectIsProduct(SubA)"}
-                         "(B, (Select(A),), noop) of A" -> {"SubjectIsProduct(A)"}
+                         "(A, (Select(SubA),), noop) of SubA" -> {"Param(SubA)"}
+                         "(B, (Select(A),), noop) of A" -> {"Param(A)"}
                          "(B, (Select(A),), noop) of SubA" -> {"(A, (Select(SubA),), noop) of SubA"}
                      }""").strip(),
                      fullgraph)
@@ -265,7 +265,7 @@ class RuleGraphMakerTest(unittest.TestCase):
                          "Select(A) for SubA" [color=blue]
                          "Select(A) for SubA" -> {"(A, (Select(SubA),), noop) of SubA"}
                        // internal entries
-                         "(A, (Select(SubA),), noop) of SubA" -> {"SubjectIsProduct(SubA)"}
+                         "(A, (Select(SubA),), noop) of SubA" -> {"Param(SubA)"}
                      }""").strip(),
       subgraph)
 
@@ -284,7 +284,7 @@ class RuleGraphMakerTest(unittest.TestCase):
                          "Select(A) for SubA" [color=blue]
                          "Select(A) for SubA" -> {"(A, (Select(SubA), Select(B)), noop) of SubA"}
                        // internal entries
-                         "(A, (Select(SubA), Select(B)), noop) of SubA" -> {"SubjectIsProduct(SubA)" "(B, (,), noop) of SubA"}
+                         "(A, (Select(SubA), Select(B)), noop) of SubA" -> {"Param(SubA)" "(B, (,), noop) of SubA"}
                          "(B, (,), noop) of SubA" -> {}
                      }""").strip(),
       subgraph)
@@ -305,7 +305,7 @@ class RuleGraphMakerTest(unittest.TestCase):
                          "Select(A) for SubA" -> {"(A, (Select(B),), noop) of SubA"}
                        // internal entries
                          "(A, (Select(B),), noop) of SubA" -> {"(B, (Select(SubA),), noop) of SubA"}
-                         "(B, (Select(SubA),), noop) of SubA" -> {"SubjectIsProduct(SubA)"}
+                         "(B, (Select(SubA),), noop) of SubA" -> {"Param(SubA)"}
                      }""").strip(),
       subgraph)
 
@@ -365,7 +365,7 @@ class RuleGraphMakerTest(unittest.TestCase):
                          "Select(A) for C" [color=blue]
                          "Select(A) for C" -> {"(A, (Select(C),), noop) of C"}
                        // internal entries
-                         "(A, (Select(C),), noop) of C" -> {"SubjectIsProduct(C)"}
+                         "(A, (Select(C),), noop) of C" -> {"Param(C)"}
                      }""").strip(),
       fullgraph)
 
@@ -398,7 +398,6 @@ class RuleGraphMakerTest(unittest.TestCase):
 
     subgraph = self.create_subgraph(A, rules, SubA())
 
-    #TODO perhaps singletons should be marked in the dot format somehow
     self.assert_equal_with_printing(dedent("""
                      digraph {
                        // root subject types: SubA
@@ -406,7 +405,7 @@ class RuleGraphMakerTest(unittest.TestCase):
                          "Select(A) for SubA" [color=blue]
                          "Select(A) for SubA" -> {"(A, (Select(SubA),), [Get(B, C)], noop) of SubA"}
                        // internal entries
-                         "(A, (Select(SubA),), [Get(B, C)], noop) of SubA" -> {"SubjectIsProduct(SubA)" "Singleton(B(), B)"}
+                         "(A, (Select(SubA),), [Get(B, C)], noop) of SubA" -> {"Singleton(B(), B)" "Param(SubA)"}
                      }""").strip(),
       subgraph)
 
@@ -426,7 +425,7 @@ class RuleGraphMakerTest(unittest.TestCase):
                          "Select(B) for SubA" [color=blue]
                          "Select(B) for SubA" -> {"(B, (Select(A),), noop) of SubA"}
                        // internal entries
-                         "(A, (Select(SubA),), noop) of SubA" -> {"SubjectIsProduct(SubA)"}
+                         "(A, (Select(SubA),), noop) of SubA" -> {"Param(SubA)"}
                          "(B, (Select(A),), noop) of SubA" -> {"(A, (Select(SubA),), noop) of SubA"}
                      }""").strip(),
       subgraph)
@@ -451,7 +450,7 @@ class RuleGraphMakerTest(unittest.TestCase):
                          "Select(C) for SubA" [color=blue]
                          "Select(C) for SubA" -> {"(C, (Select(A),), noop) of SubA"}
                        // internal entries
-                         "(A, (Select(SubA),), noop) of SubA" -> {"SubjectIsProduct(SubA)"}
+                         "(A, (Select(SubA),), noop) of SubA" -> {"Param(SubA)"}
                          "(B, (Select(A),), noop) of SubA" -> {"(A, (Select(SubA),), noop) of SubA"}
                          "(C, (Select(A),), noop) of SubA" -> {"(A, (Select(SubA),), noop) of SubA"}
                      }""").strip(),
@@ -473,7 +472,7 @@ class RuleGraphMakerTest(unittest.TestCase):
                          "Select(A) for SubA" -> {"(A, (,), [Get(B, D)], noop) of SubA"}
                        // internal entries
                          "(A, (,), [Get(B, D)], noop) of SubA" -> {"(B, (Select(D),), noop) of D"}
-                         "(B, (Select(D),), noop) of D" -> {"SubjectIsProduct(D)"}
+                         "(B, (Select(D),), noop) of D" -> {"Param(D)"}
                      }""").strip(),
                                     subgraph)
 

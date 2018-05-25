@@ -1,13 +1,15 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::{hash_map, HashMap, HashSet};
+use std::collections::{hash_map, BTreeSet, HashMap, HashSet};
 use std::io;
 
-use core::{Function, Key, TypeConstraint, TypeId, Value, ANY_TYPE};
+use core::{Function, Key, Params, TypeConstraint, TypeId, Value, ANY_TYPE};
 use externs;
 use selectors::{Get, Select};
 use tasks::{Intrinsic, Task, Tasks};
+
+type ParamTypes = BTreeSet<TypeId>;
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct UnreachableError {
@@ -20,7 +22,7 @@ impl UnreachableError {
     UnreachableError {
       task_rule: task_rule,
       diagnostic: Diagnostic {
-        subject_type: ANY_TYPE,
+        params: Default::default(),
         reason: "Unreachable".to_string(),
       },
     }
@@ -34,10 +36,10 @@ pub enum EntryWithDeps {
 }
 
 impl EntryWithDeps {
-  fn subject_type(&self) -> TypeId {
+  fn params(&self) -> &ParamTypes {
     match self {
-      &EntryWithDeps::Root(ref re) => re.subject_type,
-      &EntryWithDeps::Inner(ref ie) => ie.subject_type,
+      &EntryWithDeps::Root(ref re) => &re.params,
+      &EntryWithDeps::Inner(ref ie) => &ie.params,
     }
   }
 
@@ -83,26 +85,14 @@ impl EntryWithDeps {
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Entry {
-  SubjectIsProduct { subject_type: TypeId },
-
+  Param(TypeId),
   WithDeps(EntryWithDeps),
-
-  Singleton { value: Key, product: TypeConstraint },
-}
-
-impl Entry {
-  pub fn matches_subject_type(&self, actual_subject_type: TypeId) -> bool {
-    match self {
-      &Entry::SubjectIsProduct { ref subject_type } => *subject_type == actual_subject_type,
-      &Entry::WithDeps(ref r) => r.subject_type() == actual_subject_type,
-      &Entry::Singleton { .. } => true,
-    }
-  }
+  Singleton(Key, TypeConstraint),
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct RootEntry {
-  subject_type: TypeId,
+  params: ParamTypes,
   // TODO: A RootEntry can only have one declared `Select`, and no declared `Get`s, but these
   // are shaped as Vecs to temporarily minimize the re-shuffling in `_construct_graph`. Remove in
   // a future commit.
@@ -120,28 +110,13 @@ pub enum Rule {
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct InnerEntry {
-  subject_type: TypeId,
+  params: ParamTypes,
   rule: Rule,
 }
 
 impl InnerEntry {
   pub fn rule(&self) -> &Rule {
     &self.rule
-  }
-}
-
-impl Entry {
-  fn new_subject_is_product(subject_type: TypeId) -> Entry {
-    Entry::SubjectIsProduct {
-      subject_type: subject_type,
-    }
-  }
-
-  fn new_singleton(value: Key, product: TypeConstraint) -> Entry {
-    Entry::Singleton {
-      value: value,
-      product: product,
-    }
   }
 }
 
@@ -165,7 +140,7 @@ type UnfulfillableRuleMap = HashMap<EntryWithDeps, RuleDiagnostics>;
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct Diagnostic {
-  subject_type: TypeId,
+  params: ParamTypes,
   reason: String,
 }
 
@@ -173,19 +148,23 @@ pub struct Diagnostic {
 // to be found statically rather than dynamically.
 pub struct GraphMaker<'t> {
   tasks: &'t Tasks,
-  root_subject_types: Vec<TypeId>,
+  root_param_types: ParamTypes,
 }
 
 impl<'t> GraphMaker<'t> {
   pub fn new(tasks: &'t Tasks, root_subject_types: Vec<TypeId>) -> GraphMaker<'t> {
+    let root_param_types = root_subject_types.into_iter().collect();
     GraphMaker {
-      tasks: tasks,
-      root_subject_types: root_subject_types,
+      tasks,
+      root_param_types,
     }
   }
 
-  pub fn sub_graph(&self, subject_type: TypeId, product_type: &TypeConstraint) -> RuleGraph {
-    if let Some(beginning_root) = self.gen_root_entry(subject_type, product_type) {
+  pub fn sub_graph(&self, subject_type: &TypeId, product_type: &TypeConstraint) -> RuleGraph {
+    // TODO: Update to support rendering a subgraph given a set of ParamTypes.
+    let param_types = vec![*subject_type].into_iter().collect();
+
+    if let Some(beginning_root) = self.gen_root_entry(&param_types, product_type) {
       self._construct_graph(vec![beginning_root])
     } else {
       RuleGraph::default()
@@ -198,11 +177,13 @@ impl<'t> GraphMaker<'t> {
 
   pub fn _construct_graph(&self, roots: Vec<RootEntry>) -> RuleGraph {
     let mut dependency_edges: RuleDependencyEdges = HashMap::new();
+    let mut entry_equivalences = HashMap::new();
     let mut unfulfillable_rules: UnfulfillableRuleMap = HashMap::new();
 
     for beginning_root in roots {
       self._construct_graph_helper(
         &mut dependency_edges,
+        &mut entry_equivalences,
         &mut unfulfillable_rules,
         EntryWithDeps::Root(beginning_root),
       );
@@ -211,7 +192,7 @@ impl<'t> GraphMaker<'t> {
     let unreachable_rules = self.unreachable_rules(&dependency_edges, &unfulfillable_rules);
 
     RuleGraph {
-      root_subject_types: self.root_subject_types.clone(),
+      root_param_types: self.root_param_types.clone(),
       rule_dependency_edges: dependency_edges,
       unfulfillable_rules: unfulfillable_rules,
       unreachable_rules: unreachable_rules,
@@ -249,57 +230,86 @@ impl<'t> GraphMaker<'t> {
   }
 
   ///
-  /// Computes (and memoizes) whether any rules can compute the given `product_type` for the given
-  /// `subject_type`.
+  /// Computes whether the given candidate entry is satisfiable, and if it is, returns a copy
+  /// of the entry with its parameters pruned to what is actually used. Once computed, the
+  /// "equivalence" of the input entry to the output entry is memoized in entry_equivalences.
   ///
-  /// When a rule cannot be fulfilled, it is added to `unfulfillable_rules` rather than to
-  /// `rule_dependency_edges`.
+  /// When a rule can be fulfilled it will end up stored in both the rule_dependency_edges and
+  /// the equivalances. If it can't be fulfilled, it is added to `unfulfillable_rules`.
   ///
   fn _construct_graph_helper(
     &self,
     rule_dependency_edges: &mut RuleDependencyEdges,
+    entry_equivalences: &mut HashMap<EntryWithDeps, EntryWithDeps>,
     unfulfillable_rules: &mut UnfulfillableRuleMap,
     entry: EntryWithDeps,
-  ) -> bool {
-    // If the entry has not been visited before, store a placeholder in the unfulfillable rules map
-    // and then visit its children. Otherwise, we're done.
+  ) -> Option<EntryWithDeps> {
+    if let Some(equivalent) = entry_equivalences.get(&entry) {
+      // A simplified equivalent entry has already been computed, return it.
+      return Some(equivalent.clone());
+    } else if let Some(_) = unfulfillable_rules.get(&entry) {
+      // The rule is unfulfillable.
+      return None;
+    }
+
+    // Otherwise, store a placeholder in the rule_dependency_edges map and then visit its
+    // children.
     //
     // This prevents infinite recursion by shortcircuiting when an entry recursively depends on
     // itself. It's totally fine for rules to be recursive: the recursive path just never
     // contributes to whether the rule is satisfiable.
-    match (unfulfillable_rules.entry(entry.clone()), rule_dependency_edges.entry(entry.clone())) {
-      (hash_map::Entry::Vacant(_), hash_map::Entry::Vacant(re)) => {
+    match rule_dependency_edges.entry(entry.clone()) {
+      hash_map::Entry::Vacant(re) => {
         // When a rule has not been visited before, we visit it by storing a placeholder in the
         // rule dependencies map (to prevent infinite recursion).
         re.insert(RuleEdges::default());
       },
-      (hash_map::Entry::Vacant(_), hash_map::Entry::Occupied(_)) =>
-        // Rule has been visited before and been found to be valid, or is currently being
-        // recursively visited and has a placeholder.
-        return true,
-      (hash_map::Entry::Occupied(_), _) =>
-        // Rule has either been visited before and found unfulfillable.
-        return false,
+      hash_map::Entry::Occupied(o) =>
+        // We're currently recursively under this rule, but its simplified equivalence has not yet
+        // been computed. This entry will be rewritten with its equivalency when the parent
+        // completes.
+        return Some(o.key().clone()),
     };
 
     // For each dependency of the rule, recurse for each potential match and collect RuleEdges.
     let mut edges = RuleEdges::new();
     let mut fulfillable = true;
+    let mut used_params = BTreeSet::new();
     for select_key in entry.dependency_keys() {
-      let (subject, product) = match &select_key {
-        &SelectKey::JustSelect(ref s) => (entry.subject_type(), s.product),
-        &SelectKey::JustGet(ref g) => (g.subject, g.product),
+      let (params, product) = match &select_key {
+        &SelectKey::JustSelect(ref s) => (entry.params().clone(), s.product.clone()),
+        &SelectKey::JustGet(ref g) => {
+          let get_params = {
+            let mut p = entry.params().clone();
+            p.insert(g.subject.clone());
+            p
+          };
+          (get_params, g.product.clone())
+        }
       };
 
       // Confirm that at least one candidate is fulfillable.
-      let fulfillable_candidates = rhs(&self.tasks, subject, &product)
+      let fulfillable_candidates = rhs(&self.tasks, &params, &product)
         .into_iter()
-        .filter(|candidate| match candidate {
-          &Entry::WithDeps(ref c) => {
-            self._construct_graph_helper(rule_dependency_edges, unfulfillable_rules, c.clone())
+        .filter_map(|candidate| match candidate {
+          Entry::WithDeps(c) => {
+            if let Some(equivalence) = self._construct_graph_helper(
+              rule_dependency_edges,
+              entry_equivalences,
+              unfulfillable_rules,
+              c,
+            ) {
+              used_params.extend(equivalence.params().iter().cloned());
+              Some(Entry::WithDeps(equivalence))
+            } else {
+              None
+            }
           }
-          &Entry::SubjectIsProduct { .. } => true,
-          &Entry::Singleton { .. } => true,
+          Entry::Param(type_id) => {
+            used_params.insert(type_id);
+            Some(Entry::Param(type_id))
+          }
+          s @ Entry::Singleton { .. } => Some(s),
         })
         .collect::<Vec<_>>();
 
@@ -309,11 +319,12 @@ impl<'t> GraphMaker<'t> {
           .entry(entry.clone())
           .or_insert_with(Vec::new)
           .push(Diagnostic {
-            subject_type: subject,
+            params: params.clone(),
             reason: format!(
-              "no rule was available to compute {} for subject type {}",
-              type_constraint_str(product),
-              type_str(subject)
+              "no rule was available to compute {} with parameter type{} {}",
+              type_constraint_str(product.clone()),
+              if params.len() > 1 { "s" } else { "" },
+              params_str(&params),
             ),
           });
         fulfillable = false;
@@ -324,40 +335,39 @@ impl<'t> GraphMaker<'t> {
     }
 
     if fulfillable {
-      // All depedendencies were fulfillable: replace the placeholder with the computed RuleEdges.
-      rule_dependency_edges.insert(entry, edges);
-      true
+      // All dependencies were fulfillable: store the equivalence, and replace the placeholder.
+      // TODO: Compute used parameters above and store them here.
+      // TODO2: We also need to rewrite all edges with the new equivalence, because in cases where
+      // we recursed on ourself, nodes will have dependencies on us.
+      entry_equivalences.insert(entry.clone(), entry.clone());
+      rule_dependency_edges.insert(entry.clone(), edges);
+      Some(entry)
     } else {
       // Was not fulfillable. Remove the placeholder: the unfulfillable entries we stored will
       // prevent us from attempting to expand this node again.
       rule_dependency_edges.remove(&entry);
-      false
+      None
     }
   }
 
   fn gen_root_entries(&self, product_types: &HashSet<TypeConstraint>) -> Vec<RootEntry> {
-    let mut result: Vec<RootEntry> = Vec::new();
-    for subj_type in &self.root_subject_types {
-      for pt in product_types {
-        if let Some(entry) = self.gen_root_entry(*subj_type, pt) {
-          result.push(entry);
-        }
-      }
-    }
-    result
+    product_types
+      .iter()
+      .filter_map(|product_type| self.gen_root_entry(&self.root_param_types, product_type))
+      .collect()
   }
 
   fn gen_root_entry(
     &self,
-    subject_type: TypeId,
+    param_types: &ParamTypes,
     product_type: &TypeConstraint,
   ) -> Option<RootEntry> {
-    let candidates = rhs(&self.tasks, subject_type, product_type);
+    let candidates = rhs(&self.tasks, param_types, product_type);
     if candidates.is_empty() {
       None
     } else {
       Some(RootEntry {
-        subject_type: subject_type,
+        params: param_types.clone(),
         clause: vec![Select {
           product: *product_type,
           variant_key: None,
@@ -376,7 +386,7 @@ impl<'t> GraphMaker<'t> {
 /// the subject of the graph.
 ///
 ///
-/// `root_subject_types` the root subject types this graph was generated with.
+/// `root_param_types` the root parameter types that this graph was generated with.
 /// `root_dependencies` A map from root rules, ie rules representing the expected selector / subject
 ///   types for requests, to the rules that can fulfill them.
 /// `rule_dependency_edges` A map from rule entries to the rule entries they depend on.
@@ -385,7 +395,7 @@ impl<'t> GraphMaker<'t> {
 ///   containing the reasons why they were eliminated from the graph.
 #[derive(Debug, Default)]
 pub struct RuleGraph {
-  root_subject_types: Vec<TypeId>,
+  root_param_types: ParamTypes,
   rule_dependency_edges: RuleDependencyEdges,
   unfulfillable_rules: UnfulfillableRuleMap,
   unreachable_rules: Vec<UnreachableError>,
@@ -419,6 +429,14 @@ pub fn type_str(type_id: TypeId) -> String {
   }
 }
 
+pub fn params_str(params: &ParamTypes) -> String {
+  params
+    .iter()
+    .map(|type_id| type_str(type_id.clone()))
+    .collect::<Vec<_>>()
+    .join("+")
+}
+
 fn val_name(val: &Value) -> String {
   externs::project_str(val, "__name__")
 }
@@ -438,12 +456,10 @@ fn get_str(get: &Get) -> String {
 fn entry_str(entry: &Entry) -> String {
   match entry {
     &Entry::WithDeps(ref e) => entry_with_deps_str(e),
-    &Entry::SubjectIsProduct { subject_type } => {
-      format!("SubjectIsProduct({})", type_str(subject_type))
-    }
-    &Entry::Singleton { ref value, product } => format!(
+    &Entry::Param(type_id) => format!("Param({})", type_str(type_id)),
+    &Entry::Singleton(value, product) => format!(
       "Singleton({}, {})",
-      externs::key_to_str(value),
+      externs::key_to_str(&value),
       type_constraint_str(product)
     ),
   }
@@ -453,17 +469,17 @@ fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
   match entry {
     &EntryWithDeps::Inner(InnerEntry {
       rule: Rule::Task(ref task_rule),
-      subject_type,
-    }) => format!("{} of {}", task_display(task_rule), type_str(subject_type)),
+      ref params,
+    }) => format!("{} of {}", task_display(task_rule), params_str(params)),
     &EntryWithDeps::Inner(InnerEntry {
       rule: Rule::Intrinsic(ref intrinsic),
-      subject_type,
+      ref params,
     }) => format!(
       "({}, ({},), {:?}) for {}",
       type_constraint_str(intrinsic.product),
       type_constraint_str(intrinsic.input),
       intrinsic.kind,
-      type_str(subject_type)
+      params_str(params)
     ),
     &EntryWithDeps::Root(ref root) => format!(
       "{} for {}",
@@ -473,7 +489,7 @@ fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
         .map(|s| select_str(s))
         .collect::<Vec<_>>()
         .join(", "),
-      type_str(root.subject_type)
+      params_str(&root.params)
     ),
   }
 }
@@ -515,9 +531,9 @@ impl RuleGraph {
   }
 
   pub fn find_root_edges(&self, subject_type: TypeId, select: Select) -> Option<RuleEdges> {
-    // TODO return Result instead
+    // TODO: Support more than one root parameter... needs some API work.
     let root = RootEntry {
-      subject_type: subject_type,
+      params: vec![subject_type].into_iter().collect(),
       clause: vec![select],
       gets: vec![],
     };
@@ -620,7 +636,7 @@ impl RuleGraph {
     }
 
     let mut root_subject_type_strs = self
-      .root_subject_types
+      .root_param_types
       .iter()
       .map(|&t| type_str(t))
       .collect::<Vec<String>>();
@@ -694,11 +710,24 @@ impl RuleEdges {
     }
   }
 
-  pub fn entries_for(&self, select_key: &SelectKey) -> Entries {
+  pub fn entries_for(&self, select_key: &SelectKey, param_values: &Params) -> Entries {
     self
       .dependencies_by_select_key
       .get(select_key)
-      .cloned()
+      .map(|entries| {
+        entries
+          .into_iter()
+          .filter(|&entry| match entry {
+            &Entry::WithDeps(EntryWithDeps::Root(RootEntry { ref params, .. }))
+            | &Entry::WithDeps(EntryWithDeps::Inner(InnerEntry { ref params, .. })) => params
+              .iter()
+              .all(|type_id| param_values.find(*type_id).is_some()),
+            &Entry::Param(type_id) => param_values.find(type_id).is_some(),
+            &Entry::Singleton { .. } => true,
+          })
+          .cloned()
+          .collect()
+      })
       .unwrap_or_else(Vec::new)
   }
 
@@ -722,28 +751,33 @@ impl RuleEdges {
   }
 }
 
-fn rhs(tasks: &Tasks, subject_type: TypeId, product_type: &TypeConstraint) -> Entries {
-  if externs::satisfied_by_type(product_type, subject_type) {
-    // NB a matching subject is always picked first
-    vec![Entry::new_subject_is_product(subject_type)]
-  } else if let Some(&(ref key, _)) = tasks.gen_singleton(product_type) {
-    vec![Entry::new_singleton(*key, *product_type)]
-  } else {
-    let mut entries = Vec::new();
-    if let Some(matching_intrinsic) = tasks.gen_intrinsic(product_type) {
-      entries.push(Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
-        subject_type: subject_type,
-        rule: Rule::Intrinsic(*matching_intrinsic),
-      })));
-    }
-    if let Some(matching_tasks) = tasks.gen_tasks(product_type) {
-      entries.extend(matching_tasks.iter().map(|task_rule| {
-        Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
-          subject_type: subject_type,
-          rule: Rule::Task(task_rule.clone()),
-        }))
-      }));
-    }
-    entries
+fn rhs(tasks: &Tasks, params: &ParamTypes, product_type: &TypeConstraint) -> Entries {
+  if let Some(&(ref key, _)) = tasks.gen_singleton(product_type) {
+    return vec![Entry::Singleton(*key, *product_type)];
   }
+
+  let mut entries = Vec::new();
+  if let Some(type_id) = params
+    .iter()
+    .find(|&&type_id| externs::satisfied_by_type(product_type, type_id))
+  {
+    // TODO: We only match the first param type here that satisfies the constraint although it's
+    // possible that multiple parameters could. Would be nice to be able to remove TypeConstraint.
+    entries.push(Entry::Param(*type_id));
+  }
+  if let Some(matching_intrinsic) = tasks.gen_intrinsic(product_type) {
+    entries.push(Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
+      params: params.clone(),
+      rule: Rule::Intrinsic(*matching_intrinsic),
+    })));
+  }
+  if let Some(matching_tasks) = tasks.gen_tasks(product_type) {
+    entries.extend(matching_tasks.iter().map(|task_rule| {
+      Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
+        params: params.clone(),
+        rule: Rule::Task(task_rule.clone()),
+      }))
+    }));
+  }
+  entries
 }
