@@ -28,7 +28,6 @@ from pants.source.source_root import SourceRootConfig
 from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants_test.backend.python.tasks.interpreter_cache_test_mixin import InterpreterCacheTestMixin
-from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.task_test_base import ensure_cached
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -42,8 +41,8 @@ class DeprecatedPythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
   See https://github.com/pantsbuild/pants/issues/5870
   """
 
-  @classmethod
-  def alias_groups(cls):
+  @property
+  def alias_groups(self):
     """
     :API: public
     """
@@ -113,7 +112,7 @@ class DeprecatedPythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
     return self.target(Address(relpath, name).spec)
 
 
-class PytestTestBase(PythonTaskTestBase):
+class PytestTestBase(DeprecatedPythonTaskTestBase):
   @classmethod
   def task_type(cls):
     return PytestRun
