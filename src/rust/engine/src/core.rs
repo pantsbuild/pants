@@ -71,17 +71,10 @@ pub struct Function(pub Key);
 /// Wraps a type id for use as a key in HashMaps and sets.
 ///
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Key {
   id: Id,
   type_id: TypeId,
-}
-
-// This is consumed in user-facing error messages, such as for --glob-expansion-failure=error.
-impl fmt::Debug for Key {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "Key(val={:?})", externs::key_to_str(self))
-  }
 }
 
 impl Eq for Key {}

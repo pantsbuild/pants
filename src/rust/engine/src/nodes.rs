@@ -671,8 +671,8 @@ impl Snapshot {
     let glob_match_error_behavior =
       externs::project_ignoring_type(item, "glob_match_error_behavior");
     let failure_behavior = externs::project_str(&glob_match_error_behavior, "failure_behavior");
-    let strict_glob_matching = StrictGlobMatching::create(failure_behavior)?;
-    PathGlobs::create_with_match_behavior(&include, &exclude, strict_glob_matching).map_err(|e| {
+    let strict_glob_matching = StrictGlobMatching::create(failure_behavior.as_str())?;
+    PathGlobs::create(&include, &exclude, strict_glob_matching).map_err(|e| {
       format!(
         "Failed to parse PathGlobs for include({:?}), exclude({:?}): {}",
         include, exclude, e
@@ -923,7 +923,7 @@ impl NodeKey {
         keystr(&s.subject),
         typstr(&s.product)
       ),
-      &NodeKey::Snapshot(ref s) => format!("Snapshot({:?})", s.0),
+      &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.0)),
     }
   }
 

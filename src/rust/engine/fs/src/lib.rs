@@ -49,7 +49,7 @@ use bytes::Bytes;
 use futures::future::{self, Future};
 use glob::Pattern;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
-use indexmap::{IndexMap, IndexSet};
+use indexmap::{IndexMap, IndexSet, map::Entry::Occupied};
 
 use boxfuture::{BoxFuture, Boxable};
 
@@ -121,7 +121,7 @@ impl PathStat {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct GitignoreStyleExcludes {
   patterns: Vec<String>,
   gitignore: Gitignore,
@@ -175,9 +175,7 @@ lazy_static! {
     patterns: vec![],
     gitignore: Gitignore::empty(),
   });
-  static ref MISSING_GLOB_SOURCE: GlobParsedSource = GlobParsedSource {
-    gitignore_style_glob: String::from(""),
-  };
+  static ref MISSING_GLOB_SOURCE: GlobParsedSource = GlobParsedSource(String::from(""));
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -196,9 +194,7 @@ pub enum PathGlob {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct GlobParsedSource {
-  gitignore_style_glob: String,
-}
+pub struct GlobParsedSource(String);
 
 #[derive(Clone, Debug)]
 pub struct PathGlobIncludeEntry {
@@ -261,9 +257,7 @@ impl PathGlob {
       let canonical_dir = Dir(PathBuf::new());
       let symbolic_path = PathBuf::new();
       spec_globs_map.push(PathGlobIncludeEntry {
-        input: GlobParsedSource {
-          gitignore_style_glob: filespec.clone(),
-        },
+        input: GlobParsedSource(filespec.clone()),
         globs: PathGlob::parse(canonical_dir, symbolic_path, filespec)?,
       });
     }
@@ -397,19 +391,19 @@ pub enum StrictGlobMatching {
 impl StrictGlobMatching {
   // TODO(cosmicexplorer): match this up with the allowed values for the GlobMatchErrorBehavior type
   // in python somehow?
-  pub fn create(behavior: String) -> Result<Self, String> {
-    match behavior.as_str() {
+  pub fn create(behavior: &str) -> Result<Self, String> {
+    match behavior {
       "ignore" => Ok(StrictGlobMatching::Ignore),
       "warn" => Ok(StrictGlobMatching::Warn),
       "error" => Ok(StrictGlobMatching::Error),
       _ => Err(format!(
-        "???/unrecognized strict glob matching behavior: {}",
-        behavior
+        "Unrecognized strict glob matching behavior: {}.",
+        behavior,
       )),
     }
   }
 
-  pub fn should_check_initial_glob_matches(&self) -> bool {
+  pub fn should_check_glob_matches(&self) -> bool {
     match self {
       &StrictGlobMatching::Ignore => false,
       _ => true,
@@ -426,40 +420,36 @@ impl StrictGlobMatching {
 
 #[derive(Debug)]
 pub struct PathGlobs {
-  include_entries: Vec<PathGlobIncludeEntry>,
+  include: Vec<PathGlobIncludeEntry>,
   exclude: Arc<GitignoreStyleExcludes>,
   strict_match_behavior: StrictGlobMatching,
 }
 
 impl PathGlobs {
-  pub fn create(include: &[String], exclude: &[String]) -> Result<PathGlobs, String> {
-    Self::create_with_match_behavior(include, exclude, StrictGlobMatching::Ignore)
-  }
-
-  pub fn create_with_match_behavior(
+  pub fn create(
     include: &[String],
     exclude: &[String],
     strict_match_behavior: StrictGlobMatching,
   ) -> Result<PathGlobs, String> {
-    let include_entries = PathGlob::spread_filespecs(include)?;
-    Self::create_with_globs_and_match_behavior(include_entries, exclude, strict_match_behavior)
+    let include = PathGlob::spread_filespecs(include)?;
+    Self::create_with_globs_and_match_behavior(include, exclude, strict_match_behavior)
   }
 
   fn create_with_globs_and_match_behavior(
-    include_entries: Vec<PathGlobIncludeEntry>,
+    include: Vec<PathGlobIncludeEntry>,
     exclude: &[String],
     strict_match_behavior: StrictGlobMatching,
   ) -> Result<PathGlobs, String> {
     let gitignore_excludes = GitignoreStyleExcludes::create(exclude)?;
     Ok(PathGlobs {
-      include_entries,
+      include,
       exclude: gitignore_excludes,
       strict_match_behavior,
     })
   }
 
   pub fn from_globs(include: Vec<PathGlob>) -> Result<PathGlobs, String> {
-    let include_entries = include
+    let include = include
       .into_iter()
       .map(|glob| PathGlobIncludeEntry {
         input: MISSING_GLOB_SOURCE.clone(),
@@ -467,11 +457,7 @@ impl PathGlobs {
       })
       .collect();
     // An empty exclude becomes EMPTY_IGNORE.
-    PathGlobs::create_with_globs_and_match_behavior(
-      include_entries,
-      &vec![],
-      StrictGlobMatching::Ignore,
-    )
+    PathGlobs::create_with_globs_and_match_behavior(include, &vec![], StrictGlobMatching::Ignore)
   }
 }
 
@@ -493,14 +479,14 @@ pub enum GlobMatch {
   DidNotMatchAnyFiles,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct GlobExpansionCacheEntry {
   globs: Vec<PathGlob>,
   matched: GlobMatch,
   sources: Vec<GlobSource>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SingleExpansionResult {
   sourced_glob: GlobWithSource,
   path_stats: Vec<PathStat>,
@@ -877,18 +863,23 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
   /// Recursively expands PathGlobs into PathStats while applying excludes.
   ///
   fn expand(&self, path_globs: PathGlobs) -> BoxFuture<Vec<PathStat>, E> {
-    if path_globs.include_entries.is_empty() {
+    let PathGlobs {
+      include,
+      exclude,
+      strict_match_behavior,
+    } = path_globs;
+
+    if include.is_empty() {
       return future::ok(vec![]).to_boxed();
     }
 
     let init = PathGlobsExpansion {
       context: self.clone(),
-      todo: path_globs
-        .include_entries
+      todo: include
         .iter()
         .flat_map(|entry| entry.to_sourced_globs())
         .collect(),
-      exclude: path_globs.exclude.clone(),
+      exclude,
       completed: IndexMap::default(),
       outputs: IndexSet::default(),
     };
@@ -933,13 +924,8 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
           // bypass by using `Arc`s? Profile first.
           let source_for_children = GlobSource::ParentGlob(path_glob);
           for child_glob in globs {
-            if expansion.completed.contains_key(&child_glob) {
-              expansion
-                .completed
-                .get_mut(&child_glob)
-                .unwrap()
-                .sources
-                .push(source_for_children.clone());
+            if let Occupied(mut entry) = expansion.completed.entry(child_glob.clone()) {
+              entry.get_mut().sources.push(source_for_children.clone());
             } else {
               expansion.todo.push(GlobWithSource {
                 path_glob: child_glob,
@@ -961,18 +947,13 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
       let PathGlobsExpansion {
         outputs,
         mut completed,
+        exclude,
         ..
       } = final_expansion;
 
       let match_results: Vec<_> = outputs.into_iter().collect();
 
-      let PathGlobs {
-        include_entries,
-        exclude,
-        strict_match_behavior,
-      } = path_globs;
-
-      if strict_match_behavior.should_check_initial_glob_matches() {
+      if strict_match_behavior.should_check_glob_matches() {
         let mut inputs_with_matches: HashSet<GlobParsedSource> = HashSet::new();
 
         let all_globs: Vec<PathGlob> = completed.keys().rev().map(|pg| pg.clone()).collect();
@@ -1002,7 +983,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
           });
         }
 
-        let non_matching_inputs: Vec<GlobParsedSource> = include_entries
+        let non_matching_inputs: Vec<GlobParsedSource> = include
           .into_iter()
           .map(|entry| entry.input)
           .filter(|parsed_source| !inputs_with_matches.contains(parsed_source))
@@ -1016,7 +997,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
             exclude.exclude_patterns(),
             non_matching_inputs
               .iter()
-              .map(|parsed_source| parsed_source.gitignore_style_glob.clone())
+              .map(|parsed_source| parsed_source.0.clone())
               .collect::<Vec<_>>(),
           );
           if strict_match_behavior.should_throw_on_error() {
