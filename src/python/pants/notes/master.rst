@@ -4,6 +4,79 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.8.0.dev1 (05/25/2018)
+-----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix Go distribution SYSTEM_ID key (#5861)
+  `PR #5861 <https://github.com/pantsbuild/pants/pull/5861>`_
+
+* Improve logging/handling of signaled, killed, and terminated tests (#5859)
+  `PR #5859 <https://github.com/pantsbuild/pants/pull/5859>`_
+
+* Use write_all not write (#5852)
+  `PR #5852 <https://github.com/pantsbuild/pants/pull/5852>`_
+
+New features
+~~~~~~~~~~~~
+
+* Add go_protobuf_library (#5838)
+  `PR #5838 <https://github.com/pantsbuild/pants/pull/5838>`_
+
+* setup_requires argument for python_dist targets (#5825)
+  `PR #5825 <https://github.com/pantsbuild/pants/pull/5825>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Update pep8 to pycodestyle (#5867)
+  `PR #5867 <https://github.com/pantsbuild/pants/pull/5867>`_
+
+* Update pyflakes to 2.0.0 (#5866)
+  `PR #5866 <https://github.com/pantsbuild/pants/pull/5866>`_
+
+* Port BaseTest to v2 engine as TestBase (#5611)
+  `PR #5611 <https://github.com/pantsbuild/pants/pull/5611>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [remoting] Store raw bytes for stdout and stderr if received inline. (#5855)
+  `PR #5855 <https://github.com/pantsbuild/pants/pull/5855>`_
+
+* [rust/engine] add timeout \ description for grpc process requests (#5632)
+  `PR #5632 <https://github.com/pantsbuild/pants/pull/5632>`_
+
+* Use tokio for scheduler requests and local process execution (#5846)
+  `Issue #369 <https://github.com/tokio-rs/tokio/issues/369>`_
+  `PR #5846 <https://github.com/pantsbuild/pants/pull/5846>`_
+
+* Rust compilation is more robust and fast (#5857)
+  `PR #5857 <https://github.com/pantsbuild/pants/pull/5857>`_
+
+* Core has a CommandRunner (#5850)
+  `PR #5850 <https://github.com/pantsbuild/pants/pull/5850>`_
+
+* Only depend on subprocess32 in python2. (#5847)
+  `PR #5847 <https://github.com/pantsbuild/pants/pull/5847>`_
+
+* Hermeticize cargo build. (#5742)
+  `PR #5742 <https://github.com/pantsbuild/pants/pull/5742>`_
+
+* A utility to aggregate s3 access logs. (#5777)
+  `PR #5777 <https://github.com/pantsbuild/pants/pull/5777>`_
+
+* Update all rust dependencies (ie, ran `cargo update`). (#5845)
+  `PR #5845 <https://github.com/pantsbuild/pants/pull/5845>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Document how to select a Python interpreter (#5843)
+  `PR #5843 <https://github.com/pantsbuild/pants/pull/5843>`_
+
 1.8.0.dev0 (05/18/2018)
 -----------------------
 
