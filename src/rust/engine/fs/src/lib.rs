@@ -486,6 +486,8 @@ struct GlobExpansionCacheEntry {
   sources: Vec<GlobSource>,
 }
 
+// FIXME(#5871): move glob matching to its own file so we don't need to leak this object (through
+// the return type of expand_single()).
 #[derive(Debug)]
 pub struct SingleExpansionResult {
   sourced_glob: GlobWithSource,
@@ -954,21 +956,44 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
       let match_results: Vec<_> = outputs.into_iter().collect();
 
       if strict_match_behavior.should_check_glob_matches() {
+        // Each `GlobExpansionCacheEntry` stored in `completed` for some `PathGlob` has the field
+        // `matched` to denote whether that specific `PathGlob` matched any files. We propagate a
+        // positive `matched` condition to all transitive "parents" of any glob which expands to
+        // some non-empty set of `PathStat`s. The `sources` field contains the parents (see the enum
+        // `GlobSource`), which may be another glob, or it might be a `GlobParsedSource`. We record
+        // all `GlobParsedSource` inputs which transitively expanded to some file here, and below we
+        // warn or error if some of the inputs were not found.
         let mut inputs_with_matches: HashSet<GlobParsedSource> = HashSet::new();
 
+        // `completed` is an IndexMap, and we immediately insert every glob we expand into
+        // `completed`, recording any `PathStat`s and `PathGlob`s it expanded to (and then expanding
+        // those child globs in the next iteration of the loop_fn). If we iterate in
+        // reverse order of expansion (using .rev()), we ensure that we have already visited every
+        // "child" glob of the glob we are operating on while iterating. This is a reverse
+        // "topological ordering" which preserves the partial order from parent to child globs.
         let all_globs: Vec<PathGlob> = completed.keys().rev().map(|pg| pg.clone()).collect();
         for cur_glob in all_globs {
+          // Note that we talk of "parents" and "childen", but this structure is actually a DAG,
+          // because different `DirWildcard`s can potentially expand (transitively) to the same
+          // intermediate glob. The "parents" of each glob are stored in the `sources` field of its
+          // `GlobExpansionCacheEntry` (which is mutably updated with any new parents on each
+          // iteration of the loop_fn above). This can be considered "amortized" and/or "memoized".
           let new_matched_source_globs = match completed.get(&cur_glob).unwrap() {
             &GlobExpansionCacheEntry {
               ref matched,
               ref sources,
               ..
             } => match matched {
+              // Neither this glob, nor any of its children, expanded to any `PathStat`s, so we have
+              // nothing to propagate.
               &GlobMatch::DidNotMatchAnyFiles => vec![],
               &GlobMatch::SuccessfullyMatchedSomeFiles => sources
                 .iter()
                 .filter_map(|src| match src {
+                  // This glob matched some files, so its parent also matched some files.
                   &GlobSource::ParentGlob(ref path_glob) => Some(path_glob.clone()),
+                  // We've found one of the root inputs, coming from a glob which transitively
+                  // matched some child -- record it (this may already exist in the set).
                   &GlobSource::ParsedInput(ref parsed_source) => {
                     inputs_with_matches.insert(parsed_source.clone());
                     None
@@ -978,11 +1003,14 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
             },
           };
           new_matched_source_globs.into_iter().for_each(|path_glob| {
+            // Overwrite whatever was in there before -- we now know these globs transitively
+            // expanded to some non-empty set of `PathStat`s.
             let entry = completed.get_mut(&path_glob).unwrap();
             entry.matched = GlobMatch::SuccessfullyMatchedSomeFiles;
           });
         }
 
+        // Get all the inputs which didn't transitively expand to any files.
         let non_matching_inputs: Vec<GlobParsedSource> = include
           .into_iter()
           .map(|entry| entry.input)
@@ -990,8 +1018,8 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
           .collect();
 
         if !non_matching_inputs.is_empty() {
-          // TODO(cosmicexplorer): explain what global and/or target-specific option to set to
-          // modify this behavior! See #5864.
+          // TODO(#5684): explain what global and/or target-specific option to set to
+          // modify this behavior!
           let msg = format!(
             "Globs did not match. Excludes were: {:?}. Unmatched globs were: {:?}.",
             exclude.exclude_patterns(),
@@ -1003,9 +1031,9 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
           if strict_match_behavior.should_throw_on_error() {
             return future::err(Self::mk_error(&msg));
           } else {
-            // FIXME: doesn't seem to do anything? See #5863.
-            // TODO(cosmicexplorer): this doesn't have any useful context (the stack trace) without
-            // being thrown -- this needs to be provided, otherwise this is unusable. See #5863.
+            // FIXME(#5683): warn!() doesn't seem to do anything?
+            // TODO(#5683): this doesn't have any useful context (the stack trace) without
+            // being thrown -- this needs to be provided, otherwise this is unusable.
             warn!("{}", msg);
           }
         }
