@@ -631,7 +631,8 @@ mod tests {
     let mut v = posix_fs
       .expand(
         // Don't error or warn if there are no paths matched -- that is a valid state.
-        PathGlobs::create(&["**".to_owned()], &[], StrictGlobMatching::Ignore).unwrap())
+        PathGlobs::create(&["**".to_owned()], &[], StrictGlobMatching::Ignore).unwrap(),
+      )
       .wait()
       .unwrap();
     v.sort_by(|a, b| a.path().cmp(b.path()));

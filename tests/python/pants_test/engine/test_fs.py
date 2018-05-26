@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 import tarfile
 import unittest
@@ -16,6 +17,7 @@ from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, FilesConte
 from pants.util.contextutil import temporary_dir
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
+from pants_test.test_base import TestBase
 
 
 class DirectoryListing(object):
@@ -26,7 +28,7 @@ class ReadLink(object):
   """TODO: See #4027."""
 
 
-class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
+class FSTest(TestBase, SchedulerTestBase, AbstractClass):
 
   _original_src = os.path.join(os.path.dirname(__file__), 'examples/fs_test/fs_test.tar')
 
@@ -39,41 +41,44 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
     yield project_tree
 
   @staticmethod
-  def specs(relative_to, *filespecs):
-    return PathGlobs.create(relative_to, include=filespecs)
+  def specs(filespecs):
+    if isinstance(filespecs, PathGlobs):
+      return filespecs
+    else:
+      return PathGlobs.create('', include=filespecs)
 
-  def assert_walk_dirs(self, filespecs, paths, ignore_patterns=None):
-    self.assert_walk_snapshot('dirs', filespecs, paths, ignore_patterns=ignore_patterns)
+  def assert_walk_dirs(self, filespecs_or_globs, paths, ignore_patterns=None):
+    self.assert_walk_snapshot('dirs', filespecs_or_globs, paths, ignore_patterns=ignore_patterns)
 
-  def assert_walk_files(self, filespecs, paths, ignore_patterns=None):
-    self.assert_walk_snapshot('files', filespecs, paths, ignore_patterns=ignore_patterns)
+  def assert_walk_files(self, filespecs_or_globs, paths, ignore_patterns=None):
+    self.assert_walk_snapshot('files', filespecs_or_globs, paths, ignore_patterns=ignore_patterns)
 
-  def assert_walk_snapshot(self, field, filespecs, paths, ignore_patterns=None):
+  def assert_walk_snapshot(self, field, filespecs_or_globs, paths, ignore_patterns=None):
     with self.mk_project_tree(ignore_patterns=ignore_patterns) as project_tree:
       scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
-      result = self.execute(scheduler, Snapshot, self.specs('', *filespecs))[0]
+      result = self.execute(scheduler, Snapshot, self.specs(filespecs_or_globs))[0]
       self.assertEquals(sorted([p.path for p in getattr(result, field)]), sorted(paths))
 
-  def assert_content(self, filespecs, expected_content):
+  def assert_content(self, filespecs_or_globs, expected_content):
     with self.mk_project_tree() as project_tree:
       scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
-      snapshot = self.execute_expecting_one_result(scheduler, Snapshot, self.specs('', *filespecs)).value
+      snapshot = self.execute_expecting_one_result(scheduler, Snapshot, self.specs(filespecs_or_globs)).value
       result = self.execute_expecting_one_result(scheduler, FilesContent, snapshot.directory_digest).value
       actual_content = {f.path: f.content for f in result.dependencies}
       self.assertEquals(expected_content, actual_content)
 
-  def assert_digest(self, filespecs, expected_files):
+  def assert_digest(self, filespecs_or_globs, expected_files):
     with self.mk_project_tree() as project_tree:
       scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
-      result = self.execute(scheduler, Snapshot, self.specs('', *filespecs))[0]
+      result = self.execute(scheduler, Snapshot, self.specs(filespecs_or_globs))[0]
       # Confirm all expected files were digested.
       self.assertEquals(set(expected_files), set(f.path for f in result.files))
       self.assertTrue(result.directory_digest.fingerprint is not None)
 
-  def assert_fsnodes(self, filespecs, subject_product_pairs):
+  def assert_fsnodes(self, filespecs_or_globs, subject_product_pairs):
     with self.mk_project_tree() as project_tree:
       scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
-      request = self.execute_request(scheduler, Snapshot, self.specs('', *filespecs))
+      request = self.execute_request(scheduler, Snapshot, self.specs(filespecs_or_globs))
 
       # Validate that FilesystemNodes for exactly the given subjects are reachable under this
       # request.
@@ -351,3 +356,47 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
       ))
 
       self.assertEquals(both_snapshot.directory_digest, both_merged)
+
+  def test_glob_match_error(self):
+    with self.assertRaises(ValueError) as cm:
+      self.assert_walk_files(PathGlobs(
+        include=['not-a-file.txt'],
+        exclude=[],
+        glob_match_error_behavior='error',
+      ), [])
+    expected_msg = (
+      "Globs did not match. Excludes were: []. Unmatched globs were: [\"not-a-file.txt\"].")
+    self.assertIn(expected_msg, str(cm.exception))
+
+  def test_glob_match_exclude_error(self):
+    with self.assertRaises(ValueError) as cm:
+      self.assert_walk_files(PathGlobs(
+        include=['*.txt'],
+        exclude=['4.txt'],
+        glob_match_error_behavior='error',
+      ), [])
+    expected_msg = (
+      "Globs did not match. Excludes were: [\"4.txt\"]. Unmatched globs were: [\"*.txt\"].")
+    self.assertIn(expected_msg, str(cm.exception))
+
+  def test_glob_match_ignore_logging(self):
+    with self.captured_logging(logging.WARNING) as captured:
+      self.assert_walk_files(PathGlobs(
+        include=['not-a-file.txt'],
+        exclude=[''],
+        glob_match_error_behavior='ignore',
+      ), [])
+      self.assertEqual(0, len(captured.warnings()))
+
+  @unittest.skip('Skipped to expedite landing #5769: see #5863')
+  def test_glob_match_warn_logging(self):
+    with self.captured_logging(logging.WARNING) as captured:
+      self.assert_walk_files(PathGlobs(
+        include=['not-a-file.txt'],
+        exclude=[''],
+        glob_match_error_behavior='warn',
+      ), [])
+      all_warnings = captured.warnings()
+      self.assertEqual(1, len(all_warnings))
+      single_warning = all_warnings[0]
+      self.assertEqual("???", str(single_warning))

@@ -46,8 +46,8 @@ class PathGlobs(datatype([
   def __new__(cls, include, exclude, glob_match_error_behavior=None):
     return super(PathGlobs, cls).__new__(
       cls,
-      include,
-      exclude,
+      tuple(include),
+      tuple(exclude),
       GlobMatchErrorBehavior.create(glob_match_error_behavior))
 
   def with_match_error_behavior(self, glob_match_error_behavior):

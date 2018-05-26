@@ -67,6 +67,7 @@ python_tests(
     ':scheduler_test_base',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:nodes',
+    'tests/python/pants_test:test_base',
     'tests/python/pants_test/engine/examples:fs_test',
   ]
 )
