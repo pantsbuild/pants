@@ -134,8 +134,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
         field_value = getattr(self, field_name)
         if not constraint_for_field:
           elements_formatted.append(
-            # FIXME(cosmicexplorer): use {field_value!r} in this method, even though this is
-            # __str__()!
+            # TODO: consider using the repr of arguments in this method.
             "{field_name}={field_value}"
             .format(field_name=field_name,
                     field_value=field_value))
@@ -156,7 +155,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
 class TypedDatatypeClassConstructionError(Exception):
 
-  # TODO(cosmicexplorer): make some wrapper exception class to make this kind of
+  # TODO: make some wrapper exception class to make this kind of
   # prefixing easy (maybe using a class field format string?).
   def __init__(self, type_name, msg, *args, **kwargs):
     full_msg =  "error: while trying to generate typed datatype {}: {}".format(
@@ -165,7 +164,7 @@ class TypedDatatypeClassConstructionError(Exception):
       full_msg, *args, **kwargs)
 
 
-# FIXME(cosmicexplorer): make this subclass TypeError!
+# FIXME: make this subclass TypeError!
 class TypedDatatypeInstanceConstructionError(Exception):
 
   def __init__(self, type_name, msg, *args, **kwargs):

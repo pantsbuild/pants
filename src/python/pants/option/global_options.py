@@ -288,8 +288,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
-    # TODO(cosmicexplorer): Make a custom type abstract class to automate the production of an
-    # option with specific allowed values from a datatype.
+    # TODO: Make a custom type abstract class (or something) to automate the production of an option
+    # with specific allowed values from a datatype (ideally using singletons for the allowed
+    # values).
     register('--glob-expansion-failure', type=str,
              choices=GlobMatchErrorBehavior.allowed_values,
              default=GlobMatchErrorBehavior.default_option_value,
