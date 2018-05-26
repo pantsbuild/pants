@@ -12,10 +12,10 @@ import urlparse
 
 from pants.goal.run_tracker import RunTracker
 from pants.util.contextutil import temporary_file_path
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class RunTrackerTest(BaseTest):
+class RunTrackerTest(TestBase):
   def test_upload_stats(self):
     stats = {'stats': {'foo': 'bar', 'baz': 42}}
 

@@ -15,7 +15,7 @@ from pants.build_graph.target import Target
 from pants.invalidation.build_invalidator import CacheKey
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdtemp
-from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
+from pants_test.task_test_base import TaskTestBase, ensure_cached
 
 
 # A dummy target with sources= and copied= fields.
@@ -116,8 +116,8 @@ class SimpleCodegenTaskTest(TaskTestBase):
   def task_type(cls):
     return DummyGen
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return register_core().merge(BuildFileAliases({
       'dummy_library': DummyLibrary
     }))
@@ -345,8 +345,8 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
   def task_type(cls):
     return ExportingDummyGen
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return register_core().merge(BuildFileAliases({
       'target': Target,
       'dummy_library': DummyLibrary,

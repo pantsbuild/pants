@@ -26,9 +26,9 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
   def task_type(cls):
     return AntlrJavaGen
 
-  @property
-  def alias_groups(self):
-    return super(AntlrJavaGenTest, self).alias_groups.merge(BuildFileAliases(
+  @classmethod
+  def alias_groups(cls):
+    return super(AntlrJavaGenTest, cls).alias_groups().merge(BuildFileAliases(
       targets={
         'java_antlr_library': JavaAntlrLibrary,
       },
@@ -176,19 +176,19 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
     self._test_generated_target_fingerprint_stable('4', self.PARTS['dir'].replace('/', '.'))
 
   def _test_generated_target_fingerprint_stable(self, version, package):
-    # Use a stable workdir for both builds.
-    target_workdir_fun = lambda root: os.path.join(root, 'stable')
+    self.add_to_build_file(self.BUILDFILE, dedent("""
+      java_antlr_library(
+        name='{name}',
+        compiler='antlr{version}',
+        sources=['{prefix}.g{version}'],
+      )
+    """.format(version=version, **self.PARTS)))
 
     def execute_and_get_synthetic_target_hash():
-      # Rerun setUp() to clear up the build graph of injected synthetic targets.
-      self.setUp()
-      self.add_to_build_file(self.BUILDFILE, dedent("""
-        java_antlr_library(
-          name='{name}',
-          compiler='antlr{version}',
-          sources=['{prefix}.g{version}'],
-        )
-      """.format(version=version, **self.PARTS)))
+      # Recreate the build graph.
+      self.reset_build_graph()
+      # Use a stable workdir for both builds.
+      target_workdir_fun = lambda root: os.path.join(root, 'stable')
       syn_target = self.execute_antlr_test(package, target_workdir_fun=target_workdir_fun)
       return syn_target.transitive_invalidation_hash()
 

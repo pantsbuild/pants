@@ -18,19 +18,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
-
-
-class ReverseDepmapEmptyTest(ConsoleTaskTestBase):
-  @classmethod
-  def task_type(cls):
-    return ReverseDepmap
-
-  def test(self):
-    self.assert_console_output(targets=[])
-
-  def test_output_format_json(self):
-    self.assert_console_output('{}', targets=[], options={'output_format': 'json'})
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class BaseReverseDepmapTest(ConsoleTaskTestBase):
@@ -38,8 +26,8 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
   def task_type(cls):
     return ReverseDepmap
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'target': Target,
@@ -159,6 +147,13 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
 
 
 class ReverseDepmapTest(BaseReverseDepmapTest):
+
+  def test_empty(self):
+    self.assert_console_output(targets=[])
+
+  def test_empty_json(self):
+    self.assert_console_output('{}', targets=[], options={'output_format': 'json'})
+
   def test_roots(self):
     self.assert_console_output(
       'overlaps:two',
@@ -292,12 +287,3 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       'overlaps:three',
       targets=[self.target('common/a')]
     )
-
-
-class ReverseDepmapTestWithPantsBuildIgnore(BaseReverseDepmapTest):
-  @property
-  def build_ignore_patterns(self):
-    return ['overlaps']
-
-  def test_overlaps_with_build_ignore_patterns(self):
-    self.assert_console_output(targets=[self.target('common/a')])

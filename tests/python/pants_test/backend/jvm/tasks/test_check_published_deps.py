@@ -18,13 +18,13 @@ from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class CheckPublishedDepsTest(ConsoleTaskTestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'target': Target,
@@ -38,7 +38,7 @@ class CheckPublishedDepsTest(ConsoleTaskTestBase):
         'scala_jar': ScalaJarDependency,
         'repo': Repository(name='repo',
                            url='http://www.www.com',
-                           push_db_basedir=os.path.join(self.build_root, 'repo')),
+                           push_db_basedir=os.path.join(cls._build_root(), 'repo')),
       }
     )
 

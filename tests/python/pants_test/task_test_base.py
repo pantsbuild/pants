@@ -10,16 +10,12 @@ import os
 from contextlib import closing, contextmanager
 from StringIO import StringIO
 
-from pants.base.deprecated import deprecated_module
 from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_dir
 from pants.util.process_handler import subprocess
-from pants_test.base_test import BaseTest
-
-
-deprecated_module('1.10.0.dev0', 'Use pants_test.TaskTestBase instead')
+from pants_test.test_base import TestBase
 
 
 # TODO: Find a better home for this?
@@ -54,7 +50,7 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
   return decorator
 
 
-class TaskTestBase(BaseTest):
+class TaskTestBase(TestBase):
   """A baseclass useful for testing a single Task type.
 
   :API: public

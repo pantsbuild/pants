@@ -5,12 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 from pants.contrib.node.targets.node_package import NodePackage
 
 
-class NodePackageTest(BaseTest):
+class NodePackageTest(TestBase):
   def test_implicit_package_name(self):
     target = self.make_target(spec=':name', target_type=NodePackage)
     self.assertEqual('name', target.address.target_name)

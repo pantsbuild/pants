@@ -10,7 +10,7 @@ import os
 from pants.build_graph.target import Target
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.tasks.go_binary_create import GoBinaryCreate

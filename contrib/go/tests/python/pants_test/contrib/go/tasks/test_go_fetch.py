@@ -11,7 +11,7 @@ from collections import defaultdict
 
 from pants.build_graph.address import Address
 from pants.util.contextutil import temporary_dir
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.go.subsystems.fetcher import ArchiveFetcher
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary

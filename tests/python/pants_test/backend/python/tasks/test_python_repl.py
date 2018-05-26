@@ -30,10 +30,10 @@ class PythonReplTest(PythonTaskTestBase):
   class JvmTarget(Target):
     pass
 
-  @property
-  def alias_groups(self):
-    return super(PythonReplTest, self).alias_groups.merge(
-        BuildFileAliases(targets={'jvm_target': self.JvmTarget}))
+  @classmethod
+  def alias_groups(cls):
+    return super(PythonReplTest, cls).alias_groups().merge(
+        BuildFileAliases(targets={'jvm_target': cls.JvmTarget}))
 
   def create_non_python_target(self, relpath, name):
     self.create_file(relpath=self.build_path(relpath), contents=dedent("""

@@ -17,7 +17,7 @@ from pants.contrib.googlejavaformat.googlejavaformat import (GoogleJavaFormat,
                                                              GoogleJavaFormatCheckFormat)
 
 
-class BaseTest(NailgunTaskTestBase):
+class TestBase(NailgunTaskTestBase):
 
   _BADFORMAT = dedent("""
     package org.pantsbuild.contrib.googlejavaformat;
@@ -38,14 +38,14 @@ class BaseTest(NailgunTaskTestBase):
     }
   """)
 
-  @property
-  def alias_groups(self):
-    return super(BaseTest, self).alias_groups.merge(
+  @classmethod
+  def alias_groups(cls):
+    return super(TestBase, cls).alias_groups().merge(
       register_core().merge(register_jvm())
     )
 
 
-class GoogleJavaFormatTests(BaseTest):
+class GoogleJavaFormatTests(TestBase):
 
   @classmethod
   def task_type(cls):
@@ -67,7 +67,7 @@ class GoogleJavaFormatTests(BaseTest):
     self.assertEqual(actual, self._GOODFORMAT)
 
 
-class GoogleJavaFormatCheckFormatTests(BaseTest):
+class GoogleJavaFormatCheckFormatTests(TestBase):
 
   @classmethod
   def task_type(cls):

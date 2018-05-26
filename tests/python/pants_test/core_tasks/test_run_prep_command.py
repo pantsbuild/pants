@@ -17,7 +17,7 @@ from pants.core_tasks.run_prep_command import RunPrepCommandBase
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class FakeRunPrepCommand(RunPrepCommandBase):
@@ -42,8 +42,8 @@ class RunPrepCommandTest(TaskTestBase):
   def task_type(cls):
     return FakeRunPrepCommand
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'prep_command': PrepCommand,

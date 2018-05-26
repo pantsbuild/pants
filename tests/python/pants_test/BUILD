@@ -6,6 +6,7 @@ python_library(
   dependencies=[
     'tests/python/pants_test:base_test',
     'tests/python/pants_test:int-test-for-export',
+    'tests/python/pants_test:test_base',
     'tests/python/pants_test/jvm:jar_task_test_base',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
@@ -29,6 +30,7 @@ python_library(
     'src/python/pants/base:build_file',
     'src/python/pants/base:build_root',
     'src/python/pants/base:cmd_line_spec_parser',
+    'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
@@ -73,6 +75,39 @@ target(
     'src/python/pants/bin:pants_local_binary',
     'src/rust/engine',
   ],
+)
+
+python_library(
+  name = 'test_base',
+  sources = ['test_base.py'],
+  dependencies = [
+    'src/python/pants/base:build_root',
+    'src/python/pants/base:cmd_line_spec_parser',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
+    'src/python/pants/init',
+    'src/python/pants/source',
+    'src/python/pants/subsystem',
+    'src/python/pants/task',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
+    'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test/engine:util',
+    'tests/python/pants_test/option/util',
+  ]
+)
+
+python_library(
+  name = 'task_test_base',
+  sources = ['task_test_base.py'],
+  dependencies = [
+    'src/python/pants/goal:context',
+    'src/python/pants/ivy',
+    'src/python/pants/task',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:process_handler',
+    'tests/python/pants_test:test_base',
+  ]
 )
 
 python_tests(

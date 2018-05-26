@@ -9,7 +9,7 @@ import types
 from textwrap import dedent
 
 from pants.build_graph.target import Target
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.go import register
 from pants.contrib.go.subsystems.fetcher import Fetcher
@@ -43,8 +43,8 @@ class GoBuildgenTest(TaskTestBase):
     task.get_fetcher_factory = types.MethodType(lambda s: FakeFetcherFactory(), task)
     return task
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     # Needed for test_stitch_deps_remote_existing_rev_respected which re-loads a synthetic target
     # from a generated BUILD file on disk that needs access to Go target aliases
     return register.build_file_aliases()
@@ -285,7 +285,7 @@ class GoBuildgenTest(TaskTestBase):
                      pkg='prod',
                      rev='v1.2.3')
     pre_execute_files = self.stitch_deps_remote(materialize=True)
-    self.build_graph.reset()  # Force targets to be loaded off disk
+    self.reset_build_graph(reset_build_files=True)  # Force targets to be loaded off disk
     self.assertEqual('v1.2.3', self.target('3rdparty/go/pantsbuild.org/fake:prod').rev)
     self.assertEqual({'src/go/src/jane/BUILD', '3rdparty/go/pantsbuild.org/fake/BUILD'},
                      self.buildroot_files() - pre_execute_files)

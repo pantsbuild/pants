@@ -22,7 +22,7 @@ from pants.build_graph.target import Target
 from pants.scm.scm import Scm
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class JarPublishTest(TaskTestBase):
@@ -37,10 +37,10 @@ class JarPublishTest(TaskTestBase):
       task = self.create_task(self.context())
       task.execute()
 
-  @property
-  def alias_groups(self):
-    self.push_db_basedir = os.path.join(self.build_root, "pushdb")
-    safe_mkdir(self.push_db_basedir)
+  @classmethod
+  def alias_groups(cls):
+    cls.push_db_basedir = os.path.join(cls._build_root(), "pushdb")
+    safe_mkdir(cls.push_db_basedir)
 
     return BuildFileAliases(
       targets={
@@ -52,7 +52,7 @@ class JarPublishTest(TaskTestBase):
         'artifact': Artifact,
         'scala_artifact': ScalaArtifact,
         'internal': Repository(name='internal', url='http://example.com',
-                               push_db_basedir=self.push_db_basedir),
+                               push_db_basedir=cls.push_db_basedir),
       },
     )
 

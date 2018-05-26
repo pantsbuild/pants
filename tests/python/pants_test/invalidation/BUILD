@@ -19,7 +19,7 @@ python_tests(
     'src/python/pants/invalidation',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/testutils:mock_logger',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 

@@ -14,10 +14,10 @@ from pants.cache.artifact import ArtifactError
 from pants.cache.artifact_cache import NonfatalArtifactCacheError, UnreadableArtifact
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.util.contextutil import temporary_dir
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class ArtifactCacheStatsTest(BaseTest):
+class ArtifactCacheStatsTest(TestBase):
   TEST_CACHE_NAME_1 = 'ZincCompile'
   TEST_CACHE_NAME_2 = 'Checkstyle_test_checkstyle'
   TEST_LOCAL_ERROR = UnreadableArtifact('foo', ArtifactError('CRC check failed'))

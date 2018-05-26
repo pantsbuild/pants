@@ -16,12 +16,12 @@ from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInte
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_dir
-from pants_test.base_test import BaseTest
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.test_base import TestBase
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
 
-class TestInterpreterCache(BaseTest):
+class TestInterpreterCache(TestBase):
   @staticmethod
   def _make_bad_requirement(requirement):
     """Turns a requirement that passes into one we know will fail.

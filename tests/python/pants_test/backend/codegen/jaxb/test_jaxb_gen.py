@@ -19,8 +19,8 @@ class JaxbGenJavaTest(NailgunTaskTestBase):
   def task_type(cls):
     return JaxbGen
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return register_core().merge(register_codegen())
 
   def create_schema(self, *component_names):

@@ -15,7 +15,7 @@ from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
 from pants.util.dirutil import touch
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class ResourcesTaskTestBase(TaskTestBase):

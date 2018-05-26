@@ -21,9 +21,9 @@ from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class ScalaFmtTestBase(NailgunTaskTestBase):
-  @property
-  def alias_groups(self):
-    return super(ScalaFmtTestBase, self).alias_groups.merge(
+  @classmethod
+  def alias_groups(cls):
+    return super(ScalaFmtTestBase, cls).alias_groups().merge(
       BuildFileAliases(targets={'java_tests': JUnitTests,
                                 'junit_tests': JUnitTests,
                                 'scala_library': ScalaLibrary}))

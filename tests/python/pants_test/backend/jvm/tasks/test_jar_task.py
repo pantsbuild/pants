@@ -24,9 +24,9 @@ from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
 class BaseJarTaskTest(JarTaskTestBase):
 
-  @property
-  def alias_groups(self):
-    return super(BaseJarTaskTest, self).alias_groups.merge(BuildFileAliases(
+  @classmethod
+  def alias_groups(cls):
+    return super(BaseJarTaskTest, cls).alias_groups().merge(BuildFileAliases(
       targets={
         'java_agent': JavaAgent,
         'jvm_binary': JvmBinary,

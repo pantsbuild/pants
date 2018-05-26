@@ -8,15 +8,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.payload import Payload, PayloadFieldAlreadyDefinedError, PayloadFrozenError
 from pants.base.payload_field import PrimitiveField
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.source.wrapped_globs import Globs
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class PayloadTest(BaseTest):
+class PayloadTest(TestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         # TODO: Use a dummy task type here, instead of depending on the jvm backend.
@@ -75,7 +76,7 @@ class PayloadTest(BaseTest):
   def test_no_nested_globs(self):
     # nesting no longer allowed
     self.add_to_build_file('z/BUILD', 'java_library(name="z", sources=[globs("*")])')
-    with self.assertRaises(ValueError):
+    with self.assertRaises(AddressLookupError):
       self.context().scan()
 
   def test_flat_globs_list(self):

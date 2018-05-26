@@ -10,7 +10,7 @@ from textwrap import dedent
 from pants.backend.graph_info.tasks.sorttargets import SortTargets
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class BaseSortTargetsTest(ConsoleTaskTestBase):
@@ -28,8 +28,8 @@ class SortTargetsEmptyTest(BaseSortTargetsTest):
 
 class SortTargetsTest(BaseSortTargetsTest):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(targets={'python_library': PythonLibrary})
 
   def setUp(self):

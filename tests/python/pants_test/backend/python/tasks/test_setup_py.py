@@ -137,12 +137,12 @@ class TestSetupPy(SetupPyTestBase):
     super(TestSetupPy, self).setUp()
     self.dependency_calculator = SetupPy.DependencyCalculator(self.build_graph)
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     extra_aliases = BuildFileAliases(targets={'prep_command': PrepCommand,
                                               'resources': Resources,
                                               'target': Target})
-    return super(TestSetupPy, self).alias_groups.merge(extra_aliases)
+    return super(TestSetupPy, cls).alias_groups().merge(extra_aliases)
 
   def create_dependencies(self, depmap):
     target_map = {}
@@ -494,7 +494,7 @@ class TestSetupPy(SetupPyTestBase):
   def test_symlinks_issues_2815(self):
     res = self.create_file(relpath='src/python/monster/j-function.res', contents='196884')
 
-    os.symlink(res, os.path.join(self.build_root, 'src/python/monster/group.res'))
+    self.create_link(res, 'src/python/monster/group.res')
     self.create_file(relpath='src/python/monster/__init__.py', contents='')
     self.create_file(relpath='src/python/monster/research_programme.py',
                      contents='# Look for more off-by-one "errors"!')

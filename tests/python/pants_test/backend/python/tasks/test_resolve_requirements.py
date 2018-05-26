@@ -18,7 +18,7 @@ from pants.base.build_environment import get_buildroot
 from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_file
 from pants.util.process_handler import subprocess
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class ResolveRequirementsTest(TaskTestBase):

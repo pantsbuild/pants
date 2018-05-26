@@ -252,6 +252,9 @@ class LegacyBuildGraph(BuildGraph):
 
     Yields the resulting addresses.
     """
+    if not subjects:
+      return
+
     logger.debug('Injecting specs to %s: %s', self, subjects)
     with self._resolve_context():
       specs = tuple(subjects)

@@ -5,13 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 from textwrap import dedent
 
 from pants.backend.graph_info.tasks.list_owners import ListOwners
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class ListOwnersTest(ConsoleTaskTestBase):
@@ -20,14 +21,16 @@ class ListOwnersTest(ConsoleTaskTestBase):
   def task_type(cls):
     return ListOwners
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(targets={'python_library': PythonLibrary})
 
   def setUp(self):
     super(ListOwnersTest, self).setUp()
 
     def add_to_build_file(path, name, *sources):
+      for source in sources:
+        self.create_file(os.path.join(path, source))
       all_sources = ["'{}'".format(source) for source in list(sources)]
       self.add_to_build_file(path, dedent("""
         python_library(name='{name}',

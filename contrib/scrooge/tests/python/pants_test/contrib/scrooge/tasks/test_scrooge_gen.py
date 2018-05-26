@@ -30,9 +30,9 @@ class ScroogeGenTest(NailgunTaskTestBase):
   def task_type(cls):
     return ScroogeGen
 
-  @property
-  def alias_groups(self):
-    return super(ScroogeGenTest, self).alias_groups.merge(
+  @classmethod
+  def alias_groups(cls):
+    return super(ScroogeGenTest, cls).alias_groups().merge(
       BuildFileAliases(targets={'java_thrift_library': JavaThriftLibrary,
                                 'java_library': JavaLibrary,
                                 'scala_library': ScalaLibrary}))

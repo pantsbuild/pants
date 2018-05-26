@@ -28,7 +28,7 @@ python_tests(
     'src/python/pants/base:build_root',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
 
@@ -50,7 +50,7 @@ python_tests(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
 
@@ -92,7 +92,7 @@ python_tests(
   sources = ['test_fingerprint_strategy.py'],
   dependencies = [
     'src/python/pants/base:fingerprint_strategy',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
 
@@ -101,7 +101,7 @@ python_tests(
   sources = ['test_generator.py'],
   dependencies = [
     'src/python/pants/base:generator',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
 
@@ -138,7 +138,7 @@ python_tests(
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
 
@@ -149,7 +149,7 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:payload_field',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
 
@@ -167,7 +167,7 @@ python_tests(
   sources = ['test_revision.py'],
   dependencies = [
     'src/python/pants/base:revision',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
 
@@ -177,7 +177,7 @@ python_tests(
   dependencies = [
     'src/python/pants/base:run_info',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
 

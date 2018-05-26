@@ -33,7 +33,7 @@ python_tests(
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/task',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
     'tests/python/pants_test/testutils:mock_logger',
   ]
 )
@@ -47,7 +47,7 @@ python_tests(
     'src/python/pants/base:payload',
     'src/python/pants/build_graph:build_graph',
     'src/python/pants/cache:cache',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 
@@ -58,7 +58,7 @@ python_tests(
     'src/python/pants/task:task',
     'src/python/pants/cache:cache',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 
@@ -86,7 +86,7 @@ python_tests(
   sources = ['test_pinger.py'],
   dependencies = [
     'src/python/pants/cache',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
     'tests/python/pants_test/cache:delay_server',
   ],
 )

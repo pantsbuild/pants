@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.graph_info.tasks.paths import Path, Paths
 from pants.base.exceptions import TaskError
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class PathsTest(ConsoleTaskTestBase):

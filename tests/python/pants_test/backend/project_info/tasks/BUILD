@@ -20,7 +20,7 @@ python_tests(
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -33,7 +33,7 @@ python_tests(
     'src/python/pants/backend/project_info/tasks:depmap',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -60,7 +60,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:osutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
     'tests/python/pants_test/backend/python/tasks:interpreter_cache_test_mixin',
   ]
 )
@@ -93,7 +93,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/project_info/tasks:filedeps',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 

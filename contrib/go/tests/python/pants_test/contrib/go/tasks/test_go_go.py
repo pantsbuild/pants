@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.util.contextutil import temporary_file
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.tasks.go_go import GoEnv, GoGo, GoInteropTask

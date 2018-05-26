@@ -9,7 +9,7 @@ python_tests(
     'src/python/pants/backend/python:plugin',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
 
@@ -34,7 +34,7 @@ python_tests(
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/python',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/testutils:git_util',
     'tests/python/pants_test/testutils:pexrc_util',

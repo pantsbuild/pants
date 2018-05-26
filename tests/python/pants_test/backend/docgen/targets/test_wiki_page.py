@@ -11,13 +11,13 @@ from pants.backend.docgen.targets.doc import Page, Wiki, WikiArtifact
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class WikiPageTest(BaseTest):
+class WikiPageTest(TestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'page': Page,

@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import unittest
 from textwrap import dedent
 
 from pants.base.payload import Payload
@@ -13,7 +14,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.source.wrapped_globs import EagerFilesetWithSpec, Globs, LazyFilesetWithSpec, RGlobs
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 class DummyTarget(Target):
@@ -25,10 +26,10 @@ class DummyTarget(Target):
     super(DummyTarget, self).__init__(address=address, payload=payload, **kwargs)
 
 
-class FilesetRelPathWrapperTest(BaseTest):
+class FilesetRelPathWrapperTest(TestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'dummy_target': DummyTarget,
@@ -112,7 +113,7 @@ class FilesetRelPathWrapperTest(BaseTest):
     self.add_to_build_file('y/BUILD', dedent("""
       dummy_target(name="y", sources=globs("*.java", exclude="fleem.java"))
       """))
-    with self.assertRaisesRegexp(AddressLookupError, 'Expected exclude parameter.*'):
+    with self.assertRaisesRegexp(AddressLookupError, 'Excludes of type.*are not supported.*'):
       self.context().scan()
 
   def test_glob_exclude_string_in_list(self):
@@ -176,17 +177,19 @@ class FilesetRelPathWrapperTest(BaseTest):
     self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources=globs("dir/**/*.scala"))')
     self.context().scan()
 
-  # This is no longer allowed.
+  @unittest.skip(reason='TODO: #4760')
   def test_parent_dir_glob(self):
     self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources=globs("../*.scala"))')
     with self.assertRaises(AddressLookupError):
       self.context().scan()
 
+  @unittest.skip(reason='TODO: #4760')
   def test_parent_dir_glob_question(self):
     self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources=globs("../?.scala"))')
     with self.assertRaises(AddressLookupError):
       self.context().scan()
 
+  @unittest.skip(reason='TODO: #4760')
   def test_parent_dir_bracket_glob_question(self):
     self.add_to_build_file('y/BUILD', dedent("""
       dummy_target(name="y", sources=globs("../[dir1, dir2]/?.scala"))
@@ -194,6 +197,7 @@ class FilesetRelPathWrapperTest(BaseTest):
     with self.assertRaises(AddressLookupError):
       self.context().scan()
 
+  @unittest.skip(reason='TODO: #4760')
   def test_parent_dir_bracket(self):
     self.add_to_build_file('y/BUILD', dedent("""
       dummy_target(name="y", sources=globs("../[dir1, dir2]/File.scala"))
@@ -214,17 +218,11 @@ class FilesetRelPathWrapperTest(BaseTest):
   def test_rglob_follows_symlinked_dirs_by_default(self):
     self.add_to_build_file('z/w/BUILD', 'dummy_target(name="w", sources=rglobs("*.java"))')
     graph = self.context().scan()
-    relative_sources = list(graph.get_target_from_spec('z/w').sources_relative_to_source_root())
-    assert ['y/fleem.java', 'y/morx.java', 'foo.java'] == relative_sources
-
-  def test_rglob_respects_follow_links_override(self):
-    self.add_to_build_file('z/w/BUILD',
-                           'dummy_target(name="w", sources=rglobs("*.java", follow_links=False))')
-    graph = self.context().scan()
-    assert ['foo.java'] == list(graph.get_target_from_spec('z/w').sources_relative_to_source_root())
+    relative_sources = set(graph.get_target_from_spec('z/w').sources_relative_to_source_root())
+    self.assertEquals({'y/fleem.java', 'y/morx.java', 'foo.java'}, relative_sources)
 
 
-class FilesetWithSpecTest(BaseTest):
+class FilesetWithSpecTest(TestBase):
 
   def test_lazy_fileset_with_spec_fails_if_filespec_not_prefixed_by_relroot(self):
     with self.assertRaises(ValueError):

@@ -13,13 +13,13 @@ from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.project_info.tasks.filedeps import FileDeps
 from pants.build_graph.register import build_file_aliases as register_core
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class FileDepsTest(ConsoleTaskTestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return register_core().merge(register_jvm()).merge(register_codegen())
 
   @classmethod
@@ -87,7 +87,7 @@ class FileDepsTest(ConsoleTaskTestBase):
                       ]
                     )
                   """),
-                  sources=['src/thrift/storage/data_types.thrift'])
+                  sources=['data_types.thrift'])
 
     create_target(path='src/java/lib',
                   definition=dedent("""

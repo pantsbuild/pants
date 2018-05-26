@@ -9,11 +9,11 @@ from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.target import Target
-from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import init_subsystem
+from pants_test.test_base import TestBase
 
 
-class JUnitTestsTest(BaseTest):
+class JUnitTestsTest(TestBase):
 
   def test_validation(self):
     init_subsystem(JUnit)

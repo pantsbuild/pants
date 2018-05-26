@@ -11,7 +11,7 @@ from pants.base.payload import Payload
 from pants.build_graph.target import Target
 from pants.cache.cache_setup import CacheFactory, CacheSetup
 from pants.task.task import Task
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class DummyLibrary(Target):

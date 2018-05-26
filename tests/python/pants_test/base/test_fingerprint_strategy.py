@@ -6,10 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class FingerprintStrategyTest(BaseTest):
+class FingerprintStrategyTest(TestBase):
   def test_subclass_equality(self):
     class FPStrategyA(DefaultFingerprintStrategy): pass
     class FPStrategyB(DefaultFingerprintStrategy): pass

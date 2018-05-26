@@ -13,12 +13,12 @@ from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class ScalaLibraryTest(BaseTest):
-  @property
-  def alias_groups(self):
+class ScalaLibraryTest(TestBase):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'scala_library': ScalaLibrary,

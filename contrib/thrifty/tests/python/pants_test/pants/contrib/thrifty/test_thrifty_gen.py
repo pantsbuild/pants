@@ -9,7 +9,7 @@ from pants.backend.codegen.wire.java.register import build_file_aliases as regis
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.thrifty.java_thrifty_gen import JavaThriftyGen
 from pants.contrib.thrifty.java_thrifty_library import JavaThriftyLibrary
@@ -22,8 +22,8 @@ class JavaThriftyGenTest(TaskTestBase):
   def task_type(cls):
     return JavaThriftyGen
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return register_core().merge(register_codegen())
 
   def _create_fake_thrifty_tool(self):

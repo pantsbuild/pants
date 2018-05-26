@@ -9,7 +9,7 @@ import os
 
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.util.dirutil import safe_file_dump, safe_mkdir, safe_mkdtemp
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class JvmTaskTestBase(TaskTestBase):

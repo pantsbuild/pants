@@ -11,7 +11,7 @@ from pants.backend.codegen.thrift.java.apache_thrift_java_gen import ApacheThrif
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TargetDefinitionException
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class ApacheThriftJavaGenTest(TaskTestBase):

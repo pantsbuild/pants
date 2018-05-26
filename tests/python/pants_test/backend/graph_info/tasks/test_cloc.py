@@ -12,7 +12,7 @@ from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.fs import create_fs_rules
 from pants.engine.isolated_process import create_process_rules
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class ClocTest(ConsoleTaskTestBase, SchedulerTestBase):

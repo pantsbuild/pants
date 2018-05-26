@@ -31,7 +31,7 @@ from pants.util.dirutil import safe_file_dump, touch
 from pants.util.process_handler import subprocess
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystem
-from pants_test.tasks.task_test_base import ensure_cached
+from pants_test.task_test_base import ensure_cached
 
 
 class JUnitRunnerTest(JvmToolTaskTestBase):
@@ -40,9 +40,9 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
   def task_type(cls):
     return JUnitRun
 
-  @property
-  def alias_groups(self):
-    return super(JUnitRunnerTest, self).alias_groups.merge(BuildFileAliases(
+  @classmethod
+  def alias_groups(cls):
+    return super(JUnitRunnerTest, cls).alias_groups().merge(BuildFileAliases(
       targets={
         'files': Files,
         'junit_tests': JUnitTests,

@@ -5,13 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants_test.base_test import BaseTest
 from pants_test.contrib.go.targets.go_local_source_test_base import GoLocalSourceTestBase
+from pants_test.test_base import TestBase
 
 from pants.contrib.go.targets.go_library import GoLibrary
 
 
-class GoLibraryTest(GoLocalSourceTestBase, BaseTest):
+class GoLibraryTest(GoLocalSourceTestBase, TestBase):
 
   @property
   def target_type(self):

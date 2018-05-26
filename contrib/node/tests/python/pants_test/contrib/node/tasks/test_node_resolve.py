@@ -11,7 +11,7 @@ from textwrap import dedent
 
 import mock
 from pants.build_graph.target import Target
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver import \
   NodePreinstalledModuleResolver

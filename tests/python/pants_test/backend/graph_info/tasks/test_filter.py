@@ -15,14 +15,14 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 # TODO: This test should create some dummy target types, instead of depending on other backends.
 class BaseFilterTest(ConsoleTaskTestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'target': Target,

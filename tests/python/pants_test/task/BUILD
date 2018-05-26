@@ -6,7 +6,7 @@ python_tests(
   sources = ['test_console_task.py'],
   dependencies = [
     'src/python/pants/task',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -27,7 +27,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
 
@@ -40,7 +40,7 @@ python_tests(
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 
@@ -63,7 +63,7 @@ python_tests(
     'src/python/pants/cache:cache',
     'src/python/pants/task',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -74,6 +74,6 @@ python_tests(
     '3rdparty/python:mock',
     'src/python/pants/task',
     'src/python/pants/util:process_handler',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ]
 )

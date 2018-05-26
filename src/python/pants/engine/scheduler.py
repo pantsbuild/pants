@@ -416,7 +416,9 @@ class SchedulerSession(object):
 
   def invalidate_files(self, direct_filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
-    return self._scheduler.invalidate_files(direct_filenames)
+    invalidated = self._scheduler.invalidate_files(direct_filenames)
+    self._maybe_visualize()
+    return invalidated
 
   def node_count(self):
     return self._scheduler.graph_len()
@@ -427,6 +429,12 @@ class SchedulerSession(object):
 
   def pre_fork(self):
     self._scheduler.pre_fork()
+
+  def _maybe_visualize(self):
+    if self._scheduler.visualize_to_dir() is not None:
+      name = 'graph.{0:03d}.dot'.format(self._run_count)
+      self._run_count += 1
+      self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), name))
 
   def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
@@ -439,11 +447,7 @@ class SchedulerSession(object):
     roots = zip(execution_request.roots,
                 self._scheduler._run_and_return_roots(self._session, execution_request.native))
 
-    if self._scheduler.visualize_to_dir() is not None:
-      name = 'run.{}.dot'.format(self._run_count)
-      self._run_count += 1
-      self.visualize_graph_to_file(execution_request,
-                                   os.path.join(self._scheduler.visualize_to_dir(), name))
+    self._maybe_visualize()
 
     logger.debug(
       'computed %s nodes in %f seconds. there are %s total nodes.',

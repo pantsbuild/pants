@@ -11,7 +11,7 @@ from textwrap import dedent
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.source_mapper import LazySourceMapper, SpecSourceMapper
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 class SourceMapperTest(object):
@@ -22,8 +22,8 @@ class SourceMapperTest(object):
   def get_mapper(self):
     return self._mapper
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'java_library': JavaLibrary,
@@ -114,11 +114,11 @@ class SourceMapperTest(object):
     self.owner(['//:top'], 'foo.py')
 
 
-class LazySourceMapperTest(SourceMapperTest, BaseTest):
+class LazySourceMapperTest(SourceMapperTest, TestBase):
   def set_mapper(self, fast=False):
     self._mapper = LazySourceMapper(self.address_mapper, self.build_graph, fast)
 
 
-class SpecSourceMapperTest(SourceMapperTest, BaseTest):
+class SpecSourceMapperTest(SourceMapperTest, TestBase):
   def set_mapper(self, fast=False):
     self._mapper = SpecSourceMapper(self.address_mapper, self.build_graph, fast)
