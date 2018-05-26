@@ -364,7 +364,7 @@ mod tests {
 
   use super::OneOffStoreFileByDigest;
   use super::super::{Dir, File, Path, PathGlobs, PathStat, PosixFS, ResettablePool, Snapshot,
-                     Store, VFS};
+                     Store, StrictGlobMatching, VFS};
 
   use std;
   use std::path::PathBuf;
@@ -629,7 +629,9 @@ mod tests {
 
   fn expand_all_sorted(posix_fs: Arc<PosixFS>) -> Vec<PathStat> {
     let mut v = posix_fs
-      .expand(PathGlobs::create(&["**".to_owned()], &[]).unwrap())
+      .expand(
+        // Don't error or warn if there are no paths matched -- that is a valid state.
+        PathGlobs::create(&["**".to_owned()], &[], StrictGlobMatching::Ignore).unwrap())
       .wait()
       .unwrap();
     v.sort_by(|a, b| a.path().cmp(b.path()));

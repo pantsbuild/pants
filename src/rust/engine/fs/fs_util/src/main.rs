@@ -272,6 +272,9 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
               .map(|s| s.to_string())
               .collect::<Vec<String>>(),
             &[],
+            // By using `Ignore`, we assume all elements of the globs will definitely expand to
+            // something here, or we don't care. Is that a valid assumption?
+            fs::StrictGlobMatching::Ignore,
           )?)
           .map_err(|e| format!("Error expanding globs: {}", e.description()))
           .and_then(move |paths| {
