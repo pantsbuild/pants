@@ -50,7 +50,6 @@ Refactoring, Improvements, and Tooling
   `PR #5632 <https://github.com/pantsbuild/pants/pull/5632>`_
 
 * Use tokio for scheduler requests and local process execution (#5846)
-  `Issue #369 <https://github.com/tokio-rs/tokio/issues/369>`_
   `PR #5846 <https://github.com/pantsbuild/pants/pull/5846>`_
 
 * Rust compilation is more robust and fast (#5857)
