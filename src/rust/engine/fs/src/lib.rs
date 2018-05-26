@@ -922,8 +922,8 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
             .sources
             .push(source);
 
-          // TODO(cosmicexplorer): is cloning these so many times as `GlobSource`s something we can
-          // bypass by using `Arc`s? Profile first.
+          // Do we need to worry about cloning for all these `GlobSource`s (each containing a
+          // `PathGlob`)?
           let source_for_children = GlobSource::ParentGlob(path_glob);
           for child_glob in globs {
             if let Occupied(mut entry) = expansion.completed.entry(child_glob.clone()) {
