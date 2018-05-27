@@ -521,20 +521,6 @@ function fetch_and_check_prebuilt_wheels() {
   fi
 }
 
-function adjust_wheel_platform() {
-  # Renames wheels to adjust their tag from a src platform to a dst platform.
-  # TODO: pypi will only accept manylinux wheels, but pex does not support manylinux whls:
-  # this function is used to go in one direction or another, depending on who is consuming.
-  #   see https://github.com/pantsbuild/pants/issues/4956
-  local src_plat="$1"
-  local dst_plat="$2"
-  local dir="$3"
-  for src_whl in `find "${dir}" -name '*'"${src_plat}.whl"`; do
-    local dst_whl=${src_whl/$src_plat/$dst_plat}
-    mv -f "${src_whl}" "${dst_whl}"
-  done
-}
-
 function activate_twine() {
   local -r venv_dir="${ROOT}/build-support/twine-deps.venv"
 
@@ -589,8 +575,6 @@ function build_pex() {
     build_pants_packages "${PANTS_UNSTABLE_VERSION}"
     build_3rdparty_packages "${PANTS_UNSTABLE_VERSION}"
   fi
-
-  adjust_wheel_platform "manylinux1_x86_64" "${linux_platform}" "${DEPLOY_DIR}"
 
   activate_tmp_venv && trap deactivate RETURN && pip install "pex==1.3.1" || die "Failed to install pex."
 
