@@ -71,4 +71,5 @@ class ListTargets(ConsoleTask):
       result = print_fn(target)
       if result and result not in visited:
         visited.add(result)
-        yield result
+
+    return sorted(visited)
