@@ -242,6 +242,13 @@ class TestBase(unittest.TestCase):
     """
     return BuildFileAliases(targets={'target': Target})
 
+
+  @classmethod
+  def build_config(cls):
+    build_config = BuildConfiguration()
+    build_config.register_aliases(cls.alias_groups())
+    return build_config
+
   def setUp(self):
     """
     :API: public
@@ -275,8 +282,7 @@ class TestBase(unittest.TestCase):
       'write_to': [],
     }
 
-    self._build_configuration = BuildConfiguration()
-    self._build_configuration.register_aliases(self.alias_groups())
+    self._build_configuration = self.build_config()
     self._build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
 
   def buildroot_files(self, relpath=None):
@@ -332,7 +338,7 @@ class TestBase(unittest.TestCase):
       workdir=cls._pants_workdir(),
       build_file_imports_behavior='allow',
       native=init_native(),
-      build_file_aliases=cls.alias_groups(),
+      build_configuration=cls.build_config(),
       build_ignore_patterns=None,
     ).new_session()
     cls._scheduler = graph_session.scheduler_session

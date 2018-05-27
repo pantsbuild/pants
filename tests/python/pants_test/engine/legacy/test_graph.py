@@ -17,7 +17,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.options_initializer import OptionsInitializer
+from pants.init.options_initializer import BuildConfigInitializer
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.subsystem.subsystem import Subsystem
@@ -41,36 +41,38 @@ class GraphTestBase(unittest.TestCase):
     options.for_scope.return_value = mock.Mock(diffspec=None, changes_since=None)
     return options
 
-  def _default_build_file_aliases(self):
+  def _default_build_config(self, build_file_aliases=None):
     # TODO: Get default BuildFileAliases by extending BaseTest post
     #   https://github.com/pantsbuild/pants/issues/4401
-    _, build_config = OptionsInitializer(OptionsBootstrapper()).setup(init_logging=False)
-    return build_config.registered_aliases()
+    build_config = BuildConfigInitializer.get(OptionsBootstrapper())
+    if build_file_aliases:
+      build_config.register_aliases(build_file_aliases)
+    return build_config
 
   @contextmanager
   def graph_helper(self,
-                   build_file_aliases=None,
+                   build_configuration=None,
                    build_file_imports_behavior='allow',
                    include_trace_on_error=True,
                    path_ignore_patterns=None):
 
     with temporary_dir() as work_dir:
       path_ignore_patterns = path_ignore_patterns or []
-      build_file_aliases = build_file_aliases or self._default_build_file_aliases()
+      build_config = build_configuration or self._default_build_config()
       # TODO: This test should be swapped to using TestBase.
       graph_helper = EngineInitializer.setup_legacy_graph_extended(
         path_ignore_patterns,
         work_dir,
         build_file_imports_behavior,
-        build_file_aliases=build_file_aliases,
+        build_configuration=build_configuration,
         native=self._native,
         include_trace_on_error=include_trace_on_error
       )
       yield graph_helper
 
   @contextmanager
-  def open_scheduler(self, specs, build_file_aliases=None):
-    with self.graph_helper(build_file_aliases=build_file_aliases) as graph_helper:
+  def open_scheduler(self, specs, build_configuration=None):
+    with self.graph_helper(build_configuration=build_configuration) as graph_helper:
       graph, target_roots = self.create_graph_from_specs(graph_helper, specs)
       addresses = tuple(graph.inject_roots_closure(target_roots))
       yield graph, addresses, graph_helper.scheduler.new_session()
@@ -186,10 +188,10 @@ class GraphInvalidationTest(GraphTestBase):
     tag_macro = functools.partial(macro, target_cls, tag)
     target_symbols = {'target': TargetMacro.Factory.wrap(tag_macro, target_cls)}
 
-    build_file_aliases = self._default_build_file_aliases().merge(BuildFileAliases(targets=target_symbols))
+    build_config = self._default_build_config(BuildFileAliases(targets=target_symbols))
 
     # Confirm that python_tests in a small directory are marked.
-    with self.open_scheduler([spec], build_file_aliases=build_file_aliases) as (graph, addresses, _):
+    with self.open_scheduler([spec], build_configuration=build_config) as (graph, addresses, _):
       self.assertTrue(len(addresses) > 0, 'No targets matched by {}'.format(addresses))
       for address in addresses:
         self.assertIn(tag, graph.get_target(address).tags)

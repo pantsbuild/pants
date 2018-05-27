@@ -10,8 +10,6 @@ import sys
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.bin.repro import Reproducer
-from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.engine.native import Native
 from pants.engine.round_engine import RoundEngine
@@ -20,13 +18,9 @@ from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.subprocess import Subprocess
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.option.ranked_value import RankedValue
-from pants.reporting.reporting import Reporting
-from pants.scm.subsystems.changed import Changed
-from pants.source.source_root import SourceRootConfig
 from pants.task.task import QuietTaskMixin
 from pants.util.filtering import create_filters, wrap_filters
 
@@ -199,19 +193,6 @@ class GoalRunner(object):
     self._run_tracker = run_tracker
     self._kill_nailguns = kill_nailguns
     self._exiter = exiter
-
-  @classmethod
-  def subsystems(cls):
-    """Subsystems used outside of any task."""
-    return {
-      SourceRootConfig,
-      Reporting,
-      Reproducer,
-      RunTracker,
-      Changed,
-      BinaryUtil.Factory,
-      Subprocess.Factory
-    }
 
   def _execute_engine(self):
     workdir = self._context.options.for_global_scope().pants_workdir

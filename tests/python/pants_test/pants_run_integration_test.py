@@ -406,10 +406,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
     def indent(content):
       return '\n\t'.join(content.splitlines())
 
-    if pants_run.stdout_data:
-      details.append('stdout:\n\t{stdout}'.format(stdout=indent(pants_run.stdout_data)))
-    if pants_run.stderr_data:
-      details.append('stderr:\n\t{stderr}'.format(stderr=indent(pants_run.stderr_data)))
+    details.append('stdout:\n\t{stdout}'.format(stdout=indent(pants_run.stdout_data)))
+    details.append('stderr:\n\t{stderr}'.format(stderr=indent(pants_run.stderr_data)))
     error_msg = '\n'.join(details)
 
     assertion(value, pants_run.returncode, error_msg)

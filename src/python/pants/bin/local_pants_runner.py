@@ -7,9 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.build_environment import get_buildroot
 from pants.bin.goal_runner import GoalRunner
-from pants.bin.repro import Reproducer
 from pants.goal.run_tracker import RunTracker
-from pants.init.options_initializer import OptionsInitializer
+from pants.init.logging import setup_logging_from_options
+from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
+from pants.init.repro import Reproducer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.reporting import Reporting
 from pants.util.contextutil import hard_exit_handler, maybe_profiled
@@ -48,7 +49,10 @@ class LocalPantsRunner(object):
     # Bootstrap options and logging.
     options_bootstrapper = self._options_bootstrapper or OptionsBootstrapper(env=self._env,
                                                                              args=self._args)
-    options, build_config = OptionsInitializer(options_bootstrapper, exiter=self._exiter).setup()
+    bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
+    setup_logging_from_options(bootstrap_options)
+    build_config = BuildConfigInitializer.get(options_bootstrapper)
+    options = OptionsInitializer.create(options_bootstrapper, build_config)
     global_options = options.for_global_scope()
 
     # Apply exiter options.

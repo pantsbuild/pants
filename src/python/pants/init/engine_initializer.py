@@ -16,6 +16,7 @@ from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTargets,
                                        create_legacy_graph_tasks)
+from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (AppAdaptor, GoTargetAdaptor, JavaLibraryAdaptor,
                                          JunitTestsAdaptor, PythonLibraryAdaptor,
@@ -26,7 +27,9 @@ from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import SingletonRule
 from pants.engine.scheduler import Scheduler
+from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.global_options import GlobMatchErrorBehavior
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.objects import datatype
 
 
@@ -117,16 +120,16 @@ class EngineInitializer(object):
   """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
 
   @staticmethod
-  def setup_legacy_graph(native, bootstrap_options, build_config):
+  def setup_legacy_graph(native, bootstrap_options, build_configuration):
     """Construct and return the components necessary for LegacyBuildGraph construction."""
     return EngineInitializer.setup_legacy_graph_extended(
       bootstrap_options.pants_ignore,
       bootstrap_options.pants_workdir,
       bootstrap_options.build_file_imports,
-      build_config.registered_aliases(),
+      build_configuration,
       native=native,
       glob_match_error_behavior=bootstrap_options.glob_expansion_failure,
-      rules=build_config.rules(),
+      rules=build_configuration.rules(),
       build_ignore_patterns=bootstrap_options.build_ignore,
       exclude_target_regexps=bootstrap_options.exclude_target_regexp,
       subproject_roots=bootstrap_options.subproject_roots,
@@ -140,7 +143,7 @@ class EngineInitializer(object):
     pants_ignore_patterns,
     workdir,
     build_file_imports_behavior,
-    build_file_aliases,
+    build_configuration,
     build_root=None,
     native=None,
     glob_match_error_behavior=None,
@@ -162,8 +165,8 @@ class EngineInitializer(object):
     :type build_file_imports_behavior: string
     :param str build_root: A path to be used as the build root. If None, then default is used.
     :param Native native: An instance of the native-engine subsystem.
-    :param build_file_aliases: BuildFileAliases to register.
-    :type build_file_aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
+    :param build_configuration: The `BuildConfiguration` object to get build file aliases from.
+    :type build_configuration: :class:`pants.build_graph.build_configuration.BuildConfiguration`
     :param glob_match_error_behavior: How to behave if a glob specified for a target's sources or
                                       bundles does not expand to anything.
     :type glob_match_error_behavior: :class:`pants.option.global_options.GlobMatchErrorBehavior`
@@ -178,9 +181,9 @@ class EngineInitializer(object):
     """
 
     build_root = build_root or get_buildroot()
-
-    if not rules:
-      rules = []
+    build_configuration = build_configuration or BuildConfigInitializer.get(OptionsBootstrapper())
+    build_file_aliases = build_configuration.registered_aliases()
+    rules = rules or build_configuration.rules() or []
 
     symbol_table = LegacySymbolTable(build_file_aliases)
 
@@ -203,12 +206,15 @@ class EngineInitializer(object):
     # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.
     rules = (
+      [
+        SingletonRule.from_instance(GlobMatchErrorBehavior.create(glob_match_error_behavior)),
+        SingletonRule.from_instance(build_configuration),
+      ] +
       create_legacy_graph_tasks(symbol_table) +
       create_fs_rules() +
       create_process_rules() +
       create_graph_rules(address_mapper, symbol_table) +
-      [SingletonRule(GlobMatchErrorBehavior,
-                     GlobMatchErrorBehavior.create(glob_match_error_behavior))] +
+      create_options_parsing_rules() +
       rules
     )
 
