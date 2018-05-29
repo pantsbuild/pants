@@ -23,9 +23,8 @@ from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
-from pants.util.dirutil import fast_relpath_optional
-from pants.util.filtering import create_filters, wrap_filters
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
+from pants.util.filtering import create_filters, wrap_filters
 from pants.util.objects import TypeConstraintError, datatype
 
 
@@ -229,8 +228,9 @@ def addresses_from_address_families(address_mapper, specs):
 
   def exclude_address(address):
     if specs.exclude_patterns:
-      address_str = address.spec
-      return any(pattern.search(address_str) is not None for pattern in specs._exclude_patterns)
+      return any(
+        pattern.search(address.spec) is not None for pattern in specs.exclude_patterns_memo()
+      )
     return False
 
   def filter_for_tag(tag):
@@ -240,15 +240,18 @@ def addresses_from_address_families(address_mapper, specs):
 
   addresses = []
   included = set()
+
   def include(address_families, predicate=None):
     matched = False
     for af in address_families:
-      for a,t in af.addressables.items():
-        if include_target(t) and not exclude_address(a) and (predicate is None or predicate(a)):
+      for (address, target) in af.addressables.items():
+        if include_target(target) and \
+          not exclude_address(address) and \
+          (predicate is None or predicate(address)):
           matched = True
-          if a not in included:
-            addresses.append(a)
-            included.add(a)
+          if address not in included:
+            addresses.append(address)
+            included.add(address)
     return matched
 
   for spec in specs.dependencies:

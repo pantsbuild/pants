@@ -59,7 +59,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     """Test that targets are filtered based on `tags`."""
     spec = SiblingAddresses('root')
     address_mapper = AddressMapper(JsonParser(TestTable()))
-    snapshot = Snapshot('xx', 2, [Path('root/BUILD', File('root/BUILD'))])
+    snapshot = Snapshot(DirectoryDigest(str('xx'), 2), (Path('root/BUILD', File('root/BUILD')),))
     address_family = AddressFamily('root',
       {'a': ('root/BUILD', TargetAdaptor()),
        'b': ('root/BUILD', TargetAdaptor(tags={'integration'})),
@@ -80,7 +80,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     """Test that targets are filtered based on exclude patterns."""
     spec = SiblingAddresses('root')
     address_mapper = AddressMapper(JsonParser(TestTable()))
-    snapshot = Snapshot('xx', 2, [Path('root/BUILD', File('root/BUILD'))])
+    snapshot = Snapshot(DirectoryDigest(str('xx'), 2), (Path('root/BUILD', File('root/BUILD')),))
     address_family = AddressFamily('root',
       {'exclude_me': ('root/BUILD', TargetAdaptor()),
        'not_me': ('root/BUILD', TargetAdaptor()),
