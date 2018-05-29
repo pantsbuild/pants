@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from abc import abstractmethod
 
 from pants.util.meta import AbstractClass
-from pants.util.objects import Collection, datatype
+from pants.util.objects import datatype
 
 
 class Spec(AbstractClass):
@@ -60,5 +60,8 @@ class AscendantAddresses(datatype(['directory']), Spec):
     return '{}^'.format(self.directory)
 
 
-class Specs(Collection.of(Spec)):
-  """A collection of Spec subclasses."""
+class Specs(datatype(['dependencies', 'tags', 'exclude_patterns'])):
+  """A collection of Spec subclasses and tag and name-regex filters."""
+
+  def __new__(cls, dependencies, tags=tuple(), exclude_patterns=tuple()):
+    return super(Specs, cls).__new__(cls, dependencies, tags, exclude_patterns)

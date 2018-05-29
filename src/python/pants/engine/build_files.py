@@ -23,6 +23,8 @@ from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
+from pants.util.dirutil import fast_relpath_optional
+from pants.util.filtering import create_filters, wrap_filters
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.objects import TypeConstraintError, datatype
 
@@ -226,18 +228,23 @@ def addresses_from_address_families(address_mapper, specs):
     raise ResolveError('Path "{}" does not contain any BUILD files.'.format(spec.directory))
 
   def exclude_address(address):
-    if address_mapper.exclude_patterns:
+    if specs.exclude_patterns:
       address_str = address.spec
-      return any(p.search(address_str) is not None for p in address_mapper.exclude_patterns)
+      return any(p.search(address_str) is not None for p in specs.exclude_patterns)
     return False
+
+  def filter_for_tag(tag):
+    return lambda t: tag in map(str, t.kwargs().get("tags", []))
+
+  include_target = wrap_filters(create_filters(specs.tags, filter_for_tag))
 
   addresses = []
   included = set()
   def include(address_families, predicate=None):
     matched = False
     for af in address_families:
-      for a in af.addressables.keys():
-        if not exclude_address(a) and (predicate is None or predicate(a)):
+      for a,t in af.addressables.items():
+        if include_target(t) and not exclude_address(a) and (predicate is None or predicate(a)):
           matched = True
           if a not in included:
             addresses.append(a)
