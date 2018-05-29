@@ -167,7 +167,8 @@ class PantsDaemon(FingerprintedProcessManager):
         fs_event_service,
         legacy_graph_scheduler,
         build_root,
-        bootstrap_options.pantsd_invalidation_globs
+        bootstrap_options.pantsd_invalidation_globs,
+        bootstrap_options.pants_subprocessdir,
       )
 
       pailgun_service = PailgunService(
