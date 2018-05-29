@@ -61,6 +61,7 @@ class PailgunService(PantsService):
       self._logger.debug('execution commandline: %s', arguments)
       options, _ = OptionsInitializer(OptionsBootstrapper(args=arguments)).setup(init_logging=False)
 
+      graph_helper, target_roots = None, None
       try:
         self._logger.debug('warming the product graph via %s', self._scheduler_service)
         # N.B. This call is made in the pre-fork daemon context for reach and reuse of the
