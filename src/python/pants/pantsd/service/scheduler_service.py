@@ -103,7 +103,7 @@ class SchedulerService(PantsService):
       self.terminate()
 
   def _check_pid_changed(self):
-    """Reads pidfile and returns False if its PID is ours, or a printable truthy value otherwise."""
+    """Reads pidfile and returns False if its PID is ours, else a printable (maybe falsey) value."""
     try:
       with open(os.path.join(self._build_root, self._pidfile), "r") as f:
         pid_from_file = f.read()
