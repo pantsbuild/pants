@@ -4,5 +4,8 @@
     <property name="targets" value="{{workspace.targets}}" />
     <property name="project_path" value="{{workspace.project_path}}" />
     <property name="pants_idea_plugin_version" value="{{workspace.idea_plugin_version}}" />
+    {{#workspace.incremental_import?}}
+    <property name="incremental_import" value="{{workspace.incremental_import}}" />
+    {{/workspace.incremental_import?}}
   </component>
 </project>

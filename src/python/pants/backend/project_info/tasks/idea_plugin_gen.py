@@ -27,7 +27,7 @@ from pants.util.process_handler import subprocess
 _TEMPLATE_BASEDIR = 'templates/idea'
 
 # Follow `export.py` for versioning strategy.
-IDEA_PLUGIN_VERSION = '0.0.2'
+IDEA_PLUGIN_VERSION = '1.9.2'
 
 
 class IdeaPluginGen(ConsoleTask):
@@ -63,6 +63,8 @@ class IdeaPluginGen(ConsoleTask):
     # scala/java-language level should use what Pants already knows.
     register('--open', type=bool, default=True,
              help='Attempts to open the generated project in IDEA.')
+    register('--incremental-import', type=int, default=None,
+             help='Enable incremental import of targets with the given graph depth.')
     register('--java-encoding', default='UTF-8',
              help='Sets the file encoding for java files in this project.')
     register('--open-with', type=str, default=None, recursive=True,
@@ -136,7 +138,8 @@ class IdeaPluginGen(ConsoleTask):
     configured_workspace = TemplateData(
       targets=json.dumps(abs_target_specs),
       project_path=os.path.join(get_buildroot(), abs_target_specs[0].split(':')[0]),
-      idea_plugin_version=IDEA_PLUGIN_VERSION
+      idea_plugin_version=IDEA_PLUGIN_VERSION,
+      incremental_import=self.get_options().incremental_import,
     )
 
     # Generate (without merging in any extra components).
