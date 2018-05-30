@@ -12,9 +12,13 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.coverage.engine import CoverageEngine
 from pants.base.exceptions import TaskError
+from pants.build_graph.build_graph import BuildGraph
+from pants.build_graph.target_scopes import Scopes
 from pants.java.jar.jar_dependency import JarDependency
+from pants.java.util import safe_classpath
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import relativize_paths, safe_mkdir, safe_mkdir_for, safe_walk, touch
@@ -53,6 +57,8 @@ class Cobertura(CoverageEngine):
              help='Regex patterns passed to cobertura specifying which classes should NOT be '
                   'instrumented. (see the "excludeclasses" element description here: '
                   'https://github.com/cobertura/cobertura/wiki/Ant-Task-Reference')
+    register('--coverage-cobertura-include-user-classpath', type=bool, fingerprint=True, default=True,
+             help='Use the user classpath to aid in instrumenting classes')
 
     def slf4j_jar(name):
       return JarDependency(org='org.slf4j', name=name, rev='1.7.5')
@@ -101,6 +107,7 @@ class Cobertura(CoverageEngine):
     self._rootdirs = defaultdict(OrderedSet)
     self._include_classes = options.coverage_cobertura_include_classes
     self._exclude_classes = options.coverage_cobertura_exclude_classes
+    self._include_user_classpath = options.coverage_cobertura_include_user_classpath
     self._targets = targets
     self._execute_java = functools.partial(execute_java_for_targets, targets)
 
@@ -192,6 +199,17 @@ class Cobertura(CoverageEngine):
         '--datafile',
         self._canonical_datafile,
       ]
+
+      if self._include_user_classpath:
+        closure = BuildGraph.closure(self._targets, bfs=True, include_scopes=Scopes.JVM_TEST_SCOPES,
+          respect_intransitive=True)
+
+        aux_classpath = safe_classpath(
+          ClasspathUtil.classpath(closure, runtime_classpath),
+          synthetic_jar_dir=None)
+        args.append('--auxClasspath')
+        args.extend(aux_classpath)
+
       # apply class incl/excl filters
       if len(self._include_classes) > 0:
         for pattern in self._include_classes:
