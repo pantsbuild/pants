@@ -31,7 +31,6 @@ class SchedulerService(PantsService):
     legacy_graph_scheduler,
     build_root,
     invalidation_globs,
-    subprocess_dir,
   ):
     """
     :param FSEventService fs_event_service: An unstarted FSEventService instance for setting up
@@ -41,32 +40,19 @@ class SchedulerService(PantsService):
     :param str build_root: The current build root.
     :param list invalidation_globs: A list of `globs` that when encountered in filesystem event
                                     subscriptions will tear down the daemon.
-    :param str subprocess_dir: Absolute path of the .pids directory which tracks subprocess pids.
     """
     super(SchedulerService, self).__init__()
     self._fs_event_service = fs_event_service
     self._graph_helper = legacy_graph_scheduler
     self._invalidation_globs = invalidation_globs
     self._build_root = build_root
+    self._pidfile = None
 
     self._scheduler = legacy_graph_scheduler.scheduler
     self._logger = logging.getLogger(__name__)
     self._event_queue = Queue.Queue(maxsize=self.QUEUE_SIZE)
     self._watchman_is_running = threading.Event()
     self._invalidating_files = set()
-
-    if subprocess_dir.startswith(build_root):
-      self._pidfile = os.path.relpath(
-        os.path.join(subprocess_dir, "pantsd", "pid"),
-        build_root,
-      )
-    else:
-      self._logger.warning(
-        'Not watching pantsd pidfile because subprocessdir is outside of buildroot. Having '
-        'subprocessdir be a child of buildroot (as it is by default) may help avoid stray pantsd '
-        'processes.'
-      )
-      self._pidfile = None
 
   @staticmethod
   def _combined_invalidating_fileset_from_globs(glob_strs, root):
@@ -87,19 +73,11 @@ class SchedulerService(PantsService):
       )
     self._logger.info('watching invalidating files: {}'.format(self._invalidating_files))
 
-    if self._pidfile:
-      self._fs_event_service.register_handler(
-        'pantsd_pid',
-        dict(
-          fields=['name'],
-          expression=[
-            'allof',
-            ['dirname', os.path.dirname(self._pidfile)],
-            ['name', os.path.basename(self._pidfile)],
-          ],
-        ),
-        self._enqueue_fs_event,
-      )
+  def watch_pidfile(self, pidfile):
+    if self._pidfile is not None:
+      raise Exception("Already watching pidfile {}, can't start watching {}".format(self._pidfile, pidfile))
+    self._pidfile = pidfile
+    self._fs_event_service.register_pidfile_handler(pidfile, self._enqueue_fs_event)
 
   def _enqueue_fs_event(self, event):
     """Watchman filesystem event handler for BUILD/requirements.txt updates. Called via a thread."""
@@ -110,7 +88,7 @@ class SchedulerService(PantsService):
   def _maybe_invalidate_scheduler(self, files):
     if self._pidfile in files:
       new_pid = self._check_pid_changed()
-      if new_pid:
+      if new_pid is not False:
         self._logger.fatal('{} says pantsd PID is {} but my PID is: {}: terminating'.format(
           self._pidfile,
           new_pid,

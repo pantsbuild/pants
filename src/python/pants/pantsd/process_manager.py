@@ -159,6 +159,9 @@ class ProcessMetadataManager(object):
     """Initialize the metadata directory for a named identity if it doesn't exist."""
     safe_mkdir(self._get_metadata_dir_by_name(name))
 
+  def metadata_file_path(self, name, metadata_key):
+    return os.path.join(self._get_metadata_dir_by_name(name), metadata_key)
+
   def read_metadata_by_name(self, name, metadata_key, caster=None):
     """Read process metadata using a named identity.
 
@@ -166,8 +169,8 @@ class ProcessMetadataManager(object):
     :param string metadata_key: The metadata key (e.g. 'pid').
     :param func caster: A casting callable to apply to the read value (e.g. `int`).
     """
+    file_path = self.metadata_file_path(name, metadata_key)
     try:
-      file_path = os.path.join(self._get_metadata_dir_by_name(name), metadata_key)
       return self._maybe_cast(read_file(file_path).strip(), caster)
     except (IOError, OSError):
       return None
@@ -180,7 +183,7 @@ class ProcessMetadataManager(object):
     :param string metadata_value: The metadata value (e.g. '1729').
     """
     self._maybe_init_metadata_dir_by_name(name)
-    file_path = os.path.join(self._get_metadata_dir_by_name(name), metadata_key)
+    file_path = self.metadata_file_path(name, metadata_key)
     safe_file_dump(file_path, metadata_value)
 
   def await_metadata_by_name(self, name, metadata_key, timeout, caster=None):
@@ -193,7 +196,7 @@ class ProcessMetadataManager(object):
     :returns: The value of the metadata key (read from disk post-write).
     :raises: :class:`ProcessMetadataManager.Timeout` on timeout.
     """
-    file_path = os.path.join(self._get_metadata_dir_by_name(name), metadata_key)
+    file_path = self.metadata_file_path(name, metadata_key)
     self._wait_for_file(file_path, timeout=timeout)
     return self.read_metadata_by_name(name, metadata_key, caster)
 

@@ -80,6 +80,26 @@ class FSEventService(PantsService):
       callback
     )
 
+  def register_pidfile_handler(self, pidfile_path, callback):
+    """
+
+    :param pidfile_path: Path to the pidfile, relative to the build root
+    :param callback:
+    :return:
+    """
+    self.register_handler(
+      'pantsd_pid',
+      dict(
+        fields=['name'],
+        expression=[
+          'allof',
+          ['dirname', os.path.dirname(pidfile_path)],
+          ['name', os.path.basename(pidfile_path)],
+        ],
+      ),
+      callback,
+    )
+
   def register_handler(self, name, metadata, callback):
     """Register subscriptions and their event handlers.
 
