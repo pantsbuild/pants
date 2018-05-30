@@ -21,7 +21,7 @@ native engine binary, allowing us to address it both as an importable python mod
 
 use std::fs;
 use std::io::{Read, Result};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{exit, Command};
 
 use build_utils::BuildRoot;
