@@ -21,7 +21,7 @@ native engine binary, allowing us to address it both as an importable python mod
 
 use std::fs;
 use std::io::{Read, Result};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{exit, Command};
 
 use build_utils::BuildRoot;
@@ -57,12 +57,17 @@ fn main() {
   // Generate the cffi c sources.
   let build_root = BuildRoot::find().unwrap();
   let cffi_bootstrapper = build_root.join("build-support/bin/native/bootstrap_cffi.sh");
+  mark_for_change_detection(&cffi_bootstrapper);
+
+  mark_for_change_detection(&build_root.join("src/python/pants/engine/native.py"));
 
   // N.B. The filename of this source code - at generation time - must line up 1:1 with the
   // python import name, as python keys the initialization function name off of the import name.
   let cffi_dir = Path::new("src/cffi");
-  let c_path = mark_for_change_detection(cffi_dir.join("native_engine.c"));
-  let env_script_path = mark_for_change_detection(cffi_dir.join("native_engine.cflags"));
+  let c_path = cffi_dir.join("native_engine.c");
+  mark_for_change_detection(&c_path);
+  let env_script_path = cffi_dir.join("native_engine.cflags");
+  mark_for_change_detection(&env_script_path);
 
   let result = Command::new(&cffi_bootstrapper)
     .arg(cffi_dir)
@@ -91,11 +96,10 @@ fn main() {
   config.compile("libnative_engine_ffi.a");
 }
 
-fn mark_for_change_detection(path: PathBuf) -> PathBuf {
+fn mark_for_change_detection(path: &Path) {
   // Restrict re-compilation check to just our input files.
   // See: http://doc.crates.io/build-script.html#outputs-of-the-build-script
   println!("cargo:rerun-if-changed={}", path.to_str().unwrap());
-  path
 }
 
 fn make_flags(env_script_path: &Path) -> Result<Vec<String>> {
