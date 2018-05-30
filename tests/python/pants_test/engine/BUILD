@@ -205,6 +205,16 @@ python_tests(
 )
 
 python_tests(
+  name='scheduler_integration',
+  sources=['test_scheduler_integration.py'],
+  dependencies=[
+    'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test:int-test',
+  ],
+  tags={'integration'},
+)
+
+python_tests(
   name='scheduler_test_base',
   sources=['scheduler_test_base.py'],
   dependencies=[
