@@ -258,12 +258,13 @@ class Nit(object):
   def flatten_lines(*line_or_line_list):
     return itertools.chain(*line_or_line_list)
 
-  def __init__(self, code, severity, filename, message, line_range=None, lines=None):
+  def __init__(self, code, severity, message, python_file, line_range=None, lines=None):
     if severity not in self.SEVERITY:
       raise ValueError('Severity should be one of {}'.format(' '.join(self.SEVERITY.values())))
     if not re.match(r'[A-Z]\d{3}', code):
       raise ValueError('Code must contain a prefix letter followed by a 3 digit number')
-    self.filename = filename
+    self.python_file = python_file
+    self.filename = python_file.filename
     self.code = code
     self.severity = severity
     self._message = message
@@ -321,15 +322,15 @@ class CheckSyntaxError(Exception):
 class CheckstylePlugin(AbstractClass):
   """Interface for checkstyle plugins."""
 
-  def __init__(self, options, python_file):
+  def __init__(self, options, python_files):
     super(CheckstylePlugin, self).__init__()
-    if not isinstance(python_file, PythonFile):
+    if any([not isinstance(pf, PythonFile) for pf in python_files]):
       raise TypeError('CheckstylePlugin takes PythonFile objects.')
+    self.python_files = python_files
     self.options = options
-    self.python_file = python_file
 
-  def iter_ast_types(self, ast_type):
-    for node in ast.walk(self.python_file.tree):
+  def iter_ast_types(self, ast_type, python_file):
+    for node in ast.walk(python_file.tree):
       if isinstance(node, ast_type):
         yield node
 
@@ -346,7 +347,7 @@ class CheckstylePlugin(AbstractClass):
       if nit.severity is Nit.ERROR:
         yield nit
 
-  def nit(self, code, severity, message, line_number_or_ast=None):
+  def nit(self, code, severity, message, python_file, line_number_or_ast=None):
     line_number = None
     if isinstance(line_number_or_ast, six.integer_types):
       line_number = line_number_or_ast
@@ -354,21 +355,21 @@ class CheckstylePlugin(AbstractClass):
       line_number = getattr(line_number_or_ast, 'lineno', None)
 
     if line_number:
-      line_range = self.python_file.line_range(line_number)
-      lines = self.python_file[line_number]
+      line_range = python_file.line_range(line_number)
+      lines = python_file[line_number]
     else:
       line_range = None
       lines = None
 
-    return Nit(code, severity, self.python_file.filename, message,
+    return Nit(code, severity, message, python_file,
                line_range=line_range,
                lines=lines)
 
-  def comment(self, code, message, line_number_or_ast=None):
-    return self.nit(code, Nit.COMMENT, message, line_number_or_ast)
+  def comment(self, code, message, python_file, line_number_or_ast=None):
+    return self.nit(code, Nit.COMMENT, message, python_file, line_number_or_ast)
 
-  def warning(self, code, message, line_number_or_ast=None):
-    return self.nit(code, Nit.WARNING, message, line_number_or_ast)
+  def warning(self, code, message, python_file, line_number_or_ast=None):
+    return self.nit(code, Nit.WARNING, message, python_file, line_number_or_ast)
 
-  def error(self, code, message, line_number_or_ast=None):
-    return self.nit(code, Nit.ERROR, message, line_number_or_ast)
+  def error(self, code, message, python_file, line_number_or_ast=None):
+    return self.nit(code, Nit.ERROR, message, python_file, line_number_or_ast)
