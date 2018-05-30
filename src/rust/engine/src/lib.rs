@@ -439,20 +439,17 @@ pub extern "C" fn graph_len(scheduler_ptr: *mut Scheduler) -> u64 {
 #[no_mangle]
 pub extern "C" fn graph_visualize(
   scheduler_ptr: *mut Scheduler,
-  execution_request_ptr: *mut ExecutionRequest,
+  session_ptr: *mut Session,
   path_ptr: *const raw::c_char,
-) {
+) -> PyResult {
   with_scheduler(scheduler_ptr, |scheduler| {
-    with_execution_request(execution_request_ptr, |execution_request| {
+    with_session(session_ptr, |session| {
       let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
       let path = PathBuf::from(path_str);
-      // TODO: This should likely return an error condition to python.
-      //   see https://github.com/pantsbuild/pants/issues/4025
       scheduler
-        .visualize(execution_request, path.as_path())
-        .unwrap_or_else(|e| {
-          println!("Failed to visualize to {}: {:?}", path.display(), e);
-        });
+        .visualize(session, path.as_path())
+        .map_err(|e| format!("Failed to visualize to {}: {:?}", path.display(), e))
+        .into()
     })
   })
 }

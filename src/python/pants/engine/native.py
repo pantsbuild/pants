@@ -218,7 +218,7 @@ void execution_request_destroy(ExecutionRequest*);
 
 uint64_t graph_len(Scheduler*);
 uint64_t graph_invalidate(Scheduler*, BufferBuffer);
-void graph_visualize(Scheduler*, ExecutionRequest*, char*);
+PyResult graph_visualize(Scheduler*, Session*, char*);
 void graph_trace(Scheduler*, ExecutionRequest*, char*);
 
 PyResult  execution_add_root_select(Scheduler*, ExecutionRequest*, Key, TypeConstraint);

@@ -232,7 +232,7 @@ class SchedulerTest(unittest.TestCase):
 
     with temporary_dir() as td:
       output_path = os.path.join(td, 'output.dot')
-      self.scheduler.visualize_graph_to_file(build_request, output_path)
+      self.scheduler.visualize_graph_to_file(output_path)
       with open(output_path, 'rb') as fh:
         graphviz_output = fh.read().strip()
 

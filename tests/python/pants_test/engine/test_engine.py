@@ -36,7 +36,7 @@ class EngineExamplesTest(unittest.TestCase):
   def test_serial_execution_simple(self):
     request = self.request([Classpath], self.java)
     result = self.scheduler.execute(request)
-    self.scheduler.visualize_graph_to_file(request, 'blah/run.0.dot')
+    self.scheduler.visualize_graph_to_file('blah/run.0.dot')
     self.assertEqual(Return(Classpath(creator='javac')), result.root_products[0][1])
     self.assertIsNone(result.error)
 
