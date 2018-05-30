@@ -28,7 +28,7 @@ from pants.util.objects import TypeConstraintError, datatype
 
 
 class ResolvedTypeMismatchError(ResolveError):
-  """Indicates a resolved object was not of the expected type."""
+  """Indicates a resolved object was not of the expected type. """
 
 
 def _key_func(entry):
