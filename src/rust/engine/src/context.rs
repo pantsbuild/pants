@@ -36,7 +36,7 @@ pub struct Core {
   pub runtime: Resettable<Arc<Runtime>>,
   pub store: Store,
   pub vfs: PosixFS,
-  pub command_runner: BoundedCommandRunner<process_execution::local::CommandRunner>,
+  pub command_runner: BoundedCommandRunner,
 }
 
 impl Core {
@@ -47,6 +47,8 @@ impl Core {
     build_root: &Path,
     ignore_patterns: Vec<String>,
     work_dir: &Path,
+    remote_store_server: Option<String>,
+    remote_execution_server: Option<String>,
   ) -> Core {
     let mut snapshots_dir = PathBuf::from(work_dir);
     snapshots_dir.push("snapshots");
@@ -62,15 +64,38 @@ impl Core {
     };
 
     let store = safe_create_dir_all_ioerror(&store_path)
-      .map_err(|e| format!("{:?}", e))
-      .and_then(|()| Store::local_only(store_path, fs_pool.clone()))
-      .unwrap_or_else(|e| panic!("Could not initialize Store directory: {:?}", e));
+      .map_err(|e| format!("Error making directory {:?}: {:?}", store_path, e))
+      .and_then(|()| {
+        match remote_store_server {
+          Some(address) => Store::with_remote(
+            store_path,
+            fs_pool.clone(),
+            address,
+            // TODO: Allow configuration of all of the below:
+            1,
+            1024 * 1024,
+            std::time::Duration::from_secs(60),
+          ),
+          None => Store::local_only(store_path, fs_pool.clone()),
+        }
+      })
+      .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
+
+    let underlying_command_runner: Box<process_execution::CommandRunner> =
+      match remote_execution_server {
+        Some(address) => Box::new(process_execution::remote::CommandRunner::new(
+          address,
+          1,
+          store.clone(),
+        )),
+        None => Box::new(process_execution::local::CommandRunner::new(
+          store.clone(),
+          fs_pool.clone(),
+        )),
+      };
 
     // TODO: Allow configuration of process concurrency.
-    let command_runner = BoundedCommandRunner::new(
-      process_execution::local::CommandRunner::new(store.clone(), fs_pool.clone()),
-      16,
-    );
+    let command_runner = BoundedCommandRunner::new(underlying_command_runner, 16);
 
     let rule_graph = RuleGraph::new(&tasks, root_subject_types);
 

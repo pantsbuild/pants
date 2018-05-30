@@ -202,7 +202,9 @@ Scheduler* scheduler_create(Tasks*,
                             Buffer,
                             Buffer,
                             BufferBuffer,
-                            TypeIdBuffer);
+                            TypeIdBuffer,
+                            Buffer,
+                            Buffer);
 void scheduler_pre_fork(Scheduler*);
 Value scheduler_metrics(Scheduler*, Session*);
 RawNodes* scheduler_execute(Scheduler*, Session*, ExecutionRequest*);
@@ -718,6 +720,8 @@ class Native(object):
                     build_root,
                     work_dir,
                     ignore_patterns,
+                    remote_store_server,
+                    remote_execution_server,
                     construct_directory_digest,
                     construct_snapshot,
                     construct_file_content,
@@ -781,6 +785,9 @@ class Native(object):
         self.context.utf8_buf(work_dir),
         self.context.utf8_buf_buf(ignore_patterns),
         self.to_ids_buf(root_subject_types),
+        # Remote execution config.
+        self.context.utf8_buf(remote_store_server),
+        self.context.utf8_buf(remote_execution_server),
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)
 

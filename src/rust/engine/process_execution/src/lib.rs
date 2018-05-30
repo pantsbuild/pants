@@ -87,13 +87,13 @@ pub trait CommandRunner: Send + Sync {
 ///
 /// A CommandRunner wrapper that limits the number of concurrent requests.
 ///
-pub struct BoundedCommandRunner<T: CommandRunner + Send + Sync + 'static> {
-  inner: Arc<T>,
+pub struct BoundedCommandRunner {
+  inner: Arc<Box<CommandRunner>>,
   sema: AsyncSemaphore,
 }
 
-impl<T: CommandRunner + Send + Sync + 'static> BoundedCommandRunner<T> {
-  pub fn new(inner: T, bound: usize) -> BoundedCommandRunner<T> {
+impl BoundedCommandRunner {
+  pub fn new(inner: Box<CommandRunner>, bound: usize) -> BoundedCommandRunner {
     BoundedCommandRunner {
       inner: Arc::new(inner),
       sema: AsyncSemaphore::new(bound),
@@ -101,7 +101,7 @@ impl<T: CommandRunner + Send + Sync + 'static> BoundedCommandRunner<T> {
   }
 }
 
-impl<T: CommandRunner + Send + Sync + 'static> CommandRunner for BoundedCommandRunner<T> {
+impl CommandRunner for BoundedCommandRunner {
   fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<ExecuteProcessResult, String> {
     let inner = self.inner.clone();
     self.sema.with_acquired(move || inner.run(req))

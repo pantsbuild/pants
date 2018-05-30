@@ -201,6 +201,11 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--build-file-imports', choices=['allow', 'warn', 'error'], default='warn',
       help='Whether to allow import statements in BUILD files')
 
+    register('--remote-store-server',
+             help='host:port of grpc server to use as remote execution file store')
+    register('--remote-execution-server',
+             help='host:port of grpc server to use as remote execution scheduler')
+
   @classmethod
   def register_options(cls, register):
     """Register options not tied to any particular task or subsystem."""

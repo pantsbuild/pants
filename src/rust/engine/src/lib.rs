@@ -217,6 +217,8 @@ pub extern "C" fn scheduler_create(
   work_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
   root_type_ids: TypeIdBuffer,
+  remote_store_server: Buffer,
+  remote_execution_server: Buffer,
 ) -> *const Scheduler {
   let root_type_ids = root_type_ids.to_vec();
   let ignore_patterns = ignore_patterns_buf
@@ -251,6 +253,12 @@ pub extern "C" fn scheduler_create(
   let mut tasks = with_tasks(tasks_ptr, |tasks| tasks.clone());
   tasks.intrinsics_set(&types);
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
+  let remote_store_server_string = remote_store_server
+    .to_string()
+    .expect("remote_store_server was not valid UTF8");
+  let remote_execution_server_string = remote_execution_server
+    .to_string()
+    .expect("remote_execution_server was not valid UTF8");
   Box::into_raw(Box::new(Scheduler::new(Core::new(
     root_type_ids.clone(),
     tasks,
@@ -258,6 +266,16 @@ pub extern "C" fn scheduler_create(
     build_root_buf.to_os_string().as_ref(),
     ignore_patterns,
     work_dir_buf.to_os_string().as_ref(),
+    if remote_store_server_string.is_empty() {
+      None
+    } else {
+      Some(remote_store_server_string)
+    },
+    if remote_execution_server_string.is_empty() {
+      None
+    } else {
+      Some(remote_execution_server_string)
+    },
   ))))
 }
 
