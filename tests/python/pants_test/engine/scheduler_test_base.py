@@ -56,6 +56,8 @@ class SchedulerTestBase(object):
                           project_tree,
                           work_dir,
                           rules,
+                          remote_store_server=None,
+                          remote_execution_server=None,
                           include_trace_on_error=include_trace_on_error)
     return scheduler.new_session()
 

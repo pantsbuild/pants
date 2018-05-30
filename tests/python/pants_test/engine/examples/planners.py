@@ -473,5 +473,6 @@ def setup_json_scheduler(build_root, native):
                         project_tree,
                         work_dir,
                         rules,
-                        native)
+                        None,
+                        None)
   return scheduler.new_session()

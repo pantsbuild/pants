@@ -72,7 +72,17 @@ class ExecutionError(Exception):
 
 
 class Scheduler(object):
-  def __init__(self, native, project_tree, work_dir, rules, include_trace_on_error=True, validate=True):
+  def __init__(
+    self,
+    native,
+    project_tree,
+    work_dir,
+    rules,
+    remote_store_server,
+    remote_execution_server,
+    include_trace_on_error=True,
+    validate=True,
+  ):
     """
     :param native: An instance of engine.native.Native.
     :param project_tree: An instance of ProjectTree for the current build root.
@@ -82,6 +92,13 @@ class Scheduler(object):
     :type include_trace_on_error: bool
     :param validate: True to assert that the ruleset is valid.
     """
+
+    if remote_execution_server and not remote_store_server:
+      raise ValueError("Cannot set remote execution server without setting remote store server")
+    # We can't currently pass Options to the rust side, so we pass empty strings for None:
+    remote_execution_server = remote_execution_server or ""
+    remote_store_server = remote_store_server or ""
+
     self._native = native
     self.include_trace_on_error = include_trace_on_error
 
@@ -104,6 +121,8 @@ class Scheduler(object):
       project_tree.build_root,
       work_dir,
       project_tree.ignore_patterns,
+      remote_store_server,
+      remote_execution_server,
       DirectoryDigest,
       Snapshot,
       FileContent,

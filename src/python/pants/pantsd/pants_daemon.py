@@ -149,6 +149,8 @@ class PantsDaemon(FingerprintedProcessManager):
         build_ignore_patterns=bootstrap_options.build_ignore,
         exclude_target_regexps=bootstrap_options.exclude_target_regexp,
         subproject_roots=bootstrap_options.subproject_roots,
+        remote_store_server=bootstrap_options.remote_store_server,
+        remote_execution_server=bootstrap_options.remote_execution_server,
       )
 
     @staticmethod

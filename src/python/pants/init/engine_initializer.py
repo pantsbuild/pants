@@ -135,7 +135,10 @@ class EngineInitializer(object):
                          build_ignore_patterns=None,
                          exclude_target_regexps=None,
                          subproject_roots=None,
-                         include_trace_on_error=True):
+                         include_trace_on_error=True,
+                         remote_store_server=None,
+                         remote_execution_server=None,
+  ):
     """Construct and return the components necessary for LegacyBuildGraph construction.
 
     :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
@@ -199,6 +202,8 @@ class EngineInitializer(object):
       project_tree,
       workdir,
       rules,
+      remote_store_server,
+      remote_execution_server,
       include_trace_on_error=include_trace_on_error,
     )
 
