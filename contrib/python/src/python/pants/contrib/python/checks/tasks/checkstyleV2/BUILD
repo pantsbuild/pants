@@ -1,0 +1,23 @@
+python_binary(
+  name='class_factoring',
+  source='class_factoring.py',
+  dependencies=[
+    ':all'
+  ]
+)
+
+python_library(
+  name='all',
+  sources=['common.py'],
+  dependencies=[
+    '3rdparty/python:pycodestyle',
+    '3rdparty/python:pyflakes',
+    '3rdparty/python:pex',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/option',
+    'src/python/pants/subsystem',
+    'src/python/pants/task',
+    'src/python/pants/util:meta',
+  ]
+)
