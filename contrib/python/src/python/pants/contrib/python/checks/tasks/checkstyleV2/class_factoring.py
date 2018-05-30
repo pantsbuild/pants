@@ -9,7 +9,7 @@ import argparse
 import ast
 import sys
 
-from pants.contrib.python.checks.tasks.checkstyleV2.common import CheckstylePlugin, PythonFile
+from pants.contrib.python.checks.tasks.checkstyleV2.common import CheckstylePlugin, Nit, PythonFile
 
 
 class ClassFactoring(CheckstylePlugin):
@@ -31,16 +31,21 @@ class ClassFactoring(CheckstylePlugin):
         yield node
 
   def nits(self):
+    log_threshold = Nit.SEVERITY.get(self.options.severity, Nit.COMMENT)
+    fail_threshold = Nit.WARNING if self.options.strict else Nit.ERROR
     nits = 0
     for pf in self.python_files:
       for class_def in self.iter_ast_types(ast.ClassDef, pf):
         for node in self.iter_class_accessors(class_def):
-          nits += 1
           nit = self.warning('T800',
               'Instead of {name}.{attr} use self.{attr} or cls.{attr} with instancemethods and '
               'classmethods respectively.'.format(name=class_def.name, attr=node.attr), pf)
-          print('{nit}\n'.format(nit=nit))
+          if nit.severity >= log_threshold:
+            print('{nit}\n'.format(nit=nit))
+          if nit.severity >= fail_threshold:
+            nits += 1
     return nits
+
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(
@@ -61,5 +66,5 @@ if __name__ == "__main__":
     files.append(PythonFile.parse(fname))
   if files:
     checker = ClassFactoring(options, files)
-    fail_count = checker.nits()
-    print('Fails for classfactoring: {}'.format(fail_count))
+    failure_count = checker.nits()
+    print('Fails for classfactoring: {}'.format(failure_count))
