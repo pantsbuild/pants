@@ -258,8 +258,9 @@ class Scheduler(object):
                                      TypeId(self._to_id(get.subject)))
     self._native.lib.tasks_task_end(self._tasks)
 
-  def visualize_graph_to_file(self, execution_request, filename):
-    self._native.lib.graph_visualize(self._scheduler, execution_request, bytes(filename))
+  def visualize_graph_to_file(self, session, filename):
+    res = self._native.lib.graph_visualize(self._scheduler, session, bytes(filename))
+    self._raise_or_return(res)
 
   def visualize_rule_graph_to_file(self, filename):
     self._native.lib.rule_graph_visualize(
@@ -399,13 +400,12 @@ class SchedulerSession(object):
     for line in self._scheduler.graph_trace(execution_request.native):
       yield line
 
-  def visualize_graph_to_file(self, execution_request, filename):
+  def visualize_graph_to_file(self, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
 
-    :param ExecutionRequest execution_request: A set of roots to visualize from.
     :param str filename: The filename to output the graphviz output to.
     """
-    self._scheduler.visualize_graph_to_file(execution_request.native, filename)
+    self._scheduler.visualize_graph_to_file(self._session, filename)
 
   def visualize_rule_graph_to_file(self, filename):
     self._scheduler.visualize_rule_graph_to_file(filename)

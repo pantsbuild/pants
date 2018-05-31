@@ -73,8 +73,8 @@ class SchedulerTestBase(object):
     states = [state for _, state in result.root_products]
     if any(type(state) is not Return for state in states):
       with temporary_file_path(cleanup=False, suffix='.dot') as dot_file:
-        scheduler.visualize_graph_to_file(request, dot_file)
-        raise ValueError('At least one request failed: {}. Visualized as {}'.format(states, dot_file))
+        scheduler.visualize_graph_to_file(dot_file)
+        raise ValueError('At least one root failed: {}. Visualized as {}'.format(states, dot_file))
     return list(state.value for state in states)
 
   def execute_expecting_one_result(self, scheduler, product, subject):

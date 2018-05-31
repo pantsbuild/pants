@@ -84,8 +84,8 @@ impl Scheduler {
     }
   }
 
-  pub fn visualize(&self, request: &ExecutionRequest, path: &Path) -> io::Result<()> {
-    self.core.graph.visualize(&request.root_nodes(), path)
+  pub fn visualize(&self, session: &Session, path: &Path) -> io::Result<()> {
+    self.core.graph.visualize(&session.root_nodes(), path)
   }
 
   pub fn trace(&self, request: &ExecutionRequest, path: &Path) -> io::Result<()> {
