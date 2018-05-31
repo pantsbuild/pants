@@ -331,8 +331,8 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       pants_run = self.run_pants(['list', '--changed-parent=HEAD'])
       self.assert_success(pants_run)
       changed_targets = [
-        'src/python/sources:some-missing-some-not',
         'src/python/sources:overlapping-globs',
+        'src/python/sources:some-missing-some-not',
         'src/python/sources:text',
       ]
       self.assertEqual(pants_run.stdout_data.strip(),
