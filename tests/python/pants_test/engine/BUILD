@@ -124,6 +124,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/engine:nodes',
     'src/python/pants/engine:scheduler',
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test/engine/examples:planners',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
     'tests/python/pants_test/engine:util',
@@ -208,7 +209,7 @@ python_tests(
   name='scheduler_integration',
   sources=['test_scheduler_integration.py'],
   dependencies=[
-    'tests/python/pants_test/base:context_utils',
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
   tags={'integration'},

@@ -13,6 +13,7 @@ from pants.build_graph.address import Address
 from pants.engine.nodes import Return
 from pants.engine.rules import RootRule, TaskRule, rule
 from pants.engine.selectors import Get, Select
+from pants.util.contextutil import temporary_dir
 from pants.util.objects import datatype
 from pants_test.engine.examples.planners import Classpath, setup_json_scheduler
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -36,7 +37,8 @@ class EngineExamplesTest(unittest.TestCase):
   def test_serial_execution_simple(self):
     request = self.request([Classpath], self.java)
     result = self.scheduler.execute(request)
-    self.scheduler.visualize_graph_to_file('blah/run.0.dot')
+    with temporary_dir() as tempdir:
+      self.scheduler.visualize_graph_to_file(os.path.join(tempdir, 'run.0.dot'))
     self.assertEqual(Return(Classpath(creator='javac')), result.root_products[0][1])
     self.assertIsNone(result.error)
 
