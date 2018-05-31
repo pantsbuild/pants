@@ -68,7 +68,7 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
     register('--strict', fingerprint=True, type=bool,
              help='If enabled, have non-zero exit status for any nit at WARNING or higher.')
     register('--suppress', fingerprint=True, type=file_option, default=None,
-             help='Takes a XML file where specific rules on specific files will be skipped.')
+             help='Takes a text file where specific rules on specific files will be skipped.')
     register('--fail', fingerprint=True, default=True, type=bool,
              help='Prevent test failure but still produce output for problems.')
 
@@ -173,7 +173,7 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
   def execute(self):
     """Run Checkstyle on all found non-synthetic source files."""
 
-    # If we are linting for Python 3, skip lint altogether. 
+    # If we are linting for Python 3, skip lint altogether.
     # Long-term Python 3 linting solution tracked by:
     # https://github.com/pantsbuild/pants/issues/5764
     interpreter = self.context.products.get_data(PythonInterpreter)
