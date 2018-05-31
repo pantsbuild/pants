@@ -26,6 +26,7 @@ from pants.contrib.go.targets.go_protobuf_library import GoProtobufGenLibrary, G
 class GoProtobufGen(SimpleCodegenTask):
 
   _NAMESPACE_PARSER = re.compile(r'^\s*option\s+go_package\s*=\s*"([^\s]+)"\s*;', re.MULTILINE)
+  _PACKAGE_PARSER = re.compile(r'^\s*package\s+([^\s]+)\s*;', re.MULTILINE)
 
   @classmethod
   def register_options(cls, register):
@@ -96,12 +97,13 @@ class GoProtobufGen(SimpleCodegenTask):
     all_sources = list(target.sources_relative_to_buildroot())
     source = all_sources[0]
     namespace = self._get_go_namespace(source)
-    return os.path.join(target_workdir, 'src', 'go', namespace.replace(".", os.path.sep))
+    return os.path.join(target_workdir, 'src', 'go', namespace)
 
   @classmethod
   def _get_go_namespace(cls, source):
     with open(source) as fh:
-      namespace = cls._NAMESPACE_PARSER.search(fh.read())
-      if not namespace:
-        raise TaskError('File {} must contain "option go_package"'.format(source))
-      return namespace.group(1)
+      data = fh.read()
+    namespace = cls._NAMESPACE_PARSER.search(data)
+    if not namespace:
+      namespace = cls._PACKAGE_PARSER.search(data)
+    return namespace.group(1)
