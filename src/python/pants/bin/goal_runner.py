@@ -118,7 +118,6 @@ class GoalRunnerFactory(object):
         include_trace_on_error=self._options.for_global_scope().print_exception_stacktrace,
         remote_store_server=self._options.for_global_scope().remote_store_server,
         remote_execution_server=self._options.for_global_scope().remote_execution_server,
-        include_trace_on_error=self._options.for_global_scope().print_exception_stacktrace
       ).new_session()
 
     target_roots = target_roots or TargetRootsCalculator.create(
