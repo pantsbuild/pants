@@ -23,6 +23,7 @@ from pants.init.engine_initializer import EngineInitializer
 from pants.init.subprocess import Subprocess
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.java.nailgun_executor import NailgunProcessGroup
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting import Reporting
 from pants.scm.subsystems.changed import Changed
@@ -106,6 +107,8 @@ class GoalRunnerFactory(object):
         pants_ignore_patterns,
         workdir,
         self._global_options.build_file_imports,
+        glob_match_error_behavior=GlobMatchErrorBehavior.create(
+          self._global_options.glob_expansion_failure),
         native=native,
         build_file_aliases=self._build_config.registered_aliases(),
         rules=self._build_config.rules(),

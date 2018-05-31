@@ -4,8 +4,8 @@
 extern crate bazel_protos;
 extern crate tempdir;
 
-use std::error::Error;
 use std::collections::BTreeMap;
+use std::error::Error;
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -18,9 +18,10 @@ use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
-use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDigest, VFS};
-use process_execution::{self, CommandRunner};
+use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDigest,
+         StrictGlobMatching, VFS};
 use hashing;
+use process_execution::{self, CommandRunner};
 use rule_graph;
 use selectors;
 use tasks::{self, Intrinsic, IntrinsicKind};
@@ -667,7 +668,11 @@ impl Snapshot {
   pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
     let include = externs::project_multi_strs(item, "include");
     let exclude = externs::project_multi_strs(item, "exclude");
-    PathGlobs::create(&include, &exclude).map_err(|e| {
+    let glob_match_error_behavior =
+      externs::project_ignoring_type(item, "glob_match_error_behavior");
+    let failure_behavior = externs::project_str(&glob_match_error_behavior, "failure_behavior");
+    let strict_glob_matching = StrictGlobMatching::create(failure_behavior.as_str())?;
+    PathGlobs::create(&include, &exclude, strict_glob_matching).map_err(|e| {
       format!(
         "Failed to parse PathGlobs for include({:?}), exclude({:?}): {}",
         include, exclude, e
@@ -752,10 +757,11 @@ impl Node for Snapshot {
   type Output = fs::Snapshot;
 
   fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
-    match Self::lift_path_globs(&externs::val_for(&self.0)) {
-      Ok(pgs) => Self::create(context, pgs),
-      Err(e) => err(throw(&format!("Failed to parse PathGlobs: {}", e))),
-    }
+    let lifted_path_globs = Self::lift_path_globs(&externs::val_for(&self.0));
+    future::result(lifted_path_globs)
+      .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))
+      .and_then(move |path_globs| Self::create(context, path_globs))
+      .to_boxed()
   }
 }
 
@@ -899,6 +905,8 @@ impl NodeKey {
     fn typstr(tc: &TypeConstraint) -> String {
       externs::key_to_str(&tc.0)
     }
+    // FIXME(cosmicexplorer): these should all be converted to fmt::Debug implementations, and then
+    // this method can go away in favor of the auto-derived Debug for this type.
     match self {
       &NodeKey::DigestFile(ref s) => format!("DigestFile({:?})", s.0),
       &NodeKey::ExecuteProcess(ref s) => format!("ExecuteProcess({:?}", s.0),

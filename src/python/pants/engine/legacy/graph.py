@@ -24,6 +24,7 @@ from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.rules import TaskRule, rule
 from pants.engine.selectors import Get, Select
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import Collection, datatype
@@ -364,7 +365,9 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
   fds = snapshot.path_stats if include_dirs else snapshot.files
   files = tuple(fast_relpath(fd.path, spec_path) for fd in fds)
 
-  relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(filespec['globs'], spec_path)
+  rel_include_globs = filespec['globs']
+
+  relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(rel_include_globs, spec_path)
   if filespec.has_key('exclude'):
     relpath_adjusted_filespec['exclude'] = [FilesetRelPathWrapper.to_filespec(e['globs'], spec_path)
                                             for e in filespec['exclude']]
@@ -375,33 +378,43 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
                               files_hash=snapshot.directory_digest.fingerprint)
 
 
-@rule(HydratedField, [Select(SourcesField)])
-def hydrate_sources(sources_field):
-  """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec."""
-
-  snapshot = yield Get(Snapshot, PathGlobs, sources_field.path_globs)
-  fileset_with_spec = _eager_fileset_with_spec(sources_field.address.spec_path,
-                                               sources_field.filespecs,
-                                               snapshot)
+@rule(HydratedField, [Select(SourcesField), Select(GlobMatchErrorBehavior)])
+def hydrate_sources(sources_field, glob_match_error_behavior):
+  """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
+  """
+  # TODO(#5864): merge the target's selection of --glob-expansion-failure (which doesn't exist yet)
+  # with the global default!
+  path_globs = sources_field.path_globs.with_match_error_behavior(glob_match_error_behavior)
+  snapshot = yield Get(Snapshot, PathGlobs, path_globs)
+  fileset_with_spec = _eager_fileset_with_spec(
+    sources_field.address.spec_path,
+    sources_field.filespecs,
+    snapshot)
   yield HydratedField(sources_field.arg, fileset_with_spec)
 
 
-@rule(HydratedField, [Select(BundlesField)])
-def hydrate_bundles(bundles_field):
+@rule(HydratedField, [Select(BundlesField), Select(GlobMatchErrorBehavior)])
+def hydrate_bundles(bundles_field, glob_match_error_behavior):
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
-  snapshot_list = yield [Get(Snapshot, PathGlobs, pg) for pg in bundles_field.path_globs_list]
+  path_globs_with_match_errors = [
+    pg.with_match_error_behavior(glob_match_error_behavior)
+    for pg in bundles_field.path_globs_list
+  ]
+  snapshot_list = yield [Get(Snapshot, PathGlobs, pg) for pg in path_globs_with_match_errors]
+
+  spec_path = bundles_field.address.spec_path
 
   bundles = []
   zipped = zip(bundles_field.bundles,
                bundles_field.filespecs_list,
                snapshot_list)
   for bundle, filespecs, snapshot in zipped:
-    spec_path = bundles_field.address.spec_path
+    rel_spec_path = getattr(bundle, 'rel_path', spec_path)
     kwargs = bundle.kwargs()
     # NB: We `include_dirs=True` because bundle filesets frequently specify directories in order
     # to trigger a (deprecated) default inclusion of their recursive contents. See the related
     # deprecation in `pants.backend.jvm.tasks.bundle_create`.
-    kwargs['fileset'] = _eager_fileset_with_spec(getattr(bundle, 'rel_path', spec_path),
+    kwargs['fileset'] = _eager_fileset_with_spec(rel_spec_path,
                                                  filespecs,
                                                  snapshot,
                                                  include_dirs=True)

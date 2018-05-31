@@ -61,6 +61,7 @@ python_library(
     'src/python/pants/engine:mapper',
     'src/python/pants/engine:parser',
     'src/python/pants/engine:selectors',
+    'src/python/pants/option',
     'src/python/pants/source',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:objects',

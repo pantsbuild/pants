@@ -4,7 +4,7 @@
 python_library(
   name='test_infra',
   dependencies=[
-    'tests/python/pants_test:base_test',
+    ':base_test',
     'tests/python/pants_test:int-test-for-export',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test/jvm:jar_task_test_base',

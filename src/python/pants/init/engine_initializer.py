@@ -24,8 +24,10 @@ from pants.engine.legacy.structs import (AppAdaptor, GoTargetAdaptor, JavaLibrar
 from pants.engine.mapper import AddressMapper
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
+from pants.engine.rules import SingletonRule
 from pants.engine.scheduler import Scheduler
 from pants.init.options_initializer import OptionsInitializer
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.change_calculator import EngineChangeCalculator
 from pants.util.objects import datatype
@@ -131,6 +133,7 @@ class EngineInitializer(object):
                          build_root=None,
                          native=None,
                          build_file_aliases=None,
+                         glob_match_error_behavior=None,
                          rules=None,
                          build_ignore_patterns=None,
                          exclude_target_regexps=None,
@@ -151,6 +154,9 @@ class EngineInitializer(object):
     :param Native native: An instance of the native-engine subsystem.
     :param build_file_aliases: BuildFileAliases to register.
     :type build_file_aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
+    :param glob_match_error_behavior: How to behave if a glob specified for a target's sources or
+                                      bundles does not expand to anything.
+    :type glob_match_error_behavior: :class:`pants.option.global_options.GlobMatchErrorBehavior`
     :param list build_ignore_patterns: A list of paths ignore patterns used when searching for BUILD
                                        files, usually taken from the '--build-ignore' global option.
     :param list exclude_target_regexps: A list of regular expressions for excluding targets.
@@ -194,6 +200,8 @@ class EngineInitializer(object):
       create_fs_rules() +
       create_process_rules() +
       create_graph_rules(address_mapper, symbol_table) +
+      [SingletonRule(GlobMatchErrorBehavior,
+                     GlobMatchErrorBehavior.create(glob_match_error_behavior))] +
       rules
     )
 

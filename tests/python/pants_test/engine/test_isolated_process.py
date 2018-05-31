@@ -31,9 +31,8 @@ class BinaryLocation(datatype(['bin_path'])):
     if os.path.isfile(bin_path) and os.access(bin_path, os.X_OK):
       return this_object
 
-    raise TypeCheckError(
-      cls.__name__,
-      "path {} does not name an existing executable file.".format(bin_path))
+    raise cls.make_type_error("path {} does not name an existing executable file."
+                              .format(bin_path))
 
 
 class ShellCat(datatype([('binary_location', BinaryLocation)])):
@@ -291,7 +290,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     self.assertEqual(
       repr(cat_exe_req),
-      "CatExecutionRequest(shell_cat=ShellCat(binary_location=BinaryLocation(bin_path='/bin/cat')), path_globs=PathGlobs(include=(u'fs_test/a/b/*',), exclude=()))")
+      "CatExecutionRequest(shell_cat=ShellCat(binary_location=BinaryLocation(bin_path='/bin/cat')), path_globs=PathGlobs(include=(u'fs_test/a/b/*',), exclude=(), glob_match_error_behavior=GlobMatchErrorBehavior(failure_behavior=u'ignore')))")
 
     results = self.execute(scheduler, Concatted, cat_exe_req)
     self.assertEqual(1, len(results))

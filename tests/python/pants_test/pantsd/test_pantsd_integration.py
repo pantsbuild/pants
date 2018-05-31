@@ -197,6 +197,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         if 'DeprecationWarning' in line:
           continue
 
+        # Check if the line begins with W or E to check if it is a warning or error line.
         self.assertNotRegexpMatches(line, r'^[WE].*')
 
   def test_pantsd_broken_pipe(self):

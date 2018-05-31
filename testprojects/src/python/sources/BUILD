@@ -12,3 +12,36 @@ resources(
   name='text',
   sources=globs('*.txt'),
 )
+
+resources(
+  name='missing-globs',
+  sources=globs('*.a'),
+)
+
+resources(
+  name='missing-rglobs',
+  sources=rglobs('*.a'),
+)
+
+resources(
+  name='missing-zglobs',
+  sources=zglobs('**/*.a'),
+)
+
+resources(
+  name='missing-literal-files',
+  sources=[
+    'nonexistent_test_file.txt',
+    'another_nonexistent_file.txt',
+  ],
+)
+
+resources(
+  name='some-missing-some-not',
+  sources=globs('*.txt', '*.rs'),
+)
+
+resources(
+  name='overlapping-globs',
+  sources=globs('sources.txt', '*.txt'),
+)

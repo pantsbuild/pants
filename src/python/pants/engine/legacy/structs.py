@@ -55,7 +55,7 @@ class TargetAdaptor(StructWithDeps):
         return tuple()
       base_globs = BaseGlobs.from_sources_field(sources, self.address.spec_path)
       path_globs = base_globs.to_path_globs(self.address.spec_path)
-      return (SourcesField(self.address, 'sources', base_globs.filespecs, path_globs),)
+      return (SourcesField(self.address, 'sources', base_globs.filespecs, base_globs, path_globs),)
 
   @property
   def default_sources_globs(self):
@@ -70,7 +70,7 @@ class Field(object):
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
 
 
-class SourcesField(datatype(['address', 'arg', 'filespecs', 'path_globs']), Field):
+class SourcesField(datatype(['address', 'arg', 'filespecs', 'base_globs', 'path_globs']), Field):
   """Represents the `sources` argument for a particular Target.
 
   Sources are currently eagerly computed in-engine in order to provide the `BuildGraph`
@@ -92,7 +92,8 @@ class SourcesField(datatype(['address', 'arg', 'filespecs', 'path_globs']), Fiel
     return str(self)
 
   def __str__(self):
-    return 'SourcesField(address={}, arg={}, filespecs={!r})'.format(self.address, self.arg, self.filespecs)
+    return '{}(address={}, input_globs={}, arg={}, filespecs={!r})'.format(
+      type(self).__name__, self.address, self.base_globs, self.arg, self.filespecs)
 
 
 class JavaLibraryAdaptor(TargetAdaptor):
@@ -173,6 +174,9 @@ class AppAdaptor(TargetAdaptor):
       rel_root = getattr(bundle, 'rel_path', self.address.spec_path)
 
       base_globs = BaseGlobs.from_sources_field(bundle.fileset, rel_root)
+      # TODO: we want to have this field set from the global option --glob-expansion-failure, or
+      # something set on the target. Should we move --glob-expansion-failure to be a bootstrap
+      # option? See #5864.
       path_globs = base_globs.to_path_globs(rel_root)
 
       filespecs_list.append(base_globs.filespecs)
@@ -205,6 +209,7 @@ class PythonTargetAdaptor(TargetAdaptor):
       sources_field = SourcesField(self.address,
                                    'resources',
                                    base_globs.filespecs,
+                                   base_globs,
                                    path_globs)
       return field_adaptors + (sources_field,)
 
@@ -288,6 +293,8 @@ class BaseGlobs(Locatable, AbstractClass):
     """The corresponding `wrapped_globs` class for this BaseGlobs."""
 
   def __init__(self, *patterns, **kwargs):
+    self._patterns = patterns
+    self._kwargs = kwargs
     raw_spec_path = kwargs.pop('spec_path')
     self._file_globs = self.legacy_globs_class.to_filespec(patterns).get('globs', [])
     raw_exclude = kwargs.pop('exclude', [])
@@ -324,13 +331,35 @@ class BaseGlobs(Locatable, AbstractClass):
       return []
 
   def to_path_globs(self, relpath):
-    """Return two PathGlobs representing the included and excluded Files for these patterns."""
+    """Return a PathGlobs representing the included and excluded Files for these patterns."""
     return PathGlobs.create(relpath, self._file_globs, self._excluded_file_globs)
+
+  def _gen_init_args_str(self):
+    all_arg_strs = []
+    positional_args = ', '.join([repr(p) for p in self._patterns])
+    if positional_args:
+      all_arg_strs.append(positional_args)
+    keyword_args = ', '.join([
+      '{}={}'.format(k, repr(v)) for k, v in self._kwargs.items()
+    ])
+    if keyword_args:
+      all_arg_strs.append(keyword_args)
+
+    return ', '.join(all_arg_strs)
+
+  def __repr__(self):
+    return '{}({})'.format(type(self).__name__, self._gen_init_args_str())
+
+  def __str__(self):
+    return '{}({})'.format(self.path_globs_kwarg, self._gen_init_args_str())
 
 
 class Files(BaseGlobs):
   path_globs_kwarg = 'files'
   legacy_globs_class = wrapped_globs.Globs
+
+  def __str__(self):
+    return '[{}]'.format(', '.join(repr(p) for p in self._patterns))
 
 
 class Globs(BaseGlobs):

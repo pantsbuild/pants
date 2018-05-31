@@ -9,6 +9,7 @@ from os.path import join
 
 from pants.base.project_tree import Dir, File
 from pants.engine.rules import RootRule
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.objects import Collection, datatype
 
 
@@ -29,24 +30,47 @@ class Path(datatype(['path', 'stat'])):
   """
 
 
-class PathGlobs(datatype(['include', 'exclude'])):
+class PathGlobs(datatype([
+    'include',
+    'exclude',
+    ('glob_match_error_behavior', GlobMatchErrorBehavior),
+])):
   """A wrapper around sets of filespecs to include and exclude.
 
   The syntax supported is roughly git's glob syntax.
+
+  NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
+  be aware of any changes to this object's definition.
   """
 
+  def __new__(cls, include, exclude, glob_match_error_behavior=None):
+    return super(PathGlobs, cls).__new__(
+      cls,
+      tuple(include),
+      tuple(exclude),
+      GlobMatchErrorBehavior.create(glob_match_error_behavior))
+
+  def with_match_error_behavior(self, glob_match_error_behavior):
+    return PathGlobs(
+      include=self.include,
+      exclude=self.exclude,
+      glob_match_error_behavior=glob_match_error_behavior)
+
   @staticmethod
-  def create(relative_to, include, exclude=tuple()):
+  def create(relative_to, include, exclude=tuple(), glob_match_error_behavior=None):
     """Given various file patterns create a PathGlobs object (without using filesystem operations).
 
     :param relative_to: The path that all patterns are relative to (which will itself be relative
       to the buildroot).
-    :param included: A list of filespecs to include.
-    :param excluded: A list of filespecs to exclude.
+    :param include: A list of filespecs to include.
+    :param exclude: A list of filespecs to exclude.
+    :param glob_match_error_behavior: The value to pass to GlobMatchErrorBehavior.create()
     :rtype: :class:`PathGlobs`
     """
-    return PathGlobs(tuple(join(relative_to, f) for f in include),
-                     tuple(join(relative_to, f) for f in exclude))
+    encoded_reldir = relative_to.decode('utf-8')
+    return PathGlobs(include=tuple(join(encoded_reldir, f.decode('utf-8')) for f in include),
+                     exclude=tuple(join(encoded_reldir, f.decode('utf-8')) for f in exclude),
+                     glob_match_error_behavior=glob_match_error_behavior)
 
 
 class PathGlobsAndRoot(datatype([('path_globs', PathGlobs), ('root', str)])):

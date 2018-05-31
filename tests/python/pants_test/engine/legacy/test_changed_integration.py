@@ -330,7 +330,13 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       safe_delete(os.path.join(worktree, 'src/python/sources/sources.txt'))
       pants_run = self.run_pants(['list', '--changed-parent=HEAD'])
       self.assert_success(pants_run)
-      self.assertEqual(pants_run.stdout_data.strip(), 'src/python/sources:text')
+      changed_targets = [
+        'src/python/sources:overlapping-globs',
+        'src/python/sources:some-missing-some-not',
+        'src/python/sources:text',
+      ]
+      self.assertEqual(pants_run.stdout_data.strip(),
+                       '\n'.join(changed_targets))
 
   def test_changed_with_deleted_target_transitive(self):
     with create_isolated_git_repo() as worktree:

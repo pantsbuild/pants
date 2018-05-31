@@ -37,19 +37,19 @@ extern crate tempdir;
 #[cfg(test)]
 extern crate testutil;
 
+use std::cmp::min;
 use std::collections::HashSet;
+use std::io::{self, Read};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::{fmt, fs};
-use std::io::{self, Read};
-use std::cmp::min;
 
 use bytes::Bytes;
 use futures::future::{self, Future};
 use glob::Pattern;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet, map::Entry::Occupied};
 
 use boxfuture::{BoxFuture, Boxable};
 
@@ -121,15 +121,61 @@ impl PathStat {
   }
 }
 
+#[derive(Debug)]
+pub struct GitignoreStyleExcludes {
+  patterns: Vec<String>,
+  gitignore: Gitignore,
+}
+
+impl GitignoreStyleExcludes {
+  fn create(patterns: &[String]) -> Result<Arc<Self>, String> {
+    if patterns.is_empty() {
+      return Ok(EMPTY_IGNORE.clone());
+    }
+
+    let gitignore = Self::create_gitignore(patterns)
+      .map_err(|e| format!("Could not parse glob excludes {:?}: {:?}", patterns, e))?;
+
+    Ok(Arc::new(Self {
+      patterns: patterns.to_vec(),
+      gitignore,
+    }))
+  }
+
+  fn create_gitignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {
+    let mut ignore_builder = GitignoreBuilder::new("");
+    for pattern in patterns {
+      ignore_builder.add_line(None, pattern.as_str())?;
+    }
+    ignore_builder.build()
+  }
+
+  fn exclude_patterns(&self) -> &[String] {
+    self.patterns.as_slice()
+  }
+
+  fn is_ignored(&self, stat: &Stat) -> bool {
+    let is_dir = match stat {
+      &Stat::Dir(_) => true,
+      _ => false,
+    };
+    match self.gitignore.matched(stat.path(), is_dir) {
+      ignore::Match::None | ignore::Match::Whitelist(_) => false,
+      ignore::Match::Ignore(_) => true,
+    }
+  }
+}
+
 lazy_static! {
   static ref PARENT_DIR: &'static str = "..";
-
   static ref SINGLE_STAR_GLOB: Pattern = Pattern::new("*").unwrap();
-
   static ref DOUBLE_STAR: &'static str = "**";
-  static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new("**").unwrap();
-
-  static ref EMPTY_IGNORE: Arc<Gitignore> = Arc::new(Gitignore::empty());
+  static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new(*DOUBLE_STAR).unwrap();
+  static ref EMPTY_IGNORE: Arc<GitignoreStyleExcludes> = Arc::new(GitignoreStyleExcludes {
+    patterns: vec![],
+    gitignore: Gitignore::empty(),
+  });
+  static ref MISSING_GLOB_SOURCE: GlobParsedSource = GlobParsedSource(String::from(""));
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -145,6 +191,29 @@ pub enum PathGlob {
     wildcard: Pattern,
     remainder: Vec<Pattern>,
   },
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct GlobParsedSource(String);
+
+#[derive(Clone, Debug)]
+pub struct PathGlobIncludeEntry {
+  pub input: GlobParsedSource,
+  pub globs: Vec<PathGlob>,
+}
+
+impl PathGlobIncludeEntry {
+  fn to_sourced_globs(&self) -> Vec<GlobWithSource> {
+    self
+      .globs
+      .clone()
+      .into_iter()
+      .map(|path_glob| GlobWithSource {
+        path_glob,
+        source: GlobSource::ParsedInput(self.input.clone()),
+      })
+      .collect()
+  }
 }
 
 impl PathGlob {
@@ -171,13 +240,28 @@ impl PathGlob {
   }
 
   pub fn create(filespecs: &[String]) -> Result<Vec<PathGlob>, String> {
-    let mut path_globs = Vec::new();
+    // Getting a Vec<PathGlob> per filespec is needed to create a `PathGlobs`, but we don't need
+    // that here.
+    let filespecs_globs = Self::spread_filespecs(filespecs)?;
+    let all_globs = Self::flatten_entries(filespecs_globs);
+    Ok(all_globs)
+  }
+
+  fn flatten_entries(entries: Vec<PathGlobIncludeEntry>) -> Vec<PathGlob> {
+    entries.into_iter().flat_map(|entry| entry.globs).collect()
+  }
+
+  fn spread_filespecs(filespecs: &[String]) -> Result<Vec<PathGlobIncludeEntry>, String> {
+    let mut spec_globs_map = Vec::new();
     for filespec in filespecs {
       let canonical_dir = Dir(PathBuf::new());
       let symbolic_path = PathBuf::new();
-      path_globs.extend(PathGlob::parse(canonical_dir, symbolic_path, filespec)?);
+      spec_globs_map.push(PathGlobIncludeEntry {
+        input: GlobParsedSource(filespec.clone()),
+        globs: PathGlob::parse(canonical_dir, symbolic_path, filespec)?,
+      });
     }
-    Ok(path_globs)
+    Ok(spec_globs_map)
   }
 
   ///
@@ -298,63 +382,130 @@ impl PathGlob {
 }
 
 #[derive(Debug)]
+pub enum StrictGlobMatching {
+  Error,
+  Warn,
+  Ignore,
+}
+
+impl StrictGlobMatching {
+  // TODO(cosmicexplorer): match this up with the allowed values for the GlobMatchErrorBehavior type
+  // in python somehow?
+  pub fn create(behavior: &str) -> Result<Self, String> {
+    match behavior {
+      "ignore" => Ok(StrictGlobMatching::Ignore),
+      "warn" => Ok(StrictGlobMatching::Warn),
+      "error" => Ok(StrictGlobMatching::Error),
+      _ => Err(format!(
+        "Unrecognized strict glob matching behavior: {}.",
+        behavior,
+      )),
+    }
+  }
+
+  pub fn should_check_glob_matches(&self) -> bool {
+    match self {
+      &StrictGlobMatching::Ignore => false,
+      _ => true,
+    }
+  }
+
+  pub fn should_throw_on_error(&self) -> bool {
+    match self {
+      &StrictGlobMatching::Error => true,
+      _ => false,
+    }
+  }
+}
+
+#[derive(Debug)]
 pub struct PathGlobs {
-  include: Vec<PathGlob>,
-  exclude: Arc<Gitignore>,
+  include: Vec<PathGlobIncludeEntry>,
+  exclude: Arc<GitignoreStyleExcludes>,
+  strict_match_behavior: StrictGlobMatching,
 }
 
 impl PathGlobs {
-  pub fn create(include: &[String], exclude: &[String]) -> Result<PathGlobs, String> {
-    let ignore_for_exclude = if exclude.is_empty() {
-      EMPTY_IGNORE.clone()
-    } else {
-      Arc::new(create_ignore(exclude)
-        .map_err(|e| format!("Could not parse glob excludes {:?}: {:?}", exclude, e))?)
-    };
+  pub fn create(
+    include: &[String],
+    exclude: &[String],
+    strict_match_behavior: StrictGlobMatching,
+  ) -> Result<PathGlobs, String> {
+    let include = PathGlob::spread_filespecs(include)?;
+    Self::create_with_globs_and_match_behavior(include, exclude, strict_match_behavior)
+  }
+
+  fn create_with_globs_and_match_behavior(
+    include: Vec<PathGlobIncludeEntry>,
+    exclude: &[String],
+    strict_match_behavior: StrictGlobMatching,
+  ) -> Result<PathGlobs, String> {
+    let gitignore_excludes = GitignoreStyleExcludes::create(exclude)?;
     Ok(PathGlobs {
-      include: PathGlob::create(include)?,
-      exclude: ignore_for_exclude,
+      include,
+      exclude: gitignore_excludes,
+      strict_match_behavior,
     })
   }
 
-  pub fn from_globs(include: Vec<PathGlob>) -> PathGlobs {
-    PathGlobs {
-      include: include,
-      exclude: EMPTY_IGNORE.clone(),
-    }
+  pub fn from_globs(include: Vec<PathGlob>) -> Result<PathGlobs, String> {
+    let include = include
+      .into_iter()
+      .map(|glob| PathGlobIncludeEntry {
+        input: MISSING_GLOB_SOURCE.clone(),
+        globs: vec![glob],
+      })
+      .collect();
+    // An empty exclude becomes EMPTY_IGNORE.
+    PathGlobs::create_with_globs_and_match_behavior(include, &vec![], StrictGlobMatching::Ignore)
   }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum GlobSource {
+  ParsedInput(GlobParsedSource),
+  ParentGlob(PathGlob),
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct GlobWithSource {
+  path_glob: PathGlob,
+  source: GlobSource,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum GlobMatch {
+  SuccessfullyMatchedSomeFiles,
+  DidNotMatchAnyFiles,
+}
+
+#[derive(Debug)]
+struct GlobExpansionCacheEntry {
+  globs: Vec<PathGlob>,
+  matched: GlobMatch,
+  sources: Vec<GlobSource>,
+}
+
+// FIXME(#5871): move glob matching to its own file so we don't need to leak this object (through
+// the return type of expand_single()).
+#[derive(Debug)]
+pub struct SingleExpansionResult {
+  sourced_glob: GlobWithSource,
+  path_stats: Vec<PathStat>,
+  globs: Vec<PathGlob>,
 }
 
 #[derive(Debug)]
 struct PathGlobsExpansion<T: Sized> {
   context: T,
   // Globs that have yet to be expanded, in order.
-  todo: Vec<PathGlob>,
+  todo: Vec<GlobWithSource>,
   // Paths to exclude.
-  exclude: Arc<Gitignore>,
+  exclude: Arc<GitignoreStyleExcludes>,
   // Globs that have already been expanded.
-  completed: HashSet<PathGlob>,
+  completed: IndexMap<PathGlob, GlobExpansionCacheEntry>,
   // Unique Paths that have been matched, in order.
-  outputs: IndexMap<PathStat, ()>,
-}
-
-fn create_ignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {
-  let mut ignore_builder = GitignoreBuilder::new("");
-  for pattern in patterns {
-    ignore_builder.add_line(None, pattern.as_str())?;
-  }
-  ignore_builder.build()
-}
-
-fn is_ignored(ignore: &Gitignore, stat: &Stat) -> bool {
-  let is_dir = match stat {
-    &Stat::Dir(_) => true,
-    _ => false,
-  };
-  match ignore.matched(stat.path(), is_dir) {
-    ignore::Match::None | ignore::Match::Whitelist(_) => false,
-    ignore::Match::Ignore(_) => true,
-  }
+  outputs: IndexSet<PathStat>,
 }
 
 ///
@@ -363,7 +514,7 @@ fn is_ignored(ignore: &Gitignore, stat: &Stat) -> bool {
 pub struct PosixFS {
   root: Dir,
   pool: Arc<ResettablePool>,
-  ignore: Gitignore,
+  ignore: Arc<GitignoreStyleExcludes>,
 }
 
 impl PosixFS {
@@ -389,7 +540,7 @@ impl PosixFS {
       })
       .map_err(|e| format!("Could not canonicalize root {:?}: {:?}", root, e))?;
 
-    let ignore = create_ignore(&ignore_patterns).map_err(|e| {
+    let ignore = GitignoreStyleExcludes::create(&ignore_patterns).map_err(|e| {
       format!(
         "Could not parse build ignore inputs {:?}: {:?}",
         ignore_patterns, e
@@ -422,7 +573,7 @@ impl PosixFS {
   }
 
   pub fn is_ignored(&self, stat: &Stat) -> bool {
-    is_ignored(&self.ignore, stat)
+    self.ignore.is_ignored(stat)
   }
 
   pub fn read_file(&self, file: &File) -> BoxFuture<FileContent, io::Error> {
@@ -632,7 +783,11 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
           })
           .unwrap_or_else(|| vec![])
       })
-      .and_then(move |link_globs| context.expand(PathGlobs::from_globs(link_globs)))
+      .and_then(|link_globs| {
+        let new_path_globs =
+          future::result(PathGlobs::from_globs(link_globs)).map_err(|e| Self::mk_error(e.as_str()));
+        new_path_globs.and_then(move |path_globs| context.expand(path_globs))
+      })
       .map(|mut path_stats| {
         // Since we've escaped any globs in the parsed path, expect either 0 or 1 destination.
         path_stats.pop().map(|ps| match ps {
@@ -648,7 +803,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     canonical_dir: Dir,
     symbolic_path: PathBuf,
     wildcard: Pattern,
-    exclude: &Arc<Gitignore>,
+    exclude: &Arc<GitignoreStyleExcludes>,
   ) -> BoxFuture<Vec<PathStat>, E> {
     // List the directory.
     let context = self.clone();
@@ -682,7 +837,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
               // context, or by local excludes. Note that we apply context ignore patterns to both
               // the symbolic and canonical names of Links, but only apply local excludes to their
               // symbolic names.
-              if context.is_ignored(&stat) || is_ignored(&exclude, &stat) {
+              if context.is_ignored(&stat) || exclude.is_ignored(&stat) {
                 future::ok(None).to_boxed()
               } else {
                 match stat {
@@ -710,16 +865,25 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
   /// Recursively expands PathGlobs into PathStats while applying excludes.
   ///
   fn expand(&self, path_globs: PathGlobs) -> BoxFuture<Vec<PathStat>, E> {
-    if path_globs.include.is_empty() {
+    let PathGlobs {
+      include,
+      exclude,
+      strict_match_behavior,
+    } = path_globs;
+
+    if include.is_empty() {
       return future::ok(vec![]).to_boxed();
     }
 
     let init = PathGlobsExpansion {
       context: self.clone(),
-      todo: path_globs.include,
-      exclude: path_globs.exclude,
-      completed: HashSet::default(),
-      outputs: IndexMap::default(),
+      todo: include
+        .iter()
+        .flat_map(|entry| entry.to_sourced_globs())
+        .collect(),
+      exclude,
+      completed: IndexMap::default(),
+      outputs: IndexSet::default(),
     };
     future::loop_fn(init, |mut expansion| {
       // Request the expansion of all outstanding PathGlobs as a batch.
@@ -729,29 +893,153 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
         expansion
           .todo
           .drain(..)
-          .map(|path_glob| context.expand_single(path_glob, exclude))
+          .map(|sourced_glob| context.expand_single(sourced_glob, exclude))
           .collect::<Vec<_>>()
       });
-      round.map(move |paths_and_globs| {
+      round.map(move |single_expansion_results| {
         // Collect distinct new PathStats and PathGlobs
-        for (paths, globs) in paths_and_globs.into_iter() {
-          expansion.outputs.extend(paths.into_iter().map(|p| (p, ())));
-          let completed = &mut expansion.completed;
+        for exp in single_expansion_results {
+          let SingleExpansionResult {
+            sourced_glob: GlobWithSource { path_glob, source },
+            path_stats,
+            globs,
+          } = exp;
+
+          expansion.outputs.extend(path_stats.clone());
+
           expansion
-            .todo
-            .extend(globs.into_iter().filter(|pg| completed.insert(pg.clone())));
+            .completed
+            .entry(path_glob.clone())
+            .or_insert_with(|| GlobExpansionCacheEntry {
+              globs: globs.clone(),
+              matched: if path_stats.is_empty() {
+                GlobMatch::DidNotMatchAnyFiles
+              } else {
+                GlobMatch::SuccessfullyMatchedSomeFiles
+              },
+              sources: vec![],
+            })
+            .sources
+            .push(source);
+
+          // Do we need to worry about cloning for all these `GlobSource`s (each containing a
+          // `PathGlob`)?
+          let source_for_children = GlobSource::ParentGlob(path_glob);
+          for child_glob in globs {
+            if let Occupied(mut entry) = expansion.completed.entry(child_glob.clone()) {
+              entry.get_mut().sources.push(source_for_children.clone());
+            } else {
+              expansion.todo.push(GlobWithSource {
+                path_glob: child_glob,
+                source: source_for_children.clone(),
+              });
+            }
+          }
         }
 
         // If there were any new PathGlobs, continue the expansion.
         if expansion.todo.is_empty() {
-          future::Loop::Break(expansion.outputs)
+          future::Loop::Break(expansion)
         } else {
           future::Loop::Continue(expansion)
         }
       })
-    }).map(|expansion_outputs| {
+    }).and_then(move |final_expansion| {
       // Finally, capture the resulting PathStats from the expansion.
-      expansion_outputs.into_iter().map(|(k, _)| k).collect()
+      let PathGlobsExpansion {
+        outputs,
+        mut completed,
+        exclude,
+        ..
+      } = final_expansion;
+
+      let match_results: Vec<_> = outputs.into_iter().collect();
+
+      if strict_match_behavior.should_check_glob_matches() {
+        // Each `GlobExpansionCacheEntry` stored in `completed` for some `PathGlob` has the field
+        // `matched` to denote whether that specific `PathGlob` matched any files. We propagate a
+        // positive `matched` condition to all transitive "parents" of any glob which expands to
+        // some non-empty set of `PathStat`s. The `sources` field contains the parents (see the enum
+        // `GlobSource`), which may be another glob, or it might be a `GlobParsedSource`. We record
+        // all `GlobParsedSource` inputs which transitively expanded to some file here, and below we
+        // warn or error if some of the inputs were not found.
+        let mut inputs_with_matches: HashSet<GlobParsedSource> = HashSet::new();
+
+        // `completed` is an IndexMap, and we immediately insert every glob we expand into
+        // `completed`, recording any `PathStat`s and `PathGlob`s it expanded to (and then expanding
+        // those child globs in the next iteration of the loop_fn). If we iterate in
+        // reverse order of expansion (using .rev()), we ensure that we have already visited every
+        // "child" glob of the glob we are operating on while iterating. This is a reverse
+        // "topological ordering" which preserves the partial order from parent to child globs.
+        let all_globs: Vec<PathGlob> = completed.keys().rev().map(|pg| pg.clone()).collect();
+        for cur_glob in all_globs {
+          // Note that we talk of "parents" and "childen", but this structure is actually a DAG,
+          // because different `DirWildcard`s can potentially expand (transitively) to the same
+          // intermediate glob. The "parents" of each glob are stored in the `sources` field of its
+          // `GlobExpansionCacheEntry` (which is mutably updated with any new parents on each
+          // iteration of the loop_fn above). This can be considered "amortized" and/or "memoized".
+          let new_matched_source_globs = match completed.get(&cur_glob).unwrap() {
+            &GlobExpansionCacheEntry {
+              ref matched,
+              ref sources,
+              ..
+            } => match matched {
+              // Neither this glob, nor any of its children, expanded to any `PathStat`s, so we have
+              // nothing to propagate.
+              &GlobMatch::DidNotMatchAnyFiles => vec![],
+              &GlobMatch::SuccessfullyMatchedSomeFiles => sources
+                .iter()
+                .filter_map(|src| match src {
+                  // This glob matched some files, so its parent also matched some files.
+                  &GlobSource::ParentGlob(ref path_glob) => Some(path_glob.clone()),
+                  // We've found one of the root inputs, coming from a glob which transitively
+                  // matched some child -- record it (this may already exist in the set).
+                  &GlobSource::ParsedInput(ref parsed_source) => {
+                    inputs_with_matches.insert(parsed_source.clone());
+                    None
+                  }
+                })
+                .collect(),
+            },
+          };
+          new_matched_source_globs.into_iter().for_each(|path_glob| {
+            // Overwrite whatever was in there before -- we now know these globs transitively
+            // expanded to some non-empty set of `PathStat`s.
+            let entry = completed.get_mut(&path_glob).unwrap();
+            entry.matched = GlobMatch::SuccessfullyMatchedSomeFiles;
+          });
+        }
+
+        // Get all the inputs which didn't transitively expand to any files.
+        let non_matching_inputs: Vec<GlobParsedSource> = include
+          .into_iter()
+          .map(|entry| entry.input)
+          .filter(|parsed_source| !inputs_with_matches.contains(parsed_source))
+          .collect();
+
+        if !non_matching_inputs.is_empty() {
+          // TODO(#5684): explain what global and/or target-specific option to set to
+          // modify this behavior!
+          let msg = format!(
+            "Globs did not match. Excludes were: {:?}. Unmatched globs were: {:?}.",
+            exclude.exclude_patterns(),
+            non_matching_inputs
+              .iter()
+              .map(|parsed_source| parsed_source.0.clone())
+              .collect::<Vec<_>>(),
+          );
+          if strict_match_behavior.should_throw_on_error() {
+            return future::err(Self::mk_error(&msg));
+          } else {
+            // FIXME(#5683): warn!() doesn't seem to do anything?
+            // TODO(#5683): this doesn't have any useful context (the stack trace) without
+            // being thrown -- this needs to be provided, otherwise this is unusable.
+            warn!("{}", msg);
+          }
+        }
+      }
+
+      future::ok(match_results)
     })
       .to_boxed()
   }
@@ -762,15 +1050,19 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
   ///
   fn expand_single(
     &self,
-    path_glob: PathGlob,
-    exclude: &Arc<Gitignore>,
-  ) -> BoxFuture<(Vec<PathStat>, Vec<PathGlob>), E> {
-    match path_glob {
+    sourced_glob: GlobWithSource,
+    exclude: &Arc<GitignoreStyleExcludes>,
+  ) -> BoxFuture<SingleExpansionResult, E> {
+    match sourced_glob.path_glob.clone() {
       PathGlob::Wildcard { canonical_dir, symbolic_path, wildcard } =>
         // Filter directory listing to return PathStats, with no continuation.
         self.directory_listing(canonical_dir, symbolic_path, wildcard, exclude)
-          .map(|path_stats| (path_stats, vec![]))
-          .to_boxed(),
+        .map(move |path_stats| SingleExpansionResult {
+          sourced_glob,
+          path_stats,
+          globs: vec![],
+        })
+        .to_boxed(),
       PathGlob::DirWildcard { canonical_dir, symbolic_path, wildcard, remainder } =>
         // Filter directory listing and request additional PathGlobs for matched Dirs.
         self.directory_listing(canonical_dir, symbolic_path, wildcard, exclude)
@@ -786,12 +1078,16 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
               })
               .collect::<Result<Vec<_>, E>>()
           })
-          .map(|path_globs| {
-            let flattened =
-              path_globs.into_iter()
-                .flat_map(|path_globs| path_globs.into_iter())
-                .collect();
-            (vec![], flattened)
+          .map(move |path_globs| {
+            let flattened = path_globs
+              .into_iter()
+              .flat_map(|path_globs| path_globs.into_iter())
+              .collect();
+            SingleExpansionResult {
+              sourced_glob,
+              path_stats: vec![],
+              globs: flattened,
+            }
           })
           .to_boxed(),
     }
@@ -852,9 +1148,9 @@ mod posixfs_test {
   extern crate tempdir;
   extern crate testutil;
 
+  use self::testutil::make_file;
   use super::{Dir, File, Link, PathStat, PathStatGetter, PosixFS, ResettablePool, Stat};
   use futures::Future;
-  use self::testutil::make_file;
   use std;
   use std::path::{Path, PathBuf};
   use std::sync::Arc;

@@ -16,6 +16,50 @@ from pants.option.custom_types import dir_option
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
+from pants.util.memo import memoized_method
+from pants.util.objects import datatype
+
+
+class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
+  """Describe the action to perform when matching globs in BUILD files to source files.
+
+  NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
+  be aware of any changes to this object's definition.
+  """
+
+  IGNORE = 'ignore'
+  WARN = 'warn'
+  ERROR = 'error'
+
+  allowed_values = [IGNORE, WARN, ERROR]
+
+  default_value = IGNORE
+
+  default_option_value = WARN
+
+  # FIXME(cosmicexplorer): add helpers in pants.util.memo for class properties and memoized class
+  # properties!
+  @classmethod
+  @memoized_method
+  def _singletons(cls):
+    return { behavior: cls(behavior) for behavior in cls.allowed_values }
+
+  @classmethod
+  def create(cls, value=None):
+    if isinstance(value, cls):
+      return value
+    if not value:
+      value = cls.default_value
+    return cls._singletons()[value]
+
+  def __new__(cls, *args, **kwargs):
+    this_object = super(GlobMatchErrorBehavior, cls).__new__(cls, *args, **kwargs)
+
+    if this_object.failure_behavior not in cls.allowed_values:
+      raise cls.make_type_error("Value {!r} for failure_behavior must be one of: {!r}."
+                                .format(this_object.failure_behavior, cls.allowed_values))
+
+    return this_object
 
 
 class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
@@ -244,3 +288,11 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
+    # TODO: Make a custom type abstract class (or something) to automate the production of an option
+    # with specific allowed values from a datatype (ideally using singletons for the allowed
+    # values).
+    register('--glob-expansion-failure', type=str,
+             choices=GlobMatchErrorBehavior.allowed_values,
+             default=GlobMatchErrorBehavior.default_option_value,
+             help="Raise an exception if any targets declaring source files "
+                  "fail to match any glob provided in the 'sources' argument.")
