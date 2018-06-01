@@ -252,8 +252,8 @@ class BaseZincCompile(JvmCompile):
     if JvmPlatform.global_instance().get_options().compiler == 'zinc':
       return super(BaseZincCompile, self).execute()
 
-  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              zinc_args_file, settings, fatal_warnings, zinc_file_manager,
+  def compile(self, ctx, args, classpath, upstream_analysis,
+              settings, fatal_warnings, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     self._verify_zinc_classpath(classpath)
     self._verify_zinc_classpath(upstream_analysis.keys())
@@ -262,9 +262,9 @@ class BaseZincCompile(JvmCompile):
 
     zinc_args.extend([
       '-log-level', self.get_options().level,
-      '-analysis-cache', analysis_file,
+      '-analysis-cache', ctx.analysis_file,
       '-classpath', ':'.join(classpath),
-      '-d', classes_output_dir
+      '-d', ctx.classes_dir
     ])
     if not self.get_options().colors:
       zinc_args.append('-no-color')
@@ -280,13 +280,13 @@ class BaseZincCompile(JvmCompile):
     # - We also search in the extra scalac plugin dependencies, if specified.
     # - In scala 2.11 and up, the plugin's classpath element can be a dir, but for 2.10 it must be
     #   a jar.  So in-repo plugins will only work with 2.10 if --use-classpath-jars is true.
-    # - We exclude our own classes_output_dir, because if we're a plugin ourselves, then our
-    #   classes_output_dir doesn't have scalac-plugin.xml yet, and we don't want that fact to get
+    # - We exclude our own classes_dir, because if we're a plugin ourselves, then our
+    #   classes_dir doesn't have scalac-plugin.xml yet, and we don't want that fact to get
     #   memoized (which in practice will only happen if this plugin uses some other plugin, thus
     #   triggering the plugin search mechanism, which does the memoizing).
     scalac_plugin_search_classpath = (
       (set(classpath) | set(self.scalac_plugin_classpath_elements())) -
-      {classes_output_dir}
+      {ctx.classes_dir}
     )
     zinc_args.extend(self._scalac_plugin_args(scalac_plugin_map, scalac_plugin_search_classpath))
     if upstream_analysis:
@@ -324,10 +324,10 @@ class BaseZincCompile(JvmCompile):
 
     jvm_options.extend(self._jvm_options)
 
-    zinc_args.extend(sources)
+    zinc_args.extend(ctx.sources)
 
-    self.log_zinc_file(analysis_file)
-    with open(zinc_args_file, 'w') as fp:
+    self.log_zinc_file(ctx.analysis_file)
+    with open(ctx.zinc_args_file, 'w') as fp:
       for arg in zinc_args:
         fp.write(arg)
         fp.write(b'\n')

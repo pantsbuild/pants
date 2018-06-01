@@ -114,8 +114,8 @@ class JavacCompile(JvmCompile):
     if JvmPlatform.global_instance().get_options().compiler == 'javac':
       return super(JavacCompile, self).execute()
 
-  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              zinc_args_file, settings, fatal_warnings, zinc_file_manager,
+  def compile(self, ctx, args, classpath, upstream_analysis,
+              settings, fatal_warnings, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     try:
       distribution = JvmPlatform.preferred_jvm_distribution([settings], strict=True)
@@ -137,7 +137,7 @@ class JavacCompile(JvmCompile):
       javac_cmd.extend(settings_args)
 
     javac_cmd.extend([
-      '-d', classes_output_dir,
+      '-d', ctx.classes_dir,
       # TODO: support -release
       '-source', str(settings.source_level),
       '-target', str(settings.target_level),
@@ -152,7 +152,7 @@ class JavacCompile(JvmCompile):
     else:
       javac_cmd.extend(self.get_options().fatal_warnings_disabled_args)
 
-    with argfile.safe_args(sources, self.get_options()) as batched_sources:
+    with argfile.safe_args(ctx.sources, self.get_options()) as batched_sources:
       javac_cmd.extend(batched_sources)
 
       with self.context.new_workunit(name='javac',

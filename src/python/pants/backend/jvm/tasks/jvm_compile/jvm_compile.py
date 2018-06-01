@@ -156,7 +156,7 @@ class JvmCompile(NailgunTaskBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(JvmCompile, cls).implementation_version() + [('JvmCompile', 2)]
+    return super(JvmCompile, cls).implementation_version() + [('JvmCompile', 3)]
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -246,21 +246,17 @@ class JvmCompile(NailgunTaskBase):
   def select_source(self, source_file_path):
     raise NotImplementedError()
 
-  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              zinc_args_file, settings, fatal_warnings, zinc_file_manager,
+  def compile(self, ctx, args, classpath, upstream_analysis,
+              settings, fatal_warnings, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     """Invoke the compiler.
 
-    Must raise TaskError on compile failure.
+    Subclasses must implement. Must raise TaskError on compile failure.
 
-    Subclasses must implement.
-    :param list args: Arguments to the compiler (such as jmake or zinc).
+    :param CompileContext ctx: A CompileContext for the target to compile.
+    :param list args: Arguments to the compiler (such as javac or zinc).
     :param list classpath: List of classpath entries.
-    :param list sources: Source files.
-    :param str classes_output_dir: Where to put the compiled output.
-    :param upstream_analysis:
-    :param analysis_file: Where to write the compile analysis.
-    :param zinc_args_file: Where to write the args zinc was invoked with.
+    :param upstream_analysis: A map from classpath entry to analysis file for dependencies.
     :param JvmPlatformSettings settings: platform settings determining the -source, -target, etc for
       javac to use.
     :param fatal_warnings: whether to convert compilation warnings to errors.
@@ -492,13 +488,10 @@ class JvmCompile(NailgunTaskBase):
 
         try:
           self.compile(
+            ctx,
             self._args,
             classpath,
-            ctx.sources,
-            ctx.classes_dir,
             upstream_analysis,
-            ctx.analysis_file,
-            ctx.zinc_args_file,
             settings,
             fatal_warnings,
             zinc_file_manager,
