@@ -64,6 +64,16 @@ class ContextutilTest(unittest.TestCase):
     with hermetic_environment_as(**{}):
       self.assertNotIn('USER', os.environ)
 
+  def test_hermetic_environment_subprocesses(self):
+    self.assertIn('USER', os.environ)
+    with hermetic_environment_as(**dict(AAA='333')):
+      output = subprocess.check_output('env', shell=True)
+      self.assertNotIn('USER=', output)
+      self.assertIn('AAA', os.environ)
+      self.assertEquals(os.environ['AAA'], '333')
+    self.assertIn('USER', os.environ)
+    self.assertNotIn('AAA', os.environ)
+
   def test_simple_pushd(self):
     pre_cwd = os.getcwd()
     with temporary_dir() as tempdir:

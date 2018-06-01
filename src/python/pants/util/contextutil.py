@@ -76,15 +76,31 @@ def environment_as(**kwargs):
       setenv(key, val)
 
 
+def _purge_env():
+  # N.B. Without the use of `del` here (which calls `os.unsetenv` under the hood), subprocess32
+  # invokes or other things that may access the environment at the C level may not see the
+  # correct env vars (i.e. we can't just replace os.environ with an empty dict).
+  # See https://docs.python.org/2/library/os.html#os.unsetenv for more info.
+  for k in os.environ.keys():
+    del os.environ[k]
+
+
+def _restore_env(env):
+  for k, v in env.items():
+    os.environ[k] = v
+
+
 @contextmanager
 def hermetic_environment_as(**kwargs):
   """Set the environment to the supplied values from an empty state."""
-  old_environment, os.environ = os.environ, {}
+  old_environment = os.environ.copy()
+  _purge_env()
   try:
     with environment_as(**kwargs):
       yield
   finally:
-    os.environ = old_environment
+    _purge_env()
+    _restore_env(old_environment)
 
 
 @contextmanager
