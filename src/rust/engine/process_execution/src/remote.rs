@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
 use bazel_protos;
@@ -439,15 +439,18 @@ impl CommandRunner {
     execute_response: &bazel_protos::remote_execution::ExecuteResponse,
   ) -> BoxFuture<Digest, ExecutionError> {
 
-    let mut path_map: HashMap<PathBuf, Digest> = HashMap::new();
+    let mut futures = vec!();
+    let path_map = Arc::new(Mutex::new(HashMap::new()));
+    let path_map_2 = path_map.clone();
     let mut path_stats: Vec<PathStat> = execute_response
         .get_result()
         .get_output_files()
         .into_iter()
-        .map(|output_file_og| {
-          let output_file = output_file_og.clone();
+        .cloned()
+        .map(|output_file| {
           if output_file.has_digest() {
-            path_map.insert(PathBuf::from(output_file.get_path()), output_file.get_digest().into());
+            let mut underlying_path_map = path_map.lock().unwrap();
+            underlying_path_map.insert(PathBuf::from(output_file.get_path()), output_file.get_digest().into());
             PathStat::file(
               PathBuf::from(output_file.get_path()),
               File {
@@ -457,14 +460,16 @@ impl CommandRunner {
             )
           } else {
             let raw_content = output_file.get_content().into();
-            self
+            let path_map_3 = path_map.clone();
+            futures.push(self
                 .store
                 .store_file_bytes(raw_content, false)
                 .map_err(move |error| {
                   ExecutionError::Fatal(format!("Error storing raw content for output file {:?}: {:?}", output_file.get_path(), error))
                 }).map(move |digest| {
-              path_map.insert(PathBuf::from(output_file.get_path()), digest);
-            });
+              let mut underlying_path_map = path_map_3.lock().unwrap();
+              underlying_path_map.insert(PathBuf::from(output_file.get_path()), digest);
+            }));
             PathStat::file(
               PathBuf::from(output_file.get_path()),
               File {
@@ -494,12 +499,16 @@ impl CommandRunner {
       }
     }
 
-    fs::Snapshot::digest_from_path_stats(
-      self.store.clone(),
-      StoreOneOffRemoteDigest::new(path_map.clone()),
-      path_stats)
-        .map_err(move |error| {
-      ExecutionError::Fatal(format!("Error when storing the output file directory info in the remote CAS: {:?}", error))
+    future::join_all(futures).and_then(|_| {
+      let path_wrap_mutex = Arc::try_unwrap(path_map_2).unwrap();
+      let underlying_path_map = path_wrap_mutex.into_inner().unwrap();
+      fs::Snapshot::digest_from_path_stats(
+        self.store.clone(),
+        StoreOneOffRemoteDigest::new(underlying_path_map),
+        path_stats)
+          .map_err(move |error| {
+            ExecutionError::Fatal(format!("Error when storing the output file directory info in the remote CAS: {:?}", error))
+          })
     }).to_boxed()
   }
 }
