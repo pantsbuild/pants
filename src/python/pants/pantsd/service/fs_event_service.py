@@ -25,6 +25,8 @@ class FSEventService(PantsService):
 
   ZERO_DEPTH = ['depth', 'eq', 0]
 
+  PANTS_PID_SUBSCRIPTION_NAME = 'pantsd_pid'
+
   def __init__(self, watchman, build_root, worker_count):
     """
     :param Watchman watchman: The Watchman instance as provided by the WatchmanLauncher subsystem.
@@ -88,7 +90,7 @@ class FSEventService(PantsService):
     :return:
     """
     self.register_handler(
-      'pantsd_pid',
+      self.PANTS_PID_SUBSCRIPTION_NAME,
       dict(
         fields=['name'],
         expression=[

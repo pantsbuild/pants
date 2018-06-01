@@ -85,21 +85,20 @@ class SchedulerService(PantsService):
                       .format(len(event['files']), event['subscription']))
     self._event_queue.put(event)
 
-  def _maybe_invalidate_scheduler(self, files):
-    if self._pidfile in files:
-      new_pid = self._check_pid_changed()
-      if new_pid is not False:
-        self._logger.fatal('{} says pantsd PID is {} but my PID is: {}: terminating'.format(
-          self._pidfile,
-          new_pid,
-          os.getpid(),
-        ))
-        self.terminate()
-        return
-
+  def _maybe_invalidate_scheduler_batch(self, files):
     invalidating_files = self._invalidating_files
     if any(f in invalidating_files for f in files):
       self._logger.fatal('saw file events covered by invalidation globs, terminating the daemon.')
+      self.terminate()
+
+  def _maybe_invalidate_scheduler_pidfile(self):
+    new_pid = self._check_pid_changed()
+    if new_pid is not False:
+      self._logger.fatal('{} says pantsd PID is {} but my PID is: {}: terminating'.format(
+        self._pidfile,
+        new_pid,
+        os.getpid(),
+      ))
       self.terminate()
 
   def _check_pid_changed(self):
@@ -118,7 +117,7 @@ class SchedulerService(PantsService):
     self._logger.debug('handling change event for: %s', files)
 
     with self.lifecycle_lock:
-      self._maybe_invalidate_scheduler(files)
+      self._maybe_invalidate_scheduler_batch(files)
 
     with self.fork_lock:
       self._scheduler.invalidate_files(files)
@@ -133,7 +132,7 @@ class SchedulerService(PantsService):
     try:
       subscription, is_initial_event, files = (event['subscription'],
                                                event['is_fresh_instance'],
-                                               {f.decode('utf-8') for f in event['files']})
+                                               [f.decode('utf-8') for f in event['files']])
     except (KeyError, UnicodeDecodeError) as e:
       self._logger.warn('%r raised by invalid watchman event: %s', e, event)
       return
@@ -143,7 +142,10 @@ class SchedulerService(PantsService):
 
     # The first watchman event is a listing of all files - ignore it.
     if not is_initial_event:
-      self._handle_batch_event(files)
+      if subscription == self._fs_event_service.PANTS_PID_SUBSCRIPTION_NAME:
+        self._maybe_invalidate_scheduler_pidfile()
+      else:
+        self._handle_batch_event(files)
 
     if not self._watchman_is_running.is_set():
       self._watchman_is_running.set()
