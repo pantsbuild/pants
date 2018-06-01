@@ -260,9 +260,11 @@ impl CommandRunner {
     // TODO: Log less verbosely
     debug!("Got (nested) execute response: {:?}", execute_response);
 
-    self.extract_stdout(&execute_response)
-        .join(self.extract_stderr(&execute_response))
-        .join(self.extract_output_files(&execute_response)).and_then(move |((stdout, stderr), output_directory)| {
+    self
+      .extract_stdout(&execute_response)
+      .join(self.extract_stderr(&execute_response))
+      .join(self.extract_output_files(&execute_response))
+      .and_then(move |((stdout, stderr), output_directory)| {
         match grpcio::RpcStatusCode::from(execute_response.get_status().get_code()) {
           grpcio::RpcStatusCode::Ok => future::ok(ExecuteProcessResult {
             stdout: stdout,
@@ -438,55 +440,69 @@ impl CommandRunner {
     &self,
     execute_response: &bazel_protos::remote_execution::ExecuteResponse,
   ) -> BoxFuture<Digest, ExecutionError> {
-
-    let mut futures = vec!();
+    let mut futures = vec![];
     let path_map = Arc::new(Mutex::new(HashMap::new()));
     let path_map_2 = path_map.clone();
-    let mut path_stats: Vec<PathStat> = execute_response
-        .get_result()
-        .get_output_files()
-        .into_iter()
-        .cloned()
-        .map(|output_file| {
-          if output_file.has_digest() {
-            let mut underlying_path_map = path_map.lock().unwrap();
-            underlying_path_map.insert(PathBuf::from(output_file.get_path()), output_file.get_digest().into());
-            PathStat::file(
-              PathBuf::from(output_file.get_path()),
-              File {
-                path: PathBuf::from(output_file.get_path()),
-                is_executable: output_file.get_is_executable()
-              }
-            )
-          } else {
-            let raw_content = output_file.get_content().into();
-            let path_map_3 = path_map.clone();
-            futures.push(self
-                .store
-                .store_file_bytes(raw_content, false)
-                .map_err(move |error| {
-                  ExecutionError::Fatal(format!("Error storing raw content for output file {:?}: {:?}", output_file.get_path(), error))
-                }).map(move |digest| {
-              let mut underlying_path_map = path_map_3.lock().unwrap();
-              underlying_path_map.insert(PathBuf::from(output_file.get_path()), digest);
-            }));
-            PathStat::file(
-              PathBuf::from(output_file.get_path()),
-              File {
-                path: PathBuf::from(output_file.get_path()),
-                is_executable: output_file.get_is_executable()
+    let path_stats: Vec<PathStat> = execute_response
+      .get_result()
+      .get_output_files()
+      .into_iter()
+      .map(|output_file| {
+        let output_file_path_buf = PathBuf::from(output_file.get_path());
+        if output_file.has_digest() {
+          let mut underlying_path_map = path_map.lock().unwrap();
+          underlying_path_map.insert(
+            output_file_path_buf.clone(),
+            output_file.get_digest().into(),
+          );
+          PathStat::file(
+            output_file_path_buf.clone(),
+            File {
+              path: output_file_path_buf.clone(),
+              is_executable: output_file.get_is_executable(),
+            },
+          )
+        } else {
+          let raw_content = output_file.get_content().into();
+          let path_map_3 = path_map.clone();
+          let output_file_path_buf_2 = output_file_path_buf.clone();
+          let output_file_path_buf_3 = output_file_path_buf_2.clone();
+          futures.push(
+            self
+              .store
+              .store_file_bytes(raw_content, false)
+              .map_err(move |error| {
+                ExecutionError::Fatal(format!(
+                  "Error storing raw content for output file {:?}: {:?}",
+                  output_file_path_buf_3, error
+                ))
               })
-          }
-    }).collect();
+              .map(move |digest| {
+                let mut underlying_path_map = path_map_3.lock().unwrap();
+                underlying_path_map.insert(output_file_path_buf_2, digest);
+              }),
+          );
+          PathStat::file(
+            output_file_path_buf.clone(),
+            File {
+              path: output_file_path_buf.clone(),
+              is_executable: output_file.get_is_executable(),
+            },
+          )
+        }
+      })
+      .collect();
 
     #[derive(Clone)]
     struct StoreOneOffRemoteDigest {
-      map_of_paths_to_digests: HashMap<PathBuf, Digest>
+      map_of_paths_to_digests: HashMap<PathBuf, Digest>,
     }
 
     impl StoreOneOffRemoteDigest {
       pub fn new(map: HashMap<PathBuf, Digest>) -> StoreOneOffRemoteDigest {
-        StoreOneOffRemoteDigest {map_of_paths_to_digests: map}
+        StoreOneOffRemoteDigest {
+          map_of_paths_to_digests: map,
+        }
       }
     }
 
@@ -494,22 +510,31 @@ impl CommandRunner {
       fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
         match self.map_of_paths_to_digests.get(&file.path) {
           Some(digest) => future::ok(digest.clone()),
-          None => future::err(format!("Error when trying to find digest for path {:?}", file.path))
+          None => future::err(format!(
+            "Error when trying to find digest for path {:?}",
+            file.path
+          )),
         }.to_boxed()
       }
     }
 
-    future::join_all(futures).and_then(|_| {
-      let path_wrap_mutex = Arc::try_unwrap(path_map_2).unwrap();
-      let underlying_path_map = path_wrap_mutex.into_inner().unwrap();
-      fs::Snapshot::digest_from_path_stats(
-        self.store.clone(),
-        StoreOneOffRemoteDigest::new(underlying_path_map),
-        path_stats)
-          .map_err(move |error| {
-            ExecutionError::Fatal(format!("Error when storing the output file directory info in the remote CAS: {:?}", error))
-          })
-    }).to_boxed()
+    let store = self.store.clone();
+    future::join_all(futures)
+      .and_then(|_| {
+        let path_wrap_mutex = Arc::try_unwrap(path_map_2).unwrap();
+        let underlying_path_map = path_wrap_mutex.into_inner().unwrap();
+        fs::Snapshot::digest_from_path_stats(
+          store,
+          StoreOneOffRemoteDigest::new(underlying_path_map),
+          path_stats,
+        ).map_err(move |error| {
+          ExecutionError::Fatal(format!(
+            "Error when storing the output file directory info in the remote CAS: {:?}",
+            error
+          ))
+        })
+      })
+      .to_boxed()
   }
 }
 
@@ -1144,8 +1169,8 @@ mod tests {
     };
 
     let mut output_file = bazel_protos::remote_execution::OutputFile::new();
-    output_file.set_path("/cats/roland".into());
-    output_file.set_digest(TestData::catnip().digest().into());
+    output_file.set_path("cats/roland".into());
+    output_file.set_digest((&TestData::roland().digest()).into());
     output_file.set_is_executable(false);
     let mut output_files = protobuf::RepeatedField::new();
     output_files.push(output_file);
