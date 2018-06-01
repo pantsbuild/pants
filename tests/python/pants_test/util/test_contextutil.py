@@ -69,6 +69,7 @@ class ContextutilTest(unittest.TestCase):
     with hermetic_environment_as(**{}):
       output = subprocess.check_output('env', shell=True)
       self.assertNotIn('USER=', output)
+    self.assertIn('USER', os.environ)
 
   def test_simple_pushd(self):
     pre_cwd = os.getcwd()
