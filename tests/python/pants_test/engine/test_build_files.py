@@ -86,13 +86,11 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
        'not_me': ('root/BUILD', TargetAdaptor()),
       }
     )
-
     targets = run_rule(
-      addresses_from_address_families, address_mapper, Specs([spec], exclude_patterns=['exclude.']),{
+      addresses_from_address_families, address_mapper, Specs([spec], exclude_patterns=tuple(['.exclude*'])),{
       (Snapshot, PathGlobs): lambda _: snapshot,
       (AddressFamily, Dir): lambda _: address_family,
     })
-
     self.assertEquals(len(targets.dependencies), 1)
     self.assertEquals(targets.dependencies[0].spec, 'root:not_me')
 

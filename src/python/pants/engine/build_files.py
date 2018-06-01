@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import collections
 import functools
+import logging
 from os.path import dirname, join
 
 import six
@@ -26,6 +27,9 @@ from pants.engine.struct import Struct
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.filtering import create_filters, wrap_filters
 from pants.util.objects import TypeConstraintError, datatype
+
+
+logger = logging.getLogger(__name__)
 
 
 class ResolvedTypeMismatchError(ResolveError):
@@ -226,32 +230,28 @@ def addresses_from_address_families(address_mapper, specs):
   def raise_empty_address_family(spec):
     raise ResolveError('Path "{}" does not contain any BUILD files.'.format(spec.directory))
 
-  def exclude_address(address):
+  def exclude_address(spec):
     if specs.exclude_patterns:
-      return any(
-        pattern.search(address.spec) is not None for pattern in specs.exclude_patterns_memo()
-      )
+      return any(p.search(spec) is not None for p in specs.exclude_patterns_memo())
     return False
 
   def filter_for_tag(tag):
     return lambda t: tag in map(str, t.kwargs().get("tags", []))
 
-  include_target = wrap_filters(create_filters(specs.tags, filter_for_tag))
+  include_target = wrap_filters(create_filters(specs.tags if specs.tags else '', filter_for_tag))
 
   addresses = []
   included = set()
-
   def include(address_families, predicate=None):
     matched = False
     for af in address_families:
-      for (address, target) in af.addressables.items():
-        if include_target(target) and \
-          not exclude_address(address) and \
-          (predicate is None or predicate(address)):
-          matched = True
-          if address not in included:
-            addresses.append(address)
-            included.add(address)
+      for (a, t) in af.addressables.items():
+        if (predicate is None or predicate(a)):
+          if include_target(t) and (not exclude_address(a.spec)):
+            matched = True
+            if a not in included:
+              addresses.append(a)
+              included.add(a)
     return matched
 
   for spec in specs.dependencies:
@@ -273,8 +273,11 @@ def addresses_from_address_families(address_mapper, specs):
       address_family = by_directory().get(spec.directory)
       if not address_family:
         raise_empty_address_family(spec)
+      # spec.name here is generally the root node specified on commandline. equality here implies
+      # a root node i.e. node specified on commandline.
       if not include([address_family], predicate=lambda a: a.target_name == spec.name):
-        _raise_did_you_mean(address_family, spec.name)
+        if len(addresses) == 0:
+          _raise_did_you_mean(address_family, spec.name)
     elif type(spec) is AscendantAddresses:
       include(
         af
@@ -283,7 +286,6 @@ def addresses_from_address_families(address_mapper, specs):
       )
     else:
       raise ValueError('Unrecognized Spec type: {}'.format(spec))
-
   yield BuildFileAddresses(addresses)
 
 

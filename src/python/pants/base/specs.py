@@ -61,7 +61,7 @@ class AscendantAddresses(datatype(['directory']), Spec):
     return '{}^'.format(self.directory)
 
 
-class Specs(datatype(['dependencies', 'tags', 'exclude_patterns'])):
+class Specs(datatype(['dependencies', 'tags', ('exclude_patterns', tuple)])):
   """A collection of Specs representing Spec subclasses, tags and regex filters."""
 
   def __new__(cls, dependencies, tags=tuple(), exclude_patterns=tuple()):

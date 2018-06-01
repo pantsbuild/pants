@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -101,7 +101,7 @@ class TargetRootsCalculator(object):
   """Determines the target roots for a given pants run."""
 
   @classmethod
-  def parse_specs(cls, target_specs, build_root=None):
+  def parse_specs(cls, target_specs, build_root=None, exclude_patterns=None, tags=None):
     """Parse string specs into unique `Spec` objects.
 
     :param iterable target_specs: An iterable of string specs.
@@ -110,10 +110,18 @@ class TargetRootsCalculator(object):
     """
     build_root = build_root or get_buildroot()
     spec_parser = CmdLineSpecParser(build_root)
-    return OrderedSet(spec_parser.parse_spec(spec_str) for spec_str in target_specs)
+
+    dependencies = tuple(OrderedSet(spec_parser.parse_spec(spec_str) for spec_str in target_specs))
+    if not dependencies:
+      return None
+    return [Specs(
+      dependencies=dependencies,
+      exclude_patterns=exclude_patterns if exclude_patterns else tuple(),
+      tags=tags)
+    ]
 
   @classmethod
-  def create(cls, options, session, symbol_table, build_root=None):
+  def create(cls, options, session, symbol_table, build_root=None, exclude_patterns=None, tags=None):
     """
     :param Options options: An `Options` instance to use.
     :param session: The Scheduler session
@@ -121,7 +129,7 @@ class TargetRootsCalculator(object):
     :param string build_root: The build root.
     """
     # Determine the literal target roots.
-    spec_roots = cls.parse_specs(options.target_specs, build_root)
+    spec_roots = cls.parse_specs(options.target_specs, build_root, exclude_patterns, tags)
 
     # Determine `Changed` arguments directly from options to support pre-`Subsystem`
     # initialization paths.
@@ -153,14 +161,16 @@ class TargetRootsCalculator(object):
       # alternate target roots.
       changed_addresses = change_calculator.changed_target_addresses(changed_request)
       logger.debug('changed addresses: %s', changed_addresses)
-      return TargetRoots(tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses))
+      dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses)
+      return TargetRoots([Specs(dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags)])
 
     if owner_calculator and owned_files:
       # We've been provided no spec roots (e.g. `./pants list`) AND a owner request. Compute
       # alternate target roots.
       owner_addresses = owner_calculator.owner_target_addresses(owned_files)
       logger.debug('owner addresses: %s', owner_addresses)
-      return TargetRoots(tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses))
+      dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses)
+      return TargetRoots([Specs(dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags)])
 
     return TargetRoots(spec_roots)
 
@@ -169,7 +179,7 @@ class ChangeCalculator(object):
   """A ChangeCalculator that finds the target addresses of changed files based on scm."""
 
   def __init__(self, scheduler, symbol_table, scm, workspace=None, changes_since=None,
-               diffspec=None):
+    diffspec=None):
     """
     :param scheduler: The `Scheduler` instance to use for computing file to target mappings.
     :param symbol_table: The symbol table.
@@ -200,8 +210,8 @@ class ChangeCalculator(object):
       return
 
     changed_addresses = set(address
-                            for address
-                            in self._mapper.iter_target_addresses_for_sources(changed_files))
+      for address
+      in self._mapper.iter_target_addresses_for_sources(changed_files))
     for address in changed_addresses:
       yield address
 
@@ -214,11 +224,11 @@ class ChangeCalculator(object):
     #   see https://github.com/pantsbuild/pants/issues/382
     specs = (DescendantAddresses(''),)
     adaptor_iter = (t.adaptor
-                    for targets in self._scheduler.product_request(TransitiveHydratedTargets,
-                                                                   [Specs(specs)])
-                    for t in targets.roots)
+      for targets in self._scheduler.product_request(TransitiveHydratedTargets,
+      [Specs(specs)])
+      for t in targets.roots)
     graph = _DependentGraph.from_iterable(target_types_from_symbol_table(self._symbol_table),
-                                          adaptor_iter)
+      adaptor_iter)
 
     if changed_request.include_dependees == 'direct':
       for address in graph.dependents_of_addresses(changed_addresses):
@@ -248,8 +258,8 @@ class OwnerCalculator(object):
   def iter_owner_target_addresses(self, owned_files):
     """Given an list of owned files, compute and yield all affected target addresses"""
     owner_addresses = set(address
-                          for address
-                          in self._mapper.iter_target_addresses_for_sources(owned_files))
+      for address
+      in self._mapper.iter_target_addresses_for_sources(owned_files))
     for address in owner_addresses:
       yield address
 

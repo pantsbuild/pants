@@ -9,7 +9,6 @@ import logging
 
 from pants.base.build_environment import get_buildroot
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.base.specs import Specs
 from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.isolated_process import create_process_rules
@@ -92,7 +91,9 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table'])):
     :param TargetRoots target_roots: The targets root of the request.
     """
     logger.debug('warming target_roots for: %r', target_roots)
-    subjects = [Specs(tuple(target_roots.specs))]
+    subjects = target_roots.specs
+    if not subjects:
+      return None
     request = self.scheduler_session.execution_request([TransitiveHydratedTargets], subjects)
     result = self.scheduler_session.execute(request)
     if result.error:
@@ -109,6 +110,7 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table'])):
     graph = LegacyBuildGraph.create(self.scheduler_session, self.symbol_table)
     logger.debug('build_graph is: %s', graph)
     # Ensure the entire generator is unrolled.
+
     for _ in graph.inject_roots_closure(target_roots):
       pass
 
@@ -200,7 +202,6 @@ class EngineInitializer(object):
     )
     address_mapper = AddressMapper(parser=parser,
                                    build_ignore_patterns=build_ignore_patterns,
-                                   exclude_target_regexps=exclude_target_regexps,
                                    subproject_roots=subproject_roots)
 
     # Load the native backend.
