@@ -3,6 +3,8 @@ extern crate tempdir;
 use boxfuture::{BoxFuture, Boxable};
 use fs::{self, PathStatGetter};
 use futures::{future, Future};
+use futures::future::Either;
+use futures_timer::Delay;
 use std::process::Command;
 use std::sync::Arc;
 
@@ -98,6 +100,22 @@ impl super::CommandRunner for CommandRunner {
             output_directory: snapshot.digest,
           })
           .to_boxed()
+      })
+      .select2(Delay::new(req.timeout))
+      .map(|result| {
+        match result {
+          Either::A((command, _)) => command,
+          Either::B((_, _)) => ExecuteProcessResult {  // timeout
+              stdout: Bytes::from(""),
+              stderr: Bytes::from(""),
+              exit_code: -15,
+              output_directory: fs::EMPTY_DIGEST,
+          },
+        }
+      })
+      .map_err(|err| match err {
+          Either::A((err_str, _)) => format!("{:?}", err_str),
+          Either::B((err_str, _)) => format!("{:?} timeout", err_str),
       })
       .to_boxed()
   }
@@ -382,6 +400,21 @@ mod tests {
         output_directory: TestDirectory::containing_roland().digest(),
       }
     )
+  }
+
+  #[test]
+  fn expect_timeout() {
+    match run_command_locally(ExecuteProcessRequest {
+      argv: owned_string_vec(&["/usr/bin/yes"]),
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: BTreeSet::new(),
+      timeout: Duration::from_millis(10),
+      description: "echo foo".to_string(),
+    }) {
+        Ok(ExecuteProcessResult { exit_code, ..} ) => assert_eq!(-15, exit_code),
+        _ => panic!(),
+    }
   }
 
   fn run_command_locally(req: ExecuteProcessRequest) -> Result<ExecuteProcessResult, String> {
