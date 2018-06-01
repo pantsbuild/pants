@@ -27,7 +27,7 @@ from pants.util.process_handler import subprocess
 _TEMPLATE_BASEDIR = 'templates/idea'
 
 # Follow `export.py` for versioning strategy.
-IDEA_PLUGIN_VERSION = '1.9.2'
+IDEA_PLUGIN_VERSION = '0.0.3'
 
 
 class IdeaPluginGen(ConsoleTask):
@@ -64,7 +64,8 @@ class IdeaPluginGen(ConsoleTask):
     register('--open', type=bool, default=True,
              help='Attempts to open the generated project in IDEA.')
     register('--incremental-import', type=int, default=None,
-             help='Enable incremental import of targets with the given graph depth.')
+             help='Enable incremental import of targets with the given graph depth. Supported '
+                  'by IntelliJ Pants plugin versions `>= 1.9.2`.')
     register('--java-encoding', default='UTF-8',
              help='Sets the file encoding for java files in this project.')
     register('--open-with', type=str, default=None, recursive=True,
