@@ -156,7 +156,7 @@ class JvmCompile(NailgunTaskBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(JvmCompile, cls).implementation_version() + [('JvmCompile', 2)]
+    return super(JvmCompile, cls).implementation_version() + [('JvmCompile', 3)]
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -246,21 +246,17 @@ class JvmCompile(NailgunTaskBase):
   def select_source(self, source_file_path):
     raise NotImplementedError()
 
-  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              zinc_args_file, settings, fatal_warnings, zinc_file_manager,
+  def compile(self, ctx, args, classpath, upstream_analysis,
+              settings, fatal_warnings, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     """Invoke the compiler.
 
-    Must raise TaskError on compile failure.
+    Subclasses must implement. Must raise TaskError on compile failure.
 
-    Subclasses must implement.
-    :param list args: Arguments to the compiler (such as jmake or zinc).
+    :param CompileContext ctx: A CompileContext for the target to compile.
+    :param list args: Arguments to the compiler (such as javac or zinc).
     :param list classpath: List of classpath entries.
-    :param list sources: Source files.
-    :param str classes_output_dir: Where to put the compiled output.
-    :param upstream_analysis:
-    :param analysis_file: Where to write the compile analysis.
-    :param zinc_args_file: Where to write the args zinc was invoked with.
+    :param upstream_analysis: A map from classpath entry to analysis file for dependencies.
     :param JvmPlatformSettings settings: platform settings determining the -source, -target, etc for
       javac to use.
     :param fatal_warnings: whether to convert compilation warnings to errors.
@@ -457,23 +453,20 @@ class JvmCompile(NailgunTaskBase):
       with open(path, 'w') as f:
         f.write(text.encode('utf-8'))
 
-  def _compile_vts(self, vts, target, sources, analysis_file, upstream_analysis, classpath, outdir,
-                   log_dir, zinc_args_file, progress_message, settings, fatal_warnings,
+  def _compile_vts(self, vts, ctx, upstream_analysis, classpath, progress_message, settings, fatal_warnings,
                    zinc_file_manager, counter):
     """Compiles sources for the given vts into the given output dir.
 
-    vts - versioned target set
-    sources - sources for this target set
-    analysis_file - the analysis file to manipulate
-    classpath - a list of classpath entries
-    outdir - the output dir to send classes to
+    :param vts: VersionedTargetSet with one entry for the target.
+    :param ctx: - A CompileContext instance for the target.
+    :param classpath: A list of classpath entries
 
     May be invoked concurrently on independent target sets.
 
     Postcondition: The individual targets in vts are up-to-date, as if each were
                    compiled individually.
     """
-    if not sources:
+    if not ctx.sources:
       self.context.log.warn('Skipping {} compile for targets with no sources:\n  {}'
                             .format(self.name(), vts.targets))
     else:
@@ -483,7 +476,7 @@ class JvmCompile(NailgunTaskBase):
       self.context.log.info(
         counter_str,
         'Compiling ',
-        items_to_report_element(sources, '{} source'.format(self.name())),
+        items_to_report_element(ctx.sources, '{} source'.format(self.name())),
         ' in ',
         items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
         ' (',
@@ -491,31 +484,28 @@ class JvmCompile(NailgunTaskBase):
         ').')
       with self.context.new_workunit('compile', labels=[WorkUnitLabel.COMPILER]) as compile_workunit:
         if self.get_options().capture_classpath:
-          self._record_compile_classpath(classpath, vts.targets, outdir)
+          self._record_compile_classpath(classpath, vts.targets, ctx.classes_dir)
 
         try:
           self.compile(
+            ctx,
             self._args,
             classpath,
-            sources,
-            outdir,
             upstream_analysis,
-            analysis_file,
-            zinc_args_file,
             settings,
             fatal_warnings,
             zinc_file_manager,
-            self._get_plugin_map('javac', self._zinc.javac_compiler_plugins_src(self), target),
-            self._get_plugin_map('scalac', self._zinc.scalac_compiler_plugins_src(self), target),
+            self._get_plugin_map('javac', self._zinc.javac_compiler_plugins_src(self), ctx.target),
+            self._get_plugin_map('scalac', self._zinc.scalac_compiler_plugins_src(self), ctx.target),
           )
-          self._capture_logs(compile_workunit, log_dir)
+          self._capture_logs(compile_workunit, ctx.log_dir)
         except TaskError:
           if self.get_options().suggest_missing_deps:
             logs = [path
                     for _, name, _, path in self._find_logs(compile_workunit)
                     if name == self.name()]
             if logs:
-              self._find_missing_deps(logs, target)
+              self._find_missing_deps(logs, ctx.target)
           raise
 
   def _capture_logs(self, workunit, destination):
@@ -736,14 +726,9 @@ class JvmCompile(NailgunTaskBase):
         zinc_file_manager = dep_context.defaulted_property(tgt, lambda x: x.zinc_file_manager)
         with Timer() as timer:
           self._compile_vts(vts,
-                            ctx.target,
-                            ctx.sources,
-                            ctx.analysis_file,
+                            ctx,
                             upstream_analysis,
                             cp_entries,
-                            ctx.classes_dir,
-                            ctx.log_dir,
-                            ctx.zinc_args_file,
                             progress_message,
                             tgt.platform,
                             fatal_warnings,
