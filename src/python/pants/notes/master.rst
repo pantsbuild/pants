@@ -4,6 +4,38 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.8.0.dev2 (06/01/2018)
+-----------------------
+
+Bugfixes
+~~~~~~~~
+* Fix using classpath jars with compiler plugins (#5890)
+  `PR #5890 <https://github.com/pantsbuild/pants/pull/5890>`_
+
+* Fix visualize-to option post addition of Sessions (#5885)
+  `PR #5885 <https://github.com/pantsbuild/pants/pull/5885>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add deprecation warning for pep8 'plugin' in pythonstyle suppress file (#5888)
+  `PR #5888 <https://github.com/pantsbuild/pants/pull/5888>`_
+
+* warn or error on matching source globs (#5769)
+  `PR #5769 <https://github.com/pantsbuild/pants/pull/5769>`_
+
+* Mark things which generate cffi for change detection (#5883)
+  `PR #5883 <https://github.com/pantsbuild/pants/pull/5883>`_
+
+* Sort list goal output (#5872)
+  `PR #5872 <https://github.com/pantsbuild/pants/pull/5872>`_
+
+New features
+~~~~~~~~~~~~
+
+* Remote execution can be enabled by flags (#5881)
+  `PR #5881 <https://github.com/pantsbuild/pants/pull/5881>`_
+
 1.8.0.dev1 (05/25/2018)
 -----------------------
 
