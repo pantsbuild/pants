@@ -446,12 +446,17 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       time.sleep(5)
 
       checker.assert_running()
-      with open(os.path.join(config["GLOBAL"]["pants_subprocessdir"], "pantsd", "pid"), 'w') as f:
+
+      pidpath = os.path.join(config["GLOBAL"]["pants_subprocessdir"], "pantsd", "pid")
+      with open(pidpath, 'w') as f:
         f.write('9')
 
       # Permit ample time for the async file event propagate in CI.
       time.sleep(10)
       checker.assert_stopped()
+
+      # Remove the pidfile so that the teardown script doesn't try to kill process 9.
+      os.unlink(pidpath)
 
   def test_pantsd_invalidation_stale_sources(self):
     test_path = 'tests/python/pants_test/daemon_correctness_test_0001'
