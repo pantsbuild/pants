@@ -21,7 +21,7 @@ from pants.base.build_environment import get_buildroot
 from pants.java.executor import Executor, SubprocessExecutor
 from pants.java.nailgun_client import NailgunClient
 from pants.pantsd.process_manager import FingerprintedProcessManager, ProcessGroup
-from pants.util.dirutil import safe_file_dump, safe_open
+from pants.util.dirutil import read_file, safe_file_dump, safe_open
 
 
 logger = logging.getLogger(__name__)
@@ -183,6 +183,7 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
     """Blocks for the nailgun subprocess to bind and emit a listening port in the nailgun stdout."""
     with safe_open(self._ng_stdout, 'r') as ng_stdout:
       start_time = time.time()
+      accumulated_stdout = ''
       while 1:
         readable, _, _ = select.select([ng_stdout], [], [], self._SELECT_WAIT)
         if readable:
@@ -191,10 +192,18 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
             return self._NG_PORT_REGEX.match(line).group(1)
           except AttributeError:
             pass
+          accumulated_stdout += line
 
         if (time.time() - start_time) > timeout:
+          stderr = read_file(self._ng_stderr)
           raise NailgunClient.NailgunError(
-            'Failed to read nailgun output after {sec} seconds!'.format(sec=timeout))
+            'Failed to read nailgun output after {sec} seconds!\n'
+            'Stdout:\n{stdout}\nStderr:\n{stderr}'.format(
+              sec=timeout,
+              stdout=accumulated_stdout,
+              stderr=stderr,
+            )
+          )
 
   def _create_ngclient(self, port, stdout, stderr, stdin):
     return NailgunClient(port=port, ins=stdin, out=stdout, err=stderr, workdir=get_buildroot())
