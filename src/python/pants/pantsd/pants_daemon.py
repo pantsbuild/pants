@@ -163,11 +163,23 @@ class PantsDaemon(FingerprintedProcessManager):
         bootstrap_options.pantsd_fs_event_workers
       )
 
+      pidfile_absolute = PantsDaemon.metadata_file_path('pantsd', 'pid', bootstrap_options.pants_subprocessdir)
+      if pidfile_absolute.startswith(build_root):
+        pidfile = os.path.relpath(pidfile_absolute, build_root)
+      else:
+        pidfile = None
+        logging.getLogger(__name__).warning(
+          'Not watching pantsd pidfile because subprocessdir is outside of buildroot. Having '
+          'subprocessdir be a child of buildroot (as it is by default) may help avoid stray '
+          'pantsd processes.'
+        )
+
       scheduler_service = SchedulerService(
         fs_event_service,
         legacy_graph_scheduler,
         build_root,
-        bootstrap_options.pantsd_invalidation_globs
+        bootstrap_options.pantsd_invalidation_globs,
+        pidfile,
       )
 
       pailgun_service = PailgunService(
@@ -312,17 +324,6 @@ class PantsDaemon(FingerprintedProcessManager):
       self._logger.info('starting service {}'.format(service))
       try:
         service_thread.start()
-        if isinstance(service, SchedulerService):
-          pidfile = self.metadata_file_path('pantsd', 'pid')
-          if pidfile.startswith(self._build_root):
-            service.watch_pidfile(os.path.relpath(pidfile, self._build_root))
-          else:
-            self._logger.warning(
-              'Not watching pantsd pidfile because subprocessdir is outside of buildroot. Having '
-              'subprocessdir be a child of buildroot (as it is by default) may help avoid stray '
-              'pantsd processes.'
-            )
-
       except (RuntimeError, service.ServiceError):
         self.shutdown(service_thread_map)
         raise self.StartupFailure('service {} failed to start, shutting down!'.format(service))
