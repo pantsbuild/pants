@@ -258,17 +258,14 @@ impl CommandRunner {
     // TODO: Log less verbosely
     debug!("Got (nested) execute response: {:?}", execute_response);
 
-    self
-      .extract_stdout(&execute_response)
-      .join(self.extract_stderr(&execute_response))
-      .and_then(move |(stdout, stderr)| {
+    join_all(vec![self.extract_stdout(&execute_response), self.extract_stderr(&execute_response), self.extract_output_files(&execute_response)])
+      .and_then(move |(stdout, stderr, output_directory)| {
         match grpcio::RpcStatusCode::from(execute_response.get_status().get_code()) {
           grpcio::RpcStatusCode::Ok => future::ok(ExecuteProcessResult {
             stdout: stdout,
             stderr: stderr,
             exit_code: execute_response.get_result().get_exit_code(),
-            // TODO: Populate output directory: https://github.com/pantsbuild/pants/issues/5709
-            output_directory: fs::EMPTY_DIGEST,
+            output_directory: output_directory,
           }).to_boxed(),
           grpcio::RpcStatusCode::FailedPrecondition => {
             if execute_response.get_status().get_details().len() != 1 {
@@ -432,6 +429,13 @@ impl CommandRunner {
         .to_boxed()
     };
     return stderr;
+  }
+
+  fn extract_output_files(
+    &self,
+    execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+  ) -> BoxFuture<Digest, ExecutionError> {
+
   }
 }
 
