@@ -280,13 +280,13 @@ class BaseZincCompile(JvmCompile):
     # - We also search in the extra scalac plugin dependencies, if specified.
     # - In scala 2.11 and up, the plugin's classpath element can be a dir, but for 2.10 it must be
     #   a jar.  So in-repo plugins will only work with 2.10 if --use-classpath-jars is true.
-    # - We exclude our own classes_dir, because if we're a plugin ourselves, then our
+    # - We exclude our own classes_dir/jar_file, because if we're a plugin ourselves, then our
     #   classes_dir doesn't have scalac-plugin.xml yet, and we don't want that fact to get
     #   memoized (which in practice will only happen if this plugin uses some other plugin, thus
     #   triggering the plugin search mechanism, which does the memoizing).
     scalac_plugin_search_classpath = (
       (set(classpath) | set(self.scalac_plugin_classpath_elements())) -
-      {ctx.classes_dir}
+      {ctx.classes_dir, ctx.jar_file}
     )
     zinc_args.extend(self._scalac_plugin_args(scalac_plugin_map, scalac_plugin_search_classpath))
     if upstream_analysis:
