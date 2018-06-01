@@ -1,4 +1,6 @@
+use std::collections::HashMap;
 use std::error::Error;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
@@ -6,7 +8,7 @@ use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
-use fs::{self, Store};
+use fs::{self, File, PathStat, Store};
 use futures::{future, Future};
 use futures_timer::Delay;
 use hashing::{Digest, Fingerprint};
@@ -258,8 +260,9 @@ impl CommandRunner {
     // TODO: Log less verbosely
     debug!("Got (nested) execute response: {:?}", execute_response);
 
-    join_all(vec![self.extract_stdout(&execute_response), self.extract_stderr(&execute_response), self.extract_output_files(&execute_response)])
-      .and_then(move |(stdout, stderr, output_directory)| {
+    self.extract_stdout(&execute_response)
+        .join(self.extract_stderr(&execute_response))
+        .join(self.extract_output_files(&execute_response)).and_then(move |((stdout, stderr), output_directory)| {
         match grpcio::RpcStatusCode::from(execute_response.get_status().get_code()) {
           grpcio::RpcStatusCode::Ok => future::ok(ExecuteProcessResult {
             stdout: stdout,
@@ -436,6 +439,68 @@ impl CommandRunner {
     execute_response: &bazel_protos::remote_execution::ExecuteResponse,
   ) -> BoxFuture<Digest, ExecutionError> {
 
+    let mut path_map: HashMap<PathBuf, Digest> = HashMap::new();
+    let mut path_stats: Vec<PathStat> = execute_response
+        .get_result()
+        .get_output_files()
+        .into_iter()
+        .map(|output_file_og| {
+          let output_file = output_file_og.clone();
+          if output_file.has_digest() {
+            path_map.insert(PathBuf::from(output_file.get_path()), output_file.get_digest().into());
+            PathStat::file(
+              PathBuf::from(output_file.get_path()),
+              File {
+                path: PathBuf::from(output_file.get_path()),
+                is_executable: output_file.get_is_executable()
+              }
+            )
+          } else {
+            let raw_content = output_file.get_content().into();
+            self
+                .store
+                .store_file_bytes(raw_content, false)
+                .map_err(move |error| {
+                  ExecutionError::Fatal(format!("Error storing raw content for output file {:?}: {:?}", output_file.get_path(), error))
+                }).map(move |digest| {
+              path_map.insert(PathBuf::from(output_file.get_path()), digest);
+            });
+            PathStat::file(
+              PathBuf::from(output_file.get_path()),
+              File {
+                path: PathBuf::from(output_file.get_path()),
+                is_executable: output_file.get_is_executable()
+              })
+          }
+    }).collect();
+
+    #[derive(Clone)]
+    struct StoreOneOffRemoteDigest {
+      map_of_paths_to_digests: HashMap<PathBuf, Digest>
+    }
+
+    impl StoreOneOffRemoteDigest {
+      pub fn new(map: HashMap<PathBuf, Digest>) -> StoreOneOffRemoteDigest {
+        StoreOneOffRemoteDigest {map_of_paths_to_digests: map}
+      }
+    }
+
+    impl fs::StoreFileByDigest<String> for StoreOneOffRemoteDigest {
+      fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
+        match self.map_of_paths_to_digests.get(&file.path) {
+          Some(digest) => future::ok(digest.clone()),
+          None => future::err(format!("Error when trying to find digest for path {:?}", file.path))
+        }.to_boxed()
+      }
+    }
+
+    fs::Snapshot::digest_from_path_stats(
+      self.store.clone(),
+      StoreOneOffRemoteDigest::new(path_map.clone()),
+      path_stats)
+        .map_err(move |error| {
+      ExecutionError::Fatal(format!("Error when storing the output file directory info in the remote CAS: {:?}", error))
+    }).to_boxed()
   }
 }
 
@@ -1066,8 +1131,15 @@ mod tests {
       stdout: as_bytes("roland"),
       stderr: Bytes::from("simba"),
       exit_code: 17,
-      output_directory: fs::EMPTY_DIGEST,
+      output_directory: TestDirectory::nested().digest(),
     };
+
+    let mut output_file = bazel_protos::remote_execution::OutputFile::new();
+    output_file.set_path("/cats/roland".into());
+    output_file.set_digest(TestData::catnip().digest().into());
+    output_file.set_is_executable(false);
+    let mut output_files = protobuf::RepeatedField::new();
+    output_files.push(output_file);
 
     let mut operation = bazel_protos::operations::Operation::new();
     operation.set_name("cat".to_owned());
@@ -1079,6 +1151,7 @@ mod tests {
         result.set_exit_code(want_result.exit_code);
         result.set_stdout_raw(Bytes::from(want_result.stdout.clone()));
         result.set_stderr_raw(Bytes::from(want_result.stderr.clone()));
+        result.set_output_files(output_files);
         result
       });
       response
@@ -1242,6 +1315,7 @@ mod tests {
       assert!(start_time.elapsed().unwrap() >= Duration::from_millis(500));
     }
   }
+
   #[test]
   fn wait_between_request_3_retry() {
     // wait at least 500 + 1000 + 1500 = 3000 milli for 3 retries.
@@ -1269,6 +1343,11 @@ mod tests {
       run_command_remote(mock_server.address(), execute_request).unwrap();
       assert!(start_time.elapsed().unwrap() >= Duration::from_millis(3000));
     }
+  }
+
+  #[test]
+  fn extract_output_files_from_request() {
+    // to be implemented once everything compiles
   }
 
   fn echo_foo_request() -> ExecuteProcessRequest {
