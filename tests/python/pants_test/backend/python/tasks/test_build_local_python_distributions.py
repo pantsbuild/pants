@@ -66,3 +66,5 @@ class TestBuildLocalPythonDistributions(PythonTaskTestBase, SchedulerTestBase):
     synthetic_target = next(iter(synthetic_tgts))
     self.assertEquals(['my_dist==0.0.0'],
                       [str(x.requirement) for x in synthetic_target.requirements.value])
+
+  # def test_only_native_deps_allowed(self):

@@ -19,3 +19,10 @@ def recursively_update(d, d2):
         recursively_update(d[k], v)
         continue
     d[k] = v
+
+
+def assert_single_element(iterable):
+  """???"""
+  result = list(iterable)
+  assert(len(result) == 1)
+  return result[0]

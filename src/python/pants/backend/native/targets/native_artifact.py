@@ -8,23 +8,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from hashlib import sha1
 
 from pants.base.payload_field import PayloadField
+from pants.util.objects import datatype
 
 
-class NativeArtifact(PayloadField):
+class NativeArtifact(datatype(['lib_name']), PayloadField):
   """???"""
 
   # TODO: why do we need this to be a method and not e.g. a field?
   @classmethod
   def alias(cls):
     return 'native_artifact'
-
-  def __init__(self, lib_name):
-    super(NativeArtifact, self).__init__()
-    self._lib_name = lib_name
-
-  @property
-  def lib_name(self):
-    return self._lib_name
 
   def as_filename(self, platform):
     # TODO: check that the name conforms to some format (e.g. no dots?)
@@ -34,4 +27,5 @@ class NativeArtifact(PayloadField):
     })
 
   def _compute_fingerprint(self):
-    return sha1(self._lib_name).hexdigest()
+    # FIXME: can we just use the __hash__ method here somehow?
+    return sha1(self.lib_name).hexdigest()

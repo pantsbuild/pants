@@ -38,7 +38,7 @@ class XCodeCLITools(Subsystem):
         raise self.XCodeToolsUnavailable(
           "'{}' is not an executable file, but it is required to build "
           "native code on this platform. You may need to install the XCode "
-          "command line developer tools."
+          "command line developer tools from the Mac App Store."
           .format(executable_path))
 
   def path_entries(self):

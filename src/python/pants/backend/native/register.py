@@ -6,14 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.native.config.environment import create_native_environment_rules
-from pants.backend.native.subsystems.native_toolchain import create_native_toolchain_rules
-from pants.backend.native.subsystems.xcode_cli_tools import create_xcode_cli_tools_rules
 from pants.backend.native.subsystems.binaries.binutils import create_binutils_rules
 from pants.backend.native.subsystems.binaries.gcc import create_gcc_rules
 from pants.backend.native.subsystems.binaries.llvm import create_llvm_rules
-from pants.backend.native.targets.native_artifact import NativeArtifact
+from pants.backend.native.subsystems.native_toolchain import create_native_toolchain_rules
+from pants.backend.native.subsystems.xcode_cli_tools import create_xcode_cli_tools_rules
 from pants.backend.native.targets.c_library import CLibrary
 from pants.backend.native.targets.cpp_library import CppLibrary
+from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.backend.native.tasks.c_compile import CCompile
 from pants.backend.native.tasks.cpp_compile import CppCompile
 from pants.backend.native.tasks.link_shared_libraries import LinkSharedLibraries

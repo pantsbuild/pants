@@ -12,7 +12,6 @@ import shutil
 from contextlib import contextmanager
 
 from pex.interpreter import PythonInterpreter
-from wheel.install import WheelFile
 
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
@@ -20,15 +19,16 @@ from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.pex_build_util import _resolve_multi
-from pants.backend.python.tasks.setup_py import SetupPyExecutionEnvironment, SetupPyRunner
+from pants.backend.python.tasks.setup_py import (SetupPyExecutionEnvironment, SetupPyNativeTools,
+                                                 SetupPyRunner, ensure_setup_requires_site_dir)
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.build_graph.address import Address
 from pants.task.task import Task
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import environment_as
-from pants.util.dirutil import safe_mkdir, split_basename_and_dirname
+from pants.util.dirutil import safe_mkdir_for, split_basename_and_dirname
 from pants.util.memo import memoized_property
 from pants.util.objects import Exactly
 
@@ -58,57 +58,50 @@ class BuildLocalPythonDistributions(Task):
   def subsystem_dependencies(cls):
     return super(BuildLocalPythonDistributions, cls).subsystem_dependencies() + (NativeToolchain.scoped(cls),)
 
-  @memoized_property
-  def _native_toolchain(self):
-    return NativeToolchain.scoped_instance(self)
-
   def _request_single(self, product, subject):
-    # FIXME(cosmicexplorer): This is not supposed to be exposed to Tasks yet -- see #4769 to track
-    # the status of exposing v2 products in v1 tasks.
+    # FIXME(#4769): This is not supposed to be exposed to Tasks yet -- see #4769 to track the status
+    # of exposing v2 products in v1 tasks.
     return self.context._scheduler.product_request(product, [subject])[0]
 
   @memoized_property
-  def _setup_py_environment(self):
-    return self._request_single(SetupPyExecutionEnvironment, self._native_toolchain)
+  def _setup_py_native_tools(self):
+    native_toolchain = NativeToolchain.scoped_instance(self)
+    return self._request_single(SetupPyNativeTools, native_toolchain)
 
-  # TODO: this should be made into a class property!!!
+  # TODO: This should probably be made into a class property, when that is made.
   @property
   def cache_target_dirs(self):
     return True
 
-  source_target_constraint = Exactly(PythonDistribution)
+  def _get_setup_requires_to_resolve(self, dist_target):
+    if not dist_target.setup_requires:
+      return None
 
-  def _ensure_setup_requires_site_dir(self, dist_targets, interpreter, site_dir):
     reqs_to_resolve = set()
 
-    for tgt in dist_targets:
-      for setup_req_lib_addr in tgt.setup_requires:
-        for req_lib in self.context.build_graph.resolve(setup_req_lib_addr):
-          for req in req_lib.requirements:
-            reqs_to_resolve.add(req)
+    for setup_req_lib_addr in dist_target.setup_requires:
+      for req_lib in self.context.build_graph.resolve(setup_req_lib_addr):
+        for req in req_lib.requirements:
+          reqs_to_resolve.add(req)
 
-    if not reqs_to_resolve:
+    if len(reqs_to_resolve) == 0:
       return None
-    self.context.log.debug('python_dist target(s) with setup_requires detected. '
-                           'Installing setup requirements: {}\n\n'
-                           .format([req.key for req in reqs_to_resolve]))
 
-    setup_requires_dists = _resolve_multi(interpreter, reqs_to_resolve, ['current'], None)
+    return reqs_to_resolve
 
-    overrides = {
-      'purelib': site_dir,
-      'headers': os.path.join(site_dir, 'headers'),
-      'scripts': os.path.join(site_dir, 'bin'),
-      'platlib': site_dir,
-      'data': site_dir
-    }
+  source_target_constraint = Exactly(PythonDistribution)
 
-    # The `python_dist` target builds for the current platform only.
-    for obj in setup_requires_dists['current']:
-      wf = WheelFile(obj.location)
-      wf.install(overrides=overrides, force=True)
+  # TODO: document the existence of this directory!
+  setup_requires_site_subdir = 'setup_requires_site'
+  dist_subdir = 'python_dist_subdir'
 
-    return site_dir
+  @classmethod
+  def _get_output_dir(cls, results_dir):
+    return os.path.join(results_dir, cls.dist_subdir)
+
+  @classmethod
+  def _get_dist_dir(cls, results_dir):
+    return os.path.join(cls._get_output_dir(results_dir), SetupPyRunner.DIST_DIR)
 
   def execute(self):
     dist_targets = self.context.targets(self.source_target_constraint.satisfied_by)
@@ -120,15 +113,11 @@ class BuildLocalPythonDistributions(Task):
 
     with self.invalidated(dist_targets, invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.invalid_vts:
-        native_artifact_deps = self._get_native_artifact_deps(vt.target)
-        setup_req_dir = os.path.join(vt.results_dir, 'setup_requires_site')
-        pythonpath = self._ensure_setup_requires_site_dir(dist_targets, interpreter, setup_req_dir)
-        self._create_dist(vt.target, vt.results_dir, interpreter, shared_libs_product,
-                          native_artifact_deps, pythonpath=pythonpath)
+        self._prepare_and_create_dist(interpreter, shared_libs_product, vt)
 
       local_wheel_products = self.context.products.get('local_wheels')
       for vt in invalidation_check.all_vts:
-        dist = self._get_whl_from_dir(os.path.join(vt.results_dir, 'dist'))
+        dist = self._get_whl_from_dir(vt.results_dir)
         req_lib_addr = Address.parse('{}__req_lib'.format(vt.target.address.spec))
         self._inject_synthetic_dist_requirements(dist, req_lib_addr)
         # Make any target that depends on the dist depend on the synthetic req_lib,
@@ -158,70 +147,90 @@ class BuildLocalPythonDistributions(Task):
     all_sources = list(dist_tgt.sources_relative_to_target_base())
     for src_relative_to_target_base in all_sources:
       src_rel_to_results_dir = os.path.join(dist_target_dir, src_relative_to_target_base)
-      safe_mkdir(os.path.dirname(src_rel_to_results_dir))
+      safe_mkdir_for(src_rel_to_results_dir)
       abs_src_path = os.path.join(get_buildroot(),
                                   dist_tgt.address.spec_path,
                                   src_relative_to_target_base)
       shutil.copyfile(abs_src_path, src_rel_to_results_dir)
 
-  def _add_artifacts(self, dist_target_dir, shared_libs_product, platform, native_artifact_targets):
+  def _add_artifacts(self, dist_target_dir, shared_libs_product, native_artifact_targets):
     all_shared_libs = []
     # FIXME: dedup names of native artifacts? should that happen in the LinkSharedLibraries step?
     # (yes it should)
     for tgt in native_artifact_targets:
       product_mapping = shared_libs_product.get(tgt)
-      base_dirs = product_mapping.keys()
-      assert(len(base_dirs) == 1)
-      single_base_dir = base_dirs[0]
-      shared_libs_list = product_mapping[single_base_dir]
-      assert(len(shared_libs_list) == 1)
-      single_product = shared_libs_list[0]
-      all_shared_libs.append(single_product)
+      base_dir = assert_single_element(product_mapping.keys())
+      shared_lib = assert_single_element(product_mapping[base_dir])
+      all_shared_libs.append(shared_lib)
 
     for shared_lib in all_shared_libs:
       basename = os.path.basename(shared_lib.path)
-      resolved_outname = platform.resolve_platform_specific({
-        # NB: We convert everything to .so here so that the setup.py can just
-        # declare .so to build for either platform.
-        'darwin': lambda: re.sub(r'\.dylib\Z', '.so', basename),
-        'linux': lambda: basename,
-      })
+      # NB: We convert everything to .so here so that the setup.py can just
+      # declare .so to build for either platform.
+      resolved_outname = re.sub('r\..*\Z', '.so', basename)
       dest_path = os.path.join(dist_target_dir, resolved_outname)
+      safe_mkdir_for(dest_path)
       shutil.copyfile(shared_lib.path, dest_path)
 
-  # FIXME(cosmicexplorer): We should be isolating the path to just our provided
-  # toolchain, but this causes errors in Travis because distutils looks for
-  # "x86_64-linux-gnu-gcc" when linking native extensions. We almost definitely
-  # will need to introduce a subclass of UnixCCompiler and expose it to the
-  # setup.py to be able to invoke our toolchain on hosts that already have a
-  # compiler installed. Right now we just put our tools at the end of the PATH.
-  @contextmanager
-  def _setup_py_execution_environment(self, pythonpath=None):
-    setup_py_env = self._request_single(
-      SetupPyExecutionEnvironment, self._native_toolchain)
-    env = setup_py_env.as_environment()
-    if pythonpath:
-      self.context.log.debug('Setting PYTHONPATH with setup_requires site directory: {}'
-                             .format(pythonpath))
-      env['PYTHONPATH'] = pythonpath
-    with environment_as(**env):
-      yield
+    return all_shared_libs
 
-  def _create_dist(self, dist_tgt, dist_target_dir, interpreter, shared_libs_product,
-                   native_artifact_targets, pythonpath=None):
+  def _prepare_and_create_dist(self, interpreter, shared_libs_product, versioned_target):
+    dist_target = versioned_target.target
+
+    native_artifact_deps = self._get_native_artifact_deps(dist_target)
+
+    results_dir = versioned_target.results_dir
+
+    dist_output_dir = self._get_output_dir(results_dir)
+
+    all_native_artifacts = self._add_artifacts(
+      dist_output_dir, shared_libs_product, native_artifact_deps)
+
+    is_platform_specific = False
+    native_tools = None
+    if dist_target.has_native_sources:
+      # We add the native tools if we need to compile code belonging to this python_dist() target.
+      # TODO: check that the native toolchain isn't loaded without native code in a test!
+      native_tools = self._setup_py_native_tools
+      # Native code in this python_dist() target requires marking the dist as platform-specific.
+      is_platform_specific = True
+    elif len(all_native_artifacts) > 0:
+      # We are including a platform-specific shared lib in this dist, so mark it as such.
+      is_platform_specific = True
+
+    setup_requires_dir = os.path.join(results_dir, self.setup_requires_site_subdir)
+    setup_reqs_to_resolve = self._get_setup_requires_to_resolve(dist_target)
+    if setup_reqs_to_resolve:
+      self.context.log.debug('python_dist target(s) with setup_requires detected. '
+                                 'Installing setup requirements: {}\n\n'
+                                 .format([req.key for req in setup_reqs_to_resolve]))
+
+    cur_platforms = ['current'] if is_platform_specific else None
+
+    setup_requires_site_dir = ensure_setup_requires_site_dir(
+      setup_reqs_to_resolve, interpreter, setup_requires_dir, platforms=cur_platforms)
+    if setup_requires_site_dir:
+      self.context.log.debug('Setting PYTHONPATH with setup_requires site directory: {}'
+                             .format(setup_requires_site_dir))
+
+    setup_py_execution_environment = SetupPyExecutionEnvironment(
+      setup_requires_site_dir=setup_requires_site_dir,
+      setup_py_native_tools=native_tools,
+    )
+
+    self._create_dist(dist_target, dist_output_dir, interpreter,
+                      setup_py_execution_environment, is_platform_specific=is_platform_specific)
+
+  def _create_dist(self, dist_tgt, dist_target_dir, interpreter,
+                   setup_py_execution_environment, is_platform_specific=False):
     """Create a .whl file for the specified python_distribution target."""
     self._copy_sources(dist_tgt, dist_target_dir)
-    self._add_artifacts(dist_target_dir, shared_libs_product, self._setup_py_environment.platform, native_artifact_targets)
 
-    # We are platform-specific, because we have compiled artifacts.
-    platform = None
-    if len(native_artifact_targets) > 0:
-      platform = self._setup_py_environment.platform
-    setup_runner = SetupPyRunner.for_bdist_wheel(dist_target_dir, platform=platform)
-    # TODO(cosmicexplorer): don't invoke the native toolchain unless the current
-    # dist_tgt.has_native_sources? Would need some way to check whether the
-    # toolchain is invoked in an integration test.
-    with self._setup_py_execution_environment(pythonpath=pythonpath):
+    setup_runner = SetupPyRunner.for_bdist_wheel(
+      dist_target_dir,
+      is_platform_specific=is_platform_specific)
+
+    with environment_as(**setup_py_execution_environment.as_environment()):
       # Build a whl using SetupPyRunner and return its absolute path.
       setup_runner.run()
 
@@ -239,10 +248,11 @@ class BuildLocalPythonDistributions(Task):
     self.context.build_graph.inject_synthetic_target(req_lib_addr, PythonRequirementLibrary,
                                                      requirements=[req])
 
-  @staticmethod
-  def _get_whl_from_dir(install_dir):
+  @classmethod
+  def _get_whl_from_dir(cls, install_dir):
     """Return the absolute path of the whl in a setup.py install directory."""
-    dists = glob.glob(os.path.join(install_dir, '*.whl'))
+    dist_dir = cls._get_dist_dir(install_dir)
+    dists = glob.glob(os.path.join(dist_dir, '*.whl'))
     if len(dists) == 0:
       raise TaskError('No distributions were produced by python_create_distribution task.')
     if len(dists) > 1:

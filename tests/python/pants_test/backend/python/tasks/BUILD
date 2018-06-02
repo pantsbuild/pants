@@ -93,6 +93,17 @@ python_tests(
 )
 
 python_tests(
+  name='ctypes_integration',
+  sources=['test_ctypes_integration.py'],
+  dependencies=[
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
+  tags={'integration'},
+  timeout=2400,
+)
+
+python_tests(
   name='python_isort_integration',
   sources=['test_python_isort_integration.py'],
   dependencies=[

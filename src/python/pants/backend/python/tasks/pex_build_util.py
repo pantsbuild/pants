@@ -6,11 +6,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from collections import defaultdict
 
 from pex.fetcher import Fetcher
 from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
 
+from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.pex_util import get_local_platform
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -53,7 +55,13 @@ def is_python_binary(tgt):
 
 def tgt_closure_has_native_sources(tgts):
   """Determine if any target in the current target closure has native (c or cpp) sources."""
-  return any(tgt.has_native_sources for tgt in tgts)
+  # FIXME: introduce source_target_constraint and rely on it for all tasks -- override
+  # Task#get_targets()!
+  pydist_targets = filter(is_local_python_dist, tgts)
+  has_pydist_native_sources = any(tgt.has_native_sources for tgt in pydist_targets)
+  native_targets = filter(lambda t: isinstance(t, NativeLibrary), tgts)
+  has_native_library_sources = any(tgt.has_sources() for tgt in native_targets)
+  return has_pydist_native_sources or has_native_library_sources
 
 
 def tgt_closure_platforms(tgts):
@@ -65,18 +73,12 @@ def tgt_closure_platforms(tgts):
   :param tgts: a list of :class:`Target` objects.
   :returns: a dict mapping a platform string to a list of targets that specify the platform.
   """
-  tgts_by_platforms = {}
+  tgts_by_platforms = defaultdict(list)
 
-  def insert_or_append_tgt_by_platform(tgt):
-    if tgt.platforms:
-      for platform in tgt.platforms:
-        if platform in tgts_by_platforms:
-          tgts_by_platforms[platform].append(tgt)
-        else:
-          tgts_by_platforms[platform] = [tgt]
+  for tgt in tgts:
+    for platform in tgt.platforms:
+      tgts_by_platforms[platform].append(tgt)
 
-  map(insert_or_append_tgt_by_platform, tgts)
-  # If no targets specify platforms, inherit the default platforms.
   if not tgts_by_platforms:
     for platform in PythonSetup.global_instance().platforms:
       tgts_by_platforms[platform] = ['(No target) Platform inherited from either the '
@@ -92,7 +94,12 @@ def build_for_current_platform_only_check(tgts):
   :param tgts: a list of :class:`Target` objects.
   :return: a boolean value indicating whether the current target closure has native sources.
   """
-  if tgt_closure_has_native_sources(filter(is_local_python_dist, tgts)):
+  # FIXME: This should really be checking the platforms in the closure of
+  # `PythonRequirementLibrary`s, not the targets themselves. 3rdparty libraries and local
+  # `python_dist()`s are the only way platform-specific code can be inserted into a
+  # pex. `SetupPyRunner` ensures that the artifacts built locally are marked with 'current' if they
+  # contain any native code.
+  if tgt_closure_has_native_sources(tgts):
     def predicate(x):
       return is_python_binary(x) or is_local_python_dist(x)
     platforms = tgt_closure_platforms(filter(predicate, tgts))
@@ -175,7 +182,7 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None):
       find_links.add(req.repository)
 
   # Resolve the requirements into distributions.
-  distributions = _resolve_multi(interpreter, deduped_reqs, platforms, find_links)
+  distributions = resolve_multi(interpreter, deduped_reqs, platforms, find_links)
   locations = set()
   for platform, dists in distributions.items():
     for dist in dists:
@@ -185,7 +192,7 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None):
       locations.add(dist.location)
 
 
-def _resolve_multi(interpreter, requirements, platforms, find_links):
+def resolve_multi(interpreter, requirements, platforms, find_links):
   """Multi-platform dependency resolution for PEX files.
 
   Returns a list of distributions that must be included in order to satisfy a set of requirements.

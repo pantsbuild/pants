@@ -5,12 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.native.config.environment import (CCompiler, CppCompiler,
-                                                     Linker, Platform)
-from pants.backend.native.subsystems.xcode_cli_tools import XCodeCLITools
+from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
 from pants.backend.native.subsystems.binaries.binutils import Binutils
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
+from pants.backend.native.subsystems.xcode_cli_tools import XCodeCLITools
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
 from pants.subsystem.subsystem import Subsystem
@@ -92,15 +91,7 @@ def select_c_compiler(platform, native_toolchain):
   if platform.normalized_os_name == 'darwin':
     c_compiler = yield Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
   else:
-    # FIXME: gcc needs binutils so it can have 'as'. this should probably be a subsystem dependency
-    # in gcc on binutils.
-    c_compiler_no_tools = yield Get(CCompiler, GCC, native_toolchain._gcc)
-    binutils_linker = yield Get(Linker, Binutils, native_toolchain._binutils)
-    all_path_entries = c_compiler_no_tools.path_entries + native_toolchain._binutils.path_entries()
-    c_compiler = CCompiler(
-      path_entries=all_path_entries,
-      exe_filename=c_compiler_no_tools.exe_filename,
-      platform=platform)
+    c_compiler = yield Get(CCompiler, GCC, native_toolchain._gcc)
   yield c_compiler
 
 
@@ -109,15 +100,7 @@ def select_cpp_compiler(platform, native_toolchain):
   if platform.normalized_os_name == 'darwin':
     cpp_compiler = yield Get(CppCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
   else:
-    # FIXME: gcc needs binutils so it can have 'as'. this should probably be a subsystem dependency
-    # in gcc on binutils.
-    cpp_compiler_no_tools = yield Get(CppCompiler, GCC, native_toolchain._gcc)
-    binutils_linker = yield Get(Linker, Binutils, native_toolchain._binutils)
-    all_path_entries = cpp_compiler_no_tools.path_entries + native_toolchain._binutils.path_entries()
-    cpp_compiler = CppCompiler(
-      path_entries=all_path_entries,
-      exe_filename=cpp_compiler_no_tools.exe_filename,
-      platform=platform)
+    cpp_compiler = yield Get(CppCompiler, GCC, native_toolchain._gcc)
   yield cpp_compiler
 
 

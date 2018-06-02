@@ -18,14 +18,15 @@ from pex.installer import InstallerBase, Packager
 from pex.interpreter import PythonInterpreter
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
+from wheel.install import WheelFile
 
 from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
-from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.subsystems.binaries.gcc import GCC
+from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks.pex_build_util import is_local_python_dist
+from pants.backend.python.tasks.pex_build_util import is_local_python_dist, resolve_multi
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.specs import SiblingAddresses
@@ -37,7 +38,7 @@ from pants.engine.selectors import Get, Select
 from pants.task.task import Task
 from pants.util.contextutil import get_joined_path
 from pants.util.dirutil import is_executable, safe_rmtree, safe_walk
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 from pants.util.strutil import safe_shlex_split
@@ -58,20 +59,16 @@ setup(**
 class SetupPyRunner(InstallerBase):
   _EXTRAS = ('setuptools', 'wheel')
 
-  _PLATFORM_NAMES = {
-    # TODO: note the version 10.10 thing
-    'darwin': lambda: 'macosx_10_10_x86_64',
-    'linux': lambda: 'linux_x86_64',
-  }
+  DIST_DIR = 'dist'
 
   @classmethod
-  def for_bdist_wheel(cls, source_dir, platform=None, **kw):
+  def for_bdist_wheel(cls, source_dir, is_platform_specific=False, **kw):
     cmd = ['bdist_wheel']
-    if platform:
-      plat_name = platform.resolve_platform_specific(cls._PLATFORM_NAMES)
-      cmd.extend(['--plat-name', plat_name])
+    if is_platform_specific:
+      cmd.extend(['--plat-name', 'current'])
     else:
       cmd.append('--universal')
+    cmd.extend(['--dist-dir', cls.DIST_DIR])
     return cls(source_dir, cmd, **kw)
 
   def __init__(self, source_dir, setup_command, **kw):
@@ -98,67 +95,87 @@ class SetupPyRunner(InstallerBase):
     return self.__setup_command
 
 
-class XCodeToolsUnavailable(Exception):
-  """Raised if the XCode CLI tools were required, but could not be found."""
-
-
-_XCODE_TOOL_LOCATIONS = {
-  'linker': '/usr/bin/ld',
-  'clang': '/usr/bin/clang',
-  'clang++': '/usr/bin/clang++',
-}
-
-
-def _detect_xcode_tools(platform):
-  for tool_name, tool_location in _XCODE_TOOL_LOCATIONS.items():
-    if not is_executable(tool_location):
-      raise XCodeToolsUnavailable(
-        "The file at {} does not exist or is not executable. The XCode {} is "
-        "required to build native code on OSX. You may need to install the "
-        "XCode command line developer tools."
-        .format(tool_location, tool_name))
-
-  return SetupPyExecutionEnvironment(
-    exec_path='/usr/bin',
-    c_compiler_name='clang',
-    cpp_compiler_name='clang++',
-    platform=platform)
-
-
-class SetupPyExecutionEnvironment(datatype([
-    'exec_path',
-    'c_compiler_name',
-    'cpp_compiler_name',
-    'linker_name',
-    ('platform', Platform),
+class SetupPyNativeTools(datatype([
+    ('c_compiler', CCompiler),
+    ('cpp_compiler', CppCompiler),
+    ('linker', Linker),
 ])):
+  """The native tools needed for a setup.py invocation.
 
-  def as_environment(self):
-    # NB: Overridding LD or LDSHARED causes setup.py to try to invoke that
-    # linker directly without going through the compiler, which fails. We should
-    # probably implement #5661 soon to avoid these kind of minefields.
-    return {
-      'PATH': self.exec_path,
-      'CC': self.c_compiler_name,
-      'CXX': self.cpp_compiler_name,
-    }
+This class exists so that ???"""
 
 
-@rule(SetupPyExecutionEnvironment, [Select(Platform), Select(NativeToolchain)])
-def get_setup_py_environment(platform, native_toolchain):
-  # TODO(cosmicexplorer): make it possible to yield Get with a non-static
-  # subject type and use `platform.resolve_platform_specific()`.
+@rule(SetupPyNativeTools, [Select(NativeToolchain)])
+def get_setup_py_native_tools(native_toolchain):
   c_compiler = yield Get(CCompiler, NativeToolchain, native_toolchain)
   cpp_compiler = yield Get(CppCompiler, NativeToolchain, native_toolchain)
   linker = yield Get(Linker, NativeToolchain, native_toolchain)
-  all_path_entries = linker.path_entries + c_compiler.path_entries + cpp_compiler.path_entries
-  joined_path = get_joined_path(all_path_entries, os.environ.copy())
-  yield SetupPyExecutionEnvironment(
-    exec_path=joined_path,
-    c_compiler_name=c_compiler.exe_filename,
-    cpp_compiler_name=cpp_compiler.exe_filename,
-    linker_name=linker.exe_filename,
-    platform=platform)
+
+  yield SetupPyNativeTools(
+    c_compiler=c_compiler,
+    cpp_compiler=cpp_compiler,
+    linker=linker)
+
+
+# TODO: It would be pretty useful to have an Optional TypeConstraint.
+class SetupRequiresSiteDir(datatype(['site_dir'])): pass
+
+# TODO: This could be formulated as an @rule if targets and `PythonInterpreter` are made available
+# to the v2 engine.
+def ensure_setup_requires_site_dir(reqs_to_resolve, interpreter, site_dir,
+                                   platforms=None):
+  if not reqs_to_resolve:
+    return None
+
+  setup_requires_dists = resolve_multi(interpreter, reqs_to_resolve, platforms, None)
+
+  # FIXME: there's no description of what this does or why it's necessary.
+  overrides = {
+    'purelib': site_dir,
+    'headers': os.path.join(site_dir, 'headers'),
+    'scripts': os.path.join(site_dir, 'bin'),
+    'platlib': site_dir,
+    'data': site_dir
+  }
+
+  # The `python_dist` target builds for the current platform only.
+  # FIXME: why does it build for the current platform only?
+  for obj in setup_requires_dists['current']:
+    wf = WheelFile(obj.location)
+    wf.install(overrides=overrides, force=True)
+
+  return SetupRequiresSiteDir(site_dir)
+
+
+class SetupPyExecutionEnvironment(datatype([
+    # TODO: It would be pretty useful to have an Optional TypeConstraint.
+    'setup_requires_site_dir',
+    # If None, don't execute in the toolchain environment.
+    'setup_py_native_tools',
+])):
+
+  def as_environment(self):
+    ret = {}
+
+    if self.setup_requires_site_dir:
+      ret['PYTHONPATH'] = self.setup_requires_site_dir.site_dir
+
+    native_tools = self.setup_py_native_tools
+    if native_tools:
+      ret['CC'] = native_tools.c_compiler.exe_filename
+      ret['CXX'] = native_tools.cpp_compiler.exe_filename
+
+      # NB: Overridding LD or LDSHARED causes setup.py to try to invoke that linker directly without
+      # going through the compiler, which fails. We should probably implement #5661 soon to avoid
+      # these kind of minefields.
+      all_path_entries = (
+        native_tools.c_compiler.path_entries +
+        native_tools.cpp_compiler.path_entries +
+        native_tools.linker.path_entries
+      )
+      ret['PATH'] = get_joined_path(all_path_entries)
+
+    return ret
 
 
 class TargetAncestorIterator(object):
@@ -732,5 +749,5 @@ class SetupPy(Task):
 
 def create_setup_py_rules():
   return [
-    get_setup_py_environment,
+    get_setup_py_native_tools,
   ]

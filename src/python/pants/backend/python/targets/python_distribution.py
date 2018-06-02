@@ -19,6 +19,8 @@ class PythonDistribution(Target):
 
   default_sources_globs = '*.py'
 
+  native_source_extensions = ['.c', '.cpp', '.cc']
+
   @classmethod
   def alias(cls):
     return 'python_dist'
@@ -66,7 +68,7 @@ class PythonDistribution(Target):
 
   @property
   def has_native_sources(self):
-    return self.has_sources(extension=('.c', '.cpp', '.cc'))
+    return self.has_sources(extension=tuple(self.native_source_extensions))
 
   @property
   def platforms(self):

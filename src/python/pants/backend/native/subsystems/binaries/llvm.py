@@ -46,11 +46,13 @@ class LLVM(NativeTool):
   @memoized_method
   def select(self):
     unpacked_path = super(LLVM, self).select()
-    children = os.listdir(unpacked_path)
     # The archive from releases.llvm.org wraps the extracted content into a directory one level
     # deeper, but the one from our S3 does not.
+    children = os.listdir(unpacked_path)
     if len(children) == 1:
-      return os.path.join(unpacked_path, children[0])
+      llvm_base_dir = os.path.join(unpacked_path, children[0])
+      assert(os.path.isdir(llvm_base_dir))
+      return llvm_base_dir
     return unpacked_path
 
   def path_entries(self):
