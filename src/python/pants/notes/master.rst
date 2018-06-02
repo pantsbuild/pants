@@ -4,7 +4,7 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
-1.8.0.dev2 (06/01/2018)
+1.8.0.dev2 (06/02/2018)
 -----------------------
 
 Bugfixes
@@ -14,6 +14,12 @@ Bugfixes
 
 * Fix visualize-to option post addition of Sessions (#5885)
   `PR #5885 <https://github.com/pantsbuild/pants/pull/5885>`_
+
+* Robustify go_protobuf_library (#5887)
+  `PR #5887 <https://github.com/pantsbuild/pants/pull/5887>`_
+
+*  Repair hermetic_environment_as for C-level environment variable access. (#5898)
+  `PR #5898 <https://github.com/pantsbuild/pants/pull/5898>`_
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -29,6 +35,9 @@ Refactoring, Improvements, and Tooling
 
 * Sort list goal output (#5872)
   `PR #5872 <https://github.com/pantsbuild/pants/pull/5872>`_
+
+* Output stdout and stderr when nailgun fails to connect (#5892)
+  `PR #5892 <https://github.com/pantsbuild/pants/pull/5892>`_
 
 New features
 ~~~~~~~~~~~~
