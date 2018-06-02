@@ -33,7 +33,7 @@ extern crate mock;
 extern crate protobuf;
 extern crate resettable;
 extern crate sha2;
-extern crate tempdir;
+extern crate tempfile;
 #[cfg(test)]
 extern crate testutil;
 
@@ -1145,7 +1145,7 @@ fn safe_create_dir_all(path: &Path) -> Result<(), String> {
 
 #[cfg(test)]
 mod posixfs_test {
-  extern crate tempdir;
+  extern crate tempfile;
   extern crate testutil;
 
   use self::testutil::make_file;
@@ -1157,21 +1157,21 @@ mod posixfs_test {
 
   #[test]
   fn is_executable_false() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     make_file(&dir.path().join("marmosets"), &[], 0o611);
     assert_only_file_is_executable(dir.path(), false);
   }
 
   #[test]
   fn is_executable_true() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     make_file(&dir.path().join("photograph_marmosets"), &[], 0o700);
     assert_only_file_is_executable(dir.path(), true);
   }
 
   #[test]
   fn read_file() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let path = PathBuf::from("marmosets");
     let content = "cute".as_bytes().to_vec();
     make_file(
@@ -1191,7 +1191,7 @@ mod posixfs_test {
 
   #[test]
   fn read_file_missing() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     new_posixfs(&dir.path())
       .read_file(&File {
         path: PathBuf::from("marmosets"),
@@ -1203,7 +1203,7 @@ mod posixfs_test {
 
   #[test]
   fn stat_executable_file() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("photograph_marmosets");
     make_file(&dir.path().join(&path), &[], 0o700);
@@ -1218,7 +1218,7 @@ mod posixfs_test {
 
   #[test]
   fn stat_nonexecutable_file() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("marmosets");
     make_file(&dir.path().join(&path), &[], 0o600);
@@ -1233,7 +1233,7 @@ mod posixfs_test {
 
   #[test]
   fn stat_dir() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
@@ -1245,7 +1245,7 @@ mod posixfs_test {
 
   #[test]
   fn stat_symlink() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("marmosets");
     make_file(&dir.path().join(&path), &[], 0o600);
@@ -1267,7 +1267,7 @@ mod posixfs_test {
 
   #[test]
   fn stat_missing() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     posix_fs
       .stat(PathBuf::from("no_marmosets"))
@@ -1276,7 +1276,7 @@ mod posixfs_test {
 
   #[test]
   fn scandir_empty() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("empty_enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
@@ -1285,7 +1285,7 @@ mod posixfs_test {
 
   #[test]
   fn scandir() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
@@ -1335,7 +1335,7 @@ mod posixfs_test {
 
   #[test]
   fn scandir_missing() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     posix_fs
       .scandir(&Dir(PathBuf::from("no_marmosets_here")))
@@ -1345,7 +1345,7 @@ mod posixfs_test {
 
   #[test]
   fn path_stats_for_paths() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let root_path = dir.path();
 
     // File tree:

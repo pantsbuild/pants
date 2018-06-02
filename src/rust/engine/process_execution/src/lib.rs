@@ -17,7 +17,7 @@ extern crate protobuf;
 extern crate resettable;
 extern crate sha2;
 #[cfg(test)]
-extern crate tempdir;
+extern crate tempfile;
 #[cfg(test)]
 extern crate testutil;
 extern crate tokio_process;

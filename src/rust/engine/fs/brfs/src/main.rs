@@ -640,21 +640,19 @@ fn unmount(mount_path: &str) -> i32 {
 
 #[cfg(test)]
 mod test {
-  extern crate tempdir;
+  extern crate tempfile;
   extern crate testutil;
 
   use fs;
   use futures::future::Future;
   use hashing;
-  use self::tempdir::TempDir;
   use std::sync::Arc;
   use super::mount;
   use self::testutil::{file, data::{TestData, TestDirectory}};
 
   #[test]
   fn missing_digest() {
-    let store_dir = TempDir::new("store").unwrap();
-    let mount_dir = TempDir::new("mount").unwrap();
+    let (store_dir, mount_dir) = make_dirs();
 
     let store = fs::Store::local_only(
       store_dir.path(),
@@ -671,8 +669,7 @@ mod test {
 
   #[test]
   fn read_file_by_digest() {
-    let store_dir = TempDir::new("store").unwrap();
-    let mount_dir = TempDir::new("mount").unwrap();
+    let (store_dir, mount_dir) = make_dirs();
 
     let store = fs::Store::local_only(
       store_dir.path(),
@@ -697,8 +694,7 @@ mod test {
 
   #[test]
   fn list_directory() {
-    let store_dir = TempDir::new("store").unwrap();
-    let mount_dir = TempDir::new("mount").unwrap();
+    let (store_dir, mount_dir) = make_dirs();
 
     let store = fs::Store::local_only(
       store_dir.path(),
@@ -727,8 +723,7 @@ mod test {
 
   #[test]
   fn read_file_from_directory() {
-    let store_dir = TempDir::new("store").unwrap();
-    let mount_dir = TempDir::new("mount").unwrap();
+    let (store_dir, mount_dir) = make_dirs();
 
     let store = fs::Store::local_only(
       store_dir.path(),
@@ -759,8 +754,7 @@ mod test {
 
   #[test]
   fn list_recursive_directory() {
-    let store_dir = TempDir::new("store").unwrap();
-    let mount_dir = TempDir::new("mount").unwrap();
+    let (store_dir, mount_dir) = make_dirs();
 
     let store = fs::Store::local_only(
       store_dir.path(),
@@ -800,8 +794,7 @@ mod test {
 
   #[test]
   fn read_file_from_recursive_directory() {
-    let store_dir = TempDir::new("store").unwrap();
-    let mount_dir = TempDir::new("mount").unwrap();
+    let (store_dir, mount_dir) = make_dirs();
 
     let store = fs::Store::local_only(
       store_dir.path(),
@@ -846,8 +839,7 @@ mod test {
 
   #[test]
   fn files_are_correctly_executable() {
-    let store_dir = TempDir::new("store").unwrap();
-    let mount_dir = TempDir::new("mount").unwrap();
+    let (store_dir, mount_dir) = make_dirs();
 
     let store = fs::Store::local_only(
       store_dir.path(),
@@ -879,13 +871,19 @@ mod test {
   pub fn digest_to_filepath(digest: &hashing::Digest) -> String {
     format!("{}-{}", digest.0, digest.1)
   }
+
+  pub fn make_dirs() -> (tempfile::TempDir, tempfile::TempDir) {
+    let store_dir = tempfile::Builder::new().prefix("store").tempdir().unwrap();
+    let mount_dir = tempfile::Builder::new().prefix("mount").tempdir().unwrap();
+    (store_dir, mount_dir)
+  }
 }
 
 // TODO: Write a bunch more syscall-y tests to test that each syscall for each file/directory type
 // acts as we expect.
 #[cfg(test)]
 mod syscall_tests {
-  extern crate tempdir;
+  extern crate tempfile;
   extern crate testutil;
 
   use fs;
@@ -894,15 +892,14 @@ mod syscall_tests {
   use std::sync::Arc;
   use super::mount;
   use super::test::digest_to_filepath;
-  use self::tempdir::TempDir;
   use self::testutil::data::TestData;
   use std::ffi::CString;
   use std::path::Path;
+  use test::make_dirs;
 
   #[test]
   fn read_file_by_digest_exact_bytes() {
-    let store_dir = TempDir::new("store").unwrap();
-    let mount_dir = TempDir::new("mount").unwrap();
+    let (store_dir, mount_dir) = make_dirs();
 
     let store = fs::Store::local_only(
       store_dir.path(),

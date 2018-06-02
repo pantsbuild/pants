@@ -1000,12 +1000,12 @@ mod local {
     use lmdb::{DatabaseFlags, Environment, Transaction, WriteFlags};
     use std::path::Path;
     use std::sync::Arc;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
     use testutil::data::{TestData, TestDirectory};
 
     #[test]
     fn save_file() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
 
       let testdata = TestData::roland();
       assert_eq!(
@@ -1018,7 +1018,7 @@ mod local {
 
     #[test]
     fn save_file_is_idempotent() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
 
       let testdata = TestData::roland();
       new_store(dir.path())
@@ -1035,7 +1035,7 @@ mod local {
 
     #[test]
     fn save_file_collision_preserves_first() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
 
       let bogus_value = Bytes::new();
       let realdata = TestData::roland();
@@ -1086,7 +1086,7 @@ mod local {
     #[test]
     fn roundtrip_file() {
       let testdata = TestData::roland();
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
 
       let store = new_store(dir.path());
       let hash = store
@@ -1098,7 +1098,7 @@ mod local {
 
     #[test]
     fn missing_file() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
       assert_eq!(
         load_file_bytes(&new_store(dir.path()), TestData::roland().fingerprint()),
         Ok(None)
@@ -1107,7 +1107,7 @@ mod local {
 
     #[test]
     fn record_and_load_directory_proto() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
       let testdir = TestDirectory::containing_roland();
 
       assert_eq!(
@@ -1125,7 +1125,7 @@ mod local {
 
     #[test]
     fn missing_directory() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
       let testdir = TestDirectory::containing_roland();
 
       assert_eq!(
@@ -1136,7 +1136,7 @@ mod local {
 
     #[test]
     fn file_is_not_directory_proto() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
       let testdata = TestData::roland();
 
       new_store(dir.path())
@@ -1152,7 +1152,7 @@ mod local {
 
     #[test]
     fn garbage_collect_nothing_to_do() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
       let bytes = Bytes::from("0123456789");
       store
@@ -1174,7 +1174,7 @@ mod local {
 
     #[test]
     fn garbage_collect_nothing_to_do_with_lease() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
       let bytes = Bytes::from("0123456789");
       store
@@ -1197,7 +1197,7 @@ mod local {
 
     #[test]
     fn garbage_collect_remove_one_of_two_files_no_leases() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
       let bytes_1 = Bytes::from("0123456789");
       let fingerprint_1 = Fingerprint::from_hex_string(
@@ -1231,7 +1231,7 @@ mod local {
 
     #[test]
     fn garbage_collect_remove_both_files_no_leases() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
       let bytes_1 = Bytes::from("0123456789");
       let fingerprint_1 = Fingerprint::from_hex_string(
@@ -1266,7 +1266,7 @@ mod local {
 
     #[test]
     fn garbage_collect_remove_one_of_two_directories_no_leases() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
 
       let testdir = TestDirectory::containing_roland();
       let other_testdir = TestDirectory::containing_dnalor();
@@ -1300,7 +1300,7 @@ mod local {
 
     #[test]
     fn garbage_collect_remove_file_with_leased_directory() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
 
       let testdir = TestDirectory::containing_roland();
@@ -1332,7 +1332,7 @@ mod local {
 
     #[test]
     fn garbage_collect_remove_file_while_leased_file() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
 
       let testdir = TestDirectory::containing_roland();
@@ -1363,7 +1363,7 @@ mod local {
 
     #[test]
     fn garbage_collect_fail_because_too_many_leases() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
 
       let testdir = TestDirectory::containing_roland();
@@ -1402,7 +1402,7 @@ mod local {
     fn entry_type_for_file() {
       let testdata = TestData::roland();
       let testdir = TestDirectory::containing_roland();
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
       store
         .store_bytes(EntryType::Directory, testdir.bytes(), false)
@@ -1422,7 +1422,7 @@ mod local {
     fn entry_type_for_directory() {
       let testdata = TestData::roland();
       let testdir = TestDirectory::containing_roland();
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
       store
         .store_bytes(EntryType::Directory, testdir.bytes(), false)
@@ -1442,7 +1442,7 @@ mod local {
     fn entry_type_for_missing() {
       let testdata = TestData::roland();
       let testdir = TestDirectory::containing_roland();
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
       store
         .store_bytes(EntryType::Directory, testdir.bytes(), false)
@@ -1460,7 +1460,7 @@ mod local {
 
     #[test]
     pub fn empty_file_is_known() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
       let empty_file = TestData::empty();
       assert_eq!(
@@ -1473,7 +1473,7 @@ mod local {
 
     #[test]
     pub fn empty_directory_is_known() {
-      let dir = TempDir::new("store").unwrap();
+      let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
       let empty_dir = TestDirectory::empty();
       assert_eq!(
@@ -1732,7 +1732,7 @@ mod remote {
   #[cfg(test)]
   mod tests {
 
-    extern crate tempdir;
+    extern crate tempfile;
 
     use super::ByteStore;
     use super::super::EntryType;
@@ -2052,7 +2052,7 @@ mod tests {
   use std::path::{Path, PathBuf};
   use std::sync::Arc;
   use std::time::Duration;
-  use tempdir::TempDir;
+  use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
 
   pub fn big_file_fingerprint() -> Fingerprint {
@@ -2121,7 +2121,7 @@ mod tests {
 
   #[test]
   fn load_file_prefers_local() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let testdata = TestData::roland();
 
@@ -2140,7 +2140,7 @@ mod tests {
 
   #[test]
   fn load_directory_prefers_local() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let testdir = TestDirectory::containing_roland();
 
@@ -2161,7 +2161,7 @@ mod tests {
 
   #[test]
   fn load_file_falls_back_and_backfills() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let testdata = TestData::roland();
 
@@ -2181,7 +2181,7 @@ mod tests {
 
   #[test]
   fn load_directory_falls_back_and_backfills() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let cas = new_cas(1024);
 
@@ -2205,7 +2205,7 @@ mod tests {
 
   #[test]
   fn load_file_missing_is_none() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let cas = StubCAS::empty();
     assert_eq!(
@@ -2220,7 +2220,7 @@ mod tests {
 
   #[test]
   fn load_directory_missing_is_none() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let cas = StubCAS::empty();
     assert_eq!(
@@ -2234,7 +2234,7 @@ mod tests {
 
   #[test]
   fn load_file_remote_error_is_error() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let cas = StubCAS::always_errors();
     let error = load_file_bytes(
@@ -2250,7 +2250,7 @@ mod tests {
 
   #[test]
   fn load_directory_remote_error_is_error() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let cas = StubCAS::always_errors();
     let error = new_store(dir.path(), cas.address())
@@ -2266,7 +2266,7 @@ mod tests {
 
   #[test]
   fn malformed_remote_directory_is_error() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let testdata = TestData::roland();
 
@@ -2309,7 +2309,7 @@ mod tests {
       non_canonical_directory_bytes.len(),
     );
 
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let cas = StubCAS::with_unverified_content(
       1024,
@@ -2337,7 +2337,7 @@ mod tests {
 
   #[test]
   fn wrong_remote_file_bytes_is_error() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let testdata = TestData::roland();
 
@@ -2362,7 +2362,7 @@ mod tests {
 
   #[test]
   fn wrong_remote_directory_bytes_is_error() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let testdir = TestDirectory::containing_dnalor();
 
@@ -2387,7 +2387,7 @@ mod tests {
 
   #[test]
   fn expand_empty_directory() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let empty_dir = TestDirectory::empty();
 
@@ -2403,7 +2403,7 @@ mod tests {
 
   #[test]
   fn expand_flat_directory() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let roland = TestData::roland();
     let testdir = TestDirectory::containing_roland();
@@ -2427,7 +2427,7 @@ mod tests {
 
   #[test]
   fn expand_recursive_directory() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let roland = TestData::roland();
     let catnip = TestData::catnip();
@@ -2459,7 +2459,7 @@ mod tests {
 
   #[test]
   fn expand_missing_directory() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
     let digest = TestDirectory::containing_roland().digest();
     let error = new_local_store(dir.path())
       .expand_directory(digest)
@@ -2474,7 +2474,7 @@ mod tests {
 
   #[test]
   fn expand_directory_missing_subdir() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let recursive_testdir = TestDirectory::recursive();
 
@@ -2499,7 +2499,7 @@ mod tests {
 
   #[test]
   fn uploads_files() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
     let cas = StubCAS::empty();
 
     let testdata = TestData::roland();
@@ -2524,7 +2524,7 @@ mod tests {
 
   #[test]
   fn uploads_directories_recursively() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
     let cas = StubCAS::empty();
 
     let testdata = TestData::roland();
@@ -2559,7 +2559,7 @@ mod tests {
 
   #[test]
   fn uploads_files_recursively_when_under_three_digests_ignoring_items_already_in_cas() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
     let cas = StubCAS::empty();
 
     let testdata = TestData::roland();
@@ -2600,7 +2600,7 @@ mod tests {
 
   #[test]
   fn does_not_reupload_file_already_in_cas_when_requested_with_three_other_digests() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
     let cas = StubCAS::empty();
 
     let catnip = TestData::catnip();
@@ -2651,7 +2651,7 @@ mod tests {
 
   #[test]
   fn does_not_reupload_big_file_already_in_cas() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
     let cas = StubCAS::empty();
 
     new_local_store(dir.path())
@@ -2684,7 +2684,7 @@ mod tests {
 
   #[test]
   fn upload_missing_files() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
     let cas = StubCAS::empty();
 
     let testdata = TestData::roland();
@@ -2703,7 +2703,7 @@ mod tests {
 
   #[test]
   fn upload_missing_file_in_directory() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
     let cas = StubCAS::empty();
 
     let testdir = TestDirectory::containing_roland();
@@ -2732,10 +2732,10 @@ mod tests {
 
   #[test]
   fn materialize_missing_file() {
-    let materialize_dir = TempDir::new("materialize").unwrap();
+    let materialize_dir = TempDir::new().unwrap();
     let file = materialize_dir.path().join("file");
 
-    let store_dir = TempDir::new("store").unwrap();
+    let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
     store
       .materialize_file(file.clone(), TestData::roland().digest(), false)
@@ -2745,12 +2745,12 @@ mod tests {
 
   #[test]
   fn materialize_file() {
-    let materialize_dir = TempDir::new("materialize").unwrap();
+    let materialize_dir = TempDir::new().unwrap();
     let file = materialize_dir.path().join("file");
 
     let testdata = TestData::roland();
 
-    let store_dir = TempDir::new("store").unwrap();
+    let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
     store
       .store_file_bytes(testdata.bytes(), false)
@@ -2766,12 +2766,12 @@ mod tests {
 
   #[test]
   fn materialize_file_executable() {
-    let materialize_dir = TempDir::new("materialize").unwrap();
+    let materialize_dir = TempDir::new().unwrap();
     let file = materialize_dir.path().join("file");
 
     let testdata = TestData::roland();
 
-    let store_dir = TempDir::new("store").unwrap();
+    let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
     store
       .store_file_bytes(testdata.bytes(), false)
@@ -2787,9 +2787,9 @@ mod tests {
 
   #[test]
   fn materialize_missing_directory() {
-    let materialize_dir = TempDir::new("materialize").unwrap();
+    let materialize_dir = TempDir::new().unwrap();
 
-    let store_dir = TempDir::new("store").unwrap();
+    let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
     store
       .materialize_directory(
@@ -2802,14 +2802,14 @@ mod tests {
 
   #[test]
   fn materialize_directory() {
-    let materialize_dir = TempDir::new("materialize").unwrap();
+    let materialize_dir = TempDir::new().unwrap();
 
     let roland = TestData::roland();
     let catnip = TestData::catnip();
     let testdir = TestDirectory::containing_roland();
     let recursive_testdir = TestDirectory::recursive();
 
-    let store_dir = TempDir::new("store").unwrap();
+    let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
     store
       .record_directory(&recursive_testdir.directory(), false)
@@ -2853,12 +2853,12 @@ mod tests {
 
   #[test]
   fn materialize_directory_executable() {
-    let materialize_dir = TempDir::new("materialize").unwrap();
+    let materialize_dir = TempDir::new().unwrap();
 
     let catnip = TestData::catnip();
     let testdir = TestDirectory::with_mixed_executable_files();
 
-    let store_dir = TempDir::new("store").unwrap();
+    let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
     store
       .record_directory(&testdir.directory(), false)
@@ -2889,7 +2889,7 @@ mod tests {
 
   #[test]
   fn works_after_reset_prefork() {
-    let dir = TempDir::new("store").unwrap();
+    let dir = TempDir::new().unwrap();
     let cas = new_cas(1024);
 
     let testdata = TestData::roland();
@@ -2920,7 +2920,7 @@ mod tests {
 
   #[test]
   fn contents_for_directory_empty() {
-    let store_dir = TempDir::new("store").unwrap();
+    let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
 
     let file_contents = store
@@ -2938,7 +2938,7 @@ mod tests {
     let testdir = TestDirectory::containing_roland();
     let recursive_testdir = TestDirectory::recursive();
 
-    let store_dir = TempDir::new("store").unwrap();
+    let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
     store
       .record_directory(&recursive_testdir.directory(), false)
