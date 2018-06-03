@@ -4,6 +4,48 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.8.0.dev2 (06/02/2018)
+-----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix using classpath jars with compiler plugins (#5890)
+  `PR #5890 <https://github.com/pantsbuild/pants/pull/5890>`_
+
+* Fix visualize-to option post addition of Sessions (#5885)
+  `PR #5885 <https://github.com/pantsbuild/pants/pull/5885>`_
+
+* Robustify go_protobuf_library (#5887)
+  `PR #5887 <https://github.com/pantsbuild/pants/pull/5887>`_
+
+* Repair hermetic_environment_as for C-level environment variable access. (#5898)
+  `PR #5898 <https://github.com/pantsbuild/pants/pull/5898>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add deprecation warning for pep8 'plugin' in pythonstyle suppress file (#5888)
+  `PR #5888 <https://github.com/pantsbuild/pants/pull/5888>`_
+
+* warn or error on matching source globs (#5769)
+  `PR #5769 <https://github.com/pantsbuild/pants/pull/5769>`_
+
+* Mark things which generate cffi for change detection (#5883)
+  `PR #5883 <https://github.com/pantsbuild/pants/pull/5883>`_
+
+* Sort list goal output (#5872)
+  `PR #5872 <https://github.com/pantsbuild/pants/pull/5872>`_
+
+* Output stdout and stderr when nailgun fails to connect (#5892)
+  `PR #5892 <https://github.com/pantsbuild/pants/pull/5892>`_
+
+New features
+~~~~~~~~~~~~
+
+* Remote execution can be enabled by flags (#5881)
+  `PR #5881 <https://github.com/pantsbuild/pants/pull/5881>`_
+
 1.8.0.dev1 (05/25/2018)
 -----------------------
 
