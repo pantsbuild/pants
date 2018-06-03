@@ -9,6 +9,7 @@ not undergo the vetting associated with ``stable`` releases.
 
 Bugfixes
 ~~~~~~~~
+
 * Fix using classpath jars with compiler plugins (#5890)
   `PR #5890 <https://github.com/pantsbuild/pants/pull/5890>`_
 
@@ -18,7 +19,7 @@ Bugfixes
 * Robustify go_protobuf_library (#5887)
   `PR #5887 <https://github.com/pantsbuild/pants/pull/5887>`_
 
-*  Repair hermetic_environment_as for C-level environment variable access. (#5898)
+* Repair hermetic_environment_as for C-level environment variable access. (#5898)
   `PR #5898 <https://github.com/pantsbuild/pants/pull/5898>`_
 
 Refactoring, Improvements, and Tooling
