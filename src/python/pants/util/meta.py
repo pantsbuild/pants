@@ -38,9 +38,19 @@ class ClassPropertyDescriptor(object):
 
 
 def classproperty(func):
-  """Use as a decorator on a method definition to access it as a property of the class.
+  """Use as a decorator on a method definition to make it a class-level attribute.
 
-  This decorator can be applied to a method, a classmethod, or a staticmethod.
+  This decorator can be applied to a method, a classmethod, or a staticmethod. This decorator will
+  bind the first argument to the class object.
+
+  Usage:
+  >>> class Foo(object):
+  ...   @classproperty
+  ...   def name(cls):
+  ...     return cls.__name__
+  ...
+  >>> Foo.name
+  'Foo'
 
   Caveats:
   - If this property is accessed on an instance of the class, it will run with the instance as the
@@ -63,7 +73,23 @@ def classproperty(func):
 
 
 def staticproperty(func):
-  """???"""
+  """Use as a decorator on a method definition to make it a class-level attribute (without binding).
+
+  This decorator can be applied to a method or a staticmethod. This decorator does not bind any
+  arguments.
+
+  Usage:
+  >>> other_x = 'value'
+  >>> class Foo(object):
+  ...   @staticproperty
+  ...   def x():
+  ...     return other_x
+  ...
+  >>> Foo.x
+  'value'
+
+  See the docstring for :class:`classproperty` for further caveats on usage.
+  """
   doc = func.__doc__
 
   if not isinstance(func, staticmethod):
