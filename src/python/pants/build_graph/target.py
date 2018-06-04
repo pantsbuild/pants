@@ -13,6 +13,7 @@ from six import string_types
 from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
@@ -99,18 +100,39 @@ class Target(AbstractTarget):
                     'in BUILD files that are not yet available in the current version of pants.')
 
     @classmethod
-    def check(cls, target, kwargs):
+    def check(cls, target, kwargs, payload):
       """
       :API: public
       """
-      cls.global_instance().check_unknown(target, kwargs)
+      cls.global_instance().check_unknown(target, kwargs, payload)
 
-    def check_unknown(self, target, kwargs):
+    def check_unknown(self, target, kwargs, payload):
       """
       :API: public
       """
       ignore_params = set((self.get_options().ignored or {}).get(target.type_alias, ()))
       unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
+      if 'source' in unknown_args:
+        if 'sources' in payload.as_dict():
+          deprecated_conditional(
+            lambda: True,
+            '1.10.0.dev0',
+            ('The source argument in rules is deprecated - it gets automatically promoted to '
+            'sources. Rule {} should just use a sources argument. No BUILD files need changing. '
+            'The source argument will stop being populated -').format(target.type_alias),
+          )
+          unknown_args.pop('source')
+      if 'sources' in unknown_args:
+        if 'sources' in payload.as_dict():
+          deprecated_conditional(
+            lambda: True,
+            '1.10.0.dev0',
+            ('The source argument is deprecated - it gets automatically promoted to sources. Rule '
+            '{} should just use a sources argument. No BUILD files need changing. '
+            'The source argument will stop being populated -').format(target.type_alias),
+          )
+          unknown_args.pop('sources')
+          kwargs.pop('sources')
       ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
       if ignored_args:
         logger.debug('{target} ignoring the unimplemented arguments: {args}'
@@ -311,7 +333,7 @@ class Target(AbstractTarget):
     self._cached_exports_addresses = None
     self._no_cache = no_cache
     if kwargs:
-      self.Arguments.check(self, kwargs)
+      self.Arguments.check(self, kwargs, self.payload)
 
   @property
   def scope(self):
@@ -829,6 +851,8 @@ class Target(AbstractTarget):
                                             exclude=exclude)
     return None
 
+  # TODO: Inline this as SourcesField(sources=sources) when all callers are guaranteed to pass an
+  # EagerFilesetWithSpec.
   def create_sources_field(self, sources, sources_rel_path, key_arg=None):
     """Factory method to create a SourcesField appropriate for the type of the sources object.
 
