@@ -383,7 +383,7 @@ impl Store {
             let mut accumulator = accumulator.lock().unwrap();
             accumulator.insert(digest, EntryType::Directory);
             for file in directory.get_files().into_iter() {
-              accumulator.insert(file.get_digest().into(), EntryType::File);
+              accumulator.insert(try_future!(file.get_digest().into()), EntryType::File);
             }
           }
           future::join_all(
@@ -391,9 +391,10 @@ impl Store {
               .get_directories()
               .into_iter()
               .map(move |subdir| {
-                store
-                  .clone()
-                  .expand_directory_helper(subdir.get_digest().into(), accumulator.clone())
+                store.clone().expand_directory_helper(
+                  try_future!(subdir.get_digest().into()),
+                  accumulator.clone(),
+                )
               })
               .collect::<Vec<_>>(),
           ).map(|_| ())
@@ -428,7 +429,7 @@ impl Store {
           .map(|file_node| {
             let store = store.clone();
             let path = destination.join(file_node.get_name());
-            let digest = file_node.get_digest().into();
+            let digest = try_future!(file_node.get_digest().into());
             store.materialize_file(path, digest, file_node.is_executable)
           })
           .collect::<Vec<_>>();
@@ -438,7 +439,7 @@ impl Store {
           .map(|directory_node| {
             let store = store.clone();
             let path = destination.join(directory_node.get_name());
-            let digest = directory_node.get_digest().into();
+            let digest = try_future!(directory_node.get_digest().into());
             store.materialize_directory(path, digest)
           })
           .collect::<Vec<_>>();
@@ -512,7 +513,7 @@ impl Store {
           let path = path_so_far_copy.join(file_node.get_name());
           let contents_wrapped_copy = contents_wrapped_copy.clone();
           store_copy
-            .load_file_bytes_with(file_node.get_digest().into(), |b| b)
+            .load_file_bytes_with(try_future!(file_node.get_digest().into()), |b| b)
             .and_then(move |maybe_bytes| {
               maybe_bytes
                 .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
@@ -521,6 +522,7 @@ impl Store {
                   contents.insert(path, bytes);
                 })
             })
+            .to_boxed()
         })
         .collect::<Vec<_>>(),
     );
@@ -530,7 +532,7 @@ impl Store {
         .get_directories()
         .into_iter()
         .map(move |dir_node| {
-          let digest = dir_node.get_digest().into();
+          let digest = try_future!(dir_node.get_digest().into());
           let path = path_so_far.join(dir_node.get_name());
           let store = store.clone();
           let contents_wrapped = contents_wrapped.clone();
@@ -541,6 +543,7 @@ impl Store {
                 .ok_or_else(|| format!("Could not find sub-directory with digest {:?}", digest))
             })
             .and_then(move |dir| store.contents_for_directory_helper(dir, path, contents_wrapped))
+            .to_boxed()
         })
         .collect::<Vec<_>>(),
     );
@@ -1713,18 +1716,18 @@ mod remote {
         .cas_client
         .get()
         .find_missing_blobs(&request)
-        .map(|response| {
-          response
-            .get_missing_blob_digests()
-            .iter()
-            .map(|digest| digest.into())
-            .collect()
-        })
         .map_err(|err| {
           format!(
             "Error from server in response to find_missing_blobs_request: {:?}",
             err
           )
+        })
+        .and_then(|response| {
+          response
+            .get_missing_blob_digests()
+            .iter()
+            .map(|digest| digest.into())
+            .collect()
         })
     }
   }

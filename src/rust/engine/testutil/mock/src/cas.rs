@@ -376,7 +376,8 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
     let blobs = self.blobs.lock().unwrap();
     let mut response = bazel_protos::remote_execution::FindMissingBlobsResponse::new();
     for digest in req.get_blob_digests() {
-      let hashing_digest: Digest = digest.into();
+      let hashing_digest_result: Result<Digest, String> = digest.into();
+      let hashing_digest = hashing_digest_result.expect("Bad digest");
       if !blobs.contains_key(&hashing_digest.0) {
         response.mut_missing_blob_digests().push(digest.clone())
       }
