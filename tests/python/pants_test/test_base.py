@@ -39,6 +39,7 @@ from pants.util.memo import memoized_method
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.engine.util import init_native
 from pants_test.option.util.fakes import create_options_for_optionables
+from pants_test.subsystem import subsystem_util
 
 
 class TestGenerator(object):
@@ -254,6 +255,7 @@ class TestBase(unittest.TestCase):
       {'globs': package_relative_path_globs},
       None,
       PathGlobs(tuple(os.path.join(package_dir, path) for path in package_relative_path_globs)),
+      lambda _: True,
     )
     field = self.scheduler.product_request(HydratedField, [sources_field])[0]
     return field.value
@@ -306,6 +308,8 @@ class TestBase(unittest.TestCase):
 
     self._build_configuration = self.build_config()
     self._build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
+
+    self._inited_target = False
 
   def buildroot_files(self, relpath=None):
     """Returns the set of all files under the test build root.
@@ -478,6 +482,10 @@ class TestBase(unittest.TestCase):
 
     Returns the corresponding Target or else None if the address does not point to a defined Target.
     """
+    if not self._inited_target:
+      subsystem_util.init_subsystems(Target.subsystems())
+      self._inited_target = True
+
     address = Address.parse(spec)
     self.build_graph.inject_address_closure(address)
     return self.build_graph.get_target(address)
