@@ -455,15 +455,8 @@ impl CommandRunner {
             output_file_path_buf.clone(),
             output_file.get_digest().into(),
           );
-          PathStat::file(
-            output_file_path_buf.clone(),
-            File {
-              path: output_file_path_buf.clone(),
-              is_executable: output_file.get_is_executable(),
-            },
-          )
         } else {
-          let raw_content = output_file.get_content().into();
+          let raw_content = output_file.content.clone();
           let path_map_3 = path_map.clone();
           let output_file_path_buf_2 = output_file_path_buf.clone();
           let output_file_path_buf_3 = output_file_path_buf_2.clone();
@@ -482,14 +475,14 @@ impl CommandRunner {
                 underlying_path_map.insert(output_file_path_buf_2, digest);
               }),
           );
-          PathStat::file(
-            output_file_path_buf.clone(),
-            File {
-              path: output_file_path_buf.clone(),
-              is_executable: output_file.get_is_executable(),
-            },
-          )
         }
+        PathStat::file(
+          output_file_path_buf.clone(),
+          File {
+            path: output_file_path_buf.clone(),
+            is_executable: output_file.get_is_executable(),
+          },
+        )
       })
       .collect();
 
@@ -511,7 +504,7 @@ impl CommandRunner {
         match self.map_of_paths_to_digests.get(&file.path) {
           Some(digest) => future::ok(digest.clone()),
           None => future::err(format!(
-            "Error when trying to find digest for path {:?}",
+            "Didn't know digest for path in remote execution response: {:?}",
             file.path
           )),
         }.to_boxed()
@@ -521,6 +514,7 @@ impl CommandRunner {
     let store = self.store.clone();
     future::join_all(futures)
       .and_then(|_| {
+        // The unwrap() below is safe because we have joined any futures that had references to the Arc
         let path_wrap_mutex = Arc::try_unwrap(path_map_2).unwrap();
         let underlying_path_map = path_wrap_mutex.into_inner().unwrap();
         fs::Snapshot::digest_from_path_stats(
@@ -1380,8 +1374,84 @@ mod tests {
   }
 
   #[test]
-  fn extract_output_files_from_request() {
-    // to be implemented once everything compiles
+  fn extract_output_files_from_response_one_file() {
+    let mut output_file = bazel_protos::remote_execution::OutputFile::new();
+    output_file.set_path("roland".into());
+    output_file.set_digest((&TestData::roland().digest()).into());
+    output_file.set_is_executable(false);
+    let mut output_files = protobuf::RepeatedField::new();
+    output_files.push(output_file);
+
+    let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
+    execute_response.set_result({
+      let mut result = bazel_protos::remote_execution::ActionResult::new();
+      result.set_exit_code(0);
+      result.set_output_files(output_files);
+      result
+    });
+
+    assert_eq!(
+      extract_output_files_from_response(&execute_response),
+      Ok(TestDirectory::containing_roland().digest())
+    )
+  }
+
+  #[test]
+  fn extract_output_files_from_response_two_files_not_nested() {
+    let mut output_file_1 = bazel_protos::remote_execution::OutputFile::new();
+    output_file_1.set_path("roland".into());
+    output_file_1.set_digest((&TestData::roland().digest()).into());
+    output_file_1.set_is_executable(false);
+
+    let mut output_file_2 = bazel_protos::remote_execution::OutputFile::new();
+    output_file_2.set_path("treats".into());
+    output_file_2.set_digest((&TestData::catnip().digest()).into());
+    output_file_2.set_is_executable(false);
+    let mut output_files = protobuf::RepeatedField::new();
+    output_files.push(output_file_1);
+    output_files.push(output_file_2);
+
+    let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
+    execute_response.set_result({
+      let mut result = bazel_protos::remote_execution::ActionResult::new();
+      result.set_exit_code(0);
+      result.set_output_files(output_files);
+      result
+    });
+
+    assert_eq!(
+      extract_output_files_from_response(&execute_response),
+      Ok(TestDirectory::containing_roland_and_treats().digest())
+    )
+  }
+
+  #[test]
+  fn extract_output_files_from_response_two_files_nested() {
+    let mut output_file_1 = bazel_protos::remote_execution::OutputFile::new();
+    output_file_1.set_path("cats/roland".into());
+    output_file_1.set_digest((&TestData::roland().digest()).into());
+    output_file_1.set_is_executable(false);
+
+    let mut output_file_2 = bazel_protos::remote_execution::OutputFile::new();
+    output_file_2.set_path("treats".into());
+    output_file_2.set_digest((&TestData::catnip().digest()).into());
+    output_file_2.set_is_executable(false);
+    let mut output_files = protobuf::RepeatedField::new();
+    output_files.push(output_file_1);
+    output_files.push(output_file_2);
+
+    let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
+    execute_response.set_result({
+      let mut result = bazel_protos::remote_execution::ActionResult::new();
+      result.set_exit_code(0);
+      result.set_output_files(output_files);
+      result
+    });
+
+    assert_eq!(
+      extract_output_files_from_response(&execute_response),
+      Ok(TestDirectory::recursive().digest())
+    )
   }
 
   fn echo_foo_request() -> ExecuteProcessRequest {
@@ -1518,6 +1588,16 @@ mod tests {
     let cas = mock::StubCAS::with_roland_and_directory(1024);
     let command_runner = create_command_runner("".to_owned(), &cas);
     command_runner.extract_execute_response(operation).wait()
+  }
+
+  fn extract_output_files_from_response(
+    execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+  ) -> Result<Digest, ExecutionError> {
+    let cas = mock::StubCAS::with_roland_and_directory(1024);
+    let command_runner = create_command_runner("".to_owned(), &cas);
+    command_runner
+      .extract_output_files(&execute_response)
+      .wait()
   }
 
   fn make_any_proto(message: &protobuf::Message) -> protobuf::well_known_types::Any {
