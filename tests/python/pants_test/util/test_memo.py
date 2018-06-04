@@ -7,7 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.util.memo import memoized, memoized_method, memoized_property, per_instance, testable_memoized_property
+from pants.util.memo import (memoized, memoized_method, memoized_property, per_instance,
+                             testable_memoized_property)
 from pants.util.meta import classproperty
 
 
