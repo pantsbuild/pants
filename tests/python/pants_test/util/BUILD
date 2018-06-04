@@ -82,8 +82,8 @@ python_tests(
   name = 'meta',
   sources = ['test_meta.py'],
   dependencies = [
-    'tests/python/pants_test:test_base',
     'src/python/pants/util:meta',
+    'tests/python/pants_test:test_base',
   ]
 )
 
