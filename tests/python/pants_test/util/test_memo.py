@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.util.memo import (memoized, memoized_method, memoized_property, per_instance,
+from pants.util.memo import (memoized, memoized_classproperty, memoized_method, memoized_property,
+                             memoized_staticmethod, memoized_staticproperty, per_instance,
                              testable_memoized_property)
-from pants.util.meta import classproperty
 
 
 class MemoizeTest(unittest.TestCase):
@@ -240,6 +240,8 @@ class MemoizeTest(unittest.TestCase):
     self.assertEqual(17, foo.method(3))
 
   def test_memoized_class_methods(self):
+    externally_scoped_value = "initial state!"
+
     class Foo(object):
       _x = 3
 
@@ -248,19 +250,34 @@ class MemoizeTest(unittest.TestCase):
       def method(cls, y):
         return cls._x + y
 
-      @classproperty
-      @memoized_method
+      @memoized_staticmethod
+      def static_method(x):
+        return externally_scoped_value + x
+
+      @memoized_classproperty
       def prop(cls):
         return cls._x
 
+      @memoized_staticproperty
+      def static_prop():
+        return externally_scoped_value
+
     self.assertEqual(3, Foo.prop)
     self.assertEqual(5, Foo.method(2))
+    self.assertEqual("initial state!", Foo.static_prop)
+    self.assertEqual("initial state!more stuff", Foo.static_method("more stuff"))
+
     Foo._x = 14
     # The property is cached.
     self.assertEqual(3, Foo.prop)
     # The method is cached for previously made calls only.
     self.assertEqual(5, Foo.method(2))
     self.assertEqual(15, Foo.method(1))
+
+    externally_scoped_value = "new state!"
+    self.assertEqual("initial state!", Foo.static_prop)
+    self.assertEqual("initial state!more stuff", Foo.static_method("more stuff"))
+    self.assertEqual("new state!even more stuff", Foo.static_method("even more stuff"))
 
   def test_descriptor_application_valid(self):
     class Foo(self._Called):
