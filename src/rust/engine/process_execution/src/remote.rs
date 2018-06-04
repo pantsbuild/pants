@@ -561,6 +561,17 @@ fn make_execute_request(
   let mut action = bazel_protos::remote_execution::Action::new();
   action.set_command_digest(digest(&command)?);
   action.set_input_root_digest((&req.input_files).into());
+  let mut output_files = req
+    .output_files
+    .iter()
+    .map(|p| {
+      p.to_str()
+        .map(|s| s.to_owned())
+        .ok_or_else(|| format!("Non-UTF8 output file path: {:?}", p))
+    })
+    .collect::<Result<Vec<String>, String>>()?;
+  output_files.sort();
+  action.set_output_files(protobuf::repeated::RepeatedField::from_vec(output_files));
 
   let mut execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
   execute_request.set_action(action);
@@ -612,7 +623,7 @@ mod tests {
   use fs;
   use futures::Future;
   use grpcio;
-  use hashing::Digest;
+  use hashing::{Digest, Fingerprint};
   use protobuf::{self, Message, ProtobufEnum};
   use mock;
   use tempfile::TempDir;
@@ -623,6 +634,7 @@ mod tests {
   use super::super::CommandRunner as CommandRunnerTrait;
   use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
+  use std::path::PathBuf;
   use std::sync::Arc;
   use std::time::{Duration, SystemTime};
 
@@ -636,6 +648,54 @@ mod tests {
   enum StderrType {
     Raw(String),
     Digest(Digest),
+  }
+
+  #[test]
+  fn make_execute_request() {
+    let input_directory = TestDirectory::containing_roland();
+    let req = ExecuteProcessRequest {
+      argv: owned_string_vec(&["/bin/echo", "yo"]),
+      env: vec![("SOME".to_owned(), "value".to_owned())]
+        .into_iter()
+        .collect(),
+      input_files: input_directory.digest(),
+      // Intentionally poorly sorted:
+      output_files: vec!["path/to/file", "other/file"]
+        .into_iter()
+        .map(|p| PathBuf::from(p))
+        .collect(),
+      timeout: Duration::from_millis(1000),
+      description: "some description".to_owned(),
+    };
+    let result = super::make_execute_request(&req);
+
+    let mut want_command = bazel_protos::remote_execution::Command::new();
+    want_command.mut_arguments().push("/bin/echo".to_owned());
+    want_command.mut_arguments().push("yo".to_owned());
+    want_command.mut_environment_variables().push({
+      let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+      env.set_name("SOME".to_owned());
+      env.set_value("value".to_owned());
+      env
+    });
+    let mut want_execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
+    want_execute_request.set_action({
+      let mut action = bazel_protos::remote_execution::Action::new();
+      action.set_command_digest(
+        (&Digest(
+          Fingerprint::from_hex_string(
+            "7e487b414ca637093673c010eaacc56c6ffd573035133338ca282e952158d0f4",
+          ).unwrap(),
+          30,
+        )).into(),
+      );
+      action.set_input_root_digest((&input_directory.digest()).into());
+      action.mut_output_files().push("other/file".to_owned());
+      action.mut_output_files().push("path/to/file".to_owned());
+      action
+    });
+
+    assert_eq!(result, Ok((want_command, want_execute_request)));
   }
 
   #[test]
