@@ -302,7 +302,7 @@ class JvmBinary(JvmTarget):
                payload=None,
                main=None,
                basename=None,
-               source=None,
+               sources=None,
                deploy_excludes=None,
                deploy_jar_rules=None,
                manifest_entries=None,
@@ -317,8 +317,8 @@ class JvmBinary(JvmTarget):
     :param string basename: Base name for the generated ``.jar`` file, e.g.,
       ``'hello'``. (By default, uses ``name`` param)  Note this is unsafe
       because of the possible conflict when multiple binaries are built.
-    :param string source: Name of one ``.java`` or ``.scala`` file (a good
-      place for a ``main``).
+    :param EagerFilesetWithSpec sources: Zero or one source files files. If more than one source is
+      required, they should be put in a library target which should be added to dependencies.
     :param dependencies: Targets (probably ``java_library`` and
      ``scala_library`` targets) to "link" in.
     :type dependencies: list of target specs
@@ -340,8 +340,6 @@ class JvmBinary(JvmTarget):
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     if main and not isinstance(main, string_types):
       raise TargetDefinitionException(self, 'main must be a fully qualified classname')
-    if source and not isinstance(source, string_types):
-      raise TargetDefinitionException(self, 'source must be a single relative file path')
     if deploy_jar_rules and not isinstance(deploy_jar_rules, JarRules):
       raise TargetDefinitionException(self,
                                       'deploy_jar_rules must be a JarRules specification. got {}'
@@ -350,13 +348,6 @@ class JvmBinary(JvmTarget):
       raise TargetDefinitionException(self,
                                       'manifest_entries must be a dict. got {}'
                                       .format(type(manifest_entries).__name__))
-    sources = [source] if source else None
-    if 'sources' in kwargs:
-      raise self.IllegalArgument(address.spec,
-        'jvm_binary only supports a single "source" argument, typically used to specify a main '
-        'class source file. Other sources should instead be placed in a java_library, which '
-        'should be referenced in the jvm_binary\'s dependencies.'
-      )
     payload = payload or Payload()
     payload.add_fields({
       'basename': PrimitiveField(basename or name),
@@ -372,7 +363,7 @@ class JvmBinary(JvmTarget):
     super(JvmBinary, self).__init__(name=name,
                                     address=address,
                                     payload=payload,
-                                    sources=self.assert_list(sources, key_arg='sources'),
+                                    sources=sources,
                                     **kwargs)
 
   @property

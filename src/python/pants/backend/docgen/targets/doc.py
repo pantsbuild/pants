@@ -78,15 +78,15 @@ class Page(Target):
       return combine_hashes(artifact.fingerprint() for artifact in self)
 
   def __init__(self,
+               sources,
                address=None,
                payload=None,
-               source=None,
                format=None,
                links=None,
                provides=None,
                **kwargs):
     """
-    :param source: Path to page source file.
+    :param sources: Page source file. Exactly one will be present.
     :param format: Page's format, ``md`` or ``rst``. By default, Pants infers from ``source`` file
        extension: ``.rst`` is ReStructured Text; anything else is Markdown.
     :param links: Other ``page`` targets that this `page` links to.
@@ -97,12 +97,12 @@ class Page(Target):
     """
     payload = payload or Payload()
     if not format:
-      if source and source.lower().endswith('.rst'):
+      if sources.files[0].lower().endswith('.rst'):
         format = 'rst'
       else:
         format = 'md'
     payload.add_fields({
-      'sources': self.create_sources_field(sources=[source],
+      'sources': self.create_sources_field(sources=sources,
                                            sources_rel_path=address.spec_path,
                                            key_arg='sources'),
       'format': PrimitiveField(format),
