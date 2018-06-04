@@ -52,6 +52,19 @@ impl Snapshot {
       .to_boxed()
   }
 
+  pub fn digest_from_path_stats<
+    S: StoreFileByDigest<Error> + Sized + Clone,
+    Error: fmt::Debug + 'static + Send,
+  >(
+    store: Store,
+    file_digester: S,
+    path_stats: Vec<PathStat>,
+  ) -> BoxFuture<Digest, String> {
+    let mut sorted_path_stats = path_stats.clone();
+    sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
+    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, sorted_path_stats)
+  }
+
   fn ingest_directory_from_sorted_path_stats<
     S: StoreFileByDigest<Error> + Sized + Clone,
     Error: fmt::Debug + 'static + Send,
