@@ -148,16 +148,24 @@ class ProcessMetadataManager(object):
     action_msg = 'file {} to appear'.format(filename)
     return cls._deadline_until(file_waiter, action_msg, timeout=timeout)
 
-  def _get_metadata_dir_by_name(self, name):
+  @staticmethod
+  def _get_metadata_dir_by_name(name, metadata_base_dir):
     """Retrieve the metadata dir by name.
 
     This should always live outside of the workdir to survive a clean-all.
     """
-    return os.path.join(self._metadata_base_dir, name)
+    return os.path.join(metadata_base_dir, name)
 
   def _maybe_init_metadata_dir_by_name(self, name):
     """Initialize the metadata directory for a named identity if it doesn't exist."""
-    safe_mkdir(self._get_metadata_dir_by_name(name))
+    safe_mkdir(self.__class__._get_metadata_dir_by_name(name, self._metadata_base_dir))
+
+  def _metadata_file_path(self, name, metadata_key):
+    return self.metadata_file_path(name, metadata_key, self._metadata_base_dir)
+
+  @classmethod
+  def metadata_file_path(cls, name, metadata_key, metadata_base_dir):
+    return os.path.join(cls._get_metadata_dir_by_name(name, metadata_base_dir), metadata_key)
 
   def read_metadata_by_name(self, name, metadata_key, caster=None):
     """Read process metadata using a named identity.
@@ -166,8 +174,8 @@ class ProcessMetadataManager(object):
     :param string metadata_key: The metadata key (e.g. 'pid').
     :param func caster: A casting callable to apply to the read value (e.g. `int`).
     """
+    file_path = self._metadata_file_path(name, metadata_key)
     try:
-      file_path = os.path.join(self._get_metadata_dir_by_name(name), metadata_key)
       return self._maybe_cast(read_file(file_path).strip(), caster)
     except (IOError, OSError):
       return None
@@ -180,7 +188,7 @@ class ProcessMetadataManager(object):
     :param string metadata_value: The metadata value (e.g. '1729').
     """
     self._maybe_init_metadata_dir_by_name(name)
-    file_path = os.path.join(self._get_metadata_dir_by_name(name), metadata_key)
+    file_path = self._metadata_file_path(name, metadata_key)
     safe_file_dump(file_path, metadata_value)
 
   def await_metadata_by_name(self, name, metadata_key, timeout, caster=None):
@@ -193,7 +201,7 @@ class ProcessMetadataManager(object):
     :returns: The value of the metadata key (read from disk post-write).
     :raises: :class:`ProcessMetadataManager.Timeout` on timeout.
     """
-    file_path = os.path.join(self._get_metadata_dir_by_name(name), metadata_key)
+    file_path = self._metadata_file_path(name, metadata_key)
     self._wait_for_file(file_path, timeout=timeout)
     return self.read_metadata_by_name(name, metadata_key, caster)
 
@@ -202,7 +210,7 @@ class ProcessMetadataManager(object):
 
     :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
     """
-    meta_dir = self._get_metadata_dir_by_name(name)
+    meta_dir = self._get_metadata_dir_by_name(name, self._metadata_base_dir)
     logger.debug('purging metadata directory: {}'.format(meta_dir))
     try:
       rm_rf(meta_dir)

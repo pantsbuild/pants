@@ -165,11 +165,23 @@ class PantsDaemon(FingerprintedProcessManager):
         bootstrap_options.pantsd_fs_event_workers
       )
 
+      pidfile_absolute = PantsDaemon.metadata_file_path('pantsd', 'pid', bootstrap_options.pants_subprocessdir)
+      if pidfile_absolute.startswith(build_root):
+        pidfile = os.path.relpath(pidfile_absolute, build_root)
+      else:
+        pidfile = None
+        logging.getLogger(__name__).warning(
+          'Not watching pantsd pidfile because subprocessdir is outside of buildroot. Having '
+          'subprocessdir be a child of buildroot (as it is by default) may help avoid stray '
+          'pantsd processes.'
+        )
+
       scheduler_service = SchedulerService(
         fs_event_service,
         legacy_graph_scheduler,
         build_root,
-        bootstrap_options.pantsd_invalidation_globs
+        bootstrap_options.pantsd_invalidation_globs,
+        pidfile,
       )
 
       pailgun_service = PailgunService(

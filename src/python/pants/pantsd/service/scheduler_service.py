@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import os
 import Queue
 import threading
 
@@ -24,7 +25,14 @@ class SchedulerService(PantsService):
 
   QUEUE_SIZE = 64
 
-  def __init__(self, fs_event_service, legacy_graph_scheduler, build_root, invalidation_globs):
+  def __init__(
+    self,
+    fs_event_service,
+    legacy_graph_scheduler,
+    build_root,
+    invalidation_globs,
+    pantsd_pidfile,
+  ):
     """
     :param FSEventService fs_event_service: An unstarted FSEventService instance for setting up
                                             filesystem event handlers.
@@ -39,6 +47,7 @@ class SchedulerService(PantsService):
     self._graph_helper = legacy_graph_scheduler
     self._invalidation_globs = invalidation_globs
     self._build_root = build_root
+    self._pantsd_pidfile = pantsd_pidfile
 
     self._scheduler = legacy_graph_scheduler.scheduler
     self._logger = logging.getLogger(__name__)
@@ -65,23 +74,48 @@ class SchedulerService(PantsService):
       )
     self._logger.info('watching invalidating files: {}'.format(self._invalidating_files))
 
+    if self._pantsd_pidfile:
+      self._fs_event_service.register_pidfile_handler(self._pantsd_pidfile, self._enqueue_fs_event)
+
   def _enqueue_fs_event(self, event):
     """Watchman filesystem event handler for BUILD/requirements.txt updates. Called via a thread."""
     self._logger.info('enqueuing {} changes for subscription {}'
                       .format(len(event['files']), event['subscription']))
     self._event_queue.put(event)
 
-  def _maybe_invalidate_scheduler(self, files):
+  def _maybe_invalidate_scheduler_batch(self, files):
     invalidating_files = self._invalidating_files
     if any(f in invalidating_files for f in files):
       self._logger.fatal('saw file events covered by invalidation globs, terminating the daemon.')
       self.terminate()
 
+  def _maybe_invalidate_scheduler_pidfile(self):
+    new_pid = self._check_pid_changed()
+    if new_pid is not False:
+      self._logger.fatal('{} says pantsd PID is {} but my PID is: {}: terminating'.format(
+        self._pantsd_pidfile,
+        new_pid,
+        os.getpid(),
+      ))
+      self.terminate()
+
+  def _check_pid_changed(self):
+    """Reads pidfile and returns False if its PID is ours, else a printable (maybe falsey) value."""
+    try:
+      with open(os.path.join(self._build_root, self._pantsd_pidfile), "r") as f:
+        pid_from_file = f.read()
+    except IOError:
+      return "[no file could be read]"
+    if int(pid_from_file) != os.getpid():
+      return pid_from_file
+    else:
+      return False
+
   def _handle_batch_event(self, files):
     self._logger.debug('handling change event for: %s', files)
 
     with self.lifecycle_lock:
-      self._maybe_invalidate_scheduler(files)
+      self._maybe_invalidate_scheduler_batch(files)
 
     with self.fork_lock:
       self._scheduler.invalidate_files(files)
@@ -106,7 +140,10 @@ class SchedulerService(PantsService):
 
     # The first watchman event is a listing of all files - ignore it.
     if not is_initial_event:
-      self._handle_batch_event(files)
+      if subscription == self._fs_event_service.PANTS_PID_SUBSCRIPTION_NAME:
+        self._maybe_invalidate_scheduler_pidfile()
+      else:
+        self._handle_batch_event(files)
 
     if not self._watchman_is_running.is_set():
       self._watchman_is_running.set()

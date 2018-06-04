@@ -25,6 +25,8 @@ class FSEventService(PantsService):
 
   ZERO_DEPTH = ['depth', 'eq', 0]
 
+  PANTS_PID_SUBSCRIPTION_NAME = 'pantsd_pid'
+
   def __init__(self, watchman, build_root, worker_count):
     """
     :param Watchman watchman: The Watchman instance as provided by the WatchmanLauncher subsystem.
@@ -78,6 +80,26 @@ class FSEventService(PantsService):
         ]
       ),
       callback
+    )
+
+  def register_pidfile_handler(self, pidfile_path, callback):
+    """
+
+    :param pidfile_path: Path to the pidfile, relative to the build root
+    :param callback:
+    :return:
+    """
+    self.register_handler(
+      self.PANTS_PID_SUBSCRIPTION_NAME,
+      dict(
+        fields=['name'],
+        expression=[
+          'allof',
+          ['dirname', os.path.dirname(pidfile_path)],
+          ['name', os.path.basename(pidfile_path)],
+        ],
+      ),
+      callback,
     )
 
   def register_handler(self, name, metadata, callback):

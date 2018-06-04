@@ -118,14 +118,14 @@ class TestProcessMetadataManager(TestBase):
 
   def test_get_metadata_dir_by_name(self):
     self.pmm = ProcessMetadataManager(metadata_base_dir=self.BUILDROOT)
-    self.assertEqual(self.pmm._get_metadata_dir_by_name(self.NAME),
+    self.assertEqual(self.pmm._get_metadata_dir_by_name(self.NAME, self.BUILDROOT),
                      os.path.join(self.BUILDROOT, self.NAME))
 
   def test_maybe_init_metadata_dir_by_name(self):
     with mock.patch('pants.pantsd.process_manager.safe_mkdir', **PATCH_OPTS) as mock_mkdir:
       self.pmm._maybe_init_metadata_dir_by_name(self.NAME)
       mock_mkdir.assert_called_once_with(
-        self.pmm._get_metadata_dir_by_name(self.NAME))
+        self.pmm._get_metadata_dir_by_name(self.NAME, self.subprocess_dir))
 
   def test_readwrite_metadata_by_name(self):
     with temporary_dir() as tmpdir, \
