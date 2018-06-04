@@ -20,16 +20,13 @@ class SingletonMetaclass(type):
 class ClassPropertyDescriptor(object):
   """Define a readable class property, given a function."""
 
-  # NB: it seems overriding __set__ and __delete__ require defining a metaclass or overriding
+  # NB: it seems overriding __set__ and __delete__ would require defining a metaclass or overriding
   # __setattr__/__delattr__ (see
-  # https://stackoverflow.com/questions/5189699/how-to-make-a-class-property).
-  def __init__(self, fget, doc=None):
+  # https://stackoverflow.com/questions/5189699/how-to-make-a-class-property). The current solution
+  # doesn't require any modifications to the class definition beyond declaring a @classproperty.
+  def __init__(self, fget, doc):
     self.fget = fget
-
-    if doc is None:
-      self.__doc__ = fget.__doc__
-    else:
-      self.__doc__ = doc
+    self.__doc__ = doc
 
   # See https://docs.python.org/2/howto/descriptor.html for more details.
   def __get__(self, obj, objtype=None):
@@ -41,12 +38,19 @@ class ClassPropertyDescriptor(object):
 def classproperty(func):
   """Use as a decorator on a method definition to access it as a property of the class.
 
+  This decorator can be applied to a method, a classmethod, or a staticmethod.
+
+  The docstring of the classproperty `x` for a class `C` can be obtained by
+  `C.__dict__['x'].__doc__`.
+
   NB: setting or deleting the attribute of this name will overwrite this property!
   """
+  doc = func.__doc__
+
   if not isinstance(func, (classmethod, staticmethod)):
     func = classmethod(func)
 
-  return ClassPropertyDescriptor(func)
+  return ClassPropertyDescriptor(func, doc)
 
 
 # Extend Singleton and your class becomes a singleton, each construction returns the same instance.
