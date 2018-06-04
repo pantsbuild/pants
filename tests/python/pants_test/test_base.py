@@ -325,7 +325,9 @@ class TestBase(unittest.TestCase):
     if cls._scheduler is not None:
       return
 
-    graph_session = EngineInitializer.setup_legacy_graph(
+    # NB: This uses the long form of initialization because it needs to directly specify
+    # `cls.alias_groups` rather than having them be provided by bootstrap options.
+    graph_session = EngineInitializer.setup_legacy_graph_extended(
       pants_ignore_patterns=None,
       workdir=cls._pants_workdir(),
       build_file_imports_behavior='allow',

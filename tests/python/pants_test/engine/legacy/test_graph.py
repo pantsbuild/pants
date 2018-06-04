@@ -50,7 +50,8 @@ class GraphTestBase(unittest.TestCase):
 
     with temporary_dir() as work_dir:
       path_ignore_patterns = path_ignore_patterns or []
-      graph_helper = EngineInitializer.setup_legacy_graph(
+      # TODO: This test should be swapped to using TestBase.
+      graph_helper = EngineInitializer.setup_legacy_graph_extended(
         path_ignore_patterns,
         work_dir,
         build_file_imports_behavior,

@@ -115,7 +115,8 @@ class PantsDaemon(FingerprintedProcessManager):
       if full_init:
         build_root = get_buildroot()
         native = Native.create(bootstrap_options_values)
-        legacy_graph_scheduler = cls._setup_legacy_graph_scheduler(native, bootstrap_options_values)
+        legacy_graph_scheduler = EngineInitializer.setup_legacy_graph(native,
+                                                                      bootstrap_options_values)
         services, port_map = cls._setup_services(
           build_root,
           bootstrap_options_values,
@@ -137,21 +138,6 @@ class PantsDaemon(FingerprintedProcessManager):
     @staticmethod
     def _parse_bootstrap_options():
       return OptionsBootstrapper().get_bootstrap_options()
-
-    @staticmethod
-    def _setup_legacy_graph_scheduler(native, bootstrap_options):
-      """Initializes a `LegacyGraphScheduler` instance."""
-      return EngineInitializer.setup_legacy_graph(
-        bootstrap_options.pants_ignore,
-        bootstrap_options.pants_workdir,
-        bootstrap_options.build_file_imports,
-        native=native,
-        build_ignore_patterns=bootstrap_options.build_ignore,
-        exclude_target_regexps=bootstrap_options.exclude_target_regexp,
-        subproject_roots=bootstrap_options.subproject_roots,
-        remote_store_server=bootstrap_options.remote_store_server,
-        remote_execution_server=bootstrap_options.remote_execution_server,
-      )
 
     @staticmethod
     def _setup_services(build_root, bootstrap_options, legacy_graph_scheduler, watchman):

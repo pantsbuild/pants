@@ -127,20 +127,36 @@ class EngineInitializer(object):
     return build_config.registered_aliases()
 
   @staticmethod
-  def setup_legacy_graph(pants_ignore_patterns,
-                         workdir,
-                         build_file_imports_behavior,
-                         build_root=None,
-                         native=None,
-                         build_file_aliases=None,
-                         glob_match_error_behavior=None,
-                         rules=None,
-                         build_ignore_patterns=None,
-                         exclude_target_regexps=None,
-                         subproject_roots=None,
-                         include_trace_on_error=True,
-                         remote_store_server=None,
-                         remote_execution_server=None,
+  def setup_legacy_graph(native, bootstrap_options):
+    """Construct and return the components necessary for LegacyBuildGraph construction."""
+    return EngineInitializer.setup_legacy_graph_extended(
+      bootstrap_options.pants_ignore,
+      bootstrap_options.pants_workdir,
+      bootstrap_options.build_file_imports,
+      native=native,
+      build_ignore_patterns=bootstrap_options.build_ignore,
+      exclude_target_regexps=bootstrap_options.exclude_target_regexp,
+      subproject_roots=bootstrap_options.subproject_roots,
+      remote_store_server=bootstrap_options.remote_store_server,
+      remote_execution_server=bootstrap_options.remote_execution_server,
+    )
+
+  @staticmethod
+  def setup_legacy_graph_extended(
+    pants_ignore_patterns,
+    workdir,
+    build_file_imports_behavior,
+    build_root=None,
+    native=None,
+    build_file_aliases=None,
+    glob_match_error_behavior=None,
+    rules=None,
+    build_ignore_patterns=None,
+    exclude_target_regexps=None,
+    subproject_roots=None,
+    include_trace_on_error=True,
+    remote_store_server=None,
+    remote_execution_server=None
   ):
     """Construct and return the components necessary for LegacyBuildGraph construction.
 
