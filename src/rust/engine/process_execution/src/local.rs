@@ -105,17 +105,18 @@ impl super::CommandRunner for CommandRunner {
       .map(|result| {
         match result {
           Either::A((command, _)) => command,
-          Either::B((_, _)) => ExecuteProcessResult {  // timeout
-              stdout: Bytes::from(""),
-              stderr: Bytes::from(""),
-              exit_code: -15,
-              output_directory: fs::EMPTY_DIGEST,
+          Either::B((_, _)) => ExecuteProcessResult {
+            // timeout
+            stdout: Bytes::from(""),
+            stderr: Bytes::from(""),
+            exit_code: -15,
+            output_directory: fs::EMPTY_DIGEST,
           },
         }
       })
       .map_err(|err| match err {
-          Either::A((err_str, _)) => format!("{:?}", err_str),
-          Either::B((err_str, _)) => format!("{:?} timeout", err_str),
+        Either::A((err_str, _)) => format!("{:?}", err_str),
+        Either::B((err_str, _)) => format!("{:?} timeout", err_str),
       })
       .to_boxed()
   }
@@ -412,8 +413,8 @@ mod tests {
       timeout: Duration::from_millis(10),
       description: "echo foo".to_string(),
     }) {
-        Ok(ExecuteProcessResult { exit_code, ..} ) => assert_eq!(-15, exit_code),
-        _ => panic!(),
+      Ok(ExecuteProcessResult { exit_code, .. }) => assert_eq!(-15, exit_code),
+      _ => panic!(),
     }
   }
 
