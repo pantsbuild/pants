@@ -151,8 +151,8 @@ class PantsDaemon(FingerprintedProcessManager):
         subproject_roots=bootstrap_options.subproject_roots,
       )
 
-    @classmethod
-    def _setup_services(cls, build_root, bootstrap_options, legacy_graph_scheduler, watchman):
+    @staticmethod
+    def _setup_services(build_root, bootstrap_options, legacy_graph_scheduler, watchman):
       """Initialize pantsd services.
 
       :returns: A tuple of (`tuple` service_instances, `dict` port_map).
@@ -163,7 +163,7 @@ class PantsDaemon(FingerprintedProcessManager):
         bootstrap_options.pantsd_fs_event_workers
       )
 
-      pidfile_absolute = cls.metadata_file_path('pantsd', 'pid', bootstrap_options.pants_subprocessdir)
+      pidfile_absolute = PantsDaemon.metadata_file_path('pantsd', 'pid', bootstrap_options.pants_subprocessdir)
       if pidfile_absolute.startswith(build_root):
         pidfile = os.path.relpath(pidfile_absolute, build_root)
       else:
