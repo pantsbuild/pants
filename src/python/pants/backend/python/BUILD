@@ -40,6 +40,7 @@ python_library(
   sources = ['interpreter_cache.py'],
   dependencies = [
     '3rdparty/python:pex',
+    ':pex_util',
     'src/python/pants/backend/python/targets',
     'src/python/pants/base:exceptions',
     'src/python/pants/process',
@@ -58,7 +59,6 @@ python_library(
   ]
 )
 
-
 python_library(
   name = 'python_artifact',
   sources = ['python_artifact.py'],
@@ -75,4 +75,12 @@ python_library(
 python_library(
   name = 'python_requirements',
   sources = ['python_requirements.py'],
+)
+
+python_library(
+  name = 'pex_util',
+  sources = ['pex_util.py'],
+  dependencies = [
+    '3rdparty/python:pex',
+  ]
 )
