@@ -63,6 +63,9 @@ class OverridingMethodDefSuper(WithProp):
 
 
 class ClassPropertyTest(TestBase):
+  # TODO: The assertions on both the class and an instance of it might not be necessary, if class
+  # attributes are assumed to always be the same on their instances.
+
   def test_access(self):
     self.assertEqual(3, WithProp.some_property)
     self.assertEqual(3, WithProp().some_property)
@@ -88,6 +91,8 @@ class ClassPropertyTest(TestBase):
 
     self.assertEqual(44, WithFieldToModify.f)
 
+    # The classproperty reflects the change in state (is not cached by python or something else
+    # weird we might do).
     WithFieldToModify._z = 72
     self.assertEqual(72, WithFieldToModify.f)
 
