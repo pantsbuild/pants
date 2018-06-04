@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractmethod, abstractproperty
 
-from pants.util.meta import AbstractClass, Singleton, classproperty
+from pants.util.meta import AbstractClass, Singleton, classproperty, staticproperty
 from pants_test.test_base import TestBase
 
 
@@ -40,7 +40,7 @@ class SingletonTest(TestBase):
 
 
 class WithProp(object):
-  _value = 3
+  _value = 'val0'
 
   @classproperty
   def some_property(cls):
@@ -51,14 +51,17 @@ class WithProp(object):
   def some_method(cls):
     return cls._value
 
-  @classproperty
-  @staticmethod
+  @staticproperty
   def static_property():
-    return "static"
+    return 'static_property'
+
+  @staticmethod
+  def static_method():
+    return 'static_method'
 
 
 class OverridingValueField(WithProp):
-  _value = 4
+  _value = 'val1'
 
 
 class OverridingValueInit(WithProp):
@@ -71,7 +74,7 @@ class OverridingValueInit(WithProp):
 
 class OverridingMethodDefSuper(WithProp):
 
-  _other_value = 2
+  _other_value = 'o0'
 
   @classproperty
   def some_property(cls):
@@ -81,76 +84,95 @@ class OverridingMethodDefSuper(WithProp):
 class ClassPropertyTest(TestBase):
 
   def test_access(self):
-    self.assertEqual(3, WithProp.some_property)
-    self.assertEqual(3, WithProp().some_property)
+    self.assertEqual('val0', WithProp.some_property)
+    self.assertEqual('val0', WithProp().some_property)
 
-    self.assertEqual(3, WithProp.some_method())
-    self.assertEqual(3, WithProp().some_method())
+    self.assertEqual('val0', WithProp.some_method())
+    self.assertEqual('val0', WithProp().some_method())
 
-    self.assertEqual("static", WithProp.static_property)
-    self.assertEqual("static", WithProp().static_property)
+    self.assertEqual('static_property', WithProp.static_property)
+    self.assertEqual('static_property', WithProp().static_property)
 
-  def test_docstring(self):
-    self.assertEqual("some docs", WithProp.__dict__['some_property'].__doc__)
-
-  def test_override_value(self):
-    self.assertEqual(4, OverridingValueField.some_property)
-    self.assertEqual(4, OverridingValueField().some_property)
-
-  def test_override_inst_value(self):
-    self.assertEqual(3, OverridingValueInit(3).some_property)
-    self.assertEqual(3, OverridingValueInit(3).some_method())
-
-  def test_override_method_super(self):
-    self.assertEqual(5, OverridingMethodDefSuper.some_property)
-    self.assertEqual(5, OverridingMethodDefSuper().some_property)
-
-  def test_modify_class_value(self):
-    class WithFieldToModify(object):
-      _z = 44
-
-      @classproperty
-      def f(cls):
-        return cls._z
-
-    self.assertEqual(44, WithFieldToModify.f)
-
-    # The classproperty reflects the change in state (is not cached by python or something else
-    # weird we might do).
-    WithFieldToModify._z = 72
-    self.assertEqual(72, WithFieldToModify.f)
+    self.assertEqual('static_method', WithProp.static_method())
+    self.assertEqual('static_method', WithProp().static_method())
 
   def test_has_attr(self):
     self.assertTrue(hasattr(WithProp, 'some_property'))
     self.assertTrue(hasattr(WithProp(), 'some_property'))
 
-  def test_set_attr(self):
-    class SetValue(object):
-      _x = 3
+  def test_docstring(self):
+    self.assertEqual("some docs", WithProp.__dict__['some_property'].__doc__)
+
+  def test_override_value(self):
+    self.assertEqual('val1', OverridingValueField.some_property)
+    self.assertEqual('val1', OverridingValueField().some_property)
+
+  def test_override_inst_value(self):
+    self.assertEqual('v1', OverridingValueInit('v1').some_property)
+    self.assertEqual('v1', OverridingValueInit('v1').some_method())
+
+  def test_override_method_super(self):
+    self.assertEqual('val0o0', OverridingMethodDefSuper.some_property)
+    self.assertEqual('val0o0', OverridingMethodDefSuper().some_property)
+
+  def test_modify_class_value(self):
+    class WithFieldToModify(object):
+      _z = 'z0'
 
       @classproperty
-      def x_property(cls):
+      def class_property(cls):
+        return cls._z
+
+    self.assertEqual('z0', WithFieldToModify.class_property)
+
+    # The classproperty reflects the change in state (is not cached by python or something else
+    # weird we might do).
+    WithFieldToModify._z = 'z1'
+    self.assertEqual('z1', WithFieldToModify.class_property)
+
+  def test_set_attr(self):
+    class SetValue(object):
+      _x = 'x0'
+
+      @staticproperty
+      def static_property():
+        return 's0'
+
+      @classproperty
+      def class_property(cls):
         return cls._x
 
-    self.assertEqual(3, SetValue.x_property)
+    self.assertEqual('x0', SetValue.class_property)
+    self.assertEqual('s0', SetValue.static_property)
 
     # The @classproperty is gone, this is just a regular property now.
-    SetValue.x_property = 4
-    self.assertEqual(4, SetValue.x_property)
+    SetValue.class_property = 'x1'
+    self.assertEqual('x1', SetValue.class_property)
     # The source field is unmodified.
-    self.assertEqual(3, SetValue._x)
+    self.assertEqual('x0', SetValue._x)
+
+    SetValue.static_property = 's1'
+    self.assertEqual('s1', SetValue.static_property)
 
   def test_delete_attr(self):
     class DeleteValue(object):
-      _y = 45
+      _y = 'y0'
 
       @classproperty
-      def y_property(cls):
+      def class_property(cls):
         return cls._y
 
-    self.assertEqual(45, DeleteValue.y_property)
+      @staticproperty
+      def staticproperty():
+        return 's0'
+
+    self.assertEqual('y0', DeleteValue.class_property)
+    self.assertEqual('s0', DeleteValue.static_property)
 
     # The @classproperty is gone, but the source field is still alive.
-    del DeleteValue.y_property
-    self.assertFalse(hasattr(DeleteValue, 'y_property'))
+    del DeleteValue.class_property
+    self.assertFalse(hasattr(DeleteValue, 'class_property'))
     self.assertTrue(hasattr(DeleteValue, '_y'))
+
+    del DeleteValue.static_property
+    self.assertFalse(hasattr(DeleteValue, 'static_property'))

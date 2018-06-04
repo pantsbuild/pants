@@ -62,6 +62,16 @@ def classproperty(func):
   return ClassPropertyDescriptor(func, doc)
 
 
+def staticproperty(func):
+  """???"""
+  doc = func.__doc__
+
+  if not isinstance(func, staticmethod):
+    func = staticmethod(func)
+
+  return ClassPropertyDescriptor(func, doc)
+
+
 # Extend Singleton and your class becomes a singleton, each construction returns the same instance.
 Singleton = SingletonMetaclass(str('Singleton'), (object,), {})
 

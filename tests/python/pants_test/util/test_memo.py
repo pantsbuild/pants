@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.util.memo import (memoized, memoized_classproperty, memoized_method, memoized_property,
-                             memoized_staticmethod, memoized_staticproperty, per_instance,
-                             testable_memoized_property)
+from pants.util.memo import (memoized, memoized_classmethod, memoized_classproperty,
+                             memoized_method, memoized_property, memoized_staticmethod,
+                             memoized_staticproperty, per_instance, testable_memoized_property)
 
 
 class MemoizeTest(unittest.TestCase):
@@ -225,59 +225,58 @@ class MemoizeTest(unittest.TestCase):
 
   def test_memoized_method(self):
     class Foo(object):
-      _x = 3
+      _x = 'x0'
 
       @memoized_method
       def method(self, y):
         return self._x + y
 
     foo = Foo()
-    self.assertEqual(5, foo.method(2))
-    Foo._x = 14
-    self.assertEqual(5, foo.method(2))
-    # The (foo, 3) pair is the cache key, which is different than the previous (foo, 2), so we
-    # recalculate and read the new value of `Foo._x`.
-    self.assertEqual(17, foo.method(3))
+    self.assertEqual('x0y0', foo.method('y0'))
+    Foo._x = 'x1'
+    self.assertEqual('x0y0', foo.method('y0'))
+    # The (foo, 'y1') pair is the cache key, which is different than the previous (foo, 'y0'), so we
+    # recalculate, and in the process read the new value of `Foo._x`.
+    self.assertEqual('x1y1', foo.method('y1'))
 
   def test_memoized_class_methods(self):
-    externally_scoped_value = "initial state!"
+    externally_scoped_value = 'e0'
 
     class Foo(object):
-      _x = 3
+      _x = 'x0'
 
-      @classmethod
-      @memoized_method
-      def method(cls, y):
+      @memoized_classmethod
+      def class_method(cls, y):
         return cls._x + y
 
-      @memoized_staticmethod
-      def static_method(x):
-        return externally_scoped_value + x
-
       @memoized_classproperty
-      def prop(cls):
+      def class_property(cls):
         return cls._x
 
+      @memoized_staticmethod
+      def static_method(z):
+        return externally_scoped_value + z
+
       @memoized_staticproperty
-      def static_prop():
+      def static_property():
         return externally_scoped_value
 
-    self.assertEqual(3, Foo.prop)
-    self.assertEqual(5, Foo.method(2))
-    self.assertEqual("initial state!", Foo.static_prop)
-    self.assertEqual("initial state!more stuff", Foo.static_method("more stuff"))
+    self.assertEqual('x0', Foo.class_property)
+    self.assertEqual('x0y0', Foo.class_method('y0'))
+    self.assertEqual('e0', Foo.static_property)
+    self.assertEqual('e0z0', Foo.static_method('z0'))
 
-    Foo._x = 14
+    Foo._x = 'x1'
     # The property is cached.
-    self.assertEqual(3, Foo.prop)
+    self.assertEqual('x0', Foo.class_property)
     # The method is cached for previously made calls only.
-    self.assertEqual(5, Foo.method(2))
-    self.assertEqual(15, Foo.method(1))
+    self.assertEqual('x0y0', Foo.class_method('y0'))
+    self.assertEqual('x1y1', Foo.class_method('y1'))
 
-    externally_scoped_value = "new state!"
-    self.assertEqual("initial state!", Foo.static_prop)
-    self.assertEqual("initial state!more stuff", Foo.static_method("more stuff"))
-    self.assertEqual("new state!even more stuff", Foo.static_method("even more stuff"))
+    externally_scoped_value = 'e1'
+    self.assertEqual('e0', Foo.static_property)
+    self.assertEqual('e0z0', Foo.static_method('z0'))
+    self.assertEqual('e1z1', Foo.static_method('z1'))
 
   def test_descriptor_application_valid(self):
     class Foo(self._Called):
