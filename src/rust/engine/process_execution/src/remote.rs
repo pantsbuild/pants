@@ -72,7 +72,8 @@ impl super::CommandRunner for CommandRunner {
       Ok((command, execute_request)) => {
         let command_runner = self.clone();
         let command_digest = try_future!(execute_request.get_action().get_command_digest().into());
-        self.upload_command(&command, command_digest)
+        self
+          .upload_command(&command, command_digest)
           .and_then(move |_| {
             debug!(
               "Executing remotely request: {:?} (command: {:?})",
@@ -459,10 +460,7 @@ impl CommandRunner {
         if output_file.has_digest() {
           let digest: Result<Digest, String> = output_file.get_digest().into();
           let mut underlying_path_map = path_map.lock().unwrap();
-          underlying_path_map.insert(
-            output_file_path_buf.clone(),
-            digest?,
-          );
+          underlying_path_map.insert(output_file_path_buf.clone(), digest?);
         } else {
           let raw_content = output_file.content.clone();
           let path_map_3 = path_map.clone();
