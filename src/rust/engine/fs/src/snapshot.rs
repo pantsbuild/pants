@@ -1,8 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-extern crate tempdir;
-
 use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
 use futures::Future;
@@ -366,12 +364,11 @@ impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
 
 #[cfg(test)]
 mod tests {
-  extern crate tempdir;
+  extern crate tempfile;
   extern crate testutil;
 
   use futures::future::Future;
   use hashing::{Digest, Fingerprint};
-  use tempdir::TempDir;
   use self::testutil::make_file;
   use self::testutil::data::TestDirectory;
 
@@ -385,11 +382,22 @@ mod tests {
 
   const STR: &str = "European Burmese";
 
-  fn setup() -> (Store, TempDir, Arc<PosixFS>, OneOffStoreFileByDigest) {
+  fn setup() -> (
+    Store,
+    tempfile::TempDir,
+    Arc<PosixFS>,
+    OneOffStoreFileByDigest,
+  ) {
     let pool = Arc::new(ResettablePool::new("test-pool-".to_string()));
     // TODO: Pass a remote CAS address through.
-    let store = Store::local_only(TempDir::new("lmdb_store").unwrap(), pool.clone()).unwrap();
-    let dir = TempDir::new("root").unwrap();
+    let store = Store::local_only(
+      tempfile::Builder::new()
+        .prefix("lmdb_store")
+        .tempdir()
+        .unwrap(),
+      pool.clone(),
+    ).unwrap();
+    let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();
     let posix_fs = Arc::new(PosixFS::new(dir.path(), pool, vec![]).unwrap());
     let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone());
     (store, dir, posix_fs, file_saver)

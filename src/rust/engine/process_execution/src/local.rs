@@ -1,4 +1,4 @@
-extern crate tempdir;
+extern crate tempfile;
 
 use boxfuture::{BoxFuture, Boxable};
 use fs::{self, PathStatGetter};
@@ -29,10 +29,13 @@ impl super::CommandRunner for CommandRunner {
   ///
   fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<ExecuteProcessResult, String> {
     let workdir = try_future!(
-      tempdir::TempDir::new("process-execution").map_err(|err| format!(
-        "Error making tempdir for local process execution: {:?}",
-        err
-      ))
+      tempfile::Builder::new()
+        .prefix("process-execution")
+        .tempdir()
+        .map_err(|err| format!(
+          "Error making tempdir for local process execution: {:?}",
+          err
+        ))
     );
 
     let store = self.store.clone();
@@ -110,7 +113,7 @@ impl super::CommandRunner for CommandRunner {
 
 #[cfg(test)]
 mod tests {
-  extern crate tempdir;
+  extern crate tempfile;
   extern crate testutil;
 
   use fs;
@@ -124,7 +127,7 @@ mod tests {
   use std::os::unix::fs::PermissionsExt;
   use std::path::{Path, PathBuf};
   use std::sync::Arc;
-  use tempdir::TempDir;
+  use tempfile::TempDir;
   use self::testutil::{as_bytes, owned_string_vec};
   use testutil::data::{TestData, TestDirectory};
 
@@ -391,7 +394,7 @@ mod tests {
   fn run_command_locally_in_dir(
     req: ExecuteProcessRequest,
   ) -> Result<ExecuteProcessResult, String> {
-    let store_dir = TempDir::new("store").unwrap();
+    let store_dir = TempDir::new().unwrap();
     let pool = Arc::new(fs::ResettablePool::new("test-pool-".to_owned()));
     let store = fs::Store::local_only(store_dir.path(), pool.clone()).unwrap();
     let runner = super::CommandRunner {

@@ -76,4 +76,4 @@ petgraph = "0.4.5"
 process_execution = { path = "process_execution" }
 resettable = { path = "resettable" }
 tokio = "0.1"
-tempdir = "0.3.5"
+tempfile = "3"

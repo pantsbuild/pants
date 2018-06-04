@@ -19,5 +19,5 @@ time = "0.1.39"
 
 [dev-dependencies]
 bytes = "0.4.5"
-tempdir = "0.3.5"
+tempfile = "3"
 testutil = { path = "../../testutil" }

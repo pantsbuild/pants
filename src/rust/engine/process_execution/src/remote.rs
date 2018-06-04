@@ -607,7 +607,7 @@ mod tests {
   use hashing::Digest;
   use protobuf::{self, Message, ProtobufEnum};
   use mock;
-  use tempdir::TempDir;
+  use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
   use testutil::{as_bytes, owned_string_vec};
 
@@ -762,7 +762,7 @@ mod tests {
       ))
     };
 
-    let store_dir = TempDir::new("store").unwrap();
+    let store_dir = TempDir::new().unwrap();
     let store_dir_path = store_dir.path();
 
     let cas = mock::StubCAS::empty();
@@ -1059,7 +1059,7 @@ mod tests {
       ))
     };
 
-    let store_dir = TempDir::new("store").unwrap();
+    let store_dir = TempDir::new().unwrap();
     let cas = mock::StubCAS::with_content(1024, vec![], vec![TestDirectory::containing_roland()]);
     let store = fs::Store::with_remote(
       store_dir,
@@ -1113,7 +1113,7 @@ mod tests {
       ))
     };
 
-    let store_dir = TempDir::new("store").unwrap();
+    let store_dir = TempDir::new().unwrap();
     let cas = mock::StubCAS::with_content(1024, vec![], vec![TestDirectory::containing_roland()]);
     let store = fs::Store::with_remote(
       store_dir,
@@ -1569,7 +1569,7 @@ mod tests {
   }
 
   fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
-    let store_dir = TempDir::new("store").unwrap();
+    let store_dir = TempDir::new().unwrap();
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
