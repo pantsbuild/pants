@@ -1411,12 +1411,14 @@ mod tests {
 //      mock_server.mock_responder.received_messages.lock().unwrap().iter().map(
 //        move |msg| match msg { (s,m,t) => println!("{:?}", t)}
 //      );
-//      let messages = mock_server.mock_responder.received_messages.lock().unwrap();
-//      assert!(messages.len() == 2);
+
 
 //      let (s, m, t) = messages.get(0).unwrap();
       println!("{:?}",  mock_server.mock_responder.received_messages);
-//      println!("{:?}",  messages.get(1).unwrap().2.duration_since(messages.get(0).unwrap().2).unwrap());
+
+      let messages = mock_server.mock_responder.received_messages.lock().unwrap();
+      assert!(messages.len() == 2);
+      println!("{:?}",  messages.get(1).unwrap().2.duration_since(messages.get(0).unwrap().2).unwrap());
 
 //      println!("{:?}", messages.len());
 //      assert!(mock_server.mock_responder.received_messages);
