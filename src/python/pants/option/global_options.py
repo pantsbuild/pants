@@ -17,6 +17,7 @@ from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.memo import memoized_method
+from pants.util.meta import classproperty
 from pants.util.objects import datatype
 
 
@@ -37,9 +38,7 @@ class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
 
   default_option_value = WARN
 
-  # FIXME(cosmicexplorer): add helpers in pants.util.memo for class properties and memoized class
-  # properties!
-  @classmethod
+  @classproperty
   @memoized_method
   def _singletons(cls):
     return { behavior: cls(behavior) for behavior in cls.allowed_values }
@@ -50,7 +49,7 @@ class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
       return value
     if not value:
       value = cls.default_value
-    return cls._singletons()[value]
+    return cls._singletons[value]
 
   def __new__(cls, *args, **kwargs):
     this_object = super(GlobMatchErrorBehavior, cls).__new__(cls, *args, **kwargs)

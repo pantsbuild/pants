@@ -17,6 +17,34 @@ class SingletonMetaclass(type):
     return cls.instance
 
 
+class ClassPropertyDescriptor(object):
+  """Define a readable class property, given a function.
+
+  See https://docs.python.org/2/howto/descriptor.html for more details.
+  """
+
+  def __init__(self, fget, doc=None):
+    self.fget = fget
+
+    if doc is None:
+      self.__doc__ = fget.__doc__
+    else:
+      self.__doc__ = doc
+
+  def __get__(self, obj, objtype=None):
+    if objtype is None:
+      objtype = type(obj)
+    return self.fget.__get__(obj, objtype)()
+
+
+def classproperty(func):
+  """Use as a decorator on a method definition to access it as a property of the class."""
+  if not isinstance(func, (classmethod, staticmethod)):
+    func = classmethod(func)
+
+  return ClassPropertyDescriptor(func)
+
+
 # Extend Singleton and your class becomes a singleton, each construction returns the same instance.
 Singleton = SingletonMetaclass(str('Singleton'), (object,), {})
 
