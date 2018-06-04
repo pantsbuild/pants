@@ -64,7 +64,8 @@ class OverridingValueField(WithProp):
 class OverridingValueInit(WithProp):
 
   def __init__(self, v):
-    # This will override the class's _value when calculating the @classmethod and @classproperty.
+    # This will override the class's _value when evaluating the @classmethod and @classproperty as
+    # an instance method/property.
     self._value = v
 
 
@@ -78,8 +79,6 @@ class OverridingMethodDefSuper(WithProp):
 
 
 class ClassPropertyTest(TestBase):
-  # TODO: The assertions on both the class and an instance of it might not be necessary, if class
-  # attributes are assumed to always be the same on their instances.
 
   def test_access(self):
     self.assertEqual(3, WithProp.some_property)
