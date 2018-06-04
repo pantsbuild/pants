@@ -47,9 +47,25 @@ class WithProp(object):
     "some docs"
     return cls._value
 
+  @classmethod
+  def some_method(cls):
+    return cls._value
+
+  @classproperty
+  @staticmethod
+  def static_property():
+    return "static"
+
 
 class OverridingValueField(WithProp):
   _value = 4
+
+
+class OverridingValueInit(WithProp):
+
+  def __init__(self, v):
+    # This will override the class's _value when calculating the @classmethod and @classproperty.
+    self._value = v
 
 
 class OverridingMethodDefSuper(WithProp):
@@ -69,12 +85,22 @@ class ClassPropertyTest(TestBase):
     self.assertEqual(3, WithProp.some_property)
     self.assertEqual(3, WithProp().some_property)
 
+    self.assertEqual(3, WithProp.some_method())
+    self.assertEqual(3, WithProp().some_method())
+
+    self.assertEqual("static", WithProp.static_property)
+    self.assertEqual("static", WithProp().static_property)
+
   def test_docstring(self):
     self.assertEqual("some docs", WithProp.__dict__['some_property'].__doc__)
 
   def test_override_value(self):
     self.assertEqual(4, OverridingValueField.some_property)
     self.assertEqual(4, OverridingValueField().some_property)
+
+  def test_override_inst_value(self):
+    self.assertEqual(3, OverridingValueInit(3).some_property)
+    self.assertEqual(3, OverridingValueInit(3).some_method())
 
   def test_override_method_super(self):
     self.assertEqual(5, OverridingMethodDefSuper.some_property)
