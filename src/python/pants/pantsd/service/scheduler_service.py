@@ -31,7 +31,7 @@ class SchedulerService(PantsService):
     legacy_graph_scheduler,
     build_root,
     invalidation_globs,
-    pidfile,
+    pantsd_pidfile,
   ):
     """
     :param FSEventService fs_event_service: An unstarted FSEventService instance for setting up
@@ -47,7 +47,7 @@ class SchedulerService(PantsService):
     self._graph_helper = legacy_graph_scheduler
     self._invalidation_globs = invalidation_globs
     self._build_root = build_root
-    self._pidfile = pidfile
+    self._pantsd_pidfile = pantsd_pidfile
 
     self._scheduler = legacy_graph_scheduler.scheduler
     self._logger = logging.getLogger(__name__)
@@ -74,8 +74,8 @@ class SchedulerService(PantsService):
       )
     self._logger.info('watching invalidating files: {}'.format(self._invalidating_files))
 
-    if self._pidfile:
-      self._fs_event_service.register_pidfile_handler(self._pidfile, self._enqueue_fs_event)
+    if self._pantsd_pidfile:
+      self._fs_event_service.register_pidfile_handler(self._pantsd_pidfile, self._enqueue_fs_event)
 
   def _enqueue_fs_event(self, event):
     """Watchman filesystem event handler for BUILD/requirements.txt updates. Called via a thread."""
@@ -93,7 +93,7 @@ class SchedulerService(PantsService):
     new_pid = self._check_pid_changed()
     if new_pid is not False:
       self._logger.fatal('{} says pantsd PID is {} but my PID is: {}: terminating'.format(
-        self._pidfile,
+        self._pantsd_pidfile,
         new_pid,
         os.getpid(),
       ))
@@ -102,7 +102,7 @@ class SchedulerService(PantsService):
   def _check_pid_changed(self):
     """Reads pidfile and returns False if its PID is ours, else a printable (maybe falsey) value."""
     try:
-      with open(os.path.join(self._build_root, self._pidfile), "r") as f:
+      with open(os.path.join(self._build_root, self._pantsd_pidfile), "r") as f:
         pid_from_file = f.read()
     except IOError:
       return "[no file could be read]"

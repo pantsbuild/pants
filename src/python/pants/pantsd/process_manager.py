@@ -161,7 +161,7 @@ class ProcessMetadataManager(object):
     safe_mkdir(self.__class__._get_metadata_dir_by_name(name, self._metadata_base_dir))
 
   def _metadata_file_path(self, name, metadata_key):
-    return self.__class__.metadata_file_path(name, metadata_key, self._metadata_base_dir)
+    return self.metadata_file_path(name, metadata_key, self._metadata_base_dir)
 
   @classmethod
   def metadata_file_path(cls, name, metadata_key, metadata_base_dir):
