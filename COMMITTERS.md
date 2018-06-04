@@ -12,6 +12,8 @@ Active Committers
 * Stu Hood
 * Yi Cheng
 * Daniel Wagner-Hall
+* Dorothy Ordogh
+* Daniel McClanahan
 
 Emeritus
 ========
