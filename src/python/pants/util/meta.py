@@ -18,11 +18,11 @@ class SingletonMetaclass(type):
 
 
 class ClassPropertyDescriptor(object):
-  """Define a readable class property, given a function.
+  """Define a readable class property, given a function."""
 
-  See https://docs.python.org/2/howto/descriptor.html for more details.
-  """
-
+  # NB: it seems overriding __set__ and __delete__ require defining a metaclass or overriding
+  # __setattr__/__delattr__ (see
+  # https://stackoverflow.com/questions/5189699/how-to-make-a-class-property).
   def __init__(self, fget, doc=None):
     self.fget = fget
 
@@ -31,6 +31,7 @@ class ClassPropertyDescriptor(object):
     else:
       self.__doc__ = doc
 
+  # See https://docs.python.org/2/howto/descriptor.html for more details.
   def __get__(self, obj, objtype=None):
     if objtype is None:
       objtype = type(obj)
@@ -38,7 +39,10 @@ class ClassPropertyDescriptor(object):
 
 
 def classproperty(func):
-  """Use as a decorator on a method definition to access it as a property of the class."""
+  """Use as a decorator on a method definition to access it as a property of the class.
+
+  NB: setting or deleting the attribute of this name will overwrite this property!
+  """
   if not isinstance(func, (classmethod, staticmethod)):
     func = classmethod(func)
 
