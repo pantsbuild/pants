@@ -20,10 +20,12 @@ class SingletonMetaclass(type):
 class ClassPropertyDescriptor(object):
   """Define a readable class property, given a function."""
 
-  # NB: it seems overriding __set__ and __delete__ would require defining a metaclass or overriding
-  # __setattr__/__delattr__ (see
+  # TODO: it seems overriding __set__ and __delete__ would require defining a metaclass or
+  # overriding __setattr__/__delattr__ (see
   # https://stackoverflow.com/questions/5189699/how-to-make-a-class-property). The current solution
-  # doesn't require any modifications to the class definition beyond declaring a @classproperty.
+  # doesn't require any modifications to the class definition beyond declaring a @classproperty.  If
+  # we can set __delete__ and have it work, we can use that e.g. to clear the cache for a new
+  # `@memoized_classproperty` decorator.
   def __init__(self, fget, doc):
     self.fget = fget
     self.__doc__ = doc

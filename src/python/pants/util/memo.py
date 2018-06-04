@@ -144,6 +144,9 @@ def memoized_method(func=None, key_factory=per_instance, **kwargs):
   ...   def name(self):
   ...     pass
 
+  NB: this decorator can be used below an `@classproperty` or `@classmethod` decorator to memoize a
+  class-level property or method.
+
   :API: public
 
   :param func: The function to wrap.  Only generally passed by the python runtime and should be

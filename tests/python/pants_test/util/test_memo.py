@@ -7,7 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.util.memo import memoized, memoized_property, per_instance, testable_memoized_property
+from pants.util.memo import memoized, memoized_method, memoized_property, per_instance, testable_memoized_property
+from pants.util.meta import classproperty
 
 
 class MemoizeTest(unittest.TestCase):
@@ -220,6 +221,45 @@ class MemoizeTest(unittest.TestCase):
         @property
         def name(self):
           pass
+
+  def test_memoized_method(self):
+    class Foo(object):
+      _x = 3
+
+      @memoized_method
+      def method(self, y):
+        return self._x + y
+
+    foo = Foo()
+    self.assertEqual(5, foo.method(2))
+    Foo._x = 14
+    self.assertEqual(5, foo.method(2))
+    # The (foo, 3) pair is the cache key, which is different than the previous (foo, 2), so we
+    # recalculate and read the new value of `Foo._x`.
+    self.assertEqual(17, foo.method(3))
+
+  def test_memoized_class_methods(self):
+    class Foo(object):
+      _x = 3
+
+      @classmethod
+      @memoized_method
+      def method(cls, y):
+        return cls._x + y
+
+      @classproperty
+      @memoized_method
+      def prop(cls):
+        return cls._x
+
+    self.assertEqual(3, Foo.prop)
+    self.assertEqual(5, Foo.method(2))
+    Foo._x = 14
+    # The property is cached.
+    self.assertEqual(3, Foo.prop)
+    # The method is cached for previously made calls only.
+    self.assertEqual(5, Foo.method(2))
+    self.assertEqual(15, Foo.method(1))
 
   def test_descriptor_application_valid(self):
     class Foo(self._Called):
