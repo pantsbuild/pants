@@ -16,8 +16,7 @@ from pants.option.custom_types import dir_option
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
-from pants.util.memo import memoized_method
-from pants.util.meta import classproperty
+from pants.util.memo import memoized_classproperty
 from pants.util.objects import datatype
 
 
@@ -38,8 +37,7 @@ class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
 
   default_option_value = WARN
 
-  @classproperty
-  @memoized_method
+  @memoized_classproperty
   def _singletons(cls):
     return { behavior: cls(behavior) for behavior in cls.allowed_values }
 
