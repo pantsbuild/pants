@@ -41,6 +41,12 @@ class GraphTestBase(unittest.TestCase):
     options.target_specs = specs
     return options
 
+  def _default_build_file_aliases(self):
+    # TODO: Get default BuildFileAliases by extending BaseTest post
+    #   https://github.com/pantsbuild/pants/issues/4401
+    _, build_config = OptionsInitializer(OptionsBootstrapper()).setup(init_logging=False)
+    return build_config.registered_aliases()
+
   @contextmanager
   def graph_helper(self,
                    build_file_aliases=None,
@@ -50,6 +56,7 @@ class GraphTestBase(unittest.TestCase):
 
     with temporary_dir() as work_dir:
       path_ignore_patterns = path_ignore_patterns or []
+      build_file_aliases = build_file_aliases or self._default_build_file_aliases()
       # TODO: This test should be swapped to using TestBase.
       graph_helper = EngineInitializer.setup_legacy_graph_extended(
         path_ignore_patterns,
@@ -166,12 +173,6 @@ class GraphInvalidationTest(GraphTestBase):
 
   def test_sources_ordering_glob(self):
     self._ordering_test('testprojects/src/resources/org/pantsbuild/testproject/ordering:globs')
-
-  def _default_build_file_aliases(self):
-    # TODO: Get default BuildFileAliases by extending BaseTest post
-    #   https://github.com/pantsbuild/pants/issues/4401
-    _, build_config = OptionsInitializer(OptionsBootstrapper()).setup(init_logging=False)
-    return build_config.registered_aliases()
 
   def test_target_macro_override(self):
     """Tests that we can "wrap" an existing target type with additional functionality.
