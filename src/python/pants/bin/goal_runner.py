@@ -23,7 +23,6 @@ from pants.init.engine_initializer import EngineInitializer
 from pants.init.subprocess import Subprocess
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.java.nailgun_executor import NailgunProcessGroup
-from pants.option.global_options import GlobMatchErrorBehavior
 from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting import Reporting
 from pants.scm.subsystems.changed import Changed
@@ -77,23 +76,9 @@ class GoalRunnerFactory(object):
       result = help_printer.print_help()
       self._exiter(result)
 
-  def _init_graph(self,
-                  pants_ignore_patterns,
-                  build_ignore_patterns,
-                  exclude_target_regexps,
-                  target_specs,
-                  target_roots,
-                  workdir,
-                  graph_helper,
-                  subproject_build_roots):
+  def _init_graph(self, target_roots, graph_helper):
     """Determine the BuildGraph, AddressMapper and spec_roots for a given run.
 
-    :param list pants_ignore_patterns: The pants ignore patterns from '--pants-ignore'.
-    :param list build_ignore_patterns: The build ignore patterns from '--build-ignore',
-                                       applied during BUILD file searching.
-    :param str workdir: The pants workdir.
-    :param list exclude_target_regexps: Regular expressions for targets to be excluded.
-    :param list target_specs: The original target specs.
     :param TargetRoots target_roots: The existing `TargetRoots` object, if any.
     :param LegacyGraphSession graph_helper: A LegacyGraphSession to use for graph construction,
                                             if available. This would usually come from the daemon.
@@ -103,22 +88,10 @@ class GoalRunnerFactory(object):
     if not graph_helper:
       native = Native.create(self._global_options)
       native.set_panic_handler()
-      graph_helper = EngineInitializer.setup_legacy_graph(
-        pants_ignore_patterns,
-        workdir,
-        self._global_options.build_file_imports,
-        glob_match_error_behavior=GlobMatchErrorBehavior.create(
-          self._global_options.glob_expansion_failure),
-        native=native,
-        build_file_aliases=self._build_config.registered_aliases(),
-        rules=self._build_config.rules(),
-        build_ignore_patterns=build_ignore_patterns,
-        exclude_target_regexps=exclude_target_regexps,
-        subproject_roots=subproject_build_roots,
-        include_trace_on_error=self._options.for_global_scope().print_exception_stacktrace,
-        remote_store_server=self._options.for_global_scope().remote_store_server,
-        remote_execution_server=self._options.for_global_scope().remote_execution_server,
-      ).new_session()
+      graph_scheduler_helper = EngineInitializer.setup_legacy_graph(native,
+                                                                    self._global_options,
+                                                                    self._build_config)
+      graph_helper = graph_scheduler_helper.new_session()
 
     target_roots = target_roots or TargetRootsCalculator.create(
       options=self._options,
@@ -169,14 +142,8 @@ class GoalRunnerFactory(object):
   def _setup_context(self):
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
       self._build_graph, self._address_mapper, scheduler, target_roots = self._init_graph(
-        self._global_options.pants_ignore,
-        self._global_options.build_ignore,
-        self._global_options.exclude_target_regexp,
-        self._options.target_specs,
         self._target_roots,
-        self._global_options.pants_workdir,
         self._daemon_graph_helper,
-        self._global_options.subproject_roots
       )
 
       goals = self._determine_goals(self._requested_goals)
