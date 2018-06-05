@@ -882,6 +882,13 @@ class Target(AbstractTarget):
       else:
         sources = FilesetWithSpec.empty(sources_rel_path)
     elif isinstance(sources, (set, list, tuple)):
+      deprecated_conditional(
+        lambda: True,
+        '1.10.0.dev0',
+        ('Specifying set/list/tuple sources on Targets is deprecated, and now takes a slow path. '
+         'Instead, class {} should use the ve engine source/sources path.')
+          .format(self.__class__.__name__)
+      )
       # Received a literal sources list: convert to a FilesetWithSpec via Files.
       sources = Files.create_fileset_with_spec(sources_rel_path, *sources)
     elif not isinstance(sources, FilesetWithSpec):

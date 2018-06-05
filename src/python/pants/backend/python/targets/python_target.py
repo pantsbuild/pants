@@ -52,8 +52,9 @@ class PythonTarget(Target):
     """
     self.address = address
     payload = payload or Payload()
+    sources_field = self.create_sources_field(sources, address.spec_path, key_arg='sources')
     payload.add_fields({
-      'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
+      'sources': sources_field,
       'provides': provides,
       'compatibility': PrimitiveField(maybe_list(compatibility or ())),
     })

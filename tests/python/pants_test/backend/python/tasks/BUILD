@@ -45,6 +45,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',
     'tests/python/pants_test/engine:scheduler_test_base',
+    'tests/python/pants_test/engine:sources_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:task_test_base',
     'tests/python/pants_test/tasks:task_test_base',
