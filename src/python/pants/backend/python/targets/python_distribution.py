@@ -17,8 +17,6 @@ from pants.build_graph.target import Target
 class PythonDistribution(Target):
   """A Python distribution target that accepts a user-defined setup.py."""
 
-  default_sources_globs = '*.py'
-
   @classmethod
   def alias(cls):
     return 'python_dist'

@@ -45,7 +45,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
     if isinstance(filespecs, PathGlobs):
       return filespecs
     else:
-      return PathGlobs.create('', include=filespecs)
+      return PathGlobs.create(include=filespecs)
 
   def assert_walk_dirs(self, filespecs_or_globs, paths, ignore_patterns=None):
     self.assert_walk_snapshot('dirs', filespecs_or_globs, paths, ignore_patterns=ignore_patterns)

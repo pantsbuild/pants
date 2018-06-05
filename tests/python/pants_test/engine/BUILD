@@ -228,3 +228,13 @@ python_tests(
     'src/python/pants/util:dirutil',
   ]
 )
+
+python_tests(
+  name='sources_test_base',
+  sources=['sources_test_base.py'],
+  dependencies=[
+    ':scheduler_test_base',
+    'src/python/pants/base:project_tree',
+    'src/python/pants/engine:fs',
+  ]
+)

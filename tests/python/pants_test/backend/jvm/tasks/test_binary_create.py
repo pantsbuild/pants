@@ -14,18 +14,21 @@ from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import open_zip
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
+from pants_test.engine.sources_test_base import SourcesTestBase
 
 
-class TestBinaryCreate(JvmBinaryTaskTestBase):
+class TestBinaryCreate(SourcesTestBase, JvmBinaryTaskTestBase):
 
   @classmethod
   def task_type(cls):
     return BinaryCreate
 
   def test_jvm_binaries_products(self):
+    self.create_file('Bar.java')
+
     binary_target = self.make_target(spec='//bar:bar-binary',
                                      target_type=JvmBinary,
-                                     source='Bar.java')
+                                     sources=self.sources_for(['Bar.java']))
     context = self.context(target_roots=[binary_target])
     classpath_products = self.ensure_classpath_products(context)
 
@@ -38,7 +41,7 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
 
     self.add_to_runtime_classpath(context, binary_target, {'Bar.class': '', 'bar.txt': ''})
 
-    self.execute(context)
+    JvmBinaryTaskTestBase.execute(self, context)
 
     jvm_binary_products = context.products.get('jvm_binaries')
     self.assertIsNotNone(jvm_binary_products)
@@ -56,12 +59,14 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
                        sorted(jar.namelist()))
 
   def test_jvm_binaries_deploy_excludes(self):
+    self.create_file('Bar.java')
+
     foo_jar_lib = self.make_target(spec='3rdparty/jvm/org/example:foo',
                                    target_type=JarLibrary,
                                    jars=[JarDependency(org='org.example', name='foo', rev='1.0.0')])
     binary_target = self.make_target(spec='//bar:bar-binary',
                                      target_type=JvmBinary,
-                                     source='Bar.java',
+                                     sources=self.sources_for(['Bar.java']),
                                      dependencies=[foo_jar_lib],
                                      deploy_excludes=[Exclude(org='org.pantsbuild')])
     context = self.context(target_roots=[binary_target])
@@ -82,7 +87,7 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
 
     self.add_to_runtime_classpath(context, binary_target, {'Bar.class': '', 'bar.txt': ''})
 
-    self.execute(context)
+    JvmBinaryTaskTestBase.execute(self, context)
     jvm_binary_products = context.products.get('jvm_binaries')
     self.assertIsNotNone(jvm_binary_products)
     product_data = jvm_binary_products.get(binary_target)

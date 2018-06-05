@@ -39,7 +39,7 @@ class PythonTarget(Target):
     :type dependencies: list of strings
     :param sources: Files to "include". Paths are relative to the
       BUILD file's directory.
-    :type sources: ``Fileset`` or list of strings
+    :type sources: ``EagerFilesetWithSpec``
     :param provides:
       The `setup_py <#setup_py>`_ to publish that represents this
       target outside the repo.
@@ -52,8 +52,9 @@ class PythonTarget(Target):
     """
     self.address = address
     payload = payload or Payload()
+    sources_field = self.create_sources_field(sources, address.spec_path, key_arg='sources')
     payload.add_fields({
-      'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
+      'sources': sources_field,
       'provides': provides,
       'compatibility': PrimitiveField(maybe_list(compatibility or ())),
     })

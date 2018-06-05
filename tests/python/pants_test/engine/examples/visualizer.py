@@ -80,5 +80,5 @@ def main_filespecs():
     '[build root path] [filespecs]*', sys.argv[1:])
 
   # Create PathGlobs for each arg relative to the buildroot.
-  path_globs = PathGlobs.create('', include=args, exclude=[])
+  path_globs = PathGlobs.create(include=args)
   visualize_build_request(build_root, goals, path_globs)

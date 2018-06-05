@@ -54,6 +54,7 @@ python_tests(
     ':base',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/build_graph',
+    'tests/python/pants_test/engine:sources_test_base',
   ]
 )
 

@@ -7,5 +7,6 @@ python_tests(
     'src/python/pants/backend/jvm/tasks/coverage',
     'src/python/pants/java/jar',
     'tests/python/pants_test/backend/jvm/tasks:jvm_binary_task_test_base',
+    'tests/python/pants_test/engine:sources_test_base',
   ]
 )

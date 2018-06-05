@@ -20,6 +20,7 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
+    'tests/python/pants_test/engine:sources_test_base',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
 )
