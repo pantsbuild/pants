@@ -102,9 +102,10 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
             # (>104-108 characters), so we override that here with a shorter path.
             'watchman_socket_path': '/tmp/watchman.{}.sock'.format(os.getpid()),
             'level': log_level,
-            'pants_subprocessdir': pid_dir
+            'pants_subprocessdir': pid_dir,
           }, extra_config or {})
         }
+        print('>>> config: \n{}\n'.format(pantsd_config))
         checker = PantsDaemonMonitor(pid_dir)
         self.assert_success_runner(workdir, pantsd_config, ['kill-pantsd'])
         try:
@@ -178,7 +179,15 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       checker.assert_started()
 
   def test_pantsd_run(self):
-    with self.pantsd_successful_run_context('debug') as (pantsd_run, checker, workdir, _):
+    extra_config = {
+        # Muddies the logs with warnings: once all of the warnings in the repository
+        # are fixed, this can be removed.
+        'glob_expansion_failure': 'ignore',
+      }
+    with self.pantsd_successful_run_context(
+          'debug',
+          extra_config=extra_config
+        ) as (pantsd_run, checker, workdir, _):
       pantsd_run(['list', '3rdparty:'])
       checker.assert_started()
 
