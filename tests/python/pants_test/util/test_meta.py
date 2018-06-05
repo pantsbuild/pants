@@ -43,12 +43,12 @@ class WithProp(object):
   _value = 'val0'
 
   @classproperty
-  def some_property(cls):
+  def class_property(cls):
     "some docs"
     return cls._value
 
   @classmethod
-  def some_method(cls):
+  def class_method(cls):
     return cls._value
 
   @staticproperty
@@ -77,18 +77,18 @@ class OverridingMethodDefSuper(WithProp):
   _other_value = 'o0'
 
   @classproperty
-  def some_property(cls):
-    return super(OverridingMethodDefSuper, cls).some_property + cls._other_value
+  def class_property(cls):
+    return super(OverridingMethodDefSuper, cls).class_property + cls._other_value
 
 
 class ClassPropertyTest(TestBase):
 
   def test_access(self):
-    self.assertEqual('val0', WithProp.some_property)
-    self.assertEqual('val0', WithProp().some_property)
+    self.assertEqual('val0', WithProp.class_property)
+    self.assertEqual('val0', WithProp().class_property)
 
-    self.assertEqual('val0', WithProp.some_method())
-    self.assertEqual('val0', WithProp().some_method())
+    self.assertEqual('val0', WithProp.class_method())
+    self.assertEqual('val0', WithProp().class_method())
 
     self.assertEqual('static_property', WithProp.static_property)
     self.assertEqual('static_property', WithProp().static_property)
@@ -97,23 +97,23 @@ class ClassPropertyTest(TestBase):
     self.assertEqual('static_method', WithProp().static_method())
 
   def test_has_attr(self):
-    self.assertTrue(hasattr(WithProp, 'some_property'))
-    self.assertTrue(hasattr(WithProp(), 'some_property'))
+    self.assertTrue(hasattr(WithProp, 'class_property'))
+    self.assertTrue(hasattr(WithProp(), 'class_property'))
 
   def test_docstring(self):
-    self.assertEqual("some docs", WithProp.__dict__['some_property'].__doc__)
+    self.assertEqual("some docs", WithProp.__dict__['class_property'].__doc__)
 
   def test_override_value(self):
-    self.assertEqual('val1', OverridingValueField.some_property)
-    self.assertEqual('val1', OverridingValueField().some_property)
+    self.assertEqual('val1', OverridingValueField.class_property)
+    self.assertEqual('val1', OverridingValueField().class_property)
 
   def test_override_inst_value(self):
-    self.assertEqual('v1', OverridingValueInit('v1').some_property)
-    self.assertEqual('v1', OverridingValueInit('v1').some_method())
+    self.assertEqual('val0', OverridingValueInit('v1').class_property)
+    self.assertEqual('val0', OverridingValueInit('v1').class_method())
 
   def test_override_method_super(self):
-    self.assertEqual('val0o0', OverridingMethodDefSuper.some_property)
-    self.assertEqual('val0o0', OverridingMethodDefSuper().some_property)
+    self.assertEqual('val0o0', OverridingMethodDefSuper.class_property)
+    self.assertEqual('val0o0', OverridingMethodDefSuper().class_property)
 
   def test_modify_class_value(self):
     class WithFieldToModify(object):
@@ -163,7 +163,7 @@ class ClassPropertyTest(TestBase):
         return cls._y
 
       @staticproperty
-      def staticproperty():
+      def static_property():
         return 's0'
 
     self.assertEqual('y0', DeleteValue.class_property)
