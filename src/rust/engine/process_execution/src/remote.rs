@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant};
 
 use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
@@ -84,7 +84,7 @@ impl super::CommandRunner for CommandRunner {
               .map(|result| (Arc::new(execute_request), result))
           })
           .and_then(move |(execute_request, operation)| {
-            let start_time = SystemTime::now();
+            let start_time = Instant::now();
 
             future::loop_fn((operation, 0), move |(operation, iter_num)| {
               let req_description = req_description.clone();
@@ -128,17 +128,8 @@ impl super::CommandRunner for CommandRunner {
                         (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS,
                       );
 
-                      let grpc_result =
-                        map_grpc_result(operations_client.get().get_operation(&operation_request));
-
-                      let operation = try_future!(grpc_result);
-
                       // take the grpc result and cancel the op if too much time has passed.
-                      let elapsed = try_future!(
-                        start_time
-                          .elapsed()
-                          .map_err(|err| format!("Something weird happened with time {:?}", err))
-                      );
+                      let elapsed = start_time.elapsed();
 
                       if elapsed > req_timeout {
                         future::err(format!(
@@ -155,6 +146,9 @@ impl super::CommandRunner for CommandRunner {
                             )
                           })
                           .and_then(move |_| {
+                            let grpc_result =
+                              map_grpc_result(operations_client.get().get_operation(&operation_request));
+                            let operation = try_future!(grpc_result);
                             future::ok(future::Loop::Continue((operation, iter_num + 1))).to_boxed()
                           })
                           .to_boxed()
@@ -636,7 +630,8 @@ mod tests {
   use std::iter::{self, FromIterator};
   use std::path::PathBuf;
   use std::sync::Arc;
-  use std::time::{Duration, SystemTime};
+  use std::time::{Duration, Instant};
+  use std::ops::Sub;
 
   #[derive(Debug, PartialEq)]
   enum StdoutType {
@@ -1406,23 +1401,12 @@ mod tests {
           ],
         ))
       };
-      let start_time = SystemTime::now();
+      let start_time = Instant::now();
       run_command_remote(mock_server.address(), execute_request).unwrap();
-//      mock_server.mock_responder.received_messages.lock().unwrap().iter().map(
-//        move |msg| match msg { (s,m,t) => println!("{:?}", t)}
-//      );
-
-
-//      let (s, m, t) = messages.get(0).unwrap();
-      println!("{:?}",  mock_server.mock_responder.received_messages);
-
       let messages = mock_server.mock_responder.received_messages.lock().unwrap();
       assert!(messages.len() == 2);
-      println!("{:?}",  messages.get(1).unwrap().2.duration_since(messages.get(0).unwrap().2).unwrap());
-
-//      println!("{:?}", messages.len());
-//      assert!(mock_server.mock_responder.received_messages);
-      assert!(start_time.elapsed().unwrap() >= Duration::from_millis(500));
+      let elapsed = messages.get(1).unwrap().2.sub(messages.get(0).unwrap().2);
+      assert!(elapsed >= Duration::from_millis(500));
     }
   }
 
@@ -1449,9 +1433,9 @@ mod tests {
           ],
         ))
       };
-      let start_time = SystemTime::now();
+      let start_time = Instant::now();
       run_command_remote(mock_server.address(), execute_request).unwrap();
-      assert!(start_time.elapsed().unwrap() >= Duration::from_millis(3000));
+      assert!(start_time.elapsed() >= Duration::from_millis(3000));
     }
   }
 

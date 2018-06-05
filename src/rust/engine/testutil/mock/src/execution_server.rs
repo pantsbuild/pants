@@ -5,7 +5,7 @@ use std::ops::Deref;
 use std::thread::sleep;
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
-use std::time::SystemTime;
+use std::time::Instant;
 
 use bazel_protos;
 use grpcio;
@@ -128,7 +128,7 @@ impl Drop for TestServer {
 #[derive(Clone, Debug)]
 pub struct MockResponder {
   mock_execution: MockExecution,
-  pub received_messages: Arc<Mutex<Vec<(String, Box<protobuf::Message>, SystemTime)>>>,
+  pub received_messages: Arc<Mutex<Vec<(String, Box<protobuf::Message>, Instant)>>>,
 }
 
 impl MockResponder {
@@ -144,7 +144,7 @@ impl MockResponder {
       .received_messages
       .lock()
       .unwrap()
-      .push((message.descriptor().name().to_string(), Box::new(message), SystemTime::now()));
+      .push((message.descriptor().name().to_string(), Box::new(message), Instant::now()));
   }
 
   fn display_all<D: Debug>(items: &Vec<D>) -> String {
