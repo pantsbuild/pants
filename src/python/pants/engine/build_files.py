@@ -43,8 +43,7 @@ def parse_address_family(address_mapper, directory):
   The AddressFamily may be empty, but it will not be None.
   """
   patterns = tuple(join(directory.path, p) for p in address_mapper.build_patterns)
-  path_globs = PathGlobs.create('',
-                                include=patterns,
+  path_globs = PathGlobs.create(include=patterns,
                                 exclude=address_mapper.build_ignore_patterns)
   snapshot = yield Get(Snapshot, PathGlobs, path_globs)
   files_content = yield Get(FilesContent, DirectoryDigest, snapshot.directory_digest)
@@ -294,7 +293,7 @@ def _spec_to_globs(address_mapper, specs):
                       for f in recursive_dirname(spec.directory))
     else:
       raise ValueError('Unrecognized Spec type: {}'.format(spec))
-  return PathGlobs.create('', include=patterns, exclude=address_mapper.build_ignore_patterns)
+  return PathGlobs.create(include=patterns, exclude=address_mapper.build_ignore_patterns)
 
 
 def create_graph_rules(address_mapper, symbol_table):
