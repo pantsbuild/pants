@@ -128,7 +128,7 @@ class TargetTest(TestBase):
     self.assertEqual(short_id,
                      'dummy.dummy1.dummy2.dummy3.dummy4.dummy5.dummy6.dummy7.dummy8.dummy9.foo')
 
-  def test_implicit_sources(self):
+  def test_legacy_implicit_sources(self):
     options = {Target.Arguments.options_scope: {'implicit_sources': True}}
     init_subsystem(Target.Arguments, options)
     target = self.make_target(':a', ImplicitSourcesTestingTarget)
