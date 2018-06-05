@@ -16,6 +16,7 @@ from pants.backend.docgen.targets.doc import Page
 from pants.backend.docgen.tasks import markdown_to_html_utils
 from pants.backend.docgen.tasks.markdown_to_html import MarkdownToHtml
 from pants.base.exceptions import TaskError
+from pants_test.engine.sources_test_base import SourcesTestBase
 from pants_test.task_test_base import TaskTestBase
 
 
@@ -100,14 +101,18 @@ class ChooseLinesTest(unittest.TestCase):
       '')
 
 
-class MarkdownToHtmlTest(TaskTestBase):
+class MarkdownToHtmlTest(SourcesTestBase, TaskTestBase):
   @classmethod
   def task_type(cls):
     return MarkdownToHtml
 
   def test_rst_render_empty(self):
     self.create_file('empty.rst')
-    empty_rst = self.make_target(':empty_rst', target_type=Page, source='empty.rst')
+    empty_rst = self.make_target(
+      ':empty_rst',
+      target_type=Page,
+      sources=self.sources_for(['empty.rst']),
+    )
     task = self.create_task(self.context(target_roots=[empty_rst]))
     task.execute()
 
@@ -117,7 +122,11 @@ class MarkdownToHtmlTest(TaskTestBase):
 
     * `RB #2363 https://rbcommons.com/s/twitter/r/2363/>`_
     """))
-    bad_rst = self.make_target(':bad_rst', target_type=Page, source='bad.rst')
+    bad_rst = self.make_target(
+      ':bad_rst',
+      target_type=Page,
+      sources=self.sources_for(['bad.rst']),
+    )
     task = self.create_task(self.context(target_roots=[bad_rst]))
     with self.assertRaises(TaskError):
       task.execute()
@@ -138,7 +147,11 @@ class MarkdownToHtmlTest(TaskTestBase):
 
     * `RB #2363 https://rbcommons.com/s/twitter/r/2363/>`_
     """))
-    bad_rst = self.make_target(':bad_rst', target_type=Page, source='bad.rst')
+    bad_rst = self.make_target(
+      ':bad_rst',
+      target_type=Page,
+      sources=self.sources_for(['bad.rst']),
+    )
     self.set_options(ignore_failure=True)
     context = self.context(target_roots=[bad_rst])
     context.log.warn = mock.Mock()
@@ -163,7 +176,11 @@ class MarkdownToHtmlTest(TaskTestBase):
 
     * `RB #2363 <https://rbcommons.com/s/twitter/r/2363/>`_
     """))
-    good_rst = self.make_target(':good_rst', target_type=Page, source='good.rst')
+    good_rst = self.make_target(
+      ':good_rst',
+      target_type=Page,
+      sources=self.sources_for(['good.rst']),
+    )
     context = self.context(target_roots=[good_rst])
     task = self.create_task(context)
     task.execute()
