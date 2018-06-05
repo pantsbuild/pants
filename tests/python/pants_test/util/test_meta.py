@@ -66,11 +66,36 @@ class OverridingValueField(WithProp):
 
 
 class OverridingValueInit(WithProp):
+  """Override the class-level `_value` with an instance-level `_value` from a constructor.
+
+  The class-level methods should still return the class-level `_value`, but the new instance methods
+  should return the value from the constructor."""
 
   def __init__(self, v):
-    # This will override the class's _value when evaluating the @classmethod and @classproperty as
-    # an instance method/property.
+    # This will be ignored when accessed as a class method.
     self._value = v
+
+  @property
+  def instance_property(self):
+    return self._value
+
+  def instance_method(self):
+    return self._value
+
+
+class WithShadowingInstanceMethod(OverridingValueInit):
+  """Override the class-level property and method with instance versions.
+
+  The instance-level methods should return the instance-level `_value` (the constructor argument)
+  instead of the class-level `_value` (defined in :class:`WithProp`).
+  """
+
+  @property
+  def class_property(self):
+    return self._value
+
+  def class_method(self):
+    return self._value
 
 
 class OverridingMethodDefSuper(WithProp):
@@ -110,8 +135,16 @@ class ClassPropertyTest(TestBase):
     self.assertEqual('val1', OverridingValueField().class_property)
 
   def test_override_inst_value(self):
-    self.assertEqual('val0', OverridingValueInit('v1').class_property)
-    self.assertEqual('val0', OverridingValueInit('v1').class_method())
+    obj = OverridingValueInit('v1')
+    self.assertEqual('val0', obj.class_property)
+    self.assertEqual('val0', obj.class_method())
+    self.assertEqual('v1', obj.instance_property)
+    self.assertEqual('v1', obj.instance_method())
+
+  def test_override_inst_method(self):
+    obj = WithShadowingInstanceMethod('v1')
+    self.assertEqual('v1', obj.class_property)
+    self.assertEqual('v1', obj.class_method())
 
   def test_override_method_super(self):
     self.assertEqual('val0o0', OverridingMethodDefSuper.class_property)

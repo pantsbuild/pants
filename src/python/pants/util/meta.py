@@ -52,17 +52,10 @@ def classproperty(func):
   >>> Foo.name
   'Foo'
 
-  Caveats:
-  - If this property is accessed on an instance of the class, it will run with the instance as the
-    first argument, NOT the class. If an instance field `_x` shadows a class-level field `_x`, and
-    the classproperty uses the `_x` field to compute its value, the instance field will be used
-    instead when calculating the property's result, which may be surprising. This does not affect
-    the behavior when applied to a staticmethod. See the test cases for this file for an example.
+  Setting or deleting the attribute of this name will overwrite this property.
 
-  - Setting or deleting the attribute of this name will overwrite this property.
-
-  - The docstring of the classproperty `x` for a class `C` can be obtained by
-    `C.__dict__['x'].__doc__`.
+  The docstring of the classproperty `x` for a class `C` can be obtained by
+  `C.__dict__['x'].__doc__`.
   """
   doc = func.__doc__
 
@@ -88,7 +81,10 @@ def staticproperty(func):
   >>> Foo.x
   'value'
 
-  See the docstring for :class:`classproperty` for further caveats on usage.
+  Setting or deleting the attribute of this name will overwrite this property.
+
+  The docstring of the classproperty `x` for a class `C` can be obtained by
+  `C.__dict__['x'].__doc__`.
   """
   doc = func.__doc__
 
