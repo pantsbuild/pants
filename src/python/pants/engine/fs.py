@@ -57,15 +57,15 @@ class PathGlobs(datatype([
       glob_match_error_behavior=glob_match_error_behavior)
 
   @staticmethod
-  def create(relative_to, include, exclude=tuple(), glob_match_error_behavior=None):
+  def create(include, exclude=tuple(), glob_match_error_behavior=None, relative_to=''):
     """Given various file patterns create a PathGlobs object (without using filesystem operations).
 
-    :param relative_to: The path that all patterns are relative to (which will itself be relative
-      to the buildroot).
     :param include: A list of filespecs to include.
     :param exclude: A list of filespecs to exclude.
     :param glob_match_error_behavior: The value to pass to GlobMatchErrorBehavior.create()
     :rtype: :class:`PathGlobs`
+    :param relative_to: The path that all patterns are relative to (which will itself be relative
+      to the buildroot).
     """
     encoded_reldir = relative_to.decode('utf-8')
     return PathGlobs(include=tuple(join(encoded_reldir, f.decode('utf-8')) for f in include),

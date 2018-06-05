@@ -332,7 +332,7 @@ class BaseGlobs(Locatable, AbstractClass):
 
   def to_path_globs(self, relpath):
     """Return a PathGlobs representing the included and excluded Files for these patterns."""
-    return PathGlobs.create(relpath, self._file_globs, self._excluded_file_globs)
+    return PathGlobs.create(self._file_globs, self._excluded_file_globs, relative_to=relpath)
 
   def _gen_init_args_str(self):
     all_arg_strs = []

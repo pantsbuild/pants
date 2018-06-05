@@ -63,7 +63,11 @@ class Sources(Struct, Locatable):
 
     This field may be projected to request the content of the files for this Sources object.
     """
-    return PathGlobs.create(self.spec_path, include=self.filespecs, exclude=(self.excludes or []))
+    return PathGlobs.create(
+      include=self.filespecs,
+      exclude=(self.excludes or []),
+      relative_to=self.spec_path,
+    )
 
   @abstractproperty
   def extensions(self):
