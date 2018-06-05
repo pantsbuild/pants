@@ -163,6 +163,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Read additional specs from this file, one per line')
     register('--verify-config', type=bool, default=True, daemon=False,
              help='Verify that all config file values correspond to known options.')
+
     register('--build-ignore', advanced=True, type=list, fromfile=True,
              default=['.*/', default_rel_distdir, 'bower_components/',
                       'node_modules/', '*.egg-info/'],
@@ -174,6 +175,12 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Paths to ignore for all filesystem operations performed by pants '
                   '(e.g. BUILD file scanning, glob matching, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore).')
+    register('--glob-expansion-failure', type=str,
+             choices=GlobMatchErrorBehavior.allowed_values,
+             default=GlobMatchErrorBehavior.default_option_value,
+             help="Raise an exception if any targets declaring source files "
+                  "fail to match any glob provided in the 'sources' argument.")
+
     register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,
              metavar='<regexp>', help='Exclude target roots that match these regexes.')
     register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
@@ -195,6 +202,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option, daemon=False,
              help='A directory to write execution and rule graphs to as `dot` files. The contents '
                   'of the directory will be overwritten if any filenames collide.')
+    register('--print-exception-stacktrace', advanced=True, type=bool,
+             help='Print to console the full exception stack trace if encountered.')
 
     # BinaryUtil options.
     register('--binaries-baseurls', type=list, advanced=True,
@@ -283,16 +292,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,
              help='Used to limit the number of arguments passed to some subprocesses by breaking '
              'the command up into multiple invocations.')
-    register('--print-exception-stacktrace', advanced=True, type=bool,
-             help='Print to console the full exception stack trace if encountered.')
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
-    # TODO: Make a custom type abstract class (or something) to automate the production of an option
-    # with specific allowed values from a datatype (ideally using singletons for the allowed
-    # values).
-    register('--glob-expansion-failure', type=str,
-             choices=GlobMatchErrorBehavior.allowed_values,
-             default=GlobMatchErrorBehavior.default_option_value,
-             help="Raise an exception if any targets declaring source files "
-                  "fail to match any glob provided in the 'sources' argument.")

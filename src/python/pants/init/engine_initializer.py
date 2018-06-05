@@ -26,9 +26,7 @@ from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import SingletonRule
 from pants.engine.scheduler import Scheduler
-from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import GlobMatchErrorBehavior
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.change_calculator import EngineChangeCalculator
 from pants.util.objects import datatype
 
@@ -122,21 +120,20 @@ class EngineInitializer(object):
   """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
 
   @staticmethod
-  def get_default_build_file_aliases():
-    _, build_config = OptionsInitializer(OptionsBootstrapper()).setup(init_logging=False)
-    return build_config.registered_aliases()
-
-  @staticmethod
-  def setup_legacy_graph(native, bootstrap_options):
+  def setup_legacy_graph(native, bootstrap_options, build_config):
     """Construct and return the components necessary for LegacyBuildGraph construction."""
     return EngineInitializer.setup_legacy_graph_extended(
       bootstrap_options.pants_ignore,
       bootstrap_options.pants_workdir,
       bootstrap_options.build_file_imports,
+      build_config.registered_aliases(),
       native=native,
+      glob_match_error_behavior=bootstrap_options.glob_expansion_failure,
+      rules=build_config.rules(),
       build_ignore_patterns=bootstrap_options.build_ignore,
       exclude_target_regexps=bootstrap_options.exclude_target_regexp,
       subproject_roots=bootstrap_options.subproject_roots,
+      include_trace_on_error=bootstrap_options.print_exception_stacktrace,
       remote_store_server=bootstrap_options.remote_store_server,
       remote_execution_server=bootstrap_options.remote_execution_server,
     )
@@ -146,9 +143,9 @@ class EngineInitializer(object):
     pants_ignore_patterns,
     workdir,
     build_file_imports_behavior,
+    build_file_aliases,
     build_root=None,
     native=None,
-    build_file_aliases=None,
     glob_match_error_behavior=None,
     rules=None,
     build_ignore_patterns=None,
@@ -184,9 +181,6 @@ class EngineInitializer(object):
     """
 
     build_root = build_root or get_buildroot()
-
-    if not build_file_aliases:
-      build_file_aliases = EngineInitializer.get_default_build_file_aliases()
 
     if not rules:
       rules = []

@@ -89,7 +89,8 @@ class GoalRunnerFactory(object):
       native = Native.create(self._global_options)
       native.set_panic_handler()
       graph_scheduler_helper = EngineInitializer.setup_legacy_graph(native,
-                                                                    self._global_options)
+                                                                    self._global_options,
+                                                                    self._build_config)
       graph_helper = graph_scheduler_helper.new_session()
 
     target_roots = target_roots or TargetRootsCalculator.create(
