@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
-from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
@@ -25,9 +24,6 @@ class ScalaLibrary(ExportableJvmLibrary):
 
   :API: public
   """
-
-  default_sources_globs = '*.scala'
-  default_sources_exclude_globs = JUnitTests.scala_test_globs
 
   @classmethod
   def subsystems(cls):

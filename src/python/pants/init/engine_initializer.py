@@ -19,9 +19,10 @@ from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTarge
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (AppAdaptor, GoTargetAdaptor, JavaLibraryAdaptor,
                                          JunitTestsAdaptor, JvmBinaryAdaptor, PageAdaptor,
-                                         PythonBinaryAdaptor, PythonLibraryAdaptor,
+                                         ProtobufLibraryAdaptor, PythonBinaryAdaptor,
+                                         PythonDistributionAdaptor, PythonLibraryAdaptor,
                                          PythonTestsAdaptor, RemoteSourcesAdaptor,
-                                         ScalaLibraryAdaptor, TargetAdaptor)
+                                         ScalaLibraryAdaptor, TargetAdaptor, ThriftLibraryAdaptor)
 from pants.engine.mapper import AddressMapper
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
@@ -54,12 +55,15 @@ class LegacySymbolTable(SymbolTable):
     # territory.
     for alias in ['java_library', 'java_agent', 'javac_plugin']:
       self._table[alias] = JavaLibraryAdaptor
+    self._table['java_thrifty_library'] = ThriftLibraryAdaptor
     for alias in ['scala_library', 'scalac_plugin']:
       self._table[alias] = ScalaLibraryAdaptor
     for alias in ['python_library', 'pants_plugin']:
       self._table[alias] = PythonLibraryAdaptor
+    self._table['python_distribution'] = PythonDistributionAdaptor
     for alias in ['go_library', 'go_binary']:
       self._table[alias] = GoTargetAdaptor
+    self._table['go_protobuf_library'] = ProtobufLibraryAdaptor
 
     self._table['junit_tests'] = JunitTestsAdaptor
     self._table['jvm_app'] = AppAdaptor
