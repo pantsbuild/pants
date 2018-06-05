@@ -19,12 +19,6 @@ class JUnitTests(JvmTarget):
   :API: public
   """
 
-  java_test_globs = ('*Test.java',)
-  scala_test_globs = ('*Test.scala', '*Spec.scala')
-
-  default_sources_globs = java_test_globs + scala_test_globs
-
-
   CONCURRENCY_SERIAL = 'SERIAL'
   CONCURRENCY_PARALLEL_CLASSES = 'PARALLEL_CLASSES'
   CONCURRENCY_PARALLEL_METHODS = 'PARALLEL_METHODS'

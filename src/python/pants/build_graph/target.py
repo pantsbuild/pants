@@ -871,6 +871,13 @@ class Target(AbstractTarget):
       # This is so that tests don't need to set up the subsystem when creating targets that
       # legitimately do not require sources.
       if (key_arg is None or key_arg == 'sources') and self.supports_default_sources():
+        deprecated_conditional(
+          lambda: True,
+          '1.10.0.dev0',
+          ('Specifying default sources on Targets is deprecated, and now takes a slow path. '
+           'Instead, class {} should have a TargetAdaptor installed specifying default sources to '
+           'the v2 engine.').format(self.__class__.__name__)
+        )
         sources = self.default_sources(sources_rel_path)
       else:
         sources = FilesetWithSpec.empty(sources_rel_path)

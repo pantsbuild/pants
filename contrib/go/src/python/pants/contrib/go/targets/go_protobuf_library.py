@@ -15,8 +15,6 @@ from pants.contrib.go.targets.go_target import GoTarget
 class GoProtobufLibrary(Target):
   """A Go library generated from Protobuf IDL files."""
 
-  default_sources_globs = '*.proto'
-
   def __init__(self,
                address=None,
                payload=None,
