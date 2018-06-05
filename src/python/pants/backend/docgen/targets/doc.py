@@ -79,6 +79,9 @@ class Page(Target):
 
   def __init__(self,
                sources,
+               # TODO: Remove this after working out how to make sure the Arguments subsystem is
+               # init'd when going through the TestBase.target codepath.
+               source=None,
                address=None,
                payload=None,
                format=None,
