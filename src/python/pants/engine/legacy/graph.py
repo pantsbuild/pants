@@ -361,7 +361,8 @@ def hydrate_target(target_adaptor):
                         tuple(target_adaptor.dependencies))
 
 
-def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
+# This is deprecated and should not be used in new code.
+def eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
   fds = snapshot.path_stats if include_dirs else snapshot.files
   files = tuple(fast_relpath(fd.path, spec_path) for fd in fds)
 
@@ -386,7 +387,7 @@ def hydrate_sources(sources_field, glob_match_error_behavior):
   # with the global default!
   path_globs = sources_field.path_globs.with_match_error_behavior(glob_match_error_behavior)
   snapshot = yield Get(Snapshot, PathGlobs, path_globs)
-  fileset_with_spec = _eager_fileset_with_spec(
+  fileset_with_spec = eager_fileset_with_spec(
     sources_field.address.spec_path,
     sources_field.filespecs,
     snapshot)
@@ -414,7 +415,7 @@ def hydrate_bundles(bundles_field, glob_match_error_behavior):
     # NB: We `include_dirs=True` because bundle filesets frequently specify directories in order
     # to trigger a (deprecated) default inclusion of their recursive contents. See the related
     # deprecation in `pants.backend.jvm.tasks.bundle_create`.
-    kwargs['fileset'] = _eager_fileset_with_spec(rel_spec_path,
+    kwargs['fileset'] = eager_fileset_with_spec(rel_spec_path,
                                                  filespecs,
                                                  snapshot,
                                                  include_dirs=True)
