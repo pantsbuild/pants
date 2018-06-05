@@ -302,9 +302,6 @@ class JvmBinary(JvmTarget):
                payload=None,
                main=None,
                basename=None,
-               # TODO: Remove this after working out how to make sure the Arguments subsystem is
-               # init'd when going through the TestBase.target codepath.
-               source=None,
                sources=None,
                deploy_excludes=None,
                deploy_jar_rules=None,
