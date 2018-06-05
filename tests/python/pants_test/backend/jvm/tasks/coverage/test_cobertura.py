@@ -17,6 +17,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coverage.cobertura import Cobertura
 from pants.backend.jvm.tasks.coverage.manager import CodeCoverageSettings
 from pants.java.jar.jar_dependency import JarDependency
+from pants_test.engine.sources_test_base import SourcesTestBase
 from pants_test.test_base import TestBase
 
 
@@ -46,7 +47,7 @@ class MockSystemCalls(object):
     self.safe_makedir_calls.append(dir)
 
 
-class TestCobertura(TestBase):
+class TestCobertura(SourcesTestBase, TestBase):
   def get_settings(self, options, syscalls):
     return CodeCoverageSettings(
       options,
@@ -72,9 +73,11 @@ class TestCobertura(TestBase):
                                           JarDependency(org='org.pantsbuild', name='bar',
                                                         rev='2.0.0', ext='zip')])
 
+    self.create_file('Foo.java')
+
     self.binary_target = self.make_target(spec='//foo:foo-binary',
                                           target_type=JvmBinary,
-                                          source='Foo.java',
+                                          sources=self.sources_for(['Foo.java']),
                                           dependencies=[self.jar_lib])
 
     self.app_target = self.make_target(spec='//foo:foo-app',
@@ -84,7 +87,7 @@ class TestCobertura(TestBase):
 
     self.java_target = self.make_target(spec='//foo:foo-java',
                                         target_type=JavaLibrary,
-                                        sources=[])
+                                        sources=self.sources_for([]))
 
     self.annotation_target = self.make_target(spec='//foo:foo-anno',
                                               target_type=AnnotationProcessor)
