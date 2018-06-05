@@ -140,11 +140,11 @@ impl MockResponder {
   }
 
   fn log<T: protobuf::Message + Sized>(&self, message: T) {
-    self
-      .received_messages
-      .lock()
-      .unwrap()
-      .push((message.descriptor().name().to_string(), Box::new(message), Instant::now()));
+    self.received_messages.lock().unwrap().push((
+      message.descriptor().name().to_string(),
+      Box::new(message),
+      Instant::now(),
+    ));
   }
 
   fn display_all<D: Debug>(items: &Vec<D>) -> String {

@@ -146,10 +146,12 @@ impl super::CommandRunner for CommandRunner {
                             )
                           })
                           .and_then(move |_| {
-                            let grpc_result =
-                              map_grpc_result(operations_client.get().get_operation(&operation_request));
-                            let operation = try_future!(grpc_result);
-                            future::ok(future::Loop::Continue((operation, iter_num + 1))).to_boxed()
+                            future::done(map_grpc_result(
+                              operations_client.get().get_operation(&operation_request),
+                            )).map(move |operation| {
+                              future::Loop::Continue((operation, iter_num + 1))
+                            })
+                              .to_boxed()
                           })
                           .to_boxed()
                       }
@@ -630,7 +632,7 @@ mod tests {
   use std::iter::{self, FromIterator};
   use std::path::PathBuf;
   use std::sync::Arc;
-  use std::time::{Duration, Instant};
+  use std::time::Duration;
   use std::ops::Sub;
 
   #[derive(Debug, PartialEq)]
@@ -1401,12 +1403,13 @@ mod tests {
           ],
         ))
       };
-      let start_time = Instant::now();
       run_command_remote(mock_server.address(), execute_request).unwrap();
+
       let messages = mock_server.mock_responder.received_messages.lock().unwrap();
       assert!(messages.len() == 2);
-      let elapsed = messages.get(1).unwrap().2.sub(messages.get(0).unwrap().2);
-      assert!(elapsed >= Duration::from_millis(500));
+      assert!(
+        messages.get(1).unwrap().2.sub(messages.get(0).unwrap().2) >= Duration::from_millis(500)
+      );
     }
   }
 
@@ -1433,9 +1436,19 @@ mod tests {
           ],
         ))
       };
-      let start_time = Instant::now();
       run_command_remote(mock_server.address(), execute_request).unwrap();
-      assert!(start_time.elapsed() >= Duration::from_millis(3000));
+
+      let messages = mock_server.mock_responder.received_messages.lock().unwrap();
+      assert!(messages.len() == 4);
+      assert!(
+        messages.get(1).unwrap().2.sub(messages.get(0).unwrap().2) >= Duration::from_millis(500)
+      );
+      assert!(
+        messages.get(2).unwrap().2.sub(messages.get(1).unwrap().2) >= Duration::from_millis(1000)
+      );
+      assert!(
+        messages.get(3).unwrap().2.sub(messages.get(2).unwrap().2) >= Duration::from_millis(1500)
+      );
     }
   }
 
