@@ -11,7 +11,6 @@ from pants.backend.jvm.targets.jvm_binary import (Duplicate, JarRules, JvmBinary
                                                   Skip)
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload_field import FingerprintedField
-from pants.build_graph.target import Target
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants_test.test_base import TestBase
@@ -93,16 +92,6 @@ class JvmBinaryTest(TestBase):
     self.assertEquals(repr(Duplicate.SKIP),
                       repr(jar_rules.rules[0].action))  # <object object at 0x...>
     self.assertEquals(Duplicate.FAIL, jar_rules.default_dup_action)
-
-  def test_bad_source_declaration(self):
-    with self.assertRaisesRegexp(TargetDefinitionException,
-                                 r'Invalid target JvmBinary.*foo.*source must be a single'):
-      self.make_target(':foo', JvmBinary, main='com.example.Foo', source=['foo.py'])
-
-  def test_bad_sources_declaration(self):
-    with self.assertRaisesRegexp(Target.IllegalArgument,
-                                 r'jvm_binary only supports a single "source" argument'):
-      self.make_target('foo:foo', target_type=JvmBinary, main='com.example.Foo', sources=['foo.py'])
 
   def test_bad_main_declaration(self):
     with self.assertRaisesRegexp(TargetDefinitionException,
