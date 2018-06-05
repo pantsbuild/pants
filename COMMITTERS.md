@@ -3,6 +3,9 @@ Active Committers
 
 * Benjy Weinberger
 * Chris Heisterkamp
+* Daniel McClanahan
+* Daniel Wagner-Hall
+* Dorothy Ordogh
 * Ity Kaul
 * John Sirois
 * Kris Wilson
@@ -11,9 +14,6 @@ Active Committers
 * Nora Howard
 * Stu Hood
 * Yi Cheng
-* Daniel Wagner-Hall
-* Dorothy Ordogh
-* Daniel McClanahan
 
 Emeritus
 ========
