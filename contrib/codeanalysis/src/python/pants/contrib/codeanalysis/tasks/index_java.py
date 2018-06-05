@@ -79,4 +79,4 @@ class IndexJava(NailgunTask):
                           workunit_labels=[WorkUnitLabel.COMPILER])
     if result != 0:
       raise TaskError('java {main} ... exited non-zero ({result})'.format(
-        main=self._KYTHE_INDEXER_MAIN, result=result))
+        main=self._KYTHE_JAVA_INDEXER_MAIN, result=result))
