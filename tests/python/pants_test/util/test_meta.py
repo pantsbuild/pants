@@ -44,7 +44,7 @@ class WithProp(object):
 
   @classproperty
   def class_property(cls):
-    "some docs"
+    "class_property docs"
     return cls._value
 
   @classmethod
@@ -53,6 +53,7 @@ class WithProp(object):
 
   @staticproperty
   def static_property():
+    "static_property docs"
     return 'static_property'
 
   @staticmethod
@@ -101,7 +102,8 @@ class ClassPropertyTest(TestBase):
     self.assertTrue(hasattr(WithProp(), 'class_property'))
 
   def test_docstring(self):
-    self.assertEqual("some docs", WithProp.__dict__['class_property'].__doc__)
+    self.assertEqual("class_property docs", WithProp.__dict__['class_property'].__doc__)
+    self.assertEqual("static_property docs", WithProp.__dict__['static_property'].__doc__)
 
   def test_override_value(self):
     self.assertEqual('val1', OverridingValueField.class_property)
