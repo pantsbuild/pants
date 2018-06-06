@@ -27,6 +27,8 @@ class JvmPlatform(Subsystem):
   # strictly (eg, if Java 10 != 1.10, simply leave it out).
   SUPPORTED_CONVERSION_VERSIONS = (6, 7, 8,)
 
+  _COMPILER_CHOICES = ['zinc', 'javac']
+
   class IllegalDefaultPlatform(TaskError):
     """The --default-platform option was set, but isn't defined in --platforms."""
 
@@ -51,13 +53,21 @@ class JvmPlatform(Subsystem):
   options_scope = 'jvm-platform'
 
   @classmethod
+  def add_compiler_choice(cls, name):
+    """This allows plugins to register additional jvm compilers by name.
+
+    They can then follow the pattern used by zinc_compile and javac_compile to switch themselves on
+    or off."""
+    cls._COMPILER_CHOICES.append(name)
+
+  @classmethod
   def register_options(cls, register):
     super(JvmPlatform, cls).register_options(register)
     register('--platforms', advanced=True, type=dict, default={}, fingerprint=True,
              help='Compile settings that can be referred to by name in jvm_targets.')
     register('--default-platform', advanced=True, type=str, default=None, fingerprint=True,
              help='Name of the default platform to use if none are specified.')
-    register('--compiler', advanced=True, choices=['zinc', 'javac'], default='zinc', fingerprint=True,
+    register('--compiler', advanced=True, choices=cls._COMPILER_CHOICES, default='zinc', fingerprint=True,
              help='Java compiler implementation to use.')
 
   @classmethod
