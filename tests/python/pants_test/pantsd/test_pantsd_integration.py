@@ -17,7 +17,7 @@ from colors import bold, cyan, magenta
 from concurrent.futures import ThreadPoolExecutor
 
 from pants.pantsd.process_manager import ProcessManager
-from pants.util.collections import combined_dict, recursively_update
+from pants.util.collections import recursively_update
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
 from pants_test.pants_run_integration_test import PantsResult, PantsRunIntegrationTest
@@ -540,9 +540,9 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env
     # isn't stripped.
     with self.pantsd_successful_run_context(
-      extra_config={'compile.zinc': {'jvm_options': '-Xmx1g'}},
+      extra_config={'compile.zinc': {'jvm_options': ['-Xmx1g']}},
       extra_env={'_JAVA_OPTIONS': '-Xms2g'},
-    ) as (pantsd_run, checker, workdir):
+    ) as (pantsd_run, checker, workdir, _):
       pantsd_run(['help'])
       checker.assert_started()
 
