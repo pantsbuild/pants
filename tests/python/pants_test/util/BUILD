@@ -74,6 +74,7 @@ python_tests(
   sources = ['test_memo.py'],
   dependencies = [
     'src/python/pants/util:memo',
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -82,6 +83,7 @@ python_tests(
   sources = ['test_meta.py'],
   dependencies = [
     'src/python/pants/util:meta',
+    'tests/python/pants_test:test_base',
   ]
 )
 
