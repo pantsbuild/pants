@@ -37,8 +37,8 @@ class GraphTestBase(unittest.TestCase):
   _native = init_native()
 
   def _make_setup_args(self, specs):
-    options = mock.Mock()
-    options.target_specs = specs
+    options = mock.Mock(target_specs=specs)
+    options.for_scope.return_value = mock.Mock(diffspec=None, changes_since=None)
     return options
 
   def _default_build_file_aliases(self):
@@ -77,13 +77,13 @@ class GraphTestBase(unittest.TestCase):
 
   def create_graph_from_specs(self, graph_helper, specs):
     Subsystem.reset()
-    target_roots = self.create_target_roots(specs)
     session = graph_helper.new_session()
+    target_roots = self.create_target_roots(specs, session, session.symbol_table)
     graph = session.create_build_graph(target_roots)[0]
     return graph, target_roots
 
-  def create_target_roots(self, specs):
-    return TargetRootsCalculator.create(self._make_setup_args(specs))
+  def create_target_roots(self, specs, session, symbol_table):
+    return TargetRootsCalculator.create(self._make_setup_args(specs), session, symbol_table)
 
 
 class GraphTargetScanFailureTests(GraphTestBase):

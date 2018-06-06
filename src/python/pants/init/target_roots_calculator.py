@@ -6,17 +6,19 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import itertools
+from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.specs import SingleAddress, DescendantAddresses, Specs
+from pants.base.specs import DescendantAddresses, SingleAddress, Specs
+from pants.base.target_roots import TargetRoots
 from pants.build_graph.address import Address
 from pants.engine.legacy.graph import TransitiveHydratedTargets, target_types_from_symbol_table
 from pants.engine.legacy.source_mapper import EngineSourceMapper
 from pants.goal.workspace import ScmWorkspace
-from pants.base.target_roots import TargetRoots
 from pants.scm.subsystems.changed import ChangedRequest
 
 
