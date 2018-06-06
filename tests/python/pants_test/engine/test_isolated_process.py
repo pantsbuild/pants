@@ -286,7 +286,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     cat_exe_req = CatExecutionRequest(
       ShellCat(BinaryLocation('/bin/cat')),
-      PathGlobs.create('', include=['fs_test/a/b/*']))
+      PathGlobs(include=['fs_test/a/b/*']))
 
     self.assertEqual(
       repr(cat_exe_req),

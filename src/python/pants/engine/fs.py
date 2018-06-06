@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from os.path import join
-
 from pants.base.project_tree import Dir, File
 from pants.engine.rules import RootRule
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -43,7 +41,14 @@ class PathGlobs(datatype([
   be aware of any changes to this object's definition.
   """
 
-  def __new__(cls, include, exclude, glob_match_error_behavior=None):
+  def __new__(cls, include, exclude=(), glob_match_error_behavior=None):
+    """Given various file patterns create a PathGlobs object (without using filesystem operations).
+
+    :param include: A list of filespecs to include.
+    :param exclude: A list of filespecs to exclude.
+    :param glob_match_error_behavior: The value to pass to GlobMatchErrorBehavior.create()
+    :rtype: :class:`PathGlobs`
+    """
     return super(PathGlobs, cls).__new__(
       cls,
       tuple(include),
@@ -55,22 +60,6 @@ class PathGlobs(datatype([
       include=self.include,
       exclude=self.exclude,
       glob_match_error_behavior=glob_match_error_behavior)
-
-  @staticmethod
-  def create(relative_to, include, exclude=tuple(), glob_match_error_behavior=None):
-    """Given various file patterns create a PathGlobs object (without using filesystem operations).
-
-    :param relative_to: The path that all patterns are relative to (which will itself be relative
-      to the buildroot).
-    :param include: A list of filespecs to include.
-    :param exclude: A list of filespecs to exclude.
-    :param glob_match_error_behavior: The value to pass to GlobMatchErrorBehavior.create()
-    :rtype: :class:`PathGlobs`
-    """
-    encoded_reldir = relative_to.decode('utf-8')
-    return PathGlobs(include=tuple(join(encoded_reldir, f.decode('utf-8')) for f in include),
-                     exclude=tuple(join(encoded_reldir, f.decode('utf-8')) for f in exclude),
-                     glob_match_error_behavior=glob_match_error_behavior)
 
 
 class PathGlobsAndRoot(datatype([('path_globs', PathGlobs), ('root', str)])):

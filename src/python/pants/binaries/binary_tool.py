@@ -196,7 +196,7 @@ class Script(BinaryToolBase):
     script_relpath = os.path.relpath(self.select(context), bootstrapdir)
     snapshot = context._scheduler.capture_snapshots((
       PathGlobsAndRoot(
-        PathGlobs((script_relpath,), ()),
+        PathGlobs((script_relpath,)),
         str(bootstrapdir),
       ),
     ))[0]
