@@ -19,7 +19,7 @@ class NailgunTaskTestBase(JvmToolTaskTestBase):
     :API: public
     """
     super(NailgunTaskTestBase, self).setUp()
-    self.set_options(use_nailgun=True)
+    self.set_options(execution_strategy='nailgun')
 
   def tearDown(self):
     """

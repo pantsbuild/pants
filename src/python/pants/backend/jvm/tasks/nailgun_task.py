@@ -19,12 +19,19 @@ from pants.task.task import Task, TaskBase
 
 class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   ID_PREFIX = 'ng'
+  # Possible execution strategies:
+  NAILGUN = 'nailgun'
+  SUBPROCESS = 'subprocess'
 
   @classmethod
   def register_options(cls, register):
     super(NailgunTaskBase, cls).register_options(register)
     register('--use-nailgun', type=bool, default=True,
              help='Use nailgun to make repeated invocations of this task quicker.')
+    register('--execution-strategy', type=str, default='',
+             help='Supported options: nailgun, & subprocess. If set to nailgun, nailgun '
+                  'will be enabled and repeated invocations of this task will be quicker. '
+                  'If set to subprocess, then the task will be run without nailgun.')
     register('--nailgun-timeout-seconds', advanced=True, default=10, type=float,
              help='Timeout (secs) for nailgun startup.')
     register('--nailgun-connect-attempts', advanced=True, default=5, type=int,
@@ -49,17 +56,34 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
     id_tuple = (self.ID_PREFIX, self.__class__.__name__)
 
+    self._execution_strategy = self.set_execution_strategy()
     self._identity = '_'.join(id_tuple)
     self._executor_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
                                           *id_tuple)
 
+  def _validate_execution_strategy(self):
+    valid_exec_strategies = {self.NAILGUN, self.SUBPROCESS}
+    if self.get_options().execution_strategy and not self.get_options().execution_strategy in valid_exec_strategies:
+      raise TaskError("{} is not a valid input for the execution-strategy option. The flag must be set to"
+                      "one of {}".format(self.get_options().execution_strategy, valid_exec_strategies))
+  
+  def set_execution_strategy(self):
+    # This will be more complex as we add more execution strategies are added
+    # Expected behavior: if execution-strategy is set, it will override use-nailgun
+    self._validate_execution_strategy()
+    if self.get_options().execution_strategy:
+      return self.get_options().execution_strategy
+    elif not self.get_options().use_nailgun:
+      return self.SUBPROCESS
+    return self.NAILGUN
+  
   def create_java_executor(self, dist=None):
     """Create java executor that uses this task's ng daemon, if allowed.
 
     Call only in execute() or later. TODO: Enforce this.
     """
     dist = dist or self.dist
-    if self.get_options().use_nailgun:
+    if self._execution_strategy == self.NAILGUN:
       classpath = os.pathsep.join(self.tool_classpath('nailgun-server'))
       return NailgunExecutor(self._identity,
                              self._executor_workdir,
@@ -85,7 +109,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     # Creating synthetic jar to work around system arg length limit is not necessary
     # when `NailgunExecutor` is used because args are passed through socket, therefore turning off
     # creating synthetic jar if nailgun is used.
-    create_synthetic_jar = not self.get_options().use_nailgun
+    create_synthetic_jar = self._execution_strategy != self.NAILGUN
     try:
       return util.execute_java(classpath=classpath,
                                main=main,
