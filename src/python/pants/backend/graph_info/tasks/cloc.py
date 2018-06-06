@@ -48,7 +48,7 @@ class CountLinesOfCode(ConsoleTask):
             list_file_out.write(b'\n')
       list_file_snapshot = self.context._scheduler.capture_snapshots((
         PathGlobsAndRoot(
-          PathGlobs.create(('input_files_list',)),
+          PathGlobs(('input_files_list',)),
           str(tmpdir),
         ),
       ))[0]
@@ -58,7 +58,7 @@ class CountLinesOfCode(ConsoleTask):
     # TODO: This should use an input file snapshot which should be provided on the Target object,
     # rather than hackily re-snapshotting each of the input files.
     # See https://github.com/pantsbuild/pants/issues/5762
-    input_pathglobs = PathGlobs.create(tuple(input_files))
+    input_pathglobs = PathGlobs(tuple(input_files))
     input_snapshot = self.context._scheduler.product_request(Snapshot, [input_pathglobs])[0]
 
     directory_digest = self.context._scheduler.merge_directories((
