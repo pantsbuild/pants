@@ -69,17 +69,17 @@ class NativeToolchain(Subsystem):
   def _xcode_cli_tools(self):
     return XCodeCLITools.scoped_instance(self)
 
+
 @rule(Linker, [Select(Platform), Select(NativeToolchain)])
 def select_linker(platform, native_toolchain):
-  # TODO(cosmicexplorer): make it possible to yield Get with a non-static
+  # TODO: make it possible to yield Get with a non-static
   # subject type and use `platform.resolve_platform_specific()`, something like:
   # linker = platform.resolve_platform_specific({
-  #   'darwin': lambda: Get(Linker, XCodeCLITools,
-  #                               native_toolchain._xcode_cli_tools),
+  #   'darwin': lambda: Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools),
   #   'linux': lambda: Get(Linker, Binutils, native_toolchain._binutils),
   # })
   if platform.normalized_os_name == 'darwin':
-    # TODO(cosmicexplorer): turn this into LLVM when lld works.
+    # TODO(#5663): turn this into LLVM when lld works.
     linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
   else:
     linker = yield Get(Linker, Binutils, native_toolchain._binutils)

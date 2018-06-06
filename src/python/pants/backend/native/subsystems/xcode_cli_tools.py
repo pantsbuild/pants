@@ -12,6 +12,7 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_executable
+from pants.util.memo import memoized_property
 
 
 class XCodeCLITools(Subsystem):
@@ -23,23 +24,33 @@ class XCodeCLITools(Subsystem):
 
   options_scope = 'xcode-cli-tools'
 
-  # TODO(cosmicexplorer): make this an option?
-  _INSTALL_LOCATION = '/usr/bin'
-
   _REQUIRED_TOOLS = frozenset(['cc', 'c++', 'clang', 'clang++', 'ld', 'lipo'])
 
   class XCodeToolsUnavailable(Exception):
     """Thrown if the XCode CLI tools could not be located."""
 
+  @classmethod
+  def register_options(cls, register):
+    super(XCodeCLITools, cls).register_options(register)
+
+    register('--xcode-cli-install-location', type=list, default='/usr/bin', advanced=True,
+             help='Installation location for the XCode command-line developer tools.')
+
+  @memoized_property
+  def _install_location(self):
+    return self.get_options().xcode_cli_install_location
+
   def _check_executables_exist(self):
+    install_location = self._install_location
     for filename in self._REQUIRED_TOOLS:
-      executable_path = os.path.join(self._INSTALL_LOCATION, filename)
+      executable_path = os.path.join(install_location, filename)
       if not is_executable(executable_path):
         raise self.XCodeToolsUnavailable(
           "'{}' is not an executable file, but it is required to build "
           "native code on this platform. You may need to install the XCode "
           "command line developer tools from the Mac App Store."
-          .format(executable_path))
+          "(for file '{}' with xcode_cli_install_location='{}')"
+          .format(executable_path, install_location))
 
   def path_entries(self):
     self._check_executables_exist()

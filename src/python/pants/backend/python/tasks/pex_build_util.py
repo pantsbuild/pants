@@ -55,8 +55,6 @@ def is_python_binary(tgt):
 
 def tgt_closure_has_native_sources(tgts):
   """Determine if any target in the current target closure has native (c or cpp) sources."""
-  # FIXME: introduce source_target_constraint and rely on it for all tasks -- override
-  # Task#get_targets()!
   pydist_targets = filter(is_local_python_dist, tgts)
   has_pydist_native_sources = any(tgt.has_native_sources for tgt in pydist_targets)
   native_targets = filter(lambda t: isinstance(t, NativeLibrary), tgts)
@@ -102,13 +100,19 @@ def build_for_current_platform_only_check(tgts):
   if tgt_closure_has_native_sources(tgts):
     def predicate(x):
       return is_python_binary(x) or is_local_python_dist(x)
-    platforms = tgt_closure_platforms(filter(predicate, tgts))
-    if len(platforms.keys()) > 1 or not 'current' in platforms.keys():
-      raise IncompatiblePlatformsError('The target set contains one or more targets that depend on '
-        'native code. Please ensure that the platform arguments in all relevant targets and build '
-        'options are compatible with the current platform. Found targets for platforms: {}'
-        .format(str(platforms)))
-    return True
+    platforms_with_sources = tgt_closure_platforms(filter(predicate, tgts))
+    platform_names = platforms_with_sources.keys()
+
+    # There will always be at least 1 platform, because we checked that they have native sources.
+    if platform_names == ['current']:
+      return True
+
+    raise IncompatiblePlatformsError(
+      'The target set contains one or more targets that depend on '
+      'native code. Please ensure that the platform arguments in all relevant targets and build '
+      'options are compatible with the current platform. Found targets for platforms: {}'
+      .format(str(platforms_with_sources)))
+
   return False
 
 

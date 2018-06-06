@@ -10,6 +10,7 @@ import itertools
 import os
 import pprint
 import shutil
+import sysconfig
 from abc import abstractmethod
 from collections import OrderedDict, defaultdict
 
@@ -20,9 +21,7 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 from wheel.install import WheelFile
 
-from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
-from pants.backend.native.subsystems.binaries.gcc import GCC
-from pants.backend.native.subsystems.native_toolchain import NativeToolchain
+from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -34,11 +33,11 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
 from pants.engine.rules import rule
-from pants.engine.selectors import Get, Select
+from pants.engine.selectors import Select
 from pants.task.task import Task
 from pants.util.contextutil import get_joined_path
-from pants.util.dirutil import is_executable, safe_rmtree, safe_walk
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.dirutil import safe_rmtree, safe_walk
+from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 from pants.util.strutil import safe_shlex_split
@@ -62,10 +61,11 @@ class SetupPyRunner(InstallerBase):
   DIST_DIR = 'dist'
 
   @classmethod
-  def for_bdist_wheel(cls, source_dir, is_platform_specific=False, **kw):
+  def for_bdist_wheel(cls, source_dir, is_platform_specific, **kw):
     cmd = ['bdist_wheel']
     if is_platform_specific:
-      cmd.extend(['--plat-name', 'current'])
+      plat_name = sysconfig.get_platform()
+      cmd.extend(['--plat-name', plat_name])
     else:
       cmd.append('--universal')
     cmd.extend(['--dist-dir', cls.DIST_DIR])
@@ -105,20 +105,14 @@ class SetupPyNativeTools(datatype([
 This class exists so that ???"""
 
 
-@rule(SetupPyNativeTools, [Select(NativeToolchain)])
-def get_setup_py_native_tools(native_toolchain):
-  c_compiler = yield Get(CCompiler, NativeToolchain, native_toolchain)
-  cpp_compiler = yield Get(CppCompiler, NativeToolchain, native_toolchain)
-  linker = yield Get(Linker, NativeToolchain, native_toolchain)
-
-  yield SetupPyNativeTools(
-    c_compiler=c_compiler,
-    cpp_compiler=cpp_compiler,
-    linker=linker)
+@rule(SetupPyNativeTools, [Select(CCompiler), Select(CppCompiler), Select(Linker)])
+def get_setup_py_native_tools(c_compiler, cpp_compiler, linker):
+  yield SetupPyNativeTools(c_compiler=c_compiler, cpp_compiler=cpp_compiler, linker=linker)
 
 
 # TODO: It would be pretty useful to have an Optional TypeConstraint.
 class SetupRequiresSiteDir(datatype(['site_dir'])): pass
+
 
 # TODO: This could be formulated as an @rule if targets and `PythonInterpreter` are made available
 # to the v2 engine.
@@ -165,9 +159,8 @@ class SetupPyExecutionEnvironment(datatype([
       ret['CC'] = native_tools.c_compiler.exe_filename
       ret['CXX'] = native_tools.cpp_compiler.exe_filename
 
-      # NB: Overridding LD or LDSHARED causes setup.py to try to invoke that linker directly without
-      # going through the compiler, which fails. We should probably implement #5661 soon to avoid
-      # these kind of minefields.
+      # TODO(#5661): Overridding LD or LDSHARED causes setup.py to try to invoke that linker
+      # directly without going through the compiler, which fails.
       all_path_entries = (
         native_tools.c_compiler.path_entries +
         native_tools.cpp_compiler.path_entries +

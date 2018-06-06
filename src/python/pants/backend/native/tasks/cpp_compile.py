@@ -10,7 +10,6 @@ import os
 from pants.backend.native.config.environment import CppCompiler
 from pants.backend.native.targets.cpp_library import CppLibrary
 from pants.backend.native.tasks.native_compile import NativeCompile, ObjectFiles
-from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.contextutil import get_joined_path

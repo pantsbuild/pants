@@ -16,10 +16,8 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.base.fingerprint_strategy import FingerprintStrategy
-from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.dependency_context import DependencyContext as DependencyContextBase
 from pants.build_graph.resources import Resources
-from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
 from pants.subsystem.subsystem import Subsystem
 

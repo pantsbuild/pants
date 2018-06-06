@@ -9,16 +9,12 @@ import os
 import re
 from abc import abstractmethod
 from collections import defaultdict
-from contextlib import contextmanager
 
-from pants.backend.native.config.environment import CCompiler, CppCompiler
-from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 # FIXME: when i deleted toolchain_task.py, it kept using the .pyc file. this shouldn't happen (the
 # import should have failed)!!!
 from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.exceptions import TaskError
-from pants.build_graph.dependency_context import DependencyContext
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import SubclassesOf, datatype
 

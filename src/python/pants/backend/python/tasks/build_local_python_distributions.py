@@ -9,7 +9,6 @@ import glob
 import os
 import re
 import shutil
-from contextlib import contextmanager
 
 from pex.interpreter import PythonInterpreter
 
@@ -17,20 +16,18 @@ from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
+from pants.backend.python.tasks.pex_build_util import is_local_python_dist
 from pants.backend.python.tasks.setup_py import (SetupPyExecutionEnvironment, SetupPyNativeTools,
                                                  SetupPyRunner, ensure_setup_requires_site_dir)
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
-from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.build_graph.address import Address
 from pants.task.task import Task
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdir_for, split_basename_and_dirname
 from pants.util.memo import memoized_property
-from pants.util.objects import Exactly
 
 
 class BuildLocalPythonDistributions(Task):
@@ -89,9 +86,7 @@ class BuildLocalPythonDistributions(Task):
 
     return reqs_to_resolve
 
-  source_target_constraint = Exactly(PythonDistribution)
-
-  # TODO: document the existence of this directory!
+  # TODO: document the existence of these directories!
   setup_requires_site_subdir = 'setup_requires_site'
   dist_subdir = 'python_dist_subdir'
 
@@ -104,7 +99,7 @@ class BuildLocalPythonDistributions(Task):
     return os.path.join(cls._get_output_dir(results_dir), SetupPyRunner.DIST_DIR)
 
   def execute(self):
-    dist_targets = self.context.targets(self.source_target_constraint.satisfied_by)
+    dist_targets = self.context.targets(is_local_python_dist)
     if not dist_targets:
       return
 
@@ -136,7 +131,8 @@ class BuildLocalPythonDistributions(Task):
             target,
             "Target '{}' is invalid: the only dependencies allowed in python_dist() targets "
             "are {}() targets with a provides= kwarg."
-            .format(dep_tgt.address.spec, CLibrary.alias()))
+            # FIXME: make this error message work!
+            .format(dep_tgt.address.spec, '???'))
         native_artifact_targets.append(dep_tgt)
     return native_artifact_targets
 
@@ -167,7 +163,7 @@ class BuildLocalPythonDistributions(Task):
       basename = os.path.basename(shared_lib.path)
       # NB: We convert everything to .so here so that the setup.py can just
       # declare .so to build for either platform.
-      resolved_outname = re.sub('r\..*\Z', '.so', basename)
+      resolved_outname = re.sub(r'\..*\Z', '.so', basename)
       dest_path = os.path.join(dist_target_dir, resolved_outname)
       safe_mkdir_for(dest_path)
       shutil.copyfile(shared_lib.path, dest_path)
@@ -202,8 +198,8 @@ class BuildLocalPythonDistributions(Task):
     setup_reqs_to_resolve = self._get_setup_requires_to_resolve(dist_target)
     if setup_reqs_to_resolve:
       self.context.log.debug('python_dist target(s) with setup_requires detected. '
-                                 'Installing setup requirements: {}\n\n'
-                                 .format([req.key for req in setup_reqs_to_resolve]))
+                             'Installing setup requirements: {}\n\n'
+                             .format([req.key for req in setup_reqs_to_resolve]))
 
     cur_platforms = ['current'] if is_platform_specific else None
 
@@ -215,14 +211,13 @@ class BuildLocalPythonDistributions(Task):
 
     setup_py_execution_environment = SetupPyExecutionEnvironment(
       setup_requires_site_dir=setup_requires_site_dir,
-      setup_py_native_tools=native_tools,
-    )
+      setup_py_native_tools=native_tools)
 
     self._create_dist(dist_target, dist_output_dir, interpreter,
-                      setup_py_execution_environment, is_platform_specific=is_platform_specific)
+                      setup_py_execution_environment, is_platform_specific)
 
   def _create_dist(self, dist_tgt, dist_target_dir, interpreter,
-                   setup_py_execution_environment, is_platform_specific=False):
+                   setup_py_execution_environment, is_platform_specific):
     """Create a .whl file for the specified python_distribution target."""
     self._copy_sources(dist_tgt, dist_target_dir)
 
@@ -256,5 +251,6 @@ class BuildLocalPythonDistributions(Task):
     if len(dists) == 0:
       raise TaskError('No distributions were produced by python_create_distribution task.')
     if len(dists) > 1:
+      # TODO: is this ever going to happen?
       raise TaskError('Ambiguous local python distributions found: {}'.format(dists))
     return dists[0]

@@ -6,15 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-import os
 
 from pants.backend.native.targets.native_artifact import NativeArtifact
-from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
-from pants.util.memo import memoized_property
 
 
 logger = logging.getLogger(__name__)

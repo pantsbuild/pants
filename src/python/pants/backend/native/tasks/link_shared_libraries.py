@@ -7,16 +7,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.native.config.environment import Linker, Platform
+from pants.backend.native.config.environment import Linker
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_compile import ObjectFiles
 from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.task.task import Task
 from pants.util.contextutil import get_joined_path
 from pants.util.memo import memoized_property
-from pants.util.objects import SubclassesOf, datatype
+from pants.util.objects import datatype
 from pants.util.process_handler import subprocess
 
 
@@ -84,9 +83,12 @@ class LinkSharedLibraries(NativeTask):
     # in the ObjectFiles type tbh)
     deps = self.native_deps(vt.target)
 
+    self.context.log.debug("link target: {}".format(vt.target))
+
     all_compiled_object_files = []
 
     for dep_tgt in deps:
+      self.context.log.debug("dep_tgt: {}".format(dep_tgt))
       product_mapping = compiled_objects_product.get(dep_tgt)
       base_dirs = product_mapping.keys()
       assert(len(base_dirs) == 1)
@@ -94,9 +96,9 @@ class LinkSharedLibraries(NativeTask):
       object_files_list = product_mapping[single_base_dir]
       assert(len(object_files_list) == 1)
       single_product = object_files_list[0]
+      self.context.log.debug("single_product: {}".format(single_product))
       object_files_for_target = single_product.file_paths()
-      self.context.log.debug("single_product: {}, object_files_for_target: {}, target: {}"
-                             .format(single_product, object_files_for_target, vt.target))
+      self.context.log.debug("object_files_for_target: {}".format(object_files_for_target))
       # TODO: dedup object file paths? can we assume they are already deduped?
       all_compiled_object_files.extend(object_files_for_target)
 

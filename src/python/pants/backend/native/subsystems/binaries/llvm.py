@@ -13,7 +13,6 @@ from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
 from pants.util.memo import memoized_method
-from pants.util.objects import datatype
 
 
 class LLVMReleaseUrlGenerator(BinaryToolUrlGenerator):
