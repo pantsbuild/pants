@@ -27,7 +27,7 @@ from pants.engine.parser import SymbolTable
 from pants.engine.rules import SingletonRule
 from pants.engine.scheduler import Scheduler
 from pants.option.global_options import GlobMatchErrorBehavior
-from pants.scm.change_calculator import EngineChangeCalculator
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.objects import datatype
 
 

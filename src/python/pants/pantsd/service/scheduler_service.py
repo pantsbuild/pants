@@ -174,7 +174,8 @@ class SchedulerService(PantsService):
     with self.fork_lock:
       target_roots = target_roots_calculator.create(
         options,
-        change_calculator=session.change_calculator
+        session,
+        session.symbol_table,
       )
       session.warm_product_graph(target_roots)
       return session, target_roots

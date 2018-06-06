@@ -114,8 +114,9 @@ class TargetRootsCalculator(object):
   def create(cls, options, session, symbol_table, build_root=None):
     """
     :param Options options: An `Options` instance to use.
+    :param session: The Scheduler session
+    :param symbol_table: The symbol table
     :param string build_root: The build root.
-    :param ChangeCalculator change_calculator: A `ChangeCalculator` for calculating changes.
     """
     # Determine the literal target roots.
     spec_roots = cls.parse_specs(options.target_specs, build_root)
@@ -128,7 +129,7 @@ class TargetRootsCalculator(object):
     logger.debug('spec_roots are: %s', spec_roots)
     logger.debug('changed_request is: %s', changed_request)
     scm = get_scm()
-    change_calculator = EngineChangeCalculator(session, symbol_table, scm) if scm else None
+    change_calculator = ChangeCalculator(session, symbol_table, scm) if scm else None
 
     if change_calculator and changed_request.is_actionable():
       if spec_roots:
@@ -145,8 +146,8 @@ class TargetRootsCalculator(object):
 
 
 
-class EngineChangeCalculator(object):
-  """A ChangeCalculator variant that uses the v2 engine for source mapping."""
+class ChangeCalculator(object):
+  """A ChangeCalculator that find the targed addresses of changed files based on scm."""
 
   def __init__(self, scheduler, symbol_table, scm, workspace=None, changes_since=None,
                diffspec=None):
