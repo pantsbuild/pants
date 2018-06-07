@@ -183,6 +183,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
              help='Paths that correspond with build roots for any subproject that this '
                   'project depends on.')
+    register('--owner-of', help='Select the targets that own these files', type=list, default=[],
+             metavar='<path>')
 
     # These logging options are registered in the bootstrap phase so that plugins can log during
     # registration and not so that their values can be interpolated in configs.

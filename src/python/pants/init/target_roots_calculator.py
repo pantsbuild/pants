@@ -195,11 +195,17 @@ class TargetRootsCalculator(object):
     # initialization paths.
     changed_options = options.for_scope('changed')
     changed_request = ChangedRequest.from_options(changed_options)
-
+    owned_files = options.for_global_scope().owner_of
     logger.debug('spec_roots are: %s', spec_roots)
     logger.debug('changed_request is: %s', changed_request)
     scm = get_scm()
     change_calculator = ChangeCalculator(session, symbol_table, scm) if scm else None
+    owner_calculator = OwnerCalculator(session, symbol_table) if owned_files else None
+    logger.debug('owner_files are: %s', owned_files)
+
+    if changed_request.is_actionable() and owned_files:
+      # We've been provided a change request AND an owner request. Error out.
+      raise InvalidSpecConstraint('cannot provide owner-of and changed parameters together')
 
     if change_calculator and changed_request.is_actionable():
       if spec_roots:
@@ -211,6 +217,16 @@ class TargetRootsCalculator(object):
       changed_addresses = change_calculator.changed_target_addresses(changed_request)
       logger.debug('changed addresses: %s', changed_addresses)
       return TargetRoots(tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses))
+
+    if owner_calculator and owned_files:
+      if spec_roots:
+        # We've been provided spec roots (e.g. `./pants list ::`) AND a owner request. Error out.
+        raise InvalidSpecConstraint('cannot provide owner-of parameters and target specs!')
+      # We've been provided no spec roots (e.g. `./pants list`) AND a owner request. Compute
+      # alternate target roots.
+      owner_addresses = owner_calculator.owner_target_addresses(owned_files)
+      logger.debug('owner addresses: %s', owner_addresses)
+      return TargetRoots(tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses))
 
     return TargetRoots(spec_roots)
 
@@ -279,3 +295,27 @@ class ChangeCalculator(object):
 
   def changed_target_addresses(self, changed_request):
     return list(self.iter_changed_target_addresses(changed_request))
+
+class OwnerCalculator(object):
+  """A class for owner-of target calculation"""
+
+  def __init__(self, scheduler, symbol_table):
+    """
+    :param scheduler: The `Scheduler` instance to use for computing file to target mapping
+    :param symbol_table: The symbol table.
+    """
+    self._scheduler = scheduler
+    self._symbol_table = symbol_table
+    self._mapper = EngineSourceMapper(self._scheduler)
+    
+  def iter_owner_target_addresses(self, owned_files):
+    """Given an list of owned files, compute and yield all affected target addresses"""
+    owner_addresses = set(address
+                          for address
+                          in self._mapper.iter_target_addresses_for_sources(owned_files))
+    for address in owner_addresses:
+      yield address
+    return
+
+  def owner_target_addresses(self, owner_request):
+    return list(self.iter_owner_target_addresses(owner_request))
