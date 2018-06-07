@@ -1,5 +1,5 @@
 #!/bin/bash -eu
-bad_output="$(find * -name '*.sh' -print0 | xargs -0 grep '^ *readonly .*\$(' |:)"
+bad_output="$(find * -name '*.sh' -print0 | xargs -0 grep '^ *\(readonly\|declare\) .*\(\$(\|`\)' || :)"
 
 if [[ -n "${bad_output}" ]]; then
   echo >&2 "Found bash files with readonly variables defined by invoking subprocesses."
