@@ -26,6 +26,7 @@ from pants.build_graph.target import Target
 from pants.engine.fs import PathGlobs
 from pants.engine.legacy.graph import HydratedField
 from pants.engine.legacy.structs import SourcesField
+from pants.engine.nodes import Throw
 from pants.engine.rules import RootRule
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
@@ -356,6 +357,11 @@ class TestBase(unittest.TestCase):
     return os.path.join(cls._build_root(), '.pants.d')
 
   @classmethod
+  def extra_rules(cls):
+    """Override this to register extra rules in this class's scheduler."""
+    return []
+
+  @classmethod
   def _init_engine(cls):
     if cls._scheduler is not None:
       return
@@ -370,7 +376,7 @@ class TestBase(unittest.TestCase):
       build_configuration=cls.build_config(),
       build_ignore_patterns=None,
       # Required for sources_for:
-      rules=[RootRule(SourcesField)],
+      rules=cls.extra_rules() + [RootRule(SourcesField)],
     ).new_session()
     cls._scheduler = graph_session.scheduler_session
     cls._build_graph, cls._address_mapper = graph_session.create_build_graph(
@@ -382,6 +388,21 @@ class TestBase(unittest.TestCase):
     if self._scheduler is None:
       self._init_engine()
     return self._scheduler
+
+  def scheduler_execute_expecting_one_result(self, product, subject):
+    request = self.scheduler.execution_request([product], [subject])
+    result = self.scheduler.execute(request)
+
+    if result.error:
+      raise result.error
+
+    states = [state for _, state in result.root_products]
+    self.assertEqual(len(states), 1)
+
+    state = states[0]
+    if isinstance(state, Throw):
+      raise state.exc
+    return state.value
 
   @property
   def address_mapper(self):
