@@ -75,7 +75,7 @@ class OptionsInitializer(object):
   """Initializes options."""
 
   @staticmethod
-  def _install_options(options_bootstrapper, build_configuration):
+  def _construct_options(options_bootstrapper, build_configuration):
     """Parse and register options.
 
     :returns: An Options object representing the full set of runtime options.
@@ -116,7 +116,7 @@ class OptionsInitializer(object):
       )
 
     # Parse and register options.
-    options = cls._install_options(options_bootstrapper, build_configuration)
+    options = cls._construct_options(options_bootstrapper, build_configuration)
 
     if init_subsystems:
       Subsystem.set_options(options)

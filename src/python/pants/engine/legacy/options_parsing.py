@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
-from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
+from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.objects import datatype
 
@@ -21,27 +21,12 @@ class OptionsParseRequest(datatype(['args', 'env'])):
     assert isinstance(args, (list, tuple))
     return cls(
       tuple(args),
-      tuple(env.items() if isinstance(env, dict) else env)
+      tuple(sorted(env.items() if isinstance(env, dict) else env))
     )
 
 
 class Options(datatype(['options', 'build_config'])):
   """Represents the result of an Options computation."""
-
-
-@rule(OptionsBootstrapper, [Select(OptionsParseRequest)])
-def reify_options_bootstrapper(parse_request):
-  options_bootstrapper = OptionsBootstrapper(
-    env=dict(parse_request.env),
-    args=parse_request.args
-  )
-  # TODO: Once we have the ability to get FileContent for arbitrary
-  # paths outside of the buildroot, we can invert this to use
-  # OptionsBootstrapper.produce_and_set_bootstrap_options() which
-  # will yield lists of file paths for use as subject values and permit
-  # us to avoid the direct file I/O that this rule currently requires.
-  options_bootstrapper.construct_and_set_bootstrap_options()
-  yield options_bootstrapper
 
 
 # TODO: Accommodate file_option, dir_option, etc.
@@ -54,7 +39,6 @@ def parse_options(options_bootstrapper, build_config):
 
 def create_options_parsing_rules():
   return [
-    reify_options_bootstrapper,
     parse_options,
-    RootRule(OptionsParseRequest),
+    RootRule(OptionsBootstrapper),
   ]

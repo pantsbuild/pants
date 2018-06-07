@@ -59,6 +59,12 @@ class OptionsBootstrapper(object):
 
     return ListValueComponent.merge(path_list_values).val
 
+  @classmethod
+  def from_options_parse_request(cls, parse_request):
+    inst = cls(env=dict(parse_request.env), args=parse_request.args)
+    inst.construct_and_set_bootstrap_options()
+    return inst
+
   def __init__(self, env=None, args=None):
     self._env = env if env is not None else os.environ.copy()
     self._post_bootstrap_config = None  # Will be set later.
