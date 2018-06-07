@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.build_graph.source_mapper import LazySourceMapper
 from pants.task.console_task import ConsoleTask
@@ -51,3 +52,7 @@ class ListOwners(ConsoleTask):
       if owner_info.values():
         for address_spec in owner_info.values()[0]:
           yield address_spec
+
+  @deprecated("1.8.0.dev3", "Run './pants --owner-of=<file> list' instead")
+  def execute(self):
+    super(ListOwners, self).execute()
