@@ -296,6 +296,7 @@ class ChangeCalculator(object):
   def changed_target_addresses(self, changed_request):
     return list(self.iter_changed_target_addresses(changed_request))
 
+
 class OwnerCalculator(object):
   """A class for owner-of target calculation"""
 
