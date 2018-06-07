@@ -191,20 +191,21 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
       return
     pex = os.path.join(os.getcwd(), 'dist', 'test_bin.pex')
     try:
-      pants_ini_config = {'python-setup': {'resolver_blacklist': {"functools32": "CPython>3"}}}
+      pants_ini_config = {'python-setup': {'resolver_blacklist': {'functools32': 'CPython>3'}}}
+      target_address_base = os.path.join(self.testproject, 'resolver_blacklist_testing')
       # clean-all to ensure that Pants resolves requirements for each run.
       pants_binary_36 = self.run_pants(
-        command=['clean-all', 'binary', '{}:test_bin'.format(os.path.join(self.testproject,'resolver_blacklist_testing'))],
+        command=['clean-all', 'binary', '{}:test_bin'.format(target_address_base)],
         config=pants_ini_config
       )
       self.assert_success(pants_binary_36)
       pants_run_36 = self.run_pants(
-        command=['clean-all', 'run', '{}:test_bin'.format(os.path.join(self.testproject,'resolver_blacklist_testing'))],
+        command=['clean-all', 'run', '{}:test_bin'.format(target_address_base)],
         config=pants_ini_config
       )
       self.assert_success(pants_run_36)
       pants_run_27 = self.run_pants(
-        command=['clean-all', 'run', '{}:test_py2'.format(os.path.join(self.testproject,'resolver_blacklist_testing'))],
+        command=['clean-all', 'run', '{}:test_py2'.format(target_address_base)],
         config=pants_ini_config
       )
       self.assert_success(pants_run_27)
