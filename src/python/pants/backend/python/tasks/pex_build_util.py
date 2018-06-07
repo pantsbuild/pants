@@ -6,13 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import defaultdict
 
 from pex.fetcher import Fetcher
 from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
 
-from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.pex_util import get_local_platform
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -21,7 +19,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import IncompatiblePlatformsError, TaskError
+from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
 from pants.python.python_repos import PythonRepos
 
@@ -47,73 +45,6 @@ def has_resources(tgt):
 
 def has_python_requirements(tgt):
   return isinstance(tgt, PythonRequirementLibrary)
-
-
-def is_python_binary(tgt):
-  return isinstance(tgt, PythonBinary)
-
-
-def tgt_closure_has_native_sources(tgts):
-  """Determine if any target in the current target closure has native (c or cpp) sources."""
-  pydist_targets = filter(is_local_python_dist, tgts)
-  has_pydist_native_sources = any(tgt.has_native_sources for tgt in pydist_targets)
-  native_targets = filter(lambda t: isinstance(t, NativeLibrary), tgts)
-  has_native_library_sources = any(tgt.has_sources() for tgt in native_targets)
-  return has_pydist_native_sources or has_native_library_sources
-
-
-def tgt_closure_platforms(tgts):
-  """
-  Aggregates a dict that maps a platform string to a list of targets that specify the platform.
-  If no targets have platforms arguments, return a dict containing platforms inherited from
-  the PythonSetup object.
-
-  :param tgts: a list of :class:`Target` objects.
-  :returns: a dict mapping a platform string to a list of targets that specify the platform.
-  """
-  tgts_by_platforms = defaultdict(list)
-
-  for tgt in tgts:
-    for platform in tgt.platforms:
-      tgts_by_platforms[platform].append(tgt)
-
-  if not tgts_by_platforms:
-    for platform in PythonSetup.global_instance().platforms:
-      tgts_by_platforms[platform] = ['(No target) Platform inherited from either the '
-                                     '--platforms option or a pants.ini file.']
-  return tgts_by_platforms
-
-
-def build_for_current_platform_only_check(tgts):
-  """
-  Performs a check of whether the current target closure has native sources and if so, ensures that
-  Pants is only targeting the current platform.
-
-  :param tgts: a list of :class:`Target` objects.
-  :return: a boolean value indicating whether the current target closure has native sources.
-  """
-  # FIXME: This should really be checking the platforms in the closure of
-  # `PythonRequirementLibrary`s, not the targets themselves. 3rdparty libraries and local
-  # `python_dist()`s are the only way platform-specific code can be inserted into a
-  # pex. `SetupPyRunner` ensures that the artifacts built locally are marked with 'current' if they
-  # contain any native code.
-  if tgt_closure_has_native_sources(tgts):
-    def predicate(x):
-      return is_python_binary(x) or is_local_python_dist(x)
-    platforms_with_sources = tgt_closure_platforms(filter(predicate, tgts))
-    platform_names = platforms_with_sources.keys()
-
-    # There will always be at least 1 platform, because we checked that they have native sources.
-    if platform_names == ['current']:
-      return True
-
-    raise IncompatiblePlatformsError(
-      'The target set contains one or more targets that depend on '
-      'native code. Please ensure that the platform arguments in all relevant targets and build '
-      'options are compatible with the current platform. Found targets for platforms: {}'
-      .format(str(platforms_with_sources)))
-
-  return False
 
 
 def _create_source_dumper(builder, tgt):

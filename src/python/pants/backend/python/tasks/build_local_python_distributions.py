@@ -12,10 +12,10 @@ import shutil
 
 from pex.interpreter import PythonInterpreter
 
-from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
 from pants.backend.python.python_requirement import PythonRequirement
+from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.pex_build_util import is_local_python_dist
 from pants.backend.python.tasks.setup_py import (SetupPyExecutionEnvironment, SetupPyNativeTools,
@@ -53,19 +53,26 @@ class BuildLocalPythonDistributions(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BuildLocalPythonDistributions, cls).subsystem_dependencies() + (NativeToolchain.scoped(cls),)
+    return super(BuildLocalPythonDistributions, cls).subsystem_dependencies() + (
+      PythonNativeCode.scoped(cls),
+    )
 
+  @memoized_property
+  def _python_native_code_settings(self):
+    return PythonNativeCode.scoped_instance(self)
+
+  # FIXME(#5869): delete this and get Subsystems from options, when that is possible.
   def _request_single(self, product, subject):
-    # FIXME(#4769): This is not supposed to be exposed to Tasks yet -- see #4769 to track the status
-    # of exposing v2 products in v1 tasks.
+    # NB: This is not supposed to be exposed to Tasks yet -- see #4769 to track the status of
+    # exposing v2 products in v1 tasks.
     return self.context._scheduler.product_request(product, [subject])[0]
 
   @memoized_property
   def _setup_py_native_tools(self):
-    native_toolchain = NativeToolchain.scoped_instance(self)
+    native_toolchain = self._python_native_code_settings.native_toolchain
     return self._request_single(SetupPyNativeTools, native_toolchain)
 
-  # TODO: This should probably be made into a class property, when that is made.
+  # TODO: This should probably be made into an @classproperty (see PR #5901).
   @property
   def cache_target_dirs(self):
     return True
@@ -86,8 +93,10 @@ class BuildLocalPythonDistributions(Task):
 
     return reqs_to_resolve
 
-  # TODO: document the existence of these directories!
+  # NB: these are all the immediate subdirectories of the target's results directory.
+  # This contains any modules from a setup_requires().
   setup_requires_site_subdir = 'setup_requires_site'
+  # This will contain the sources used to build the python_dist().
   dist_subdir = 'python_dist_subdir'
 
   @classmethod
@@ -126,13 +135,12 @@ class BuildLocalPythonDistributions(Task):
     native_artifact_targets = []
     if target.dependencies:
       for dep_tgt in target.dependencies:
-        if not NativeLibrary.provides_native_artifact(dep_tgt):
+        if not NativeLibrary.produces_ctypes_dylib(dep_tgt):
           raise TargetDefinitionException(
             target,
             "Target '{}' is invalid: the only dependencies allowed in python_dist() targets "
-            "are {}() targets with a provides= kwarg."
-            # FIXME: make this error message work!
-            .format(dep_tgt.address.spec, '???'))
+            "are C or C++ targets with a ctypes_dylib= kwarg."
+            .format(dep_tgt.address.spec))
         native_artifact_targets.append(dep_tgt)
     return native_artifact_targets
 
@@ -151,8 +159,6 @@ class BuildLocalPythonDistributions(Task):
 
   def _add_artifacts(self, dist_target_dir, shared_libs_product, native_artifact_targets):
     all_shared_libs = []
-    # FIXME: dedup names of native artifacts? should that happen in the LinkSharedLibraries step?
-    # (yes it should)
     for tgt in native_artifact_targets:
       product_mapping = shared_libs_product.get(tgt)
       base_dir = assert_single_element(product_mapping.keys())
@@ -184,9 +190,9 @@ class BuildLocalPythonDistributions(Task):
 
     is_platform_specific = False
     native_tools = None
-    if dist_target.has_native_sources:
+    if self._python_native_code_settings.pydist_has_native_sources(dist_target):
       # We add the native tools if we need to compile code belonging to this python_dist() target.
-      # TODO: check that the native toolchain isn't loaded without native code in a test!
+      # TODO: test this branch somehow!
       native_tools = self._setup_py_native_tools
       # Native code in this python_dist() target requires marking the dist as platform-specific.
       is_platform_specific = True

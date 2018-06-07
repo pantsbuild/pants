@@ -6,21 +6,26 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import re
 from abc import abstractmethod
 from collections import defaultdict
 
+from pants.backend.native.config.environment import Executable
 from pants.backend.native.targets.native_library import NativeLibrary
-# FIXME: when i deleted toolchain_task.py, it kept using the .pyc file. this shouldn't happen (the
-# import should have failed)!!!
 from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.exceptions import TaskError
+from pants.build_graph.dependency_context import DependencyContext
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import SubclassesOf, datatype
 
 
-class NativeSourcesByType(datatype(['rel_root', 'headers', 'sources'])):
-  """???"""
+class NativeCompileRequest(datatype([
+    ('compiler', SubclassesOf(Executable)),
+    # TODO: add type checking for Collection.of(<type>)!
+    'include_dirs',
+    'sources',
+    ('fatal_warnings', bool),
+    'output_dir',
+])): pass
 
 
 # TODO: verify that filenames are valid fileNAMES and not deeper paths? does this matter?
@@ -30,84 +35,131 @@ class ObjectFiles(datatype(['root_dir', 'filenames'])):
     return [os.path.join(self.root_dir, fname) for fname in self.filenames]
 
 
+# FIXME: this is a temporary hack -- we could introduce something like a "NativeRequirement" with
+# dependencies, header, object file, library name (more?) instead of using multiple products.
+class NativeTargetDependencies(datatype(['native_deps'])): pass
+
+
 class NativeCompile(NativeTask):
 
   @classmethod
   def product_types(cls):
-    return [ObjectFiles]
+    return [ObjectFiles, NativeTargetDependencies]
 
   @property
   def cache_target_dirs(self):
     return True
 
-  # FIXME: add NB: to note how you have to override this or whatever
-  default_header_file_extensions = None
-  default_source_file_extensions = None
+  @abstractmethod
+  def get_compile_settings(self):
+    """An instance of `NativeCompileSettings` which is used in `NativeCompile`.
 
-  @classmethod
-  def register_options(cls, register):
-    super(NativeCompile, cls).register_options(register)
+    :return: :class:`pants.backend.native.subsystems.native_compile_settings.NativeCompileSettings`
+    """
 
-    register('--fatal-warnings', type=bool, default=True, fingerprint=True, advanced=True,
-             help='???/The default for the "fatal_warnings" argument for targets of this language.')
-
-    # TODO(cosmicexplorer): make a list of file extension option type?
-    register('--header-file-extensions', type=list, default=cls.default_header_file_extensions,
-             fingerprint=True, advanced=True,
-             help='???/the allowed file extensions, as a list of strings (file extensions)')
-    register('--source-file-extensions', type=list, default=cls.default_source_file_extensions,
-             fingerprint=True, advanced=True,
-             help='???/the allowed file extensions, as a list of strings (file extensions)')
+  @memoized_property
+  def _compile_settings(self):
+    return self.get_compile_settings()
 
   @classmethod
   def implementation_version(cls):
     return super(NativeCompile, cls).implementation_version() + [('NativeCompile', 0)]
 
-  class NativeCompileError(TaskError):
-    """???"""
+  @memoized_property
+  def _header_file_extensions(self):
+    return self._compile_settings.get_options().header_file_extensions
 
-  # NB: these are not provided by NativeTask, but are a convention.
-  # TODO: mention that you gotta override at least the source target constraint (???)
+  @memoized_property
+  def _source_file_extensions(self):
+    return self._compile_settings.get_options().source_file_extensions
+
+  class NativeCompileError(TaskError):
+    """Raised for errors in this class's logic.
+
+    Subclasses are advised to create their own exception class.
+    """
+
+  # `NativeCompile` will use the `source_target_constraint` to determine what targets have "sources"
+  # to compile, and the `dependent_target_constraint` to determine which dependent targets to
+  # operate on for `strict_deps` calculation.
+  # NB: `source_target_constraint` must be overridden.
   source_target_constraint = None
   dependent_target_constraint = SubclassesOf(NativeLibrary)
 
+  def native_deps(self, target):
+    return self.strict_deps_for_target(
+      target, predicate=self.dependent_target_constraint.satisfied_by)
+
+  def strict_deps_for_target(self, target, predicate=None):
+    """Get the dependencies of `target` filtered by `predicate`, accounting for 'strict_deps'.
+
+    If 'strict_deps' is on, instead of using the transitive closure of dependencies, targets will
+    only be able to see their immediate dependencies declared in the BUILD file. The 'strict_deps'
+    setting is obtained from the result of `get_compile_settings()`.
+
+    NB: This includes the current target in the result.
+    """
+    if self._compile_settings.get_subsystem_target_mirrored_field_value('strict_deps', target):
+      strict_deps = target.strict_dependencies(DependencyContext())
+      if predicate:
+        filtered_deps = filter(predicate, strict_deps)
+      else:
+        filtered_deps = strict_deps
+      deps = [target] + filtered_deps
+    else:
+      deps = self.context.build_graph.transitive_subgraph_of_addresses(
+        [target.address], predicate=predicate)
+
+    return deps
+
+  @staticmethod
+  def _add_product_at_target_base(product_mapping, target, value):
+    product_mapping.add(target, target.target_base).append(value)
+
   def execute(self):
     object_files_product = self.context.products.get(ObjectFiles)
+    native_deps_product = self.context.products.get(NativeTargetDependencies)
     source_targets = self.context.targets(self.source_target_constraint.satisfied_by)
 
     with self.invalidated(source_targets, invalidate_dependents=True) as invalidation_check:
+      for vt in invalidation_check.invalid_vts:
+        deps = self.native_deps(vt.target)
+        self._add_product_at_target_base(native_deps_product, vt.target, deps)
+        compile_request = self._make_compile_request(vt, deps)
+        self.context.log.debug("compile_request: {}".format(compile_request))
+        self.compile(compile_request)
+
       for vt in invalidation_check.all_vts:
-        if vt.valid:
-          object_files = self.collect_cached_objects(vt)
-        else:
-          object_files = self.compile(vt)
+        object_files = self.collect_cached_objects(vt)
+        self._add_product_at_target_base(object_files_product, vt.target, object_files)
 
-        object_files_product.add(vt.target, vt.target.target_base).append(object_files)
-
+  # This may be calculated many times for a target, so we memoize it.
   @memoized_method
-  def include_dirs_for_target(self, target):
-    deps = self.native_deps(target)
-    sources_fields = [dep_tgt.sources_relative_to_target_base() for dep_tgt in deps]
-    return [src_field.rel_root for src_field in sources_fields]
+  def _include_dirs_for_target(self, target):
+    return target.sources_relative_to_target_base().rel_root
 
-  @memoized_property
-  def _header_exts(self):
-    return self.get_options().header_file_extensions
+  class NativeSourcesByType(datatype(['rel_root', 'headers', 'sources'])): pass
 
-  @memoized_property
-  def _source_exts(self):
-    return self.get_options().source_file_extensions
-
-  @memoized_method
   def get_sources_headers_for_target(self, target):
-    header_extensions = self._header_exts
-    source_extensions = self._source_exts
+    """Split a target's sources into header and source files.
+
+    This method will use the result of `get_compile_settings()` to get the extensions belonging to
+    header and source files, and then it will group the sources by those extensions.
+
+    :return: :class:`NativeCompile.NativeSourcesByType`
+    :raises: :class:`NativeCompile.NativeCompileError` if there is an error processing the sources.
+    """
+    header_extensions = self._header_file_extensions
+    source_extensions = self._source_file_extensions
 
     header_files = []
     source_files = []
-    # Relative to source root so the exception message makes sense.
+    # Get source paths relative to the target base so the exception message with the target and
+    # paths makes sense.
     target_relative_sources = target.sources_relative_to_target_base()
     rel_root = target_relative_sources.rel_root
+
+    # Group the sources by extension. Check whether a file has an extension using `endswith()`.
     for src in target_relative_sources:
       found_file_ext = None
       for h_ext in header_extensions:
@@ -123,7 +175,7 @@ class NativeCompile(NativeTask):
           found_file_ext = s_ext
           continue
       if not found_file_ext:
-        dashed_options_scope = re.sub(r'\.', '-', self.options_scope)
+        # TODO: test this error!
         raise self.NativeCompileError(
           "Source file '{source_file}' for target '{target}' "
           "does not have any of this task's known file extensions. "
@@ -132,16 +184,13 @@ class NativeCompile(NativeTask):
           "--{processed_scope}-source-file-extensions: (value was: {source_exts})"
           .format(source_file=src,
                   target=target.address.spec,
-                  processed_scope=dashed_options_scope,
+                  processed_scope=self.get_options_scope_equivalent_flag_component(),
                   header_exts=header_extensions,
                   source_exts=source_extensions))
 
-    self.context.log.debug("header_files: {}".format(header_files))
-    self.context.log.debug("source_files: {}".format(source_files))
-
     # Unique file names are required because we just dump object files into a single directory, and
     # the compiler will silently just produce a single object file if provided non-unique filenames.
-    # TODO(cosmicexplorer): add some shading to file names so we can remove this check.
+    # TODO: add some shading to file names so we can remove this check.
     seen_filenames = defaultdict(list)
     for src in source_files:
       seen_filenames[os.path.basename(src)].append(src)
@@ -157,16 +206,43 @@ class NativeCompile(NativeTask):
 
     headers_for_compile = [os.path.join(rel_root, h) for h in header_files]
     sources_for_compile = [os.path.join(rel_root, s) for s in source_files]
-    self.context.log.debug("target: {}, target.target_base: {}, source root: {}, rel_path: {}, headers_for_compile: {}, sources_for_compile: {}"
-                           .format(target, target.target_base, target._sources_field.source_root, target._sources_field.rel_path, headers_for_compile, sources_for_compile))
-    return NativeSourcesByType(rel_root, headers_for_compile, sources_for_compile)
 
-  # TODO: document how these two are supposed to both produce an ObjectFiles (getting from the cache
-  # vs getting from a compile).
+    return self.NativeSourcesByType(rel_root, headers_for_compile, sources_for_compile)
+
   @abstractmethod
+  def get_compiler(self):
+    """An instance of `Executable` which can be invoked to compile files.
+
+    :return: :class:`pants.backend.native.config.environment.Executable`
+    """
+
+  @memoized_property
+  def _compiler(self):
+    return self.get_compiler()
+
+  def _make_compile_request(self, versioned_target, dependencies):
+    target = versioned_target.target
+    include_dirs = [self._include_dirs_for_target(dep_tgt) for dep_tgt in dependencies]
+    sources_by_type = self.get_sources_headers_for_target(target)
+    return NativeCompileRequest(
+      compiler=self._compiler,
+      include_dirs=include_dirs,
+      sources=sources_by_type.sources,
+      fatal_warnings=self._compile_settings.get_subsystem_target_mirrored_field_value(
+        'fatal_warnings', target),
+      output_dir=versioned_target.results_dir)
+
+  @abstractmethod
+  def compile(self, compile_request):
+    """Perform the process of compilation, writing object files to the request's 'output_dir'.
+
+    NB: This method must arrange the output files so that `collect_cached_objects()` can collect all
+    of the results (or vice versa)!
+    """
+
   def collect_cached_objects(self, versioned_target):
-    """???/use vt.results_dir!"""
+    """Scan `versioned_target`'s results directory and return the output files from that directory.
 
-  @abstractmethod
-  def compile(self, versioned_target):
-    """???"""
+    :return: :class:`ObjectFiles`
+    """
+    return ObjectFiles(versioned_target.results_dir, os.listdir(versioned_target.results_dir))

@@ -12,6 +12,7 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
     'src/python/pants/task',
+    'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:objects',

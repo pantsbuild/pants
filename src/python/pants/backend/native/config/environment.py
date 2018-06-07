@@ -13,10 +13,7 @@ from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
 
 
 class UnsupportedPlatformError(Exception):
-  """Thrown if the native toolchain is invoked on an unrecognized platform.
-
-    Note that the native toolchain should work on all of Pants's supported
-    platforms."""
+  """Thrown if pants is running on an unrecognized platform."""
 
 
 class Platform(datatype(['normalized_os_name'])):
@@ -48,11 +45,14 @@ class Executable(object):
 
   @abstractproperty
   def path_entries(self):
-    """???"""
+    """A list of directory paths containing this executable, to be used in a subprocess's PATH.
+
+    This may be multiple directories, e.g. if the main executable program invokes any subprocesses.
+    """
 
   @abstractproperty
   def exe_filename(self):
-    """???"""
+    """The "entry point" -- which file to invoke when PATH is set to `path_entries()`."""
 
 
 class Linker(datatype([

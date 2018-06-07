@@ -102,7 +102,8 @@ class SetupPyNativeTools(datatype([
 ])):
   """The native tools needed for a setup.py invocation.
 
-This class exists so that ???"""
+  This class exists because `SetupPyExecutionEnvironment` is created manually, one per target.
+  """
 
 
 @rule(SetupPyNativeTools, [Select(CCompiler), Select(CppCompiler), Select(Linker)])
@@ -110,7 +111,6 @@ def get_setup_py_native_tools(c_compiler, cpp_compiler, linker):
   yield SetupPyNativeTools(c_compiler=c_compiler, cpp_compiler=cpp_compiler, linker=linker)
 
 
-# TODO: It would be pretty useful to have an Optional TypeConstraint.
 class SetupRequiresSiteDir(datatype(['site_dir'])): pass
 
 
@@ -142,7 +142,7 @@ def ensure_setup_requires_site_dir(reqs_to_resolve, interpreter, site_dir,
 
 
 class SetupPyExecutionEnvironment(datatype([
-    # TODO: It would be pretty useful to have an Optional TypeConstraint.
+    # TODO: It might be pretty useful to have an Optional TypeConstraint.
     'setup_requires_site_dir',
     # If None, don't execute in the toolchain environment.
     'setup_py_native_tools',
@@ -166,7 +166,14 @@ class SetupPyExecutionEnvironment(datatype([
         native_tools.cpp_compiler.path_entries +
         native_tools.linker.path_entries
       )
-      ret['PATH'] = get_joined_path(all_path_entries)
+      # FIXME(#5662): It seems that crti.o is provided by glibc, which we don't provide yet, so this
+      # lets Travis pass for now.
+      ret['PATH'] = native_tools.linker.platform.resolve_platform_specific({
+        'darwin': lambda: get_joined_path(all_path_entries),
+        # Append our tools after the ones already on the PATH -- this is shameful and should be
+        # removed when glibc is introduced.
+        'linux': lambda: get_joined_path(all_path_entries, os.environ.copy()),
+      })
 
     return ret
 

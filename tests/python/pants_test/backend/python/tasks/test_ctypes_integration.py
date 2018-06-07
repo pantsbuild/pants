@@ -7,31 +7,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import glob
 import os
-import sysconfig
 from zipfile import ZipFile
 
+from pants.backend.native.config.environment import Platform
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import is_executable
 from pants.util.process_handler import subprocess
+from pants_test.backend.python.tasks.python_task_test_base import name_and_platform
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-
-
-def normalize_platform_tag(platform_tag):
-  return platform_tag.replace('-', '_')
-
-
-def name_and_platform(whl):
-  # The wheel filename is of the format
-  # {distribution}-{version}(-{build tag})?-{python tag}-{abi tag}-{platform tag}.whl
-  # See https://www.python.org/dev/peps/pep-0425/.
-  # We don't care about the python or abi versions (they depend on what we're currently
-  # running on), we just want to make sure we have all the platforms we expect.
-  parts = os.path.splitext(whl)[0].split('-')
-  dist = parts[0]
-  version = parts[1]
-  platform_tag = parts[-1]
-  return dist, version, normalize_platform_tag(platform_tag)
 
 
 def invoke_pex_for_output(pex_file_to_run):
@@ -68,8 +52,12 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       self.assertEqual(len(globbed_wheel), 1)
       wheel_dist = globbed_wheel[0]
 
-      wheel_uname, wheel_name, wheel_platform = name_and_platform(wheel_dist)
-      self.assertEqual(wheel_platform, normalize_platform_tag(sysconfig.get_platform()))
+      _, _, wheel_platform = name_and_platform(wheel_dist)
+      contains_current_platform = Platform.create().resolve_platform_specific({
+        'darwin': lambda: wheel_platform.startswith('macosx'),
+        'linux': lambda: wheel_platform.startswith('linux'),
+      })
+      self.assertTrue(contains_current_platform)
 
       # Verify that the wheel contains our shared libraries.
       wheel_files = ZipFile(wheel_dist).namelist()

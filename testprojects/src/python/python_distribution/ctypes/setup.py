@@ -12,5 +12,6 @@ setup(
   name='ctypes_test',
   version='0.0.1',
   packages=find_packages(),
+  # Declare two files at the top-level directory (denoted by '').
   data_files=[('', ['libasdf-c.so', 'libasdf-cpp.so'])],
 )

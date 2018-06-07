@@ -22,7 +22,7 @@ def recursively_update(d, d2):
 
 
 def assert_single_element(iterable):
-  """???"""
+  """Convert `iterable` to a list, assert that the list has one element, then return the element."""
   result = list(iterable)
   assert(len(result) == 1)
   return result[0]

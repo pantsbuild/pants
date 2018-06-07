@@ -19,30 +19,16 @@ from pants.util.memo import memoized_property
 class NativeToolchain(Subsystem):
   """Abstraction over platform-specific tools to compile and link native code.
 
-  This "native toolchain" subsystem is an abstraction that exposes directories
-  containing executables to compile and link "native" code (for now, C and C++
-  are supported). Consumers of this subsystem can add these directories to their
-  PATH to invoke subprocesses which use these tools.
+  When this subsystem is consumed, Pants will download and unpack archives (if necessary) which
+  together provide an appropriate "native toolchain" for the host platform: a compiler and linker,
+  usually. This subsystem exposes the toolchain through `@rule`s, which tasks then request during
+  setup or execution (synchronously, for now).
 
-  This abstraction is necessary for two reasons. First, because there are
-  multiple binaries involved in compilation and linking, which often invoke
-  other binaries that must also be available on the PATH. Second, because unlike
-  other binary tools in Pants, we can't provide the same package built for both
-  OSX and Linux, because there is no open-source linker for OSX with a
-  compatible license.
-
-  So when this subsystem is consumed, Pants will download and unpack archives
-  (if necessary) which together provide an appropriate "native toolchain" for
-  the host platform. On OSX, Pants will also find and provide path entries for
-  the XCode command-line tools, or error out with installation instructions if
-  the XCode tools could not be found.
+  NB: Currently, on OSX, Pants will find and invoke the XCode command-line tools, or error out with
+  installation instructions if the XCode tools could not be found.
   """
 
   options_scope = 'native-toolchain'
-
-  # This is a list of subsystems which implement `ExecutablePathProvider` and
-  # can be provided for all supported platforms.
-  _CROSS_PLATFORM_SUBSYSTEMS = [LLVM]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -72,7 +58,7 @@ class NativeToolchain(Subsystem):
 
 @rule(Linker, [Select(Platform), Select(NativeToolchain)])
 def select_linker(platform, native_toolchain):
-  # TODO: make it possible to yield Get with a non-static
+  # TODO(#5933): make it possible to yield Get with a non-static
   # subject type and use `platform.resolve_platform_specific()`, something like:
   # linker = platform.resolve_platform_specific({
   #   'darwin': lambda: Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools),

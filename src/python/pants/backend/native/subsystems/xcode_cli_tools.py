@@ -54,7 +54,7 @@ class XCodeCLITools(Subsystem):
 
   def path_entries(self):
     self._check_executables_exist()
-    return [self._INSTALL_LOCATION]
+    return [self._install_location]
 
   def linker(self, platform):
     return Linker(

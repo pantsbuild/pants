@@ -19,8 +19,6 @@ class PythonDistribution(Target):
 
   default_sources_globs = '*.py'
 
-  native_source_extensions = ['.c', '.cpp', '.cc']
-
   @classmethod
   def alias(cls):
     return 'python_dist'

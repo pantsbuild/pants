@@ -12,15 +12,15 @@ from pants.util.objects import datatype
 
 
 class NativeArtifact(datatype(['lib_name']), PayloadField):
-  """???"""
+  """A BUILD file object declaring a target can be exported to other languages with a native ABI."""
 
-  # TODO: why do we need this to be a method and not e.g. a field?
+  # TODO: This should probably be made into an @classproperty (see PR #5901).
   @classmethod
   def alias(cls):
     return 'native_artifact'
 
-  def as_filename(self, platform):
-    # TODO: check that the name conforms to some format (e.g. no dots?)
+  def as_shared_lib(self, platform):
+    # TODO: check that the name conforms to some format in the constructor (e.g. no dots?).
     return platform.resolve_platform_specific({
       'darwin': lambda: 'lib{}.dylib'.format(self.lib_name),
       'linux': lambda: 'lib{}.so'.format(self.lib_name),

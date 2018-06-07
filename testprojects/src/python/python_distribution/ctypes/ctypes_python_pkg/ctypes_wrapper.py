@@ -10,7 +10,9 @@ import os
 
 
 def get_generated_shared_lib(lib_name):
+  # These are the same filenames as in setup.py.
   filename = 'lib{}.so'.format(lib_name)
+  # The data files are in the root directory, but we are in ctypes_python_pkg/.
   rel_path = os.path.join(os.path.dirname(__file__), '..', filename)
   return os.path.normpath(rel_path)
 

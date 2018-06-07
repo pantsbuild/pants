@@ -24,7 +24,7 @@ class LLVMReleaseUrlGenerator(BinaryToolUrlGenerator):
   # TODO(cosmicexplorer): Give a more useful error message than KeyError if the host platform was
   # not recognized (and make it easy for other BinaryTool subclasses to do this as well).
   _SYSTEM_ID = {
-    'darwin': 'apple-darwin',
+    'mac': 'apple-darwin',
     'linux': 'linux-gnu-ubuntu-16.04',
   }
 
