@@ -585,7 +585,7 @@ function build_pex() {
     build_3rdparty_packages "${PANTS_UNSTABLE_VERSION}"
   fi
 
-  activate_tmp_venv && trap deactivate RETURN && pip install "pex==1.3.1" || die "Failed to install pex."
+  activate_tmp_venv && trap deactivate RETURN && pip install "pex==1.4.3" || die "Failed to install pex."
 
   local requirements=()
   for pkg_name in $PANTS_PEX_PACKAGES; do
