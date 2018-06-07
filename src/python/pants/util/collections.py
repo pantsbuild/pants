@@ -11,11 +11,11 @@ def combined_dict(*dicts):
   return {k: v for d in dicts for k, v in d.items()}
 
 
-def recursively_update(dict, dict2):
+def recursively_update(d, d2):
   """dict.update but which merges child dicts (dict2 takes precedence where there's conflict)."""
-  for k, v in dict2.items():
-    if k in dict:
-      if isinstance(v, type(dict)):
-        recursively_update(dict[k], v)
+  for k, v in d2.items():
+    if k in d:
+      if isinstance(v, dict):
+        recursively_update(d[k], v)
         continue
-    dict[k] = v
+    d[k] = v
