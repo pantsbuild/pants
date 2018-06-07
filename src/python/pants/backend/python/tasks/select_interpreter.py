@@ -42,6 +42,8 @@ class SelectInterpreter(Task):
 
   @classmethod
   def implementation_version(cls):
+    # TODO(John Sirois): Fixup this task to use VTS results_dirs. Right now version bumps aren't
+    # effective in dealing with workdir data format changes.
     return super(SelectInterpreter, cls).implementation_version() + [('SelectInterpreter', 2)]
 
   @classmethod
@@ -88,7 +90,7 @@ class SelectInterpreter(Task):
         outfile.write(b'{}\t{}\t{}\n'.format(dist_name, dist_version, location))
 
   def _interpreter_path_file(self, target_set_id):
-    return os.path.join(self.workdir, target_set_id, 'interpreter.path')
+    return os.path.join(self.workdir, target_set_id, 'interpreter.info')
 
   @staticmethod
   def _get_interpreter(interpreter_path_file):
