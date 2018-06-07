@@ -13,6 +13,7 @@ echo "* Checking packages" && ./build-support/bin/check_packages.sh || exit 1
 echo "* Checking headers" && ./build-support/bin/check_header.sh || exit 1
 echo "* Checking for banned imports" && ./build-support/bin/check_banned_imports.sh || exit 1
 echo "* Checking formatting of rust files" && "$(pwd)/build-support/bin/check_rust_formatting.sh" || exit 1
+echo "* Checking for bad shell patterns" && ./build-support/bin/check_shell.sh || exit 1
 
 $(git rev-parse --verify master > /dev/null 2>&1)
 if [[ $? -eq 0 ]]; then

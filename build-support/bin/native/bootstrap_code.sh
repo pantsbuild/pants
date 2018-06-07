@@ -7,7 +7,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 # + fingerprint_data: Fingerprints the data on stdin.
 source ${REPO_ROOT}/build-support/common.sh
 
-readonly KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
+KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "${KERNEL}" in
   linux)
     readonly LIB_EXTENSION=so

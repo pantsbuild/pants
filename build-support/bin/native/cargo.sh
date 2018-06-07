@@ -12,20 +12,20 @@ REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 source "${REPO_ROOT}/build-support/bin/native/bootstrap_rust.sh"
 ensure_native_build_prerequisites >&2
 
-readonly download_binary="${REPO_ROOT}/build-support/bin/download_binary.sh"
+download_binary="${REPO_ROOT}/build-support/bin/download_binary.sh"
 
 # The following is needed by grpcio-sys and we have no better way to hook its build.rs than this;
 # ie: wrapping cargo.
-readonly cmakeroot="$("${download_binary}" "binaries.pantsbuild.org" "cmake" "3.9.5" "cmake.tar.gz")"
-readonly goroot="$("${download_binary}" "binaries.pantsbuild.org" "go" "1.7.3" "go.tar.gz")/go"
+cmakeroot="$("${download_binary}" "binaries.pantsbuild.org" "cmake" "3.9.5" "cmake.tar.gz")"
+goroot="$("${download_binary}" "binaries.pantsbuild.org" "go" "1.7.3" "go.tar.gz")/go"
 
 # Code generation in the bazel_protos crate needs to be able to find protoc on the PATH.
-readonly protoc="$("${download_binary}" "binaries.pantsbuild.org" "protobuf" "3.4.1" "protoc")"
+protoc="$("${download_binary}" "binaries.pantsbuild.org" "protobuf" "3.4.1" "protoc")"
 
 export GOROOT="${goroot}"
 export PATH="${cmakeroot}/bin:${goroot}/bin:${CARGO_HOME}/bin:$(dirname "${protoc}"):${PATH}"
 
-readonly cargo_bin="${CARGO_HOME}/bin/cargo"
+cargo_bin="${CARGO_HOME}/bin/cargo"
 
 if [[ -n "${CARGO_WRAPPER_DEBUG}" ]]; then
   cat << DEBUG >&2
