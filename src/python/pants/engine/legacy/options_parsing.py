@@ -6,9 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine.fs import FileContent, PathGlobs
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get, Select
+from pants.engine.selectors import Select
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.objects import datatype

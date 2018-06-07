@@ -64,7 +64,7 @@ class GraphTestBase(unittest.TestCase):
         path_ignore_patterns,
         work_dir,
         build_file_imports_behavior,
-        build_configuration=build_configuration,
+        build_configuration=build_config,
         native=self._native,
         include_trace_on_error=include_trace_on_error
       )

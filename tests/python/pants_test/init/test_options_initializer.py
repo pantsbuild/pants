@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pkg_resources import WorkingSet
-
 from pants.base.exceptions import BuildConfigurationError
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper

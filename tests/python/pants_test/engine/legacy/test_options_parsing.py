@@ -5,14 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-import unittest
-from contextlib import contextmanager
-
-from pants.base.build_environment import get_buildroot
 from pants.engine.legacy.options_parsing import Options, OptionsParseRequest
-from pants.init.engine_initializer import EngineInitializer
-from pants_test.engine.util import init_native
 from pants_test.test_base import TestBase
 
 

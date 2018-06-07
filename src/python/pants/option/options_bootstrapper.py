@@ -152,7 +152,7 @@ class OptionsBootstrapper(object):
       try:
         files = next_item or next(producer)
         next_item = producer.send([filecontent_for(f) for f in files])
-      except StopIteration as e:
+      except StopIteration:
         break
 
   def get_bootstrap_options(self):

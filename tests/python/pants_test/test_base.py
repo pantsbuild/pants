@@ -242,7 +242,6 @@ class TestBase(unittest.TestCase):
     """
     return BuildFileAliases(targets={'target': Target})
 
-
   @classmethod
   def build_config(cls):
     build_config = BuildConfiguration()
