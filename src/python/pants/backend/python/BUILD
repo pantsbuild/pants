@@ -20,12 +20,10 @@ python_library(
   name = 'all_utils',
   sources = globs('*.py', exclude=[['__init__.py', 'register.py']]),
   dependencies = [
-    ':code_generator',
     ':interpreter_cache',
     ':python_artifact',
     ':python_requirement',
     ':python_requirements',
-    ':sdist_builder',
   ]
 )
 
@@ -36,17 +34,6 @@ page(
     'src/python/pants:readme',
   ]
 )
-
-python_library(
-  name = 'code_generator',
-  sources = ['code_generator.py'],
-  dependencies = [
-    ':sdist_builder',
-    '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    'src/python/pants/util:dirutil'
-  ]
-)
-
 
 python_library(
   name = 'interpreter_cache',
@@ -88,12 +75,4 @@ python_library(
 python_library(
   name = 'python_requirements',
   sources = ['python_requirements.py'],
-)
-
-python_library(
-  name = 'sdist_builder',
-  sources = ['sdist_builder.py'],
-  dependencies = [
-    '3rdparty/python:pex',
-  ]
 )
