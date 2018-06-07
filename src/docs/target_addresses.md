@@ -37,6 +37,16 @@ The following target addresses all specify the same single target.
 
     It's idiomatic to omit the repetition of the target name in this case.
 
+-   If the address of the target that owns a certain file is not known, the `--owner-of=` global
+    option can be passed to run the goal on the target which own that file.
+
+        ::::bash
+        $ ./pants --owner-of=examples/src/java/org/pantsbuild/example/hello/main/HelloMain.java list
+        examples/src/java/org/pantsbuild/example/hello/main:main
+    
+    It's also worth noting that `owner-of=` can also receive a list of files and it will execute
+    the goal on all the targets that own those files.
+
 -   Relative paths and trailing forward slashes are ignored on the
     command-line to accommodate tab completion:
 
