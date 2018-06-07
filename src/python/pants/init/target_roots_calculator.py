@@ -5,8 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import logging
 import itertools
+import logging
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -149,7 +149,7 @@ class TargetRootsCalculator(object):
 
 
 class ChangeCalculator(object):
-  """A ChangeCalculator that find the targed addresses of changed files based on scm."""
+  """A ChangeCalculator that find the target addresses of changed files based on scm."""
 
   def __init__(self, scheduler, symbol_table, scm, workspace=None, changes_since=None,
                diffspec=None):
