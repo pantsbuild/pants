@@ -56,7 +56,7 @@ class TargetAdaptor(StructWithDeps):
         return tuple()
       base_globs = BaseGlobs.from_sources_field(sources, self.address.spec_path)
       path_globs = base_globs.to_path_globs(self.address.spec_path)
-      return (SourcesField(self.address, 'sources', base_globs.filespecs, base_globs, path_globs),)
+      return (SourcesField(self.address, 'sources', base_globs.filespecs, path_globs),)
 
   @property
   def default_sources_globs(self):
@@ -71,7 +71,7 @@ class Field(object):
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
 
 
-class SourcesField(datatype(['address', 'arg', 'filespecs', 'base_globs', 'path_globs']), Field):
+class SourcesField(datatype(['address', 'arg', 'filespecs', 'path_globs']), Field):
   """Represents the `sources` argument for a particular Target.
 
   Sources are currently eagerly computed in-engine in order to provide the `BuildGraph`
@@ -88,13 +88,6 @@ class SourcesField(datatype(['address', 'arg', 'filespecs', 'base_globs', 'path_
 
   def __hash__(self):
     return hash((self.address, self.arg))
-
-  def __repr__(self):
-    return str(self)
-
-  def __str__(self):
-    return '{}(address={}, input_globs={}, arg={}, filespecs={!r})'.format(
-      type(self).__name__, self.address, self.base_globs, self.arg, self.filespecs)
 
 
 class JavaLibraryAdaptor(TargetAdaptor):
@@ -210,7 +203,6 @@ class PythonTargetAdaptor(TargetAdaptor):
       sources_field = SourcesField(self.address,
                                    'resources',
                                    base_globs.filespecs,
-                                   base_globs,
                                    path_globs)
       return field_adaptors + (sources_field,)
 
