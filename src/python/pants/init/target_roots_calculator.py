@@ -24,6 +24,7 @@ from pants.scm.subsystems.changed import ChangedRequest
 
 logger = logging.getLogger(__name__)
 
+
 class _DependentGraph(object):
   """A graph for walking dependent addresses of TargetAdaptor objects.
 
@@ -92,7 +93,6 @@ class _DependentGraph(object):
       yield dep
 
 
-
 class InvalidSpecConstraint(Exception):
   """Raised when invalid constraints are given via target specs and arguments like --changed*."""
 
@@ -145,7 +145,6 @@ class TargetRootsCalculator(object):
       return TargetRoots(tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses))
 
     return TargetRoots(spec_roots)
-
 
 
 class ChangeCalculator(object):

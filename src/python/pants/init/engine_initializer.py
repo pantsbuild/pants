@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.build_environment import get_buildroot
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.specs import Specs
 from pants.engine.build_files import create_graph_rules
@@ -27,7 +27,6 @@ from pants.engine.parser import SymbolTable
 from pants.engine.rules import SingletonRule
 from pants.engine.scheduler import Scheduler
 from pants.option.global_options import GlobMatchErrorBehavior
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.objects import datatype
 
 
