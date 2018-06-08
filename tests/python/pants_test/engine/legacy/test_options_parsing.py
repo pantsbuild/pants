@@ -5,10 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 import unittest
 
-from pants.engine.legacy.options_parsing import Options, OptionsParseRequest, parse_options
+from pants.engine.legacy.options_parsing import OptionsParseRequest, parse_options
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants_test.engine.util import run_rule
