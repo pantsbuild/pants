@@ -26,7 +26,6 @@ from pants.build_graph.target import Target
 from pants.engine.fs import PathGlobs
 from pants.engine.legacy.graph import HydratedField
 from pants.engine.legacy.structs import SourcesField
-from pants.engine.nodes import Throw
 from pants.engine.rules import RootRule
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
@@ -388,21 +387,6 @@ class TestBase(unittest.TestCase):
     if self._scheduler is None:
       self._init_engine()
     return self._scheduler
-
-  def scheduler_execute_expecting_one_result(self, product, subject):
-    request = self.scheduler.execution_request([product], [subject])
-    result = self.scheduler.execute(request)
-
-    if result.error:
-      raise result.error
-
-    states = [state for _, state in result.root_products]
-    self.assertEqual(len(states), 1)
-
-    state = states[0]
-    if isinstance(state, Throw):
-      raise state.exc
-    return state.value
 
   @property
   def address_mapper(self):

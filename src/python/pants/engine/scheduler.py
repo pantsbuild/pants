@@ -69,7 +69,9 @@ class ExecutionResult(datatype(['error', 'root_products'])):
 
 
 class ExecutionError(Exception):
-  pass
+  def __init__(self, message, wrapped_exceptions):
+    super(ExecutionError, self).__init__(message)
+    self.wrapped_exceptions = wrapped_exceptions or ()
 
 
 class Scheduler(object):
@@ -538,17 +540,23 @@ class SchedulerSession(object):
     # TODO: See https://github.com/pantsbuild/pants/issues/3912
     throw_root_states = tuple(state for root, state in result.root_products if type(state) is Throw)
     if throw_root_states:
+      unique_exceptions = tuple(set(t.exc for t in throw_root_states))
+
       if self._scheduler.include_trace_on_error:
         cumulative_trace = '\n'.join(self.trace(request))
-        raise ExecutionError('Received unexpected Throw state(s):\n{}'.format(cumulative_trace))
+        raise ExecutionError(
+          'Received unexpected Throw state(s):\n{}'.format(cumulative_trace),
+          unique_exceptions,
+        )
 
-      unique_exceptions = set(t.exc for t in throw_root_states)
       if len(unique_exceptions) == 1:
         raise throw_root_states[0].exc
       else:
-        raise ExecutionError('Multiple exceptions encountered:\n  {}'
-                             .format('\n  '.join('{}: {}'.format(type(t).__name__, str(t))
-                                                                 for t in unique_exceptions)))
+        raise ExecutionError(
+          'Multiple exceptions encountered:\n  {}'.format(
+            '\n  '.join('{}: {}'.format(type(t).__name__, str(t)) for t in unique_exceptions)),
+          unique_exceptions
+        )
 
     # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
     # order in output lists.

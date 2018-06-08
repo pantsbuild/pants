@@ -16,6 +16,7 @@ from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcess
                                            FallibleExecuteProcessResult, ProcessExecutionFailure,
                                            create_process_rules)
 from pants.engine.rules import RootRule, rule
+from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, Select
 from pants.util.objects import TypeCheckError, datatype
 from pants_test.test_base import TestBase
@@ -285,12 +286,12 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
       PathGlobs(include=['f*']),
     )
 
-    concatted = self.scheduler_execute_expecting_one_result(Concatted, cat_exe_req)
+    concatted = self.scheduler.product_request(Concatted, [cat_exe_req])[0]
     self.assertEqual(Concatted(text_type('one\ntwo\n')), concatted)
 
   def test_javac_version_example(self):
     request = JavacVersionExecutionRequest(BinaryLocation('/usr/bin/javac'))
-    result = self.scheduler_execute_expecting_one_result(JavacVersionOutput, request)
+    result = self.scheduler.product_request(JavacVersionOutput, [request])[0]
     self.assertIn('javac', result.value)
 
   def test_write_file(self):
@@ -300,10 +301,10 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
       output_files=("roland",)
     )
 
-    execute_process_result = self.scheduler_execute_expecting_one_result(
+    execute_process_result = self.scheduler.product_request(
       ExecuteProcessResult,
-      request,
-    )
+      [request],
+    )[0]
 
     self.assertEquals(
       execute_process_result.output_directory_digest,
@@ -313,10 +314,10 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
       )
     )
 
-    files_content_result = self.scheduler_execute_expecting_one_result(
+    files_content_result = self.scheduler.product_request(
       FilesContent,
-      execute_process_result.output_directory_digest
-    )
+      [execute_process_result.output_directory_digest],
+    )[0]
 
     self.assertEquals(
       files_content_result.dependencies,
@@ -334,7 +335,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
       description='sleepy-cat',
     )
 
-    self.scheduler_execute_expecting_one_result(ExecuteProcessResult, request)
+    self.scheduler.product_request(ExecuteProcessResult, [request])[0]
 
   def test_javac_compilation_example_success(self):
     self.create_dir('simple')
@@ -349,8 +350,8 @@ class Simple {
       JavacSources((u'simple/Simple.java',)),
     )
 
-    result = self.scheduler_execute_expecting_one_result(JavacCompileResult, request)
-    files_content = self.scheduler_execute_expecting_one_result(FilesContent, result.directory_digest).dependencies
+    result = self.scheduler.product_request(JavacCompileResult, [request])[0]
+    files_content = self.scheduler.product_request(FilesContent, [result.directory_digest])[0].dependencies
 
     self.assertEquals(
       tuple(sorted((
@@ -374,9 +375,10 @@ class Broken {
       JavacSources(('simple/Broken.java',))
     )
 
-    with self.assertRaises(ProcessExecutionFailure) as cm:
-      self.scheduler_execute_expecting_one_result(JavacCompileResult, request)
-    e = cm.exception
+    with self.assertRaises(ExecutionError) as cm:
+      self.scheduler.product_request(JavacCompileResult, [request])[0]
+    e = cm.exception.wrapped_exceptions[0]
+    self.assertIsInstance(e, ProcessExecutionFailure)
     self.assertEqual(1, e.exit_code)
     self.assertIn('javac compilation', str(e))
     self.assertIn("NOT VALID JAVA", e.stderr)
@@ -387,7 +389,7 @@ class Broken {
       description='one-cat',
     )
 
-    result = self.scheduler_execute_expecting_one_result(FallibleExecuteProcessResult, request)
+    result = self.scheduler.product_request(FallibleExecuteProcessResult, [request])[0]
 
     self.assertEquals(result.exit_code, 1)
 
@@ -397,6 +399,6 @@ class Broken {
       description='one-cat',
     )
 
-    with self.assertRaises(ProcessExecutionFailure) as cm:
-      self.scheduler_execute_expecting_one_result(ExecuteProcessResult, request)
+    with self.assertRaises(ExecutionError) as cm:
+      self.scheduler.product_request(ExecuteProcessResult, [request])
     self.assertIn("process 'one-cat' failed with exit code 1.", str(cm.exception))
