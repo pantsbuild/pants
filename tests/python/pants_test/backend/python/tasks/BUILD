@@ -18,6 +18,28 @@ python_library(
 )
 
 python_tests(
+  name='python_native_code_testing',
+  sources=[
+    # TODO: This test does not have any platform-specific testing right now, but that will be
+    # changed when #5815 is merged.
+    'test_build_local_python_distributions.py',
+    'test_python_distribution_integration.py',
+  ],
+  dependencies=[
+    ':python_task_test_base',
+    'src/python/pants/backend/native',
+    'src/python/pants/backend/python:plugin',
+    'src/python/pants/backend/python/targets',
+    'src/python/pants/backend/python/tasks',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:process_handler',
+    'tests/python/pants_test:int-test',
+    'tests/python/pants_test/engine:scheduler_test_base',
+  ],
+  tags={'platform_specific_behavior'},
+)
+
+python_tests(
   sources=globs('test_*.py', exclude=[globs('*_integration.py')]),
   dependencies=[
     ':python_task_test_base',
