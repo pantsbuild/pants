@@ -13,6 +13,7 @@ from pants.backend.jvm.ivy_utils import NO_RESOLVE_RUN_RESULT, IvyFetchStep, Ivy
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
@@ -101,6 +102,8 @@ class IvyTaskMixin(TaskBase):
     return super(IvyTaskMixin, cls).implementation_version() + [('IvyTaskMixin', 4)]
 
   @memoized_property
+  @deprecated(removal_version='1.10.0.dev0',
+              hint_message='Use ivy_repository_cache_dir or ivy_resolution_cache_dir instead.')
   def ivy_cache_dir(self):
     """The path of the ivy cache dir used for resolves.
 
@@ -110,6 +113,14 @@ class IvyTaskMixin(TaskBase):
     """
     # TODO(John Sirois): Fixup the IvySubsystem to encapsulate its properties.
     return IvySubsystem.global_instance().get_options().cache_dir
+
+  @memoized_property
+  def ivy_repository_cache_dir(self):
+    return IvySubsystem.global_instance().repository_cache_dir()
+
+  @memoized_property
+  def ivy_resolution_cache_dir(self):
+    return IvySubsystem.global_instance().resolution_cache_dir()
 
   def resolve(self, executor, targets, classpath_products, confs=None, extra_args=None,
               invalidate_dependents=False):
@@ -237,13 +248,15 @@ class IvyTaskMixin(TaskBase):
                            resolve_hash_name,
                            pinned_artifacts,
                            self.get_options().soft_excludes,
-                           self.ivy_cache_dir,
+                           self.ivy_resolution_cache_dir,
+                           self.ivy_repository_cache_dir,
                            global_ivy_workdir)
       resolve = IvyResolveStep(confs,
                                resolve_hash_name,
                                pinned_artifacts,
                                self.get_options().soft_excludes,
-                               self.ivy_cache_dir,
+                               self.ivy_resolution_cache_dir,
+                               self.ivy_repository_cache_dir,
                                global_ivy_workdir)
 
       return self._perform_resolution(fetch, resolve, executor, extra_args, invalidation_check,

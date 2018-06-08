@@ -593,7 +593,8 @@ class IvyUtilsResolveStepsTest(TestBase):
       'hash_name',
       None,
       False,
-      'cache_dir',
+      'resolution_cache_dir',
+      'repository_cache_dir',
       'workdir')
 
     # Stub resolving and creating the result, returning one missing artifacts.
@@ -608,7 +609,9 @@ class IvyUtilsResolveStepsTest(TestBase):
                          'hash_name',
                          False,
                          None,
-                         'ivy_cache_dir', 'global_ivy_workdir')
+                         'ivy_resolution_cache_dir',
+                         'ivy_repository_cache_dir',
+                         'global_ivy_workdir')
 
     # Stub resolving and creating the result, returning one missing artifacts.
     fetch._do_fetch = do_nothing
