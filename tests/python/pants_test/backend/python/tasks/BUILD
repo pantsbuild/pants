@@ -79,7 +79,7 @@ python_tests(
 
 python_tests(
   name='integration',
-  sources=globs('*_integration.py'),
+  sources=globs('*_integration.py', exclude=python_native_code_test_files),
   dependencies=[
     '3rdparty/python:pex',
     'src/python/pants/util:contextutil',
