@@ -184,9 +184,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Paths that correspond with build roots for any subproject that this '
                   'project depends on.')
     register('--owner-of', type=list, default=[], metavar='<path>',
-             help='Select the targets that own these files.'
-                  'This is the third target calculation strategy along with the --changed'
-                  'options and specifying the targets directly. These three types of target'
+             help='Select the targets that own these files. '
+                  'This is the third target calculation strategy along with the --changed '
+                  'options and specifying the targets directly. These three types of target '
                   'selection are mutually exclusive.')
 
     # These logging options are registered in the bootstrap phase so that plugins can log during
