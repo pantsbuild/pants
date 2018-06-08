@@ -44,8 +44,8 @@ The following target addresses all specify the same single target.
         $ ./pants --owner-of=examples/src/java/org/pantsbuild/example/hello/main/HelloMain.java list
         examples/src/java/org/pantsbuild/example/hello/main:main
     
-    It's also worth noting that `owner-of=` can also receive a list of files and it will execute
-    the goal on all the targets that own those files.
+    It's also worth noting that multiple passes of `owner-of=` are accepted in order to work with multiple 
+    files and pants will execute the goal on all the targets that own those files.
 
 -   Relative paths and trailing forward slashes are ignored on the
     command-line to accommodate tab completion:
