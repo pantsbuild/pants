@@ -100,7 +100,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Kushal Dave
 + Kyle Derr
 + Larry Hosken
-+ LarryFinn
++ Lawrence Finn
 + Le Nucksi
 + Lei Wang
 + Leo Kim
