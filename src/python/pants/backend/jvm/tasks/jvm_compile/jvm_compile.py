@@ -483,6 +483,7 @@ class JvmCompile(NailgunTaskBase):
           self._record_compile_classpath(classpath, vts.targets, ctx.classes_dir)
 
         try:
+          print("OHHHHHHLALALALALALALALLAALALALLA")
           self.compile(
             ctx,
             self._args,

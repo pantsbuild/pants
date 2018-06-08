@@ -17,6 +17,8 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import safe_open
 from pants.util.process_handler import subprocess
@@ -117,6 +119,7 @@ class JavacCompile(JvmCompile):
   def compile(self, ctx, args, classpath, upstream_analysis,
               settings, fatal_warnings, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
+    print("NANANANANANLALALALALALALALLAALALALLA")
     try:
       distribution = JvmPlatform.preferred_jvm_distribution([settings], strict=True)
     except DistributionLocator.Error:
@@ -146,6 +149,8 @@ class JavacCompile(JvmCompile):
     javac_cmd.extend(self._javac_plugin_args(javac_plugin_map))
 
     javac_cmd.extend(args)
+    
+    print("@@@@@@@@", self.execution_strategy(), javac_cmd)
 
     if fatal_warnings:
       javac_cmd.extend(self.get_options().fatal_warnings_enabled_args)
@@ -155,15 +160,18 @@ class JavacCompile(JvmCompile):
     with argfile.safe_args(ctx.sources, self.get_options()) as batched_sources:
       javac_cmd.extend(batched_sources)
 
-      with self.context.new_workunit(name='javac',
-                                     cmd=' '.join(javac_cmd),
-                                     labels=[WorkUnitLabel.COMPILER]) as workunit:
-        self.context.log.debug('Executing {}'.format(' '.join(javac_cmd)))
-        p = subprocess.Popen(javac_cmd, stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
-        return_code = p.wait()
-        workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
-        if return_code:
-          raise TaskError('javac exited with return code {rc}'.format(rc=return_code))
+      if self.execution_strategy() == 'hermetic':
+        self._execute_compile_remotely(javac_cmd)
+      else:
+        with self.context.new_workunit(name='javac',
+                                       cmd=' '.join(javac_cmd),
+                                       labels=[WorkUnitLabel.COMPILER]) as workunit:
+          self.context.log.debug('Executing {}'.format(' '.join(javac_cmd)))
+          p = subprocess.Popen(javac_cmd, stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
+          return_code = p.wait()
+          workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
+          if return_code:
+            raise TaskError('javac exited with return code {rc}'.format(rc=return_code))
 
   @classmethod
   def _javac_plugin_args(cls, javac_plugin_map):
@@ -177,3 +185,34 @@ class JavacCompile(JvmCompile):
                           '(arg {} for plugin {})'.format(arg, plugin))
       ret.append('-Xplugin:{} {}'.format(plugin, ' '.join(args)))
     return ret
+
+  def _execute_compile_remotely(self, cmd):
+      # (self, executor, classpath, main, jvm_options, args, cwd, create_synthetic_jar,
+      #                          synthetic_jar_dir):
+    # How should I write a test for this?
+    # safe_cp = classpath
+    # if create_synthetic_jar:
+    #   safe_cp = util.safe_classpath(classpath, synthetic_jar_dir)
+    #   logger.debug('Bundling classpath {} into {}'.format(':'.join(classpath), safe_cp))
+    #
+    # runner = executor.runner(safe_cp, main, args=args, jvm_options=jvm_options, cwd=cwd)
+    #
+    # cmd = runner.cmd()
+    
+    print("&&&&&&&&&&&&", cmd)
+
+    # targets = self.context.targets()
+    #
+    # input_files = set()
+    # for target in targets:
+    #   for source in target.sources_relative_to_buildroot():
+    #     input_files.add(source)
+    #
+    # input_pathglobs = PathGlobs(tuple(input_files), ())
+    # input_snapshot = self.context._scheduler.product_request(Snapshot, [input_pathglobs])[0]
+    #
+    # exec_process_request = ExecuteProcessRequest(cmd, (), input_snapshot.directory_digest, ('jar',), 15 * 60,
+    #                                              'jvm_task')
+    # exec_result = self.context.execute_process_synchronously(exec_process_request,
+    #                                                          'jvm_task',
+    #                                                          (WorkUnitLabel.TASK, WorkUnitLabel.JVM))
