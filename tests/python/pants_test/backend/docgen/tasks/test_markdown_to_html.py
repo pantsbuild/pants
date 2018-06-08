@@ -12,7 +12,7 @@ from textwrap import dedent
 import bs4
 import mock
 
-from pants.backend.docgen.targets.doc import Page
+from pants.backend.docgen.register import build_file_aliases
 from pants.backend.docgen.tasks import markdown_to_html_utils
 from pants.backend.docgen.tasks.markdown_to_html import MarkdownToHtml
 from pants.base.exceptions import TaskError
@@ -105,9 +105,14 @@ class MarkdownToHtmlTest(TaskTestBase):
   def task_type(cls):
     return MarkdownToHtml
 
+  @classmethod
+  def alias_groups(cls):
+    return build_file_aliases()
+
   def test_rst_render_empty(self):
     self.create_file('empty.rst')
-    empty_rst = self.make_target(':empty_rst', target_type=Page, source='empty.rst')
+    self.add_to_build_file('', 'page(name = "empty_rst", source = "empty.rst")')
+    empty_rst = self.target(':empty_rst')
     task = self.create_task(self.context(target_roots=[empty_rst]))
     task.execute()
 
@@ -117,7 +122,8 @@ class MarkdownToHtmlTest(TaskTestBase):
 
     * `RB #2363 https://rbcommons.com/s/twitter/r/2363/>`_
     """))
-    bad_rst = self.make_target(':bad_rst', target_type=Page, source='bad.rst')
+    self.add_to_build_file('', 'page(name = "bad_rst", source = "bad.rst")')
+    bad_rst = self.target(':bad_rst')
     task = self.create_task(self.context(target_roots=[bad_rst]))
     with self.assertRaises(TaskError):
       task.execute()
@@ -138,8 +144,9 @@ class MarkdownToHtmlTest(TaskTestBase):
 
     * `RB #2363 https://rbcommons.com/s/twitter/r/2363/>`_
     """))
-    bad_rst = self.make_target(':bad_rst', target_type=Page, source='bad.rst')
+    self.add_to_build_file('', 'page(name = "bad_rst", source = "bad.rst")')
     self.set_options(ignore_failure=True)
+    bad_rst = self.target(':bad_rst')
     context = self.context(target_roots=[bad_rst])
     context.log.warn = mock.Mock()
     task = self.create_task(context)
@@ -163,7 +170,8 @@ class MarkdownToHtmlTest(TaskTestBase):
 
     * `RB #2363 <https://rbcommons.com/s/twitter/r/2363/>`_
     """))
-    good_rst = self.make_target(':good_rst', target_type=Page, source='good.rst')
+    self.add_to_build_file('', 'page(name = "good_rst", source = "good.rst")')
+    good_rst = self.target(':good_rst')
     context = self.context(target_roots=[good_rst])
     task = self.create_task(context)
     task.execute()
