@@ -11,17 +11,17 @@ from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
 from pants.init.subprocess import Subprocess
 from pants.java import util
-from pants.java.executor import SubprocessExecutor
+from pants.java.executor import SubprocessExecutor, Executor, RemoteExecutor
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
 from pants.task.task import Task, TaskBase
-
 
 class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   ID_PREFIX = 'ng'
   # Possible execution strategies:
   NAILGUN = 'nailgun'
   SUBPROCESS = 'subprocess'
+  HERMETIC = 'hermetic'
 
   @classmethod
   def register_options(cls, register):
@@ -29,9 +29,9 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     register('--use-nailgun', type=bool, default=True,
              help='Use nailgun to make repeated invocations of this task quicker.')
     register('--execution-strategy', type=str, default='',
-             help='Supported options: nailgun, & subprocess. If set to nailgun, nailgun '
-                  'will be enabled and repeated invocations of this task will be quicker. '
-                  'If set to subprocess, then the task will be run without nailgun.')
+             help='Supported options: nailgun, hermetic, & subprocess. If set to nailgun, nailgun will be enabled '
+                  'and repeated invocations of this task will be quicker. When set to hermetic, the process will be '
+                  'executed remotely. If set to subprocess, then the task will be run without nailgun.')
     register('--nailgun-timeout-seconds', advanced=True, default=10, type=float,
              help='Timeout (secs) for nailgun startup.')
     register('--nailgun-connect-attempts', advanced=True, default=5, type=int,
@@ -56,26 +56,28 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
     id_tuple = (self.ID_PREFIX, self.__class__.__name__)
 
-    self._execution_strategy = self.set_execution_strategy()
+    self._execution_strategy = self._set_execution_strategy()
     self._identity = '_'.join(id_tuple)
     self._executor_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
                                           *id_tuple)
 
   def _validate_execution_strategy(self):
-    valid_exec_strategies = {self.NAILGUN, self.SUBPROCESS}
+    valid_exec_strategies = {self.NAILGUN, self.SUBPROCESS, self.HERMETIC}
     if self.get_options().execution_strategy and not self.get_options().execution_strategy in valid_exec_strategies:
       raise TaskError("{} is not a valid input for the execution-strategy option. The flag must be set to"
                       "one of {}".format(self.get_options().execution_strategy, valid_exec_strategies))
   
-  def set_execution_strategy(self):
-    # This will be more complex as we add more execution strategies are added
-    # Expected behavior: if execution-strategy is set, it will override use-nailgun
+  def _set_execution_strategy(self):
+    # If execution-strategy is set, it will override use_nailgun
     self._validate_execution_strategy()
     if self.get_options().execution_strategy:
       return self.get_options().execution_strategy
     elif not self.get_options().use_nailgun:
       return self.SUBPROCESS
     return self.NAILGUN
+  
+  def execution_strategy(self):
+    return self._execution_strategy
   
   def create_java_executor(self, dist=None):
     """Create java executor that uses this task's ng daemon, if allowed.
