@@ -20,13 +20,3 @@ python_library(
     'src/python/pants/util:strutil',
   ],
 )
-
-python_library(
-  name = 'change_calculator',
-  sources = ['change_calculator.py'],
-  dependencies = [
-    'src/python/pants/base:specs',
-    'src/python/pants/build_graph',
-    'src/python/pants/goal:workspace',
-  ],
-)

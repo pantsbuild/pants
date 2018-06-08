@@ -96,7 +96,8 @@ class GoalRunnerFactory(object):
     target_roots = target_roots or TargetRootsCalculator.create(
       options=self._options,
       build_root=self._root_dir,
-      change_calculator=graph_helper.change_calculator
+      session=graph_helper.scheduler_session,
+      symbol_table=graph_helper.symbol_table
     )
     graph, address_mapper = graph_helper.create_build_graph(target_roots,
                                                             self._root_dir)
