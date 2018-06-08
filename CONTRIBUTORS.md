@@ -3,6 +3,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Aaron Mitchell
 + Adam Chainz
 + Alan Paulin
++ Alan Velasco
 + Alexander Johnson
 + Alyssa Pohahau
 + Andrew Hamilton
@@ -99,6 +100,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Kushal Dave
 + Kyle Derr
 + Larry Hosken
++ LarryFinn
 + Le Nucksi
 + Lei Wang
 + Leo Kim
