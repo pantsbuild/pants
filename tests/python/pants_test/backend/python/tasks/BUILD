@@ -17,14 +17,16 @@ python_library(
   ]
 )
 
+python_native_code_test_files = [
+  # TODO: This test does not have any platform-specific testing right now, but that will be
+  # changed when #5815 is merged.
+  'test_build_local_python_distributions.py',
+  'test_python_distribution_integration.py',
+]
+
 python_tests(
   name='python_native_code_testing',
-  sources=[
-    # TODO: This test does not have any platform-specific testing right now, but that will be
-    # changed when #5815 is merged.
-    'test_build_local_python_distributions.py',
-    'test_python_distribution_integration.py',
-  ],
+  sources=python_native_code_test_files,
   dependencies=[
     ':python_task_test_base',
     'src/python/pants/backend/native',
@@ -40,7 +42,7 @@ python_tests(
 )
 
 python_tests(
-  sources=globs('test_*.py', exclude=[globs('*_integration.py')]),
+  sources=globs('test_*.py', exclude=([globs('*_integration.py')] + python_native_code_test_files)),
   dependencies=[
     ':python_task_test_base',
     '3rdparty/python/twitter/commons:twitter.common.collections',
