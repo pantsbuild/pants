@@ -92,7 +92,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution_server=None,
     remote_store_chunk_size=1024*1024,
     remote_store_chunk_upload_timeout=60,
-    process_execution_parallelism=multiprocessing.cpu_count(),
+    process_execution_parallelism=multiprocessing.cpu_count()*2,
   )
 
 
@@ -297,13 +297,16 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     remote_execution_server = '--remote-execution-server'
     register(remote_store_server, advanced=True,
              help='host:port of grpc server to use as remote execution file store.')
-    register('--remote-store-thread-count', type=int, default=1, advanced=True,
+    register('--remote-store-thread-count', type=int, advanced=True,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_store_thread_count,
              help='Thread count to use for the pool that interacts with the remote file store.')
     register(remote_execution_server, advanced=True,
              help='host:port of grpc server to use as remote execution scheduler.')
-    register('--remote-store-chunk-size', type=int, default=1024*1024, advanced=True,
+    register('--remote-store-chunk-size', type=int, advanced=True,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_size,
              help='Size in bytes of chunks transferred to/from the remote file store.')
-    register('--remote-store-chunk-upload-timeout', type=int, default=60, advanced=True,
+    register('--remote-store-chunk-upload-timeout', type=int, advanced=True,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_upload_timeout,
              help='Timeout (in seconds) for uploads of individual chunks to the remote file store.')
 
     # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
