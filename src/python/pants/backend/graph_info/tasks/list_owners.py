@@ -53,6 +53,6 @@ class ListOwners(ConsoleTask):
         for address_spec in owner_info.values()[0]:
           yield address_spec
 
-  @deprecated("1.8.0.dev3", "Run './pants --owner-of=<file> list' instead")
+  @deprecated("1.10.0.dev0", "Run './pants --owner-of=<file> list' instead")
   def execute(self):
     super(ListOwners, self).execute()
