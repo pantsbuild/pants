@@ -25,7 +25,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
 from pants.source.payload_fields import SourcesField
-from pants.source.wrapped_globs import Files, FilesetWithSpec, Globs
+from pants.source.wrapped_globs import FilesetWithSpec, Globs
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -871,19 +871,15 @@ class Target(AbstractTarget):
       # This is so that tests don't need to set up the subsystem when creating targets that
       # legitimately do not require sources.
       if (key_arg is None or key_arg == 'sources') and self.supports_default_sources():
-        deprecated_conditional(
-          lambda: True,
-          '1.10.0.dev0',
-          ('Specifying default sources on Targets is deprecated, and now takes a slow path. '
-           'Instead, class {} should have a TargetAdaptor installed specifying default sources to '
-           'the v2 engine.').format(self.__class__.__name__)
-        )
-        sources = self.default_sources(sources_rel_path)
+        raise Exception("Fell back to legacy default sources")
       else:
         sources = FilesetWithSpec.empty(sources_rel_path)
     elif isinstance(sources, (set, list, tuple)):
-      # Received a literal sources list: convert to a FilesetWithSpec via Files.
-      sources = Files.create_fileset_with_spec(sources_rel_path, *sources)
+      if len(sources) == 0:
+        sources = FilesetWithSpec.empty(sources_rel_path)
+      else:
+        # Received a literal sources list: convert to a FilesetWithSpec via Files.
+        raise Exception("Fell back to legacy set/list/tuple sources")
     elif not isinstance(sources, FilesetWithSpec):
       key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
       raise TargetDefinitionException(self, "Expected {}a glob, an address or a list, but was {}"
