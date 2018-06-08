@@ -27,10 +27,6 @@ from pants.engine.parser import SymbolTable
 from pants.engine.rules import SingletonRule
 from pants.engine.scheduler import Scheduler
 from pants.option.global_options import GlobMatchErrorBehavior
-<<<<<<< 84084e918921aec1294ffcb77d8c5d0e69921a38
-=======
-from pants.option.options_bootstrapper import OptionsBootstrapper
->>>>>>> Remove changed_calculator targets and dependencies
 from pants.util.objects import datatype
 
 
