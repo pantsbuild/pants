@@ -24,6 +24,7 @@ from pants.engine.rules import SingletonRule, TaskRule, rule
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Get, Select, SelectVariant
 from pants.engine.struct import HasProducts, Struct, StructWithDeps, Variants
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.util.meta import AbstractClass
 from pants.util.objects import SubclassesOf, datatype
 from pants_test.engine.examples.parsers import JsonParser
@@ -473,6 +474,7 @@ def setup_json_scheduler(build_root, native):
                         project_tree,
                         work_dir,
                         rules,
+                        DEFAULT_EXECUTION_OPTIONS,
                         None,
                         None)
   return scheduler.new_session()

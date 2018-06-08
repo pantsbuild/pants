@@ -204,7 +204,11 @@ Scheduler* scheduler_create(Tasks*,
                             BufferBuffer,
                             TypeIdBuffer,
                             Buffer,
-                            Buffer);
+                            Buffer,
+                            uint64_t,
+                            uint64_t,
+                            uint64_t,
+                            uint64_t);
 void scheduler_pre_fork(Scheduler*);
 Value scheduler_metrics(Scheduler*, Session*);
 RawNodes* scheduler_execute(Scheduler*, Session*, ExecutionRequest*);
@@ -720,8 +724,7 @@ class Native(object):
                     build_root,
                     work_dir,
                     ignore_patterns,
-                    remote_store_server,
-                    remote_execution_server,
+                    execution_options,
                     construct_directory_digest,
                     construct_snapshot,
                     construct_file_content,
@@ -786,8 +789,13 @@ class Native(object):
         self.context.utf8_buf_buf(ignore_patterns),
         self.to_ids_buf(root_subject_types),
         # Remote execution config.
-        self.context.utf8_buf(remote_store_server),
-        self.context.utf8_buf(remote_execution_server),
+        # We can't currently pass Options to the rust side, so we pass empty strings for None.
+        self.context.utf8_buf(execution_options.remote_store_server or ""),
+        self.context.utf8_buf(execution_options.remote_execution_server or ""),
+        execution_options.remote_store_thread_count,
+        execution_options.remote_store_chunk_size,
+        execution_options.remote_store_chunk_upload_timeout,
+        execution_options.process_execution_parallelism,
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)
 
