@@ -317,7 +317,7 @@ class JvmBinary(JvmTarget):
     :param string basename: Base name for the generated ``.jar`` file, e.g.,
       ``'hello'``. (By default, uses ``name`` param)  Note this is unsafe
       because of the possible conflict when multiple binaries are built.
-    :param EagerFilesetWithSpec sources: Zero or one source files files. If more than one source is
+    :param EagerFilesetWithSpec sources: Zero or one source files. If more than one source is
       required, they should be put in a library target which should be added to dependencies.
     :param dependencies: Targets (probably ``java_library`` and
      ``scala_library`` targets) to "link" in.

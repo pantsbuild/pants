@@ -117,8 +117,8 @@ class Target(AbstractTarget):
           deprecated_conditional(
             lambda: True,
             '1.10.0.dev0',
-            ('The source argument in rules is deprecated - it gets automatically promoted to '
-            'sources. Rule {} should just use a sources argument. No BUILD files need changing. '
+            ('The source argument in targets is deprecated - it gets automatically promoted to '
+            'sources. Target {} should just use a sources argument. No BUILD files need changing. '
             'The source argument will stop being populated -').format(target.type_alias),
           )
           unknown_args.pop('source')
@@ -127,9 +127,9 @@ class Target(AbstractTarget):
           deprecated_conditional(
             lambda: True,
             '1.10.0.dev0',
-            ('The source argument is deprecated - it gets automatically promoted to sources. Rule '
-            '{} should just use a sources argument. No BUILD files need changing. '
-            'The source argument will stop being populated -').format(target.type_alias),
+            ('The source argument is deprecated - it gets automatically promoted to sources.'
+             'Target {} should just use a sources argument. No BUILD files need changing. '
+             'The source argument will stop being populated -').format(target.type_alias),
           )
           unknown_args.pop('sources')
           kwargs.pop('sources')
