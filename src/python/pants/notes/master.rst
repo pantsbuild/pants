@@ -44,9 +44,6 @@ Refactoring, Improvements, and Tooling
   `PR #5926 <https://github.com/pantsbuild/pants/pull/5926>`_
 
 * Upgrade to pex 1.4.3. (#5910)
->`_ttps://github.com/pantsbuild/pex/issues/511.
->`_ttps://github.com/pantsbuild/pex/issues/510.
->`_ttps://github.com/pantsbuild/pants/issues/5922.
   `PR #5910 <https://github.com/pantsbuild/pants/pull/5910>`_
 
 * Kill unused legacy code. (#5921)
