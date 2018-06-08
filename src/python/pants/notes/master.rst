@@ -4,6 +4,81 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.8.0dev3 (06/08/2018)
+----------------------
+
+New features
+~~~~~~~~~~~~
+
+* Initial @rules for Options computation via the engine. (#5889)
+  `PR #5889 <https://github.com/pantsbuild/pants/pull/5889>`_
+
+* Pantsd terminates if its pidfile changes (#5877)
+  `PR #5877 <https://github.com/pantsbuild/pants/pull/5877>`_
+
+* Populate output_directory in ExecuteProcessResponse (#5896)
+  `PR #5896 <https://github.com/pantsbuild/pants/pull/5896>`_
+
+* Add support for passing an incremental_import option via idea-plugin (#5886)
+  `PR #5886 <https://github.com/pantsbuild/pants/pull/5886>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix `SelectInterpreter` read of `interpreter.path` (#5925)
+  `PR #5925 <https://github.com/pantsbuild/pants/pull/5925>`_
+
+* Fix rust log level comparison (#5918)
+  `PR #5918 <https://github.com/pantsbuild/pants/pull/5918>`_
+
+* Fix a trivial bug in error reporting in the kythe indexing task. (#5913)
+  `PR #5913 <https://github.com/pantsbuild/pants/pull/5913>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Put the ChangeCalculator implementation next to TargetRootsCalculator (#5917)
+  `PR #5917 <https://github.com/pantsbuild/pants/pull/5917>`_
+
+* Remove sdist publishing hack. (#5926)
+  `PR #5926 <https://github.com/pantsbuild/pants/pull/5926>`_
+
+* Upgrade to pex 1.4.3. (#5910)
+  `PR #5910 <https://github.com/pantsbuild/pants/pull/5910>`_
+
+* Kill unused legacy code. (#5921)
+  `PR #5921 <https://github.com/pantsbuild/pants/pull/5921>`_
+
+* Add @classproperty (#5901)
+  `PR #5901 <https://github.com/pantsbuild/pants/pull/5901>`_
+
+* Simplify PathGlobs python datatype (#5915)
+  `PR #5915 <https://github.com/pantsbuild/pants/pull/5915>`_
+
+* Split short-form from long-form of setup_legacy_graph (#5911)
+  `PR #5911 <https://github.com/pantsbuild/pants/pull/5911>`_
+
+* Add Daniel McClanahan & Dorothy Ordogh to committers (#5909)
+  `PR #5909 <https://github.com/pantsbuild/pants/pull/5909>`_
+
+* Merge Root/Inner Entry cases into an EntryWithDeps case. (#5914)
+  `PR #5914 <https://github.com/pantsbuild/pants/pull/5914>`_
+
+* Make mock test server emit timing data (#5891)
+  `PR #5891 <https://github.com/pantsbuild/pants/pull/5891>`_
+
+* Update release jvm docs to have notes about gpg 2.1 (#5907)
+  `PR #5907 <https://github.com/pantsbuild/pants/pull/5907>`_
+
+* Set output_files field on remote Action (#5902)
+  `PR #5902 <https://github.com/pantsbuild/pants/pull/5902>`_
+
+* From<Digest> no longer panics (#5832)
+  `PR #5832 <https://github.com/pantsbuild/pants/pull/5832>`_
+
+* Use tempfile crate not tempdir crate (#5900)
+  `PR #5900 <https://github.com/pantsbuild/pants/pull/5900>`_
+
 1.8.0.dev2 (06/02/2018)
 -----------------------
 
