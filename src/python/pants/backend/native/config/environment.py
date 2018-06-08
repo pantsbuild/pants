@@ -78,6 +78,10 @@ class CppCompiler(datatype([
   pass
 
 
+class HostLibcDevInstallation(datatype(['lib_dir'])):
+  """???/lib_dir may be None!"""
+
+
 def create_native_environment_rules():
   return [
     SingletonRule(Platform, Platform.create()),

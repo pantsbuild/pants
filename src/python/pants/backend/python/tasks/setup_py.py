@@ -20,7 +20,7 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 from wheel.install import WheelFile
 
-from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker
+from pants.backend.native.config.environment import CCompiler, CppCompiler, HostLibcDevInstallation, Linker
 from pants.backend.python.pex_util import get_local_platform
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -98,6 +98,7 @@ class SetupPyNativeTools(datatype([
     ('c_compiler', CCompiler),
     ('cpp_compiler', CppCompiler),
     ('linker', Linker),
+    ('libc_dev_install', HostLibcDevInstallation),
 ])):
   """The native tools needed for a setup.py invocation.
 
@@ -105,9 +106,13 @@ class SetupPyNativeTools(datatype([
   """
 
 
-@rule(SetupPyNativeTools, [Select(CCompiler), Select(CppCompiler), Select(Linker)])
-def get_setup_py_native_tools(c_compiler, cpp_compiler, linker):
-  yield SetupPyNativeTools(c_compiler=c_compiler, cpp_compiler=cpp_compiler, linker=linker)
+@rule(SetupPyNativeTools, [Select(CCompiler), Select(CppCompiler), Select(Linker), Select(HostLibcDevInstallation)])
+def get_setup_py_native_tools(c_compiler, cpp_compiler, linker, libc_dev_install):
+  yield SetupPyNativeTools(
+    c_compiler=c_compiler,
+    cpp_compiler=cpp_compiler,
+    linker=linker,
+    libc_dev_install=libc_dev_install)
 
 
 class SetupRequiresSiteDir(datatype(['site_dir'])): pass
@@ -157,6 +162,11 @@ class SetupPyExecutionEnvironment(datatype([
     if native_tools:
       ret['CC'] = native_tools.c_compiler.exe_filename
       ret['CXX'] = native_tools.cpp_compiler.exe_filename
+
+      libc_install_dir = native_tools.libc_dev_install.lib_dir
+      if libc_install_dir:
+        # FIXME: add DYLD_LIBRARY_PATH for osx!
+        ret['LD_LIBRARY_PATH'] = libc_install_dir
 
       # TODO(#5661): Overridding LD or LDSHARED causes setup.py to try to invoke that linker
       # directly without going through the compiler, which fails.

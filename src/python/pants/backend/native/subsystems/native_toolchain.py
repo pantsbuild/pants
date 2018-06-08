@@ -5,8 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
+from pants.backend.native.config.environment import CCompiler, CppCompiler, HostLibcDevInstallation, Linker, Platform
 from pants.backend.native.subsystems.binaries.binutils import Binutils
+from pants.backend.native.subsystems.glibc import GLibc
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
 from pants.backend.native.subsystems.xcode_cli_tools import XCodeCLITools
@@ -14,6 +15,8 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
+from pants.util.objects import datatype
+from pants.util.osutil import get_normalized_os_name
 
 
 class NativeToolchain(Subsystem):
@@ -35,6 +38,7 @@ class NativeToolchain(Subsystem):
     return super(NativeToolchain, cls).subsystem_dependencies() + (
       Binutils.scoped(cls),
       GCC.scoped(cls),
+      GLibc.scoped(cls),
       LLVM.scoped(cls),
       XCodeCLITools.scoped(cls),
     )
@@ -54,6 +58,10 @@ class NativeToolchain(Subsystem):
   @memoized_property
   def _xcode_cli_tools(self):
     return XCodeCLITools.scoped_instance(self)
+
+  @memoized_property
+  def _libc(self):
+    return GLibc.scoped_instance(self)
 
 
 @rule(Linker, [Select(Platform), Select(NativeToolchain)])
@@ -90,10 +98,21 @@ def select_cpp_compiler(platform, native_toolchain):
   yield cpp_compiler
 
 
+@rule(HostLibcDevInstallation, [Select(Platform), Select(NativeToolchain)])
+def select_libc_dev_install(platform, native_toolchain):
+  lib_dir = platform.resolve_platform_specific({
+    'darwin': lambda: None,
+    'linux': lambda: native_toolchain._libc.lib_dir(),
+  })
+
+  yield HostLibcDevInstallation(lib_dir=lib_dir)
+
+
 def create_native_toolchain_rules():
   return [
     select_linker,
     select_c_compiler,
     select_cpp_compiler,
+    select_libc_dev_install,
     RootRule(NativeToolchain),
   ]
