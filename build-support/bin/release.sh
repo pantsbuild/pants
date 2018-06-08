@@ -518,9 +518,6 @@ function fetch_and_check_prebuilt_wheels() {
 
 function adjust_wheel_platform() {
   # Renames wheels to adjust their tag from a src platform to a dst platform.
-  # TODO: pypi will only accept manylinux wheels, but pex does not support manylinux whls:
-  # this function is used to go in one direction or another, depending on who is consuming.
-  #   see https://github.com/pantsbuild/pants/issues/4956
   local src_plat="$1"
   local dst_plat="$2"
   local dir="$3"
@@ -546,7 +543,7 @@ function build_pex() {
   local mode="$1"
 
   local linux_platform="linux_x86_64"
-  local osx_platform="macosx_10.10_x86_64"
+  local osx_platform="macosx_10.11_x86_64"
 
   case "${mode}" in
     build)
@@ -566,7 +563,7 @@ function build_pex() {
       local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.pex"
       ;;
     fetch)
-      local platforms=("${linux_platform}" "macosx_10.10_x86_64")
+      local platforms=("${linux_platform}" "${osx_platform}")
       local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
       ;;
     *)
