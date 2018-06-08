@@ -57,7 +57,10 @@ class JvmPlatform(Subsystem):
     """This allows plugins to register additional jvm compilers by name.
 
     They can then follow the pattern used by zinc_compile and javac_compile to switch themselves on
-    or off."""
+    or off.
+
+    We'd prefer that folks upstream their implementations rather than using this hook though, as
+    it's not likely to be the final API."""
     cls._COMPILER_CHOICES.append(name)
 
   @classmethod
