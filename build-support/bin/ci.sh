@@ -229,10 +229,14 @@ if [[ "${skip_rust_tests:-false}" == "false" ]]; then
   end_travis_section
 fi
 
+# NB: this only tests python tests right now -- the command needs to be edited if test targets in
+# other languages are tagged with 'platform_specific_behavior' in the future.
 if [[ "${test_platform_specific_behavior:-false}" == 'true' ]]; then
-  start_travis_section "Platform-specific tests" "Running platform-specific testing on platform: $(uname)"
+  start_travis_section "Platform-specific tests" \
+                       "Running platform-specific testing on platform: $(uname)"
   (
-    ./pants.pex ${PANTS_ARGS[@]} --tag='+platform_specific_behavior' test tests::
+    ./pants.pex ${PANTS_ARGS[@]} --tag='+platform_specific_behavior' test \
+                tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Pants platform-specific test failure"
   end_travis_section
 fi
