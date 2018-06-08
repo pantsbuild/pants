@@ -39,6 +39,7 @@ python_tests(
     'tests/python/pants_test/engine:scheduler_test_base',
   ],
   tags={'platform_specific_behavior'},
+  timeout=2400,
 )
 
 python_tests(
