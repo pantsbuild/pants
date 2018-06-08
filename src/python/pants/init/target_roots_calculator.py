@@ -134,16 +134,18 @@ class TargetRootsCalculator(object):
     change_calculator = ChangeCalculator(session, symbol_table, scm) if scm else None
     owner_calculator = OwnerCalculator(session, symbol_table) if owned_files else None
     logger.debug('owner_files are: %s', owned_files)
+    targets_specified = [1 for spec
+                         in (changed_request.is_actionable(), owned_files, spec_roots)
+                         if spec]
 
-    if changed_request.is_actionable() and owned_files:
-      # We've been provided a change request AND an owner request. Error out.
-      raise InvalidSpecConstraint('cannot provide owner-of and changed parameters together')
+    if len(targets_specified) > 1:
+      # We've been provided a more than one of: a change request, an owner request, or spec roots.
+      raise InvalidSpecConstraint(
+        'Only one target specification can be provided out of these three options: '
+        '--changed-*, --owner-of=, or a specific target'
+      )
 
     if change_calculator and changed_request.is_actionable():
-      if spec_roots:
-        # We've been provided spec roots (e.g. `./pants list ::`) AND a changed request. Error out.
-        raise InvalidSpecConstraint('cannot provide changed parameters and target specs!')
-
       # We've been provided no spec roots (e.g. `./pants list`) AND a changed request. Compute
       # alternate target roots.
       changed_addresses = change_calculator.changed_target_addresses(changed_request)
@@ -151,9 +153,6 @@ class TargetRootsCalculator(object):
       return TargetRoots(tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses))
 
     if owner_calculator and owned_files:
-      if spec_roots:
-        # We've been provided spec roots (e.g. `./pants list ::`) AND a owner request. Error out.
-        raise InvalidSpecConstraint('cannot provide owner-of parameters and target specs!')
       # We've been provided no spec roots (e.g. `./pants list`) AND a owner request. Compute
       # alternate target roots.
       owner_addresses = owner_calculator.owner_target_addresses(owned_files)
