@@ -130,16 +130,18 @@ class XZCompressedTarArchiver(TarArchiver):
 
     if not os.path.isdir(xz_library_path):
       raise self.XZArchiverError(
-        "The path {} does not name an existing directory. A directory containing liblzma.{so,dylib} must "
-        "be provided to decompress xz archives."
-        .format(xz_library_path))
+        "The path {lib_dir} does not name an existing directory. A directory containing "
+        "{dylib_filename} must be provided to decompress xz archives."
+        .format(lib_dir=xz_library_path,
+                dylib_filename=self._liblzma_shared_lib_filename))
 
     lib_lzma_dylib = os.path.join(xz_library_path, self._liblzma_shared_lib_filename)
     if not os.path.isfile(lib_lzma_dylib):
       raise self.XZArchiverError(
-        "The path {} names an existing directory, but it does not contain liblzma.{so,dylib}. A directory "
-        "containing liblzma.{so,dylib} must be provided to decompress xz archives."
-        .format(xz_library_path))
+        "The path {lib_dir} names an existing directory, but it does not contain {dylib_filename}. "
+        "A directory containing {dylib_filename} must be provided to decompress xz archives."
+        .format(lib_dir=xz_library_path,
+                dylib_filename=self._liblzma_shared_lib_filename))
 
     self._xz_library_path = xz_library_path
 
