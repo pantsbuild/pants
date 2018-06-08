@@ -124,6 +124,10 @@ class TaskRule(datatype(['output_constraint', 'input_selectors', 'input_gets', '
 class SingletonRule(datatype(['output_constraint', 'value']), Rule):
   """A default rule for a product, which is thus a singleton for that product."""
 
+  @classmethod
+  def from_instance(cls, obj):
+    return cls(type(obj), obj)
+
   def __new__(cls, output_type, value):
     # Validate result type.
     if isinstance(output_type, Exactly):

@@ -50,7 +50,8 @@ class BuildConfiguration(object):
     return BuildFileAliases(
         targets=target_factories_by_alias,
         objects=self._exposed_object_by_alias.copy(),
-        context_aware_object_factories=self._exposed_context_aware_object_factory_by_alias.copy())
+        context_aware_object_factories=self._exposed_context_aware_object_factory_by_alias.copy()
+    )
 
   def register_aliases(self, aliases):
     """Registers the given aliases to be exposed in parsed BUILD files.

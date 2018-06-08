@@ -32,6 +32,17 @@ python_library(
 )
 
 python_library(
+  name='options_parsing',
+  sources=['options_parsing.py'],
+  dependencies=[
+    'src/python/pants/build_graph',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:objects',
+    'src/python/pants/option',
+  ],
+)
+
+python_library(
   name='structs',
   sources=['structs.py'],
   dependencies=[

@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import io
 import os
 import shlex
 import tempfile
@@ -14,6 +15,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.deprecated import CodeRemovedError
+from pants.engine.fs import FileContent
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
 from pants.option.custom_types import UnsetBool, file_option, target_option
@@ -158,13 +160,17 @@ class OptionsTest(unittest.TestCase):
     options.register('fingerprinting', '--fingerprinted', fingerprint=True)
     options.register('fingerprinting', '--definitely-not-fingerprinted', fingerprint=False)
 
+  @contextmanager
+  def _write_config_to_file(self, fp, config):
+    for section, options in config.items():
+      fp.write('[{}]\n'.format(section))
+      for key, value in options.items():
+        fp.write('{}: {}\n'.format(key, value))
+
   def _create_config(self, config):
     with open(os.path.join(safe_mkdtemp(), 'test_config.ini'), 'w') as fp:
-      for section, options in config.items():
-        fp.write('[{}]\n'.format(section))
-        for key, value in options.items():
-          fp.write('{}: {}\n'.format(key, value))
-    return Config.load(configpaths=[fp.name])
+      self._write_config_to_file(fp, config)
+    return Config.load(config_paths=[fp.name])
 
   def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None):
     args = shlex.split(str(args_str))
@@ -1337,3 +1343,14 @@ class OptionsTest(unittest.TestCase):
     # Check that we got no warnings and that the actual scope took precedence.
     self.assertEquals(0, len(w))
     self.assertEquals('xx', vals1.foo)
+
+
+class OptionsTestStringPayloads(OptionsTest):
+  """Runs the same tests as OptionsTest, but backed with `Config.loads` vs `Config.load`."""
+
+  def _create_config_from_strings(self, config):
+    with io.StringIO('') as fp:
+      self._write_config_to_file(fp, config)
+      fp.seek(0)
+      payload = fp.read()
+      return Config.load_file_contents(config_payloads=[FileContent('blah', payload)])

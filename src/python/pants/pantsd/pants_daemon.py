@@ -18,9 +18,9 @@ from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonExiter, DaemonPantsRunner
 from pants.engine.native import Native
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.options_initializer import OptionsInitializer
+from pants.init.logging import setup_logging
+from pants.init.options_initializer import BuildConfigInitializer
 from pants.init.target_roots_calculator import TargetRootsCalculator
-from pants.logging.setup import setup_logging
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionsFingerprinter
@@ -116,7 +116,8 @@ class PantsDaemon(FingerprintedProcessManager):
       if full_init:
         build_root = get_buildroot()
         native = Native.create(bootstrap_options_values)
-        _, build_config = OptionsInitializer(OptionsBootstrapper()).setup(init_logging=False)
+        options_bootstrapper = OptionsBootstrapper()
+        build_config = BuildConfigInitializer.get(options_bootstrapper)
         legacy_graph_scheduler = EngineInitializer.setup_legacy_graph(native,
                                                                       bootstrap_options_values,
                                                                       build_config)

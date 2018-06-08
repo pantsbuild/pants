@@ -5,7 +5,6 @@ python_tests(
   sources=globs('*.py', exclude=['test_native_engine_logging.py', 'test_workunit_label.py']),
   dependencies=[
     '3rdparty/python:six',
-    'src/python/pants/logging',
     'src/python/pants/util:contextutil',
   ],
 )

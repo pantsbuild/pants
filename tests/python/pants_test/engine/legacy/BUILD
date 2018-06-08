@@ -142,6 +142,19 @@ python_tests(
 )
 
 python_tests(
+  name = 'options_parsing',
+  sources = ['test_options_parsing.py'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/bin',
+    'src/python/pants/build_graph',
+    'src/python/pants/init',
+    'tests/python/pants_test:test_base',
+    'tests/python/pants_test/engine:util',
+  ]
+)
+
+python_tests(
   name = 'pants_engine_integration',
   sources = ['test_pants_engine_integration.py'],
   dependencies = [

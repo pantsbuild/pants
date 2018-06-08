@@ -9,10 +9,10 @@ import os
 import unittest
 from functools import partial
 
-from pants.bin.repro import Repro
 from pants.fs.archive import TGZ
+from pants.init.repro import Repro
 from pants.util.contextutil import temporary_dir
-from pants_test.bin.repro_mixin import ReproMixin
+from pants_test.init.repro_mixin import ReproMixin
 
 
 class ReproTest(unittest.TestCase, ReproMixin):

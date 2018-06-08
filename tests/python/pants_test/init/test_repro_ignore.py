@@ -10,10 +10,10 @@ import unittest
 from functools import partial
 
 from pants.base.build_root import BuildRoot
-from pants.bin.repro import Reproducer
 from pants.fs.archive import TGZ
+from pants.init.repro import Reproducer
 from pants.util.contextutil import pushd, temporary_dir
-from pants_test.bin.repro_mixin import ReproMixin
+from pants_test.init.repro_mixin import ReproMixin
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
