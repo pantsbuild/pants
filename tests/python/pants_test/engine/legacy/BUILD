@@ -54,6 +54,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'owners_integration',
+  sources = [ 'test_owners_integration.py' ],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
   name = 'dependees_integration',
   sources = ['test_dependees_integration.py'],
   dependencies = [
