@@ -52,9 +52,8 @@ class BinaryToolBase(Subsystem):
   def subsystem_dependencies(cls):
     sub_deps = super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
 
-    # TODO(cosmicexplorer): if we need to do more conditional subsystem dependencies, do it
-    # declaratively with a dict class field so that we only try to create or access it if we
-    # declared a dependency on it.
+    # TODO: if we need to do more conditional subsystem dependencies, do it declaratively with a
+    # dict class field so that we only try to create or access it if we declared a dependency on it.
     if cls.archive_type == 'txz':
       sub_deps = sub_deps + (XZ.scoped(cls),)
 
