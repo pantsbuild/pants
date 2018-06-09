@@ -79,10 +79,15 @@ impl super::CommandRunner for CommandRunner {
                   .and_then(|posix_fs| {
                       let output_dirs_strings: Vec<String> = output_dir_paths
                                                   .into_iter()
-                                                  .map(|p| p
-                                                            .into_os_string()
-                                                            .into_string()
-                                                            .unwrap())
+                                                  .map(|p|
+                                                    format!(
+                                                      "{}/**",
+                                                      p
+                                                      .into_os_string()
+                                                      .into_string()
+                                                      .unwrap()
+                                                    )
+                                                  )
                                                   .collect();
 
                       let output_dirs_stats = posix_fs
@@ -322,6 +327,38 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: TestDirectory::containing_roland().digest(),
+      }
+    )
+  }
+
+  #[test]
+  fn output_dirs() {
+    let result = run_command_locally_in_dir(ExecuteProcessRequest {
+      argv: vec![
+        find_bash(),
+        "-c".to_owned(),
+        format!(
+          "/bin/mkdir cats && echo -n {} > {} ; echo -n {} > treats",
+          TestData::roland().string(),
+          "cats/roland",
+          TestData::catnip().string()
+        ),
+      ],
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: vec![PathBuf::from("treats")].into_iter().collect(),
+      output_directories: vec![PathBuf::from("cats")].into_iter().collect(),
+      timeout: Duration::from_millis(1000),
+      description: "bash".to_string(),
+    });
+
+    assert_eq!(
+      result.unwrap(),
+      ExecuteProcessResult {
+        stdout: as_bytes(""),
+        stderr: as_bytes(""),
+        exit_code: 0,
+        output_directory: TestDirectory::recursive().digest(),
       }
     )
   }
