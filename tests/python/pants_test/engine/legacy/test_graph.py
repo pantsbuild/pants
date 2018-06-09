@@ -39,6 +39,7 @@ class GraphTestBase(unittest.TestCase):
   def _make_setup_args(self, specs):
     options = mock.Mock(target_specs=specs)
     options.for_scope.return_value = mock.Mock(diffspec=None, changes_since=None)
+    options.for_global_scope.return_value = mock.Mock(owner_of=None)
     return options
 
   def _default_build_config(self, build_file_aliases=None):

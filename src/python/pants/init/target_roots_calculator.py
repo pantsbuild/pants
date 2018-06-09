@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -128,27 +128,45 @@ class TargetRootsCalculator(object):
     changed_options = options.for_scope('changed')
     changed_request = ChangedRequest.from_options(changed_options)
 
+    # Determine the `--owner-of=` arguments provided from the global options
+    owned_files = options.for_global_scope().owner_of
+
     logger.debug('spec_roots are: %s', spec_roots)
     logger.debug('changed_request is: %s', changed_request)
+    logger.debug('owned_files are: %s', owned_files)
     scm = get_scm()
     change_calculator = ChangeCalculator(session, symbol_table, scm) if scm else None
+    owner_calculator = OwnerCalculator(session, symbol_table) if owned_files else None
+    targets_specified = sum(1 for item
+                         in (changed_request.is_actionable(), owned_files, spec_roots)
+                         if item)
+
+    if targets_specified > 1:
+      # We've been provided a more than one of: a change request, an owner request, or spec roots.
+      raise InvalidSpecConstraint(
+        'Multiple target selection methods provided. Please use only one of '
+        '--changed-*, --owner-of, or target specs'
+      )
 
     if change_calculator and changed_request.is_actionable():
-      if spec_roots:
-        # We've been provided spec roots (e.g. `./pants list ::`) AND a changed request. Error out.
-        raise InvalidSpecConstraint('cannot provide changed parameters and target specs!')
-
       # We've been provided no spec roots (e.g. `./pants list`) AND a changed request. Compute
       # alternate target roots.
       changed_addresses = change_calculator.changed_target_addresses(changed_request)
       logger.debug('changed addresses: %s', changed_addresses)
       return TargetRoots(tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses))
 
+    if owner_calculator and owned_files:
+      # We've been provided no spec roots (e.g. `./pants list`) AND a owner request. Compute
+      # alternate target roots.
+      owner_addresses = owner_calculator.owner_target_addresses(owned_files)
+      logger.debug('owner addresses: %s', owner_addresses)
+      return TargetRoots(tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses))
+
     return TargetRoots(spec_roots)
 
 
 class ChangeCalculator(object):
-  """A ChangeCalculator that find the target addresses of changed files based on scm."""
+  """A ChangeCalculator that finds the target addresses of changed files based on scm."""
 
   def __init__(self, scheduler, symbol_table, scm, workspace=None, changes_since=None,
                diffspec=None):
@@ -211,3 +229,29 @@ class ChangeCalculator(object):
 
   def changed_target_addresses(self, changed_request):
     return list(self.iter_changed_target_addresses(changed_request))
+
+
+class OwnerCalculator(object):
+  """An OwnerCalculator that finds the target addresses of the files passed down as arguments
+  to --owner-of
+  """
+
+  def __init__(self, scheduler, symbol_table):
+    """
+    :param scheduler: The `Scheduler` instance to use for computing file to target mapping
+    :param symbol_table: The symbol table.
+    """
+    self._scheduler = scheduler
+    self._symbol_table = symbol_table
+    self._mapper = EngineSourceMapper(self._scheduler)
+
+  def iter_owner_target_addresses(self, owned_files):
+    """Given an list of owned files, compute and yield all affected target addresses"""
+    owner_addresses = set(address
+                          for address
+                          in self._mapper.iter_target_addresses_for_sources(owned_files))
+    for address in owner_addresses:
+      yield address
+
+  def owner_target_addresses(self, owner_request):
+    return list(self.iter_owner_target_addresses(owner_request))
