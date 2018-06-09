@@ -161,6 +161,7 @@ mod tests {
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
       output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
     });
@@ -184,6 +185,7 @@ mod tests {
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
       output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo foo and fail".to_string(),
     });
@@ -211,6 +213,7 @@ mod tests {
       env: env.clone(),
       input_files: fs::EMPTY_DIGEST,
       output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "run env".to_string(),
     });
@@ -245,6 +248,7 @@ mod tests {
         env: env,
         input_files: fs::EMPTY_DIGEST,
         output_files: BTreeSet::new(),
+        output_directories: BTreeSet::new(),
         timeout: Duration::from_millis(1000),
         description: "run env".to_string(),
       }
@@ -263,6 +267,7 @@ mod tests {
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
       output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
     }).expect_err("Want Err");
@@ -279,6 +284,7 @@ mod tests {
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
       output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
     });
@@ -304,6 +310,7 @@ mod tests {
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
       output_files: vec![PathBuf::from("roland")].into_iter().collect(),
+      output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
     });
@@ -336,6 +343,7 @@ mod tests {
       output_files: vec![PathBuf::from("cats/roland"), PathBuf::from("treats")]
         .into_iter()
         .collect(),
+      output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "treats-roland".to_string(),
     });
@@ -366,6 +374,7 @@ mod tests {
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
       output_files: vec![PathBuf::from("roland")].into_iter().collect(),
+      output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
     });
@@ -394,6 +403,7 @@ mod tests {
       output_files: vec![PathBuf::from("roland"), PathBuf::from("susannah")]
         .into_iter()
         .collect(),
+      output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo-roland".to_string(),
     });
