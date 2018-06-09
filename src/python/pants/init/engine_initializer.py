@@ -20,10 +20,11 @@ from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (AppAdaptor, GoTargetAdaptor, JavaLibraryAdaptor,
                                          JunitTestsAdaptor, JvmBinaryAdaptor, PageAdaptor,
-                                         ProtobufLibraryAdaptor, PythonBinaryAdaptor,
-                                         PythonDistributionAdaptor, PythonLibraryAdaptor,
-                                         PythonTestsAdaptor, RemoteSourcesAdaptor,
-                                         ScalaLibraryAdaptor, TargetAdaptor, ThriftLibraryAdaptor)
+                                         PantsPluginAdaptor, ProtobufLibraryAdaptor,
+                                         PythonBinaryAdaptor, PythonDistributionAdaptor,
+                                         PythonLibraryAdaptor, PythonTestsAdaptor,
+                                         RemoteSourcesAdaptor, ScalaLibraryAdaptor, TargetAdaptor,
+                                         ThriftLibraryAdaptor)
 from pants.engine.mapper import AddressMapper
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
@@ -73,6 +74,8 @@ class LegacySymbolTable(SymbolTable):
     self._table['python_binary'] = PythonBinaryAdaptor
     self._table['remote_sources'] = RemoteSourcesAdaptor
     self._table['page'] = PageAdaptor
+    self._table['pants_plugin'] = PantsPluginAdaptor
+    self._table['contrib_plugin'] = PantsPluginAdaptor
 
   def aliases(self):
     return self._build_file_aliases
