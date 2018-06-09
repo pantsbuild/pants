@@ -163,9 +163,17 @@ class XZCompressedTarArchiver(TarArchiver):
     env = {
       # Isolate the path so we know we're using our provided version of xz.
       'PATH': xz_bin_dir,
-      # Only allow our xz's lib directory to resolve the liblzma.{so,dylib} dependency at runtime.
-      'LD_LIBRARY_PATH': self._xz_library_path,
     }
+
+    # Only allow our xz's lib directory to resolve the liblzma.{so,dylib} dependency at runtime.
+    normalized_os_name = get_normalized_os_name()
+    if normalized_os_name == 'darwin':
+      env['DYLD_FALLBACK_LIBRARY_PATH'] = self._xz_library_path
+    elif normalized_os_name == 'linux':
+      env['LD_LIBRARY_PATH'] = self._xz_library_path
+    else:
+      raise self.XZArchiverError("Unrecognized platform: {}.".format(normalized_os_name))
+
     try:
       # Pipe stderr to our own stderr, but leave stdout open so we can yield it.
       process = subprocess.Popen(
