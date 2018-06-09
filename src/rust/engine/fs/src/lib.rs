@@ -978,7 +978,8 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
           // because different `DirWildcard`s can potentially expand (transitively) to the same
           // intermediate glob. The "parents" of each glob are stored in the `sources` field of its
           // `GlobExpansionCacheEntry` (which is mutably updated with any new parents on each
-          // iteration of the loop_fn above). This can be considered "amortized" and/or "memoized".
+          // iteration of the loop_fn above). This can be considered "amortized" and/or "memoized",
+          // because we only traverse every parent -> child link once.
           let new_matched_source_globs = match completed.get(&cur_glob).unwrap() {
             &GlobExpansionCacheEntry {
               ref matched,
@@ -1032,7 +1033,6 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
           if strict_match_behavior.should_throw_on_error() {
             return future::err(Self::mk_error(&msg));
           } else {
-            // FIXME(#5683): warn!() doesn't seem to do anything?
             // TODO(#5683): this doesn't have any useful context (the stack trace) without
             // being thrown -- this needs to be provided, otherwise this is unusable.
             warn!("{}", msg);
