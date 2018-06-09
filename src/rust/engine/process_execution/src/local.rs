@@ -1,7 +1,7 @@
 extern crate tempfile;
 
 use boxfuture::{BoxFuture, Boxable};
-use fs::{self, PathStatGetter};
+use fs::{self, PathGlobs, PathStatGetter, StrictGlobMatching, VFS};
 use futures::{future, Future};
 use std::process::Command;
 use std::sync::Arc;
@@ -42,6 +42,7 @@ impl super::CommandRunner for CommandRunner {
     let fs_pool = self.fs_pool.clone();
     let env = req.env;
     let output_file_paths = req.output_files;
+    let output_dir_paths = req.output_directories;
     let argv = req.argv;
     self
       .store
@@ -60,7 +61,7 @@ impl super::CommandRunner for CommandRunner {
                   .map(|output| (output, workdir))
       })
       .and_then(|(output, workdir)| {
-        let output_snapshot = if output_file_paths.is_empty() {
+        let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
           future::ok(fs::Snapshot::empty()).to_boxed()
         } else {
           // Use no ignore patterns, because we are looking for explicitly listed paths.
@@ -76,10 +77,31 @@ impl super::CommandRunner for CommandRunner {
               })
                   .map(|posix_fs| Arc::new(posix_fs))
                   .and_then(|posix_fs| {
+                      let output_dirs_strings: Vec<String> = output_dir_paths
+                                                  .into_iter()
+                                                  .map(|p| p
+                                                            .into_os_string()
+                                                            .into_string()
+                                                            .unwrap())
+                                                  .collect();
+
+                      let output_dirs_stats = posix_fs
+                          .expand(
+                            PathGlobs::create(&output_dirs_strings,
+                                              &[],
+                                              StrictGlobMatching::Ignore).unwrap()
+                          )
+                          .map_err(|e| format!("Error stating output dirs: {}", e))
+                          .wait()
+                          .unwrap()
+                          .into_iter()
+                          .map(|p| Some(p));
+
                       posix_fs
                           .path_stats(output_file_paths.into_iter().collect())
                           .map_err(|e| format!("Error stating output files: {}", e))
-                          .and_then(move |paths| {
+                          .and_then(move |mut paths| {
+                              paths.extend(output_dirs_stats);
                               fs::Snapshot::from_path_stats(
                                   store.clone(),
                                   fs::OneOffStoreFileByDigest::new(store, posix_fs),
