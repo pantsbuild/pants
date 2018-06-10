@@ -313,7 +313,7 @@ impl<'t> GraphMaker<'t> {
           .push(Diagnostic {
             subject_type: subject.clone(),
             reason: format!(
-              "no rule was available to compute {} for {}",
+              "no rule was available to compute {} for subject type {}",
               type_constraint_str(product.clone()),
               type_str(subject.clone())
             ),
@@ -555,8 +555,7 @@ impl RuleGraph {
   }
 
   pub fn validate(&self) -> Result<(), String> {
-    // TODO the rule display is really unfriendly right now. Next up should be to improve it.
-    let mut collated_errors: HashMap<Task, HashMap<String, HashSet<TypeId>>> = HashMap::new();
+    let mut collated_errors: HashMap<Task, Vec<String>> = HashMap::new();
 
     let used_rules: HashSet<_> = self
       .rule_dependency_edges
@@ -594,13 +593,10 @@ impl RuleGraph {
         continue;
       }
       for d in diagnostics {
-        let msg_to_type = collated_errors
+        collated_errors
           .entry(task_rule.clone())
-          .or_insert(HashMap::new());
-        let subject_set = msg_to_type
-          .entry(d.reason.clone())
-          .or_insert(HashSet::new());
-        subject_set.insert(d.subject_type.clone());
+          .or_insert(Vec::new())
+          .push(d.reason.clone());
       }
     }
 
@@ -610,7 +606,10 @@ impl RuleGraph {
 
     let mut msgs: Vec<String> = collated_errors
       .into_iter()
-      .map(|(ref rule, ref subject_types_by_reasons)| format_msgs(rule, subject_types_by_reasons))
+      .map(|(rule, mut errors)| {
+        errors.sort();
+        format!("{}:\n    {}", task_display(&rule), errors.join("\n    "))
+      })
       .collect();
     msgs.sort();
 
@@ -751,23 +750,4 @@ fn rhs(tasks: &Tasks, subject_type: TypeId, product_type: &TypeConstraint) -> En
     }
     entries
   }
-}
-
-fn format_msgs(rule: &Task, subject_types_by_reasons: &HashMap<String, HashSet<TypeId>>) -> String {
-  let mut errors: Vec<_> = subject_types_by_reasons
-    .iter()
-    .map(|(reason, subject_types)| {
-      format!(
-        "{} with subject types: {}",
-        reason,
-        subject_types
-          .iter()
-          .map(|&t| type_str(t))
-          .collect::<Vec<String>>()
-          .join(", ")
-      )
-    })
-    .collect();
-  errors.sort();
-  format!("{}:\n    {}", task_display(rule), errors.join("\n    "))
 }

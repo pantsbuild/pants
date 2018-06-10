@@ -82,7 +82,7 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
                        (A, (Select(B),), noop):
-                         no rule was available to compute B for SubA with subject types: SubA
+                         no rule was available to compute B for subject type SubA
                      """).strip(),
                                     str(cm.exception))
 
@@ -94,8 +94,8 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
                        (A, (Select(B), Select(C)), noop):
-                         no rule was available to compute B for SubA with subject types: SubA
-                         no rule was available to compute C for SubA with subject types: SubA
+                         no rule was available to compute B for subject type SubA
+                         no rule was available to compute C for subject type SubA
                      """).strip(),
       str(cm.exception))
 
@@ -115,9 +115,9 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                       Rules with errors: 2
                                         (A, (Select(B),), noop):
-                                          no rule was available to compute B for C with subject types: C
+                                          no rule was available to compute B for subject type C
                                         (B, (Select(SubA),), noop):
-                                          no rule was available to compute SubA for C with subject types: C
+                                          no rule was available to compute SubA for subject type C
                                       """).strip(),
                                     str(cm.exception))
 
@@ -142,7 +142,7 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                       Rules with errors: 1
                                         (D, (Select(C),), noop):
-                                          no rule was available to compute C for A with subject types: A
+                                          no rule was available to compute C for subject type A
                                       """).strip(),
                                     str(cm.exception))
 
@@ -161,9 +161,9 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                       Rules with errors: 2
                         (B, (Select(D),), noop):
-                          no rule was available to compute D for SubA with subject types: SubA
+                          no rule was available to compute D for subject type SubA
                         (D, (Select(A), Select(SubA)), [Get(A, C)], noop):
-                          no rule was available to compute A for C with subject types: C
+                          no rule was available to compute A for subject type C
                       """).strip(),
         str(cm.exception))
 
