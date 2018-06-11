@@ -87,7 +87,8 @@ impl Core {
       match remote_execution_server {
         Some(address) => Box::new(process_execution::remote::CommandRunner::new(
           address,
-          1,
+          // Allow for some overhead for bookkeeping threads (if any).
+          process_execution_parallelism + 2,
           store.clone(),
         )),
         None => Box::new(process_execution::local::CommandRunner::new(
