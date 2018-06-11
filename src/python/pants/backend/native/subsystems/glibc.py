@@ -14,7 +14,7 @@ from pants.engine.selectors import Select
 
 class GLibc(NativeTool):
   options_scope = 'glibc'
-  default_version = '2.27'
+  default_version = '2.23'
   archive_type = 'tgz'
 
   def lib_dir(self):
