@@ -10,6 +10,7 @@ import logging
 import os
 import re
 import textwrap
+from collections import defaultdict
 from contextlib import closing
 from hashlib import sha1
 from xml.etree import ElementTree
@@ -210,6 +211,30 @@ class BaseZincCompile(JvmCompile):
   def select_source(self, source_file_path):
     raise NotImplementedError()
 
+  def register_extra_products_from_contexts(self, targets, compile_contexts):
+    compile_contexts = [self.select_runtime_context(compile_contexts[t]) for t in targets]
+    zinc_analysis = self.context.products.get_data('zinc_analysis')
+    zinc_args = self.context.products.get_data('zinc_args')
+
+    if zinc_analysis is not None:
+      for compile_context in compile_contexts:
+        zinc_analysis[compile_context.target] = (compile_context.classes_dir,
+        compile_context.jar_file,
+        compile_context.analysis_file)
+
+    if zinc_args is not None:
+      for compile_context in compile_contexts:
+        with open(compile_context.zinc_args_file, 'r') as fp:
+          args = fp.read().split()
+        zinc_args[compile_context.target] = args
+
+  def create_empty_extra_products(self):
+    if self.context.products.is_required_data('zinc_analysis'):
+      self.context.products.safe_create_data('zinc_analysis', dict)
+
+    if self.context.products.is_required_data('zinc_args'):
+      self.context.products.safe_create_data('zinc_args', lambda: defaultdict(list))
+
   def javac_classpath(self):
     # Note that if this classpath is empty then Zinc will automatically use the javac from
     # the JDK it was invoked with.
@@ -247,10 +272,6 @@ class BaseZincCompile(JvmCompile):
       hasher.update(os.path.relpath(cp_entry, self.get_options().pants_workdir))
     key = hasher.hexdigest()[:12]
     return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
-
-  def execute(self):
-    if JvmPlatform.global_instance().get_options().compiler == 'zinc':
-      return super(BaseZincCompile, self).execute()
 
   def compile(self, ctx, args, classpath, upstream_analysis,
               settings, fatal_warnings, zinc_file_manager,
@@ -522,3 +543,7 @@ class ZincCompile(BaseZincCompile):
 
   def select_source(self, source_file_path):
     return source_file_path.endswith('.java') or source_file_path.endswith('.scala')
+
+  def execute(self):
+    if JvmPlatform.global_instance().get_options().compiler == 'zinc':
+      return super(ZincCompile, self).execute()
