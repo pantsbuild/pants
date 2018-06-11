@@ -12,7 +12,7 @@ from collections import OrderedDict
 from contextlib import contextmanager
 from zipfile import ZIP_DEFLATED
 
-from pants.util.contextutil import open_tar, open_zip, temporary_dir
+from pants.util.contextutil import get_joined_path, open_tar, open_zip, temporary_dir
 from pants.util.dirutil import (is_executable, safe_concurrent_rename, safe_walk,
                                 split_basename_and_dirname)
 from pants.util.memo import memoized_classproperty
@@ -105,10 +105,10 @@ class XZCompressedTarArchiver(TarArchiver):
 
   class XZArchiverError(Exception): pass
 
-  # FIXME: move Platform#resolve_platform_specific() into somewhere common and consume it here after
-  # #5815 is merged.
   @memoized_classproperty
   def _liblzma_shared_lib_filename(cls):
+    # FIXME: move Platform#resolve_platform_specific() into somewhere common and consume it here after
+    # #5815 is merged.
     normalized_os_name = get_normalized_os_name()
     if normalized_os_name == 'darwin':
       return 'liblzma.dylib'
@@ -165,14 +165,22 @@ class XZCompressedTarArchiver(TarArchiver):
       'PATH': xz_bin_dir,
     }
 
-    # Only allow our xz's lib directory to resolve the liblzma.{so,dylib} dependency at runtime.
+    # Allow our xz's lib directory to resolve the liblzma.{so,dylib} dependency at runtime by
+    # prepending it to the platform-specific library path environment variable.
+    # FIXME: move Platform#resolve_platform_specific() into somewhere common and consume it here
+    # after #5815 is merged.
     normalized_os_name = get_normalized_os_name()
     if normalized_os_name == 'darwin':
-      env['DYLD_FALLBACK_LIBRARY_PATH'] = self._xz_library_path
+      env_var='DYLD_LIBRARY_PATH'
     elif normalized_os_name == 'linux':
-      env['LD_LIBRARY_PATH'] = self._xz_library_path
+      env_var='LD_LIBRARY_PATH'
     else:
       raise self.XZArchiverError("Unrecognized platform: {}.".format(normalized_os_name))
+
+    env[env_var] = get_joined_path([self._xz_library_path],
+                                   env=os.environ.copy(),
+                                   env_var=env_var,
+                                   prepend=True)
 
     try:
       # Pipe stderr to our own stderr, but leave stdout open so we can yield it.
