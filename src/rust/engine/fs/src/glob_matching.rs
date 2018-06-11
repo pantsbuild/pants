@@ -14,6 +14,29 @@ use indexmap::{IndexMap, IndexSet, map::Entry::Occupied};
 use {Dir, GitignoreStyleExcludes, GlobParsedSource, GlobSource, GlobWithSource, Link, PathGlob,
      PathGlobs, PathStat, Stat, VFS};
 
+pub trait GlobMatching<E: Send + Sync + 'static>: VFS<E> {
+  ///
+  /// Canonicalize the Link for the given Path to an underlying File or Dir. May result
+  /// in None if the PathStat represents a broken Link.
+  ///
+  /// Skips ignored paths both before and after expansion.
+  ///
+  /// TODO: Should handle symlink loops (which would exhibit as an infinite loop in expand).
+  ///
+  fn canonicalize(&self, symbolic_path: PathBuf, link: Link) -> BoxFuture<Option<PathStat>, E> {
+    GlobMatchingImplementation::canonicalize(self, symbolic_path, link)
+  }
+
+  ///
+  /// Recursively expands PathGlobs into PathStats while applying excludes.
+  ///
+  fn expand(&self, path_globs: PathGlobs) -> BoxFuture<Vec<PathStat>, E> {
+    GlobMatchingImplementation::expand(self, path_globs)
+  }
+}
+
+impl<E: Send + Sync + 'static, T: VFS<E>> GlobMatching<E> for T {}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 enum GlobMatch {
   SuccessfullyMatchedSomeFiles,
@@ -47,6 +70,10 @@ struct PathGlobsExpansion<T: Sized> {
   outputs: IndexSet<PathStat>,
 }
 
+// FIXME: This trait exists because `expand_single()` (and its return type) should be private, but
+// traits don't allow specifying private methods (and we don't want to use a top-level `fn` because
+// it's much more awkward than just specifying `&self`).
+// The methods of `GlobMatching` are forwarded to methods here.
 trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
   fn directory_listing(
     &self,
@@ -111,9 +138,6 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
       .to_boxed()
   }
 
-  ///
-  /// Recursively expands PathGlobs into PathStats while applying excludes.
-  ///
   fn expand(&self, path_globs: PathGlobs) -> BoxFuture<Vec<PathStat>, E> {
     let PathGlobs {
       include,
@@ -343,14 +367,6 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
     }
   }
 
-  ///
-  /// Canonicalize the Link for the given Path to an underlying File or Dir. May result
-  /// in None if the PathStat represents a broken Link.
-  ///
-  /// Skips ignored paths both before and after expansion.
-  ///
-  /// TODO: Should handle symlink loops (which would exhibit as an infinite loop in expand).
-  ///
   fn canonicalize(&self, symbolic_path: PathBuf, link: Link) -> BoxFuture<Option<PathStat>, E> {
     // Read the link, which may result in PathGlob(s) that match 0 or 1 Path.
     let context = self.clone();
@@ -383,15 +399,3 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
 }
 
 impl<E: Send + Sync + 'static, T: VFS<E>> GlobMatchingImplementation<E> for T {}
-
-pub trait GlobMatching<E: Send + Sync + 'static>: VFS<E> {
-  fn canonicalize(&self, symbolic_path: PathBuf, link: Link) -> BoxFuture<Option<PathStat>, E> {
-    GlobMatchingImplementation::canonicalize(self, symbolic_path, link)
-  }
-
-  fn expand(&self, path_globs: PathGlobs) -> BoxFuture<Vec<PathStat>, E> {
-    GlobMatchingImplementation::expand(self, path_globs)
-  }
-}
-
-impl<E: Send + Sync + 'static, T: VFS<E>> GlobMatching<E> for T {}
