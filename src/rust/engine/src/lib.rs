@@ -221,7 +221,7 @@ pub extern "C" fn scheduler_create(
   remote_execution_server: Buffer,
   remote_store_thread_count: u64,
   remote_store_chunk_bytes: u64,
-  remote_store_chunk_upload_timeout: u64,
+  remote_store_chunk_upload_timeout_seconds: u64,
   process_execution_parallelism: u64,
 ) -> *const Scheduler {
   let root_type_ids = root_type_ids.to_vec();
@@ -282,7 +282,7 @@ pub extern "C" fn scheduler_create(
     },
     remote_store_thread_count as usize,
     remote_store_chunk_bytes as usize,
-    Duration::from_secs(remote_store_chunk_upload_timeout),
+    Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
     process_execution_parallelism as usize,
   ))))
 }

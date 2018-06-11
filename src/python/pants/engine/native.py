@@ -794,7 +794,7 @@ class Native(object):
         self.context.utf8_buf(execution_options.remote_execution_server or ""),
         execution_options.remote_store_thread_count,
         execution_options.remote_store_chunk_bytes,
-        execution_options.remote_store_chunk_upload_timeout,
+        execution_options.remote_store_chunk_upload_timeout_seconds,
         execution_options.process_execution_parallelism,
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)
