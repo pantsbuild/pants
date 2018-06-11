@@ -51,7 +51,7 @@ impl Core {
     remote_store_server: Option<String>,
     remote_execution_server: Option<String>,
     remote_store_thread_count: usize,
-    remote_store_chunk_size: usize,
+    remote_store_chunk_bytes: usize,
     remote_store_chunk_upload_timeout: Duration,
     process_execution_parallelism: usize,
   ) -> Core {
@@ -76,7 +76,7 @@ impl Core {
           fs_pool.clone(),
           address,
           remote_store_thread_count,
-          remote_store_chunk_size,
+          remote_store_chunk_bytes,
           remote_store_chunk_upload_timeout,
         ),
         None => Store::local_only(store_path, fs_pool.clone()),

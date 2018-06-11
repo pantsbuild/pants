@@ -220,7 +220,7 @@ pub extern "C" fn scheduler_create(
   remote_store_server: Buffer,
   remote_execution_server: Buffer,
   remote_store_thread_count: u64,
-  remote_store_chunk_size: u64,
+  remote_store_chunk_bytes: u64,
   remote_store_chunk_upload_timeout: u64,
   process_execution_parallelism: u64,
 ) -> *const Scheduler {
@@ -281,7 +281,7 @@ pub extern "C" fn scheduler_create(
       Some(remote_execution_server_string)
     },
     remote_store_thread_count as usize,
-    remote_store_chunk_size as usize,
+    remote_store_chunk_bytes as usize,
     Duration::from_secs(remote_store_chunk_upload_timeout),
     process_execution_parallelism as usize,
   ))))
