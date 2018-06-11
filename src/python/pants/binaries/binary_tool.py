@@ -221,10 +221,7 @@ class XZ(NativeTool):
 
   @memoized_property
   def tar_xz_extractor(self):
-    return XZCompressedTarArchiver(self._executable_location(), self._lib_dir())
+    return XZCompressedTarArchiver(self._executable_location())
 
   def _executable_location(self):
     return os.path.join(self.select(), 'bin', 'xz')
-
-  def _lib_dir(self):
-    return os.path.join(self.select(), 'lib')

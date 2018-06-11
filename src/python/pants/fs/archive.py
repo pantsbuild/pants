@@ -12,12 +12,10 @@ from collections import OrderedDict
 from contextlib import contextmanager
 from zipfile import ZIP_DEFLATED
 
-from pants.util.contextutil import get_joined_path, open_tar, open_zip, temporary_dir
+from pants.util.contextutil import open_tar, open_zip, temporary_dir
 from pants.util.dirutil import (is_executable, safe_concurrent_rename, safe_walk,
                                 split_basename_and_dirname)
-from pants.util.memo import memoized_classproperty
 from pants.util.meta import AbstractClass
-from pants.util.osutil import get_normalized_os_name
 from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_text
 
@@ -98,52 +96,18 @@ class XZCompressedTarArchiver(TarArchiver):
 
   Invokes an xz executable to decompress a .tar.xz into a tar stream, which is piped into the
   extract() method.
-
-  NB: This class will raise an error if used to create an archive! This class can only currently be
-  used to extract from xz archives.
   """
 
   class XZArchiverError(Exception): pass
 
-  @memoized_classproperty
-  def _liblzma_shared_lib_filename(cls):
-    # FIXME: move Platform#resolve_platform_specific() into somewhere common and consume it here after
-    # #5815 is merged.
-    normalized_os_name = get_normalized_os_name()
-    if normalized_os_name == 'darwin':
-      return 'liblzma.dylib'
-    elif normalized_os_name == 'linux':
-      return 'liblzma.so'
-    else:
-      raise cls.XZArchiverError("Unrecognized platform: {}.".format(normalized_os_name))
+  def __init__(self, xz_binary_path):
 
-  def __init__(self, xz_binary_path, xz_library_path):
-
-    # TODO: test these exceptions somewhere!
+    # TODO: test this exception somewhere!
     if not is_executable(xz_binary_path):
       raise self.XZArchiverError(
         "The path {} does not name an existing executable file. An xz executable must be provided "
         "to decompress xz archives."
         .format(xz_binary_path))
-
-    self._xz_binary_path = xz_binary_path
-
-    if not os.path.isdir(xz_library_path):
-      raise self.XZArchiverError(
-        "The path {lib_dir} does not name an existing directory. A directory containing "
-        "{dylib_filename} must be provided to decompress xz archives."
-        .format(lib_dir=xz_library_path,
-                dylib_filename=self._liblzma_shared_lib_filename))
-
-    lib_lzma_dylib = os.path.join(xz_library_path, self._liblzma_shared_lib_filename)
-    if not os.path.isfile(lib_lzma_dylib):
-      raise self.XZArchiverError(
-        "The path {lib_dir} names an existing directory, but it does not contain {dylib_filename}. "
-        "A directory containing {dylib_filename} must be provided to decompress xz archives."
-        .format(lib_dir=xz_library_path,
-                dylib_filename=self._liblzma_shared_lib_filename))
-
-    self._xz_library_path = xz_library_path
 
     super(XZCompressedTarArchiver, self).__init__('r|', 'tar.xz')
 
@@ -164,23 +128,6 @@ class XZCompressedTarArchiver(TarArchiver):
       # Isolate the path so we know we're using our provided version of xz.
       'PATH': xz_bin_dir,
     }
-
-    # Allow our xz's lib directory to resolve the liblzma.{so,dylib} dependency at runtime by
-    # prepending it to the platform-specific library path environment variable.
-    # FIXME: move Platform#resolve_platform_specific() into somewhere common and consume it here
-    # after #5815 is merged.
-    normalized_os_name = get_normalized_os_name()
-    if normalized_os_name == 'darwin':
-      env_var='DYLD_LIBRARY_PATH'
-    elif normalized_os_name == 'linux':
-      env_var='LD_LIBRARY_PATH'
-    else:
-      raise self.XZArchiverError("Unrecognized platform: {}.".format(normalized_os_name))
-
-    env[env_var] = get_joined_path([self._xz_library_path],
-                                   env=os.environ.copy(),
-                                   env_var=env_var,
-                                   prepend=True)
 
     try:
       # Pipe stderr to our own stderr, but leave stdout open so we can yield it.
@@ -210,6 +157,7 @@ class XZCompressedTarArchiver(TarArchiver):
       return super(XZCompressedTarArchiver, self)._extract(
         xz_decompressed_tar_stream, outdir, mode=self.mode)
 
+  # TODO: implement this method, if we ever need it.
   def create(self, *args, **kwargs):
     """
     :raises: :class:`NotImplementedError`
