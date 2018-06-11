@@ -17,6 +17,7 @@ from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Get
 from pants.engine.struct import HasProducts, Struct
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.util.objects import SubclassesOf
 from pants_test.option.util.fakes import create_options_for_optionables
 from pants_test.subsystem.subsystem_util import init_subsystem
@@ -97,8 +98,7 @@ def create_scheduler(rules, validate=True):
     FileSystemProjectTree(os.getcwd()),
     './.pants.d',
     rules,
-    remote_store_server=None,
-    remote_execution_server=None,
+    execution_options=DEFAULT_EXECUTION_OPTIONS,
     validate=validate,
   )
 

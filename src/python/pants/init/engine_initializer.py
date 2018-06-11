@@ -28,7 +28,8 @@ from pants.engine.parser import SymbolTable
 from pants.engine.rules import SingletonRule
 from pants.engine.scheduler import Scheduler
 from pants.init.options_initializer import BuildConfigInitializer
-from pants.option.global_options import GlobMatchErrorBehavior
+from pants.option.global_options import (DEFAULT_EXECUTION_OPTIONS, ExecutionOptions,
+                                         GlobMatchErrorBehavior)
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.objects import datatype
 
@@ -134,8 +135,7 @@ class EngineInitializer(object):
       exclude_target_regexps=bootstrap_options.exclude_target_regexp,
       subproject_roots=bootstrap_options.subproject_roots,
       include_trace_on_error=bootstrap_options.print_exception_stacktrace,
-      remote_store_server=bootstrap_options.remote_store_server,
-      remote_execution_server=bootstrap_options.remote_execution_server,
+      execution_options=ExecutionOptions.from_bootstrap_options(bootstrap_options),
     )
 
   @staticmethod
@@ -152,8 +152,7 @@ class EngineInitializer(object):
     exclude_target_regexps=None,
     subproject_roots=None,
     include_trace_on_error=True,
-    remote_store_server=None,
-    remote_execution_server=None
+    execution_options=None,
   ):
     """Construct and return the components necessary for LegacyBuildGraph construction.
 
@@ -177,6 +176,8 @@ class EngineInitializer(object):
                                   under the current build root.
     :param bool include_trace_on_error: If True, when an error occurs, the error message will
                 include the graph trace.
+    :param execution_options: Option values for (remote) process execution.
+    :type execution_options: :class:`pants.option.global_options.ExecutionOptions`
     :returns: A LegacyGraphScheduler.
     """
 
@@ -188,6 +189,8 @@ class EngineInitializer(object):
     symbol_table = LegacySymbolTable(build_file_aliases)
 
     project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
+
+    execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
     # Register "literal" subjects required for these rules.
     parser = LegacyPythonCallbacksParser(
@@ -223,8 +226,7 @@ class EngineInitializer(object):
       project_tree,
       workdir,
       rules,
-      remote_store_server,
-      remote_execution_server,
+      execution_options,
       include_trace_on_error=include_trace_on_error,
     )
 

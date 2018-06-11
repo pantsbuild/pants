@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import multiprocessing
 import os
 import sys
 
@@ -57,6 +58,42 @@ class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
                                 .format(this_object.failure_behavior, cls.allowed_values))
 
     return this_object
+
+
+class ExecutionOptions(datatype([
+  'remote_store_server',
+  'remote_store_thread_count',
+  'remote_execution_server',
+  'remote_store_chunk_bytes',
+  'remote_store_chunk_upload_timeout_seconds',
+  'process_execution_parallelism',
+])):
+  """A collection of all options related to (remote) execution of processes.
+
+  TODO: These options should move to a Subsystem once we add support for "bootstrap" Subsystems (ie,
+  allowing Subsystems to be consumed before the Scheduler has been created).
+  """
+
+  @classmethod
+  def from_bootstrap_options(cls, bootstrap_options):
+    cls(
+      remote_store_server=bootstrap_options.remote_store_server,
+      remote_execution_server=bootstrap_options.remote_execution_server,
+      remote_store_thread_count=bootstrap_options.remote_store_thread_count,
+      remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
+      remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
+      process_execution_parallelism=bootstrap_options.process_execution_parallelism,
+    )
+
+
+DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
+    remote_store_server=None,
+    remote_store_thread_count=1,
+    remote_execution_server=None,
+    remote_store_chunk_bytes=1024*1024,
+    remote_store_chunk_upload_timeout_seconds=60,
+    process_execution_parallelism=multiprocessing.cpu_count()*2,
+  )
 
 
 class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
@@ -256,10 +293,24 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--build-file-imports', choices=['allow', 'warn', 'error'], default='warn',
       help='Whether to allow import statements in BUILD files')
 
-    register('--remote-store-server',
-             help='host:port of grpc server to use as remote execution file store')
-    register('--remote-execution-server',
-             help='host:port of grpc server to use as remote execution scheduler')
+    register('--remote-store-server', advanced=True,
+             help='host:port of grpc server to use as remote execution file store.')
+    register('--remote-store-thread-count', type=int, advanced=True,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_store_thread_count,
+             help='Thread count to use for the pool that interacts with the remote file store.')
+    register('--remote-execution-server', advanced=True,
+             help='host:port of grpc server to use as remote execution scheduler.')
+    register('--remote-store-chunk-bytes', type=int, advanced=True,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_bytes,
+             help='Size in bytes of chunks transferred to/from the remote file store.')
+    register('--remote-store-chunk-upload-timeout-seconds', type=int, advanced=True,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_upload_timeout_seconds,
+             help='Timeout (in seconds) for uploads of individual chunks to the remote file store.')
+
+    # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
+    # lookups via CacheSetup in TaskBase.
+    register('--process-execution-parallelism', type=int, default=multiprocessing.cpu_count(),
+             help='Number of concurrent processes that may be executed either locally and remotely.')
 
   @classmethod
   def register_options(cls, register):
