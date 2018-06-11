@@ -24,3 +24,20 @@ class JavacCompileIntegration(BaseCompileIT):
            ],
           workdir, config)
         self.assert_success(pants_run)
+
+  def test_extra_compile_args(self):
+    with temporary_dir() as cache_dir:
+      config = {
+        'cache.compile.javac': {'write_to': [cache_dir]},
+        'jvm-platform': {'compiler': 'javac'}
+      }
+
+      with self.temporary_workdir() as workdir:
+        pants_run = self.run_pants_with_workdir(
+          ['compile',
+           'testprojects/src/java/org/pantsbuild/testproject/extracompileargs:main',
+           '-ldebug',
+           ],
+          workdir, config)
+        self.assert_success(pants_run)
+        self.assertIn('-Werror testprojects/src/java/org/pantsbuild/testproject/extracompileargs/Main.java', pants_run.stdout_data)

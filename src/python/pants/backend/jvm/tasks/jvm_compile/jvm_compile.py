@@ -17,6 +17,7 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
   CLASS_NOT_FOUND_ERROR_PATTERNS
@@ -132,7 +133,7 @@ class JvmCompile(NailgunTaskBase):
     register('--suggest-missing-deps', type=bool,
              help='Suggest missing dependencies on a best-effort basis from target\'s transitive'
                   'deps for compilation failures that are due to class not found.')
-    
+
     register('--buildozer',
              help='Path to buildozer for suggest-missing-deps command lines. '
                   'If absent, no command line will be suggested to fix missing deps.')
@@ -501,10 +502,15 @@ class JvmCompile(NailgunTaskBase):
         if self.get_options().capture_classpath:
           self._record_compile_classpath(classpath, vts.targets, ctx.classes_dir)
 
+        extra_compile_args = []
+        for tgt in vts.targets:
+          if isinstance(tgt, JvmTarget):
+            extra_compile_args.extend(tgt.payload.extra_compile_args)
+
         try:
           self.compile(
             ctx,
-            self._args,
+            self._args + extra_compile_args,
             classpath,
             upstream_analysis,
             settings,
@@ -587,7 +593,7 @@ class JvmCompile(NailgunTaskBase):
   def _find_missing_deps(self, compile_logs, target):
     with self.context.new_workunit('missing-deps-suggest', labels=[WorkUnitLabel.COMPILER]):
       compile_failure_log = '\n'.join(read_file(log).decode('utf-8') for log in compile_logs)
-      
+
       missing_dep_suggestions, no_suggestions = self._missing_deps_finder.find(
         compile_failure_log, target)
 

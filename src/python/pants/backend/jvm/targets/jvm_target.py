@@ -49,6 +49,7 @@ class JvmTarget(Target, Jarable):
                javac_plugin_args=None,
                scalac_plugins=None,
                scalac_plugin_args=None,
+               extra_compile_args=None,
                **kwargs):
     """
     :API: public
@@ -91,6 +92,9 @@ class JvmTarget(Target, Jarable):
     :param dict javac_plugin_args: Map from javac plugin name to list of arguments for that plugin.
     :param scalac_plugins: names of compiler plugins to use when compiling this target with scalac.
     :param dict scalac_plugin_args: Map from scalac plugin name to list of arguments for that plugin.
+    :param list extra_compile_args: A list of args that will be added to the default compile args
+                                    when compiling the sources of this target.
+                                    Example: ['--add-modules=java.xml.bind']
     """
 
     self.address = address  # Set in case a TargetDefinitionException is thrown early
@@ -109,6 +113,7 @@ class JvmTarget(Target, Jarable):
       'javac_plugin_args': PrimitiveField(javac_plugin_args),
       'scalac_plugins': SetOfPrimitivesField(scalac_plugins),
       'scalac_plugin_args': PrimitiveField(scalac_plugin_args),
+      'extra_compile_args': PrimitiveField(tuple(extra_compile_args or ())),
     })
 
     super(JvmTarget, self).__init__(address=address, payload=payload, **kwargs)
