@@ -70,7 +70,7 @@ struct PathGlobsExpansion<T: Sized> {
   outputs: IndexSet<PathStat>,
 }
 
-// FIXME: This trait exists because `expand_single()` (and its return type) should be private, but
+// NB: This trait exists because `expand_single()` (and its return type) should be private, but
 // traits don't allow specifying private methods (and we don't want to use a top-level `fn` because
 // it's much more awkward than just specifying `&self`).
 // The methods of `GlobMatching` are forwarded to methods here.
