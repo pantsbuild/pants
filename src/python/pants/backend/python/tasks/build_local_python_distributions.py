@@ -88,7 +88,7 @@ class BuildLocalPythonDistributions(Task):
         for req in req_lib.requirements:
           reqs_to_resolve.add(req)
 
-    if len(reqs_to_resolve) == 0:
+    if not reqs_to_resolve:
       return None
 
     return reqs_to_resolve
