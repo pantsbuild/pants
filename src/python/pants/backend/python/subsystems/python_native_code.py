@@ -61,11 +61,13 @@ class PythonNativeCode(Subsystem):
   @memoized_property
   def _native_target_matchers(self):
     return {
-      Exactly(PythonDistribution): lambda tgt: self.pydist_has_native_sources,
-      Exactly(NativeLibrary): lambda tgt: self.native_target_has_native_sources,
+      Exactly(PythonDistribution): self.pydist_has_native_sources,
+      Exactly(NativeLibrary): self.native_target_has_native_sources,
     }
 
   def _any_targets_have_native_sources(self, targets):
+    # TODO(#5949): convert this to checking if the closure of python requirements has any
+    # platform-specific packages (maybe find the platforms there too?).
     for tgt in targets:
       for type_constraint, target_predicate in self._native_target_matchers.items():
         if type_constraint.satisfied_by(tgt) and target_predicate(tgt):
