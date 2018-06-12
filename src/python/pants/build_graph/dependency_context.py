@@ -11,6 +11,6 @@ from pants.build_graph.target import Target
 
 class DependencyContext(object):
 
-  alias_types = (Target, AliasTarget)
+  alias_types = (AliasTarget, Target)
   types_with_closure = ()
   target_closure_kwargs = {}
