@@ -10,9 +10,10 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
+from pants.util.meta import AbstractClass
 
 
-class NativeLibrary(Target):
+class NativeLibrary(Target, AbstractClass):
   """A class wrapping targets containing sources for C-family languages and related code."""
 
   @classmethod
