@@ -148,7 +148,12 @@ class TestNailgunClient(unittest.TestCase):
   @mock.patch.object(NailgunClient, 'try_connect', **PATCH_OPTS)
   @mock.patch('pants.java.nailgun_client.NailgunClientSession', **PATCH_OPTS)
   def test_execute_propagates_connection_error_on_connect(self, mock_session, mock_try_connect):
-    mock_try_connect.side_effect = NailgunClient.NailgunConnectionError('oops')
+    mock_try_connect.side_effect = NailgunClient.NailgunConnectionError(
+      '127.0.0.1:31337',
+      31337,
+      Exception('oops'),
+      None
+    )
 
     with self.assertRaises(NailgunClient.NailgunConnectionError):
       self.nailgun_client.execute('test')
