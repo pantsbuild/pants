@@ -28,11 +28,11 @@ class Ivy(object):
   class Error(Exception):
     """Indicates an error executing an ivy command."""
 
-  def __init__(self, classpath, ivy_settings=None, ivy_cache_dir=None, extra_jvm_options=None):
+  def __init__(self, classpath, ivy_settings=None, ivy_resolution_cache_dir=None, extra_jvm_options=None):
     """Configures an ivy wrapper for the ivy distribution at the given classpath.
 
     :param ivy_settings: path to find settings.xml file
-    :param ivy_cache_dir: path to store downloaded ivy artifacts
+    :param ivy_resolution_cache_dir: path to store downloaded ivy artifacts
     :param extra_jvm_options: list of strings to add to command line when invoking Ivy
     """
     self._classpath = maybe_list(classpath)
@@ -41,14 +41,14 @@ class Ivy(object):
       raise ValueError('ivy_settings must be a string, given {} of type {}'.format(
                          self._ivy_settings, type(self._ivy_settings)))
 
-    self._ivy_cache_dir = ivy_cache_dir
-    if not isinstance(self._ivy_cache_dir, string_types):
-      raise ValueError('ivy_cache_dir must be a string, given {} of type {}'.format(
-                         self._ivy_cache_dir, type(self._ivy_cache_dir)))
+    self._ivy_resolution_cache_dir = ivy_resolution_cache_dir
+    if not isinstance(self._ivy_resolution_cache_dir, string_types):
+      raise ValueError('ivy_resolution_cache_dir must be a string, given {} of type {}'.format(
+                         self._ivy_resolution_cache_dir, type(self._ivy_resolution_cache_dir)))
 
     self._extra_jvm_options = extra_jvm_options or []
     self._lock = OwnerPrintingInterProcessFileLock(
-      os.path.join(self._ivy_cache_dir, 'pants_ivy.file_lock'))
+      os.path.join(self._ivy_resolution_cache_dir, 'pants_ivy.file_lock'))
 
   @property
   def ivy_settings(self):
@@ -60,14 +60,14 @@ class Ivy(object):
     return self._ivy_settings
 
   @property
-  def ivy_cache_dir(self):
+  def ivy_resolution_cache_dir(self):
     """Returns the ivy cache dir used by this `Ivy` instance."""
-    return self._ivy_cache_dir
+    return self._ivy_resolution_cache_dir
 
   @property
   @contextmanager
   def resolution_lock(self):
-    safe_mkdir(self._ivy_cache_dir)
+    safe_mkdir(self._ivy_resolution_cache_dir)
     with self._lock:
       yield
 
@@ -100,12 +100,12 @@ class Ivy(object):
       args = ['-settings', self._ivy_settings] + args
 
     options = list(jvm_options) if jvm_options else []
-    if self._ivy_cache_dir and '-cache' not in args:
+    if self._ivy_resolution_cache_dir and '-cache' not in args:
       # TODO(John Sirois): Currently this is a magic property to support hand-crafted <caches/> in
       # ivysettings.xml.  Ideally we'd support either simple -caches or these hand-crafted cases
       # instead of just hand-crafted.  Clean this up by taking over ivysettings.xml and generating
       # it from BUILD constructs.
-      options += ['-Divy.cache.dir={}'.format(self._ivy_cache_dir)]
+      options += ['-Divy.cache.dir={}'.format(self._ivy_resolution_cache_dir)]
     options += self._extra_jvm_options
 
     executor = executor or SubprocessExecutor(DistributionLocator.cached())

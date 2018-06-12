@@ -147,7 +147,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     report = None
     org = IvyUtils.INTERNAL_ORG_NAME
     name = result.resolve_hash_name
-    xsl = os.path.join(self.ivy_cache_dir, 'ivy-report.xsl')
+    xsl = os.path.join(self.ivy_resolution_cache_dir, 'ivy-report.xsl')
 
     # Xalan needs this dir to exist - ensure that, but do no more - we have no clue where this
     # points.
@@ -180,7 +180,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     css = os.path.join(self._outdir, 'ivy-report.css')
     if os.path.exists(css):
       os.unlink(css)
-    shutil.copy(os.path.join(self.ivy_cache_dir, 'ivy-report.css'), self._outdir)
+    shutil.copy(os.path.join(self.ivy_resolution_cache_dir, 'ivy-report.css'), self._outdir)
 
     if self._open and report:
       try:
