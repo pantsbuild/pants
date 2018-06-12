@@ -10,7 +10,6 @@ import itertools
 import os
 import pprint
 import shutil
-import sysconfig
 from abc import abstractmethod
 from collections import OrderedDict, defaultdict
 
@@ -22,6 +21,7 @@ from twitter.common.dirutil.chroot import Chroot
 from wheel.install import WheelFile
 
 from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker
+from pants.backend.python.pex_util import get_local_platform
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -64,8 +64,7 @@ class SetupPyRunner(InstallerBase):
   def for_bdist_wheel(cls, source_dir, is_platform_specific, **kw):
     cmd = ['bdist_wheel']
     if is_platform_specific:
-      plat_name = sysconfig.get_platform()
-      cmd.extend(['--plat-name', plat_name])
+      cmd.extend(['--plat-name', get_local_platform()])
     else:
       cmd.append('--universal')
     cmd.extend(['--dist-dir', cls.DIST_DIR])
