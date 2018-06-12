@@ -22,7 +22,17 @@ def recursively_update(d, d2):
 
 
 def assert_single_element(iterable):
-  """Convert `iterable` to a list, assert that the list has one element, then return the element."""
-  result = list(iterable)
-  assert(len(result) == 1)
-  return result[0]
+  """Get the single element of `iterable`, or raise an error.
+
+  :raise: :class:`StopIteration` if there is no element.
+  :raise: :class:`ValueError` if there is more than one element.
+  """
+  it = iter(iterable)
+  first_item = next(it)
+
+  try:
+    next(it)
+  except StopIteration:
+    return first_item
+
+  raise ValueError("iterable {!r} has more than one element.".format(iterable))
