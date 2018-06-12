@@ -109,6 +109,8 @@ class XZCompressedTarArchiver(TarArchiver):
         "to decompress xz archives."
         .format(xz_binary_path))
 
+    self._xz_binary_path = xz_binary_path
+
     super(XZCompressedTarArchiver, self).__init__('r|', 'tar.xz')
 
   @contextmanager
