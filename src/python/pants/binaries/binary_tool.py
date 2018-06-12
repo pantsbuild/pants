@@ -70,6 +70,9 @@ class BinaryToolBase(Subsystem):
     if not self.archive_type:
       return None
 
+    # This forces downloading and extracting the `XZ` archive if any BinaryTool with a 'txz'
+    # archive_type is used, but that's fine, because unless the cache is manually changed we won't
+    # do more work than necessary.
     if self.archive_type == 'txz':
       return self._xz.tar_xz_extractor
 
@@ -216,7 +219,7 @@ class ExecutablePathProvider(object):
 
 class XZ(NativeTool):
   options_scope = 'xz'
-  default_version = '5.2.4'
+  default_version = '5.2.4-1'
   archive_type = 'tgz'
 
   @memoized_property
