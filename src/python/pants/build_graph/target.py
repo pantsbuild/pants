@@ -218,9 +218,7 @@ class Target(AbstractTarget):
   @classmethod
   def _closure_dep_predicate(cls, roots, include_scopes=None, exclude_scopes=None, respect_intransitive=False):
     if not respect_intransitive and include_scopes is None and exclude_scopes is None:
-      def trivial_predicate(*args, **kwargs):
-        return True
-      return trivial_predicate
+      return None
 
     root_lookup = set(roots)
     def predicate(target, dep_target):

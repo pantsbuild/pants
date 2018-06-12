@@ -37,6 +37,7 @@ class DependencyContext(Subsystem, DependencyContextBase):
 
   types_with_closure = (AnnotationProcessor, JavacPlugin, ScalacPlugin)
   target_closure_kwargs = dict(include_scopes=Scopes.JVM_COMPILE_SCOPES, respect_intransitive=True)
+  # FIXME: are these used anywhere?
   codegen_types = (JavaThriftLibrary, JavaProtobufLibrary)
 
   @classmethod
@@ -61,8 +62,9 @@ class DependencyContext(Subsystem, DependencyContextBase):
     If the target does not override the language property, returns true iff the property
     is true for any of the matched languages for the target.
     """
-    if selector(target) is not None:
-      return selector(target)
+    target_property_selected = selector(target)
+    if target_property_selected is not None:
+      return target_property_selected
 
     prop = False
     if target.has_sources('.java'):
