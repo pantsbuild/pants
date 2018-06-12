@@ -25,6 +25,8 @@ class PythonNativeCode(Subsystem):
 
   default_native_source_extensions = ['.c', '.cpp', '.cc']
 
+  class PythonNativeCodeError(Exception): pass
+
   @classmethod
   def register_options(cls, register):
     super(PythonNativeCode, cls).register_options(register)
@@ -113,8 +115,11 @@ class PythonNativeCode(Subsystem):
     platforms_with_sources = self.get_targets_by_declared_platform(targets_with_platforms)
     platform_names = platforms_with_sources.keys()
 
-    # There will always be at least 1 platform, because we checked that they have native sources.
-    assert(len(platform_names) >= 1)
+    if len(platform_names) < 1:
+      raise self.PythonNativeCodeError(
+        "Error: there should be at least one platform in the target closure, because "
+        "we checked that there are native sources.")
+
     if platform_names == ['current']:
       return True
 
