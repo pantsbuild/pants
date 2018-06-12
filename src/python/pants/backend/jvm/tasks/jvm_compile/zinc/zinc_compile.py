@@ -268,7 +268,7 @@ class BaseZincCompile(JvmCompile):
     than compiling it.
     """
     hasher = sha1()
-    for cp_entry in self._zinc.zinc + [self._zinc.compiler_interface, self._zinc.compiler_bridge]:
+    for cp_entry in [self._zinc.zinc, self._zinc.compiler_interface, self._zinc.compiler_bridge]:
       hasher.update(os.path.relpath(cp_entry, self.get_options().pants_workdir))
     key = hasher.hexdigest()[:12]
     return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
@@ -353,7 +353,7 @@ class BaseZincCompile(JvmCompile):
         fp.write(arg)
         fp.write(b'\n')
 
-    if self.runjava(classpath=self._zinc.zinc,
+    if self.runjava(classpath=[self._zinc.zinc],
                     main=Zinc.ZINC_COMPILE_MAIN,
                     jvm_options=jvm_options,
                     args=zinc_args,
