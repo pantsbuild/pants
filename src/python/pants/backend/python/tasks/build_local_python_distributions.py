@@ -109,27 +109,26 @@ class BuildLocalPythonDistributions(Task):
 
   def execute(self):
     dist_targets = self.context.targets(is_local_python_dist)
-    if not dist_targets:
-      return
 
-    interpreter = self.context.products.get_data(PythonInterpreter)
-    shared_libs_product = self.context.products.get(SharedLibrary)
+    if dist_targets:
+      interpreter = self.context.products.get_data(PythonInterpreter)
+      shared_libs_product = self.context.products.get(SharedLibrary)
 
-    with self.invalidated(dist_targets, invalidate_dependents=True) as invalidation_check:
-      for vt in invalidation_check.invalid_vts:
-        self._prepare_and_create_dist(interpreter, shared_libs_product, vt)
+      with self.invalidated(dist_targets, invalidate_dependents=True) as invalidation_check:
+        for vt in invalidation_check.invalid_vts:
+          self._prepare_and_create_dist(interpreter, shared_libs_product, vt)
 
-      local_wheel_products = self.context.products.get('local_wheels')
-      for vt in invalidation_check.all_vts:
-        dist = self._get_whl_from_dir(vt.results_dir)
-        req_lib_addr = Address.parse('{}__req_lib'.format(vt.target.address.spec))
-        self._inject_synthetic_dist_requirements(dist, req_lib_addr)
-        # Make any target that depends on the dist depend on the synthetic req_lib,
-        # for downstream consumption.
-        for dependent in self.context.build_graph.dependents_of(vt.target.address):
-          self.context.build_graph.inject_dependency(dependent, req_lib_addr)
-        dist_dir, dist_base = split_basename_and_dirname(dist)
-        local_wheel_products.add(vt.target, dist_dir).append(dist_base)
+        local_wheel_products = self.context.products.get('local_wheels')
+        for vt in invalidation_check.all_vts:
+          dist = self._get_whl_from_dir(vt.results_dir)
+          req_lib_addr = Address.parse('{}__req_lib'.format(vt.target.address.spec))
+          self._inject_synthetic_dist_requirements(dist, req_lib_addr)
+          # Make any target that depends on the dist depend on the synthetic req_lib,
+          # for downstream consumption.
+          for dependent in self.context.build_graph.dependents_of(vt.target.address):
+            self.context.build_graph.inject_dependency(dependent, req_lib_addr)
+          dist_dir, dist_base = split_basename_and_dirname(dist)
+          local_wheel_products.add(vt.target, dist_dir).append(dist_base)
 
   def _get_native_artifact_deps(self, target):
     native_artifact_targets = []
