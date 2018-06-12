@@ -94,6 +94,19 @@ class PantsDaemon(FingerprintedProcessManager):
           return stub_pantsd.read_named_socket('pailgun', int)
 
     @classmethod
+    def restart(cls, bootstrap_options=None):
+      """Restarts a running daemon instance.
+
+      :param Options bootstrap_options: The bootstrap options, if available.
+      :returns: The pailgun port number of the new pantsd instance.
+      :rtype: int
+      """
+      pantsd = cls.create(bootstrap_options)
+      with pantsd.lifecycle_lock:
+        # N.B. This will call `pantsd.terminate()` before starting.
+        return pantsd.launch()
+
+    @classmethod
     def create(cls, bootstrap_options=None, full_init=True):
       """
       :param Options bootstrap_options: The bootstrap options, if available.
@@ -402,11 +415,13 @@ class PantsDaemon(FingerprintedProcessManager):
     return listening_port
 
   def terminate(self, include_watchman=True):
-    """Terminates pantsd and watchman."""
-    with self.lifecycle_lock:
-      super(PantsDaemon, self).terminate()
-      if include_watchman:
-        self.watchman_launcher.terminate()
+    """Terminates pantsd and watchman.
+
+    N.B. This should always be called under care of `self.lifecycle_lock`.
+    """
+    super(PantsDaemon, self).terminate()
+    if include_watchman:
+      self.watchman_launcher.terminate()
 
 
 def launch():
