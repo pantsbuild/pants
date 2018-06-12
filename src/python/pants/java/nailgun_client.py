@@ -97,8 +97,30 @@ class NailgunClient(object):
   class NailgunError(Exception):
     """Indicates an error interacting with a nailgun server."""
 
+    DESCRIPTION = 'Problem talking to nailgun server'
+
+    def __init__(self, address, pid, wrapped_exc, traceback):
+      self.address = address
+      self.pid = pid
+      self.wrapped_exc = wrapped_exc
+      self.traceback = traceback
+      super(NailgunClient.NailgunError, self).__init__(
+        '{} (address: {}{}): {!r}'
+        .format(
+          self.DESCRIPTION,
+          address,
+          ', remote_pid: {}'.format(pid) if pid is not None else '',
+          self.wrapped_exc
+        )
+      )
+
   class NailgunConnectionError(NailgunError):
     """Indicates an error upon initial connect to the nailgun server."""
+    DESCRIPTION = 'Problem connecting to nailgun server'
+
+  class NailgunExecutionError(NailgunError):
+    """Indicates an error upon initial command execution on the nailgun server."""
+    DESCRIPTION = 'Problem executing command on nailgun server'
 
   # For backwards compatibility with nails expecting the ng c client special env vars.
   ENV_DEFAULTS = dict(NAILGUN_FILESEPARATOR=os.sep, NAILGUN_PATHSEPARATOR=os.pathsep)
@@ -106,7 +128,7 @@ class NailgunClient(object):
   DEFAULT_NG_PORT = 2113
 
   def __init__(self, host=DEFAULT_NG_HOST, port=DEFAULT_NG_PORT, ins=sys.stdin, out=None, err=None,
-               workdir=None, exit_on_broken_pipe=False):
+               workdir=None, exit_on_broken_pipe=False, expects_pid=False):
     """Creates a nailgun client that can be used to issue zero or more nailgun commands.
 
     :param string host: the nailgun server to contact (defaults to '127.0.0.1')
@@ -117,16 +139,29 @@ class NailgunClient(object):
     :param file out: a stream to write command standard output to (defaults to stdout)
     :param file err: a stream to write command standard error to (defaults to stderr)
     :param string workdir: the default working directory for all nailgun commands (defaults to CWD)
-    :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are encountered.
+    :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are encountered
+    :param bool expect_pid: Whether or not to expect a PID from the server (only true for pantsd)
     """
     self._host = host
     self._port = port
+    self._address = (host, port)
+    self._address_string = ':'.join(str(i) for i in self._address)
     self._stdin = ins
     self._stdout = out or sys.stdout
     self._stderr = err or sys.stderr
     self._workdir = workdir or os.path.abspath(os.path.curdir)
     self._exit_on_broken_pipe = exit_on_broken_pipe
+    self._expects_pid = expects_pid
     self._session = None
+
+  @property
+  def pid(self):
+    if not self._expects_pid:
+      return None
+    try:
+      return self._session.remote_pid
+    except AttributeError:
+      return None
 
   def try_connect(self):
     """Creates a socket, connects it to the nailgun and returns the connected socket.
@@ -136,12 +171,16 @@ class NailgunClient(object):
     """
     sock = RecvBufferedSocket(socket.socket(socket.AF_INET, socket.SOCK_STREAM))
     try:
-      sock.connect((self._host, self._port))
+      sock.connect(self._address)
     except (socket.error, socket.gaierror) as e:
       logger.debug('Encountered socket exception {!r} when attempting connect to nailgun'.format(e))
       sock.close()
       raise self.NailgunConnectionError(
-        'Problem connecting to nailgun server at {}:{}: {!r}'.format(self._host, self._port, e))
+        address=self._address_string,
+        pid=self.pid,
+        wrapped_exc=e,
+        traceback=sys.exc_info()[2]
+      )
     else:
       return sock
 
@@ -178,11 +217,24 @@ class NailgunClient(object):
     try:
       return self._session.execute(cwd, main_class, *args, **environment)
     except socket.error as e:
-      raise self.NailgunError('Problem communicating with nailgun server at {}:{}: {!r}'
-                              .format(self._host, self._port, e))
+      raise self.NailgunError(
+        address=self._address_string,
+        pid=self.pid,
+        wrapped_exc=e,
+        traceback=sys.exc_info()[2]
+      )
     except NailgunProtocol.ProtocolError as e:
-      raise self.NailgunError('Problem in nailgun protocol with nailgun server at {}:{}: {!r}'
-                              .format(self._host, self._port, e))
+      # If we get to a `ProtocolError` and we don't yet have a pid, then
+      # the daemon has not yet achieved a successful fork - so we can
+      # treat that as a separate, retryable error (usually indicating that
+      # the daemon is in a bad state).
+      exc_type = self.NailgunExecutionError if self.pid is None else self.NailgunError
+      raise exc_type(
+        address=self._address_string,
+        pid=self.pid,
+        wrapped_exc=e,
+        traceback=sys.exc_info()[2]
+      )
     finally:
       sock.close()
       self._session = None
