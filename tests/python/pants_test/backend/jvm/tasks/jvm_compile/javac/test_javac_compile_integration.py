@@ -24,3 +24,19 @@ class JavacCompileIntegration(BaseCompileIT):
            ],
           workdir, config)
         self.assert_success(pants_run)
+        
+  def test_basic_binary_remote(self):
+    with temporary_dir() as cache_dir:
+      config = {
+        'cache.compile.javac': {'write_to': [cache_dir]},
+        'jvm-platform': {'compiler': 'javac'},
+        'compile.javac': {'execution_strategy': 'hermetic'}
+      }
+
+      with self.temporary_workdir() as workdir:
+        pants_run = self.run_pants_with_workdir(
+          ['compile',
+           'testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
+           ],
+          workdir, config)
+        self.assert_success(pants_run)

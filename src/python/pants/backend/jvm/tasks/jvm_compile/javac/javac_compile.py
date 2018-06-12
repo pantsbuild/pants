@@ -15,9 +15,10 @@ from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.fs import FilesContent, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import safe_open
@@ -140,7 +141,7 @@ class JavacCompile(JvmCompile):
       javac_cmd.extend(settings_args)
 
     javac_cmd.extend([
-      '-d', ctx.classes_dir,
+      '-d', os.path.relpath(ctx.classes_dir, get_buildroot()),
       # TODO: support -release
       '-source', str(settings.source_level),
       '-target', str(settings.target_level),
@@ -161,7 +162,7 @@ class JavacCompile(JvmCompile):
       javac_cmd.extend(batched_sources)
 
       if self.execution_strategy() == 'hermetic':
-        self._execute_compile_remotely(javac_cmd)
+        self._execute_compile_remotely(javac_cmd, ctx)
       else:
         with self.context.new_workunit(name='javac',
                                        cmd=' '.join(javac_cmd),
@@ -186,33 +187,56 @@ class JavacCompile(JvmCompile):
       ret.append('-Xplugin:{} {}'.format(plugin, ' '.join(args)))
     return ret
 
-  def _execute_compile_remotely(self, cmd):
-      # (self, executor, classpath, main, jvm_options, args, cwd, create_synthetic_jar,
-      #                          synthetic_jar_dir):
+  def _execute_compile_remotely(self, cmd, ctx):
+    # (self, executor, classpath, main, jvm_options, args, cwd, create_synthetic_jar,
+    #                          synthetic_jar_dir):
     # How should I write a test for this?
     # safe_cp = classpath
     # if create_synthetic_jar:
     #   safe_cp = util.safe_classpath(classpath, synthetic_jar_dir)
     #   logger.debug('Bundling classpath {} into {}'.format(':'.join(classpath), safe_cp))
-    #
-    # runner = executor.runner(safe_cp, main, args=args, jvm_options=jvm_options, cwd=cwd)
-    #
-    # cmd = runner.cmd()
-    
-    print("&&&&&&&&&&&&", cmd)
 
-    # targets = self.context.targets()
-    #
+    # runner = executor.runner(safe_cp, main, args=args, jvm_options=jvm_options, cwd=cwd)
+
+    # cmd = runner.cmd()
+
+    targets = self.context.targets()
+
     # input_files = set()
     # for target in targets:
     #   for source in target.sources_relative_to_buildroot():
     #     input_files.add(source)
-    #
-    # input_pathglobs = PathGlobs(tuple(input_files), ())
-    # input_snapshot = self.context._scheduler.product_request(Snapshot, [input_pathglobs])[0]
-    #
-    # exec_process_request = ExecuteProcessRequest(cmd, (), input_snapshot.directory_digest, ('jar',), 15 * 60,
-    #                                              'jvm_task')
-    # exec_result = self.context.execute_process_synchronously(exec_process_request,
-    #                                                          'jvm_task',
-    #                                                          (WorkUnitLabel.TASK, WorkUnitLabel.JVM))
+    
+    input_files = set()
+    input_files.add(os.path.relpath(ctx.classes_dir, get_buildroot()))
+    for source in ctx.target.sources_relative_to_buildroot():
+      input_files.add(source)
+    
+    output_files = set()
+    for source in ctx.target.sources_relative_to_source_root():
+      output_file = source.replace(".java", ".class")
+      output_file = os.path.join(ctx.classes_dir, output_file)
+      output_file = os.path.relpath(output_file, get_buildroot())
+      output_files.add(output_file)
+
+    print(output_files)
+    input_pathglobs = PathGlobs(tuple(input_files), ())
+    input_snapshot = self.context._scheduler.product_request(Snapshot, [input_pathglobs])[0]
+
+    exec_process_request = ExecuteProcessRequest(tuple(cmd), (), input_snapshot.directory_digest, tuple(output_files), 15 * 60,
+                                                 'jvm_task')
+    exec_result = self.context.execute_process_synchronously(exec_process_request,
+                                                             'jvm_task',
+                                                             (WorkUnitLabel.TASK, WorkUnitLabel.JVM))
+    # print(exec_result)
+    # TODO: Remove this check when https://github.com/pantsbuild/pants/issues/5719 is resolved.
+    if exec_result.exit_code != 0:
+      print(exec_result.stdout, exec_result.stderr)
+      raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), exec_result.exit_code))
+
+    files_content_tuple = self.context._scheduler.product_request(
+      FilesContent,
+      [exec_result.output_directory_digest]
+    )[0].dependencies
+    
+    print(files_content_tuple)
