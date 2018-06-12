@@ -13,8 +13,7 @@ from contextlib import contextmanager
 from zipfile import ZIP_DEFLATED
 
 from pants.util.contextutil import open_tar, open_zip, temporary_dir
-from pants.util.dirutil import (is_executable, safe_concurrent_rename, safe_walk,
-                                split_basename_and_dirname)
+from pants.util.dirutil import is_executable, safe_concurrent_rename, safe_walk
 from pants.util.meta import AbstractClass
 from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_text
@@ -120,28 +119,21 @@ class XZCompressedTarArchiver(TarArchiver):
     This allows streaming the decompressed tar archive directly into a tar decompression stream,
     which is significantly faster in practice than making a temporary file.
     """
-    (xz_bin_dir, xz_filename) = split_basename_and_dirname(self._xz_binary_path)
-
     # FIXME: --threads=0 is supposed to use "the number of processor cores on the machine", but I
     # see no more than 100% cpu used at any point. This seems like it could be a bug? If performance
     # is an issue, investigate further.
-    cmd = [xz_filename, '--decompress', '--stdout', '--keep', '--threads=0', xz_input_file]
-    env = {
-      # Isolate the path so we know we're using our provided version of xz.
-      'PATH': xz_bin_dir,
-    }
+    cmd = [self._xz_binary_path, '--decompress', '--stdout', '--keep', '--threads=0', xz_input_file]
 
     try:
       # Pipe stderr to our own stderr, but leave stdout open so we can yield it.
       process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
-        stderr=sys.stderr,
-        env=env)
+        stderr=sys.stderr)
     except OSError as e:
       raise self.XZArchiverError(
-        "Error invoking xz with command {} and environment {} for input file {}: {}"
-        .format(cmd, env, xz_input_file, e),
+        "Error invoking xz with command {} for input file {}: {}"
+        .format(cmd, xz_input_file, e),
         e)
 
     # This is a file object.
@@ -150,9 +142,8 @@ class XZCompressedTarArchiver(TarArchiver):
     rc = process.wait()
     if rc != 0:
       raise self.XZArchiverError(
-        "Error decompressing xz input with command {} and environment {} for input file {}. "
-        "Exit code was: {}. "
-        .format(cmd, env, xz_input_file, rc))
+        "Error decompressing xz input with command {} for input file {}. Exit code was: {}. "
+        .format(cmd, xz_input_file, rc))
 
   def _extract(self, path, outdir):
     with self._invoke_xz(path) as xz_decompressed_tar_stream:
