@@ -14,7 +14,7 @@ from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
 from pants_test.base_test import TestGenerator
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 from pants_test.testutils.git_util import initialize_repo
 
 
@@ -352,6 +352,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       self.assert_success(pants_run)
       self.assertEqual(pants_run.stdout_data.strip(), '')
 
+  @ensure_daemon
   def test_list_changed(self):
     deleted_file = 'src/python/sources/sources.py'
 

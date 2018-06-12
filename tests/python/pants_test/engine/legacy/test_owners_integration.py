@@ -5,10 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 
 
 class ListOwnersIntegrationTest(PantsRunIntegrationTest):
+  @ensure_daemon
   def test_owner_of_success(self):
     pants_run = self.do_command('--owner-of=testprojects/tests/python/pants/dummies/test_pass.py',
                                 'list',
