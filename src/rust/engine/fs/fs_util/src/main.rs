@@ -10,7 +10,7 @@ extern crate protobuf;
 
 use bytes::Bytes;
 use clap::{App, Arg, SubCommand};
-use fs::{ResettablePool, Snapshot, Store, StoreFileByDigest, VFS};
+use fs::{GlobMatching, ResettablePool, Snapshot, Store, StoreFileByDigest, VFS};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use protobuf::Message;

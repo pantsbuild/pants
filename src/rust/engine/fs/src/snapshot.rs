@@ -376,8 +376,8 @@ mod tests {
   use self::testutil::data::TestDirectory;
 
   use super::OneOffStoreFileByDigest;
-  use super::super::{Dir, File, Path, PathGlobs, PathStat, PosixFS, ResettablePool, Snapshot,
-                     Store, StrictGlobMatching, VFS};
+  use super::super::{Dir, File, GlobMatching, Path, PathGlobs, PathStat, PosixFS, ResettablePool,
+                     Snapshot, Store, StrictGlobMatching, VFS};
 
   use std;
   use std::path::PathBuf;

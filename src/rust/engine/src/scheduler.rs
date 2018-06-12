@@ -12,7 +12,7 @@ use futures::sync::oneshot;
 use boxfuture::{BoxFuture, Boxable};
 use context::{Context, ContextFactory, Core};
 use core::{Failure, Key, TypeConstraint, TypeId, Value};
-use fs::{self, PosixFS, VFS};
+use fs::{self, GlobMatching, PosixFS};
 use graph::EntryId;
 use nodes::{NodeKey, Select};
 use rule_graph;

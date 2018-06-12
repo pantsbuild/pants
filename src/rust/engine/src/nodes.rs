@@ -17,7 +17,7 @@ use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
-use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDigest,
+use fs::{self, Dir, File, FileContent, GlobMatching, Link, PathGlobs, PathStat, StoreFileByDigest,
          StrictGlobMatching, VFS};
 use hashing;
 use process_execution::{self, CommandRunner};
