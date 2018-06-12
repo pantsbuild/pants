@@ -13,9 +13,13 @@ from pants.backend.native.config.environment import Executable
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.dependency_context import DependencyContext
+from pants.util.contextutil import get_joined_path
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.meta import AbstractClass
 from pants.util.objects import SubclassesOf, datatype
+from pants.util.process_handler import subprocess
 
 
 class NativeCompileRequest(datatype([
@@ -40,7 +44,17 @@ class ObjectFiles(datatype(['root_dir', 'filenames'])):
 class NativeTargetDependencies(datatype(['native_deps'])): pass
 
 
-class NativeCompile(NativeTask):
+class NativeCompile(NativeTask, AbstractClass):
+  # `NativeCompile` will use the `source_target_constraint` to determine what targets have "sources"
+  # to compile, and the `dependent_target_constraint` to determine which dependent targets to
+  # operate on for `strict_deps` calculation.
+  # NB: `source_target_constraint` must be overridden.
+  source_target_constraint = None
+  dependent_target_constraint = SubclassesOf(NativeLibrary)
+
+  # `NativeCompile` will use `workunit_label` as the name of the workunit when executing the
+  # compiler process. `workunit_label` must be set to a string.
+  workunit_label = None
 
   @classmethod
   def product_types(cls):
@@ -78,13 +92,6 @@ class NativeCompile(NativeTask):
 
     Subclasses are advised to create their own exception class.
     """
-
-  # `NativeCompile` will use the `source_target_constraint` to determine what targets have "sources"
-  # to compile, and the `dependent_target_constraint` to determine which dependent targets to
-  # operate on for `strict_deps` calculation.
-  # NB: `source_target_constraint` must be overridden.
-  source_target_constraint = None
-  dependent_target_constraint = SubclassesOf(NativeLibrary)
 
   def native_deps(self, target):
     return self.strict_deps_for_target(
@@ -127,7 +134,7 @@ class NativeCompile(NativeTask):
         self._add_product_at_target_base(native_deps_product, vt.target, deps)
         compile_request = self._make_compile_request(vt, deps)
         self.context.log.debug("compile_request: {}".format(compile_request))
-        self.compile(compile_request)
+        self._compile(compile_request)
 
       for vt in invalidation_check.all_vts:
         object_files = self.collect_cached_objects(vt)
@@ -209,6 +216,9 @@ class NativeCompile(NativeTask):
 
     return self.NativeSourcesByType(rel_root, headers_for_compile, sources_for_compile)
 
+  # FIXME(#5951): expand `Executable` to cover argv generation (where an `Executable` is subclassed
+  # to modify or extend the argument list, as declaratively as possible) to remove
+  # `get_compile_argv(self)`!
   @abstractmethod
   def get_compiler(self):
     """An instance of `Executable` which can be invoked to compile files.
@@ -232,13 +242,57 @@ class NativeCompile(NativeTask):
         'fatal_warnings', target),
       output_dir=versioned_target.results_dir)
 
-  @abstractmethod
-  def compile(self, compile_request):
+  def get_compile_argv(self, compile_request):
+    """Return a list of arguments to use to compile sources. Subclasses can override and append."""
+    compiler = compile_request.compiler
+    err_flags = ['-Werror'] if compile_request.fatal_warnings else []
+
+    # We are going to execute in the target output, so get absolute paths for everything.
+    # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
+    return [compiler.exe_filename] + err_flags + ['-c', '-fPIC'] + [
+      '-I{}'.format(os.path.abspath(inc_dir)) for inc_dir in compile_request.include_dirs
+    ] + [os.path.abspath(src) for src in compile_request.sources]
+
+  def _compile(self, compile_request):
     """Perform the process of compilation, writing object files to the request's 'output_dir'.
 
     NB: This method must arrange the output files so that `collect_cached_objects()` can collect all
     of the results (or vice versa)!
     """
+    sources = compile_request.sources
+
+    if len(sources) == 0:
+      # TODO: do we need this log message? Should we still have it for intentionally header-only
+      # libraries (that might be a confusing message to see)?
+      self.context.log.debug("no sources in request {}, skipping".format(compile_request))
+      return
+
+    compiler = compile_request.compiler
+    output_dir = compile_request.output_dir
+
+    argv = self.get_compile_argv(compile_request)
+
+    with self.context.new_workunit(
+        name=self.workunit_label, labels=[WorkUnitLabel.COMPILER]) as workunit:
+      try:
+        process = subprocess.Popen(
+          argv,
+          cwd=output_dir,
+          stdout=workunit.output('stdout'),
+          stderr=workunit.output('stderr'),
+          env={'PATH': get_joined_path(compiler.path_entries)})
+      except OSError as e:
+        workunit.set_outcome(WorkUnit.FAILURE)
+        raise self.NativeCompileError(
+          "Error invoking '{exe}' with command {cmd} for request {req}: {err}"
+          .format(exe=compiler.exe_filename, cmd=argv, req=compile_request, err=e))
+
+      rc = process.wait()
+      if rc != 0:
+        workunit.set_outcome(WorkUnit.FAILURE)
+        raise self.NativeCompileError(
+          "Error in '{section_name}' with command {cmd} for request {req}. Exit code was: {rc}."
+          .format(section_name=self.workunit_name, cmd=argv, req=compile_request, rc=rc))
 
   def collect_cached_objects(self, versioned_target):
     """Scan `versioned_target`'s results directory and return the output files from that directory.
