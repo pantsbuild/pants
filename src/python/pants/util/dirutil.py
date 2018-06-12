@@ -500,10 +500,3 @@ def split_basename_and_dirname(path):
   if not os.path.isfile(path):
     raise ValueError("{} does not exist or is not a regular file.".format(path))
   return (os.path.dirname(path), os.path.basename(path))
-
-
-def narrow_relative_paths(cur_root_dir, new_root_subdir, rel_paths):
-  """If `cur_root_dir` contains `new_root_subdir`, relativize `rel_paths` to `new_root_subdir`."""
-  for rel_file in rel_paths:
-    file_abs = os.path.join(cur_root_dir, rel_file)
-    yield os.path.relpath(file_abs, new_root_subdir)

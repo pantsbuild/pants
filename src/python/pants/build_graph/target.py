@@ -28,7 +28,6 @@ from pants.fs.fs import safe_filename
 from pants.source.payload_fields import SourcesField
 from pants.source.wrapped_globs import Files, FilesetWithSpec, Globs
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import narrow_relative_paths
 from pants.util.memo import memoized_property
 
 
@@ -521,15 +520,20 @@ class Target(AbstractTarget):
     """
     :API: public
     """
-    return self._sources_field.relative_to_buildroot()
+    if self.has_sources():
+      return self._sources_field.relative_to_buildroot()
+    else:
+      return []
 
   def sources_relative_to_source_root(self):
     """
     :API: public
     """
-    buildroot = get_buildroot()
-    abs_source_root = os.path.join(get_buildroot(), self.target_base)
-    return narrow_relative_paths(buildroot, abs_source_root, self.sources_relative_to_buildroot())
+    if self.has_sources():
+      abs_source_root = os.path.join(get_buildroot(), self.target_base)
+      for source in self.sources_relative_to_buildroot():
+        abs_source = os.path.join(get_buildroot(), source)
+        yield os.path.relpath(abs_source, abs_source_root)
 
   def globs_relative_to_buildroot(self):
     """
