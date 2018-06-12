@@ -41,14 +41,14 @@ class NativeCompileSettings(Subsystem):
 
 
 class CCompileSettings(NativeCompileSettings):
-  options_scope = 'c-compile-settings'
+  options_scope = 'c-compile'
 
   default_header_file_extensions = ['.h']
   default_source_file_extensions = ['.c']
 
 
 class CppCompileSettings(NativeCompileSettings):
-  options_scope = 'cpp-compile-settings'
+  options_scope = 'cpp-compile'
 
   default_header_file_extensions = ['.h', '.hpp', '.tpp']
   default_source_file_extensions = ['.cpp', '.cxx', '.cc']
