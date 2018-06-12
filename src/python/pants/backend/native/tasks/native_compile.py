@@ -28,7 +28,7 @@ class NativeCompileRequest(datatype([
 ])): pass
 
 
-# TODO: verify that filenames are valid fileNAMES and not deeper paths? does this matter?
+# FIXME(#5950): perform all process execution in the v2 engine!g
 class ObjectFiles(datatype(['root_dir', 'filenames'])):
 
   def file_paths(self):
