@@ -1,7 +1,7 @@
 extern crate tempfile;
 
 use boxfuture::{BoxFuture, Boxable};
-use fs::{self, PathGlobs, PathStatGetter, StrictGlobMatching, VFS};
+use fs::{self, GlobMatching, PathGlobs, PathStatGetter, StrictGlobMatching};
 use futures::{future, Future};
 use std::process::Command;
 use std::sync::Arc;
@@ -77,42 +77,45 @@ impl super::CommandRunner for CommandRunner {
               })
                   .map(|posix_fs| Arc::new(posix_fs))
                   .and_then(|posix_fs| {
-                      let output_dirs_strings: Vec<String> = output_dir_paths
-                                                  .into_iter()
-                                                  .map(|p|
-                                                    format!(
-                                                      "{}/**",
-                                                      p
-                                                      .into_os_string()
-                                                      .into_string()
-                                                      .unwrap()
-                                                    )
-                                                  )
-                                                  .collect();
+                    let output_dirs_strings: Vec<String> = output_dir_paths
+                                                             .into_iter()
+                                                             .map(|p|
+                                                               format!(
+                                                                 "{}/**",
+                                                                 p
+                                                                  .into_os_string()
+                                                                  .into_string()
+                                                                  .unwrap()
+                                                               )
+                                                             )
+                                                             .collect();
 
-                      let output_dirs_stats = posix_fs
-                          .expand(
-                            PathGlobs::create(&output_dirs_strings,
-                                              &[],
-                                              StrictGlobMatching::Ignore).unwrap()
-                          )
-                          .map_err(|e| format!("Error stating output dirs: {}", e))
-                          .wait()
-                          .unwrap()
-                          .into_iter()
-                          .map(|p| Some(p));
+                    let output_dirs_future = posix_fs
+                                               .expand(
+                                                 PathGlobs::create(
+                                                   &output_dirs_strings,
+                                                   &[],
+                                                   StrictGlobMatching::Ignore
+                                                 ).unwrap()
+                                               )
+                                               .map_err(|e| format!("Error stating output dirs: {}", e));
 
-                      posix_fs
-                          .path_stats(output_file_paths.into_iter().collect())
-                          .map_err(|e| format!("Error stating output files: {}", e))
-                          .and_then(move |mut paths| {
-                              paths.extend(output_dirs_stats);
-                              fs::Snapshot::from_path_stats(
-                                  store.clone(),
-                                  fs::OneOffStoreFileByDigest::new(store, posix_fs),
-                                  paths.into_iter().filter_map(|v| v).collect(),
-                              )
-                          })
+                    let output_files_future = posix_fs
+                                                .path_stats(output_file_paths.into_iter().collect())
+                                                .map_err(|e| format!("Error stating output files: {}", e));
+
+                    output_files_future.join(output_dirs_future)
+                      .and_then(|(output_files_stats, output_dirs_stats)| {
+                        let paths: Vec<_> = output_files_stats
+                                              .into_iter()
+                                              .chain(output_dirs_stats.into_iter().map(|p| Some(p)))
+                                              .collect();
+                        fs::Snapshot::from_path_stats(
+                            store.clone(),
+                            fs::OneOffStoreFileByDigest::new(store, posix_fs),
+                            paths.into_iter().filter_map(|v| v).collect(),
+                        )
+                      })
                   })
                   // Force workdir not to get dropped until after we've ingested the outputs
                   .map(|result| (result, workdir))
