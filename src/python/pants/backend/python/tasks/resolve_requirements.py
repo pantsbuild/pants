@@ -7,11 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pex.interpreter import PythonInterpreter
 
-from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.tasks.pex_build_util import (has_python_requirements,
                                                        is_local_python_dist,
-                                                       is_python_binary)
+                                                       is_python_binary,
+                                                       is_python_tests)
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 
 
@@ -28,7 +27,9 @@ class ResolveRequirements(ResolveRequirementsTaskBase):
     round_manager.require_data(PythonInterpreter)
 
   def execute(self):
-    if self.context.targets(is_python_binary) and not self.context.targets(is_local_python_dist):
+    if (self.context.targets(is_python_binary) and
+        not self.context.targets(is_local_python_dist) and
+        not self.context.targets(is_python_tests)):
       self.context.log.debug('Skipping resolve requirements task because no '
                              '`python_binary` targets in the current target '
                              'closure depend on `python_dist` targets.')

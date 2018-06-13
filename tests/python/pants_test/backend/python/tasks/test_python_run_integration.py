@@ -10,6 +10,7 @@ import sys
 
 from pex.pex_bootstrapper import get_pex_info
 
+from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
@@ -214,18 +215,37 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
         os.remove(pex)
 
   def test_pants_binary_does_not_invoke_resolve_requirements_task(self):
-    pex = os.path.join(os.getcwd(), 'dist', 'test_linux_only.pex')
-    try:
-      if 'linux' in sys.platform:
-        platform_string = 'linux-x86_64'
-      else:
-        platform_string = 'macosx-10.12-x86_64'
-      pants_ini_config = {'python-setup': {'platforms': [platform_string]}}
+    # The purpose of this test is to test the python binary creation task when building
+    # a cross-platform pex that does not have current-platform-compatible wheels available
+    # in the python requirement remote locations.
 
-      target_address_base = os.path.join(self.testproject, 'python_targets')
+    # These are intentionally mismatched to simulate resolving for a different target
+    # platform than the current platform this test is running on.
+    if 'linux' in sys.platform:
+      target = 'test_osx_only_resolve'
+      local_python_repo = os.path.join(get_buildroot(),
+          'testprojects/src/python/python_targets/test_wheels/test_whl_osx')
+    else:
+      target = 'test_linux_only_resolve'
+      local_python_repo = os.path.join(get_buildroot(),
+          'testprojects/src/python/python_targets/test_wheels/test_whl_linux')
+
+    pex = os.path.join(os.getcwd(), 'dist', target + '.pex')
+
+    try:
+      pants_ini_config = {
+        'python-setup': {
+          'platforms': ['linux-x86_64', 'macosx-10.12-x86_64'],
+          'resolver_cache_dir': ''
+        },
+        'python-repos': {'repos': ['file://{}'.format(local_python_repo)], 'indexes': []}
+      }
+
+      test_target_dir = 'testprojects/src/python/python_targets'
+
       pants_binary_run = self.run_pants(
-        command=['binary', '{}:test_linux_only'.format(target_address_base)],
-        pants_ini_config=pants_ini_config
+        command=['binary', '{}:{}'.format(test_target_dir, target)],
+        config=pants_ini_config
       )
       self.assert_success(pants_binary_run)
     finally:

@@ -39,6 +39,10 @@ def is_local_python_dist(tgt):
   return isinstance(tgt, PythonDistribution)
 
 
+def is_python_tests(tgt):
+  return isinstance(tgt, PythonTests)
+
+
 def has_resources(tgt):
   return isinstance(tgt, Files) and tgt.has_sources()
 

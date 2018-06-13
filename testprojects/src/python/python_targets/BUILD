@@ -43,14 +43,22 @@ python_library(
 )
 
 python_binary(
-  name='test_linux_only',
+  name='test_linux_only_resolve',
   source='test_binary.py',
-  dependencies=[':tf_gpu', ':test_library']
+  platforms=('linux-x86_64'),
+  dependencies=[':Markupsafe', ':test_library']
+)
+
+python_binary(
+  name='test_osx_only_resolve',
+  source='test_binary.py',
+  platforms=('macosx-10.12-x86_64'),
+  dependencies=[':Markupsafe', ':test_library']
 )
 
 python_requirement_library(
-  name='tf_gpu',
+  name='Markupsafe',
   requirements=[
-    python_requirement('tensorflow-gpu')
+    python_requirement('MarkupSafe')
   ]
 )
