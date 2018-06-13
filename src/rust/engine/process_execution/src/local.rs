@@ -1,8 +1,10 @@
 extern crate tempfile;
 
 use boxfuture::{BoxFuture, Boxable};
-use fs::{self, GlobMatching, PathGlobs, PathStatGetter, StrictGlobMatching};
+use fs::{self, GlobMatching, PathGlobs, PathStatGetter, Snapshot, Store, StrictGlobMatching};
 use futures::{future, Future};
+use std::collections::BTreeSet;
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
 
@@ -20,6 +22,53 @@ pub struct CommandRunner {
 impl CommandRunner {
   pub fn new(store: fs::Store, fs_pool: Arc<fs::ResettablePool>) -> CommandRunner {
     CommandRunner { store, fs_pool }
+  }
+
+  fn construct_output_snapshot(
+    store: Store,
+    posix_fs: Arc<fs::PosixFS>,
+    output_file_paths: BTreeSet<PathBuf>,
+    output_dir_paths: BTreeSet<PathBuf>,
+  ) -> BoxFuture<Snapshot, String> {
+    let output_dirs_glob_strings: Result<Vec<String>, String> = output_dir_paths
+      .into_iter()
+      .map(|p| {
+        p.into_os_string()
+          .into_string()
+          .map_err(|e| format!("Error stringifying output_directories: {:?}", e))
+          .map(|s| format!("{}/**", s))
+      })
+      .collect();
+
+    let output_dirs_future = posix_fs
+      .expand(
+        PathGlobs::create(
+          &try_future!(output_dirs_glob_strings),
+          &[],
+          StrictGlobMatching::Ignore,
+        ).unwrap(),
+      )
+      .map_err(|e| format!("Error stating output dirs: {}", e));
+
+    let output_files_future = posix_fs
+      .path_stats(output_file_paths.into_iter().collect())
+      .map_err(|e| format!("Error stating output files: {}", e));
+
+    output_files_future
+      .join(output_dirs_future)
+      .and_then(|(output_files_stats, output_dirs_stats)| {
+        let paths: Vec<_> = output_files_stats
+          .into_iter()
+          .chain(output_dirs_stats.into_iter().map(|p| Some(p)))
+          .collect();
+
+        fs::Snapshot::from_path_stats(
+          store.clone(),
+          fs::OneOffStoreFileByDigest::new(store, posix_fs),
+          paths.into_iter().filter_map(|v| v).collect(),
+        )
+      })
+      .to_boxed()
   }
 }
 
@@ -65,66 +114,32 @@ impl super::CommandRunner for CommandRunner {
           future::ok(fs::Snapshot::empty()).to_boxed()
         } else {
           // Use no ignore patterns, because we are looking for explicitly listed paths.
-          future::done(fs::PosixFS::new(
-                  workdir.path(),
-                  fs_pool,
-                  vec![],
-              )).map_err(|err| {
-                  format!(
-                      "Error making posix_fs to fetch local process execution output files: {}",
-                      err
-                  )
-              })
-                  .map(|posix_fs| Arc::new(posix_fs))
-                  .and_then(|posix_fs| {
-                    let output_dirs_glob_strings: Result<Vec<String>, String> =
-                      output_dir_paths
-                        .into_iter()
-                        .map(|p|
-                          p
-                           .into_os_string()
-                           .into_string()
-                           .map_err(|e| format!("Error stringifying output_directories: {:?}", e))
-                           .map(|s| format!("{}/**", s))
-                        )
-                        .collect();
-
-                    let output_dirs_future = posix_fs
-                                               .expand(
-                                                 PathGlobs::create(
-                                                   &try_future!(output_dirs_glob_strings),
-                                                   &[],
-                                                   StrictGlobMatching::Ignore
-                                                 ).unwrap()
-                                               )
-                                               .map_err(|e| format!("Error stating output dirs: {}", e));
-
-                    let output_files_future = posix_fs
-                                                .path_stats(output_file_paths.into_iter().collect())
-                                                .map_err(|e| format!("Error stating output files: {}", e));
-
-                    output_files_future.join(output_dirs_future)
-                      .and_then(|(output_files_stats, output_dirs_stats)| {
-                        let paths: Vec<_> = output_files_stats
-                                              .into_iter()
-                                              .chain(
-                                                output_dirs_stats
-                                                  .into_iter()
-                                                  .map(|p| Some(p))
-                                              )
-                                              .collect();
-
-                        fs::Snapshot::from_path_stats(
-                            store.clone(),
-                            fs::OneOffStoreFileByDigest::new(store, posix_fs),
-                            paths.into_iter().filter_map(|v| v).collect(),
-                        )
-                      }).to_boxed()
-                  })
-                  // Force workdir not to get dropped until after we've ingested the outputs
-                  .map(|result| (result, workdir))
-                  .map(|(result, _workdir)| result)
-                  .to_boxed()
+          future::done(
+            fs::PosixFS::new(
+              workdir.path(),
+              fs_pool,
+              vec![],
+            )
+          )
+          .map_err(|err| {
+            format!(
+              "Error making posix_fs to fetch local process execution output files: {}",
+              err
+            )
+          })
+          .map(|posix_fs| Arc::new(posix_fs))
+          .and_then(|posix_fs| {
+            CommandRunner::construct_output_snapshot(
+              store,
+              posix_fs,
+              output_file_paths,
+              output_dir_paths
+            )
+          })
+          // Force workdir not to get dropped until after we've ingested the outputs
+          .map(|result| (result, workdir))
+          .map(|(result, _workdir)| result)
+          .to_boxed()
         };
 
         output_snapshot
