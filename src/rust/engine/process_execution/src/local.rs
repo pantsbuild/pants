@@ -77,23 +77,22 @@ impl super::CommandRunner for CommandRunner {
               })
                   .map(|posix_fs| Arc::new(posix_fs))
                   .and_then(|posix_fs| {
-                    let output_dirs_strings: Vec<String> = output_dir_paths
-                                                             .into_iter()
-                                                             .map(|p|
-                                                               format!(
-                                                                 "{}/**",
-                                                                 p
-                                                                  .into_os_string()
-                                                                  .into_string()
-                                                                  .unwrap()
-                                                               )
-                                                             )
-                                                             .collect();
+                    let output_dirs_glob_strings: Result<Vec<String>, String> =
+                      output_dir_paths
+                        .into_iter()
+                        .map(|p|
+                          p
+                           .into_os_string()
+                           .into_string()
+                           .map_err(|e| format!("Error stringifying output_directories: {:?}", e))
+                           .map(|s| format!("{}/**", s))
+                        )
+                        .collect();
 
                     let output_dirs_future = posix_fs
                                                .expand(
                                                  PathGlobs::create(
-                                                   &output_dirs_strings,
+                                                   &try_future!(output_dirs_glob_strings),
                                                    &[],
                                                    StrictGlobMatching::Ignore
                                                  ).unwrap()
@@ -108,14 +107,19 @@ impl super::CommandRunner for CommandRunner {
                       .and_then(|(output_files_stats, output_dirs_stats)| {
                         let paths: Vec<_> = output_files_stats
                                               .into_iter()
-                                              .chain(output_dirs_stats.into_iter().map(|p| Some(p)))
+                                              .chain(
+                                                output_dirs_stats
+                                                  .into_iter()
+                                                  .map(|p| Some(p))
+                                              )
                                               .collect();
+
                         fs::Snapshot::from_path_stats(
                             store.clone(),
                             fs::OneOffStoreFileByDigest::new(store, posix_fs),
                             paths.into_iter().filter_map(|v| v).collect(),
                         )
-                      })
+                      }).to_boxed()
                   })
                   // Force workdir not to get dropped until after we've ingested the outputs
                   .map(|result| (result, workdir))
