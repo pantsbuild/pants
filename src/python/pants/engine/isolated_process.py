@@ -24,7 +24,6 @@ class ExecuteProcessRequest(datatype([
   ('env', tuple),
   ('input_files', DirectoryDigest),
   ('output_files', tuple),
-  ('output_directories', tuple),
   # NB: timeout_seconds covers the whole remote operation including queuing and setup.
   ('timeout_seconds', Exactly(float, int)),
   ('description', SubclassesOf(*six.string_types)),
@@ -39,7 +38,6 @@ class ExecuteProcessRequest(datatype([
       env=tuple(env.items()),
       input_files=snapshot.directory_digest,
       output_files=output_files,
-      output_directories=output_directories,
       timeout_seconds=timeout_seconds,
       description=description,
     )
