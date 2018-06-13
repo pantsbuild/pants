@@ -41,3 +41,16 @@ python_library(
   sources=[],
   dependencies=[':test_library_transitive_dependee_3']
 )
+
+python_binary(
+  name='test_linux_only',
+  source='test_binary.py',
+  dependencies=[':tf_gpu', ':test_library']
+)
+
+python_requirement_library(
+  name='tf_gpu',
+  requirements=[
+    python_requirement('tensorflow-gpu')
+  ]
+)

@@ -212,3 +212,22 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     finally:
       if os.path.exists(pex):
         os.remove(pex)
+
+  def test_pants_binary_does_not_invoke_resolve_requirements_task(self):
+    pex = os.path.join(os.getcwd(), 'dist', 'test_linux_only.pex')
+    try:
+      if 'linux' in sys.platform:
+        platform_string = 'linux-x86_64'
+      else:
+        platform_string = 'macosx-10.12-x86_64'
+      pants_ini_config = {'python-setup': {'platforms': [platform_string]}}
+
+      target_address_base = os.path.join(self.testproject, 'python_targets')
+      pants_binary_run = self.run_pants(
+        command=['binary', '{}:test_linux_only'.format(target_address_base)],
+        pants_ini_config=pants_ini_config
+      )
+      self.assert_success(pants_binary_run)
+    finally:
+      if os.path.exists(pex):
+        os.remove(pex)
