@@ -42,11 +42,13 @@ impl CommandRunner {
 
     let output_dirs_future = posix_fs
       .expand(
-        PathGlobs::create(
-          &try_future!(output_dirs_glob_strings),
-          &[],
-          StrictGlobMatching::Ignore,
-        ).unwrap(),
+        try_future!(
+          PathGlobs::create(
+            &try_future!(output_dirs_glob_strings),
+            &[],
+            StrictGlobMatching::Ignore,
+          )
+        )
       )
       .map_err(|e| format!("Error stating output dirs: {}", e));
 
