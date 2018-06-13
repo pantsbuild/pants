@@ -90,8 +90,8 @@ class GoalRunnerFactory(object):
       build_root=self._root_dir,
       session=graph_helper.scheduler_session,
       symbol_table=graph_helper.symbol_table,
-      exclude_patterns=tuple(exclude_target_regexps) if (len(exclude_target_regexps)>0) else tuple(),
-      tags=tuple(tags) if (len(tags)>0) else tuple()
+      exclude_patterns=tuple(exclude_target_regexps),
+      tags=tuple(tags)
     )
     graph, address_mapper = graph_helper.create_build_graph(target_roots,
                                                             self._root_dir)

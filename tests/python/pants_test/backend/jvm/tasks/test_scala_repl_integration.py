@@ -36,19 +36,19 @@ class ScalaReplIntegrationTest(PantsRunIntegrationTest):
   def test_run_repl_direct(self):
     self.assertIn('Hello, World!', self.run_repl_helloworld())
 
-  # def test_run_repl_explicit_usejavacp(self):
-  #   self.assertIn('Hello, World!',
-  #                 self.run_repl_helloworld(repl_args=['--jvm-options=-Dscala.usejavacp=true']))
-  #
-  # def test_run_repl_explicit_nousejavacp(self):
-  #   self.assertIn('Failed to initialize compiler: object scala in compiler mirror not found.',
-  #                 self.run_repl_helloworld(repl_args=['--jvm-options=-Dscala.usejavacp=false']))
-  #
-  # def test_run_repl_transitive(self):
-  #   output_lines = self.run_repl(
-  #     'testprojects/src/scala/org/pantsbuild/testproject/unicode',
-  #     dedent("""
-  #         import org.pantsbuild.testproject.unicode.shapeless.ShapelessExample
-  #         println(ShapelessExample.greek())
-  #       """))
-  #   self.assertIn("shapeless success", output_lines)
+  def test_run_repl_explicit_usejavacp(self):
+    self.assertIn('Hello, World!',
+                  self.run_repl_helloworld(repl_args=['--jvm-options=-Dscala.usejavacp=true']))
+
+  def test_run_repl_explicit_nousejavacp(self):
+    self.assertIn('Failed to initialize compiler: object scala in compiler mirror not found.',
+                  self.run_repl_helloworld(repl_args=['--jvm-options=-Dscala.usejavacp=false']))
+
+  def test_run_repl_transitive(self):
+    output_lines = self.run_repl(
+      'testprojects/src/scala/org/pantsbuild/testproject/unicode',
+      dedent("""
+          import org.pantsbuild.testproject.unicode.shapeless.ShapelessExample
+          println(ShapelessExample.greek())
+        """))
+    self.assertIn("shapeless success", output_lines)

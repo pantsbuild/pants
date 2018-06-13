@@ -110,7 +110,6 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table'])):
     graph = LegacyBuildGraph.create(self.scheduler_session, self.symbol_table)
     logger.debug('build_graph is: %s', graph)
     # Ensure the entire generator is unrolled.
-
     for _ in graph.inject_roots_closure(target_roots):
       pass
 
@@ -202,6 +201,7 @@ class EngineInitializer(object):
     )
     address_mapper = AddressMapper(parser=parser,
                                    build_ignore_patterns=build_ignore_patterns,
+                                   exclude_target_regexps=exclude_target_regexps,
                                    subproject_roots=subproject_roots)
 
     # Load the native backend.

@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import re
 from collections import OrderedDict
 
 from pants.build_graph.address import BuildFileAddress
@@ -165,6 +166,7 @@ class AddressMapper(object):
                parser,
                build_patterns=None,
                build_ignore_patterns=None,
+               exclude_target_regexps=None,
                subproject_roots=None):
     """Create an AddressMapper.
 
@@ -181,6 +183,8 @@ class AddressMapper(object):
     self.parser = parser
     self.build_patterns = tuple(build_patterns or [b'BUILD', b'BUILD.*'])
     self.build_ignore_patterns = tuple(build_ignore_patterns or [])
+    self._exclude_target_regexps = exclude_target_regexps or []
+    self.exclude_patterns = [re.compile(pattern) for pattern in self._exclude_target_regexps]
     self.subproject_roots = subproject_roots or []
 
   def __eq__(self, other):
