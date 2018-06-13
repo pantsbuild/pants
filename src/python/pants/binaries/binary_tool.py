@@ -219,7 +219,7 @@ class ExecutablePathProvider(object):
 
 class XZ(NativeTool):
   options_scope = 'xz'
-  default_version = '5.2.4-2'
+  default_version = '5.2.4-3'
   archive_type = 'tgz'
 
   @memoized_property
