@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import hashlib
 
-from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
-from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
@@ -37,8 +35,6 @@ class DependencyContext(Subsystem, DependencyContextBase):
 
   types_with_closure = (AnnotationProcessor, JavacPlugin, ScalacPlugin)
   target_closure_kwargs = dict(include_scopes=Scopes.JVM_COMPILE_SCOPES, respect_intransitive=True)
-  # FIXME: are these used anywhere?
-  codegen_types = (JavaThriftLibrary, JavaProtobufLibrary)
 
   @classmethod
   def subsystem_dependencies(cls):
