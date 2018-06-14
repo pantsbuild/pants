@@ -112,7 +112,10 @@ class PluginResolver(object):
                             context=self._python_repos.get_network_context(),
                             cache=self.plugin_cache_dir,
                             cache_ttl=10 * 365 * 24 * 60 * 60,  # Effectively never expire.
-                            allow_prereleases=PANTS_SEMVER.is_prerelease)
+                            allow_prereleases=PANTS_SEMVER.is_prerelease,
+                            # Plugins will all depend on `pantsbuild.pants` which is distributed as
+                            # a manylinux wheel.
+                            use_manylinux=True)
 
   @memoized_property
   def plugin_cache_dir(self):

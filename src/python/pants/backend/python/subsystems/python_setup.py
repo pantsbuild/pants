@@ -75,6 +75,9 @@ class PythonSetup(Subsystem):
               'NOTE: this keyword is a temporary fix and will be reverted per: '
               'https://github.com/pantsbuild/pants/issues/5696. The long term '
               'solution is tracked by: https://github.com/pantsbuild/pex/issues/456.')
+    register('--resolver-use-manylinux', advanced=True, type=bool, default=True, fingerprint=True,
+             help='Whether to consider manylinux wheels when resolving requirements for linux '
+                  'platforms.')
 
   @property
   def interpreter_constraints(self):
@@ -123,6 +126,10 @@ class PythonSetup(Subsystem):
   @property
   def resolver_blacklist(self):
     return self.get_options().resolver_blacklist
+
+  @property
+  def use_manylinux(self):
+    return self.get_options().resolver_use_manylinux
 
   @property
   def artifact_cache_dir(self):

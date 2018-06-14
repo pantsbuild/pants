@@ -218,6 +218,7 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
       cache=requirements_cache_dir,
       cache_ttl=python_setup.resolver_cache_ttl,
       allow_prereleases=python_setup.resolver_allow_prereleases,
-      pkg_blacklist=python_setup.resolver_blacklist)
+      pkg_blacklist=python_setup.resolver_blacklist,
+      use_manylinux=python_setup.use_manylinux)
 
   return distributions
