@@ -328,13 +328,11 @@ impl Store {
   }
 
   ///
-  /// Downloads directories from remote CAS recursively to the local one.
+  /// Download a directory from remote CAS recursively to the local one. Called only with the
+  /// Digest of a Directory.
   ///
-  pub fn ensure_local_has_recursive(&self, digests: Vec<Digest>) -> BoxFuture<(), String> {
-    let directory_queue = Vec::new();
-    let mut directory_futures = Vec::new();
-    let mut file_futures = Vec::new();
-
+  pub fn ensure_local_has_recursive_directory(&self, digest: Digest) -> BoxFuture<(), String> {
+    let local = self.local.clone();
     let remote = match self.remote {
       Some(ref remote) => remote,
       None => {
@@ -344,52 +342,41 @@ impl Store {
       }
     };
 
-    for digest in digests {
-      match self.local.entry_type(&digest.0) {
-        Ok(Some(EntryType::File)) => {
-          // Not sure what the function should be or if we need to be doing validation on the file
-          // just return the bytes returned from the remote cas
-          file_futures.push(self.load_file_bytes_with(digest, |bytes| bytes));
-        }
-        Ok(Some(EntryType::Directory)) => {
-          directory_futures.push(self.load_directory(digest));
-        }
-        Ok(None) => {
-          return future::err(format!(
-            "Failed to load from remote for digest {:?}: Not found",
-            digest
-          )).to_boxed() as BoxFuture<_, _>
-        }
-        Err(err) => {
-          return future::err(format!(
-            "Failed to load from remote for digest {:?}: {:?}",
-            digest, err
-          )).to_boxed() as BoxFuture<_, _>
-        }
-      };
-    }
-
-    // I  don't think this is needed...?
-    future::join_all(file_futures).map(|_| ());
-
-    future::join_all(directory_futures).map(|futures| {
-      // unpack option
-      for directory in futures {
-        match directory {
-          Some(dir) => {
-            let mut digests = Vec::new();
-            for file in dir.get_files().into_iter() {
-              digests.push(file.get_digest());
-            }
-            for subdir in dir.get_directories().into_iter() {
-              digests.push(subdir.get_digest());
-            }
-            self.ensure_local_has_recursive(digests.clone());
+    self.load_directory(digest)    // backfills from remote if necessary
+      .and_then(|maybe_dir| match maybe_dir {
+        Some(directory) => {
+          // Traverse the files in the Digest Directory
+          for file in directory.get_files().into_iter() {
+            let file_digest = file.get_digest();
+            self.load_bytes_with(
+              EntryType::File,
+              file_digest,
+              move |bytes: Bytes| local.store_bytes(EntryType::File, bytes, false).unwrap(),
+              move |bytes: Bytes| {
+                let mut directory = bazel_protos::remote_execution::Directory::new();
+                directory.merge_from_bytes(&bytes).map_err(|e| {
+                  format!(
+                    "CAS returned Directory proto for {:?} which was not valid: {:?}",
+                    digest, e
+                  )
+                })?;
+                bazel_protos::verify_directory_canonical(&directory)?;
+                Ok(directory)}
+            ).and_then(move |maybe_future| match maybe_future {
+              Some(future) => Ok(future),
+              None => Err(format!("Failed to download digest {:?}: Not found", file_digest)),
+            });
           }
-          None => Err(format!("An error occurred")),
+          // Recursively call subdirectories within Digest Directory
+          for sub_dir in directory.get_directories().into_iter() {
+            self.ensure_local_has_recursive_directory(sub_dir.get_digest().into());
+          }
         }
-      }
-    })
+        None => {
+          return future::err(
+            format!("Could not read directory: {:?}", digest)).to_boxed() as BoxFuture<_,_>
+        }
+      }).to_boxed()
   }
 
   pub fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(&self, digests: Ds) -> Result<(), String> {
