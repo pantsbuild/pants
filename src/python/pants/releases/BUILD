@@ -16,5 +16,4 @@ python_binary(
     '3rdparty/python:beautifulsoup4',
     'src/python/pants/util:process_handler',
   ],
-  tags={'platform_specific_behavior'},
 )

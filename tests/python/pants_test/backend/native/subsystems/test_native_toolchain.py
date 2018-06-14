@@ -33,7 +33,12 @@ class TestNativeToolchain(BaseTest):
       cwd = self.build_root
 
     toolchain_dirs = self.toolchain.path_entries()
-    process_invocation_env = dict(PATH=get_joined_path(toolchain_dirs))
+    isolated_toolchain_path = get_joined_path(toolchain_dirs)
+    process_invocation_env = dict(PATH=isolated_toolchain_path)
+
+    glibc_dir = self.toolchain.glibc_dir()
+    if glibc_dir:
+      process_invocation_env['LIBRARY_PATH'] = glibc_dir
 
     try:
       with environment_as(**process_invocation_env):
@@ -75,8 +80,12 @@ int main() {
 }
 """)
 
-    self._invoke_capturing_output(['g++', '-c', 'hello.cpp', '-o', 'hello_g++.o'])
-    self.assertTrue(os.path.isfile(self._get_test_file_path('hello_g++.o')))
+    self._invoke_capturing_output(['g++', 'hello.cpp', '-o', 'hello_g++'])
+    gpp_output = self._invoke_capturing_output(['./hello_g++'])
+    self.assertEqual(gpp_output, 'hello, world!\n')
 
     self._invoke_capturing_output(['clang++', '-c', 'hello.cpp', '-o', 'hello_clang++.o'])
     self.assertTrue(os.path.isfile(self._get_test_file_path('hello_clang++.o')))
+    self._invoke_capturing_output(['g++', 'hello_clang++.o', '-o', 'hello_clang++'])
+    clangpp_output = self._invoke_capturing_output(['./hello_clang++'])
+    self.assertEqual(clangpp_output, 'hello, world!\n')
