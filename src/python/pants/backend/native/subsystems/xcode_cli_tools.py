@@ -37,20 +37,24 @@ class XCodeCLITools(Subsystem):
              help='Installation location for the XCode command-line developer tools.')
 
   @memoized_property
-  def _install_location(self):
+  def _install_locations(self):
     return self.get_options().xcode_cli_install_location
 
   def _check_executables_exist(self):
-    install_location = self._install_location
     for filename in self._REQUIRED_TOOLS:
-      executable_path = os.path.join(install_location, filename)
-      if not is_executable(executable_path):
+      found_exe = False
+      for loc in self._install_locations:
+        executable_path = os.path.join(loc, filename)
+        if is_executable(executable_path):
+          found_exe = True
+          break
+      if not found_exe:
         raise self.XCodeToolsUnavailable(
-          "'{}' is not an executable file, but it is required to build "
+          "'{exe}' is not an executable file, but it is required to build "
           "native code on this platform. You may need to install the XCode "
           "command line developer tools from the Mac App Store."
-          "(for file '{}' with xcode_cli_install_location='{}')"
-          .format(executable_path, install_location))
+          "(for file '{exe}' with --xcode_cli_install_location={locs!r})"
+          .format(exe=filename, locs=self._install_locations))
 
   def path_entries(self):
     self._check_executables_exist()
