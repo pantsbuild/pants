@@ -43,9 +43,9 @@ class LibcDev(Subsystem):
   def register_options(cls, register):
     super(LibcDev, cls).register_options(register)
 
-    # FIXME(now): make something in custom_types.py for "a path to an existing executable file
-    # (absolute or relative to buildroot), or a filename that will be resolved against the PATH in
-    # some subprocess"
+    # TODO: make something in custom_types.py for "a path to an existing executable file (absolute
+    # or relative to buildroot), or a filename that will be resolved against the PATH in some
+    # subprocess".
     register('--host-compiler', type=str, default='gcc', advanced=True,
              help='The host compiler to invoke with -print-search-dirs to find the host libc.')
 
@@ -95,7 +95,6 @@ class LibcDev(Subsystem):
     for lib_dir_path in compiler_search_libraries:
       # Could use a `seen_dir_paths` set if we want to avoid pinging the fs for duplicate entries.
       if is_readable_dir(lib_dir_path):
-        # FIXME(now): raise if path is not absolute
         real_lib_dirs.add(os.path.realpath(lib_dir_path))
       else:
         logger.debug("non-existent or non-accessible program directory at {} while locating libc."
