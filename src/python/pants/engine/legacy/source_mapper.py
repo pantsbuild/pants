@@ -83,12 +83,6 @@ class EngineSourceMapper(SourceMapper):
 
     # Uniqify all transitive hydrated targets.
     hydrated_target_to_address = {}
-    with open('logging', 'a') as f:
-      f.write('***************\n')
-      f.write('{}'.format(self._scheduler))
-      f.write('\n')
-      f.write('{}'.format(dependencies))
-      f.write('\n*******\n')
     hydrated_targets, = self._scheduler.product_request(HydratedTargets, [Specs(dependencies=dependencies)])
     for hydrated_target in hydrated_targets.dependencies:
       if hydrated_target not in hydrated_target_to_address:

@@ -288,11 +288,9 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
   def test_changed_exclude_root_targets_only(self):
     changed_src = 'src/python/python_targets/test_library.py'
     exclude_target_regexp = r'_[0-9]'
-    excluded_set = {
-      'src/python/python_targets:test_library_transitive_dependee_2',
-      'src/python/python_targets:test_library_transitive_dependee_3',
-      'src/python/python_targets:test_library_transitive_dependee_4'
-    }
+    excluded_set = {'src/python/python_targets:test_library_transitive_dependee_2',
+                    'src/python/python_targets:test_library_transitive_dependee_3',
+                    'src/python/python_targets:test_library_transitive_dependee_4'}
     expected_set = set(self.TEST_MAPPING[changed_src]['transitive']) - excluded_set
 
     with create_isolated_git_repo() as worktree:
@@ -316,8 +314,8 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
     changed_src = 'src/python/python_targets/test_library.py'
     exclude_target_regexp = r'_[0-9]'
     excluded_set = {'src/python/python_targets:test_library_transitive_dependee_2',
-      'src/python/python_targets:test_library_transitive_dependee_3',
-      'src/python/python_targets:test_library_transitive_dependee_4'}
+                    'src/python/python_targets:test_library_transitive_dependee_3',
+                    'src/python/python_targets:test_library_transitive_dependee_4'}
     expected_set = set(self.TEST_MAPPING[changed_src]['transitive']) - excluded_set
 
     with create_isolated_git_repo() as worktree:

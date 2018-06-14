@@ -173,7 +173,7 @@ class SchedulerService(PantsService):
     with self.fork_lock:
       target_roots = target_roots_calculator.create(
         options=options,
-        session=session,
+        session=session.scheduler_session,
         symbol_table=session.symbol_table,
         exclude_patterns=tuple(options.for_global_scope().exclude_target_regexp) if options.for_global_scope().exclude_target_regexp else tuple(),
         tags=tuple(options.for_global_scope().tag) if options.for_global_scope().tag else tuple()
