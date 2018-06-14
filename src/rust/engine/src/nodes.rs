@@ -497,6 +497,11 @@ impl ExecuteProcess {
       .map(|path: String| PathBuf::from(path))
       .collect();
 
+    let output_directories = externs::project_multi_strs(&value, "output_directories")
+      .into_iter()
+      .map(|path: String| PathBuf::from(path))
+      .collect();
+
     let timeout_str = externs::project_str(&value, "timeout_seconds");
     let timeout_in_seconds = timeout_str
       .parse::<f64>()
@@ -509,6 +514,7 @@ impl ExecuteProcess {
       env: env,
       input_files: digest,
       output_files: output_files,
+      output_directories: output_directories,
       timeout: Duration::from_millis((timeout_in_seconds * 1000.0) as u64),
       description: description,
     }))
