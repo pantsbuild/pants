@@ -190,7 +190,7 @@ impl<'t> GraphMaker<'t> {
     if let Some(beginning_root) = self.gen_root_entry(subject_type, product_type) {
       self._construct_graph(vec![beginning_root])
     } else {
-      Default::default()
+      RuleGraph::default()
     }
   }
 
@@ -273,7 +273,7 @@ impl<'t> GraphMaker<'t> {
       (hash_map::Entry::Vacant(_), hash_map::Entry::Vacant(re)) => {
         // When a rule has not been visited before, we visit it by storing a placeholder in the
         // rule dependencies map (to prevent infinite recursion).
-        re.insert(Default::default());
+        re.insert(RuleEdges::default());
       },
       (hash_map::Entry::Vacant(_), hash_map::Entry::Occupied(_)) =>
         // Rule has been visited before and been found to be valid, or is currently being
