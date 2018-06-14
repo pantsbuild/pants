@@ -98,7 +98,9 @@ class Libc(Subsystem):
     for fname in self._required_files():
       libc_file_path = os.path.join(libc_dir, fname)
       if not os.path.isfile(libc_file_path):
-        raise self.HostLibcResolutionError("???")
+        raise self.HostLibcResolutionError(
+          "Could not locate required file {} in libc dir {}."
+          .format(fname, libc_dir))
       hash_file(libc_file_path, digest=hasher)
 
     return HostLibc(libc_dir, hasher.hexdigest())
