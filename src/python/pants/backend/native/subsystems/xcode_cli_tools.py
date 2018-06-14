@@ -20,7 +20,8 @@ class XCodeCLITools(Subsystem):
 
   This subsystem exists to give a useful error message if the tools aren't
   installed, and because the install location may not be on the PATH when Pants
-  is invoked."""
+  is invoked.
+  """
 
   options_scope = 'xcode-cli-tools'
 
