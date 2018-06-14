@@ -33,12 +33,7 @@ class TestNativeToolchain(BaseTest):
       cwd = self.build_root
 
     toolchain_dirs = self.toolchain.path_entries()
-    isolated_toolchain_path = get_joined_path(toolchain_dirs)
-    process_invocation_env = dict(PATH=isolated_toolchain_path)
-
-    glibc_dir = self.toolchain.glibc_dir()
-    if glibc_dir:
-      process_invocation_env['LIBRARY_PATH'] = glibc_dir
+    process_invocation_env = dict(PATH=get_joined_path(toolchain_dirs))
 
     try:
       with environment_as(**process_invocation_env):
