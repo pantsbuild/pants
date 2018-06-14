@@ -17,10 +17,10 @@ class NativeLibrary(Target, AbstractClass):
   """A class wrapping targets containing sources for C-family languages and related code."""
 
   @classmethod
-  def produces_ctypes_dylib(cls, target):
-    return isinstance(target, cls) and bool(target.ctypes_dylib)
+  def produces_ctypes_native_library(cls, target):
+    return isinstance(target, cls) and bool(target.ctypes_native_library)
 
-  def __init__(self, address, payload=None, sources=None, ctypes_dylib=None,
+  def __init__(self, address, payload=None, sources=None, ctypes_native_library=None,
                strict_deps=None, fatal_warnings=None, **kwargs):
 
     if not payload:
@@ -28,16 +28,16 @@ class NativeLibrary(Target, AbstractClass):
     sources_field = self.create_sources_field(sources, address.spec_path, key_arg='sources')
     payload.add_fields({
       'sources': sources_field,
-      'ctypes_dylib': ctypes_dylib,
+      'ctypes_native_library': ctypes_native_library,
       'strict_deps': PrimitiveField(strict_deps),
       'fatal_warnings': PrimitiveField(fatal_warnings),
     })
 
-    if ctypes_dylib and not isinstance(ctypes_dylib, NativeArtifact):
+    if ctypes_native_library and not isinstance(ctypes_native_library, NativeArtifact):
       raise TargetDefinitionException(
         "Target must provide a valid pants '{}' object. Received an object with type '{}' "
         "and value: {}."
-        .format(NativeArtifact.alias(), type(ctypes_dylib).__name__, ctypes_dylib))
+        .format(NativeArtifact.alias(), type(ctypes_native_library).__name__, ctypes_native_library))
 
     super(NativeLibrary, self).__init__(address=address, payload=payload, **kwargs)
 
@@ -50,8 +50,8 @@ class NativeLibrary(Target, AbstractClass):
     return self.payload.fatal_warnings
 
   @property
-  def ctypes_dylib(self):
-    return self.payload.ctypes_dylib
+  def ctypes_native_library(self):
+    return self.payload.ctypes_native_library
 
 
 class CLibrary(NativeLibrary):

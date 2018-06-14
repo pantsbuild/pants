@@ -134,11 +134,11 @@ class BuildLocalPythonDistributions(Task):
     native_artifact_targets = []
     if target.dependencies:
       for dep_tgt in target.dependencies:
-        if not NativeLibrary.produces_ctypes_dylib(dep_tgt):
+        if not NativeLibrary.produces_ctypes_native_library(dep_tgt):
           raise TargetDefinitionException(
             target,
             "Target '{}' is invalid: the only dependencies allowed in python_dist() targets "
-            "are C or C++ targets with a ctypes_dylib= kwarg."
+            "are C or C++ targets with a ctypes_native_library= kwarg."
             .format(dep_tgt.address.spec))
         native_artifact_targets.append(dep_tgt)
     return native_artifact_targets

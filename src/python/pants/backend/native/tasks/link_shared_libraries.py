@@ -74,7 +74,7 @@ class LinkSharedLibraries(NativeTask):
     return single_product
 
   def execute(self):
-    targets_providing_artifacts = self.context.targets(NativeLibrary.produces_ctypes_dylib)
+    targets_providing_artifacts = self.context.targets(NativeLibrary.produces_ctypes_native_library)
     native_target_deps_product = self.context.products.get(NativeTargetDependencies)
     compiled_objects_product = self.context.products.get(ObjectFiles)
     shared_libs_product = self.context.products.get(SharedLibrary)
@@ -105,7 +105,7 @@ class LinkSharedLibraries(NativeTask):
         shared_libs_product.add(vt.target, vt.target.target_base).append(shared_library)
 
   def _retrieve_shared_lib_from_cache(self, vt):
-    native_artifact = vt.target.ctypes_dylib
+    native_artifact = vt.target.ctypes_native_library
     path_to_cached_lib = os.path.join(
       vt.results_dir, native_artifact.as_shared_lib(self.linker.platform))
     if not os.path.isfile(path_to_cached_lib):
@@ -131,7 +131,7 @@ class LinkSharedLibraries(NativeTask):
     return LinkSharedLibraryRequest(
       linker=self.linker,
       object_files=all_compiled_object_files,
-      native_artifact=vt.target.ctypes_dylib,
+      native_artifact=vt.target.ctypes_native_library,
       output_dir=vt.results_dir)
 
   _SHARED_CMDLINE_ARGS = {
