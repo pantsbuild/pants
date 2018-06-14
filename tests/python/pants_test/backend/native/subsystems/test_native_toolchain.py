@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.util.contextutil import environment_as, get_joined_path
 from pants.util.process_handler import subprocess
@@ -23,17 +25,15 @@ class TestNativeToolchain(BaseTest):
     super(TestNativeToolchain, self).setUp()
     self.toolchain = global_subsystem_instance(NativeToolchain)
 
+  def _get_test_file_path(self, path):
+    return os.path.join(self.build_root, path)
+
   def _invoke_capturing_output(self, cmd, cwd=None):
     if cwd is None:
       cwd = self.build_root
 
     toolchain_dirs = self.toolchain.path_entries()
-    isolated_toolchain_path = get_joined_path(toolchain_dirs)
-    process_invocation_env = dict(PATH=isolated_toolchain_path)
-
-    glibc_dir = self.toolchain.glibc_dir()
-    if glibc_dir:
-      process_invocation_env['LD_LIBRARY_PATH'] = glibc_dir
+    process_invocation_env = dict(PATH=get_joined_path(toolchain_dirs))
 
     try:
       with environment_as(**process_invocation_env):
@@ -56,13 +56,11 @@ int main() {
 }
 """)
 
-    self._invoke_capturing_output(['gcc', 'hello.c', '-o', 'hello_gcc'])
-    gcc_output = self._invoke_capturing_output(['./hello_gcc'])
-    self.assertEqual(gcc_output, 'hello, world!\n')
+    self._invoke_capturing_output(['gcc', '-c', 'hello.c', '-o', 'hello_gcc.o'])
+    self.assertTrue(os.path.isfile(self._get_test_file_path('hello_gcc.o')))
 
-    self._invoke_capturing_output(['clang', 'hello.c', '-o', 'hello_clang'])
-    clang_output = self._invoke_capturing_output(['./hello_clang'])
-    self.assertEqual(clang_output, 'hello, world!\n')
+    self._invoke_capturing_output(['clang', '-c', 'hello.c', '-o', 'hello_clang.o'])
+    self.assertTrue(os.path.isfile(self._get_test_file_path('hello_clang.o')))
 
   def test_hello_cpp(self):
     self.create_file('hello.cpp', contents="""
@@ -73,10 +71,8 @@ int main() {
 }
 """)
 
-    self._invoke_capturing_output(['g++', 'hello.cpp', '-o', 'hello_g++'])
-    gpp_output = self._invoke_capturing_output(['./hello_g++'])
-    self.assertEqual(gpp_output, 'hello, world!\n')
+    self._invoke_capturing_output(['g++', '-c', 'hello.cpp', '-o', 'hello_g++.o'])
+    self.assertTrue(os.path.isfile(self._get_test_file_path('hello_g++.o')))
 
-    self._invoke_capturing_output(['clang++', 'hello.cpp', '-o', 'hello_clang++'])
-    clangpp_output = self._invoke_capturing_output(['./hello_clang++'])
-    self.assertEqual(clangpp_output, 'hello, world!\n')
+    self._invoke_capturing_output(['clang++', '-c', 'hello.cpp', '-o', 'hello_clang++.o'])
+    self.assertTrue(os.path.isfile(self._get_test_file_path('hello_clang++.o')))
