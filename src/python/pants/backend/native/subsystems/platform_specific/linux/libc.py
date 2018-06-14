@@ -22,6 +22,7 @@ from pants.util.process_handler import subprocess
 logger = logging.getLogger(__name__)
 
 
+# FIXME: make this an @rule, after we can automatically produce LibcDev (see #5788).
 class HostLibcDev(datatype(['crti_object', 'fingerprint'])): pass
 
 
@@ -52,30 +53,42 @@ class LibcDev(Subsystem):
   def _search_dirs_libraries_regex(cls):
     return re.compile('^libraries: =(.*)$', flags=re.MULTILINE)
 
-  @classmethod
-  def _parse_search_dirs_output_libraries(cls, cmd_output):
-    libs_line = cls._search_dirs_libraries_regex.search(cmd_output)
+  def _parse_libraries_from_compiler_search_dirs(self, compiler_exe):
+    # This argument is supported by at least gcc and clang.
+    cmd = [compiler_exe, '-print-search-dirs']
+
+    try:
+      compiler_output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+    except OSError as e:
+      raise self.HostLibcDevResolutionError(
+        "The compiler '{}' could not be invoked with command '{}': {}"
+        .format(compiler_exe, cmd, e))
+
+    libs_line = self._search_dirs_libraries_regex.search(compiler_output)
 
     if not libs_line:
-      raise cls.HostLibcDevResolutionError("???/libs_line: {}".format(libs_line))
+      raise self.HostLibcDevResolutionError(
+        "Could not parse libraries from compiler '{}' with command '{}'. Output:\n{}"
+        .format(compiler_exe, cmd, compiler_output))
 
-    return libs_line.group(1).split(':')
+    return cmd, libs_line.group(1).split(':')
 
-  # NB: this file is required to create executables. gcc can find it if the containing directory is
-  # within the LIBRARY_PATH environment variable.
+  # NB: crti.o is required to create executables on Linux. Our provided gcc can find it if the
+  # containing directory is within the LIBRARY_PATH environment variable when we invoke gcc.
+  # Note that clang is not able to use LIBRARY_PATH to find this file -- instead, you need to set
+  # --sysroot and provide a -Bprefix (may require a space?) such that this file is located at
+  # <sysroot>/<prefix>/lib/crti.o. Setting --sysroot requires adding so many more "-Bprefix"
+  # arguments to add other required files and libraries for linking that we do not try to link with
+  # clang at all currently.
   _LIBC_INIT_OBJECT_FILE = 'crti.o'
 
   @memoized_property
   def host_libc(self):
-    """???"""
+    """Locate the host's libc-dev installation using a specified host compiler's search dirs."""
     compiler_exe = self.get_options().host_compiler
-    cmd = [compiler_exe, '-print-search-dirs']
-    try:
-      compiler_output = subprocess.check_output(cmd)
-    except OSError as e:
-      raise self.HostLibcDevResolutionError("???: {}".format(e))
 
-    compiler_search_libraries = self._parse_search_dirs_output_libraries(compiler_output)
+    # We use `cmd` for error messages below.
+    cmd, compiler_search_libraries = self._parse_libraries_from_compiler_search_dirs(compiler_exe)
 
     real_lib_dirs = OrderedSet()
 
@@ -100,4 +113,5 @@ class LibcDev(Subsystem):
         "Could not locate {fname} in library search dirs {dirs} parsed from the output of {cmd}."
         .format(fname=self._LIBC_INIT_OBJECT_FILE, dirs=real_lib_dirs, cmd=cmd))
 
-    return HostLibcDev(libc_crti_object_file, hash_file(libc_crti_object_file))
+    return HostLibcDev(crti_object=libc_crti_object_file,
+                       fingerpint=hash_file(libc_crti_object_file))
