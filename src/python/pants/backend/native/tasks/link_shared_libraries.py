@@ -15,7 +15,7 @@ from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.collections import assert_single_element
-from pants.util.contextutil import get_joined_path
+from pants.util.strutil import create_path_env_var
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 from pants.util.process_handler import subprocess
@@ -167,7 +167,7 @@ class LinkSharedLibraries(NativeTask):
           cwd=output_dir,
           stdout=workunit.output('stdout'),
           stderr=workunit.output('stderr'),
-          env={'PATH': get_joined_path(linker.path_entries)})
+          env={'PATH': create_path_env_var(linker.path_entries)})
       except OSError as e:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.LinkSharedLibrariesError(

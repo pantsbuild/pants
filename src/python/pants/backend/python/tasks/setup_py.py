@@ -35,12 +35,11 @@ from pants.build_graph.resources import Resources
 from pants.engine.rules import rule
 from pants.engine.selectors import Select
 from pants.task.task import Task
-from pants.util.contextutil import get_joined_path
 from pants.util.dirutil import safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
-from pants.util.strutil import safe_shlex_split
+from pants.util.strutil import create_path_env_var, safe_shlex_join
 
 
 SETUP_BOILERPLATE = """
@@ -178,10 +177,10 @@ class SetupPyExecutionEnvironment(datatype([
       # FIXME(#5662): It seems that crti.o is provided by glibc, which we don't provide yet, so this
       # lets Travis pass for now.
       ret['PATH'] = native_tools.linker.platform.resolve_platform_specific({
-        'darwin': lambda: get_joined_path(all_path_entries),
+        'darwin': lambda: create_path_env_var(all_path_entries),
         # Append our tools after the ones already on the PATH -- this is shameful and should be
         # removed when glibc is introduced.
-        'linux': lambda: get_joined_path(all_path_entries, os.environ.copy()),
+        'linux': lambda: create_path_env_var(all_path_entries, os.environ.copy()),
       })
 
     return ret

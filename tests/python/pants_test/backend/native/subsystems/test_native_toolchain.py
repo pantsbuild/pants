@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
-from pants.util.contextutil import environment_as, get_joined_path
 from pants.util.process_handler import subprocess
+from pants.util.strutil import create_path_env_var, environment_as
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
@@ -33,7 +33,7 @@ class TestNativeToolchain(BaseTest):
       cwd = self.build_root
 
     toolchain_dirs = self.toolchain.path_entries()
-    process_invocation_env = dict(PATH=get_joined_path(toolchain_dirs))
+    process_invocation_env = dict(PATH=create_path_env_var(toolchain_dirs))
 
     try:
       with environment_as(**process_invocation_env):

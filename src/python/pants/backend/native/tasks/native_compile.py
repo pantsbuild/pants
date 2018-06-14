@@ -15,7 +15,7 @@ from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.dependency_context import DependencyContext
-from pants.util.contextutil import get_joined_path
+from pants.util.strutil import create_path_env_var
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import SubclassesOf, datatype
@@ -251,7 +251,7 @@ class NativeCompile(NativeTask, AbstractClass):
           cwd=output_dir,
           stdout=workunit.output('stdout'),
           stderr=workunit.output('stderr'),
-          env={'PATH': get_joined_path(compiler.path_entries)})
+          env={'PATH': create_path_env_var(compiler.path_entries)})
       except OSError as e:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.NativeCompileError(
