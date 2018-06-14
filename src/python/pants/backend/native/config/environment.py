@@ -12,11 +12,10 @@ from pants.util.objects import datatype
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
 
 
-class UnsupportedPlatformError(Exception):
-  """Thrown if pants is running on an unrecognized platform."""
-
-
 class Platform(datatype(['normalized_os_name'])):
+
+  class UnsupportedPlatformError(Exception):
+    """Thrown if pants is running on an unrecognized platform."""
 
   @classmethod
   def create(cls):
@@ -28,12 +27,12 @@ class Platform(datatype(['normalized_os_name'])):
     arg_keys = frozenset(platform_specific_funs.keys())
     unknown_plats = self._NORMALIZED_OS_NAMES - arg_keys
     if unknown_plats:
-      raise UnsupportedPlatformError(
+      raise self.UnsupportedPlatformError(
         "platform_specific_funs {} must support platforms {}"
         .format(platform_specific_funs, list(unknown_plats)))
     extra_plats = arg_keys - self._NORMALIZED_OS_NAMES
     if extra_plats:
-      raise UnsupportedPlatformError(
+      raise self.UnsupportedPlatformError(
         "platform_specific_funs {} has unrecognized platforms {}"
         .format(platform_specific_funs, list(extra_plats)))
 
