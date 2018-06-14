@@ -22,7 +22,6 @@ from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.option.ranked_value import RankedValue
 from pants.task.task import QuietTaskMixin
-from pants.util.filtering import create_filters, wrap_filters
 
 
 logger = logging.getLogger(__name__)
@@ -70,7 +69,7 @@ class GoalRunnerFactory(object):
       result = help_printer.print_help()
       self._exiter(result)
 
-  def _init_graph(self, target_roots, graph_helper):
+  def _init_graph(self, target_roots, graph_helper, exclude_target_regexps, tags):
     """Determine the BuildGraph, AddressMapper and spec_roots for a given run.
 
     :param TargetRoots target_roots: The existing `TargetRoots` object, if any.
@@ -86,12 +85,13 @@ class GoalRunnerFactory(object):
                                                                     self._global_options,
                                                                     self._build_config)
       graph_helper = graph_scheduler_helper.new_session()
-
     target_roots = target_roots or TargetRootsCalculator.create(
       options=self._options,
-      build_root=self._root_dir,
       session=graph_helper.scheduler_session,
-      symbol_table=graph_helper.symbol_table
+      build_root=self._root_dir,
+      symbol_table=graph_helper.symbol_table,
+      exclude_patterns=tuple(exclude_target_regexps),
+      tags=tuple(tags)
     )
     graph, address_mapper = graph_helper.create_build_graph(target_roots,
                                                             self._root_dir)
@@ -112,16 +112,10 @@ class GoalRunnerFactory(object):
   def _roots_to_targets(self, target_roots):
     """Populate the BuildGraph and target list from a set of input TargetRoots."""
     with self._run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
-      def filter_for_tag(tag):
-        return lambda target: tag in map(str, target.tags)
-
-      tag_filter = wrap_filters(create_filters(self._tag, filter_for_tag))
 
       def generate_targets():
         for address in self._build_graph.inject_roots_closure(target_roots, self._fail_fast):
-          target = self._build_graph.get_target(address)
-          if tag_filter(target):
-            yield target
+          yield self._build_graph.get_target(address)
 
       return list(generate_targets())
 
@@ -139,6 +133,8 @@ class GoalRunnerFactory(object):
       self._build_graph, self._address_mapper, scheduler, target_roots = self._init_graph(
         self._target_roots,
         self._daemon_graph_helper,
+        self._global_options.exclude_target_regexp,
+        self._global_options.tag
       )
 
       goals = self._determine_goals(self._requested_goals)

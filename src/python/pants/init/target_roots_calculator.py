@@ -101,7 +101,7 @@ class TargetRootsCalculator(object):
   """Determines the target roots for a given pants run."""
 
   @classmethod
-  def parse_specs(cls, target_specs, build_root=None):
+  def parse_specs(cls, target_specs, build_root=None, exclude_patterns=None, tags=None):
     """Parse string specs into unique `Spec` objects.
 
     :param iterable target_specs: An iterable of string specs.
@@ -110,10 +110,18 @@ class TargetRootsCalculator(object):
     """
     build_root = build_root or get_buildroot()
     spec_parser = CmdLineSpecParser(build_root)
-    return OrderedSet(spec_parser.parse_spec(spec_str) for spec_str in target_specs)
+
+    dependencies = tuple(OrderedSet(spec_parser.parse_spec(spec_str) for spec_str in target_specs))
+    if not dependencies:
+      return None
+    return [Specs(
+      dependencies=dependencies,
+      exclude_patterns=exclude_patterns if exclude_patterns else tuple(),
+      tags=tags)
+    ]
 
   @classmethod
-  def create(cls, options, session, symbol_table, build_root=None):
+  def create(cls, options, session, symbol_table, build_root=None, exclude_patterns=None, tags=None):
     """
     :param Options options: An `Options` instance to use.
     :param session: The Scheduler session
@@ -121,7 +129,11 @@ class TargetRootsCalculator(object):
     :param string build_root: The build root.
     """
     # Determine the literal target roots.
-    spec_roots = cls.parse_specs(options.target_specs, build_root)
+    spec_roots = cls.parse_specs(
+      target_specs=options.target_specs,
+      build_root=build_root,
+      exclude_patterns=exclude_patterns,
+      tags=tags)
 
     # Determine `Changed` arguments directly from options to support pre-`Subsystem`
     # initialization paths.
@@ -135,8 +147,8 @@ class TargetRootsCalculator(object):
     logger.debug('changed_request is: %s', changed_request)
     logger.debug('owned_files are: %s', owned_files)
     scm = get_scm()
-    change_calculator = ChangeCalculator(session, symbol_table, scm) if scm else None
-    owner_calculator = OwnerCalculator(session, symbol_table) if owned_files else None
+    change_calculator = ChangeCalculator(scheduler=session, symbol_table=symbol_table, scm=scm) if scm else None
+    owner_calculator = OwnerCalculator(scheduler=session, symbol_table=symbol_table) if owned_files else None
     targets_specified = sum(1 for item
                          in (changed_request.is_actionable(), owned_files, spec_roots)
                          if item)
@@ -153,14 +165,16 @@ class TargetRootsCalculator(object):
       # alternate target roots.
       changed_addresses = change_calculator.changed_target_addresses(changed_request)
       logger.debug('changed addresses: %s', changed_addresses)
-      return TargetRoots(tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses))
+      dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses)
+      return TargetRoots([Specs(dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags)])
 
     if owner_calculator and owned_files:
       # We've been provided no spec roots (e.g. `./pants list`) AND a owner request. Compute
       # alternate target roots.
       owner_addresses = owner_calculator.owner_target_addresses(owned_files)
       logger.debug('owner addresses: %s', owner_addresses)
-      return TargetRoots(tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses))
+      dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses)
+      return TargetRoots([Specs(dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags)])
 
     return TargetRoots(spec_roots)
 
