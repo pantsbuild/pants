@@ -56,11 +56,15 @@ int main() {
 }
 """)
 
-    self._invoke_capturing_output(['gcc', '-c', 'hello.c', '-o', 'hello_gcc.o'])
-    self.assertTrue(os.path.isfile(self._get_test_file_path('hello_gcc.o')))
+    self._invoke_capturing_output(['gcc', 'hello.c', '-o', 'hello_gcc'])
+    gcc_out = self._invoke_capturing_output(['./hello_gcc'])
+    self.assertEqual('hello, world!\n', gcc_out)
 
     self._invoke_capturing_output(['clang', '-c', 'hello.c', '-o', 'hello_clang.o'])
     self.assertTrue(os.path.isfile(self._get_test_file_path('hello_clang.o')))
+    self._invoke_capturing_output(['gcc', 'hello_clang.o', '-o', 'hello_clang'])
+    clang_compile_out = self._invoke_capturing_output(['./hello_clang'])
+    self.assertEqual('hello, world!\n', clang_compile_out)
 
   def test_hello_cpp(self):
     self.create_file('hello.cpp', contents="""
