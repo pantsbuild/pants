@@ -17,6 +17,7 @@ from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_classproperty, memoized_property
 from pants.util.objects import datatype
 from pants.util.process_handler import subprocess
+from pants.util.strutil import safe_shlex_join
 
 
 logger = logging.getLogger(__name__)
@@ -37,7 +38,15 @@ class LibcDev(Subsystem):
 
   options_scope = 'libc'
 
-  class HostLibcDevResolutionError(Exception): pass
+  class HostLibcDevResolutionError(Exception):
+
+    def __init__(self, compiler, cmd, err_msg, *args, **kwargs):
+      # We use `safe_shlex_join` here to pretty-print the command.
+      msg = ("In command={cmd!r} with --host-compiler={compiler!r}: {err_msg}"
+             .format(cmd=safe_shlex_join(cmd),
+                     compiler=compiler,
+                     err_msg=err_msg))
+      super(LibcDev.HostLibcDevResolutionError, self).__init__(msg, *args, **kwargs)
 
   @classmethod
   def register_options(cls, register):
@@ -58,18 +67,17 @@ class LibcDev(Subsystem):
     cmd = [compiler_exe, '-print-search-dirs']
 
     try:
+      # Get stderr interspersed in the error message too -- this should not affect output parsing.
       compiler_output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
     except OSError as e:
-      raise self.HostLibcDevResolutionError(
-        "The compiler '{}' could not be invoked with command '{}': {}"
-        .format(compiler_exe, cmd, e))
+      raise self.HostLibcDevResolutionError(compiler_exe, cmd, "invocation failed.", e)
 
     libs_line = self._search_dirs_libraries_regex.search(compiler_output)
 
     if not libs_line:
       raise self.HostLibcDevResolutionError(
-        "Could not parse libraries from compiler '{}' with command '{}'. Output:\n{}"
-        .format(compiler_exe, cmd, compiler_output))
+        compiler_exe, cmd,
+        "Could not parse libraries from output:\n{}".format(compiler_output))
 
     return cmd, libs_line.group(1).split(':')
 
@@ -109,8 +117,11 @@ class LibcDev(Subsystem):
 
     if not libc_crti_object_file:
       raise self.HostLibcDevResolutionError(
-        "Could not locate {fname} in library search dirs {dirs} parsed from the output of {cmd}."
-        .format(fname=self._LIBC_INIT_OBJECT_FILE, dirs=real_lib_dirs, cmd=cmd))
+        compiler_exe, cmd,
+        "Could not locate {fname} in library search dirs {dirs}. "
+        "You may need to install a libc dev package for the current system. "
+        "For many operating systems, this package is named 'libc-dev' or 'libc6-dev'."
+        .format(fname=self._LIBC_INIT_OBJECT_FILE, dirs=real_lib_dirs))
 
     return HostLibcDev(crti_object=libc_crti_object_file,
                        fingerpint=hash_file(libc_crti_object_file))
