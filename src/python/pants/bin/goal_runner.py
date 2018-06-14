@@ -79,16 +79,24 @@ class GoalRunnerFactory(object):
     """
     # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
     if not graph_helper:
+      with open('logging', 'a') as f:
+        f.write('creating new graph helper\n')
       native = Native.create(self._global_options)
       native.set_panic_handler()
       graph_scheduler_helper = EngineInitializer.setup_legacy_graph(native,
                                                                     self._global_options,
                                                                     self._build_config)
       graph_helper = graph_scheduler_helper.new_session()
+      with open('logging', 'a') as f:
+        f.write('creating new graph helper: {}\n'.format(graph_helper))
+    else:
+      with open('logging', 'a') as f:
+        f.write('use daemon provided graph helper\n')
+        f.write('use daemon provided graph helper: {}\n'.format(graph_helper))
     target_roots = target_roots or TargetRootsCalculator.create(
       options=self._options,
-      build_root=self._root_dir,
       session=graph_helper.scheduler_session,
+      build_root=self._root_dir,
       symbol_table=graph_helper.symbol_table,
       exclude_patterns=tuple(exclude_target_regexps),
       tags=tuple(tags)

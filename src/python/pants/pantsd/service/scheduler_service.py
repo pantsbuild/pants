@@ -175,8 +175,8 @@ class SchedulerService(PantsService):
         options=options,
         session=session,
         symbol_table=session.symbol_table,
-        exclude_patterns=options.exclude_target_regexp if options.exclude_target_regexp else tuple(),
-        tags=options.tag if options.tag else tuple()
+        exclude_patterns=tuple(options.for_global_scope().exclude_target_regexp) if options.for_global_scope().exclude_target_regexp else tuple(),
+        tags=tuple(options.for_global_scope().tag) if options.for_global_scope().tag else tuple()
       )
       session.warm_product_graph(target_roots)
       return session, target_roots

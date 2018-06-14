@@ -93,7 +93,7 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table'])):
     logger.debug('warming target_roots for: %r', target_roots)
     subjects = target_roots.specs
     if not subjects:
-      return None
+      subjects = []
     request = self.scheduler_session.execution_request([TransitiveHydratedTargets], subjects)
     result = self.scheduler_session.execute(request)
     if result.error:

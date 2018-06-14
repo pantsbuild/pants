@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -129,7 +129,11 @@ class TargetRootsCalculator(object):
     :param string build_root: The build root.
     """
     # Determine the literal target roots.
-    spec_roots = cls.parse_specs(options.target_specs, build_root, exclude_patterns, tags)
+    spec_roots = cls.parse_specs(
+      target_specs=options.target_specs,
+      build_root=build_root,
+      exclude_patterns=exclude_patterns,
+      tags=tags)
 
     # Determine `Changed` arguments directly from options to support pre-`Subsystem`
     # initialization paths.
@@ -143,8 +147,8 @@ class TargetRootsCalculator(object):
     logger.debug('changed_request is: %s', changed_request)
     logger.debug('owned_files are: %s', owned_files)
     scm = get_scm()
-    change_calculator = ChangeCalculator(session, symbol_table, scm) if scm else None
-    owner_calculator = OwnerCalculator(session, symbol_table) if owned_files else None
+    change_calculator = ChangeCalculator(scheduler=session, symbol_table=symbol_table, scm=scm) if scm else None
+    owner_calculator = OwnerCalculator(scheduler=session, symbol_table=symbol_table) if owned_files else None
     targets_specified = sum(1 for item
                          in (changed_request.is_actionable(), owned_files, spec_roots)
                          if item)
@@ -179,7 +183,7 @@ class ChangeCalculator(object):
   """A ChangeCalculator that finds the target addresses of changed files based on scm."""
 
   def __init__(self, scheduler, symbol_table, scm, workspace=None, changes_since=None,
-    diffspec=None):
+               diffspec=None):
     """
     :param scheduler: The `Scheduler` instance to use for computing file to target mappings.
     :param symbol_table: The symbol table.
@@ -210,8 +214,8 @@ class ChangeCalculator(object):
       return
 
     changed_addresses = set(address
-      for address
-      in self._mapper.iter_target_addresses_for_sources(changed_files))
+                            for address
+                            in self._mapper.iter_target_addresses_for_sources(changed_files))
     for address in changed_addresses:
       yield address
 
@@ -224,11 +228,11 @@ class ChangeCalculator(object):
     #   see https://github.com/pantsbuild/pants/issues/382
     specs = (DescendantAddresses(''),)
     adaptor_iter = (t.adaptor
-      for targets in self._scheduler.product_request(TransitiveHydratedTargets,
-      [Specs(specs)])
-      for t in targets.roots)
+                    for targets in self._scheduler.product_request(TransitiveHydratedTargets,
+                                                                   [Specs(specs)])
+                    for t in targets.roots)
     graph = _DependentGraph.from_iterable(target_types_from_symbol_table(self._symbol_table),
-      adaptor_iter)
+                                          adaptor_iter)
 
     if changed_request.include_dependees == 'direct':
       for address in graph.dependents_of_addresses(changed_addresses):
@@ -258,8 +262,8 @@ class OwnerCalculator(object):
   def iter_owner_target_addresses(self, owned_files):
     """Given an list of owned files, compute and yield all affected target addresses"""
     owner_addresses = set(address
-      for address
-      in self._mapper.iter_target_addresses_for_sources(owned_files))
+                          for address
+                          in self._mapper.iter_target_addresses_for_sources(owned_files))
     for address in owner_addresses:
       yield address
 
