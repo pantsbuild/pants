@@ -8,17 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
+from pants.util.osutil import get_normalized_os_name
 from pants.util.process_handler import subprocess
 from pants.util.strutil import create_path_env_var, environment_as
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
-# TODO(cosmicexplorer): Can we have some form of this run in an OSX shard on
-# Travis?
-# FIXME(cosmicexplorer): We need to test gcc as well, but the gcc driver can't
-# find the right include directories for system headers in Travis. We need to
-# use the clang driver to find library paths, then use those when invoking gcc.
 class TestNativeToolchain(BaseTest):
 
   def setUp(self):
@@ -34,6 +30,11 @@ class TestNativeToolchain(BaseTest):
 
     toolchain_dirs = self.toolchain.path_entries()
     process_invocation_env = dict(PATH=create_path_env_var(toolchain_dirs))
+
+    # FIXME: convert this to Platform#resolve_platform_specific() when #5815 is merged.
+    if get_normalized_os_name() == 'linux':
+      host_libc = self.toolchain.libc.host_libc
+      process_invocation_env['LIBRARY_PATH'] = os.path.dirname(host_libc.crti_object)
 
     try:
       with environment_as(**process_invocation_env):
