@@ -126,7 +126,7 @@ class LibcDev(Subsystem):
         .format(fname=self._LIBC_INIT_OBJECT_FILE, dirs=real_lib_dirs))
 
     return HostLibcDev(crti_object=libc_crti_object_file,
-                       fingerpint=hash_file(libc_crti_object_file))
+                       fingerprint=hash_file(libc_crti_object_file))
 
   @memoized_property
   def host_libc(self):
