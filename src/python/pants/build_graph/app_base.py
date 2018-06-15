@@ -212,8 +212,8 @@ class AppBase(Target):
                archive=None,
                **kwargs):
     """
-    :param string binary: Target spec of the ``jvm_binary`` that contains the
-      app main.
+    :param string binary: Target spec of the ``jvm_binary`` or the ``python-binary``
+      that contains the app main.
     :param bundles: One or more ``bundle``\s
       describing "extra files" that should be included with this app
       (e.g.: config files, startup scripts).
