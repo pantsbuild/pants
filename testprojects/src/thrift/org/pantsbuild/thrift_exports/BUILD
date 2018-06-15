@@ -1,61 +1,61 @@
 java_thrift_library(
-  name='A',
-  sources=[
-    'A.thrift',
-  ],
-  language='scala',
-  compiler='scrooge',
+    name = "A",
+    sources = [
+        "A.thrift",
+    ],
+    compiler = "scrooge",
+    language = "scala",
 )
 
 java_thrift_library(
-  name='B-with-exports',
-  sources=[
-    'B.thrift',
-  ],
-  dependencies=[
-    ':A',
-  ],
-  exports=[
-    ':A',
-  ],
-  language='scala',
-  compiler='scrooge',
+    name = "B-with-exports",
+    sources = [
+        "B.thrift",
+    ],
+    compiler = "scrooge",
+    language = "scala",
+    dependencies = [
+        ":A",
+    ],
+    exports = [
+        ":A",
+    ],
 )
 
 java_thrift_library(
-  name='B-without-exports',
-  sources=[
-    'B.thrift',
-  ],
-  dependencies=[
-    ':A',
-  ],
-  language='scala',
-  compiler='scrooge',
+    name = "B-without-exports",
+    sources = [
+        "B.thrift",
+    ],
+    compiler = "scrooge",
+    language = "scala",
+    dependencies = [
+        ":A",
+    ],
 )
 
 java_thrift_library(
-  name='C-with-exports',
-  sources=[
-    'C.thrift',
-  ],
-  dependencies=[
-    ':B-with-exports',
-  ],
-  language='scala',
-  compiler='scrooge',
-  strict_deps=True,
+    name = "C-with-exports",
+    sources = [
+        "C.thrift",
+    ],
+    compiler = "scrooge",
+    language = "scala",
+    strict_deps = True,
+    dependencies = [
+        ":B-with-exports",
+    ],
 )
 
 java_thrift_library(
-  name='C-without-exports',
-  sources=[
-    'C.thrift',
-  ],
-  dependencies=[
-    ':B-without-exports',
-  ],
-  language='scala',
-  compiler='scrooge',
-  strict_deps=True,
+    name = "C-without-exports",
+    sources = [
+        "C.thrift",
+    ],
+    compiler = "scrooge",
+    language = "scala",
+    strict_deps = True,
+    dependencies = [
+        ":B-without-exports",
+    ],
 )

@@ -3,34 +3,39 @@
 
 # trivial example of thrift that includes other thrift
 
-java_thrift_library(name='precipitation-java',
-  sources=['precipitation.thrift'],
-  dependencies=[
-    'examples/src/thrift/org/pantsbuild/example/distance:distance-java',
-  ],
-  provides = artifact(org='org.pantsbuild.example',
-                      name='precipitation-thrift-java',
-                      repo=public),
+java_thrift_library(
+    name = "precipitation-java",
+    sources = ["precipitation.thrift"],
+    provides = artifact(
+        org = "org.pantsbuild.example",
+        name = "precipitation-thrift-java",
+        repo = public,
+    ),
+    dependencies = [
+        "examples/src/thrift/org/pantsbuild/example/distance:distance-java",
+    ],
 )
 
-python_thrift_library(name='precipitation-python',
-  sources=['precipitation.thrift'],
-  dependencies=[
-    'examples/src/thrift/org/pantsbuild/example/distance:distance-python',
-  ],
-  provides=setup_py(
-    name='pantsbuild.pants.precipitation-thrift-python',
-    version='0.0.1',
-  )
+python_thrift_library(
+    name = "precipitation-python",
+    sources = ["precipitation.thrift"],
+    provides = setup_py(
+        name = "pantsbuild.pants.precipitation-thrift-python",
+        version = "0.0.1",
+    ),
+    dependencies = [
+        "examples/src/thrift/org/pantsbuild/example/distance:distance-python",
+    ],
 )
 
-python_thrift_library(name='monolithic-precipitation-python',
-  sources=['precipitation.thrift'],
-  dependencies=[
-    'examples/src/thrift/org/pantsbuild/example/distance:unexported-distance-python',
-  ],
-  provides=setup_py(
-    name='pantsbuild.pants.monolithic-precipitation-thrift-python',
-    version='0.0.1',
-  )
+python_thrift_library(
+    name = "monolithic-precipitation-python",
+    sources = ["precipitation.thrift"],
+    provides = setup_py(
+        name = "pantsbuild.pants.monolithic-precipitation-thrift-python",
+        version = "0.0.1",
+    ),
+    dependencies = [
+        "examples/src/thrift/org/pantsbuild/example/distance:unexported-distance-python",
+    ],
 )

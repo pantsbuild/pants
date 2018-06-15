@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_library(
-  dependencies = [
-    'testprojects/src/thrift/org/pantsbuild/testproject:thrift-java',
-  ],
-  sources = rglobs('*.java')
+    sources = rglobs("*.java"),
+    dependencies = [
+        "testprojects/src/thrift/org/pantsbuild/testproject:thrift-java",
+    ],
 )

@@ -2,12 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  sources = rglobs('*.py'),
-  dependencies = [
-    '3rdparty/python:requests',
-    '3rdparty/python:pyopenssl',
-    '3rdparty/python:six',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:meta',
-  ],
+    sources = rglobs("*.py"),
+    dependencies = [
+        "3rdparty/python:pyopenssl",
+        "3rdparty/python:requests",
+        "3rdparty/python:six",
+        "src/python/pants/util:dirutil",
+        "src/python/pants/util:meta",
+    ],
 )

@@ -4,9 +4,9 @@
 # two libraries own the same source file
 
 scala_library(
-  name = 'a',
+    name = "a",
 )
 
 scala_library(
-  name = 'b',
+    name = "b",
 )

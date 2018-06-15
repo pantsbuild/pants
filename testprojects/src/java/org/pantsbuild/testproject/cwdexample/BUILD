@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 jvm_binary(
-  basename='cwd-example',
-  source='ExampleCwd.java',
-  main='org.pantsbuild.testproject.cwdexample.ExampleCwd',
-  dependencies=[
-    "3rdparty:guava",
-  ]
+    basename = "cwd-example",
+    main = "org.pantsbuild.testproject.cwdexample.ExampleCwd",
+    source = "ExampleCwd.java",
+    dependencies = [
+        "3rdparty:guava",
+    ],
 )

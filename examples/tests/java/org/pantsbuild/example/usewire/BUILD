@@ -4,10 +4,10 @@
 # Tests functionality of wire generating java code.
 
 junit_tests(
-  sources=['UseWireTest.java',],
-  dependencies=[
-    '3rdparty:junit',
-    '3rdparty:wire-runtime',
-    'examples/src/wire/org/pantsbuild/example/temperature',
-  ],
+    sources = ["UseWireTest.java"],
+    dependencies = [
+        "3rdparty:junit",
+        "3rdparty:wire-runtime",
+        "examples/src/wire/org/pantsbuild/example/temperature",
+    ],
 )

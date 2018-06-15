@@ -5,21 +5,21 @@
 # python_dist allows you to use setup.py to depend on C/C++ extensions.
 
 python_dist(
-  name='fasthello',
-  sources=[
-    'c_greet.c',
-    'cpp_greet.cpp',
-    'hello_package/hello.py',
-    'hello_package/__init__.py',
-    'setup.py'
-  ]
+    name = "fasthello",
+    sources = [
+        "c_greet.c",
+        "cpp_greet.cpp",
+        "hello_package/__init__.py",
+        "hello_package/hello.py",
+        "setup.py",
+    ],
 )
 
 python_binary(
-  name='main',
-  source='main.py',
-  dependencies=[
-    ':fasthello',
-  ],
-  platforms=['current']
+    name = "main",
+    source = "main.py",
+    platforms = ["current"],
+    dependencies = [
+        ":fasthello",
+    ],
 )

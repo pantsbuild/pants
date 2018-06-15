@@ -2,6 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_protobuf_library(
-  sources=['testproto1.proto', 'testproto2.proto',],
-  imports=['3rdparty:protobuf-test-import',],
+    sources = [
+        "testproto1.proto",
+        "testproto2.proto",
+    ],
+    imports = ["3rdparty:protobuf-test-import"],
 )

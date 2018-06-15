@@ -4,11 +4,11 @@
 #  Example for annotation_processor() target
 
 jvm_binary(
-  source='Main.java',
-  main='org.pantsbuild.example.annotation.main.Main',
-  basename = 'annotation-example',
-  dependencies=[
-    'examples/src/java/org/pantsbuild/example/annotation/example',
-    'examples/src/java/org/pantsbuild/example/annotation/processor',
-  ],
+    basename = "annotation-example",
+    main = "org.pantsbuild.example.annotation.main.Main",
+    source = "Main.java",
+    dependencies = [
+        "examples/src/java/org/pantsbuild/example/annotation/example",
+        "examples/src/java/org/pantsbuild/example/annotation/processor",
+    ],
 )

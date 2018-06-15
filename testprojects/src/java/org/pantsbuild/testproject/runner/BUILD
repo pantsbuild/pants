@@ -2,22 +2,22 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_library(
-  name='main-class',
-  dependencies=[
-    ':dependent-class',
-  ],
-  sources=['MainClass.java']
+    name = "main-class",
+    sources = ["MainClass.java"],
+    dependencies = [
+        ":dependent-class",
+    ],
 )
 
 java_library(
-  name='dependent-class',
-  dependencies=[],
-  sources=['DependentClass.java']
+    name = "dependent-class",
+    sources = ["DependentClass.java"],
+    dependencies = [],
 )
 
 jvm_binary(
-  name='pants-runner-testproject',
-  dependencies=[
-    ':main-class',
-  ]
+    name = "pants-runner-testproject",
+    dependencies = [
+        ":main-class",
+    ],
 )

@@ -3,15 +3,15 @@
 
 # Track files depended on to build the native engine to allow for downstream invalidations.
 files(
-  sources=zglobs(
-    '**/Cargo.*',
-    '**/*.rs',
-    exclude=[
-      zglobs('**/target/*'),
-      'process_execution/bazel_protos'
-    ]
-  ),
-  dependencies=[
-    'src/rust/engine/process_execution/bazel_protos'
-  ]
+    sources = zglobs(
+        "**/Cargo.*",
+        "**/*.rs",
+        exclude = [
+            zglobs("**/target/*"),
+            "process_execution/bazel_protos",
+        ],
+    ),
+    dependencies = [
+        "src/rust/engine/process_execution/bazel_protos",
+    ],
 )

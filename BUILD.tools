@@ -1,60 +1,105 @@
 # JVM artifacts that Pants itself depends on.
 # http://pantsbuild.github.io/dev_tasks.html#jvm-tool-bootstrapping
 
-target(name = 'scala-js-cli', dependencies=['contrib/scalajs/3rdparty/jvm/org/scala-js:cli'])
-target(name = 'scala-js-compiler', dependencies=[
-  'contrib/scalajs/3rdparty/jvm/org/scala-js:compiler',
-  'contrib/scalajs/3rdparty/jvm/org/scala-js:library',
-])
-target(name = 'scala-js-library', dependencies=['contrib/scalajs/3rdparty/jvm/org/scala-js:library'])
+target(
+    name = "scala-js-cli",
+    dependencies = ["contrib/scalajs/3rdparty/jvm/org/scala-js:cli"],
+)
+
+target(
+    name = "scala-js-compiler",
+    dependencies = [
+        "contrib/scalajs/3rdparty/jvm/org/scala-js:compiler",
+        "contrib/scalajs/3rdparty/jvm/org/scala-js:library",
+    ],
+)
+
+target(
+    name = "scala-js-library",
+    dependencies = ["contrib/scalajs/3rdparty/jvm/org/scala-js:library"],
+)
 
 # NB: The scrooge tools do not mix their classpaths with the sources they interact with, and
 # therefore they do not need to use the `scala-platform` via scala_jar.
-jar_library(name = 'scrooge-gen',
-            jars = [
-              jar(org='com.twitter', name='scrooge-generator_2.11', rev='3.20.0',
-                        excludes=[
-                          # scrooge requires libthrift 0.5.0-1 which is not available on
-                          # the default maven repos. Force scrooge to use thrift-0.6.1, which
-                          # is compatible, instead.
-                          exclude(org = 'org.apache.thrift', name = 'libthrift')
-                        ])
+jar_library(
+    name = "scrooge-gen",
+    jars = [
+        jar(
+            org = "com.twitter",
+            name = "scrooge-generator_2.11",
+            rev = "3.20.0",
+            excludes = [
+                # scrooge requires libthrift 0.5.0-1 which is not available on
+                # the default maven repos. Force scrooge to use thrift-0.6.1, which
+                # is compatible, instead.
+                exclude(
+                    org = "org.apache.thrift",
+                    name = "libthrift",
+                ),
             ],
-            dependencies = [
-              '3rdparty:thrift-0.6.1',
-            ])
+        ),
+    ],
+    dependencies = [
+        "3rdparty:thrift-0.6.1",
+    ],
+)
 
-jar_library(name = 'scrooge-linter',
-            jars = [
-              jar(org='com.twitter', name='scrooge-linter_2.11', rev='3.20.0',
-                        excludes=[
-                          exclude(org = 'org.apache.thrift', name = 'libthrift')
-                        ])
+jar_library(
+    name = "scrooge-linter",
+    jars = [
+        jar(
+            org = "com.twitter",
+            name = "scrooge-linter_2.11",
+            rev = "3.20.0",
+            excludes = [
+                exclude(
+                    org = "org.apache.thrift",
+                    name = "libthrift",
+                ),
             ],
-            dependencies = [
-              '3rdparty:thrift-0.6.1',
-            ])
-
+        ),
+    ],
+    dependencies = [
+        "3rdparty:thrift-0.6.1",
+    ],
+)
 
 # Google doesn't publish Kythe jars (yet?).  So we publish them to a custom repo
 # (https://github.com/benjyw/binhost) for now.  See build-support/ivy/ivysettings.xml
 # for more info.
 jar_library(
-  name='kythe-java-extractor',
-  jars = [jar(org='kythe', name='javac_extractor', rev='v0.0.26.5-snowchain037-82964297aef')]
+    name = "kythe-java-extractor",
+    jars = [jar(
+        org = "kythe",
+        name = "javac_extractor",
+        rev = "v0.0.26.5-snowchain037-82964297aef",
+    )],
 )
 
 jar_library(
-  name='kythe-java-indexer',
-  jars = [jar(org='kythe', name='java_indexer', rev='v0.0.26.5-snowchain037-82964297aef')]
+    name = "kythe-java-indexer",
+    jars = [jar(
+        org = "kythe",
+        name = "java_indexer",
+        rev = "v0.0.26.5-snowchain037-82964297aef",
+    )],
 )
 
 # Runtime dependencies for the Avro Java generated code.
-avro_rev = '1.8.2'
+avro_rev = "1.8.2"
+
 jar_library(
-  name = 'avro-java-runtime',
-  jars = [
-    jar(org='org.apache.avro', name='avro', rev=avro_rev),
-    jar(org='org.apache.avro', name='avro-ipc', rev=avro_rev),
-  ],
+    name = "avro-java-runtime",
+    jars = [
+        jar(
+            org = "org.apache.avro",
+            name = "avro",
+            rev = avro_rev,
+        ),
+        jar(
+            org = "org.apache.avro",
+            name = "avro-ipc",
+            rev = avro_rev,
+        ),
+    ],
 )

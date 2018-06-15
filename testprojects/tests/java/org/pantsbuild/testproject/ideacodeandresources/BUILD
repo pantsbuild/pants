@@ -3,20 +3,19 @@
 
 # see test_idea_integration.py
 junit_tests(
-  name='code',
-  sources = ['TestResourcesAndCode.java'],
-  dependencies=[
-    '3rdparty:junit',
-    ':readme',
-    # Add a direct dependency on a non-test resources folder
-    # to make sure it stays non-test resources
-    'testprojects/src/resources/org/pantsbuild/testproject/ideacodeandresources:resource',
-    'testprojects/tests/resources/org/pantsbuild/testproject/ideacodeandresources:resource',
-  ]
+    name = "code",
+    sources = ["TestResourcesAndCode.java"],
+    dependencies = [
+        "3rdparty:junit",
+        ":readme",
+        # Add a direct dependency on a non-test resources folder
+        # to make sure it stays non-test resources
+        "testprojects/src/resources/org/pantsbuild/testproject/ideacodeandresources:resource",
+        "testprojects/tests/resources/org/pantsbuild/testproject/ideacodeandresources:resource",
+    ],
 )
 
 resources(
-  name='readme',
-  sources=['README.md'],
+    name = "readme",
+    sources = ["README.md"],
 )
-

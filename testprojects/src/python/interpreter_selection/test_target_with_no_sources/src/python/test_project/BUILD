@@ -1,3 +1,3 @@
 python_library(
-  sources=globs('*.py')
+    sources = globs("*.py"),
 )

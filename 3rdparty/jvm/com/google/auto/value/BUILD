@@ -3,10 +3,14 @@
 
 # DOCSTART: This target is included in documentation.
 jar_library(
-  jars=[
-    jar(org='com.google.auto.value', name='auto-value', rev='1.1'),
-  ],
-  # Is used as an annotation processor.
-  scope='compile',
+    jars = [
+        jar(
+            org = "com.google.auto.value",
+            name = "auto-value",
+            rev = "1.1",
+        ),
+    ],
+    # Is used as an annotation processor.
+    scope = "compile",
 )
 # DOCEND

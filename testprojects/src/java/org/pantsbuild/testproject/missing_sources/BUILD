@@ -2,11 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 target(
-  dependencies=[':ant'],
+    dependencies = [":ant"],
 )
 
-jar_library(name='ant',
-  jars=[
-    jar(org='ant', name='ant', rev='1.6.4')
-  ],
+jar_library(
+    name = "ant",
+    jars = [
+        jar(
+            org = "ant",
+            name = "ant",
+            rev = "1.6.4",
+        ),
+    ],
 )

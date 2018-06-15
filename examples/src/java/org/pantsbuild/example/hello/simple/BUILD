@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 jvm_binary(
-  source = 'HelloWorld.java',
-  main = 'org.pantsbuild.example.hello.simple.HelloWorld',
+    main = "org.pantsbuild.example.hello.simple.HelloWorld",
+    source = "HelloWorld.java",
 )
-

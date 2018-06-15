@@ -3,5 +3,5 @@
 
 # see test_idea_integration.py
 resources(
-  sources=['README.md'],
+    sources = ["README.md"],
 )

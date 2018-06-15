@@ -6,6 +6,6 @@
 # for the purposes of resource ordering testing.
 
 resources(
-  name='resources',
-  sources=['resources.txt']
+    name = "resources",
+    sources = ["resources.txt"],
 )

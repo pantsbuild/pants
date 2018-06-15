@@ -6,39 +6,52 @@
 java_library()
 
 jvm_prep_command(
-  name='test-prep-command',
-  mainclass='org.pantsbuild.testproject.jvmprepcommand.ExampleJvmPrepCommand',
-  args=['/tmp/running-in-goal-test', 'foo'],
-  jvm_options=['-Dorg.pantsbuild.jvm_prep_command=WORKS-IN-TEST'],
-  dependencies=[':jvmprepcommand']
+    name = "test-prep-command",
+    args = [
+        "/tmp/running-in-goal-test",
+        "foo",
+    ],
+    jvm_options = ["-Dorg.pantsbuild.jvm_prep_command=WORKS-IN-TEST"],
+    mainclass = "org.pantsbuild.testproject.jvmprepcommand.ExampleJvmPrepCommand",
+    dependencies = [":jvmprepcommand"],
 )
 
 jvm_prep_command(
-  name='binary-prep-command',
-  goal='binary',
-  mainclass='org.pantsbuild.testproject.jvmprepcommand.ExampleJvmPrepCommand',
-  args=['/tmp/running-in-goal-binary', 'bar'],
-  jvm_options=['-Dorg.pantsbuild.jvm_prep_command=WORKS-IN-BINARY'],
-  dependencies=[':jvmprepcommand']
+    name = "binary-prep-command",
+    args = [
+        "/tmp/running-in-goal-binary",
+        "bar",
+    ],
+    goal = "binary",
+    jvm_options = ["-Dorg.pantsbuild.jvm_prep_command=WORKS-IN-BINARY"],
+    mainclass = "org.pantsbuild.testproject.jvmprepcommand.ExampleJvmPrepCommand",
+    dependencies = [":jvmprepcommand"],
 )
 
 # NB(Eric Ayers), a jvm_prep_command running from the compile step can only depend on published
 # jar_library() targets, not code compiled within the repo.
 jvm_prep_command(
-  name='compile-prep-command',
-  goal='compile',
-  mainclass='org.pantsbuild.tools.jar.Main',
-  args=['/tmp/running-in-goal-compile.jar',
-    '-files=testprojects/src/java/org/pantsbuild/testproject/jvmprepcommand'],
-  dependencies=[
-    ':jar-tool',
-  ],
+    name = "compile-prep-command",
+    args = [
+        "/tmp/running-in-goal-compile.jar",
+        "-files=testprojects/src/java/org/pantsbuild/testproject/jvmprepcommand",
+    ],
+    goal = "compile",
+    mainclass = "org.pantsbuild.tools.jar.Main",
+    dependencies = [
+        ":jar-tool",
+    ],
 )
 
-jar_library(name='jar-tool',
-  jars=[
-    # NB(Eric Ayers): this can be any version of jar-tool, does not need to stay in sync with the
-    # rest of pants' use of jar-tool.
-    jar(org='org.pantsbuild', name='jar-tool', rev='0.0.8'),
-  ],
+jar_library(
+    name = "jar-tool",
+    jars = [
+        # NB(Eric Ayers): this can be any version of jar-tool, does not need to stay in sync with the
+        # rest of pants' use of jar-tool.
+        jar(
+            org = "org.pantsbuild",
+            name = "jar-tool",
+            rev = "0.0.8",
+        ),
+    ],
 )

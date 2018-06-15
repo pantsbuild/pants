@@ -1,16 +1,16 @@
 java_library(
-  name='fatal',
-  fatal_warnings=True,
-  sources=['Warning.java'],
+    name = "fatal",
+    sources = ["Warning.java"],
+    fatal_warnings = True,
 )
 
 java_library(
-  name='nonfatal',
-  fatal_warnings=False,
-  sources=['Warning.java'],
+    name = "nonfatal",
+    sources = ["Warning.java"],
+    fatal_warnings = False,
 )
 
 java_library(
-  name='defaultfatal',
-  sources=['Warning.java'],
+    name = "defaultfatal",
+    sources = ["Warning.java"],
 )

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 jvm_binary(
-  source='Seven.java',
-  main='org.pantsbuild.testproject.targetlevels.java7.Seven',
-  platform='java7',
+    main = "org.pantsbuild.testproject.targetlevels.java7.Seven",
+    source = "Seven.java",
+    platform = "java7",
 )

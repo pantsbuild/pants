@@ -4,11 +4,11 @@
 # Example of defining a test target that depends on a python_dist target.
 
 python_tests(
-  name='fasthello',
-  sources=[
-    'test_fasthello.py'
-  ],
-  dependencies=[
-    'examples/src/python/example/python_distribution/hello/fasthello:fasthello'
-  ]
+    name = "fasthello",
+    sources = [
+        "test_fasthello.py",
+    ],
+    dependencies = [
+        "examples/src/python/example/python_distribution/hello/fasthello",
+    ],
 )

@@ -1,28 +1,32 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-junit_tests(name='tests',
-  sources=['AllTests.java'],
-  dependencies=[
-    '3rdparty:junit',
-    ':check',
-    ':lib',
-  ],
+junit_tests(
+    name = "tests",
+    sources = ["AllTests.java"],
+    dependencies = [
+        ":check",
+        ":lib",
+        "3rdparty:junit",
+    ],
 )
 
-jvm_binary(name='bin',
-  source='CheckForLibrary.java',
-  main='org.pantsbuild.testproject.junit.testscope.CheckForLibrary',
-  dependencies=[
-    ':lib',
-  ],
+jvm_binary(
+    name = "bin",
+    main = "org.pantsbuild.testproject.junit.testscope.CheckForLibrary",
+    source = "CheckForLibrary.java",
+    dependencies = [
+        ":lib",
+    ],
 )
 
-java_library(name='check',
-  sources=['CheckForLibrary.java'],
+java_library(
+    name = "check",
+    sources = ["CheckForLibrary.java"],
 )
 
-java_library(name='lib',
-  sources=['SomeLibraryFile.java'],
-  scope='test',
+java_library(
+    name = "lib",
+    sources = ["SomeLibraryFile.java"],
+    scope = "test",
 )

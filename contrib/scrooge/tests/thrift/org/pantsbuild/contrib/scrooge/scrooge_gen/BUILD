@@ -2,41 +2,40 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_thrift_library(
-  name = 'good-thrift',
-  sources = ['good.thrift'],
-  compiler='scrooge',
-  language='scala',
-  compiler_args=['--finagle'],
+    name = "good-thrift",
+    sources = ["good.thrift"],
+    compiler = "scrooge",
+    compiler_args = ["--finagle"],
+    language = "scala",
 )
 
 java_thrift_library(
-  name = 'namespace-map-thrift',
-  sources = ['good.thrift'],
-  compiler='scrooge',
-  language='scala',
-  compiler_args=['--finagle'],
-  namespace_map = {
-    'old': 'new',
-  },
+    name = "namespace-map-thrift",
+    sources = ["good.thrift"],
+    compiler = "scrooge",
+    compiler_args = ["--finagle"],
+    language = "scala",
+    namespace_map = {
+        "old": "new",
+    },
 )
 
 java_thrift_library(
-  name = 'default-java-namespace-thrift',
-  sources = ['good.thrift'],
-  compiler='scrooge',
-  language='scala',
-  compiler_args=['--finagle'],
-  default_java_namespace = 'the_namespace',
+    name = "default-java-namespace-thrift",
+    sources = ["good.thrift"],
+    compiler = "scrooge",
+    compiler_args = ["--finagle"],
+    default_java_namespace = "the_namespace",
+    language = "scala",
 )
 
 java_thrift_library(
-  name = 'include-paths-thrift',
-  sources = ['good.thrift'],
-  compiler='scrooge',
-  language='scala',
-  compiler_args=['--finagle'],
-  include_paths = [
-    'some_dir',
-  ],
+    name = "include-paths-thrift",
+    sources = ["good.thrift"],
+    compiler = "scrooge",
+    compiler_args = ["--finagle"],
+    include_paths = [
+        "some_dir",
+    ],
+    language = "scala",
 )
-

@@ -5,29 +5,29 @@
 # python_dist allows you to use setup.py to depend on C/C++ extensions.
 
 python_dist(
-  name='hello',
-  sources=[
-    'hello_package/hello.py',
-    'hello_package/__init__.py',
-    'setup.py'
-  ],
-  setup_requires=[
-    'examples/src/python/example/python_distribution/hello/setup_requires:setup_requires_lib'
-  ]
+    name = "hello",
+    sources = [
+        "hello_package/__init__.py",
+        "hello_package/hello.py",
+        "setup.py",
+    ],
+    setup_requires = [
+        "examples/src/python/example/python_distribution/hello/setup_requires:setup_requires_lib",
+    ],
 )
 
 python_requirement_library(
-  name = "setup_requires_lib",
-  requirements = [
-    python_requirement("pycountry==18.5.20"),
-  ],
+    name = "setup_requires_lib",
+    requirements = [
+        python_requirement("pycountry==18.5.20"),
+    ],
 )
 
 python_binary(
-  name='main',
-  source='main.py',
-  dependencies=[
-    ':hello',
-  ],
-  platforms=['current']
+    name = "main",
+    source = "main.py",
+    platforms = ["current"],
+    dependencies = [
+        ":hello",
+    ],
 )

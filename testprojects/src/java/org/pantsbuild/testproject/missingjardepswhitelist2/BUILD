@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_library(
-  sources=rglobs('*.java'),
-  dependencies=[
-    '3rdparty:guava',
-  ]
+    sources = rglobs("*.java"),
+    dependencies = [
+        "3rdparty:guava",
+    ],
 )

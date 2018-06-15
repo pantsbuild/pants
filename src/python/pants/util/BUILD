@@ -2,159 +2,159 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'argutil',
-  sources = ['argutil.py'],
+    name = "argutil",
+    sources = ["argutil.py"],
 )
 
 python_library(
-   name = 'contextutil',
-   sources = ['contextutil.py'],
-   dependencies = [
-     '3rdparty/python:ansicolors',
-     '3rdparty/python:six',
-     ':dirutil',
-     ':tarutil',
-   ],
+    name = "contextutil",
+    sources = ["contextutil.py"],
+    dependencies = [
+        ":dirutil",
+        ":tarutil",
+        "3rdparty/python:ansicolors",
+        "3rdparty/python:six",
+    ],
 )
 
 python_library(
-  name = 'collections',
-  sources = ['collections.py'],
+    name = "collections",
+    sources = ["collections.py"],
 )
 
 python_library(
-  name = 'debug',
-  sources = ['debug.py'],
+    name = "debug",
+    sources = ["debug.py"],
 )
 
 python_library(
-  name = 'desktop',
-  sources = ['desktop.py'],
-  dependencies = [
-    ':osutil',
-    'src/python/pants/util:process_handler',
-  ],
+    name = "desktop",
+    sources = ["desktop.py"],
+    dependencies = [
+        ":osutil",
+        ":process_handler",
+    ],
 )
 
 python_library(
-  name = 'dirutil',
-  sources = ['dirutil.py'],
-  dependencies = [
-    ':strutil',
-  ],
+    name = "dirutil",
+    sources = ["dirutil.py"],
+    dependencies = [
+        ":strutil",
+    ],
 )
 
 python_library(
-  name = 'eval',
-  sources = ['eval.py'],
-  dependencies = [
-    '3rdparty/python:six',
-  ]
+    name = "eval",
+    sources = ["eval.py"],
+    dependencies = [
+        "3rdparty/python:six",
+    ],
 )
 
 python_library(
-  name = 'fileutil',
-  sources = ['fileutil.py'],
-  dependencies = [
-    ':contextutil',
-  ],
+    name = "fileutil",
+    sources = ["fileutil.py"],
+    dependencies = [
+        ":contextutil",
+    ],
 )
 
 python_library(
-  name = 'filtering',
-  sources = ['filtering.py'],
+    name = "filtering",
+    sources = ["filtering.py"],
 )
 
 python_library(
-  name = 'memo',
-  sources = ['memo.py'],
+    name = "memo",
+    sources = ["memo.py"],
 )
 
 python_library(
-  name = 'meta',
-  sources = ['meta.py'],
+    name = "meta",
+    sources = ["meta.py"],
 )
 
 python_library(
-  name = 'netrc',
-  sources = ['netrc.py'],
+    name = "netrc",
+    sources = ["netrc.py"],
 )
 
 python_library(
-  name = 'objects',
-  sources = ['objects.py'],
-  dependencies = [
-    ':memo',
-    ':meta',
-  ],
+    name = "objects",
+    sources = ["objects.py"],
+    dependencies = [
+        ":memo",
+        ":meta",
+    ],
 )
 
 python_library(
-  name = 'osutil',
-  sources = ['osutil.py'],
+    name = "osutil",
+    sources = ["osutil.py"],
 )
 
 python_library(
-  name = 'process_handler',
-  sources = ['process_handler.py'],
-  dependencies=[
-    '3rdparty/python:six',
-    '3rdparty/python:subprocess32',
-    ':meta',
-  ]
+    name = "process_handler",
+    sources = ["process_handler.py"],
+    dependencies = [
+        ":meta",
+        "3rdparty/python:six",
+        "3rdparty/python:subprocess32",
+    ],
 )
 
 python_library(
-  name = 'retry',
-  sources = ['retry.py'],
+    name = "retry",
+    sources = ["retry.py"],
 )
 
 python_library(
-  name = 'rwbuf',
-  sources = ['rwbuf.py'],
-  dependencies = [
-    '3rdparty/python:six',
-  ]
+    name = "rwbuf",
+    sources = ["rwbuf.py"],
+    dependencies = [
+        "3rdparty/python:six",
+    ],
 )
 
 python_library(
-  name = 's3_log_aggregator',
-  sources = ['s3_log_aggregator.py'],
-  dependencies = [
-    '3rdparty/python:s3logparse'
-  ]
+    name = "s3_log_aggregator",
+    sources = ["s3_log_aggregator.py"],
+    dependencies = [
+        "3rdparty/python:s3logparse",
+    ],
 )
 
 python_binary(
-  name = 's3_log_aggregator_bin',
-  entry_point = 'pants.util.s3_log_aggregator',
-  dependencies = [
-    ':s3_log_aggregator'
-  ]
+    name = "s3_log_aggregator_bin",
+    entry_point = "pants.util.s3_log_aggregator",
+    dependencies = [
+        ":s3_log_aggregator",
+    ],
 )
 
 python_library(
-  name = 'socket',
-  sources = ['socket.py']
+    name = "socket",
+    sources = ["socket.py"],
 )
 
 python_library(
-  name = 'strutil',
-  sources = ['strutil.py'],
-  dependencies = [
-    '3rdparty/python:six',
-  ],
+    name = "strutil",
+    sources = ["strutil.py"],
+    dependencies = [
+        "3rdparty/python:six",
+    ],
 )
 
 python_library(
-  name = 'tarutil',
-  sources = ['tarutil.py'],
-  dependencies = [
-    '3rdparty/python:six',
-  ],
+    name = "tarutil",
+    sources = ["tarutil.py"],
+    dependencies = [
+        "3rdparty/python:six",
+    ],
 )
 
 python_library(
-  name = 'xml_parser',
-  sources = ['xml_parser.py'],
+    name = "xml_parser",
+    sources = ["xml_parser.py"],
 )

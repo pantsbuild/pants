@@ -4,19 +4,20 @@
 # Like Hello World, but built with Pants.
 
 jvm_app(
-  basename = 'hello-example',
-  dependencies = [
-    ':main-bin'
-  ],
+    basename = "hello-example",
+    dependencies = [
+        ":main-bin",
+    ],
 )
 
 # The binary, the "runnable" part:
 
-jvm_binary(name = 'main-bin',
-  dependencies = [
-    'testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
-  ],
-  source = 'HelloMain.java',
-  main = 'org.pantsbuild.testproject.publish.hello.main.HelloMain',
-  basename = 'hello-example',
+jvm_binary(
+    name = "main-bin",
+    basename = "hello-example",
+    main = "org.pantsbuild.testproject.publish.hello.main.HelloMain",
+    source = "HelloMain.java",
+    dependencies = [
+        "testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet",
+    ],
 )

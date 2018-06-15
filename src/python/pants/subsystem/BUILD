@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/option',
-  ],
+    dependencies = [
+        "3rdparty/python/twitter/commons:twitter.common.collections",
+        "src/python/pants/option",
+    ],
 )

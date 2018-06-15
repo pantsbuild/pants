@@ -4,16 +4,17 @@
 # The greet library doesn't do much, but we should still test it
 
 python_tests(
-  dependencies=[
-    'examples/src/python/example/hello/greet:greet',
-    ':prep',
-  ],
+    dependencies = [
+        ":prep",
+        "examples/src/python/example/hello/greet",
+    ],
 )
 
 # Prepare for the 'greet' test. Realistically, you wouldn't set up a
 # prep_command just to create an emtpy temp file. This is meant as a
 # simple example.
-prep_command(name='prep',
-  prep_executable='touch',
-  prep_args=['/tmp/prep_command_result']
+prep_command(
+    name = "prep",
+    prep_args = ["/tmp/prep_command_result"],
+    prep_executable = "touch",
 )

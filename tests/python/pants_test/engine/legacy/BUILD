@@ -2,190 +2,190 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name = 'address_mapper',
-  sources = ['test_address_mapper.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    'src/python/pants/base:specs',
-    'src/python/pants/bin',
-    'src/python/pants/build_graph',
-    'src/python/pants/engine/legacy:address_mapper',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test/engine:util',
-    'tests/python/pants_test:test_base'
-  ]
+    name = "address_mapper",
+    sources = ["test_address_mapper.py"],
+    dependencies = [
+        "3rdparty/python:mock",
+        "src/python/pants/base:specs",
+        "src/python/pants/bin",
+        "src/python/pants/build_graph",
+        "src/python/pants/engine/legacy:address_mapper",
+        "src/python/pants/util:contextutil",
+        "src/python/pants/util:dirutil",
+        "tests/python/pants_test:test_base",
+        "tests/python/pants_test/engine:util",
+    ],
 )
 
 python_tests(
-  name = 'build_ignore_integration',
-  sources = [ 'test_build_ignore_integration.py' ],
-  dependencies = [
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
+    name = "build_ignore_integration",
+    sources = ["test_build_ignore_integration.py"],
+    tags = {"integration"},
+    dependencies = [
+        "tests/python/pants_test:int-test",
+    ],
 )
 
 python_tests(
-  name = 'bundle_integration',
-  sources = ['test_bundle_integration.py'],
-  dependencies = [
-    'src/python/pants/base:deprecated',
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
-  timeout = 240,
+    name = "bundle_integration",
+    sources = ["test_bundle_integration.py"],
+    tags = {"integration"},
+    timeout = 240,
+    dependencies = [
+        "src/python/pants/base:deprecated",
+        "tests/python/pants_test:int-test",
+    ],
 )
 
 python_tests(
-  name = 'changed_integration',
-  sources = ['test_changed_integration.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
-    'tests/python/pants_test/testutils:git_util',
-    'tests/python/pants_test:base_test',
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
-  timeout = 600,
+    name = "changed_integration",
+    sources = ["test_changed_integration.py"],
+    tags = {"integration"},
+    timeout = 600,
+    dependencies = [
+        "src/python/pants/base:build_environment",
+        "src/python/pants/util:contextutil",
+        "src/python/pants/util:dirutil",
+        "src/python/pants/util:process_handler",
+        "tests/python/pants_test:base_test",
+        "tests/python/pants_test:int-test",
+        "tests/python/pants_test/testutils:git_util",
+    ],
 )
 
 python_tests(
-  name = 'owners_integration',
-  sources = [ 'test_owners_integration.py' ],
-  dependencies = [
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
+    name = "owners_integration",
+    sources = ["test_owners_integration.py"],
+    tags = {"integration"},
+    dependencies = [
+        "tests/python/pants_test:int-test",
+    ],
 )
 
 python_tests(
-  name = 'dependees_integration',
-  sources = ['test_dependees_integration.py'],
-  dependencies = [
-    'tests/python/pants_test:int-test'
-  ],
-  tags = {'integration'},
+    name = "dependees_integration",
+    sources = ["test_dependees_integration.py"],
+    tags = {"integration"},
+    dependencies = [
+        "tests/python/pants_test:int-test",
+    ],
 )
 
 python_tests(
-  name = 'dependencies_integration',
-  sources = ['test_dependencies_integration.py'],
-  dependencies = [
-    'tests/python/pants_test:int-test'
-  ],
-  tags = {'integration'},
-  timeout = 30,
+    name = "dependencies_integration",
+    sources = ["test_dependencies_integration.py"],
+    tags = {"integration"},
+    timeout = 30,
+    dependencies = [
+        "tests/python/pants_test:int-test",
+    ],
 )
 
 python_tests(
-  name = 'filemap_integration',
-  sources = ['test_filemap_integration.py'],
-  dependencies = [
-    'src/python/pants/base:project_tree',
-    'tests/python/pants_test:int-test'
-  ],
-  tags = {'integration'},
-  timeout = 180,
+    name = "filemap_integration",
+    sources = ["test_filemap_integration.py"],
+    tags = {"integration"},
+    timeout = 180,
+    dependencies = [
+        "src/python/pants/base:project_tree",
+        "tests/python/pants_test:int-test",
+    ],
 )
 
 python_tests(
-  name = 'filedeps_integration',
-  sources = ['test_filedeps_integration.py'],
-  dependencies = [
-    'src/python/pants/base:project_tree',
-    'tests/python/pants_test:int-test'
-  ],
-  tags = {'integration'},
-  timeout = 180,
+    name = "filedeps_integration",
+    sources = ["test_filedeps_integration.py"],
+    tags = {"integration"},
+    timeout = 180,
+    dependencies = [
+        "src/python/pants/base:project_tree",
+        "tests/python/pants_test:int-test",
+    ],
 )
 
 python_tests(
-  name = 'graph',
-  sources = ['test_graph.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    '3rdparty/python:requirements_files',
-    'src/python/pants/bin',
-    'src/python/pants/build_graph',
-    'src/python/pants/engine/legacy:graph',
-    'src/python/pants/init',
-    'tests/python/pants_test:base_test',
-    'tests/python/pants_test/engine:util',
-  ]
+    name = "graph",
+    sources = ["test_graph.py"],
+    dependencies = [
+        "3rdparty/python:mock",
+        "3rdparty/python:requirements_files",
+        "src/python/pants/bin",
+        "src/python/pants/build_graph",
+        "src/python/pants/engine/legacy:graph",
+        "src/python/pants/init",
+        "tests/python/pants_test:base_test",
+        "tests/python/pants_test/engine:util",
+    ],
 )
 
 python_tests(
-  name='graph_integration',
-  sources=['test_graph_integration.py'],
-  dependencies=[
-    'src/python/pants/build_graph',
-    'src/python/pants/engine/legacy:graph',
-    'src/python/pants/option',
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
-  timeout = 180,
+    name = "graph_integration",
+    sources = ["test_graph_integration.py"],
+    tags = {"integration"},
+    timeout = 180,
+    dependencies = [
+        "src/python/pants/build_graph",
+        "src/python/pants/engine/legacy:graph",
+        "src/python/pants/option",
+        "tests/python/pants_test:int-test",
+    ],
 )
 
 python_tests(
-  name = 'list_integration',
-  sources = ['test_list_integration.py'],
-  dependencies = [
-    'tests/python/pants_test:int-test'
-  ],
-  tags = {'integration'},
-  timeout = 180,
+    name = "list_integration",
+    sources = ["test_list_integration.py"],
+    tags = {"integration"},
+    timeout = 180,
+    dependencies = [
+        "tests/python/pants_test:int-test",
+    ],
 )
 
 python_tests(
-  name = 'list_owners_integration',
-  sources = ['test_list_owners_integration.py'],
-  dependencies = [
-    'tests/python/pants_test:int-test'
-  ],
-  tags = {'integration'},
+    name = "list_owners_integration",
+    sources = ["test_list_owners_integration.py"],
+    tags = {"integration"},
+    dependencies = [
+        "tests/python/pants_test:int-test",
+    ],
 )
 
 python_tests(
-  name = 'options_parsing',
-  sources = ['test_options_parsing.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    'src/python/pants/bin',
-    'src/python/pants/build_graph',
-    'src/python/pants/init',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/engine:util',
-  ]
+    name = "options_parsing",
+    sources = ["test_options_parsing.py"],
+    dependencies = [
+        "3rdparty/python:mock",
+        "src/python/pants/bin",
+        "src/python/pants/build_graph",
+        "src/python/pants/init",
+        "tests/python/pants_test:test_base",
+        "tests/python/pants_test/engine:util",
+    ],
 )
 
 python_tests(
-  name = 'pants_engine_integration',
-  sources = ['test_pants_engine_integration.py'],
-  dependencies = [
-    'tests/python/pants_test:int-test'
-  ],
-  tags = {'integration'}
+    name = "pants_engine_integration",
+    sources = ["test_pants_engine_integration.py"],
+    tags = {"integration"},
+    dependencies = [
+        "tests/python/pants_test:int-test",
+    ],
 )
 
 python_tests(
-  name = 'parser',
-  sources = ['test_parser.py'],
-  dependencies = [
-    'src/python/pants/build_graph',
-    'src/python/pants/engine/legacy:parser',
-    'src/python/pants/engine:parser',
-  ]
+    name = "parser",
+    sources = ["test_parser.py"],
+    dependencies = [
+        "src/python/pants/build_graph",
+        "src/python/pants/engine:parser",
+        "src/python/pants/engine/legacy:parser",
+    ],
 )
 
 python_tests(
-  name = 'structs',
-  sources = ['test_structs.py'],
-  dependencies = [
-    'src/python/pants/engine/legacy:structs',
-  ]
+    name = "structs",
+    sources = ["test_structs.py"],
+    dependencies = [
+        "src/python/pants/engine/legacy:structs",
+    ],
 )

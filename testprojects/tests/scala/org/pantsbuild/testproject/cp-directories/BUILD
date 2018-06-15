@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 junit_tests(
-  dependencies = [
-    '3rdparty:junit',
-    '3rdparty:scalatest',
-  ],
-  sources=globs('*.scala'),
+    sources = globs("*.scala"),
+    dependencies = [
+        "3rdparty:junit",
+        "3rdparty:scalatest",
+    ],
 )
