@@ -10,6 +10,7 @@ import os
 from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
+from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_executable
 from pants.util.memo import memoized_property
@@ -34,32 +35,27 @@ class XCodeCLITools(Subsystem):
   def register_options(cls, register):
     super(XCodeCLITools, cls).register_options(register)
 
-    register('--xcode-cli-install-location', type=list, default='/usr/bin', advanced=True,
+    register('--xcode-cli-install-location', type=dir_option, default='/usr/bin', advanced=True,
              help='Installation location for the XCode command-line developer tools.')
 
   @memoized_property
-  def _install_locations(self):
+  def _install_location(self):
     return self.get_options().xcode_cli_install_location
 
   def _check_executables_exist(self):
     for filename in self._REQUIRED_TOOLS:
-      found_exe = False
-      for loc in self._install_locations:
-        executable_path = os.path.join(loc, filename)
-        if is_executable(executable_path):
-          found_exe = True
-          break
-      if not found_exe:
+      executable_path = os.path.join(self._install_location, filename)
+      if not is_executable(executable_path):
         raise self.XCodeToolsUnavailable(
           "'{exe}' is not an executable file, but it is required to build "
           "native code on this platform. You may need to install the XCode "
-          "command line developer tools from the Mac App Store."
-          "(for file '{exe}' with --xcode_cli_install_location={locs!r})"
-          .format(exe=filename, locs=self._install_locations))
+          "command line developer tools from the Mac App Store. "
+          "(for file '{exe}' with --xcode_cli_install_location={loc!r})"
+          .format(exe=filename, loc=self._install_location))
 
   def path_entries(self):
     self._check_executables_exist()
-    return self._install_locations
+    return self._install_location
 
   def linker(self, platform):
     return Linker(
