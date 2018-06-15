@@ -8,9 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
+from pants.util.contextutil import environment_as
 from pants.util.osutil import get_normalized_os_name
 from pants.util.process_handler import subprocess
-from pants.util.strutil import create_path_env_var, environment_as
+from pants.util.strutil import create_path_env_var
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
