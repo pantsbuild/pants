@@ -33,6 +33,8 @@ def build_file_aliases():
 
 
 def register_goals():
+  # FIXME(#5962): register these under the 'compile' goal when we eliminate the product transitive
+  # dependency from export -> compile.
   task(name='c-for-ctypes', action=CCompile).install('native-compile')
   task(name='cpp-for-ctypes', action=CppCompile).install('native-compile')
   task(name='shared-libraries', action=LinkSharedLibraries).install('link')
