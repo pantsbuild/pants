@@ -12,6 +12,7 @@ import re
 from twitter.common.collections import OrderedSet
 
 from pants.base.hash_utils import hash_file
+from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_classproperty, memoized_property
@@ -52,6 +53,8 @@ class LibcDev(Subsystem):
   def register_options(cls, register):
     super(LibcDev, cls).register_options(register)
 
+    register('--libc-dir', type=dir_option, default='/usr/lib', advanced=True,
+             help='A directory containing a host-specific crti.o from libc.')
     # TODO: make something in custom_types.py for "a path to an existing executable file (absolute
     # or relative to buildroot), or a filename that will be resolved against the PATH in some
     # subprocess".
@@ -90,8 +93,7 @@ class LibcDev(Subsystem):
   # clang at all currently.
   _LIBC_INIT_OBJECT_FILE = 'crti.o'
 
-  @memoized_property
-  def host_libc(self):
+  def _get_host_libc_from_host_compiler(self):
     """Locate the host's libc-dev installation using a specified host compiler's search dirs."""
     compiler_exe = self.get_options().host_compiler
 
@@ -125,3 +127,14 @@ class LibcDev(Subsystem):
 
     return HostLibcDev(crti_object=libc_crti_object_file,
                        fingerpint=hash_file(libc_crti_object_file))
+
+  @memoized_property
+  def host_libc(self):
+    """Use the --libc-dir option if provided, otherwise invoke a host compiler to find libc dev."""
+    libc_dir_option = self.get_options().libc_dir
+    maybe_libc_crti = os.path.join(libc_dir_option, self._LIBC_INIT_OBJECT_FILE)
+    if os.path.isfile(maybe_libc_crti):
+      return HostLibcDev(crti_object=maybe_libc_crti,
+                         fingerprint=hash_file(maybe_libc_crti))
+
+    return self._get_host_libc_from_host_compiler()
