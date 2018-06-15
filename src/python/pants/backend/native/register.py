@@ -33,8 +33,8 @@ def build_file_aliases():
 
 
 def register_goals():
-  task(name='c-for-ctypes', action=CCompile).install('compile')
-  task(name='cpp-for-ctypes', action=CppCompile).install('compile')
+  task(name='c-for-ctypes', action=CCompile).install('native-compile')
+  task(name='cpp-for-ctypes', action=CppCompile).install('native-compile')
   task(name='shared-libraries', action=LinkSharedLibraries).install('link')
 
 

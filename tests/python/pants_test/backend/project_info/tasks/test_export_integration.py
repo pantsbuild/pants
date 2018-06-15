@@ -182,8 +182,8 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       json_data = self.run_export(test_target, workdir, load_libs=False, extra_args=[
         '--jvm-platform-default-platform=java7',
         '--jvm-platform-platforms={'
-        ' "java7": {"source": "1.7", "target": "1.7", "args": [ "-C-verbose" ]},'
-        ' "java8": {"source": "1.8", "target": "1.8", "args": [ "-C-nowarn" ]}'
+        ' "java7": {"source": "1.7", "target": "1.7", "args": [ "-X123" ]},'
+        ' "java8": {"source": "1.8", "target": "1.8", "args": [ "-X456" ]}'
         '}',
         '--jvm-distributions-paths={'
         ' "macos": [ "/Library/JDK" ],'
@@ -200,11 +200,11 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
           'platforms': {
             'java7': {
               'source_level': '1.7',
-              'args': ['-C-verbose'],
+              'args': ['-X123'],
               'target_level': '1.7'},
             'java8': {
               'source_level': '1.8',
-              'args': ['-C-nowarn'],
+              'args': ['-X456'],
               'target_level': '1.8'},
           }
         },
