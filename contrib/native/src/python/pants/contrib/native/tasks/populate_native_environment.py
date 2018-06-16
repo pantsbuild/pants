@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.native.register import NativeToolchainEnvironment
+from pants.backend.python.tasks.setup_py import NativeToolchainEnvironment
 from pants.task.task import Task
 from pants.util.memo import memoized_property
 

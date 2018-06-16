@@ -19,7 +19,6 @@ from pex.interpreter import PythonInterpreter
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
-from pants.backend.native.register import NativeToolchainEnvironment
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -30,7 +29,7 @@ from pants.base.specs import SiblingAddresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
-from pants.engine.rules import rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
 from pants.task.task import Task
 from pants.util.contextutil import get_joined_path
@@ -77,6 +76,12 @@ class SetupPyRunner(InstallerBase):
 
   def _setup_command(self):
     return self.__setup_command
+
+
+class NativeToolchainEnvironment(datatype([('path_entries', tuple)])):
+  """???/not declaring a rule for this here because this is just a stub for moving stuff to contrib
+  in #5815
+  """
 
 
 class SetupPyInvocationEnvironment(datatype(['joined_path'])):
@@ -665,5 +670,6 @@ class SetupPy(Task):
 
 def create_setup_py_rules():
   return [
+    RootRule(NativeToolchainEnvironment),
     get_setup_py_env,
   ]

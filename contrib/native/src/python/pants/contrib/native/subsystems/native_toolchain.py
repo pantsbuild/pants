@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.native.register import NativeToolchainEnvironment
+from pants.backend.python.tasks.setup_py import NativeToolchainEnvironment
 from pants.binaries.binary_tool import ExecutablePathProvider
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select

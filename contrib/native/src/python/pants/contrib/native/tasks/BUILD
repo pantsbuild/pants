@@ -3,7 +3,7 @@
 
 python_library(
   dependencies=[
-    'src/python/pants/backend/native',
+    'src/python/pants/backend/python/tasks',
     'src/python/pants/task',
     'src/python/pants/util:memo',
   ],

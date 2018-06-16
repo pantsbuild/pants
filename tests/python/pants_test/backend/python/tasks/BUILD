@@ -29,7 +29,6 @@ python_tests(
   sources=python_native_code_test_files,
   dependencies=[
     ':python_task_test_base',
-    'src/python/pants/backend/native',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks',
@@ -51,7 +50,6 @@ python_tests(
     '3rdparty/python:coverage',
     '3rdparty/python:mock',
     '3rdparty/python:pex',
-    'src/python/pants/backend/native',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',

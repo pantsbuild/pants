@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.python.register import rules as python_backend_rules
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.tasks.build_local_python_distributions import \
@@ -48,7 +47,6 @@ class TestBuildLocalPythonDistributions(PythonTaskTestBase, SchedulerTestBase):
 
   def _scheduling_context(self, **kwargs):
     rules = (
-      native_backend_rules() +
       python_backend_rules()
     )
     scheduler = self.mk_scheduler(rules=rules)

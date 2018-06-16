@@ -149,7 +149,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              default=['pants.backend.graph_info',
                       'pants.backend.python',
                       'pants.backend.jvm',
-                      'pants.backend.native',
                       'pants.backend.codegen.antlr.java',
                       'pants.backend.codegen.antlr.python',
                       'pants.backend.codegen.jaxb',
