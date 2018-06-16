@@ -143,7 +143,7 @@ class BuildLocalPythonDistributions(Task):
   def _native_toolchain_environment(self):
     env = self.context.products.get_data(NativeToolchainEnvironment)
     if not env:
-      env = NativeToolchainEnvironment([])
+      env = NativeToolchainEnvironment(tuple())
 
     return env
 

@@ -16,7 +16,7 @@ class Platform(datatype(['normalized_os_name'])):
     return super(Platform, cls).__new__(cls, get_normalized_os_name())
 
 
-class NativeToolchainEnvironment(datatype(['path_entries'])):
+class NativeToolchainEnvironment(datatype([('path_entries', tuple)])):
   """???/not declaring a rule for this here because this is just a stub for moving stuff to contrib
   in #5815
   """

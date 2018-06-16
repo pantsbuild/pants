@@ -107,7 +107,7 @@ class NativeToolchain(Subsystem, ExecutablePathProvider):
 
 @rule(NativeToolchainEnvironment, [Select(NativeToolchain)])
 def get_native_toolchain_environment(native_toolchain):
-  yield NativeToolchainEnvironment(native_toolchain.path_entries())
+  yield NativeToolchainEnvironment(tuple(native_toolchain.path_entries()))
 
 
 def create_native_toolchain_rules():
