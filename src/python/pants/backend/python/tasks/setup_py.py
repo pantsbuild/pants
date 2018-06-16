@@ -79,8 +79,9 @@ class SetupPyRunner(InstallerBase):
 
 
 class NativeToolchainEnvironment(datatype([('path_entries', tuple)])):
-  """???/not declaring a rule for this here because this is just a stub for moving stuff to contrib
-  in #5815
+  """FIXME: this is a stub for now to facilitate moving the native backend to contrib in #5970.
+
+  This will be removed when #5815 is merged.
   """
 
 
