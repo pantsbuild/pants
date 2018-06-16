@@ -196,6 +196,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--target-spec-file', type=list, dest='target_spec_files', daemon=False,
              help='Read additional specs from this file, one per line')
     register('--verify-config', type=bool, default=True, daemon=False,
+             advanced=True,
              help='Verify that all config file values correspond to known options.')
 
     register('--build-ignore', advanced=True, type=list, fromfile=True,
@@ -212,6 +213,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--glob-expansion-failure', type=str,
              choices=GlobMatchErrorBehavior.allowed_values,
              default=GlobMatchErrorBehavior.default_option_value,
+             advanced=True,
              help="Raise an exception if any targets declaring source files "
                   "fail to match any glob provided in the 'sources' argument.")
 
@@ -291,7 +293,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # This option changes the parser behavior in a fundamental way (which currently invalidates
     # all caches), and needs to be parsed out early, so we make it a bootstrap option.
     register('--build-file-imports', choices=['allow', 'warn', 'error'], default='warn',
-      help='Whether to allow import statements in BUILD files')
+             advanced=True,
+             help='Whether to allow import statements in BUILD files')
 
     register('--remote-store-server', advanced=True,
              help='host:port of grpc server to use as remote execution file store.')
@@ -310,6 +313,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
     # lookups via CacheSetup in TaskBase.
     register('--process-execution-parallelism', type=int, default=multiprocessing.cpu_count(),
+             advanced=True,
              help='Number of concurrent processes that may be executed either locally and remotely.')
 
   @classmethod
