@@ -46,6 +46,18 @@ function pkg_go_install_test() {
       --explain test | grep "GoTest_test_go" &> /dev/null
 }
 
+PKG_NATIVE=(
+  "pantsbuild.pants.contrib.native"
+  "//contrib/native/src/python/pants/contrib/native:plugin"
+  "pkg_native_install_test"
+)
+function pkg_native_install_test() {
+  local version="$1"
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.native==${version}']" \
+    --explain test | grep "NativeTest_test_native" &> /dev/null
+}
+
 PKG_NODE=(
   "pantsbuild.pants.contrib.node"
   "//contrib/node/src/python/pants/contrib/node:plugin"
@@ -217,6 +229,7 @@ CONTRIB_PACKAGES=(
   PKG_SCROOGE
   PKG_BUILDGEN
   PKG_GO
+  PKG_NATIVE
   PKG_NODE
   PKG_PYTHON_CHECKS
   PKG_SCALAJS
