@@ -7,11 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.util.contextutil import environment_as, get_joined_path
 from pants.util.process_handler import subprocess
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
+
+from pants.contrib.native.subsystems.native_toolchain import NativeToolchain
 
 
 # TODO(cosmicexplorer): Can we have some form of this run in an OSX shard on

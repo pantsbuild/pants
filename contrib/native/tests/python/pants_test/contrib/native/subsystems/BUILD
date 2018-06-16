@@ -4,7 +4,7 @@
 
 python_tests(
   dependencies=[
-    'src/python/pants/backend/native/subsystems',
+    'contrib/native/src/python/pants/contrib/native/subsystems',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
     'tests/python/pants_test:base_test',

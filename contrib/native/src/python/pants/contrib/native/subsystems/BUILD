@@ -3,9 +3,11 @@
 
 python_library(
   dependencies=[
-    'src/python/pants/backend/native/subsystems/platform_specific/darwin',
-    'src/python/pants/backend/native/subsystems/platform_specific/linux',
+    'contrib/native/src/python/pants/contrib/native/subsystems/platform_specific/darwin',
+    'contrib/native/src/python/pants/contrib/native/subsystems/platform_specific/linux',
     'src/python/pants/binaries',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:selectors',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',

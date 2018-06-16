@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from pex.interpreter import PythonInterpreter
 from wheel.install import WheelFile
 
-from pants.backend.native.subsystems.native_toolchain import NativeToolchain
+from pants.backend.native.register import NativeToolchainEnvironment
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -26,7 +26,7 @@ from pants.build_graph.address import Address
 from pants.task.task import Task
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdir
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_property
 
 
 class BuildLocalPythonDistributions(Task):
@@ -44,18 +44,11 @@ class BuildLocalPythonDistributions(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
+    round_manager.optional_product(NativeToolchainEnvironment)
 
   @classmethod
   def implementation_version(cls):
     return super(BuildLocalPythonDistributions, cls).implementation_version() + [('BuildLocalPythonDistributions', 2)]
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(BuildLocalPythonDistributions, cls).subsystem_dependencies() + (NativeToolchain.scoped(cls),)
-
-  @memoized_method
-  def _native_toolchain_instance(self):
-    return NativeToolchain.scoped_instance(self)
 
   @property
   def cache_target_dirs(self):
@@ -146,6 +139,14 @@ class BuildLocalPythonDistributions(Task):
     # status of exposing v2 products in v1 tasks.
     return self.context._scheduler.product_request(product, [subject])[0]
 
+  @memoized_property
+  def _native_toolchain_environment(self):
+    env = self.context.products.get_data(NativeToolchainEnvironment)
+    if not env:
+      env = NativeToolchainEnvironment([])
+
+    return env
+
   # FIXME(cosmicexplorer): We should be isolating the path to just our provided
   # toolchain, but this causes errors in Travis because distutils looks for
   # "x86_64-linux-gnu-gcc" when linking native extensions. We almost definitely
@@ -155,7 +156,7 @@ class BuildLocalPythonDistributions(Task):
   @contextmanager
   def _setup_py_invocation_environment(self, pythonpath):
     setup_py_env = self._request_single(
-      SetupPyInvocationEnvironment, self._native_toolchain_instance())
+      SetupPyInvocationEnvironment, self._native_toolchain_environment)
     env = setup_py_env.as_env_dict()
     if pythonpath:
       self.context.log.debug('Setting PYTHONPATH with setup_requires site directory: {}'

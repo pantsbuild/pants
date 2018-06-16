@@ -93,4 +93,3 @@ class EngineSourceMapper(SourceMapper):
       if (LegacyAddressMapper.any_is_declaring_file(legacy_address, sources_set) or
           self._owns_any_source(sources_set, hydrated_target)):
         yield legacy_address
-

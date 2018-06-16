@@ -5,14 +5,18 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.native.subsystems.gcc import GCC
-from pants.backend.native.subsystems.llvm import LLVM
-from pants.backend.native.subsystems.platform_specific.darwin.xcode_cli_tools import XCodeCLITools
-from pants.backend.native.subsystems.platform_specific.linux.binutils import Binutils
+from pants.backend.native.register import NativeToolchainEnvironment
 from pants.binaries.binary_tool import ExecutablePathProvider
+from pants.engine.rules import RootRule, rule
+from pants.engine.selectors import Select
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 from pants.util.osutil import get_os_name, normalize_os_name
+
+from pants.contrib.native.subsystems.gcc import GCC
+from pants.contrib.native.subsystems.llvm import LLVM
+from pants.contrib.native.subsystems.platform_specific.darwin.xcode_cli_tools import XCodeCLITools
+from pants.contrib.native.subsystems.platform_specific.linux.binutils import Binutils
 
 
 class NativeToolchain(Subsystem, ExecutablePathProvider):
@@ -99,3 +103,15 @@ class NativeToolchain(Subsystem, ExecutablePathProvider):
       combined_path_entries.extend(subsystem.path_entries())
 
     return combined_path_entries
+
+
+@rule(NativeToolchainEnvironment, [Select(NativeToolchain)])
+def get_native_toolchain_environment(native_toolchain):
+  yield NativeToolchainEnvironment(native_toolchain.path_entries())
+
+
+def create_native_toolchain_rules():
+  return [
+    RootRule(NativeToolchain),
+    get_native_toolchain_environment,
+  ]
