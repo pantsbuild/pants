@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.base.payload import Payload
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.cache.cache_setup import CacheFactory, CacheSetup
 from pants.task.task import Task
@@ -15,11 +16,10 @@ from pants_test.task_test_base import TaskTestBase
 
 
 class DummyLibrary(Target):
-  def __init__(self, address, source, *args, **kwargs):
+  def __init__(self, address, sources, *args, **kwargs):
     payload = Payload()
-    payload.add_fields({'sources': self.create_sources_field(sources=[source],
+    payload.add_fields({'sources': self.create_sources_field(sources=sources,
                                                              sources_rel_path=address.spec_path)})
-    self.source = source
     super(DummyLibrary, self).__init__(address=address, payload=payload, *args, **kwargs)
 
 
@@ -41,6 +41,10 @@ class LocalCachingTest(TaskTestBase):
   _filename = 'f'
 
   @classmethod
+  def alias_groups(cls):
+    return BuildFileAliases(targets={'dummy_library': DummyLibrary})
+
+  @classmethod
   def task_type(cls):
     return DummyTask
 
@@ -54,8 +58,9 @@ class LocalCachingTest(TaskTestBase):
       read_from=[self.artifact_cache],
       write=True,
     )
-    self.target = self.make_target(':t', target_type=DummyLibrary, source=self._filename)
-    context = self.context(for_task_types=[DummyTask], target_roots=[self.target])
+    self.add_to_build_file('', 'dummy_library(name = "t", source = "{}")'.format(self._filename))
+    self._target = self.target(':t')
+    context = self.context(for_task_types=[DummyTask], target_roots=[self._target])
     self.task = self.create_task(context)
 
   def test_cache_written_to(self):
@@ -65,7 +70,7 @@ class LocalCachingTest(TaskTestBase):
       artifact_address = os.path.join(
         self.artifact_cache,
         CacheFactory.make_task_cache_dirname(self.task),
-        self.target.id,
+        self._target.id,
         '{}.tgz'.format(vt.cache_key.hash),
       )
       self.assertTrue(os.path.isfile(artifact_address))
@@ -76,7 +81,7 @@ class LocalCachingTest(TaskTestBase):
     self.assertGreater(len(invalid_vts), 0)
     first_vt = invalid_vts[0]
     # Mark the target invalid.
-    self.target.mark_invalidation_hash_dirty()
+    self._target.mark_invalidation_hash_dirty()
     all_vts2, invalid_vts2 = self.task.execute()
     # Check that running the task a second time results in a valid vt,
     # implying the artifact cache was hit.
