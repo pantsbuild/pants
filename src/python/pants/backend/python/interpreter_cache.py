@@ -156,6 +156,9 @@ class PythonInterpreterCache(object):
                    or self.pex_python_paths()
                    or self._python_setup.interpreter_search_paths
                    or os.getenv('PATH').split(os.pathsep))
+    self._logger(
+      'Initializing Python interpreter cache matching filters `{}` from paths `{}`'.format(
+        ':'.join(filters), ':'.join(setup_paths)))
 
     def unsatisfied_filters(interpreters):
       return filter(lambda f: len(list(self._matching(interpreters, [f]))) == 0, filters)
@@ -173,6 +176,8 @@ class PythonInterpreterCache(object):
     if len(matches) == 0:
       self._logger('Found no valid interpreters!')
 
+    self._logger(
+      'Initialized Python interpreter cache with {}'.format(', '.join([x.binary for x in matches])))
     return matches
 
   def _resolve(self, interpreter, interpreter_dir=None):

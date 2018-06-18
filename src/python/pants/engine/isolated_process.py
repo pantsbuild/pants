@@ -24,6 +24,7 @@ class ExecuteProcessRequest(datatype([
   ('env', tuple),
   ('input_files', DirectoryDigest),
   ('output_files', tuple),
+  ('output_directories', tuple),
   # NB: timeout_seconds covers the whole remote operation including queuing and setup.
   ('timeout_seconds', Exactly(float, int)),
   ('description', SubclassesOf(*six.string_types)),
@@ -31,20 +32,46 @@ class ExecuteProcessRequest(datatype([
   """Request for execution with args and snapshots to extract."""
 
   @classmethod
-  def create_from_snapshot(cls, argv, env, snapshot, output_files, timeout_seconds=_default_timeout_seconds, description='process'):
+  def create_from_snapshot(
+    cls,
+    argv,
+    env,
+    snapshot,
+    output_files=(),
+    output_directories=(),
+    timeout_seconds=_default_timeout_seconds,
+    description='process'
+  ):
     cls._verify_env_is_dict(env)
     return ExecuteProcessRequest(
       argv=argv,
       env=tuple(env.items()),
       input_files=snapshot.directory_digest,
       output_files=output_files,
+      output_directories=output_directories,
       timeout_seconds=timeout_seconds,
       description=description,
     )
 
   @classmethod
-  def create_with_empty_snapshot(cls, argv, env, output_files, timeout_seconds=_default_timeout_seconds, description='process'):
-    return cls.create_from_snapshot(argv, env, EMPTY_SNAPSHOT, output_files, timeout_seconds, description)
+  def create_with_empty_snapshot(
+    cls,
+    argv,
+    env,
+    output_files=(),
+    output_directories=(),
+    timeout_seconds=_default_timeout_seconds,
+    description='process'
+  ):
+    return cls.create_from_snapshot(
+      argv,
+      env,
+      EMPTY_SNAPSHOT,
+      output_files,
+      output_directories,
+      timeout_seconds,
+      description
+    )
 
   @classmethod
   def _verify_env_is_dict(cls, env):

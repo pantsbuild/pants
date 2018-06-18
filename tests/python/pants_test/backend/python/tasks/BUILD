@@ -17,8 +17,33 @@ python_library(
   ]
 )
 
+python_native_code_test_files = [
+  # TODO: This test does not have any platform-specific testing right now, but that will be
+  # changed when #5815 is merged.
+  'test_build_local_python_distributions.py',
+  'test_python_distribution_integration.py',
+]
+
 python_tests(
-  sources=globs('test_*.py', exclude=[globs('*_integration.py')]),
+  name='python_native_code_testing',
+  sources=python_native_code_test_files,
+  dependencies=[
+    ':python_task_test_base',
+    'src/python/pants/backend/native',
+    'src/python/pants/backend/python:plugin',
+    'src/python/pants/backend/python/targets',
+    'src/python/pants/backend/python/tasks',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:process_handler',
+    'tests/python/pants_test:int-test',
+    'tests/python/pants_test/engine:scheduler_test_base',
+  ],
+  tags={'platform_specific_behavior'},
+  timeout=2400,
+)
+
+python_tests(
+  sources=globs('test_*.py', exclude=([globs('*_integration.py')] + python_native_code_test_files)),
   dependencies=[
     ':python_task_test_base',
     '3rdparty/python/twitter/commons:twitter.common.collections',
@@ -55,7 +80,7 @@ python_tests(
 
 python_tests(
   name='integration',
-  sources=globs('*_integration.py'),
+  sources=globs('*_integration.py', exclude=python_native_code_test_files),
   dependencies=[
     '3rdparty/python:pex',
     'src/python/pants/util:contextutil',

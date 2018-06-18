@@ -423,7 +423,7 @@ class SchedulerSession(object):
       :class:`pants.engine.fs.PathGlobs` objects.
     :returns: An ExecutionRequest for the given products and subjects.
     """
-    roots = tuple((s, p) for s in subjects for p in products)
+    roots = (tuple((s, p) for s in subjects for p in products))
     native_execution_request = self._scheduler._native.new_execution_request()
     for subject, product in roots:
       self._scheduler.add_root_selection(native_execution_request, subject, product)

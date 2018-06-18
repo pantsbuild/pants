@@ -170,12 +170,13 @@ class SchedulerService(PantsService):
       self._watchman_is_running.wait()
 
     session = self._graph_helper.new_session()
-
     with self.fork_lock:
       target_roots = target_roots_calculator.create(
-        options,
-        session.scheduler_session,
-        session.symbol_table,
+        options=options,
+        session=session.scheduler_session,
+        symbol_table=session.symbol_table,
+        exclude_patterns=tuple(options.for_global_scope().exclude_target_regexp) if options.for_global_scope().exclude_target_regexp else tuple(),
+        tags=tuple(options.for_global_scope().tag) if options.for_global_scope().tag else tuple()
       )
       session.warm_product_graph(target_roots)
       return session, target_roots

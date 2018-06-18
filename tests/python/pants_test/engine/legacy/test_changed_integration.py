@@ -285,7 +285,32 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
     pants_run = self.do_command(*list_args, success=success)
     return pants_run.stdout_data
 
-  def test_test_changed_exclude_target(self):
+  def test_changed_exclude_root_targets_only(self):
+    changed_src = 'src/python/python_targets/test_library.py'
+    exclude_target_regexp = r'_[0-9]'
+    excluded_set = {'src/python/python_targets:test_library_transitive_dependee_2',
+                    'src/python/python_targets:test_library_transitive_dependee_3',
+                    'src/python/python_targets:test_library_transitive_dependee_4'}
+    expected_set = set(self.TEST_MAPPING[changed_src]['transitive']) - excluded_set
+
+    with create_isolated_git_repo() as worktree:
+      with mutated_working_copy([os.path.join(worktree, changed_src)]):
+        pants_run = self.run_pants([
+          '-ldebug',   # This ensures the changed target names show up in the pants output.
+          '--exclude-target-regexp={}'.format(exclude_target_regexp),
+          '--changed-parent=HEAD',
+          '--changed-include-dependees=transitive',
+          'test',
+        ])
+
+      self.assert_success(pants_run)
+      for expected_item in expected_set:
+        self.assertIn(expected_item, pants_run.stdout_data)
+
+      for excluded_item in excluded_set:
+        self.assertNotIn(excluded_item, pants_run.stdout_data)
+
+  def test_changed_not_exclude_inner_targets(self):
     changed_src = 'src/python/python_targets/test_library.py'
     exclude_target_regexp = r'_[0-9]'
     excluded_set = {'src/python/python_targets:test_library_transitive_dependee_2',

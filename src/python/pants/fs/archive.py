@@ -13,8 +13,7 @@ from contextlib import contextmanager
 from zipfile import ZIP_DEFLATED
 
 from pants.util.contextutil import open_tar, open_zip, temporary_dir
-from pants.util.dirutil import (is_executable, safe_concurrent_rename, safe_walk,
-                                split_basename_and_dirname)
+from pants.util.dirutil import is_executable, safe_concurrent_rename, safe_walk
 from pants.util.meta import AbstractClass
 from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_text
@@ -96,16 +95,13 @@ class XZCompressedTarArchiver(TarArchiver):
 
   Invokes an xz executable to decompress a .tar.xz into a tar stream, which is piped into the
   extract() method.
-
-  NB: This class will raise an error if used to create an archive! This class can only currently be
-  used to extract from xz archives.
   """
 
   class XZArchiverError(Exception): pass
 
-  def __init__(self, xz_binary_path, xz_library_path):
+  def __init__(self, xz_binary_path):
 
-    # TODO(cosmicexplorer): test these exceptions somewhere!
+    # TODO: test this exception somewhere!
     if not is_executable(xz_binary_path):
       raise self.XZArchiverError(
         "The path {} does not name an existing executable file. An xz executable must be provided "
@@ -113,21 +109,6 @@ class XZCompressedTarArchiver(TarArchiver):
         .format(xz_binary_path))
 
     self._xz_binary_path = xz_binary_path
-
-    if not os.path.isdir(xz_library_path):
-      raise self.XZArchiverError(
-        "The path {} does not name an existing directory. A directory containing liblzma.so must "
-        "be provided to decompress xz archives."
-        .format(xz_library_path))
-
-    lib_lzma_dylib = os.path.join(xz_library_path, 'liblzma.so')
-    if not os.path.isfile(lib_lzma_dylib):
-      raise self.XZArchiverError(
-        "The path {} names an existing directory, but it does not contain liblzma.so. A directory "
-        "containing liblzma.so must be provided to decompress xz archives."
-        .format(xz_library_path))
-
-    self._xz_library_path = xz_library_path
 
     super(XZCompressedTarArchiver, self).__init__('r|', 'tar.xz')
 
@@ -138,29 +119,21 @@ class XZCompressedTarArchiver(TarArchiver):
     This allows streaming the decompressed tar archive directly into a tar decompression stream,
     which is significantly faster in practice than making a temporary file.
     """
-    (xz_bin_dir, xz_filename) = split_basename_and_dirname(self._xz_binary_path)
+    # FIXME: --threads=0 is supposed to use "the number of processor cores on the machine", but I
+    # see no more than 100% cpu used at any point. This seems like it could be a bug? If performance
+    # is an issue, investigate further.
+    cmd = [self._xz_binary_path, '--decompress', '--stdout', '--keep', '--threads=0', xz_input_file]
 
-    # TODO(cosmicexplorer): --threads=0 is supposed to use "the number of processor cores on the
-    # machine", but I see no more than 100% cpu used at any point. This seems like it could be a
-    # bug? If performance is an issue, investigate further.
-    cmd = [xz_filename, '--decompress', '--stdout', '--keep', '--threads=0', xz_input_file]
-    env = {
-      # Isolate the path so we know we're using our provided version of xz.
-      'PATH': xz_bin_dir,
-      # Only allow our xz's lib directory to resolve the liblzma.so dependency at runtime.
-      'LD_LIBRARY_PATH': self._xz_library_path,
-    }
     try:
       # Pipe stderr to our own stderr, but leave stdout open so we can yield it.
       process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
-        stderr=sys.stderr,
-        env=env)
+        stderr=sys.stderr)
     except OSError as e:
       raise self.XZArchiverError(
-        "Error invoking xz with command {} and environment {} for input file {}: {}"
-        .format(cmd, env, xz_input_file, e),
+        "Error invoking xz with command {} for input file {}: {}"
+        .format(cmd, xz_input_file, e),
         e)
 
     # This is a file object.
@@ -169,15 +142,15 @@ class XZCompressedTarArchiver(TarArchiver):
     rc = process.wait()
     if rc != 0:
       raise self.XZArchiverError(
-        "Error decompressing xz input with command {} and environment {} for input file {}. "
-        "Exit code was: {}. "
-        .format(cmd, env, xz_input_file, rc))
+        "Error decompressing xz input with command {} for input file {}. Exit code was: {}. "
+        .format(cmd, xz_input_file, rc))
 
   def _extract(self, path, outdir):
     with self._invoke_xz(path) as xz_decompressed_tar_stream:
       return super(XZCompressedTarArchiver, self)._extract(
         xz_decompressed_tar_stream, outdir, mode=self.mode)
 
+  # TODO: implement this method, if we ever need it.
   def create(self, *args, **kwargs):
     """
     :raises: :class:`NotImplementedError`

@@ -80,6 +80,9 @@ class PythonSetup(Subsystem):
               'solution is tracked by: https://github.com/pantsbuild/pex/issues/456.')
     register('--build', advanced=True, type=bool, default=UnsetBool, fingerprint= True,
              help='Whether to allow building of distributions from source; Default: allow builds')
+    register('--resolver-use-manylinux', advanced=True, type=bool, default=True, fingerprint=True,
+             help='Whether to consider manylinux wheels when resolving requirements for linux '
+                  'platforms.')
 
   @property
   def interpreter_constraints(self):
@@ -142,6 +145,10 @@ class PythonSetup(Subsystem):
       no_allow_builds(precedence)
 
     return precedence
+
+  @property
+  def use_manylinux(self):
+    return self.get_options().resolver_use_manylinux
 
   @property
   def artifact_cache_dir(self):

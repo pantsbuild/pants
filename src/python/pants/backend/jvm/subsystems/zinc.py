@@ -49,13 +49,17 @@ class Zinc(object):
           Shader.exclude_package('scala', recursive=True),
           Shader.exclude_package('xsbt', recursive=True),
           Shader.exclude_package('xsbti', recursive=True),
+          # Unfortunately, is loaded reflectively by the compiler.
+          Shader.exclude_package('org.apache.logging.log4j', recursive=True),
         ]
 
       cls.register_jvm_tool(register,
                             Zinc.ZINC_COMPILER_TOOL_NAME,
                             classpath=[
                               JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.5'),
-                            ])
+                            ],
+                            main=Zinc.ZINC_COMPILE_MAIN,
+                            custom_rules=shader_rules)
 
       cls.register_jvm_tool(register,
                             'compiler-bridge',
@@ -85,7 +89,7 @@ class Zinc(object):
 
     @classmethod
     def _zinc(cls, products):
-      return cls.tool_classpath_from_products(products, Zinc.ZINC_COMPILER_TOOL_NAME, cls.options_scope)
+      return cls.tool_jar_from_products(products, Zinc.ZINC_COMPILER_TOOL_NAME, cls.options_scope)
 
     @classmethod
     def _compiler_bridge(cls, products):
