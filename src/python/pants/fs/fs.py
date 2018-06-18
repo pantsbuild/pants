@@ -47,7 +47,6 @@ def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LE
 
     # Prefix and suffix length: max length less 2 periods, the extension length, and the digest length.
     ps_len = max(0, (max_length - (2 + len(ext) + len(hexdigest))) // 2)
-    print('prefix/suffix len is: {}'.format(ps_len))
     sep = '.' if ps_len > 0 else ''
     prefix = name[:ps_len]
     suffix = name[-ps_len:] if ps_len > 0 else ''
