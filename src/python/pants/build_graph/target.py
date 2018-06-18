@@ -26,7 +26,7 @@ from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
 from pants.fs.fs import safe_filename
 from pants.source.payload_fields import SourcesField
-from pants.source.wrapped_globs import Files, FilesetWithSpec, Globs
+from pants.source.wrapped_globs import EagerFilesetWithSpec, Files, FilesetWithSpec, Globs
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -881,10 +881,27 @@ class Target(AbstractTarget):
         sources = FilesetWithSpec.empty(sources_rel_path)
     elif isinstance(sources, (set, list, tuple)):
       # Received a literal sources list: convert to a FilesetWithSpec via Files.
+      deprecated_conditional(
+        lambda: True,
+        '1.10.0.dev0',
+        ('Passing collections as the value of the sources argument to create_sources_field is '
+         'deprecated, and now takes a slow path. Instead, class {} should have its sources '
+         'argument populated by the engine, either by using the standard parsing pipeline, or by '
+         'requesting a SourcesField product.'
+         'the v2 engine.').format(self.__class__.__name__)
+      )
       sources = Files.create_fileset_with_spec(sources_rel_path, *sources)
     elif not isinstance(sources, FilesetWithSpec):
       key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
       raise TargetDefinitionException(self, "Expected {}a glob, an address or a list, but was {}"
                                             .format(key_arg_section, type(sources)))
+    elif not isinstance(sources, EagerFilesetWithSpec):
+      deprecated_conditional(
+        lambda: True,
+        '1.10.0.dev0',
+        ('FilesetWithSpec sources values are deprecated except for EagerFilesetWithSpec values. '
+         'Saw value of type {}').format(type(sources))
+      )
+
 
     return SourcesField(sources=sources)
