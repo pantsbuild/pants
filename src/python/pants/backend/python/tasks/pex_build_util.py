@@ -140,7 +140,7 @@ def dump_sources(builder, tgt, log):
                     'Depend on resources() targets instead.'.format(tgt.address.spec))
 
 
-def dump_requirement_libs(builder, interpreter, req_libs, log, platforms=None):
+def dump_requirement_libs(builder, interpreter, req_libs, log, platforms=None, precedence=None):
   """Multi-platform dependency resolution for PEX files.
 
   :param builder: Dump the requirements into this builder.
@@ -151,10 +151,10 @@ def dump_requirement_libs(builder, interpreter, req_libs, log, platforms=None):
                     Defaults to the platforms specified by PythonSetup.
   """
   reqs = [req for req_lib in req_libs for req in req_lib.requirements]
-  dump_requirements(builder, interpreter, reqs, log, platforms=platforms)
+  dump_requirements(builder, interpreter, reqs, log, platforms=platforms, precedence=precedence)
 
 
-def dump_requirements(builder, interpreter, reqs, log, platforms=None):
+def dump_requirements(builder, interpreter, reqs, log, platforms=None, precedence=None):
   """Multi-platform dependency resolution for PEX files.
 
   :param builder: Dump the requirements into this builder.
@@ -163,19 +163,21 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None):
   :param log: Use this logger.
   :param platforms: A list of :class:`Platform`s to resolve requirements for.
                     Defaults to the platforms specified by PythonSetup.
+  :param precedence: An ordered list of allowable :class:`Package` classes
+                     to be used for producing distributions.
   """
   deduped_reqs = OrderedSet(reqs)
   find_links = OrderedSet()
   blacklist = PythonSetup.global_instance().resolver_blacklist
+  precedence = precedence or PythonSetup.global_instance().default_precedence[:]
   for req in deduped_reqs:
     log.debug('  Dumping requirement: {}'.format(req))
     if not (req.key in blacklist and interpreter.identity.matches(blacklist[req.key])):
       builder.add_requirement(req.requirement)
     if req.repository:
       find_links.add(req.repository)
-
   # Resolve the requirements into distributions.
-  distributions = _resolve_multi(interpreter, deduped_reqs, platforms, find_links)
+  distributions = _resolve_multi(interpreter, deduped_reqs, platforms, find_links, precedence)
   locations = set()
   for platform, dists in distributions.items():
     for dist in dists:
@@ -185,7 +187,7 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None):
       locations.add(dist.location)
 
 
-def _resolve_multi(interpreter, requirements, platforms, find_links):
+def _resolve_multi(interpreter, requirements, platforms, find_links, precedence):
   """Multi-platform dependency resolution for PEX files.
 
   Returns a list of distributions that must be included in order to satisfy a set of requirements.
@@ -195,6 +197,8 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
   :param requirements: A list of :class:`PythonRequirement` objects to resolve.
   :param platforms: A list of :class:`Platform`s to resolve for.
   :param find_links: Additional paths to search for source packages during resolution.
+  :param precedence: An ordered list of allowable :class:`Package` classes
+                     to be used for producing distributions.
   :return: Map of platform name -> list of :class:`pkg_resources.Distribution` instances needed
            to satisfy the requirements on that platform.
   """
@@ -205,7 +209,6 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
   distributions = {}
   fetchers = python_repos.get_fetchers()
   fetchers.extend(Fetcher([path]) for path in find_links)
-
   for platform in platforms:
     requirements_cache_dir = os.path.join(python_setup.resolver_cache_dir,
                                           str(interpreter.identity))
@@ -215,6 +218,7 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
       fetchers=fetchers,
       platform=get_local_platform() if platform == 'current' else platform,
       context=python_repos.get_network_context(),
+      precedence=precedence,
       cache=requirements_cache_dir,
       cache_ttl=python_setup.resolver_cache_ttl,
       allow_prereleases=python_setup.resolver_allow_prereleases,

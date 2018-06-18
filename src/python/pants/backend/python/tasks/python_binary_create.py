@@ -11,6 +11,7 @@ from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.pex_build_util import (build_for_current_platform_only_check,
@@ -58,6 +59,7 @@ class PythonBinaryCreate(Task):
   def execute(self):
     binaries = self.context.targets(self.is_binary)
 
+    python_setup = PythonSetup.global_instance()
     # Check for duplicate binary names, since we write the pexes to <dist>/<name>.pex.
     names = {}
     for binary in binaries:
@@ -70,11 +72,16 @@ class PythonBinaryCreate(Task):
     with self.invalidated(binaries, invalidate_dependents=True) as invalidation_check:
       python_deployable_archive = self.context.products.get('deployable_archives')
       python_pex_product = self.context.products.get('pex_archives')
+      precedence = python_setup.default_precedence[:]
       for vt in invalidation_check.all_vts:
         pex_path = os.path.join(vt.results_dir, '{}.pex'.format(vt.target.name))
         if not vt.valid:
           self.context.log.debug('cache for {} is invalid, rebuilding'.format(vt.target))
-          self._create_binary(vt.target, vt.results_dir)
+          if vt.target.build is True:
+            precedence = python_setup._allow_builds(precedence)
+          elif vt.target.build is False:
+            precedence = python_setup._no_allow_builds(precedence)
+          self._create_binary(vt.target, vt.results_dir, precedence=precedence)
         else:
           self.context.log.debug('using cache for {}'.format(vt.target))
 
@@ -89,7 +96,7 @@ class PythonBinaryCreate(Task):
         atomic_copy(pex_path, pex_copy)
         self.context.log.info('created pex {}'.format(os.path.relpath(pex_copy, get_buildroot())))
 
-  def _create_binary(self, binary_tgt, results_dir):
+  def _create_binary(self, binary_tgt, results_dir, precedence=None):
     """Create a .pex file for the specified binary target."""
     # Note that we rebuild a chroot from scratch, instead of using the REQUIREMENTS_PEX
     # and PYTHON_SOURCES products, because those products are already-built pexes, and there's
@@ -133,8 +140,7 @@ class PythonBinaryCreate(Task):
       # including local python dist targets that have native extensions.
       build_for_current_platform_only_check(self.context.targets())
       dump_requirement_libs(builder, interpreter, req_tgts, self.context.log,
-                            platforms=binary_tgt.platforms)
-
+                            platforms=binary_tgt.platforms, precedence=precedence)
       # Build the .pex file.
       pex_path = os.path.join(results_dir, '{}.pex'.format(binary_tgt.name))
       builder.build(pex_path)

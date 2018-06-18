@@ -44,6 +44,7 @@ class PythonBinary(PythonTarget):
                indices=None,              # pex option
                ignore_errors=False,       # pex option
                shebang=None,              # pex option
+               build=True,                # pex option
                platforms=(),
                **kwargs):
     """
@@ -64,6 +65,7 @@ class PythonBinary(PythonTarget):
     :param repositories: a list of repositories to query for dependencies.
     :param indices: a list of indices to use for packages.
     :param ignore_errors: should we ignore inability to resolve dependencies?
+    :param build: whether to allow building of distributions from source
     :param platforms: extra platforms to target when building this binary. If this is, e.g.,
       ``['current', 'linux-x86_64', 'macosx-10.4-x86_64']``, then when building the pex, then
       for any platform-dependent modules, Pants will include ``egg``\s for Linux (64-bit Intel),
@@ -88,6 +90,7 @@ class PythonBinary(PythonTarget):
       'ignore_errors': PrimitiveField(bool(ignore_errors)),
       'platforms': PrimitiveField(tuple(maybe_list(platforms or []))),
       'shebang': PrimitiveField(shebang),
+      'build': PrimitiveField(bool(build))
     })
 
     sources = [] if source is None else [source]
@@ -112,6 +115,10 @@ class PythonBinary(PythonTarget):
   @property
   def platforms(self):
     return self.payload.platforms
+
+  @property
+  def build(self):
+    return self.payload.build
 
   # TODO(wickman) These should likely be attributes on PythonLibrary targets
   # and not PythonBinary targets, or at the very worst, both.

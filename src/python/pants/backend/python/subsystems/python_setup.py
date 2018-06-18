@@ -7,6 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pex.package import SourcePackage
+from pex.sorter import Sorter
+
 from pkg_resources import Requirement
 
 from pants.option.custom_types import UnsetBool
@@ -75,6 +78,8 @@ class PythonSetup(Subsystem):
               'NOTE: this keyword is a temporary fix and will be reverted per: '
               'https://github.com/pantsbuild/pants/issues/5696. The long term '
               'solution is tracked by: https://github.com/pantsbuild/pex/issues/456.')
+    register('--build', advanced=True, type=bool, default=UnsetBool, fingerprint= True,
+             help='Whether to allow building of distributions from source; Default: allow builds')
 
   @property
   def interpreter_constraints(self):
@@ -125,6 +130,20 @@ class PythonSetup(Subsystem):
     return self.get_options().resolver_blacklist
 
   @property
+  def build(self):
+    return self.get_options().build
+
+  @property
+  def default_precedence(self):
+    precedence = Sorter.DEFAULT_PACKAGE_PRECEDENCE[:]
+    if self.build is True:
+      allow_builds(precedence)
+    elif self.build is False:
+      no_allow_builds(precedence)
+
+    return precedence
+
+  @property
   def artifact_cache_dir(self):
     """Note that this is unrelated to the general pants artifact cache."""
     return (self.get_options().artifact_cache_dir or
@@ -151,3 +170,23 @@ class PythonSetup(Subsystem):
       return Requirement.parse(requirement, replacement=False)
     except TypeError:
       return Requirement.parse(requirement)
+
+  def _allow_builds(self, precedence):
+    """Enable building SourcePackages
+    :param precedence: An ordered list of allowable :class:`Package` classes
+                       to be used for producing distributions.
+    :return: An ordered list of allowable :class:`Package classes with the SourcePackage
+    """
+    if SourcePackage not in precedence:
+      precedence = precedence + (SourcePackage,)
+    return precedence
+
+
+  def _no_allow_builds(self, precedence):
+    """Disable building SourcePackages
+    :param precedence: An ordered list of allowable :class:`Package` classes
+                       to be used for producing distributions.
+    :return: An ordered list of allowable :class:`Package classes without the SourcePackage
+    """
+    precedence = tuple([precedent for precedent in precedence if precedent is not SourcePackage])
+    return precedence
