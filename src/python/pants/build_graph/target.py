@@ -218,9 +218,7 @@ class Target(AbstractTarget):
   @classmethod
   def _closure_dep_predicate(cls, roots, include_scopes=None, exclude_scopes=None, respect_intransitive=False):
     if not respect_intransitive and include_scopes is None and exclude_scopes is None:
-      def passthrough_success_predicate(*args, **kwargs):
-        return True
-      return passthrough_success_predicate
+      return None
 
     root_lookup = set(roots)
     def predicate(target, dep_target):
@@ -681,8 +679,10 @@ class Target(AbstractTarget):
     """
     strict_deps = self._cached_strict_dependencies_map.get(dep_context, None)
     if strict_deps is None:
-      default_predicate = self._closure_dep_predicate({self},
-                                                      **dep_context.target_closure_kwargs)
+      default_predicate = self._closure_dep_predicate({self}, **dep_context.target_closure_kwargs)
+      if not default_predicate:
+        def default_predicate(*args, **kwargs):
+          return True
 
       def dep_predicate(source, dependency):
         if not default_predicate(source, dependency):
