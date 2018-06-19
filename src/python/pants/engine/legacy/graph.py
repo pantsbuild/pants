@@ -392,6 +392,7 @@ def hydrate_sources(sources_field, glob_match_error_behavior):
     sources_field.address.spec_path,
     sources_field.filespecs,
     snapshot)
+  sources_field.validate_fn(fileset_with_spec)
   yield HydratedField(sources_field.arg, fileset_with_spec)
 
 
