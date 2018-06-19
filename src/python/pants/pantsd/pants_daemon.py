@@ -18,8 +18,9 @@ from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonExiter, DaemonPantsRunner
 from pants.engine.native import Native
 from pants.init.engine_initializer import EngineInitializer
+from pants.init.logging import setup_logging
+from pants.init.options_initializer import BuildConfigInitializer
 from pants.init.target_roots_calculator import TargetRootsCalculator
-from pants.logging.setup import setup_logging
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionsFingerprinter
@@ -93,6 +94,19 @@ class PantsDaemon(FingerprintedProcessManager):
           return stub_pantsd.read_named_socket('pailgun', int)
 
     @classmethod
+    def restart(cls, bootstrap_options=None):
+      """Restarts a running daemon instance.
+
+      :param Options bootstrap_options: The bootstrap options, if available.
+      :returns: The pailgun port number of the new pantsd instance.
+      :rtype: int
+      """
+      pantsd = cls.create(bootstrap_options)
+      with pantsd.lifecycle_lock:
+        # N.B. This will call `pantsd.terminate()` before starting.
+        return pantsd.launch()
+
+    @classmethod
     def create(cls, bootstrap_options=None, full_init=True):
       """
       :param Options bootstrap_options: The bootstrap options, if available.
@@ -115,7 +129,11 @@ class PantsDaemon(FingerprintedProcessManager):
       if full_init:
         build_root = get_buildroot()
         native = Native.create(bootstrap_options_values)
-        legacy_graph_scheduler = cls._setup_legacy_graph_scheduler(native, bootstrap_options_values)
+        options_bootstrapper = OptionsBootstrapper()
+        build_config = BuildConfigInitializer.get(options_bootstrapper)
+        legacy_graph_scheduler = EngineInitializer.setup_legacy_graph(native,
+                                                                      bootstrap_options_values,
+                                                                      build_config)
         services, port_map = cls._setup_services(
           build_root,
           bootstrap_options_values,
@@ -137,21 +155,6 @@ class PantsDaemon(FingerprintedProcessManager):
     @staticmethod
     def _parse_bootstrap_options():
       return OptionsBootstrapper().get_bootstrap_options()
-
-    @staticmethod
-    def _setup_legacy_graph_scheduler(native, bootstrap_options):
-      """Initializes a `LegacyGraphScheduler` instance."""
-      return EngineInitializer.setup_legacy_graph(
-        bootstrap_options.pants_ignore,
-        bootstrap_options.pants_workdir,
-        bootstrap_options.build_file_imports,
-        native=native,
-        build_ignore_patterns=bootstrap_options.build_ignore,
-        exclude_target_regexps=bootstrap_options.exclude_target_regexp,
-        subproject_roots=bootstrap_options.subproject_roots,
-        remote_store_server=bootstrap_options.remote_store_server,
-        remote_execution_server=bootstrap_options.remote_execution_server,
-      )
 
     @staticmethod
     def _setup_services(build_root, bootstrap_options, legacy_graph_scheduler, watchman):
@@ -412,11 +415,13 @@ class PantsDaemon(FingerprintedProcessManager):
     return listening_port
 
   def terminate(self, include_watchman=True):
-    """Terminates pantsd and watchman."""
-    with self.lifecycle_lock:
-      super(PantsDaemon, self).terminate()
-      if include_watchman:
-        self.watchman_launcher.terminate()
+    """Terminates pantsd and watchman.
+
+    N.B. This should always be called under care of `self.lifecycle_lock`.
+    """
+    super(PantsDaemon, self).terminate()
+    if include_watchman:
+      self.watchman_launcher.terminate()
 
 
 def launch():

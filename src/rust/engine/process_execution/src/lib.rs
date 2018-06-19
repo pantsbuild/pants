@@ -59,6 +59,8 @@ pub struct ExecuteProcessRequest {
 
   pub output_files: BTreeSet<PathBuf>,
 
+  pub output_directories: BTreeSet<PathBuf>,
+
   pub timeout: std::time::Duration,
 
   pub description: String,

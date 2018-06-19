@@ -18,17 +18,15 @@ function run_local_pants() {
 # NB: Pants core does not have the ability to change its own version, so we compute the
 # suffix here and mutate the VERSION_FILE to affect the current version.
 readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
-readonly PANTS_STABLE_VERSION="$(cat "${VERSION_FILE}")"
-readonly HEAD_SHA=$(git rev-parse --verify HEAD)
+PANTS_STABLE_VERSION="$(cat "${VERSION_FILE}")"
+HEAD_SHA=$(git rev-parse --verify HEAD)
 readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+${HEAD_SHA:0:8}"
 
 readonly DEPLOY_DIR="${ROOT}/dist/deploy"
 readonly DEPLOY_3RDPARTY_WHEELS_PATH="wheels/3rdparty/${HEAD_SHA}"
 readonly DEPLOY_PANTS_WHEELS_PATH="wheels/pantsbuild.pants/${HEAD_SHA}"
-readonly DEPLOY_PANTS_SDIST_PATH="sdists/pantsbuild.pants/${HEAD_SHA}"
 readonly DEPLOY_3RDPARTY_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_3RDPARTY_WHEELS_PATH}"
 readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
-readonly DEPLOY_PANTS_SDIST_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_SDIST_PATH}"
 
 # A space-separated list of pants packages to include in any pexes that are built: by default,
 # only pants core is included.
@@ -196,12 +194,10 @@ function build_3rdparty_packages() {
 }
 
 function build_pants_packages() {
-  # TODO(John Sirois): Remove sdist generation and twine upload when
-  # https://github.com/pantsbuild/pants/issues/4956 is resolved.
   local version=$1
 
-  rm -rf "${DEPLOY_PANTS_WHEEL_DIR}" "${DEPLOY_PANTS_SDIST_DIR}"
-  mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}/${version}" "${DEPLOY_PANTS_SDIST_DIR}/${version}"
+  rm -rf "${DEPLOY_PANTS_WHEEL_DIR}"
+  mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
 
   pants_version_set "${version}"
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
@@ -213,11 +209,10 @@ function build_pants_packages() {
     start_travis_section "${NAME}" "Building package ${NAME}-${version} with target '${BUILD_TARGET}'"
     (
       run_local_pants setup-py \
-        --run="sdist bdist_wheel ${BDIST_WHEEL_FLAGS:---python-tag py27}" \
+        --run="bdist_wheel ${BDIST_WHEEL_FLAGS:---python-tag py27}" \
           ${BUILD_TARGET} && \
       wheel=$(find_pkg ${NAME} ${version} "${ROOT}/dist") && \
-      cp -p "${wheel}" "${DEPLOY_PANTS_WHEEL_DIR}/${version}" && \
-      cp -p "${ROOT}/dist/${NAME}-${version}/dist/${NAME}-${version}.tar.gz" "${DEPLOY_PANTS_SDIST_DIR}/${version}"
+      cp -p "${wheel}" "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
     ) || die "Failed to build package ${NAME}-${version} with target '${BUILD_TARGET}'!"
     end_travis_section
   done
@@ -523,9 +518,6 @@ function fetch_and_check_prebuilt_wheels() {
 
 function adjust_wheel_platform() {
   # Renames wheels to adjust their tag from a src platform to a dst platform.
-  # TODO: pypi will only accept manylinux wheels, but pex does not support manylinux whls:
-  # this function is used to go in one direction or another, depending on who is consuming.
-  #   see https://github.com/pantsbuild/pants/issues/4956
   local src_plat="$1"
   local dst_plat="$2"
   local dir="$3"
@@ -551,7 +543,7 @@ function build_pex() {
   local mode="$1"
 
   local linux_platform="linux_x86_64"
-  local osx_platform="macosx_10.10_x86_64"
+  local osx_platform="macosx_10.11_x86_64"
 
   case "${mode}" in
     build)
@@ -571,7 +563,7 @@ function build_pex() {
       local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.pex"
       ;;
     fetch)
-      local platforms=("${linux_platform}" "macosx_10.10_x86_64")
+      local platforms=("${linux_platform}" "${osx_platform}")
       local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
       ;;
     *)
@@ -590,9 +582,7 @@ function build_pex() {
     build_3rdparty_packages "${PANTS_UNSTABLE_VERSION}"
   fi
 
-  adjust_wheel_platform "manylinux1_x86_64" "${linux_platform}" "${DEPLOY_DIR}"
-
-  activate_tmp_venv && trap deactivate RETURN && pip install "pex==1.3.1" || die "Failed to install pex."
+  activate_tmp_venv && trap deactivate RETURN && pip install "pex==1.4.3" || die "Failed to install pex."
 
   local requirements=()
   for pkg_name in $PANTS_PEX_PACKAGES; do
@@ -619,12 +609,6 @@ function build_pex() {
 }
 
 function publish_packages() {
-  # TODO(John Sirois): Remove sdist generation and twine upload when
-  # https://github.com/pantsbuild/pants/issues/4956 is resolved.
-  # NB: We need this step to generate sdists. It also generates wheels locally, but we nuke them
-  # and replace with pre-tested binary wheels we download from s3.
-  build_pants_packages "${PANTS_STABLE_VERSION}"
-
   rm -rf "${DEPLOY_PANTS_WHEEL_DIR}"
   mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"
 
@@ -643,8 +627,8 @@ function publish_packages() {
   activate_twine
   trap deactivate RETURN
 
-  twine upload --sign --sign-with=$(get_pgp_program) --identity=$(get_pgp_keyid) "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"/*.whl
-  twine upload --sign --sign-with=$(get_pgp_program) --identity=$(get_pgp_keyid) "${DEPLOY_PANTS_SDIST_DIR}/${PANTS_STABLE_VERSION}"/*.tar.gz
+  twine upload --sign --sign-with=$(get_pgp_program) --identity=$(get_pgp_keyid) \
+    "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"/*.whl
 
   end_travis_section
 }

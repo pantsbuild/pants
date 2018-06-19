@@ -11,7 +11,7 @@ import sys
 import traceback
 from contextlib import contextmanager
 
-from pants.init.options_initializer import OptionsInitializer
+from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pailgun_server import PailgunServer
 from pants.pantsd.service.pants_service import PantsService
@@ -59,7 +59,9 @@ class PailgunService(PantsService):
       deferred_exc = None
 
       self._logger.debug('execution commandline: %s', arguments)
-      options, _ = OptionsInitializer(OptionsBootstrapper(args=arguments)).setup(init_logging=False)
+      options_bootstrapper = OptionsBootstrapper(args=arguments)
+      build_config = BuildConfigInitializer.get(options_bootstrapper)
+      options = OptionsInitializer.create(options_bootstrapper, build_config)
 
       graph_helper, target_roots = None, None
       try:

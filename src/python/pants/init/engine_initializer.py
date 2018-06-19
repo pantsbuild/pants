@@ -7,15 +7,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.build_environment import get_buildroot
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.base.specs import Specs
 from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTargets,
                                        create_legacy_graph_tasks)
+from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (AppAdaptor, GoTargetAdaptor, JavaLibraryAdaptor,
                                          JunitTestsAdaptor, PythonLibraryAdaptor,
@@ -26,10 +26,10 @@ from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import SingletonRule
 from pants.engine.scheduler import Scheduler
-from pants.init.options_initializer import OptionsInitializer
-from pants.option.global_options import GlobMatchErrorBehavior
+from pants.init.options_initializer import BuildConfigInitializer
+from pants.option.global_options import (DEFAULT_EXECUTION_OPTIONS, ExecutionOptions,
+                                         GlobMatchErrorBehavior)
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.scm.change_calculator import EngineChangeCalculator
 from pants.util.objects import datatype
 
 
@@ -79,12 +79,10 @@ class LegacyGraphScheduler(datatype(['scheduler', 'symbol_table'])):
 
   def new_session(self):
     session = self.scheduler.new_session()
-    scm = get_scm()
-    change_calculator = EngineChangeCalculator(session, self.symbol_table, scm) if scm else None
-    return LegacyGraphSession(session, self.symbol_table, change_calculator)
+    return LegacyGraphSession(session, self.symbol_table)
 
 
-class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'change_calculator'])):
+class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table'])):
   """A thin wrapper around a SchedulerSession configured with @rules for a symbol table."""
 
   def warm_product_graph(self, target_roots):
@@ -93,7 +91,9 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'change_
     :param TargetRoots target_roots: The targets root of the request.
     """
     logger.debug('warming target_roots for: %r', target_roots)
-    subjects = [Specs(tuple(target_roots.specs))]
+    subjects = target_roots.specs
+    if not subjects:
+      subjects = []
     request = self.scheduler_session.execution_request([TransitiveHydratedTargets], subjects)
     result = self.scheduler_session.execute(request)
     if result.error:
@@ -122,25 +122,38 @@ class EngineInitializer(object):
   """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
 
   @staticmethod
-  def get_default_build_file_aliases():
-    _, build_config = OptionsInitializer(OptionsBootstrapper()).setup(init_logging=False)
-    return build_config.registered_aliases()
+  def setup_legacy_graph(native, bootstrap_options, build_configuration):
+    """Construct and return the components necessary for LegacyBuildGraph construction."""
+    return EngineInitializer.setup_legacy_graph_extended(
+      bootstrap_options.pants_ignore,
+      bootstrap_options.pants_workdir,
+      bootstrap_options.build_file_imports,
+      build_configuration,
+      native=native,
+      glob_match_error_behavior=bootstrap_options.glob_expansion_failure,
+      rules=build_configuration.rules(),
+      build_ignore_patterns=bootstrap_options.build_ignore,
+      exclude_target_regexps=bootstrap_options.exclude_target_regexp,
+      subproject_roots=bootstrap_options.subproject_roots,
+      include_trace_on_error=bootstrap_options.print_exception_stacktrace,
+      execution_options=ExecutionOptions.from_bootstrap_options(bootstrap_options),
+    )
 
   @staticmethod
-  def setup_legacy_graph(pants_ignore_patterns,
-                         workdir,
-                         build_file_imports_behavior,
-                         build_root=None,
-                         native=None,
-                         build_file_aliases=None,
-                         glob_match_error_behavior=None,
-                         rules=None,
-                         build_ignore_patterns=None,
-                         exclude_target_regexps=None,
-                         subproject_roots=None,
-                         include_trace_on_error=True,
-                         remote_store_server=None,
-                         remote_execution_server=None,
+  def setup_legacy_graph_extended(
+    pants_ignore_patterns,
+    workdir,
+    build_file_imports_behavior,
+    build_configuration,
+    build_root=None,
+    native=None,
+    glob_match_error_behavior=None,
+    rules=None,
+    build_ignore_patterns=None,
+    exclude_target_regexps=None,
+    subproject_roots=None,
+    include_trace_on_error=True,
+    execution_options=None,
   ):
     """Construct and return the components necessary for LegacyBuildGraph construction.
 
@@ -152,8 +165,8 @@ class EngineInitializer(object):
     :type build_file_imports_behavior: string
     :param str build_root: A path to be used as the build root. If None, then default is used.
     :param Native native: An instance of the native-engine subsystem.
-    :param build_file_aliases: BuildFileAliases to register.
-    :type build_file_aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
+    :param build_configuration: The `BuildConfiguration` object to get build file aliases from.
+    :type build_configuration: :class:`pants.build_graph.build_configuration.BuildConfiguration`
     :param glob_match_error_behavior: How to behave if a glob specified for a target's sources or
                                       bundles does not expand to anything.
     :type glob_match_error_behavior: :class:`pants.option.global_options.GlobMatchErrorBehavior`
@@ -164,20 +177,21 @@ class EngineInitializer(object):
                                   under the current build root.
     :param bool include_trace_on_error: If True, when an error occurs, the error message will
                 include the graph trace.
+    :param execution_options: Option values for (remote) process execution.
+    :type execution_options: :class:`pants.option.global_options.ExecutionOptions`
     :returns: A LegacyGraphScheduler.
     """
 
     build_root = build_root or get_buildroot()
-
-    if not build_file_aliases:
-      build_file_aliases = EngineInitializer.get_default_build_file_aliases()
-
-    if not rules:
-      rules = []
+    build_configuration = build_configuration or BuildConfigInitializer.get(OptionsBootstrapper())
+    build_file_aliases = build_configuration.registered_aliases()
+    rules = rules or build_configuration.rules() or []
 
     symbol_table = LegacySymbolTable(build_file_aliases)
 
     project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
+
+    execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
     # Register "literal" subjects required for these rules.
     parser = LegacyPythonCallbacksParser(
@@ -196,12 +210,15 @@ class EngineInitializer(object):
     # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.
     rules = (
+      [
+        SingletonRule.from_instance(GlobMatchErrorBehavior.create(glob_match_error_behavior)),
+        SingletonRule.from_instance(build_configuration),
+      ] +
       create_legacy_graph_tasks(symbol_table) +
       create_fs_rules() +
       create_process_rules() +
       create_graph_rules(address_mapper, symbol_table) +
-      [SingletonRule(GlobMatchErrorBehavior,
-                     GlobMatchErrorBehavior.create(glob_match_error_behavior))] +
+      create_options_parsing_rules() +
       rules
     )
 
@@ -210,8 +227,7 @@ class EngineInitializer(object):
       project_tree,
       workdir,
       rules,
-      remote_store_server,
-      remote_execution_server,
+      execution_options,
       include_trace_on_error=include_trace_on_error,
     )
 

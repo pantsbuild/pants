@@ -430,14 +430,15 @@ matrix:
       osx_image: xcode8.3
       language: generic
       env:
-        - SHARD="Rust Tests OSX"
+        - SHARD="Rust + Platform-specific Tests OSX"
       before_install:
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
       before_script:
         - ulimit -c unlimited
         - ulimit -n 8192
       script:
-        - ./build-support/bin/ci.sh -bcfjklmnprtx
+        # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and set -z to run the platform-specific tests.
+        - ./build-support/bin/ci.sh -cfjklmnprtxz
 
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/s3/

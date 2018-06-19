@@ -11,6 +11,7 @@ import shutil
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.nodes import Return, Throw
 from pants.engine.scheduler import Scheduler
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants_test.engine.util import init_native
@@ -56,8 +57,7 @@ class SchedulerTestBase(object):
                           project_tree,
                           work_dir,
                           rules,
-                          remote_store_server=None,
-                          remote_execution_server=None,
+                          DEFAULT_EXECUTION_OPTIONS,
                           include_trace_on_error=include_trace_on_error)
     return scheduler.new_session()
 

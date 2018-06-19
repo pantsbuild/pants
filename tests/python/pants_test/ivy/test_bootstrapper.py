@@ -22,7 +22,7 @@ class BootstrapperTest(unittest.TestCase):
     ivy_subsystem = IvySubsystem.global_instance()
     bootstrapper = Bootstrapper(ivy_subsystem=ivy_subsystem)
     ivy = bootstrapper.ivy()
-    self.assertIsNotNone(ivy.ivy_cache_dir)
+    self.assertIsNotNone(ivy.ivy_resolution_cache_dir)
     self.assertIsNone(ivy.ivy_settings)
     bootstrap_jar_path = os.path.join(ivy_subsystem.get_options().pants_bootstrapdir,
                                       'tools', 'jvm', 'ivy', 'bootstrap.jar')
@@ -36,5 +36,5 @@ class BootstrapperTest(unittest.TestCase):
 
   def test_default_ivy(self):
     ivy = Bootstrapper.default_ivy()
-    self.assertIsNotNone(ivy.ivy_cache_dir)
+    self.assertIsNotNone(ivy.ivy_resolution_cache_dir)
     self.assertIsNone(ivy.ivy_settings)

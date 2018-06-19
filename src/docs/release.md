@@ -112,7 +112,7 @@ the release manager may also need to do a release from a stable branch.*
    [docs reference](http://www.pantsbuild.org/docs#generating-the-site)
 4. Bring the CONTRIBUTORS roster in
    [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
-   up to date by running `build-support/bin/contributors.sh`.
+   up to date by running `./build-support/bin/contributors.sh`.
 5. Create and land a review for changes in the master branch.
 6. Execute the release as described later on this page.
 7. Finally, if creating a release candidate, create the stable branch from the commit in

@@ -5,12 +5,16 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.python.targets.python_binary import PythonBinary
+from pants.backend.python.register import build_file_aliases
 from pants.base.exceptions import TargetDefinitionException
 from pants_test.test_base import TestBase
 
 
 class TestPythonBinary(TestBase):
+  @classmethod
+  def alias_groups(self):
+    return build_file_aliases()
+
   def setUp(self):
     super(TestPythonBinary, self).setUp()
     # Force creation of SourceRootConfig global instance. PythonBinary uses source roots
@@ -18,54 +22,79 @@ class TestPythonBinary(TestBase):
     self.context()
 
   def test_python_binary_must_have_some_entry_point(self):
+    self.add_to_build_file('', 'python_binary(name = "binary")')
     with self.assertRaises(TargetDefinitionException):
-      self.make_target(spec=':binary', target_type=PythonBinary)
+      self.target(':binary')
 
   def test_python_binary_with_entry_point_no_source(self):
-    assert self.make_target(spec=':binary',
-                            target_type=PythonBinary,
-                            entry_point='blork').entry_point == 'blork'
+    self.add_to_build_file('', 'python_binary(name = "binary", entry_point = "blork")')
+    assert self.target(':binary').entry_point == 'blork'
 
   def test_python_binary_with_source_no_entry_point(self):
-    assert self.make_target(spec=':binary1',
-                            target_type=PythonBinary,
-                            source='blork.py').entry_point == 'blork'
-    assert self.make_target(spec=':binary2',
-                            target_type=PythonBinary,
-                            source='bin/blork.py').entry_point == 'bin.blork'
+    self.add_to_build_file(
+      '',
+      '''python_binary(
+  name = "binary1",
+  source = "blork.py",
+)
+
+python_binary(
+  name = "binary2",
+  source = "bin/blork.py",
+)''')
+    assert self.target(':binary1').entry_point == 'blork'
+    assert self.target(':binary2').entry_point == 'bin.blork'
 
   def test_python_binary_with_entry_point_and_source(self):
-    assert 'blork' == self.make_target(spec=':binary1',
-                                       target_type=PythonBinary,
-                                       entry_point='blork',
-                                       source='blork.py').entry_point
-    assert 'blork:main' == self.make_target(spec=':binary2',
-                                            target_type=PythonBinary,
-                                            entry_point='blork:main',
-                                            source='blork.py').entry_point
-    assert 'bin.blork:main' == self.make_target(spec=':binary3',
-                                                target_type=PythonBinary,
-                                                entry_point='bin.blork:main',
-                                                source='bin/blork.py').entry_point
+    self.add_to_build_file(
+      '',
+      '''python_binary(
+  name = "binary1",
+  entry_point = "blork",
+  source = "blork.py",
+)
+
+python_binary(
+  name = "binary2",
+  entry_point = "blork:main",
+  source = "blork.py",
+)
+
+python_binary(
+  name = "binary3",
+  entry_point = "bin.blork:main",
+  source = "bin/blork.py",
+)''')
+
+    assert 'blork' == self.target(':binary1').entry_point
+    assert 'blork:main' == self.target(':binary2').entry_point
+    assert 'bin.blork:main' == self.target(':binary3').entry_point
 
   def test_python_binary_with_entry_point_and_source_mismatch(self):
+    self.add_to_build_file(
+      'binary1',
+      'python_binary(entry_point = "blork", source = "hork.py")',
+    )
     with self.assertRaises(TargetDefinitionException):
-      self.make_target(spec=':binary1',
-                       target_type=PythonBinary,
-                       entry_point='blork',
-                       source='hork.py')
+      self.target('binary1')
+
+    self.add_to_build_file(
+      'binary2',
+      'python_binary(entry_point = "blork:main", source = "hork.py")',
+    )
     with self.assertRaises(TargetDefinitionException):
-      self.make_target(spec=':binary2',
-                       target_type=PythonBinary,
-                       entry_point='blork:main',
-                       source='hork.py')
+      self.target('binary2')
+
+    self.add_to_build_file(
+      'binary3',
+      'python_binary(entry_point = "bin.blork", source = "blork.py")',
+    )
     with self.assertRaises(TargetDefinitionException):
-      self.make_target(spec=':binary3',
-                       target_type=PythonBinary,
-                       entry_point='bin.blork',
-                       source='blork.py')
+      self.target('binary3')
+
+    self.add_to_build_file(
+      'binary4',
+      'python_binary(entry_point = "bin.blork", source = "bin.py")',
+    )
     with self.assertRaises(TargetDefinitionException):
-      self.make_target(spec=':binary4',
-                       target_type=PythonBinary,
-                       entry_point='bin.blork',
-                       source='bin.py')
+      self.target('binary4')

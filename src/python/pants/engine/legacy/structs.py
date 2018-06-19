@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import os.path
 from abc import abstractproperty
 
 from six import string_types
@@ -332,7 +333,10 @@ class BaseGlobs(Locatable, AbstractClass):
 
   def to_path_globs(self, relpath):
     """Return a PathGlobs representing the included and excluded Files for these patterns."""
-    return PathGlobs.create(relpath, self._file_globs, self._excluded_file_globs)
+    return PathGlobs(
+      tuple(os.path.join(relpath, glob) for glob in self._file_globs),
+      tuple(os.path.join(relpath, exclude) for exclude in self._excluded_file_globs),
+    )
 
   def _gen_init_args_str(self):
     all_arg_strs = []

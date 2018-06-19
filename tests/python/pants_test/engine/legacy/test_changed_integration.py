@@ -14,7 +14,7 @@ from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
 from pants_test.base_test import TestGenerator
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 from pants_test.testutils.git_util import initialize_repo
 
 
@@ -285,7 +285,32 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
     pants_run = self.do_command(*list_args, success=success)
     return pants_run.stdout_data
 
-  def test_test_changed_exclude_target(self):
+  def test_changed_exclude_root_targets_only(self):
+    changed_src = 'src/python/python_targets/test_library.py'
+    exclude_target_regexp = r'_[0-9]'
+    excluded_set = {'src/python/python_targets:test_library_transitive_dependee_2',
+                    'src/python/python_targets:test_library_transitive_dependee_3',
+                    'src/python/python_targets:test_library_transitive_dependee_4'}
+    expected_set = set(self.TEST_MAPPING[changed_src]['transitive']) - excluded_set
+
+    with create_isolated_git_repo() as worktree:
+      with mutated_working_copy([os.path.join(worktree, changed_src)]):
+        pants_run = self.run_pants([
+          '-ldebug',   # This ensures the changed target names show up in the pants output.
+          '--exclude-target-regexp={}'.format(exclude_target_regexp),
+          '--changed-parent=HEAD',
+          '--changed-include-dependees=transitive',
+          'test',
+        ])
+
+      self.assert_success(pants_run)
+      for expected_item in expected_set:
+        self.assertIn(expected_item, pants_run.stdout_data)
+
+      for excluded_item in excluded_set:
+        self.assertNotIn(excluded_item, pants_run.stdout_data)
+
+  def test_changed_not_exclude_inner_targets(self):
     changed_src = 'src/python/python_targets/test_library.py'
     exclude_target_regexp = r'_[0-9]'
     excluded_set = {'src/python/python_targets:test_library_transitive_dependee_2',
@@ -352,6 +377,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       self.assert_success(pants_run)
       self.assertEqual(pants_run.stdout_data.strip(), '')
 
+  @ensure_daemon
   def test_list_changed(self):
     deleted_file = 'src/python/sources/sources.py'
 

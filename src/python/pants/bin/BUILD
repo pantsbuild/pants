@@ -36,7 +36,6 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/reporting',
     'src/python/pants/pantsd:pants_daemon',
-    'src/python/pants/scm:change_calculator',
     'src/python/pants/scm/subsystems:changed',
     'src/python/pants/subsystem',
     'src/python/pants/task',

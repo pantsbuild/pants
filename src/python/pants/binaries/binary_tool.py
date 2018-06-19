@@ -52,9 +52,8 @@ class BinaryToolBase(Subsystem):
   def subsystem_dependencies(cls):
     sub_deps = super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
 
-    # TODO(cosmicexplorer): if we need to do more conditional subsystem dependencies, do it
-    # declaratively with a dict class field so that we only try to create or access it if we
-    # declared a dependency on it.
+    # TODO: if we need to do more conditional subsystem dependencies, do it declaratively with a
+    # dict class field so that we only try to create or access it if we declared a dependency on it.
     if cls.archive_type == 'txz':
       sub_deps = sub_deps + (XZ.scoped(cls),)
 
@@ -71,6 +70,9 @@ class BinaryToolBase(Subsystem):
     if not self.archive_type:
       return None
 
+    # This forces downloading and extracting the `XZ` archive if any BinaryTool with a 'txz'
+    # archive_type is used, but that's fine, because unless the cache is manually changed we won't
+    # do more work than necessary.
     if self.archive_type == 'txz':
       return self._xz.tar_xz_extractor
 
@@ -196,7 +198,7 @@ class Script(BinaryToolBase):
     script_relpath = os.path.relpath(self.select(context), bootstrapdir)
     snapshot = context._scheduler.capture_snapshots((
       PathGlobsAndRoot(
-        PathGlobs((script_relpath,), ()),
+        PathGlobs((script_relpath,)),
         str(bootstrapdir),
       ),
     ))[0]
@@ -217,15 +219,12 @@ class ExecutablePathProvider(object):
 
 class XZ(NativeTool):
   options_scope = 'xz'
-  default_version = '5.2.4'
+  default_version = '5.2.4-3'
   archive_type = 'tgz'
 
   @memoized_property
   def tar_xz_extractor(self):
-    return XZCompressedTarArchiver(self._executable_location(), self._lib_dir())
+    return XZCompressedTarArchiver(self._executable_location())
 
   def _executable_location(self):
     return os.path.join(self.select(), 'bin', 'xz')
-
-  def _lib_dir(self):
-    return os.path.join(self.select(), 'lib')

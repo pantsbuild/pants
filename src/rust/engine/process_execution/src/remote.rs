@@ -661,6 +661,7 @@ mod tests {
         .into_iter()
         .map(|p| PathBuf::from(p))
         .collect(),
+      output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "some description".to_owned(),
     };
@@ -707,6 +708,7 @@ mod tests {
           env: BTreeMap::new(),
           input_files: fs::EMPTY_DIGEST,
           output_files: BTreeSet::new(),
+          output_directories: BTreeSet::new(),
           timeout: Duration::from_millis(1000),
           description: "wrong command".to_string(),
         }).unwrap()
@@ -920,6 +922,7 @@ mod tests {
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
       output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
       timeout: request_timeout,
       description: "echo-a-foo".to_string(),
     };
@@ -1539,6 +1542,7 @@ mod tests {
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
       output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(5000),
       description: "echo a foo".to_string(),
     }
@@ -1715,6 +1719,7 @@ mod tests {
       env: BTreeMap::new(),
       input_files: TestDirectory::containing_roland().digest(),
       output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "cat a roland".to_string(),
     }
@@ -1726,6 +1731,7 @@ mod tests {
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
       output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "unleash a roaring meow".to_string(),
     }

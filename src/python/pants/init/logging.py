@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
+import sys
 import time
 from collections import namedtuple
 from logging import FileHandler, Formatter, StreamHandler
@@ -18,8 +19,12 @@ class LoggingSetupResult(namedtuple('LoggingSetupResult', ['log_filename', 'log_
   """A structured result for logging setup."""
 
 
-# TODO: Once pantsd had a separate launcher entry point, and so no longer needs to call this
-# function, move this into the pants.init package, and remove the pants.logging package.
+def setup_logging_from_options(bootstrap_options):
+  # N.B. quiet help says 'Squelches all console output apart from errors'.
+  level = 'ERROR' if bootstrap_options.quiet else bootstrap_options.level.upper()
+  return setup_logging(level, console_stream=sys.stderr, log_dir=bootstrap_options.logdir)
+
+
 def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name=None):
   """Configures logging for a given scope, by default the global scope.
 

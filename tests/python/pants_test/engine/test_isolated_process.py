@@ -195,11 +195,12 @@ def javac_compile_process_result(javac_compile_req):
     if not java_file.endswith(".java"):
       raise ValueError("Can only compile .java files but got {}".format(java_file))
   sources_snapshot = yield Get(Snapshot, PathGlobs, PathGlobs(java_files, ()))
+  output_dirs = tuple({os.path.dirname(java_file) for java_file in java_files})
   process_request = ExecuteProcessRequest.create_from_snapshot(
     argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
     env=dict(),
     snapshot=sources_snapshot,
-    output_files=tuple(java_file[:-5] + ".class" for java_file in java_files),
+    output_directories=output_dirs,
   )
   javac_proc_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
 
@@ -252,31 +253,39 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
         env=dict(),
         input_files='',
         output_files=(),
+        output_directories=(),
         timeout_seconds=0.1,
-        description='')
+        description=''
+      )
     with self.assertRaisesRegexp(TypeCheckError, "input_files"):
       ExecuteProcessRequest(argv=('1',),
         env=dict(),
         input_files=3,
         output_files=(),
+        output_directories=(),
         timeout_seconds=0.1,
-        description='')
+        description=''
+      )
     with self.assertRaisesRegexp(TypeCheckError, "output_files"):
       ExecuteProcessRequest(
         argv=('1',),
         env=tuple(),
         input_files=EMPTY_DIRECTORY_DIGEST,
-        output_files=["blah"],
+        output_files=("blah"),
+        output_directories=(),
         timeout_seconds=0.1,
-        description='')
+        description=''
+      )
     with self.assertRaisesRegexp(TypeCheckError, "timeout"):
       ExecuteProcessRequest(
         argv=('1',),
         env=tuple(),
         input_files=EMPTY_DIRECTORY_DIGEST,
-        output_files=["blah"],
+        output_files=("blah"),
+        output_directories=(),
         timeout_seconds=None,
-        description='')
+        description=''
+      )
 
 
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
@@ -286,7 +295,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     cat_exe_req = CatExecutionRequest(
       ShellCat(BinaryLocation('/bin/cat')),
-      PathGlobs.create('', include=['fs_test/a/b/*']))
+      PathGlobs(include=['fs_test/a/b/*']))
 
     self.assertEqual(
       repr(cat_exe_req),
@@ -373,8 +382,11 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     files_content = self.execute_expecting_one_result(scheduler, FilesContent, result.directory_digest).value.dependencies
 
     self.assertEquals(
-      ("scheduler_inputs/src/java/simple/Simple.class",),
-      tuple(file.path for file in files_content)
+      tuple(sorted((
+        "scheduler_inputs/src/java/simple/Simple.java",
+        "scheduler_inputs/src/java/simple/Simple.class",
+      ))),
+      tuple(sorted(file.path for file in files_content))
     )
 
     self.assertGreater(len(files_content[0].content), 0)

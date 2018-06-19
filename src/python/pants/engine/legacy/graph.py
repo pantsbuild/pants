@@ -203,7 +203,9 @@ class LegacyBuildGraph(BuildGraph):
     addresses = set(addresses) - set(self._target_by_address.keys())
     if not addresses:
       return
-    for _ in self._inject_specs([SingleAddress(a.spec_path, a.target_name) for a in addresses]):
+    dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in addresses)
+    specs = [Specs(dependencies=tuple(dependencies))]
+    for _ in self._inject_specs(specs):
       pass
 
   def inject_roots_closure(self, target_roots, fail_fast=None):
@@ -211,6 +213,7 @@ class LegacyBuildGraph(BuildGraph):
       yield address
 
   def inject_specs_closure(self, specs, fail_fast=None):
+    specs = [Specs(dependencies=tuple(specs))]
     # Request loading of these specs.
     for address in self._inject_specs(specs):
       yield address
@@ -258,9 +261,8 @@ class LegacyBuildGraph(BuildGraph):
 
     logger.debug('Injecting specs to %s: %s', self, subjects)
     with self._resolve_context():
-      specs = tuple(subjects)
       thts, = self._scheduler.product_request(TransitiveHydratedTargets,
-                                              [Specs(specs)])
+                                              subjects)
 
     self._index(thts.closure)
 

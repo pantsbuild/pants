@@ -65,6 +65,9 @@ class Options(object):
   class OptionTrackerRequiredError(Exception):
     """Options requires an OptionTracker instance."""
 
+  class FrozenOptionsError(Exception):
+    """Options are frozen and can't be mutated."""
+
   @classmethod
   def complete_scopes(cls, scope_infos):
     """Expand a set of scopes to include all enclosing scopes.
@@ -150,6 +153,13 @@ class Options(object):
     self._bootstrap_option_values = bootstrap_option_values
     self._known_scope_to_info = known_scope_to_info
     self._option_tracker = option_tracker
+    self._frozen = False
+
+  # TODO: Eliminate this in favor of a builder/factory.
+  @property
+  def frozen(self):
+    """Whether or not this Options object is frozen from writes."""
+    return self._frozen
 
   @property
   def tracker(self):
@@ -185,6 +195,10 @@ class Options(object):
   @property
   def scope_to_flags(self):
     return self._scope_to_flags
+
+  def freeze(self):
+    """Freezes this Options instance."""
+    self._frozen = True
 
   def drop_flag_values(self):
     """Returns a copy of these options that ignores values specified via flags.
@@ -236,8 +250,13 @@ class Options(object):
     else:
       return []
 
+  def _assert_not_frozen(self):
+    if self._frozen:
+      raise self.FrozenOptionsError('cannot mutate frozen Options instance {!r}.'.format(self))
+
   def register(self, scope, *args, **kwargs):
     """Register an option in the given scope."""
+    self._assert_not_frozen()
     self.get_parser(scope).register(*args, **kwargs)
     deprecated_scope = self.known_scope_to_info[scope].deprecated_scope
     if deprecated_scope:
@@ -245,6 +264,7 @@ class Options(object):
 
   def registration_function_for_optionable(self, optionable_class):
     """Returns a function for registering options on the given scope."""
+    self._assert_not_frozen()
     # TODO(benjy): Make this an instance of a class that implements __call__, so we can
     # docstring it, and so it's less weird than attatching properties to a function.
     def register(*args, **kwargs):
@@ -258,11 +278,14 @@ class Options(object):
 
   def get_parser(self, scope):
     """Returns the parser for the given scope, so code can register on it directly."""
+    self._assert_not_frozen()
     return self._parser_hierarchy.get_parser_by_scope(scope)
 
   def walk_parsers(self, callback):
+    self._assert_not_frozen()
     self._parser_hierarchy.walk(callback)
 
+  # TODO: Eagerly precompute backing data for this?
   def for_scope(self, scope, inherit_from_enclosing_scope=True):
     """Return the option values for the given scope.
 

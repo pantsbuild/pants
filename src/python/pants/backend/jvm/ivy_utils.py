@@ -39,15 +39,16 @@ class IvyResolutionStep(object):
   # NB(nh): This class is the base class for the ivy resolve and fetch steps.
   # It also specifies the abstract methods that define the components of resolution steps.
 
-  def __init__(self, confs, hash_name, pinned_artifacts, soft_excludes, ivy_cache_dir,
-               global_ivy_workdir):
+  def __init__(self, confs, hash_name, pinned_artifacts, soft_excludes, ivy_resolution_cache_dir,
+               ivy_repository_cache_dir, global_ivy_workdir):
     """
     :param confs: A tuple of string ivy confs to resolve for.
     :param hash_name: A unique string name for this resolve.
     :param pinned_artifacts: A tuple of "artifact-alikes" to force the versions of.
     :param soft_excludes: A flag marking whether to pass excludes to Ivy or to apply them after the
                           fact.
-    :param ivy_cache_dir: The cache directory used by Ivy for this resolution step.
+    :param ivy_repository_cache_dir: The cache directory used by Ivy for repository cache data.
+    :param ivy_resolution_cache_dir: The cache directory used by Ivy for resolution cache data.
     :param global_ivy_workdir: The workdir that all ivy outputs live in.
     """
 
@@ -56,7 +57,8 @@ class IvyResolutionStep(object):
     self.pinned_artifacts = pinned_artifacts
     self.soft_excludes = soft_excludes
 
-    self.ivy_cache_dir = ivy_cache_dir
+    self.ivy_repository_cache_dir = ivy_repository_cache_dir
+    self.ivy_resolution_cache_dir = ivy_resolution_cache_dir
     self.global_ivy_workdir = global_ivy_workdir
 
     self.workdir_reports_by_conf = {c: self.resolve_report_path(c) for c in confs}
@@ -109,7 +111,7 @@ class IvyResolutionStep(object):
   def _construct_and_load_symlink_map(self):
     artifact_paths, symlink_map = IvyUtils.construct_and_load_symlink_map(
       self.symlink_dir,
-      self.ivy_cache_dir,
+      self.ivy_repository_cache_dir,
       self.ivy_cache_classpath_filename,
       self.symlink_classpath_filename)
     return artifact_paths, symlink_map
@@ -122,7 +124,7 @@ class IvyResolutionStep(object):
                         jvm_options,
                         self.workdir_reports_by_conf,
                         self.confs,
-                        self.ivy_cache_dir,
+                        self.ivy_resolution_cache_dir,
                         self.ivy_cache_classpath_filename,
                         hash_name_for_report,
                         workunit_factory,
@@ -726,7 +728,7 @@ class IvyUtils(object):
 
   @classmethod
   def do_resolve(cls, executor, extra_args, ivyxml, jvm_options, workdir_report_paths_by_conf,
-                 confs, ivy_cache_dir, ivy_cache_classpath_filename, resolve_hash_name,
+                 confs, ivy_resolution_cache_dir, ivy_cache_classpath_filename, resolve_hash_name,
                  workunit_factory, workunit_name):
     """Execute Ivy with the given ivy.xml and copies all relevant files into the workdir.
 
@@ -764,15 +766,15 @@ class IvyUtils(object):
         raise cls.IvyError('Ivy failed to create classpath file at {}'
                            .format(raw_target_classpath_file_tmp))
 
-      cls._copy_ivy_reports(workdir_report_paths_by_conf, confs, ivy_cache_dir, resolve_hash_name)
+      cls._copy_ivy_reports(workdir_report_paths_by_conf, confs, ivy_resolution_cache_dir, resolve_hash_name)
 
     logger.debug('Moved ivy classfile file to {dest}'
                  .format(dest=ivy_cache_classpath_filename))
 
   @classmethod
-  def _copy_ivy_reports(cls, workdir_report_paths_by_conf, confs, ivy_cache_dir, resolve_hash_name):
+  def _copy_ivy_reports(cls, workdir_report_paths_by_conf, confs, ivy_resolution_cache_dir, resolve_hash_name):
     for conf in confs:
-      ivy_cache_report_path = IvyUtils.xml_report_path(ivy_cache_dir, resolve_hash_name,
+      ivy_cache_report_path = IvyUtils.xml_report_path(ivy_resolution_cache_dir, resolve_hash_name,
                                                        conf)
       workdir_report_path = workdir_report_paths_by_conf[conf]
       try:
@@ -808,7 +810,7 @@ class IvyUtils(object):
       raise IvyUtils.IvyError(e)
 
   @classmethod
-  def construct_and_load_symlink_map(cls, symlink_dir, ivy_cache_dir,
+  def construct_and_load_symlink_map(cls, symlink_dir, ivy_repository_cache_dir,
                                      ivy_cache_classpath_filename, symlink_classpath_filename):
     # Make our actual classpath be symlinks, so that the paths are uniform across systems.
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
@@ -818,7 +820,7 @@ class IvyUtils(object):
       # in artifact-cached analysis files are consistent across systems.
       # Note that we have one global, well-known symlink dir, again so that paths are
       # consistent across builds.
-      symlink_map = cls._symlink_cachepath(ivy_cache_dir,
+      symlink_map = cls._symlink_cachepath(ivy_repository_cache_dir,
                                            ivy_cache_classpath_filename,
                                            symlink_dir,
                                            symlink_classpath_filename)
@@ -826,18 +828,18 @@ class IvyUtils(object):
     return classpath, symlink_map
 
   @classmethod
-  def _symlink_cachepath(cls, ivy_cache_dir, inpath, symlink_dir, outpath):
-    """Symlinks all paths listed in inpath that are under ivy_cache_dir into symlink_dir.
+  def _symlink_cachepath(cls, ivy_repository_cache_dir, inpath, symlink_dir, outpath):
+    """Symlinks all paths listed in inpath that are under ivy_repository_cache_dir into symlink_dir.
 
     If there is an existing symlink for a file under inpath, it is used rather than creating
     a new symlink. Preserves all other paths. Writes the resulting paths to outpath.
     Returns a map of path -> symlink to that path.
     """
     safe_mkdir(symlink_dir)
-    # The ivy_cache_dir might itself be a symlink. In this case, ivy may return paths that
+    # The ivy_repository_cache_dir might itself be a symlink. In this case, ivy may return paths that
     # reference the realpath of the .jar file after it is resolved in the cache dir. To handle
     # this case, add both the symlink'ed path and the realpath to the jar to the symlink map.
-    real_ivy_cache_dir = os.path.realpath(ivy_cache_dir)
+    real_ivy_cache_dir = os.path.realpath(ivy_repository_cache_dir)
     symlink_map = OrderedDict()
 
     inpaths = cls._load_classpath_from_cachepath(inpath)
@@ -870,7 +872,7 @@ class IvyUtils(object):
     return dict(symlink_map)
 
   @classmethod
-  def xml_report_path(cls, cache_dir, resolve_hash_name, conf):
+  def xml_report_path(cls, resolution_cache_dir, resolve_hash_name, conf):
     """The path to the xml report ivy creates after a retrieve.
 
     :API: public
@@ -882,8 +884,8 @@ class IvyUtils(object):
     :returns: The report path.
     :rtype: string
     """
-    return os.path.join(cache_dir, '{}-{}-{}.xml'.format(IvyUtils.INTERNAL_ORG_NAME,
-                                                         resolve_hash_name, conf))
+    return os.path.join(resolution_cache_dir, '{}-{}-{}.xml'.format(IvyUtils.INTERNAL_ORG_NAME,
+                                                                    resolve_hash_name, conf))
 
   @classmethod
   def parse_xml_report(cls, conf, path):

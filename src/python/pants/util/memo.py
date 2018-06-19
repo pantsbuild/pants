@@ -9,6 +9,8 @@ import functools
 import inspect
 from contextlib import contextmanager
 
+from pants.util.meta import classproperty, staticproperty
+
 
 # Used as a sentinel that disambiguates tuples passed in *args from coincidentally matching tuples
 # formed from kwargs item pairs.
@@ -221,6 +223,22 @@ def memoized_property(func=None, key_factory=per_instance, **kwargs):
   """
   getter = memoized_method(func=func, key_factory=key_factory, **kwargs)
   return property(fget=getter, fdel=lambda self: getter.forget(self))
+
+
+def memoized_classmethod(*args, **kwargs):
+  return classmethod(memoized_method(*args, **kwargs))
+
+
+def memoized_classproperty(*args, **kwargs):
+  return classproperty(memoized_classmethod(*args, **kwargs))
+
+
+def memoized_staticmethod(*args, **kwargs):
+  return staticmethod(memoized(*args, **kwargs))
+
+
+def memoized_staticproperty(*args, **kwargs):
+  return staticproperty(memoized_staticmethod(*args, **kwargs))
 
 
 def testable_memoized_property(func=None, key_factory=per_instance, **kwargs):

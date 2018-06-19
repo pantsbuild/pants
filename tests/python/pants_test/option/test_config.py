@@ -15,47 +15,53 @@ from pants.util.contextutil import temporary_file
 class ConfigTest(unittest.TestCase):
 
   def setUp(self):
+    self.ini1_content = textwrap.dedent(
+      """
+      [DEFAULT]
+      name: foo
+      answer: 42
+      scale: 1.2
+      path: /a/b/%(answer)s
+      embed: %(path)s::foo
+      disclaimer:
+        Let it be known
+        that.
+      blank_section:
+
+      [a]
+      list: [1, 2, 3, %(answer)s]
+      listappend: +[7, 8, 9]
+
+      [b]
+      preempt: True
+      dict: {
+          'a': 1,
+          'b': %(answer)s,
+          'c': ['%(answer)s', %(answer)s]
+        }
+      """
+    )
+
+    self.ini2_content = textwrap.dedent(
+      """
+      [a]
+      fast: True
+
+      [b]
+      preempt: False
+
+      [defined_section]
+      """
+    )
+
     with temporary_file() as ini1:
-      ini1.write(textwrap.dedent(
-        """
-        [DEFAULT]
-        name: foo
-        answer: 42
-        scale: 1.2
-        path: /a/b/%(answer)s
-        embed: %(path)s::foo
-        disclaimer:
-          Let it be known
-          that.
-        blank_section:
-
-        [a]
-        list: [1, 2, 3, %(answer)s]
-        listappend: +[7, 8, 9]
-
-        [b]
-        preempt: True
-        dict: {
-            'a': 1,
-            'b': %(answer)s,
-            'c': ['%(answer)s', %(answer)s]
-          }
-        """))
+      ini1.write(self.ini1_content)
       ini1.close()
 
       with temporary_file() as ini2:
-        ini2.write(textwrap.dedent(
-          """
-          [a]
-          fast: True
-
-          [b]
-          preempt: False
-
-          [defined_section]
-          """))
+        ini2.write(self.ini2_content)
         ini2.close()
-        self.config = Config.load(configpaths=[ini1.name, ini2.name])
+        self.config = Config.load(config_paths=[ini1.name, ini2.name])
         self.assertEqual([ini1.name, ini2.name], self.config.sources())
 
   def test_getstring(self):

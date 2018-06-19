@@ -11,6 +11,7 @@ import os
 import sys
 
 from pants.base.build_environment import get_default_pants_config_file
+from pants.engine.fs import FileContent
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
@@ -58,6 +59,12 @@ class OptionsBootstrapper(object):
 
     return ListValueComponent.merge(path_list_values).val
 
+  @classmethod
+  def from_options_parse_request(cls, parse_request):
+    inst = cls(env=dict(parse_request.env), args=parse_request.args)
+    inst.construct_and_set_bootstrap_options()
+    return inst
+
   def __init__(self, env=None, args=None):
     self._env = env if env is not None else os.environ.copy()
     self._post_bootstrap_config = None  # Will be set later.
@@ -66,68 +73,100 @@ class OptionsBootstrapper(object):
     self._full_options = {}  # We memoize the full options here.
     self._option_tracker = OptionTracker()
 
+  def produce_and_set_bootstrap_options(self):
+    """Cooperatively populates the internal bootstrap_options cache with
+    a producer of `FileContent`."""
+    flags = set()
+    short_flags = set()
+
+    def capture_the_flags(*args, **kwargs):
+      for arg in args:
+        flags.add(arg)
+        if len(arg) == 2:
+          short_flags.add(arg)
+        elif kwargs.get('type') == bool:
+          flags.add('--no-{}'.format(arg[2:]))
+
+    GlobalOptionsRegistrar.register_bootstrap_options(capture_the_flags)
+
+    def is_bootstrap_option(arg):
+      components = arg.split('=', 1)
+      if components[0] in flags:
+        return True
+      for flag in short_flags:
+        if arg.startswith(flag):
+          return True
+      return False
+
+    # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
+    # Stop before '--' since args after that are pass-through and may have duplicate names to our
+    # bootstrap options.
+    bargs = filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != '--', self._args))
+
+    config_file_paths = self.get_config_file_paths(env=self._env, args=self._args)
+    config_files_products = yield config_file_paths
+    pre_bootstrap_config = Config.load_file_contents(config_files_products)
+
+    def bootstrap_options_from_config(config):
+      bootstrap_options = Options.create(
+        env=self._env,
+        config=config,
+        known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()],
+        args=bargs,
+        option_tracker=self._option_tracker
+      )
+
+      def register_global(*args, **kwargs):
+        ## Only use of Options.register?
+        bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
+
+      GlobalOptionsRegistrar.register_bootstrap_options(register_global)
+      return bootstrap_options
+
+    initial_bootstrap_options = bootstrap_options_from_config(pre_bootstrap_config)
+    bootstrap_option_values = initial_bootstrap_options.for_global_scope()
+
+    # Now re-read the config, post-bootstrapping. Note the order: First whatever we bootstrapped
+    # from (typically pants.ini), then config override, then rcfiles.
+    full_configpaths = pre_bootstrap_config.sources()
+    if bootstrap_option_values.pantsrc:
+      rcfiles = [os.path.expanduser(rcfile) for rcfile in bootstrap_option_values.pantsrc_files]
+      existing_rcfiles = filter(os.path.exists, rcfiles)
+      full_configpaths.extend(existing_rcfiles)
+
+    full_config_files_products = yield full_configpaths
+    self._post_bootstrap_config = Config.load_file_contents(
+      full_config_files_products,
+      seed_values=bootstrap_option_values
+    )
+
+    # Now recompute the bootstrap options with the full config. This allows us to pick up
+    # bootstrap values (such as backends) from a config override file, for example.
+    self._bootstrap_options = bootstrap_options_from_config(self._post_bootstrap_config)
+
+  def construct_and_set_bootstrap_options(self):
+    """Populates the internal bootstrap_options cache."""
+    def filecontent_for(path):
+      with open(path, 'rb') as fh:
+        return FileContent(path, fh.read())
+
+    # N.B. This adaptor is meant to simulate how we would co-operatively invoke options bootstrap
+    # via an `@rule` after we have a solution in place for producing `FileContent` of abspaths.
+    producer = self.produce_and_set_bootstrap_options()
+    next_item = None
+    while 1:
+      try:
+        files = next_item or next(producer)
+        next_item = producer.send([filecontent_for(f) for f in files])
+      except StopIteration:
+        break
+
   def get_bootstrap_options(self):
     """:returns: an Options instance that only knows about the bootstrap options.
     :rtype: :class:`Options`
     """
     if not self._bootstrap_options:
-      flags = set()
-      short_flags = set()
-
-      def capture_the_flags(*args, **kwargs):
-        for arg in args:
-          flags.add(arg)
-          if len(arg) == 2:
-            short_flags.add(arg)
-          elif kwargs.get('type') == bool:
-            flags.add('--no-{}'.format(arg[2:]))
-
-      GlobalOptionsRegistrar.register_bootstrap_options(capture_the_flags)
-
-      def is_bootstrap_option(arg):
-        components = arg.split('=', 1)
-        if components[0] in flags:
-          return True
-        for flag in short_flags:
-          if arg.startswith(flag):
-            return True
-        return False
-
-      # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
-      # Stop before '--' since args after that are pass-through and may have duplicate names to our
-      # bootstrap options.
-      bargs = filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != '--', self._args))
-
-      configpaths = self.get_config_file_paths(env=self._env, args=self._args)
-      pre_bootstrap_config = Config.load(configpaths)
-
-      def bootstrap_options_from_config(config):
-        bootstrap_options = Options.create(env=self._env, config=config,
-            known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()], args=bargs,
-            option_tracker=self._option_tracker)
-
-        def register_global(*args, **kwargs):
-          bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
-        GlobalOptionsRegistrar.register_bootstrap_options(register_global)
-        return bootstrap_options
-
-      initial_bootstrap_options = bootstrap_options_from_config(pre_bootstrap_config)
-      bootstrap_option_values = initial_bootstrap_options.for_global_scope()
-
-      # Now re-read the config, post-bootstrapping. Note the order: First whatever we bootstrapped
-      # from (typically pants.ini), then config override, then rcfiles.
-      full_configpaths = pre_bootstrap_config.sources()
-      if bootstrap_option_values.pantsrc:
-        rcfiles = [os.path.expanduser(rcfile) for rcfile in bootstrap_option_values.pantsrc_files]
-        existing_rcfiles = filter(os.path.exists, rcfiles)
-        full_configpaths.extend(existing_rcfiles)
-
-      self._post_bootstrap_config = Config.load(full_configpaths,
-                                                seed_values=bootstrap_option_values)
-
-      # Now recompute the bootstrap options with the full config. This allows us to pick up
-      # bootstrap values (such as backends) from a config override file, for example.
-      self._bootstrap_options = bootstrap_options_from_config(self._post_bootstrap_config)
+      self.construct_and_set_bootstrap_options()
     return self._bootstrap_options
 
   def get_full_options(self, known_scope_infos):
