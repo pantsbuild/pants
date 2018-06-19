@@ -4,7 +4,6 @@
 extern crate bazel_protos;
 
 use std::collections::{BTreeMap, HashMap};
-use std::error::Error;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -171,13 +170,13 @@ impl Select {
     if !externs::satisfied_by(&self.selector.product, candidate) {
       return false;
     }
-    return match variant_value {
+    match variant_value {
       &Some(ref vv) if externs::project_str(candidate, "name") != *vv =>
         // There is a variant value, and it doesn't match.
         false,
       _ =>
         true,
-    };
+    }
   }
 
   ///
@@ -214,7 +213,7 @@ impl Select {
   ///
   fn choose_task_result(
     &self,
-    context: Context,
+    context: &Context,
     results: Vec<Result<Value, Failure>>,
     variant_value: &Option<String>,
   ) -> Result<Value, Failure> {
@@ -261,7 +260,7 @@ impl Select {
   }
 
   fn snapshot(&self, context: &Context, entry: &rule_graph::Entry) -> NodeFuture<fs::Snapshot> {
-    let ref edges = context
+    let edges = &context
       .core
       .rule_graph
       .edges_for_inner(entry)
@@ -270,7 +269,7 @@ impl Select {
     let context = context.clone();
     Select::new(
       context.core.types.path_globs.clone(),
-      self.subject.clone(),
+      self.subject,
       self.variants.clone(),
       edges,
     ).run(context.clone())
@@ -283,7 +282,7 @@ impl Select {
     context: &Context,
     entry: &rule_graph::Entry,
   ) -> NodeFuture<ProcessResult> {
-    let ref edges = context
+    let edges = &context
       .core
       .rule_graph
       .edges_for_inner(entry)
@@ -291,8 +290,8 @@ impl Select {
     // Compute an ExecuteProcessRequest for the subject.
     let context = context.clone();
     Select::new(
-      context.core.types.process_request.clone(),
-      self.subject.clone(),
+      context.core.types.process_request,
+      self.subject,
       self.variants.clone(),
       edges,
     ).run(context.clone())
@@ -319,7 +318,7 @@ impl Select {
       .map(
         |entry| match context.core.rule_graph.rule_for_inner(entry) {
           &rule_graph::Rule::Task(ref task) => context.get(Task {
-            subject: self.subject.clone(),
+            subject: self.subject,
             product: self.product().clone(),
             variants: self.variants.clone(),
             task: task.clone(),
@@ -339,15 +338,15 @@ impl Select {
             kind: IntrinsicKind::FilesContent,
             ..
           }) => {
-            let ref edges = context
+            let edges = &context
               .core
               .rule_graph
               .edges_for_inner(entry)
               .expect("Expected edges to exist for FilesContent intrinsic.");
             let context = context.clone();
             Select::new(
-              context.core.types.directory_digest.clone(),
-              self.subject.clone(),
+              context.core.types.directory_digest,
+              self.subject,
               self.variants.clone(),
               edges,
             ).run(context.clone())
@@ -388,7 +387,7 @@ impl Select {
                   &[
                     externs::store_bytes(&result.0.stdout),
                     externs::store_bytes(&result.0.stderr),
-                    externs::store_i64(result.0.exit_code as i64),
+                    externs::store_i64(result.0.exit_code.into()),
                     Snapshot::store_directory(&context.core, &result.0.output_directory),
                   ],
                 )
@@ -435,7 +434,7 @@ impl WrappedNode for Select {
         .into_iter()
         .map(|node_future| {
           // Don't fail the join if one fails.
-          node_future.then(|r| future::ok(r))
+          node_future.then(future::ok)
         })
         .collect::<Vec<_>>(),
     );
@@ -443,7 +442,7 @@ impl WrappedNode for Select {
     let variant_value = variant_value.map(|s| s.to_string());
     deps_future
       .and_then(move |dep_results| {
-        future::result(self.choose_task_result(context, dep_results, &variant_value))
+        future::result(self.choose_task_result(&context, dep_results, &variant_value))
       })
       .to_boxed()
   }
@@ -481,7 +480,7 @@ impl ExecuteProcess {
     let mut env: BTreeMap<String, String> = BTreeMap::new();
     let env_var_parts = externs::project_multi_strs(&value, "env");
     if env_var_parts.len() % 2 != 0 {
-      return Err(format!("Error parsing env: odd number of parts"));
+      return Err("Error parsing env: odd number of parts".to_owned());
     }
     for i in 0..(env_var_parts.len() / 2) {
       env.insert(
@@ -494,12 +493,12 @@ impl ExecuteProcess {
 
     let output_files = externs::project_multi_strs(&value, "output_files")
       .into_iter()
-      .map(|path: String| PathBuf::from(path))
+      .map(PathBuf::from)
       .collect();
 
     let output_directories = externs::project_multi_strs(&value, "output_directories")
       .into_iter()
-      .map(|path: String| PathBuf::from(path))
+      .map(PathBuf::from)
       .collect();
 
     let timeout_str = externs::project_str(&value, "timeout_seconds");
@@ -534,7 +533,7 @@ impl WrappedNode for ExecuteProcess {
       .core
       .command_runner
       .run(request)
-      .map(|result| ProcessResult(result))
+      .map(ProcessResult)
       .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
       .to_boxed()
   }
@@ -564,7 +563,7 @@ impl WrappedNode for ReadLink {
       .core
       .vfs
       .read_link(&self.0)
-      .map(|dest_path| LinkDest(dest_path))
+      .map(LinkDest)
       .map_err(move |e| throw(&format!("Failed to read_link for {:?}: {:?}", link, e)))
       .to_boxed()
   }
@@ -591,13 +590,7 @@ impl WrappedNode for DigestFile {
       .core
       .vfs
       .read_file(&self.0)
-      .map_err(move |e| {
-        throw(&format!(
-          "Error reading file {:?}: {}",
-          file,
-          e.description()
-        ))
-      })
+      .map_err(move |e| throw(&format!("Error reading file {:?}: {:?}", file, e,)))
       .and_then(move |c| {
         context
           .core
@@ -746,7 +739,7 @@ impl Snapshot {
     )
   }
 
-  fn store_files_content(context: &Context, item: &Vec<FileContent>) -> Value {
+  fn store_files_content(context: &Context, item: &[FileContent]) -> Value {
     let entries: Vec<_> = item
       .iter()
       .map(|e| Self::store_file_content(context, e))
@@ -804,9 +797,9 @@ impl Task {
             product: product,
             subject: subject.type_id().clone(),
           }));
-        Select::new_with_entries(product, subject, Default::default(), entries)
+        Select::new_with_entries(product, subject, Variants::default(), entries)
           .run(context.clone())
-          .map_err(|e| was_required(e))
+          .map_err(was_required)
       })
       .collect::<Vec<_>>();
     future::join_all(get_futures).to_boxed()
@@ -844,7 +837,7 @@ impl WrappedNode for Task {
 
   fn run(self, context: Context) -> NodeFuture<Value> {
     let deps = {
-      let ref edges = context
+      let edges = &context
         .core
         .rule_graph
         .edges_for_inner(&self.entry)
@@ -857,8 +850,7 @@ impl WrappedNode for Task {
           .clause
           .into_iter()
           .map(|s| {
-            Select::new_with_selector(s, subject.clone(), variants.clone(), edges)
-              .run(context.clone())
+            Select::new_with_selector(s, subject, variants.clone(), edges).run(context.clone())
           })
           .collect::<Vec<_>>(),
       )

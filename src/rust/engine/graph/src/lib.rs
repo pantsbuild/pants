@@ -133,7 +133,7 @@ impl<N: Node> Entry<N> {
   ///
   /// If the Node has started and has not yet completed, returns its runtime.
   ///
-  fn current_running_duration(&self, now: &Instant) -> Option<Duration> {
+  fn current_running_duration(&self, now: Instant) -> Option<Duration> {
     self.state.as_ref().and_then(|state| {
       if state.field.peek().is_none() {
         // Still running.
@@ -189,11 +189,7 @@ impl<N: Node> InnerGraph<N> {
     InnerGraph::ensure_entry_internal(&mut self.pg, &mut self.nodes, node)
   }
 
-  fn ensure_entry_internal<'a>(
-    pg: &mut PGraph<N>,
-    nodes: &mut Nodes<N>,
-    node: EntryKey<N>,
-  ) -> EntryId {
+  fn ensure_entry_internal(pg: &mut PGraph<N>, nodes: &mut Nodes<N>, node: EntryKey<N>) -> EntryId {
     if let Some(&id) = nodes.get(&node) {
       return id;
     }
@@ -267,7 +263,9 @@ impl<N: Node> InnerGraph<N> {
 
   fn clear(&mut self) {
     for eid in self.nodes.values() {
-      self.pg.node_weight_mut(*eid).map(|entry| entry.clear());
+      if let Some(entry) = self.pg.node_weight_mut(*eid) {
+        entry.clear();
+      }
     }
   }
 
@@ -301,18 +299,18 @@ impl<N: Node> InnerGraph<N> {
 
     // Then remove all entries in one shot.
     let result = ids.len();
-    InnerGraph::invalidate_internal(&mut self.pg, &mut self.nodes, ids);
+    InnerGraph::invalidate_internal(&mut self.pg, &mut self.nodes, &ids);
 
     // And return the removed count.
     result
   }
 
-  fn invalidate_internal(pg: &mut PGraph<N>, nodes: &mut Nodes<N>, ids: HashSet<EntryId, FNV>) {
+  fn invalidate_internal(pg: &mut PGraph<N>, nodes: &mut Nodes<N>, ids: &HashSet<EntryId, FNV>) {
     if ids.is_empty() {
       return;
     }
 
-    for &id in &ids {
+    for &id in ids {
       // Validate that all dependents of the id are also scheduled for removal.
       assert!(
         pg.neighbors_directed(id, Direction::Incoming)
@@ -360,7 +358,7 @@ impl<N: Node> InnerGraph<N> {
     let root_entries = roots
       .iter()
       .filter_map(|n| self.entry_id(&EntryKey::Valid(n.clone())))
-      .map(|&eid| eid)
+      .cloned()
       .collect();
 
     for eid in self.walk(root_entries, Direction::Outgoing) {
@@ -394,7 +392,7 @@ impl<N: Node> InnerGraph<N> {
     let is_bottom = |eid: EntryId| -> bool { T::is_bottom(self.unsafe_entry_for_id(eid).peek()) };
 
     let is_one_level_above_bottom =
-      |eid: EntryId| -> bool { self.pg.neighbors(eid).all(|d| is_bottom(d)) };
+      |eid: EntryId| -> bool { self.pg.neighbors(eid).all(&is_bottom) };
 
     let _indent = |level: Level| -> String {
       let mut indent = String::new();
@@ -426,7 +424,7 @@ impl<N: Node> InnerGraph<N> {
       .unwrap_or_else(|| vec![]);
     for t in self.leveled_walk(root_entries, |eid, _| !is_bottom(eid), Direction::Outgoing) {
       let (eid, level) = t;
-      try!(write!(&mut f, "{}\n", _format(eid, level)));
+      try!(writeln!(&mut f, "{}", _format(eid, level)));
     }
 
     try!(f.write_all(b"\n"));
@@ -441,7 +439,7 @@ impl<N: Node> InnerGraph<N> {
     let queue_entry = |id| {
       self
         .entry_for_id(id)
-        .and_then(|entry| entry.current_running_duration(&now))
+        .and_then(|entry| entry.current_running_duration(now))
         .map(|d| (d, id))
     };
 
@@ -466,7 +464,7 @@ impl<N: Node> InnerGraph<N> {
       let mut deps = self
         .pg
         .neighbors_directed(id, Direction::Outgoing)
-        .filter_map(|id| queue_entry(id))
+        .filter_map(&queue_entry)
         .peekable();
 
       if deps.peek().is_none() {

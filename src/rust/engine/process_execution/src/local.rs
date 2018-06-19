@@ -57,7 +57,7 @@ impl CommandRunner {
       .and_then(|(output_files_stats, output_dirs_stats)| {
         let paths: Vec<_> = output_files_stats
           .into_iter()
-          .chain(output_dirs_stats.into_iter().map(|p| Some(p)))
+          .chain(output_dirs_stats.into_iter().map(Some))
           .collect();
 
         fs::Snapshot::from_path_stats(
@@ -127,7 +127,7 @@ impl super::CommandRunner for CommandRunner {
               err
             )
           })
-          .map(|posix_fs| Arc::new(posix_fs))
+          .map(Arc::new)
           .and_then(|posix_fs| {
             CommandRunner::construct_output_snapshot(
               store,

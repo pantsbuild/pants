@@ -433,9 +433,9 @@ pub extern "C" fn graph_invalidate(scheduler_ptr: *mut Scheduler, paths_buf: Buf
     let paths = paths_buf
       .to_os_strings()
       .into_iter()
-      .map(|os_str| PathBuf::from(os_str))
+      .map(PathBuf::from)
       .collect();
-    scheduler.invalidate(paths) as u64
+    scheduler.invalidate(&paths) as u64
   })
 }
 
@@ -672,8 +672,8 @@ fn graph_sub(
   subject_type: TypeId,
   product_type: TypeConstraint,
 ) -> RuleGraph {
-  let graph_maker = GraphMaker::new(&scheduler.core.tasks, vec![subject_type.clone()]);
-  graph_maker.sub_graph(&subject_type, &product_type)
+  let graph_maker = GraphMaker::new(&scheduler.core.tasks, vec![subject_type]);
+  graph_maker.sub_graph(subject_type, &product_type)
 }
 
 fn write_to_file(path: &Path, graph: &RuleGraph) -> io::Result<()> {

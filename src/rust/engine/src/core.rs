@@ -37,7 +37,7 @@ impl Variants {
     Variants(result)
   }
 
-  pub fn find(&self, key: &String) -> Option<&str> {
+  pub fn find(&self, key: &str) -> Option<&str> {
     self
       .0
       .iter()

@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -95,7 +94,7 @@ impl super::CommandRunner for CommandRunner {
               let operations_client = operations_client.clone();
               command_runner
                 .extract_execute_response(operation)
-                .map(|value| future::Loop::Break(value))
+                .map(future::Loop::Break)
                 .or_else(move |value| {
                   match value {
                     ExecutionError::Fatal(err) => future::err(err).to_boxed(),
@@ -308,7 +307,7 @@ impl CommandRunner {
                   violation
                 ))).to_boxed();
               }
-              let parts: Vec<_> = violation.get_subject().split("/").collect();
+              let parts: Vec<_> = violation.get_subject().split('/').collect();
               if parts.len() != 3 || parts.get(0).unwrap() != &"blobs" {
                 return future::err(ExecutionError::Fatal(format!(
                   "Received FailedPrecondition MISSING but didn't recognize subject {}",
@@ -340,7 +339,7 @@ impl CommandRunner {
                 "Error from remote execution: FailedPrecondition, but no details".to_owned(),
               )).to_boxed();
             }
-            return future::err(ExecutionError::MissingDigests(missing_digests)).to_boxed();
+            future::err(ExecutionError::MissingDigests(missing_digests)).to_boxed()
           }
           code => future::err(ExecutionError::Fatal(format!(
             "Error from remote execution: {:?}: {:?}",
@@ -372,14 +371,13 @@ impl CommandRunner {
             stdout_digest, error
           ))
         })
-        .and_then(move |maybe_value| match maybe_value {
-          Some(value) => return Ok(value),
-          None => {
-            return Err(ExecutionError::Fatal(format!(
+        .and_then(move |maybe_value| {
+          maybe_value.ok_or_else(|| {
+            ExecutionError::Fatal(format!(
               "Couldn't find stdout digest ({:?}), when fetching.",
               stdout_digest
-            )))
-          }
+            ))
+          })
         })
         .to_boxed()
     } else {
@@ -394,7 +392,7 @@ impl CommandRunner {
         .map(|_| stdout_copy)
         .to_boxed()
     };
-    return stdout;
+    stdout
   }
 
   fn extract_stderr(
@@ -417,14 +415,13 @@ impl CommandRunner {
             stderr_digest, error
           ))
         })
-        .and_then(move |maybe_value| match maybe_value {
-          Some(value) => return Ok(value),
-          None => {
-            return Err(ExecutionError::Fatal(format!(
+        .and_then(move |maybe_value| {
+          maybe_value.ok_or_else(|| {
+            ExecutionError::Fatal(format!(
               "Couldn't find stderr digest ({:?}), when fetching.",
               stderr_digest
-            )))
-          }
+            ))
+          })
         })
         .to_boxed()
     } else {
@@ -439,7 +436,7 @@ impl CommandRunner {
         .map(|_| stderr_copy)
         .to_boxed()
     };
-    return stderr;
+    stderr
   }
 
   fn extract_output_files(
@@ -490,7 +487,7 @@ impl CommandRunner {
       })
       .collect();
 
-    let path_stats = try_future!(path_stats_result.map_err(|err| ExecutionError::Fatal(err)));
+    let path_stats = try_future!(path_stats_result.map_err(ExecutionError::Fatal));
 
     #[derive(Clone)]
     struct StoreOneOffRemoteDigest {
@@ -549,7 +546,7 @@ fn make_execute_request(
 > {
   let mut command = bazel_protos::remote_execution::Command::new();
   command.set_arguments(protobuf::RepeatedField::from_vec(req.argv.clone()));
-  for (ref name, ref value) in req.env.iter() {
+  for (ref name, ref value) in &req.env {
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env.set_name(name.to_string());
     env.set_value(value.to_string());
@@ -592,17 +589,14 @@ fn map_grpc_result<T>(result: grpcio::Result<T>) -> Result<T, String> {
     Err(grpcio::Error::RpcFailure(status)) => Err(format!(
       "{:?}: {:?}",
       status.status,
-      status.details.unwrap_or("[no message]".to_string())
+      status.details.unwrap_or_else(|| "[no message]".to_string())
     )),
-    Err(err) => Err(err.description().to_string()),
+    Err(err) => Err(format!("{:?}", err)),
   }
 }
 
 fn digest(message: &protobuf::Message) -> Result<bazel_protos::remote_execution::Digest, String> {
-  let bytes = match message.write_to_bytes() {
-    Ok(b) => b,
-    Err(e) => return Err(e.description().to_string()),
-  };
+  let bytes = message.write_to_bytes().map_err(|e| format!("{:?}", e))?;
 
   let mut hasher = Sha256::default();
   hasher.input(&bytes);
@@ -611,7 +605,7 @@ fn digest(message: &protobuf::Message) -> Result<bazel_protos::remote_execution:
   digest.set_size_bytes(bytes.len() as i64);
   digest.set_hash(format!("{:x}", hasher.fixed_result()));
 
-  return Ok(digest);
+  Ok(digest)
 }
 
 #[cfg(test)]

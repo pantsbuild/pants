@@ -11,7 +11,7 @@ use futures::sync::oneshot;
 
 use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
-use core::{Failure, Key, TypeConstraint, TypeId, Value};
+use core::{Failure, Key, TypeConstraint, TypeId, Value, Variants};
 use fs::{self, GlobMatching, PosixFS};
 use graph::{EntryId, Graph, Node, NodeContext};
 use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
@@ -106,23 +106,23 @@ impl Scheduler {
   ) -> Result<(), String> {
     let edges = self.find_root_edges_or_update_rule_graph(
       subject.type_id().clone(),
-      selectors::Select::without_variant(product),
+      &selectors::Select::without_variant(product),
     )?;
     request
       .roots
-      .push(Select::new(product, subject, Default::default(), &edges));
+      .push(Select::new(product, subject, Variants::default(), &edges));
     Ok(())
   }
 
   fn find_root_edges_or_update_rule_graph(
     &self,
     subject_type: TypeId,
-    select: selectors::Select,
+    select: &selectors::Select,
   ) -> Result<rule_graph::RuleEdges, String> {
     self
       .core
       .rule_graph
-      .find_root_edges(subject_type.clone(), select.clone())
+      .find_root_edges(subject_type, select.clone())
       .ok_or_else(|| {
         format!(
           "No installed rules can satisfy {} for a root subject of type {}.",
@@ -135,7 +135,7 @@ impl Scheduler {
   ///
   /// Invalidate the invalidation roots represented by the given Paths.
   ///
-  pub fn invalidate(&self, paths: HashSet<PathBuf>) -> usize {
+  pub fn invalidate(&self, paths: &HashSet<PathBuf>) -> usize {
     self.core.graph.invalidate_from_roots(move |node| {
       if let Some(fs_subject) = node.fs_subject() {
         paths.contains(fs_subject)

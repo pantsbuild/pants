@@ -28,10 +28,10 @@ impl StubCAS {
     directories: Vec<TestDirectory>,
   ) -> StubCAS {
     let mut blobs = HashMap::new();
-    for file in files.into_iter() {
+    for file in files {
       blobs.insert(file.fingerprint(), file.bytes());
     }
-    for directory in directories.into_iter() {
+    for directory in directories {
       blobs.insert(directory.fingerprint(), directory.bytes());
     }
     StubCAS::with_unverified_content(chunk_size_bytes, blobs)
@@ -125,7 +125,7 @@ impl StubCASResponder {
     &self,
     req: bazel_protos::bytestream::ReadRequest,
   ) -> Result<Vec<bazel_protos::bytestream::ReadResponse>, grpcio::RpcStatus> {
-    let parts: Vec<_> = req.get_resource_name().splitn(4, "/").collect();
+    let parts: Vec<_> = req.get_resource_name().splitn(4, '/').collect();
     if parts.len() != 4 || parts.get(0) != Some(&"") || parts.get(1) != Some(&"blobs") {
       return Err(grpcio::RpcStatus::new(
         grpcio::RpcStatusCode::InvalidArgument,
@@ -274,7 +274,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
               Some(format!("Stream saw no messages")),
             )),
             Some(resource_name) => {
-              let parts: Vec<_> = resource_name.splitn(6, "/").collect();
+              let parts: Vec<_> = resource_name.splitn(6, '/').collect();
               if parts.len() != 6
                 || parts.get(1) != Some(&"uploads")
                 || parts.get(3) != Some(&"blobs")

@@ -186,7 +186,7 @@ impl<'t> GraphMaker<'t> {
     }
   }
 
-  pub fn sub_graph(&self, subject_type: &TypeId, product_type: &TypeConstraint) -> RuleGraph {
+  pub fn sub_graph(&self, subject_type: TypeId, product_type: &TypeConstraint) -> RuleGraph {
     if let Some(beginning_root) = self.gen_root_entry(subject_type, product_type) {
       self._construct_graph(vec![beginning_root])
     } else {
@@ -202,7 +202,7 @@ impl<'t> GraphMaker<'t> {
     let mut dependency_edges: RuleDependencyEdges = HashMap::new();
     let mut unfulfillable_rules: UnfulfillableRuleMap = HashMap::new();
 
-    for beginning_root in roots.into_iter() {
+    for beginning_root in roots {
       self._construct_graph_helper(
         &mut dependency_edges,
         &mut unfulfillable_rules,
@@ -287,10 +287,10 @@ impl<'t> GraphMaker<'t> {
     // For each dependency of the rule, recurse for each potential match and collect RuleEdges.
     let mut edges = RuleEdges::new();
     let mut fulfillable = true;
-    for select_key in entry.dependency_keys().into_iter() {
+    for select_key in entry.dependency_keys() {
       let (subject, product) = match &select_key {
-        &SelectKey::JustSelect(ref s) => (entry.subject_type(), s.product.clone()),
-        &SelectKey::JustGet(ref g) => (g.subject.clone(), g.product.clone()),
+        &SelectKey::JustSelect(ref s) => (entry.subject_type(), s.product),
+        &SelectKey::JustGet(ref g) => (g.subject, g.product),
       };
 
       // Confirm that at least one candidate is fulfillable.
@@ -309,13 +309,13 @@ impl<'t> GraphMaker<'t> {
         // If no candidates were fulfillable, this rule is not fulfillable.
         unfulfillable_rules
           .entry(entry.clone())
-          .or_insert(vec![])
+          .or_insert_with(Vec::new)
           .push(Diagnostic {
-            subject_type: subject.clone(),
+            subject_type: subject,
             reason: format!(
               "no rule was available to compute {} for subject type {}",
-              type_constraint_str(product.clone()),
-              type_str(subject.clone())
+              type_constraint_str(product),
+              type_str(subject)
             ),
           });
         fulfillable = false;
@@ -341,7 +341,7 @@ impl<'t> GraphMaker<'t> {
     let mut result: Vec<RootEntry> = Vec::new();
     for subj_type in &self.root_subject_types {
       for pt in product_types {
-        if let Some(entry) = self.gen_root_entry(subj_type, pt) {
+        if let Some(entry) = self.gen_root_entry(*subj_type, pt) {
           result.push(entry);
         }
       }
@@ -351,7 +351,7 @@ impl<'t> GraphMaker<'t> {
 
   fn gen_root_entry(
     &self,
-    subject_type: &TypeId,
+    subject_type: TypeId,
     product_type: &TypeConstraint,
   ) -> Option<RootEntry> {
     let candidates = rhs(&self.tasks, subject_type.clone(), product_type);
@@ -433,7 +433,7 @@ fn get_str(get: &Get) -> String {
   format!(
     "Get({}, {})",
     type_constraint_str(get.product),
-    type_str(get.subject.clone())
+    type_str(get.subject)
   )
 }
 
@@ -499,7 +499,7 @@ fn task_display(task: &Task) -> String {
     .map(|g| get_str(g))
     .collect::<Vec<_>>()
     .join(", ");
-  get_portion = if task.gets.len() > 0 {
+  get_portion = if !task.gets.is_empty() {
     format!("[{}], ", get_portion)
   } else {
     "".to_string()
@@ -526,7 +526,7 @@ impl RuleGraph {
     self
       .rule_dependency_edges
       .get(&EntryWithDeps::Root(root))
-      .map(|e| e.clone())
+      .cloned()
   }
 
   ///
@@ -546,7 +546,7 @@ impl RuleGraph {
   ///
   pub fn edges_for_inner(&self, entry: &Entry) -> Option<RuleEdges> {
     if let &Entry::WithDeps(ref e) = entry {
-      self.rule_dependency_edges.get(e).map(|e| e.clone())
+      self.rule_dependency_edges.get(e).cloned()
     } else {
       panic!("not an inner entry! {:?}", entry)
     }
@@ -593,7 +593,7 @@ impl RuleGraph {
       for d in diagnostics {
         collated_errors
           .entry(task_rule.clone())
-          .or_insert(Vec::new())
+          .or_insert_with(Vec::new)
           .push(d.reason.clone());
       }
     }
@@ -616,9 +616,9 @@ impl RuleGraph {
 
   pub fn visualize(&self, f: &mut io::Write) -> io::Result<()> {
     if self.rule_dependency_edges.is_empty() {
-      write!(f, "digraph {{\n")?;
-      write!(f, "  // empty graph\n")?;
-      return write!(f, "}}");
+      writeln!(f, "digraph {{")?;
+      writeln!(f, "  // empty graph")?;
+      writeln!(f, "}}")?;
     }
 
     let mut root_subject_type_strs = self
@@ -627,13 +627,13 @@ impl RuleGraph {
       .map(|&t| type_str(t))
       .collect::<Vec<String>>();
     root_subject_type_strs.sort();
-    write!(f, "digraph {{\n")?;
-    write!(
+    writeln!(f, "digraph {{")?;
+    writeln!(
       f,
-      "  // root subject types: {}\n",
+      "  // root subject types: {}",
       root_subject_type_strs.join(", ")
     )?;
-    write!(f, "  // root entries\n")?;
+    writeln!(f, "  // root entries")?;
     let mut root_rule_strs = self
       .rule_dependency_edges
       .iter()
@@ -656,9 +656,9 @@ impl RuleGraph {
       })
       .collect::<Vec<String>>();
     root_rule_strs.sort();
-    write!(f, "{}\n", root_rule_strs.join("\n"))?;
+    writeln!(f, "{}", root_rule_strs.join("\n"))?;
 
-    write!(f, "  // internal entries\n")?;
+    writeln!(f, "  // internal entries")?;
     let mut internal_rule_strs = self
       .rule_dependency_edges
       .iter()
@@ -677,8 +677,8 @@ impl RuleGraph {
       })
       .collect::<Vec<String>>();
     internal_rule_strs.sort();
-    write!(f, "{}\n", internal_rule_strs.join("\n"))?;
-    write!(f, "}}")
+    writeln!(f, "{}", internal_rule_strs.join("\n"))?;
+    writeln!(f, "}}")
   }
 }
 
@@ -701,7 +701,7 @@ impl RuleEdges {
       .dependencies_by_select_key
       .get(select_key)
       .cloned()
-      .unwrap_or_else(|| Vec::new())
+      .unwrap_or_else(Vec::new)
   }
 
   pub fn is_empty(&self) -> bool {
@@ -712,8 +712,8 @@ impl RuleEdges {
     let deps_for_selector = self
       .dependencies_by_select_key
       .entry(select_key)
-      .or_insert(vec![]);
-    for d in new_dependencies.into_iter() {
+      .or_insert_with(Vec::new);
+    for d in new_dependencies {
       if !deps_for_selector.contains(&d) {
         deps_for_selector.push(d.clone());
       }
@@ -725,7 +725,7 @@ impl RuleEdges {
 }
 
 fn rhs(tasks: &Tasks, subject_type: TypeId, product_type: &TypeConstraint) -> Entries {
-  if externs::satisfied_by_type(product_type, &subject_type) {
+  if externs::satisfied_by_type(product_type, subject_type) {
     // NB a matching subject is always picked first
     vec![Entry::new_subject_is_product(subject_type)]
   } else if let Some(&(ref key, _)) = tasks.gen_singleton(product_type) {

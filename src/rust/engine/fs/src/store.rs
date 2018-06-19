@@ -208,7 +208,7 @@ impl Store {
       .load_bytes_with(entry_type, digest.0, f_local)
       .and_then(
         move |maybe_local_value| match (maybe_local_value, maybe_remote) {
-          (Some(value_result), _) => future::done(value_result.map(|v| Some(v))).to_boxed(),
+          (Some(value_result), _) => future::done(value_result.map(Some)).to_boxed(),
           (None, None) => future::ok(None).to_boxed(),
           (None, Some(remote)) => remote
             .load_bytes_with(entry_type, digest, move |bytes: Bytes| bytes)
@@ -254,7 +254,7 @@ impl Store {
     let mut expanding_futures = Vec::new();
 
     let mut expanded_digests = HashMap::new();
-    for digest in digests.into_iter() {
+    for digest in digests {
       match self.local.entry_type(&digest.0) {
         Ok(Some(EntryType::File)) => {
           expanded_digests.insert(digest, EntryType::File);
@@ -310,7 +310,7 @@ impl Store {
             .collect::<Vec<_>>(),
         )
       })
-      .and_then(move |futures| future::join_all(futures))
+      .and_then(future::join_all)
       .map(|_| ())
       .to_boxed()
   }
@@ -382,7 +382,7 @@ impl Store {
           {
             let mut accumulator = accumulator.lock().unwrap();
             accumulator.insert(digest, EntryType::Directory);
-            for file in directory.get_files().into_iter() {
+            for file in directory.get_files() {
               accumulator.insert(try_future!(file.get_digest().into()), EntryType::File);
             }
           }
@@ -400,9 +400,7 @@ impl Store {
           ).map(|_| ())
             .to_boxed()
         }
-        None => {
-          return future::err(format!("Could not expand unknown directory: {:?}", digest)).to_boxed()
-        }
+        None => future::err(format!("Could not expand unknown directory: {:?}", digest)).to_boxed(),
       })
       .to_boxed()
   }
@@ -606,10 +604,8 @@ mod local {
       Ok(ByteStore {
         inner: Arc::new(InnerStore {
           pool: pool,
-          file_dbs: Resettable::new(move || ShardedLmdb::new(&files_root).map(|db| Arc::new(db))),
-          directory_dbs: Resettable::new(move || {
-            ShardedLmdb::new(&directories_root).map(|db| Arc::new(db))
-          }),
+          file_dbs: Resettable::new(move || ShardedLmdb::new(&files_root).map(Arc::new)),
+          directory_dbs: Resettable::new(move || ShardedLmdb::new(&directories_root).map(Arc::new)),
         }),
       })
     }
@@ -651,7 +647,7 @@ mod local {
           ))
         }
       };
-      return Ok(None);
+      Ok(None)
     }
 
     pub fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(
@@ -757,7 +753,7 @@ mod local {
         EntryType::Directory => self.inner.directory_dbs.clone(),
       };
 
-      for &(ref env, ref database, ref lease_database) in database.get()?.all_lmdbs().iter() {
+      for &(ref env, ref database, ref lease_database) in &database.get()?.all_lmdbs() {
         let txn = env
           .begin_ro_txn()
           .map_err(|err| format!("Error beginning transaction to garbage collect: {}", err))?;
@@ -1696,7 +1692,7 @@ mod remote {
                 e
               )),
             })
-            .map(move |maybe_bytes| maybe_bytes.map(|bytes| f(bytes)))
+            .map(move |maybe_bytes| maybe_bytes.map(f))
             .to_boxed()
         }
         Err(err) => future::err(format!(

@@ -46,9 +46,9 @@ pub struct Tasks {
 impl Tasks {
   pub fn new() -> Tasks {
     Tasks {
-      intrinsics: Default::default(),
-      singletons: Default::default(),
-      tasks: Default::default(),
+      intrinsics: HashMap::default(),
+      singletons: HashMap::default(),
+      tasks: HashMap::default(),
       preparing: None,
     }
   }
@@ -97,7 +97,7 @@ impl Tasks {
         input: types.process_request,
       },
     ].into_iter()
-      .map(|i| (i.product.clone(), i))
+      .map(|i| (i.product, i))
       .collect();
   }
 
@@ -161,10 +161,7 @@ impl Tasks {
       .preparing
       .take()
       .expect("Must `begin()` a task creation before ending it!");
-    let tasks = self
-      .tasks
-      .entry(task.product.clone())
-      .or_insert_with(|| Vec::new());
+    let tasks = self.tasks.entry(task.product).or_insert_with(Vec::new);
     assert!(
       !tasks.contains(&task),
       "{:?} was double-registered for {:?}: {:?}",

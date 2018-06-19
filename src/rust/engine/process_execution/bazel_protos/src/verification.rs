@@ -40,23 +40,20 @@ where
   for node in nodes {
     verify_no_unknown_fields(node)?;
     verify_no_unknown_fields(get_digest(node))?;
-    if get_name(node).contains("/") {
+    if get_name(node).contains('/') {
       return Err(format!(
         "All children must have one path segment, but found {}",
         get_name(node)
       ));
     }
-    match prev {
-      Some(p) => {
-        if get_name(node) <= get_name(p) {
-          return Err(format!(
-            "Children must be sorted and unique, but {} was before {}",
-            get_name(p),
-            get_name(node)
-          ));
-        }
+    if let Some(p) = prev {
+      if get_name(node) <= get_name(p) {
+        return Err(format!(
+          "Children must be sorted and unique, but {} was before {}",
+          get_name(p),
+          get_name(node)
+        ));
       }
-      None => {}
     }
     prev = Some(node);
   }
@@ -70,7 +67,7 @@ fn verify_no_unknown_fields(message: &protobuf::Message) -> Result<(), String> {
       message.get_unknown_fields()
     ));
   }
-  return Ok(());
+  Ok(())
 }
 
 #[cfg(test)]

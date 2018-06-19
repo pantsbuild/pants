@@ -40,7 +40,7 @@ pub struct Interns {
 
 impl Interns {
   pub fn new() -> Interns {
-    Default::default()
+    Interns::default()
   }
 
   pub fn insert(&mut self, v: Value) -> Key {
