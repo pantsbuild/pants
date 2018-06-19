@@ -23,6 +23,10 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.target import Target
+from pants.engine.fs import PathGlobs
+from pants.engine.legacy.graph import HydratedField
+from pants.engine.legacy.structs import SourcesField
+from pants.engine.rules import RootRule
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -193,6 +197,7 @@ class TestBase(unittest.TestCase):
                   dependencies=None,
                   derived_from=None,
                   synthetic=False,
+                  make_missing_sources=True,
                   **kwargs):
     """Creates a target and injects it into the test's build graph.
 
@@ -205,6 +210,13 @@ class TestBase(unittest.TestCase):
     :type derived_from: :class:`pants.build_graph.target.Target`
     """
     address = Address.parse(spec)
+
+    if make_missing_sources and 'sources' in kwargs:
+      for source in kwargs['sources']:
+        if '*' not in source:
+          self.create_file(os.path.join(address.spec_path, source), mode='a')
+      kwargs['sources'] = self.sources_for(kwargs['sources'], address.spec_path)
+
     target = target_type(name=address.target_name,
                          address=address,
                          build_graph=self.build_graph,
@@ -234,6 +246,17 @@ class TestBase(unittest.TestCase):
         target.mark_transitive_invalidation_hash_dirty()
 
     return target
+
+  def sources_for(self, package_relative_path_globs, package_dir=''):
+    sources_field = SourcesField(
+      Address.parse('{}:_bogus_target_for_test'.format(package_dir)),
+      'sources',
+      {'globs': package_relative_path_globs},
+      None,
+      PathGlobs(tuple(os.path.join(package_dir, path) for path in package_relative_path_globs)),
+    )
+    field = self.scheduler.product_request(HydratedField, [sources_field])[0]
+    return field.value
 
   @classmethod
   def alias_groups(cls):
@@ -339,6 +362,8 @@ class TestBase(unittest.TestCase):
       native=init_native(),
       build_configuration=cls.build_config(),
       build_ignore_patterns=None,
+      # Required for sources_for:
+      rules=[RootRule(SourcesField)],
     ).new_session()
     cls._scheduler = graph_session.scheduler_session
     cls._build_graph, cls._address_mapper = graph_session.create_build_graph(
