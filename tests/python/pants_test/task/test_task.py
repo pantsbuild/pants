@@ -150,7 +150,12 @@ class TaskTest(TaskTestBase):
     )
 
   def _fixture(self, incremental, options=None):
-    target = self.make_target(':t', target_type=Files, sources=[self._filename])
+    target = self.make_target(
+      ':t',
+      target_type=Files,
+      sources=[self._filename],
+      make_missing_sources=False,
+    )
     context = self.context(options=options, target_roots=[target])
     task = self.create_task(context)
     task._incremental = incremental
