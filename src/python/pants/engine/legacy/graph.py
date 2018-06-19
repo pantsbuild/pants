@@ -363,9 +363,8 @@ def hydrate_target(target_adaptor):
                         tuple(target_adaptor.dependencies))
 
 
-def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
-  fds = snapshot.path_stats if include_dirs else snapshot.files
-  files = tuple(fast_relpath(fd.path, spec_path) for fd in fds)
+def _eager_fileset_with_spec(spec_path, filespec, snapshot):
+  files = tuple(fast_relpath(fd.path, spec_path) for fd in snapshot.files)
 
   rel_include_globs = filespec['globs']
 
@@ -414,13 +413,9 @@ def hydrate_bundles(bundles_field, glob_match_error_behavior):
   for bundle, filespecs, snapshot in zipped:
     rel_spec_path = getattr(bundle, 'rel_path', spec_path)
     kwargs = bundle.kwargs()
-    # NB: We `include_dirs=True` because bundle filesets frequently specify directories in order
-    # to trigger a (deprecated) default inclusion of their recursive contents. See the related
-    # deprecation in `pants.backend.jvm.tasks.bundle_create`.
     kwargs['fileset'] = _eager_fileset_with_spec(rel_spec_path,
                                                  filespecs,
-                                                 snapshot,
-                                                 include_dirs=True)
+                                                 snapshot)
     bundles.append(BundleAdaptor(**kwargs))
   yield HydratedField('bundles', bundles)
 
