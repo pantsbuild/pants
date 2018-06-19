@@ -362,7 +362,7 @@ class TestBase(unittest.TestCase):
       native=init_native(),
       build_configuration=cls.build_config(),
       build_ignore_patterns=None,
-      # Stu assures me that this isn't necessary, but sources_for doesn't work without it, so...
+      # Required for sources_for:
       rules=[RootRule(SourcesField)],
     ).new_session()
     cls._scheduler = graph_session.scheduler_session
