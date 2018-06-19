@@ -13,6 +13,9 @@ Bugfixes
 * Shorten safe filenames further, and combine codepaths to make them readable. (#5971)
   `PR #5971 <https://github.com/pantsbuild/pants/pull/5971>`_
 
+* Whitelist the --owner-of option to not restart the daemon. (#5979)
+  `PR #5979 <https://github.com/pantsbuild/pants/pull/5979>`_
+
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
