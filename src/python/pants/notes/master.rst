@@ -4,8 +4,33 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
-1.8.0dev4 (06/15/2018)
-----------------------
+1.8.0rc0 (06/18/2018)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Shorten safe filenames further, and combine codepaths to make them readable. (#5971)
+  `PR #5971 <https://github.com/pantsbuild/pants/pull/5971>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove DeprecatedPythonTaskTestBase (#5973)
+  `Issue #5870 <https://github.com/pantsbuild/pants/issues/5870>`_
+  `PR #5973 <https://github.com/pantsbuild/pants/pull/5973>`_
+
+* Mark a few options that should not show up in `./pants help`. (#5968)
+  `PR #5968 <https://github.com/pantsbuild/pants/pull/5968>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* adding more documentation for python_app (#5965)
+  `PR #5965 <https://github.com/pantsbuild/pants/pull/5965>`_
+
+1.8.0.dev4 (06/15/2018)
+-----------------------
 
 New features
 ~~~~~~~~~~~~
@@ -91,8 +116,8 @@ Documentation Updates
 * Add the --owner-of= usage on Target Address documentation (#5931)
   `PR #5931 <https://github.com/pantsbuild/pants/pull/5931>`_
 
-1.8.0dev3 (06/08/2018)
-----------------------
+1.8.0.dev3 (06/08/2018)
+-----------------------
 
 New features
 ~~~~~~~~~~~~
