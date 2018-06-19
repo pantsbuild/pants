@@ -329,6 +329,11 @@ class GoTargetAdaptor(TargetAdaptor):
     return ('BUILD', 'BUILD.*')
 
 
+class PantsPluginAdaptor(TargetAdaptor):
+  def get_sources(self):
+    return ['register.py']
+
+
 class BaseGlobs(Locatable, AbstractClass):
   """An adaptor class to allow BUILD file parsing from ContextAwareObjectFactories."""
 
