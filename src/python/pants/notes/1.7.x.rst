@@ -3,6 +3,11 @@
 
 This document describes releases leading up to the ``1.7.x`` ``stable`` series.
 
+1.7.0 (06/19/2018)
+------------------
+
+The ``1.7.0`` stable release.
+
 1.7.0.rc1 (06/08/2018)
 ----------------------
 
