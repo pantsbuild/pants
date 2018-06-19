@@ -222,7 +222,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
              help='Paths that correspond with build roots for any subproject that this '
                   'project depends on.')
-    register('--owner-of', type=list, default=[], fromfile=True, metavar='<path>',
+    register('--owner-of', type=list, default=[], daemon=False, fromfile=True, metavar='<path>',
              help='Select the targets that own these files. '
                   'This is the third target calculation strategy along with the --changed '
                   'options and specifying the targets directly. These three types of target '
