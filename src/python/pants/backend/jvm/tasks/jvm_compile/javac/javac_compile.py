@@ -140,18 +140,24 @@ class JavacCompile(JvmCompile):
         settings_args = (a.replace('$JAVA_HOME', distribution.home) for a in settings.args)
       javac_cmd.extend(settings_args)
 
-    javac_cmd.extend([
-      '-d', os.path.relpath(ctx.classes_dir, get_buildroot()),
-      # TODO: support -release
-      '-source', str(settings.source_level),
-      '-target', str(settings.target_level),
-    ])
+    if self.execution_strategy() == 'hermetic':
+      javac_cmd.extend([
+        # '-d', os.path.relpath(ctx.classes_dir, get_buildroot()),
+        # TODO: support -release
+        '-source', str(settings.source_level),
+        '-target', str(settings.target_level),
+      ])
+    else:
+      javac_cmd.extend([
+        '-d', ctx.classes_dir,
+        # TODO: support -release
+        '-source', str(settings.source_level),
+        '-target', str(settings.target_level),
+      ])
 
     javac_cmd.extend(self._javac_plugin_args(javac_plugin_map))
 
     javac_cmd.extend(args)
-    
-    print("@@@@@@@@", self.execution_strategy(), javac_cmd)
 
     if fatal_warnings:
       javac_cmd.extend(self.get_options().fatal_warnings_enabled_args)
@@ -188,24 +194,6 @@ class JavacCompile(JvmCompile):
     return ret
 
   def _execute_compile_remotely(self, cmd, ctx):
-    # (self, executor, classpath, main, jvm_options, args, cwd, create_synthetic_jar,
-    #                          synthetic_jar_dir):
-    # How should I write a test for this?
-    # safe_cp = classpath
-    # if create_synthetic_jar:
-    #   safe_cp = util.safe_classpath(classpath, synthetic_jar_dir)
-    #   logger.debug('Bundling classpath {} into {}'.format(':'.join(classpath), safe_cp))
-
-    # runner = executor.runner(safe_cp, main, args=args, jvm_options=jvm_options, cwd=cwd)
-
-    # cmd = runner.cmd()
-
-    targets = self.context.targets()
-
-    # input_files = set()
-    # for target in targets:
-    #   for source in target.sources_relative_to_buildroot():
-    #     input_files.add(source)
     
     input_files = set()
     input_files.add(os.path.relpath(ctx.classes_dir, get_buildroot()))
@@ -215,8 +203,8 @@ class JavacCompile(JvmCompile):
     output_files = set()
     for source in ctx.target.sources_relative_to_source_root():
       output_file = source.replace(".java", ".class")
-      output_file = os.path.join(ctx.classes_dir, output_file)
-      output_file = os.path.relpath(output_file, get_buildroot())
+      # output_file = os.path.join(ctx.classes_dir, output_file)
+      # output_file = os.path.relpath(output_file, get_buildroot())
       output_files.add(output_file)
 
     print(output_files)
@@ -228,14 +216,16 @@ class JavacCompile(JvmCompile):
     exec_result = self.context.execute_process_synchronously(exec_process_request,
                                                              'jvm_task',
                                                              (WorkUnitLabel.TASK, WorkUnitLabel.JVM))
-    # print(exec_result)
+
     # TODO: Remove this check when https://github.com/pantsbuild/pants/issues/5719 is resolved.
     if exec_result.exit_code != 0:
-      print(exec_result.stdout, exec_result.stderr)
-      raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), exec_result.exit_code))
+      print(exec_result.stderr, exec_result.stdout)
+      raise TaskError('{} ... exited non-zero ({}) due to {}.'.format(' '.join(cmd), exec_result.exit_code, exec_result.stderr))
 
+    print("HEEEEEEEEEYYYYYYY", exec_result.stderr, exec_result.stdout)
+    
     files_content_tuple = self.context._scheduler.product_request(
-      FilesContent,
+      Snapshot,
       [exec_result.output_directory_digest]
     )[0].dependencies
     
