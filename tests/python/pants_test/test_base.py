@@ -210,6 +210,8 @@ class TestBase(unittest.TestCase):
     :param derived_from: The target this new target was derived from.
     :type derived_from: :class:`pants.build_graph.target.Target`
     """
+    self._init_target_subsystem()
+
     address = Address.parse(spec)
 
     if make_missing_sources and 'sources' in kwargs:
@@ -473,6 +475,11 @@ class TestBase(unittest.TestCase):
     super(TestBase, self).tearDown()
     Subsystem.reset()
 
+  def _init_target_subsystem(self):
+    if not self._inited_target:
+      subsystem_util.init_subsystems(Target.subsystems())
+      self._inited_target = True
+
   def target(self, spec):
     """Resolves the given target address to a Target object.
 
@@ -482,9 +489,7 @@ class TestBase(unittest.TestCase):
 
     Returns the corresponding Target or else None if the address does not point to a defined Target.
     """
-    if not self._inited_target:
-      subsystem_util.init_subsystems(Target.subsystems())
-      self._inited_target = True
+    self._init_target_subsystem()
 
     address = Address.parse(spec)
     self.build_graph.inject_address_closure(address)
