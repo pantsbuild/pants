@@ -5,7 +5,6 @@ pub mod cffi_externs;
 mod context;
 mod core;
 mod externs;
-mod graph;
 mod handles;
 mod interning;
 mod nodes;
@@ -22,12 +21,12 @@ extern crate enum_primitive;
 extern crate fnv;
 extern crate fs;
 extern crate futures;
+extern crate graph;
 extern crate hashing;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
-extern crate petgraph;
 extern crate process_execution;
 extern crate resettable;
 extern crate tokio;

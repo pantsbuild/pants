@@ -30,6 +30,7 @@ members = [
   "fs",
   "fs/brfs",
   "fs/fs_util",
+  "graph",
   "hashing",
   "process_execution",
   "process_execution/bazel_protos",
@@ -53,6 +54,7 @@ default-members = [
   "boxfuture",
   "fs",
   "fs/fs_util",
+  "graph",
   "hashing",
   "process_execution",
   "process_execution/bazel_protos",
@@ -69,10 +71,10 @@ enum_primitive = "0.1.1"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "^0.1.16"
+graph = { path = "graph" }
 hashing = { path = "hashing" }
 lazy_static = "0.2.2"
 log = "0.4"
-petgraph = "0.4.5"
 process_execution = { path = "process_execution" }
 resettable = { path = "resettable" }
 tokio = "0.1"

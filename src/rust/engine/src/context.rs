@@ -8,12 +8,15 @@ use std::time::Duration;
 
 use tokio::runtime::Runtime;
 
-use core::TypeId;
+use futures::Future;
+
+use boxfuture::{BoxFuture, Boxable};
+use core::{Failure, TypeId};
 use externs;
 use fs::{safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
-use graph::{EntryId, Graph};
+use graph::{EntryId, Graph, NodeContext};
 use handles::maybe_drain_handles;
-use nodes::{Node, NodeFuture};
+use nodes::{NodeKey, TryInto, WrappedNode};
 use process_execution::{self, BoundedCommandRunner, CommandRunner};
 use resettable::Resettable;
 use rule_graph::RuleGraph;
@@ -29,7 +32,7 @@ use types::Types;
 /// https://github.com/tokio-rs/tokio/issues/369 is resolved.
 ///
 pub struct Core {
-  pub graph: Graph,
+  pub graph: Graph<NodeKey>,
   pub tasks: Tasks,
   pub rule_graph: RuleGraph,
   pub types: Types,
@@ -144,25 +147,32 @@ impl Context {
   ///
   /// Get the future value for the given Node implementation.
   ///
-  pub fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output> {
+  pub fn get<N: WrappedNode>(&self, node: N) -> BoxFuture<N::Item, Failure> {
     // TODO: Odd place for this... could do it periodically in the background?
     maybe_drain_handles().map(|handles| {
       externs::drop_handles(handles);
     });
-    self.core.graph.get(self.entry_id, self, node)
+    self
+      .core
+      .graph
+      .get(self.entry_id, self, node.into())
+      .map(|node_result| {
+        node_result
+          .try_into()
+          .unwrap_or_else(|_| panic!("A Node implementation was ambiguous."))
+      })
+      .to_boxed()
   }
 }
 
-pub trait ContextFactory {
-  fn create(&self, entry_id: EntryId) -> Context;
-}
+impl NodeContext for Context {
+  type CloneFor = Context;
 
-impl ContextFactory for Context {
   ///
   /// Clones this Context for a new EntryId. Because the Core of the context is an Arc, this
   /// is a shallow clone.
   ///
-  fn create(&self, entry_id: EntryId) -> Context {
+  fn clone_for(&self, entry_id: EntryId) -> Context {
     Context {
       entry_id: entry_id,
       core: self.core.clone(),
