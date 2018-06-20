@@ -12,6 +12,7 @@ class GoBinary(GoLocalSource):
   """A local Go main package."""
 
   default_sources_globs = '*'
+  default_sources_exclude_globs = ('BUILD', 'BUILD.*')
 
   @classmethod
   def alias(cls):

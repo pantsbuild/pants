@@ -273,23 +273,6 @@ class PythonTestsAdaptor(PythonTargetAdaptor):
     return self.python_test_globs
 
 
-class GoTargetAdaptor(TargetAdaptor):
-
-  @property
-  def default_sources(self):
-    # Go has always used implicit_sources: override to ignore the option.
-    return True
-
-  @property
-  def default_sources_globs(self):
-    # N.B. Go targets glob on `*` due to the way resources and .c companion files are handled.
-    return ('*',)
-
-  @property
-  def default_sources_exclude_globs(self):
-    return ('BUILD', 'BUILD.*')
-
-
 class PantsPluginAdaptor(PythonTargetAdaptor):
   def get_sources(self):
     return ['register.py']

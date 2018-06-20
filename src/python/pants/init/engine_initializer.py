@@ -58,6 +58,19 @@ class LegacySymbolTable(SymbolTable):
       for alias, target_type in build_file_aliases.target_types.items()
     }
 
+    for alias, factory in build_file_aliases.target_macro_factories.items():
+      # TargetMacro.Factory with more than one target type is deprecated.
+      # For default sources, this means that TargetMacro Factories with more than one target_type
+      # will not parse sources through the engine, and will fall back to the legacy python sources
+      # parsing.
+      # Conveniently, multi-target_type TargetMacro.Factory, and legacy python source parsing, are
+      # targeted to be removed in the same version of pants.
+      if len(factory.target_types) == 1:
+        self._table[alias] = self._make_target_adaptor(
+          TargetAdaptor,
+          tuple(factory.target_types)[0],
+        )
+
     # TODO: The alias replacement here is to avoid elevating "TargetAdaptors" into the public
     # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
     # These should likely move onto Target subclasses as the engine gets deeper into beta

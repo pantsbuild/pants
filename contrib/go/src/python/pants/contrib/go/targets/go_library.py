@@ -12,6 +12,7 @@ class GoLibrary(GoLocalSource):
   """A local Go package."""
 
   default_sources_globs = '*'
+  default_sources_exclude_globs = ('BUILD', 'BUILD.*')
 
   @classmethod
   def alias(cls):
