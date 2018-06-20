@@ -868,6 +868,12 @@ class Target(AbstractTarget):
       # This is so that tests don't need to set up the subsystem when creating targets that
       # legitimately do not require sources.
       if (key_arg is None or key_arg == 'sources') and self.supports_default_sources():
+        logger.warning(
+          'Default sources should always be piped through the engine. This code should be '
+          'unreachable. If you see this message, please contact pants-dev. '
+          'Class which caused this message: %s',
+          self.__class__.__name__
+        )
         sources = self.default_sources(sources_rel_path)
       else:
         sources = FilesetWithSpec.empty(sources_rel_path)

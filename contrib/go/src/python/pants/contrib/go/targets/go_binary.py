@@ -11,6 +11,8 @@ from pants.contrib.go.targets.go_local_source import GoLocalSource
 class GoBinary(GoLocalSource):
   """A local Go main package."""
 
+  default_sources_globs = '*'
+
   @classmethod
   def alias(cls):
     return 'go_binary'

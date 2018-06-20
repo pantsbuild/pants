@@ -11,7 +11,7 @@ from pants.contrib.go.targets.go_local_source import GoLocalSource
 class GoLibrary(GoLocalSource):
   """A local Go package."""
 
-  default_sources_globs = '*.go'
+  default_sources_globs = '*'
 
   @classmethod
   def alias(cls):
