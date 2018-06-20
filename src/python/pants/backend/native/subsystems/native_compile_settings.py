@@ -11,14 +11,6 @@ from pants.subsystem.subsystem import Subsystem
 class NativeCompileSettings(Subsystem):
   """Any settings relevant to a compiler invocation."""
 
-  # NB: These seed the --header-file-extensions and --source-file-extensions options for the
-  # class. C/C++ source files *must* have one of the extensions specified in their subsystem's
-  # header or source file extensions options, or we throw an error. This is done because we want to
-  # be able to differentiate headers and sources, but now that I think about it, that might not be
-  # necessary.
-  default_header_file_extensions = None
-  default_source_file_extensions = None
-
   @classmethod
   def register_options(cls, register):
     super(NativeCompileSettings, cls).register_options(register)
@@ -27,14 +19,6 @@ class NativeCompileSettings(Subsystem):
              help='The default for the "strict_deps" argument for targets of this language.')
     register('--fatal-warnings', type=bool, default=True, fingerprint=True, advanced=True,
              help='The default for the "fatal_warnings" argument for targets of this language.')
-
-    # TODO: make a list of file extension option type?
-    register('--header-file-extensions', type=list, default=cls.default_header_file_extensions,
-             fingerprint=True, advanced=True,
-             help='The allowed extensions for header files, as a list of strings.')
-    register('--source-file-extensions', type=list, default=cls.default_source_file_extensions,
-             fingerprint=True, advanced=True,
-             help='The allowed extensions for source files, as a list of strings.')
 
   # FIXME: use some more formal method of mirroring options between a target and a subsystem -- see
   # pants.backend.jvm.subsystems.dependency_context.DependencyContext#defaulted_property()!
@@ -49,12 +33,6 @@ class NativeCompileSettings(Subsystem):
 class CCompileSettings(NativeCompileSettings):
   options_scope = 'c-compile'
 
-  default_header_file_extensions = ['.h']
-  default_source_file_extensions = ['.c']
-
 
 class CppCompileSettings(NativeCompileSettings):
   options_scope = 'cpp-compile'
-
-  default_header_file_extensions = ['.h', '.hpp', '.tpp']
-  default_source_file_extensions = ['.cpp', '.cxx', '.cc']

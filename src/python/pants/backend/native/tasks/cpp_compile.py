@@ -44,8 +44,5 @@ class CppCompile(NativeCompile):
 
   # FIXME(#5951): don't have any command-line args in the task or in the subsystem -- rather,
   # subsystem options should be used to populate an `Executable` which produces its own arguments.
-  def get_compile_argv(self, compile_request):
-    return super(CppCompile, self).get_compile_argv(compile_request) + [
-      '-x', 'c++',
-      '-std=c++11',
-    ]
+  def extra_compile_args(self):
+    return ['-x', 'c++', '-std=c++11']

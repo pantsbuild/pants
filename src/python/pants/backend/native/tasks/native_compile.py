@@ -79,14 +79,6 @@ class NativeCompile(NativeTask, AbstractClass):
   def implementation_version(cls):
     return super(NativeCompile, cls).implementation_version() + [('NativeCompile', 0)]
 
-  @memoized_property
-  def _header_file_extensions(self):
-    return self._compile_settings.get_options().header_file_extensions
-
-  @memoized_property
-  def _source_file_extensions(self):
-    return self._compile_settings.get_options().source_file_extensions
-
   class NativeCompileError(TaskError):
     """Raised for errors in this class's logic.
 
@@ -148,58 +140,24 @@ class NativeCompile(NativeTask, AbstractClass):
   class NativeSourcesByType(datatype(['rel_root', 'headers', 'sources'])): pass
 
   def get_sources_headers_for_target(self, target):
-    """Split a target's sources into header and source files.
+    """Return a list of file arguments to provide to the compiler.
 
-    This method will use the result of `get_compile_settings()` to get the extensions belonging to
-    header and source files, and then it will group the sources by those extensions.
+    NB: result list will contain both header and source files!
 
-    :return: :class:`NativeCompile.NativeSourcesByType`
     :raises: :class:`NativeCompile.NativeCompileError` if there is an error processing the sources.
     """
-    header_extensions = self._header_file_extensions
-    source_extensions = self._source_file_extensions
-
-    header_files = []
-    source_files = []
     # Get source paths relative to the target base so the exception message with the target and
     # paths makes sense.
     target_relative_sources = target.sources_relative_to_target_base()
     rel_root = target_relative_sources.rel_root
 
-    # Group the sources by extension. Check whether a file has an extension using `endswith()`.
-    for src in target_relative_sources:
-      found_file_ext = None
-      for h_ext in header_extensions:
-        if src.endswith(h_ext):
-          header_files.append(src)
-          found_file_ext = h_ext
-          continue
-      if found_file_ext:
-        continue
-      for s_ext in source_extensions:
-        if src.endswith(s_ext):
-          source_files.append(src)
-          found_file_ext = s_ext
-          continue
-      if not found_file_ext:
-        # TODO: test this error!
-        raise self.NativeCompileError(
-          "Source file '{source_file}' for target '{target}' "
-          "does not have any of this task's known file extensions. "
-          "The known file extensions can be extended with the below options:\n"
-          "--{processed_scope}-header-file-extensions: (value was: {header_exts})\n"
-          "--{processed_scope}-source-file-extensions: (value was: {source_exts})"
-          .format(source_file=src,
-                  target=target.address.spec,
-                  processed_scope=self.get_options_scope_equivalent_flag_component(),
-                  header_exts=header_extensions,
-                  source_exts=source_extensions))
-
     # Unique file names are required because we just dump object files into a single directory, and
     # the compiler will silently just produce a single object file if provided non-unique filenames.
-    # TODO: add some shading to file names so we can remove this check.
+    # FIXME: add some shading to file names so we can remove this check.
+    # NB: It shouldn't matter if header files have the same name, but this will raise an error in
+    # that case as well. We won't need to do any shading of header file names.
     seen_filenames = defaultdict(list)
-    for src in source_files:
+    for src in target_relative_sources:
       seen_filenames[os.path.basename(src)].append(src)
     duplicate_filename_err_msgs = []
     for fname, source_paths in seen_filenames.items():
@@ -211,14 +169,11 @@ class NativeCompile(NativeTask, AbstractClass):
         "Conflicting filenames:\n{}"
         .format(target.address.spec, target.alias(), '\n'.join(duplicate_filename_err_msgs)))
 
-    headers_for_compile = [os.path.join(rel_root, h) for h in header_files]
-    sources_for_compile = [os.path.join(rel_root, s) for s in source_files]
-
-    return self.NativeSourcesByType(rel_root, headers_for_compile, sources_for_compile)
+    return [os.path.join(rel_root, src) for src in target_relative_sources]
 
   # FIXME(#5951): expand `Executable` to cover argv generation (where an `Executable` is subclassed
   # to modify or extend the argument list, as declaratively as possible) to remove
-  # `get_compile_argv(self)`!
+  # `extra_compile_args(self)`!
   @abstractmethod
   def get_compiler(self):
     """An instance of `Executable` which can be invoked to compile files.
@@ -233,25 +188,35 @@ class NativeCompile(NativeTask, AbstractClass):
   def _make_compile_request(self, versioned_target, dependencies):
     target = versioned_target.target
     include_dirs = [self._include_dirs_for_target(dep_tgt) for dep_tgt in dependencies]
-    sources_by_type = self.get_sources_headers_for_target(target)
+    sources_and_headers = self.get_sources_headers_for_target(target)
     return NativeCompileRequest(
       compiler=self._compiler,
       include_dirs=include_dirs,
-      sources=sources_by_type.sources,
+      sources=sources_and_headers,
       fatal_warnings=self._compile_settings.get_subsystem_target_mirrored_field_value(
         'fatal_warnings', target),
       output_dir=versioned_target.results_dir)
 
-  def get_compile_argv(self, compile_request):
+  @abstractmethod
+  def extra_compile_args(self):
+    """Return a list of task-specific arguments to use to compile sources."""
+
+  def _make_compile_argv(self, compile_request):
     """Return a list of arguments to use to compile sources. Subclasses can override and append."""
     compiler = compile_request.compiler
     err_flags = ['-Werror'] if compile_request.fatal_warnings else []
 
     # We are going to execute in the target output, so get absolute paths for everything.
     # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
-    return [compiler.exe_filename] + err_flags + ['-c', '-fPIC'] + [
-      '-I{}'.format(os.path.abspath(inc_dir)) for inc_dir in compile_request.include_dirs
-    ] + [os.path.abspath(src) for src in compile_request.sources]
+    argv = (
+      [compiler.exe_filename] +
+      self.extra_compile_args() +
+      err_flags +
+      ['-c', '-fPIC'] +
+      ['-I{}'.format(os.path.abspath(inc_dir)) for inc_dir in compile_request.include_dirs] +
+      [os.path.abspath(src) for src in compile_request.sources])
+
+    return argv
 
   def _compile(self, compile_request):
     """Perform the process of compilation, writing object files to the request's 'output_dir'.
@@ -270,7 +235,7 @@ class NativeCompile(NativeTask, AbstractClass):
     compiler = compile_request.compiler
     output_dir = compile_request.output_dir
 
-    argv = self.get_compile_argv(compile_request)
+    argv = self._make_compile_argv(compile_request)
 
     with self.context.new_workunit(
         name=self.workunit_label, labels=[WorkUnitLabel.COMPILER]) as workunit:
