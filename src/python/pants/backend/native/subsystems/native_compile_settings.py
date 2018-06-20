@@ -11,6 +11,11 @@ from pants.subsystem.subsystem import Subsystem
 class NativeCompileSettings(Subsystem):
   """Any settings relevant to a compiler invocation."""
 
+  # NB: These seed the --header-file-extensions and --source-file-extensions options for the
+  # class. C/C++ source files *must* have one of the extensions specified in their subsystem's
+  # header or source file extensions options, or we throw an error. This is done because we want to
+  # be able to differentiate headers and sources, but now that I think about it, that might not be
+  # necessary.
   default_header_file_extensions = None
   default_source_file_extensions = None
 
@@ -18,7 +23,6 @@ class NativeCompileSettings(Subsystem):
   def register_options(cls, register):
     super(NativeCompileSettings, cls).register_options(register)
 
-    # TODO: have some more formal method of mirroring options between a target and a subsystem?
     register('--strict-deps', type=bool, default=True, fingerprint=True, advanced=True,
              help='The default for the "strict_deps" argument for targets of this language.')
     register('--fatal-warnings', type=bool, default=True, fingerprint=True, advanced=True,
@@ -32,6 +36,8 @@ class NativeCompileSettings(Subsystem):
              fingerprint=True, advanced=True,
              help='The allowed extensions for source files, as a list of strings.')
 
+  # FIXME: use some more formal method of mirroring options between a target and a subsystem -- see
+  # pants.backend.jvm.subsystems.dependency_context.DependencyContext#defaulted_property()!
   def get_subsystem_target_mirrored_field_value(self, field_name, target):
     """Get the attribute `field_name` from `target` if set, else from this subsystem's options."""
     tgt_setting = getattr(target, field_name)

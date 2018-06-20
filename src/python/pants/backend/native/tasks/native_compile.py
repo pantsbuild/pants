@@ -32,7 +32,7 @@ class NativeCompileRequest(datatype([
 ])): pass
 
 
-# FIXME(#5950): perform all process execution in the v2 engine!g
+# FIXME(#5950): perform all process execution in the v2 engine!
 class ObjectFiles(datatype(['root_dir', 'filenames'])):
 
   def file_paths(self):
