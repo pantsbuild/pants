@@ -135,7 +135,7 @@ class LinkSharedLibraries(NativeTask):
       output_dir=vt.results_dir)
 
   _SHARED_CMDLINE_ARGS = {
-    'darwin': lambda: ['-dylib'],
+    'darwin': lambda: ['-mmacosx-version-min=10.11', '-Wl,-dylib'],
     'linux': lambda: ['-shared'],
   }
 

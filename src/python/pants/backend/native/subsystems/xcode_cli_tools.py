@@ -60,7 +60,9 @@ class XCodeCLITools(Subsystem):
   def linker(self, platform):
     return Linker(
       path_entries=self.path_entries(),
-      exe_filename='ld',
+      # FIXME(#5951): This actually links correctly for both C and C++ sources -- there should
+      # probably be some testing to ensure this is correct in CI as well.
+      exe_filename='clang++',
       platform=platform)
 
   def c_compiler(self, platform):

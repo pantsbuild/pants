@@ -206,10 +206,16 @@ class NativeCompile(NativeTask, AbstractClass):
     compiler = compile_request.compiler
     err_flags = ['-Werror'] if compile_request.fatal_warnings else []
 
+    platform_specific_flags = compiler.platform.resolve_platform_specific({
+      'linux': lambda: [],
+      'darwin': lambda: ['-mmacosx-version-min=10.11'],
+    })
+
     # We are going to execute in the target output, so get absolute paths for everything.
     # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
     argv = (
       [compiler.exe_filename] +
+      platform_specific_flags +
       self.extra_compile_args() +
       err_flags +
       ['-c', '-fPIC'] +
