@@ -679,8 +679,11 @@ class Target(AbstractTarget):
     """
     strict_deps = self._cached_strict_dependencies_map.get(dep_context, None)
     if strict_deps is None:
-      default_predicate = self._closure_dep_predicate({self},
-                                                      **dep_context.target_closure_kwargs)
+      default_predicate = self._closure_dep_predicate({self}, **dep_context.target_closure_kwargs)
+      # FIXME(#5977): this branch needs testing!
+      if not default_predicate:
+        def default_predicate(*args, **kwargs):
+          return True
 
       def dep_predicate(source, dependency):
         if not default_predicate(source, dependency):
@@ -707,7 +710,7 @@ class Target(AbstractTarget):
       for declared in result:
         if type(declared) in dep_context.alias_types:
           continue
-        if isinstance(declared, dep_context.compiler_plugin_types):
+        if isinstance(declared, dep_context.types_with_closure):
           strict_deps.update(declared.closure(
             bfs=True,
             **dep_context.target_closure_kwargs))

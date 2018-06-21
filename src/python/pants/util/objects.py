@@ -109,7 +109,8 @@ def datatype(field_decls, superclass_name=None, **kwargs):
         raise ValueError('Got unexpected field names: %r' % kwds.keys())
       return result
 
-    # TODO(cosmicexplorer): would we want to expose a self.as_tuple() method so we can tuple assign?
+    # TODO: would we want to expose a self.as_tuple() method (which just calls __getnewargs__) so we
+    # can tuple assign? E.g.:
     # class A(datatype(['field'])): pass
     # x = A(field='asdf')
     # field_value, = x.as_tuple()
@@ -310,12 +311,14 @@ class SubclassesOf(TypeConstraint):
 
 class Collection(object):
   """Constructs classes representing collections of objects of a particular type."""
+  # TODO: could we check that the input is iterable in the ctor?
 
   @classmethod
   @memoized
   def of(cls, *element_types):
     union = '|'.join(element_type.__name__ for element_type in element_types)
     type_name = b'{}.of({})'.format(cls.__name__, union)
+    # TODO: could we allow type checking in the datatype() invocation here?
     supertypes = (cls, datatype(['dependencies'], superclass_name='Collection'))
     properties = {'element_types': element_types}
     collection_of_type = type(type_name, supertypes, properties)

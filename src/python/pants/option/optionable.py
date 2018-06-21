@@ -58,6 +58,16 @@ class Optionable(AbstractClass):
     yield cls.get_scope_info()
 
   @classmethod
+  def get_options_scope_equivalent_flag_component(cls):
+    """Return a string representing this optionable's scope as it would be in a command line flag.
+
+    This method can be used to generate error messages with flags e.g. to fix some error with a
+    pants command. These flags will then be as specific as possible, including e.g. all dependent
+    subsystem scopes.
+    """
+    return re.sub(r'\.', '-', cls.options_scope)
+
+  @classmethod
   def get_description(cls):
     # First line of docstring.
     return '' if cls.__doc__ is None else cls.__doc__.partition('\n')[0].strip()

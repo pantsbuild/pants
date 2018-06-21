@@ -5,97 +5,95 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.native.subsystems.gcc import GCC
-from pants.backend.native.subsystems.llvm import LLVM
-from pants.backend.native.subsystems.platform_specific.darwin.xcode_cli_tools import XCodeCLITools
-from pants.backend.native.subsystems.platform_specific.linux.binutils import Binutils
-from pants.binaries.binary_tool import ExecutablePathProvider
+from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
+from pants.backend.native.subsystems.binaries.binutils import Binutils
+from pants.backend.native.subsystems.binaries.gcc import GCC
+from pants.backend.native.subsystems.binaries.llvm import LLVM
+from pants.backend.native.subsystems.xcode_cli_tools import XCodeCLITools
+from pants.engine.rules import RootRule, rule
+from pants.engine.selectors import Get, Select
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_method
-from pants.util.osutil import get_os_name, normalize_os_name
+from pants.util.memo import memoized_property
 
 
-class NativeToolchain(Subsystem, ExecutablePathProvider):
+class NativeToolchain(Subsystem):
   """Abstraction over platform-specific tools to compile and link native code.
 
-  This "native toolchain" subsystem is an abstraction that exposes directories
-  containing executables to compile and link "native" code (for now, C and C++
-  are supported). Consumers of this subsystem can add these directories to their
-  PATH to invoke subprocesses which use these tools.
+  When this subsystem is consumed, Pants will download and unpack archives (if necessary) which
+  together provide an appropriate "native toolchain" for the host platform: a compiler and linker,
+  usually. This subsystem exposes the toolchain through `@rule`s, which tasks then request during
+  setup or execution (synchronously, for now).
 
-  This abstraction is necessary for two reasons. First, because there are
-  multiple binaries involved in compilation and linking, which often invoke
-  other binaries that must also be available on the PATH. Second, because unlike
-  other binary tools in Pants, we can't provide the same package built for both
-  OSX and Linux, because there is no open-source linker for OSX with a
-  compatible license.
-
-  So when this subsystem is consumed, Pants will download and unpack archives
-  (if necessary) which together provide an appropriate "native toolchain" for
-  the host platform. On OSX, Pants will also find and provide path entries for
-  the XCode command-line tools, or error out with installation instructions if
-  the XCode tools could not be found.
+  NB: Currently, on OSX, Pants will find and invoke the XCode command-line tools, or error out with
+  installation instructions if the XCode tools could not be found.
   """
 
   options_scope = 'native-toolchain'
 
-  # This is a list of subsystems which implement `ExecutablePathProvider` and
-  # can be provided for all supported platforms.
-  _CROSS_PLATFORM_SUBSYSTEMS = [LLVM, GCC]
-
-  # This is a map of {<platform> -> [<subsystem_cls>, ...]}; the key is the
-  # normalized OS name, and the value is a list of subsystem class objects that
-  # implement `ExecutablePathProvider`. The native toolchain subsystem will
-  # declare dependencies only on the subsystems for the platform Pants is
-  # executing on.
-  _PLATFORM_SPECIFIC_SUBSYSTEMS = {
-    'darwin': [XCodeCLITools],
-    'linux': [Binutils],
-  }
-
-  class UnsupportedPlatformError(Exception):
-    """Thrown if the native toolchain is invoked on an unrecognized platform.
-
-    Note that the native toolchain should work on all of Pants's supported
-    platforms."""
-
-  @classmethod
-  @memoized_method
-  def _get_platform_specific_subsystems(cls):
-    """Return the subsystems used by the native toolchain for this platform."""
-    os_name = get_os_name()
-    normed_os_name = normalize_os_name(os_name)
-
-    subsystems_for_host = cls._PLATFORM_SPECIFIC_SUBSYSTEMS.get(normed_os_name, None)
-
-    if subsystems_for_host is None:
-      raise cls.UnsupportedPlatformError(
-        "Pants doesn't support building native code on this platform "
-        "(uname: '{}').".format(os_name))
-
-    # NB: path entries for cross-platform subsystems currently take precedence
-    # over platform-specific ones -- this could be made configurable.
-    all_subsystems_for_toolchain = cls._CROSS_PLATFORM_SUBSYSTEMS + subsystems_for_host
-
-    return all_subsystems_for_toolchain
-
   @classmethod
   def subsystem_dependencies(cls):
-    prev = super(NativeToolchain, cls).subsystem_dependencies()
-    cur_platform_subsystems = cls._get_platform_specific_subsystems()
-    return prev + tuple(sub.scoped(cls) for sub in cur_platform_subsystems)
+    return super(NativeToolchain, cls).subsystem_dependencies() + (
+      Binutils.scoped(cls),
+      GCC.scoped(cls),
+      LLVM.scoped(cls),
+      XCodeCLITools.scoped(cls),
+    )
 
-  @memoized_method
-  def _subsystem_instances(self):
-    cur_platform_subsystems = self._get_platform_specific_subsystems()
-    return [sub.scoped_instance(self) for sub in cur_platform_subsystems]
+  @memoized_property
+  def _binutils(self):
+    return Binutils.scoped_instance(self)
 
-  # TODO(cosmicexplorer): We might want to run a very small test suite verifying
-  # the toolchain can compile and link native code before returning, especially
-  # since we don't provide the tools on OSX.
-  def path_entries(self):
-    combined_path_entries = []
-    for subsystem in self._subsystem_instances():
-      combined_path_entries.extend(subsystem.path_entries())
+  @memoized_property
+  def _gcc(self):
+    return GCC.scoped_instance(self)
 
-    return combined_path_entries
+  @memoized_property
+  def _llvm(self):
+    return LLVM.scoped_instance(self)
+
+  @memoized_property
+  def _xcode_cli_tools(self):
+    return XCodeCLITools.scoped_instance(self)
+
+
+@rule(Linker, [Select(Platform), Select(NativeToolchain)])
+def select_linker(platform, native_toolchain):
+  # TODO(#5933): make it possible to yield Get with a non-static
+  # subject type and use `platform.resolve_platform_specific()`, something like:
+  # linker = platform.resolve_platform_specific({
+  #   'darwin': lambda: Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools),
+  #   'linux': lambda: Get(Linker, Binutils, native_toolchain._binutils),
+  # })
+  if platform.normalized_os_name == 'darwin':
+    # TODO(#5663): turn this into LLVM when lld works.
+    linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
+  else:
+    linker = yield Get(Linker, Binutils, native_toolchain._binutils)
+  yield linker
+
+
+@rule(CCompiler, [Select(Platform), Select(NativeToolchain)])
+def select_c_compiler(platform, native_toolchain):
+  if platform.normalized_os_name == 'darwin':
+    c_compiler = yield Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+  else:
+    c_compiler = yield Get(CCompiler, GCC, native_toolchain._gcc)
+  yield c_compiler
+
+
+@rule(CppCompiler, [Select(Platform), Select(NativeToolchain)])
+def select_cpp_compiler(platform, native_toolchain):
+  if platform.normalized_os_name == 'darwin':
+    cpp_compiler = yield Get(CppCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+  else:
+    cpp_compiler = yield Get(CppCompiler, GCC, native_toolchain._gcc)
+  yield cpp_compiler
+
+
+def create_native_toolchain_rules():
+  return [
+    select_linker,
+    select_c_compiler,
+    select_cpp_compiler,
+    RootRule(NativeToolchain),
+  ]

@@ -292,7 +292,7 @@ class TargetTest(TestBase):
   def test_strict_dependencies(self):
     self._generate_strict_dependencies()
     dep_context = mock.Mock()
-    dep_context.compiler_plugin_types = ()
+    dep_context.types_with_closure = ()
     dep_context.codegen_types = ()
     dep_context.alias_types = (Target,)
     dep_context.target_closure_kwargs = {'include_scopes': Scopes.JVM_COMPILE_SCOPES}
