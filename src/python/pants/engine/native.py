@@ -32,7 +32,12 @@ NATIVE_ENGINE_MODULE = 'native_engine'
 
 CFFI_TYPEDEFS = '''
 typedef uint64_t   Id;
-typedef void*      Handle;
+
+// Value is declared as a typedef rather than a wrapper struct because it avoids needing to wrap
+// the inner handle/`void*` in a tuple or datatype at the ffi boundary. For most types that
+// overhead would not be worth worrying about, but Value is used often enough that it gives a 6%
+// speedup to avoid the wrapping.
+typedef void*      Value;
 
 typedef struct {
   Id id_;
@@ -50,10 +55,6 @@ typedef struct {
 typedef struct {
   Key key;
 } Function;
-
-typedef struct {
-  Handle   handle;
-} Value;
 
 typedef struct {
   uint8_t*  bytes_ptr;
@@ -104,7 +105,7 @@ typedef uint8_t             extern_log_level;
 typedef Ident               (*extern_ptr_identify)(ExternContext*, Value*);
 typedef _Bool               (*extern_ptr_equals)(ExternContext*, Value*, Value*);
 typedef Value               (*extern_ptr_clone_val)(ExternContext*, Value*);
-typedef void                (*extern_ptr_drop_handles)(ExternContext*, Handle*, uint64_t);
+typedef void                (*extern_ptr_drop_handles)(ExternContext*, Value*, uint64_t);
 typedef Buffer              (*extern_ptr_type_to_str)(ExternContext*, TypeId);
 typedef Buffer              (*extern_ptr_val_to_str)(ExternContext*, Value*);
 typedef _Bool               (*extern_ptr_satisfied_by)(ExternContext*, Value*, Value*);
@@ -204,7 +205,11 @@ Scheduler* scheduler_create(Tasks*,
                             BufferBuffer,
                             TypeIdBuffer,
                             Buffer,
-                            Buffer);
+                            Buffer,
+                            uint64_t,
+                            uint64_t,
+                            uint64_t,
+                            uint64_t);
 void scheduler_pre_fork(Scheduler*);
 Value scheduler_metrics(Scheduler*, Session*);
 RawNodes* scheduler_execute(Scheduler*, Session*, ExecutionRequest*);
@@ -250,7 +255,7 @@ extern "Python" {
   Ident               extern_identify(ExternContext*, Value*);
   _Bool               extern_equals(ExternContext*, Value*, Value*);
   Value               extern_clone_val(ExternContext*, Value*);
-  void                extern_drop_handles(ExternContext*, Handle*, uint64_t);
+  void                extern_drop_handles(ExternContext*, Value*, uint64_t);
   Buffer              extern_type_to_str(ExternContext*, TypeId);
   Buffer              extern_val_to_str(ExternContext*, Value*);
   _Bool               extern_satisfied_by(ExternContext*, Value*, Value*);
@@ -357,7 +362,7 @@ def _initialize_externs(ffi):
   def extern_identify(context_handle, val):
     """Return an Ident containing a clone of the Value with its __hash__ and TypeId."""
     c = ffi.from_handle(context_handle)
-    obj = ffi.from_handle(val.handle)
+    obj = ffi.from_handle(val[0])
     hash_ = hash(obj)
     cloned = c.to_value(obj)
     type_id = c.to_id(type(obj))
@@ -366,17 +371,17 @@ def _initialize_externs(ffi):
   @ffi.def_extern()
   def extern_equals(context_handle, val1, val2):
     """Return true if the given Values are __eq__."""
-    return ffi.from_handle(val1.handle) == ffi.from_handle(val2.handle)
+    return ffi.from_handle(val1[0]) == ffi.from_handle(val2[0])
 
   @ffi.def_extern()
   def extern_clone_val(context_handle, val):
     """Clone the given Value."""
     c = ffi.from_handle(context_handle)
-    return c.to_value(ffi.from_handle(val.handle))
+    return c.to_value(ffi.from_handle(val[0]))
 
   @ffi.def_extern()
   def extern_drop_handles(context_handle, handles_ptr, handles_len):
-    """Drop the given Handles."""
+    """Drop the given Values."""
     c = ffi.from_handle(context_handle)
     handles = ffi.unpack(handles_ptr, handles_len)
     c.drop_handles(handles)
@@ -391,19 +396,19 @@ def _initialize_externs(ffi):
   def extern_val_to_str(context_handle, val):
     """Given a Value for `obj`, write str(obj) and return it."""
     c = ffi.from_handle(context_handle)
-    return c.utf8_buf(six.text_type(c.from_value(val)))
+    return c.utf8_buf(six.text_type(c.from_value(val[0])))
 
   @ffi.def_extern()
   def extern_satisfied_by(context_handle, constraint_val, val):
     """Given a TypeConstraint and a Value return constraint.satisfied_by(value)."""
-    constraint = ffi.from_handle(constraint_val.handle)
-    return constraint.satisfied_by(ffi.from_handle(val.handle))
+    constraint = ffi.from_handle(constraint_val[0])
+    return constraint.satisfied_by(ffi.from_handle(val[0]))
 
   @ffi.def_extern()
   def extern_satisfied_by_type(context_handle, constraint_val, cls_id):
     """Given a TypeConstraint and a TypeId, return constraint.satisfied_by_type(type_id)."""
     c = ffi.from_handle(context_handle)
-    constraint = ffi.from_handle(constraint_val.handle)
+    constraint = ffi.from_handle(constraint_val[0])
     return constraint.satisfied_by_type(c.from_id(cls_id.id_))
 
   @ffi.def_extern()
@@ -428,7 +433,7 @@ def _initialize_externs(ffi):
   def extern_project_ignoring_type(context_handle, val, field_str_ptr, field_str_len):
     """Given a Value for `obj`, and a field name, project the field as a new Value."""
     c = ffi.from_handle(context_handle)
-    obj = c.from_value(val)
+    obj = c.from_value(val[0])
     field_name = to_py_str(field_str_ptr, field_str_len)
     projected = getattr(obj, field_name)
 
@@ -438,7 +443,7 @@ def _initialize_externs(ffi):
   def extern_project_multi(context_handle, val, field_str_ptr, field_str_len):
     """Given a Key for `obj`, and a field name, project the field as a list of Keys."""
     c = ffi.from_handle(context_handle)
-    obj = c.from_value(val)
+    obj = c.from_value(val[0])
     field_name = to_py_str(field_str_ptr, field_str_len)
 
     return c.vals_buf(tuple(c.to_value(p) for p in getattr(obj, field_name)))
@@ -455,7 +460,7 @@ def _initialize_externs(ffi):
     """Given a generator, send it the given value and return a response."""
     c = ffi.from_handle(context_handle)
     try:
-      res = c.from_value(func).send(c.from_value(arg))
+      res = c.from_value(func[0]).send(c.from_value(arg[0]))
       if isinstance(res, Get):
         # Get.
         values = [res.subject]
@@ -489,7 +494,7 @@ def _initialize_externs(ffi):
   def extern_call(context_handle, func, args_ptr, args_len):
     """Given a callable, call it."""
     c = ffi.from_handle(context_handle)
-    runnable = c.from_value(func)
+    runnable = c.from_value(func[0])
     args = tuple(c.from_value(arg) for arg in ffi.unpack(args_ptr, args_len))
     return call(c, runnable, args)
 
@@ -498,10 +503,6 @@ def _initialize_externs(ffi):
     """Given an evalable string, eval it and return a Value for its result."""
     c = ffi.from_handle(context_handle)
     return call(c, eval, [to_py_str(python_code_str_ptr, python_code_str_len)])
-
-
-class Value(datatype(['handle'])):
-  """Corresponds to the native object of the same name."""
 
 
 class Key(datatype(['id_', 'type_id'])):
@@ -571,10 +572,10 @@ class ExternContext(object):
   def to_value(self, obj):
     handle = self._ffi.new_handle(obj)
     self._handles.add(handle)
-    return Value(handle)
+    return handle
 
   def from_value(self, val):
-    return self._ffi.from_handle(val.handle)
+    return self._ffi.from_handle(val)
 
   def drop_handles(self, handles):
     self._handles -= set(handles)
@@ -592,7 +593,7 @@ class ExternContext(object):
     return Key(cdata.id_, TypeId(cdata.type_id.id_))
 
   def from_key(self, key):
-    return Value(self._lib.externs_val_for(key).handle)
+    return self._lib.externs_val_for(key)
 
 
 class Native(object):
@@ -657,7 +658,7 @@ class Native(object):
   @memoized_property
   def context(self):
     # We statically initialize a ExternContext to correspond to the queue of dropped
-    # Handles that the native code maintains.
+    # Values that the native code maintains.
     def init_externs():
       context = ExternContext(self.ffi, self.lib)
       self.lib.externs_set(context._handle,
@@ -720,8 +721,7 @@ class Native(object):
                     build_root,
                     work_dir,
                     ignore_patterns,
-                    remote_store_server,
-                    remote_execution_server,
+                    execution_options,
                     construct_directory_digest,
                     construct_snapshot,
                     construct_file_content,
@@ -786,8 +786,13 @@ class Native(object):
         self.context.utf8_buf_buf(ignore_patterns),
         self.to_ids_buf(root_subject_types),
         # Remote execution config.
-        self.context.utf8_buf(remote_store_server),
-        self.context.utf8_buf(remote_execution_server),
+        # We can't currently pass Options to the rust side, so we pass empty strings for None.
+        self.context.utf8_buf(execution_options.remote_store_server or ""),
+        self.context.utf8_buf(execution_options.remote_execution_server or ""),
+        execution_options.remote_store_thread_count,
+        execution_options.remote_store_chunk_bytes,
+        execution_options.remote_store_chunk_upload_timeout_seconds,
+        execution_options.process_execution_parallelism,
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)
 

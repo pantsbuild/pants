@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import collections
 import functools
+import logging
 from os.path import dirname, join
 
 import six
@@ -24,7 +25,11 @@ from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
+from pants.util.filtering import create_filters, wrap_filters
 from pants.util.objects import TypeConstraintError, datatype
+
+
+logger = logging.getLogger(__name__)
 
 
 class ResolvedTypeMismatchError(ResolveError):
@@ -43,9 +48,8 @@ def parse_address_family(address_mapper, directory):
   The AddressFamily may be empty, but it will not be None.
   """
   patterns = tuple(join(directory.path, p) for p in address_mapper.build_patterns)
-  path_globs = PathGlobs.create('',
-                                include=patterns,
-                                exclude=address_mapper.build_ignore_patterns)
+  path_globs = PathGlobs(include=patterns,
+                         exclude=address_mapper.build_ignore_patterns)
   snapshot = yield Get(Snapshot, PathGlobs, path_globs)
   files_content = yield Get(FilesContent, DirectoryDigest, snapshot.directory_digest)
 
@@ -226,23 +230,28 @@ def addresses_from_address_families(address_mapper, specs):
   def raise_empty_address_family(spec):
     raise ResolveError('Path "{}" does not contain any BUILD files.'.format(spec.directory))
 
-  def exclude_address(address):
-    if address_mapper.exclude_patterns:
-      address_str = address.spec
-      return any(p.search(address_str) is not None for p in address_mapper.exclude_patterns)
+  def exclude_address(spec):
+    if specs.exclude_patterns:
+      return any(p.search(spec) is not None for p in specs.exclude_patterns_memo())
     return False
+
+  def filter_for_tag(tag):
+    return lambda t: tag in map(str, t.kwargs().get("tags", []))
+
+  include_target = wrap_filters(create_filters(specs.tags if specs.tags else '', filter_for_tag))
 
   addresses = []
   included = set()
   def include(address_families, predicate=None):
     matched = False
     for af in address_families:
-      for a in af.addressables.keys():
-        if not exclude_address(a) and (predicate is None or predicate(a)):
-          matched = True
-          if a not in included:
-            addresses.append(a)
-            included.add(a)
+      for (a, t) in af.addressables.items():
+        if (predicate is None or predicate(a)):
+          if include_target(t) and (not exclude_address(a.spec)):
+            matched = True
+            if a not in included:
+              addresses.append(a)
+              included.add(a)
     return matched
 
   for spec in specs.dependencies:
@@ -264,8 +273,11 @@ def addresses_from_address_families(address_mapper, specs):
       address_family = by_directory().get(spec.directory)
       if not address_family:
         raise_empty_address_family(spec)
+      # spec.name here is generally the root node specified on commandline. equality here implies
+      # a root node i.e. node specified on commandline.
       if not include([address_family], predicate=lambda a: a.target_name == spec.name):
-        _raise_did_you_mean(address_family, spec.name)
+        if len(addresses) == 0:
+          _raise_did_you_mean(address_family, spec.name)
     elif type(spec) is AscendantAddresses:
       include(
         af
@@ -274,7 +286,6 @@ def addresses_from_address_families(address_mapper, specs):
       )
     else:
       raise ValueError('Unrecognized Spec type: {}'.format(spec))
-
   yield BuildFileAddresses(addresses)
 
 
@@ -294,7 +305,7 @@ def _spec_to_globs(address_mapper, specs):
                       for f in recursive_dirname(spec.directory))
     else:
       raise ValueError('Unrecognized Spec type: {}'.format(spec))
-  return PathGlobs.create('', include=patterns, exclude=address_mapper.build_ignore_patterns)
+  return PathGlobs(include=patterns, exclude=address_mapper.build_ignore_patterns)
 
 
 def create_graph_rules(address_mapper, symbol_table):

@@ -38,7 +38,7 @@ class PantsRunner(object):
       try:
         return RemotePantsRunner(self._exiter, self._args, self._env, bootstrap_options).run()
       except RemotePantsRunner.Fallback as e:
-        logger.debug('caught client exception: {!r}, falling back to non-daemon mode'.format(e))
+        logger.warn('caught client exception: {!r}, falling back to non-daemon mode'.format(e))
 
     # N.B. Inlining this import speeds up the python thin client run by about 100ms.
     from pants.bin.local_pants_runner import LocalPantsRunner

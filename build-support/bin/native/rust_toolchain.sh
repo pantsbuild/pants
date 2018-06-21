@@ -18,7 +18,7 @@ of the \$CARGO_HOME binary to run.
 EOF
   exit 1
 fi
-readonly binary="$(basename "$0")"
+binary="$(basename "$0")"
 
 ensure_native_build_prerequisites >&2
 exec "${CARGO_HOME}/bin/${binary}" "$@"

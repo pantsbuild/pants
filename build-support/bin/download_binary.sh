@@ -25,7 +25,7 @@ readonly util_name="$2"
 readonly version="$3"
 readonly filename="${4:-${util_name}}"
 
-readonly os=$("${REPO_ROOT}/build-support/bin/get_os.sh")
+os=$("${REPO_ROOT}/build-support/bin/get_os.sh")
 readonly path="bin/${util_name}/${os}/${version}/${filename}"
 readonly cache_path="${CACHE_ROOT}/${path}"
 

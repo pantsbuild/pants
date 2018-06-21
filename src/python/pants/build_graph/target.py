@@ -23,6 +23,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
+from pants.fs.fs import safe_filename
 from pants.source.payload_fields import SourcesField
 from pants.source.wrapped_globs import Files, FilesetWithSpec, Globs
 from pants.subsystem.subsystem import Subsystem
@@ -173,11 +174,7 @@ class Target(AbstractTarget):
   @classmethod
   def compute_target_id(cls, address):
     """Computes a target id from the given address."""
-    id_candidate = address.path_safe_spec
-    if len(id_candidate) >= 200:
-      # two dots + 79 char head + 79 char tail + 40 char sha1
-      return '{}.{}.{}'.format(id_candidate[:79], sha1(id_candidate).hexdigest(), id_candidate[-79:])
-    return id_candidate
+    return safe_filename(address.path_safe_spec)
 
   @staticmethod
   def combine_ids(ids):

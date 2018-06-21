@@ -10,8 +10,6 @@ import sys
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.bin.repro import Reproducer
-from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.engine.native import Native
 from pants.engine.round_engine import RoundEngine
@@ -20,16 +18,10 @@ from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.subprocess import Subprocess
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.java.nailgun_executor import NailgunProcessGroup
-from pants.option.global_options import GlobMatchErrorBehavior
 from pants.option.ranked_value import RankedValue
-from pants.reporting.reporting import Reporting
-from pants.scm.subsystems.changed import Changed
-from pants.source.source_root import SourceRootConfig
 from pants.task.task import QuietTaskMixin
-from pants.util.filtering import create_filters, wrap_filters
 
 
 logger = logging.getLogger(__name__)
@@ -77,23 +69,9 @@ class GoalRunnerFactory(object):
       result = help_printer.print_help()
       self._exiter(result)
 
-  def _init_graph(self,
-                  pants_ignore_patterns,
-                  build_ignore_patterns,
-                  exclude_target_regexps,
-                  target_specs,
-                  target_roots,
-                  workdir,
-                  graph_helper,
-                  subproject_build_roots):
+  def _init_graph(self, target_roots, graph_helper, exclude_target_regexps, tags):
     """Determine the BuildGraph, AddressMapper and spec_roots for a given run.
 
-    :param list pants_ignore_patterns: The pants ignore patterns from '--pants-ignore'.
-    :param list build_ignore_patterns: The build ignore patterns from '--build-ignore',
-                                       applied during BUILD file searching.
-    :param str workdir: The pants workdir.
-    :param list exclude_target_regexps: Regular expressions for targets to be excluded.
-    :param list target_specs: The original target specs.
     :param TargetRoots target_roots: The existing `TargetRoots` object, if any.
     :param LegacyGraphSession graph_helper: A LegacyGraphSession to use for graph construction,
                                             if available. This would usually come from the daemon.
@@ -103,27 +81,17 @@ class GoalRunnerFactory(object):
     if not graph_helper:
       native = Native.create(self._global_options)
       native.set_panic_handler()
-      graph_helper = EngineInitializer.setup_legacy_graph(
-        pants_ignore_patterns,
-        workdir,
-        self._global_options.build_file_imports,
-        glob_match_error_behavior=GlobMatchErrorBehavior.create(
-          self._global_options.glob_expansion_failure),
-        native=native,
-        build_file_aliases=self._build_config.registered_aliases(),
-        rules=self._build_config.rules(),
-        build_ignore_patterns=build_ignore_patterns,
-        exclude_target_regexps=exclude_target_regexps,
-        subproject_roots=subproject_build_roots,
-        include_trace_on_error=self._options.for_global_scope().print_exception_stacktrace,
-        remote_store_server=self._options.for_global_scope().remote_store_server,
-        remote_execution_server=self._options.for_global_scope().remote_execution_server,
-      ).new_session()
-
+      graph_scheduler_helper = EngineInitializer.setup_legacy_graph(native,
+                                                                    self._global_options,
+                                                                    self._build_config)
+      graph_helper = graph_scheduler_helper.new_session()
     target_roots = target_roots or TargetRootsCalculator.create(
       options=self._options,
+      session=graph_helper.scheduler_session,
       build_root=self._root_dir,
-      change_calculator=graph_helper.change_calculator
+      symbol_table=graph_helper.symbol_table,
+      exclude_patterns=tuple(exclude_target_regexps),
+      tags=tuple(tags)
     )
     graph, address_mapper = graph_helper.create_build_graph(target_roots,
                                                             self._root_dir)
@@ -144,16 +112,10 @@ class GoalRunnerFactory(object):
   def _roots_to_targets(self, target_roots):
     """Populate the BuildGraph and target list from a set of input TargetRoots."""
     with self._run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
-      def filter_for_tag(tag):
-        return lambda target: tag in map(str, target.tags)
-
-      tag_filter = wrap_filters(create_filters(self._tag, filter_for_tag))
 
       def generate_targets():
         for address in self._build_graph.inject_roots_closure(target_roots, self._fail_fast):
-          target = self._build_graph.get_target(address)
-          if tag_filter(target):
-            yield target
+          yield self._build_graph.get_target(address)
 
       return list(generate_targets())
 
@@ -169,14 +131,10 @@ class GoalRunnerFactory(object):
   def _setup_context(self):
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
       self._build_graph, self._address_mapper, scheduler, target_roots = self._init_graph(
-        self._global_options.pants_ignore,
-        self._global_options.build_ignore,
-        self._global_options.exclude_target_regexp,
-        self._options.target_specs,
         self._target_roots,
-        self._global_options.pants_workdir,
         self._daemon_graph_helper,
-        self._global_options.subproject_roots
+        self._global_options.exclude_target_regexp,
+        self._global_options.tag
       )
 
       goals = self._determine_goals(self._requested_goals)
@@ -231,19 +189,6 @@ class GoalRunner(object):
     self._run_tracker = run_tracker
     self._kill_nailguns = kill_nailguns
     self._exiter = exiter
-
-  @classmethod
-  def subsystems(cls):
-    """Subsystems used outside of any task."""
-    return {
-      SourceRootConfig,
-      Reporting,
-      Reproducer,
-      RunTracker,
-      Changed,
-      BinaryUtil.Factory,
-      Subprocess.Factory
-    }
 
   def _execute_engine(self):
     workdir = self._context.options.for_global_scope().pants_workdir

@@ -4,7 +4,6 @@
 package org.pantsbuild.testproject.annotation.processor;
 
 import com.google.common.collect.ImmutableSet;
-import com.google.common.io.Closer;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -120,24 +119,25 @@ public class ResourceMappingProcessor extends AbstractProcessor {
     }
 
     FileObject outputFile = createResourceOrDie("" /* no package */, REPORT_FILE_NAME);
-    Closer closer = Closer.create();
     try {
-      Set<String> typeNames = new HashSet<String>();
-      PrintWriter writer = closer.register(new PrintWriter(outputFile.openWriter()));
-      for (TypeElement annotation : annotations) {
-        Set<? extends Element> annotatedElements = roundEnv.getElementsAnnotatedWith(annotation);
-        Set<TypeElement> typeElements = ElementFilter.typesIn(annotatedElements);
-        for (TypeElement typeElement : typeElements) {
-          String typeName = elementUtils.getBinaryName(typeElement).toString();
-          typeNames.add(typeName);
-          writer.println(typeName);
+      PrintWriter writer = new PrintWriter(outputFile.openWriter());
+      try {
+        Set<String> typeNames = new HashSet<String>();
+        for (TypeElement annotation : annotations) {
+          Set<? extends Element> annotatedElements = roundEnv.getElementsAnnotatedWith(annotation);
+          Set<TypeElement> typeElements = ElementFilter.typesIn(annotatedElements);
+          for (TypeElement typeElement : typeElements) {
+            String typeName = elementUtils.getBinaryName(typeElement).toString();
+            typeNames.add(typeName);
+            writer.println(typeName);
+          }
         }
+
+        writeResourceMapping(typeNames, outputFile);
+        log(Diagnostic.Kind.NOTE, "Generated resource '%s'", outputFile.toUri());
+      } finally {
+        writer.close();
       }
-
-      closer.close();
-
-      writeResourceMapping(typeNames, outputFile);
-      log(Diagnostic.Kind.NOTE, "Generated resource '%s'", outputFile.toUri());
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

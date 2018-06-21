@@ -24,6 +24,7 @@ from pants.engine.rules import SingletonRule, TaskRule, rule
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Get, Select, SelectVariant
 from pants.engine.struct import HasProducts, Struct, StructWithDeps, Variants
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.util.meta import AbstractClass
 from pants.util.objects import SubclassesOf, datatype
 from pants_test.engine.examples.parsers import JsonParser
@@ -123,7 +124,7 @@ def calculate_package_search_path(jvm_package_name, source_roots):
   """Return PathGlobs to match directories where the given JVMPackageName might exist."""
   rel_package_dir = jvm_package_name.name.replace('.', os_sep)
   specs = [os_path_join(srcroot, rel_package_dir) for srcroot in source_roots.srcroots]
-  return PathGlobs.create('', include=specs)
+  return PathGlobs(include=specs)
 
 
 @printing_func
@@ -473,6 +474,7 @@ def setup_json_scheduler(build_root, native):
                         project_tree,
                         work_dir,
                         rules,
+                        DEFAULT_EXECUTION_OPTIONS,
                         None,
                         None)
   return scheduler.new_session()

@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.util.collections import combined_dict
+from pants.util.collections import combined_dict, recursively_update
 
 
 class TestCollections(unittest.TestCase):
@@ -19,4 +19,11 @@ class TestCollections(unittest.TestCase):
        {'c': 3},
       ),
       {'a': 1, 'b': 2, 'c': 3}
+    )
+
+  def test_recursively_update(self):
+    d = {'a': 1, 'b': {'c': 2, 'o': 'z'}, 'z': {'y': 0}}
+    recursively_update(d, {'e': 3, 'b': {'f': 4, 'o': 9}, 'g': {'h': 5}, 'z': 7})
+    self.assertEqual(
+      d, {'a': 1, 'b': {'c': 2, 'f': 4, 'o': 9}, 'e': 3, 'g': {'h': 5}, 'z': 7}
     )

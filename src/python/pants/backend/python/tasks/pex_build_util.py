@@ -11,6 +11,7 @@ from pex.fetcher import Fetcher
 from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
 
+from pants.backend.python.pex_util import get_local_platform
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
@@ -150,7 +151,7 @@ def dump_requirement_libs(builder, interpreter, req_libs, log, platforms=None):
                     Defaults to the platforms specified by PythonSetup.
   """
   reqs = [req for req_lib in req_libs for req in req_lib.requirements]
-  dump_requirements(builder, interpreter, reqs, log, platforms)
+  dump_requirements(builder, interpreter, reqs, log, platforms=platforms)
 
 
 def dump_requirements(builder, interpreter, reqs, log, platforms=None):
@@ -212,11 +213,12 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
       requirements=[req.requirement for req in requirements],
       interpreter=interpreter,
       fetchers=fetchers,
-      platform=None if platform == 'current' else platform,
+      platform=get_local_platform() if platform == 'current' else platform,
       context=python_repos.get_network_context(),
       cache=requirements_cache_dir,
       cache_ttl=python_setup.resolver_cache_ttl,
       allow_prereleases=python_setup.resolver_allow_prereleases,
-      pkg_blacklist=python_setup.resolver_blacklist)
+      pkg_blacklist=python_setup.resolver_blacklist,
+      use_manylinux=python_setup.use_manylinux)
 
   return distributions

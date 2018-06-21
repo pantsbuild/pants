@@ -28,9 +28,8 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
       target = ('testprojects/maven_layout/resource_collision/example_{name}/'
                 'src/main/java/org/pantsbuild/duplicateres/example{name}/'
                 .format(name=name))
-      bundle_name = ('testprojects.maven_layout.resource_collision.example_{name}.'
-                     'src.main.java.org.pantsbuild.duplicateres.example{name}.example{name}'
-                     .format(name=name))
-      bundle_jar_name = 'example{proj}'.format(proj=name)
-      stdout = self.bundle_and_run(target, bundle_name, bundle_jar_name=bundle_jar_name)
+      bundle_name = 'example{name}'.format(name=name)
+      stdout = self.bundle_and_run(target, bundle_name, bundle_jar_name=bundle_name, bundle_options=[
+          '--bundle-jvm-use-basename-prefix',
+        ])
       self.assertEquals(stdout, 'Hello world!: resource from example {name}\n'.format(name=name))

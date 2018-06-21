@@ -13,106 +13,22 @@ from textwrap import dedent
 import coverage
 from six.moves import configparser
 
-from pants.backend.python.register import build_file_aliases as register_python
-from pants.backend.python.targets.python_library import PythonLibrary
-from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
 from pants.backend.python.tasks.pytest_run import PytestResult, PytestRun
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.exceptions import ErrorWhileTesting, TaskError
-from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.source.source_root import SourceRootConfig
 from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
-from pants_test.backend.python.tasks.interpreter_cache_test_mixin import InterpreterCacheTestMixin
+from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.task_test_base import ensure_cached
-from pants_test.tasks.task_test_base import TaskTestBase
 
 
-class DeprecatedPythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
-  """
-  TODO: This is a copy of `PythonTaskTestBase` that extends the deprecated TaskTestBase
-  instance, because it was the last test blocking migration.
-
-  See https://github.com/pantsbuild/pants/issues/5870
-  """
-
-  @property
-  def alias_groups(self):
-    """
-    :API: public
-    """
-    return register_python()
-
-  def create_python_library(self, relpath, name, source_contents_map=None,
-                            dependencies=(), provides=None):
-    """
-    :API: public
-    """
-    sources = None if source_contents_map is None else ['__init__.py'] + source_contents_map.keys()
-    sources_strs = ["'{0}'".format(s) for s in sources] if sources else None
-    self.add_to_build_file(relpath=relpath, target=dedent("""
-    python_library(
-      name='{name}',
-      {sources_clause}
-      dependencies=[
-        {dependencies}
-      ],
-      {provides_clause}
-    )
-    """).format(
-      name=name,
-      sources_clause='sources=[{0}],'.format(','.join(sources_strs)) if sources_strs else '',
-      dependencies=','.join(map(repr, dependencies)),
-      provides_clause='provides={0},'.format(provides) if provides else ''))
-    if source_contents_map:
-      self.create_file(relpath=os.path.join(relpath, '__init__.py'))
-      for source, contents in source_contents_map.items():
-        self.create_file(relpath=os.path.join(relpath, source), contents=contents)
-    return self.target(Address(relpath, name).spec)
-
-  def create_python_binary(self, relpath, name, entry_point, dependencies=(), provides=None, shebang=None):
-    """
-    :API: public
-    """
-    self.add_to_build_file(relpath=relpath, target=dedent("""
-    python_binary(
-      name='{name}',
-      entry_point='{entry_point}',
-      dependencies=[
-        {dependencies}
-      ],
-      {provides_clause}
-      {shebang_clause}
-    )
-    """).format(name=name, entry_point=entry_point, dependencies=','.join(map(repr, dependencies)),
-                provides_clause='provides={0},'.format(provides) if provides else '',
-                shebang_clause='shebang={!r},'.format(shebang) if shebang else ''))
-    return self.target(Address(relpath, name).spec)
-
-  def create_python_requirement_library(self, relpath, name, requirements):
-    """
-    :API: public
-    """
-    def make_requirement(req):
-      return 'python_requirement("{}")'.format(req)
-
-    self.add_to_build_file(relpath=relpath, target=dedent("""
-    python_requirement_library(
-      name='{name}',
-      requirements=[
-        {requirements}
-      ]
-    )
-    """).format(name=name, requirements=','.join(map(make_requirement, requirements))))
-    return self.target(Address(relpath, name).spec)
-
-
-class PytestTestBase(DeprecatedPythonTaskTestBase):
+class PytestTestBase(PythonTaskTestBase):
   @classmethod
   def task_type(cls):
     return PytestRun
@@ -253,9 +169,10 @@ class PytestTest(PytestTestBase):
           def two():  # line 5
             return 2  # line 6
         """).strip())
-    core_lib = self.make_target(spec='lib:core',
-                                target_type=PythonLibrary,
-                                sources=['core.py'])
+    self.add_to_build_file(
+      'lib',
+      'python_library(name = "core", sources = ["core.py"])',
+    )
 
     self.create_file(
         'app/app.py',
@@ -266,10 +183,10 @@ class PytestTest(PytestTestBase):
           def use_two():       # line 4
             return core.two()  # line 5
         """).strip())
-    app_lib = self.make_target(spec='app',
-                               target_type=PythonLibrary,
-                               sources=['app.py'],
-                               dependencies=[core_lib])
+    self.add_to_build_file(
+      'app',
+      'python_library(name = "app", sources = ["app.py"], dependencies = ["lib:core"])'
+    )
 
     # Test targets.
     self.create_file(
@@ -283,10 +200,69 @@ class PytestTest(PytestTestBase):
             def test_use_two(self):
               self.assertEqual(2, app.use_two())
         """))
-    self.app = self.make_target(spec='tests:app',
-                                target_type=PythonTests,
-                                sources=['test_app.py'],
-                                dependencies=[app_lib])
+    self.add_to_build_file(
+      'tests',
+      'python_tests(name = "app", sources = ["test_app.py"], dependencies = ["app"])\n'
+    )
+
+    for name in ['green', 'green2', 'green3', 'red', 'red_in_class']:
+      content = '''python_tests(
+  name = "{name}",
+  sources = ["test_core_{name}.py"],
+  dependencies = ["lib:core"],
+  coverage = ["core"],
+)
+'''.format(name=name)
+      self.add_to_build_file('tests', content)
+
+    self.add_to_build_file(
+      'tests',
+      '''python_tests(
+  name = "sleep_no_timeout",
+  sources = ["test_core_sleep.py"],
+  dependencies = ["lib:core"],
+  coverage = ["core"],
+  timeout = 0,
+)
+
+python_tests(
+  name = "sleep_timeout",
+  sources = ["test_core_sleep.py"],
+  dependencies = ["lib:core"],
+  coverage = ["core"],
+  timeout = 1,
+)
+
+python_tests(
+  name = "error",
+  sources = ["test_error.py"],
+)
+
+python_tests(
+  name = "failure_outside_function",
+  sources = ["test_failure_outside_function.py"],
+)
+
+python_tests(
+  name = "green-with-conftest",
+  sources = ["conftest.py", "test_core_green.py"],
+  dependencies = ["lib:core"],
+)
+
+python_tests(
+  name = "all",
+  sources = ["test_core_green.py", "test_core_red.py"],
+  dependencies = ["lib:core"],
+)
+
+python_tests(
+  name = "all-with-coverage",
+  sources = ["test_core_green.py", "test_core_red.py"],
+  dependencies = ["lib:core"],
+  coverage = ["core"],
+)
+'''
+    )
 
     self.create_file(
         'tests/test_core_green.py',
@@ -299,11 +275,6 @@ class PytestTest(PytestTestBase):
             def test_one(self):
               self.assertEqual(1, core.one())
         """))
-    self.green = self.make_target(spec='tests:green',
-                                  target_type=PythonTests,
-                                  sources=['test_core_green.py'],
-                                  dependencies=[core_lib],
-                                  coverage=['core'])
 
     self.create_file(
         'tests/test_core_green2.py',
@@ -316,11 +287,6 @@ class PytestTest(PytestTestBase):
             def test_one(self):
               self.assertEqual(1, core.one())
         """))
-    self.green2 = self.make_target(spec='tests:green2',
-                                   target_type=PythonTests,
-                                   sources=['test_core_green2.py'],
-                                   dependencies=[core_lib],
-                                   coverage=['core'])
 
     self.create_file(
         'tests/test_core_green3.py',
@@ -333,11 +299,6 @@ class PytestTest(PytestTestBase):
             def test_one(self):
               self.assertEqual(1, core.one())
         """))
-    self.green3 = self.make_target(spec='tests:green3',
-                                   target_type=PythonTests,
-                                   sources=['test_core_green3.py'],
-                                   dependencies=[core_lib],
-                                   coverage=['core'])
 
     self.create_file(
         'tests/test_core_red.py',
@@ -347,11 +308,6 @@ class PytestTest(PytestTestBase):
           def test_two():
             assert 1 == core.two()
         """))
-    self.red = self.make_target(spec='tests:red',
-                                target_type=PythonTests,
-                                sources=['test_core_red.py'],
-                                dependencies=[core_lib],
-                                coverage=['core'])
 
     self.create_file(
         'tests/test_core_red_in_class.py',
@@ -364,32 +320,15 @@ class PytestTest(PytestTestBase):
             def test_one_in_class(self):
               self.assertEqual(1, core.two())
         """))
-    self.red_in_class = self.make_target(spec='tests:red_in_class',
-                                         target_type=PythonTests,
-                                         sources=['test_core_red_in_class.py'],
-                                         dependencies=[core_lib],
-                                         coverage=['core'])
 
     self.create_file(
-        'tests/test_core_sleep.py',
-        dedent("""
+      'tests/test_core_sleep.py',
+      dedent("""
           import core
 
           def test_three():
             assert 1 == core.one()
         """))
-    self.sleep_no_timeout = self.make_target(spec='tests:sleep_no_timeout',
-                                             target_type=PythonTests,
-                                             sources=['test_core_sleep.py'],
-                                             dependencies=[core_lib],
-                                             coverage=['core'],
-                                             timeout=0)
-    self.sleep_timeout = self.make_target(spec='tests:sleep_timeout',
-                                          target_type=PythonTests,
-                                          sources=['test_core_sleep.py'],
-                                          dependencies=[core_lib],
-                                          coverage=['core'],
-                                          timeout=1)
 
     self.create_file(
         'tests/test_error.py',
@@ -397,9 +336,6 @@ class PytestTest(PytestTestBase):
           def test_error(bad_fixture):
             pass
         """))
-    self.error = self.make_target(spec='tests:error',
-                                  target_type=PythonTests,
-                                  sources=['test_error.py'])
 
     self.create_file(
         'tests/test_failure_outside_function.py',
@@ -409,27 +345,22 @@ class PytestTest(PytestTestBase):
 
         assert(False)
         """))
-    self.failure_outside_function = self.make_target(spec='tests:failure_outside_function',
-                                                     target_type=PythonTests,
-                                                     sources=['test_failure_outside_function.py'])
 
     self.create_file('tests/conftest.py', self._CONFTEST_CONTENT)
-    self.green_with_conftest = self.make_target(spec='tests:green-with-conftest',
-                                                target_type=PythonTests,
-                                                sources=['conftest.py', 'test_core_green.py'],
-                                                dependencies=[core_lib])
 
-    self.all = self.make_target(spec='tests:all',
-                                target_type=PythonTests,
-                                sources=['test_core_green.py',
-                                         'test_core_red.py'],
-                                dependencies=[core_lib])
-
-    self.all_with_cov = self.make_target(spec='tests:all-with-coverage',
-                                         target_type=PythonTests,
-                                         sources=['test_core_green.py', 'test_core_red.py'],
-                                         dependencies=[core_lib],
-                                         coverage=['core'])
+    self.app = self.target('tests:app')
+    self.green = self.target('tests:green')
+    self.green2 = self.target('tests:green2')
+    self.green3 = self.target('tests:green3')
+    self.red = self.target('tests:red')
+    self.red_in_class = self.target('tests:red_in_class')
+    self.sleep_no_timeout = self.target('tests:sleep_no_timeout')
+    self.sleep_timeout = self.target('tests:sleep_timeout')
+    self.error = self.target('tests:error')
+    self.failure_outside_function = self.target('tests:failure_outside_function')
+    self.green_with_conftest = self.target('tests:green-with-conftest')
+    self.all = self.target('tests:all')
+    self.all_with_cov = self.target('tests:all-with-coverage')
 
   @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_error(self):
@@ -609,14 +540,16 @@ class PytestTest(PytestTestBase):
     init_subsystem(Target.Arguments)
     init_subsystem(SourceRootConfig)
 
+    self.add_to_build_file('src/python/util', 'python_library()')
+
     self.create_file(
       'src/python/util/math.py',
       dedent("""
           def one():  # line 1
             return 1  # line 2
         """).strip())
-    util = self.make_target(spec='src/python/util',
-                            target_type=PythonLibrary)
+
+    self.add_to_build_file('test/python/util', 'python_tests(dependencies = ["src/python/util"])')
 
     self.create_file(
       'test/python/util/test_math.py',
@@ -629,9 +562,7 @@ class PytestTest(PytestTestBase):
             def test_one(self):
               self.assertEqual(1, math.one())
         """))
-    test = self.make_target(spec='test/python/util',
-                            target_type=PythonTests,
-                            dependencies=[util])
+    test = self.target('test/python/util')
     covered_path = os.path.join(self.build_root, 'src/python/util/math.py')
 
     all_statements, not_run_statements = self.run_coverage_auto(targets=[test],
@@ -646,14 +577,16 @@ class PytestTest(PytestTestBase):
     init_subsystem(Target.Arguments)
     init_subsystem(SourceRootConfig)
 
+    self.add_to_build_file('src/python/util', 'python_library()')
+
     self.create_file(
       'src/python/util/math.py',
       dedent("""
           def one():  # line 1
             return 1  # line 2
         """).strip())
-    util = self.make_target(spec='src/python/util',
-                            target_type=PythonLibrary)
+
+    self.add_to_build_file('test/python/util_tests', 'python_tests(dependencies = ["src/python/util"])')
 
     self.create_file(
       'test/python/util_tests/test_math.py',
@@ -666,9 +599,7 @@ class PytestTest(PytestTestBase):
             def test_one(self):
               self.assertEqual(1, math.one())
         """))
-    test = self.make_target(spec='test/python/util_tests',
-                            target_type=PythonTests,
-                            dependencies=[util])
+    test = self.target('test/python/util_tests')
     covered_path = os.path.join(self.build_root, 'src/python/util/math.py')
     all_statements, not_run_statements = self.run_coverage_auto(targets=[test],
                                                                 covered_path=covered_path)
@@ -839,7 +770,8 @@ class PytestTest(PytestTestBase):
         marker_file = os.path.join(marker_dir, name)
         self.assertEqual(exists, os.path.exists(marker_file), message)
 
-      test = self.make_target(spec='test/python/passthru', target_type=PythonTests)
+      self.add_to_build_file('test/python/passthru', 'python_tests()')
+      test = self.target('test/python/passthru')
       yield test, functools.partial(assert_mark, True), functools.partial(assert_mark, False)
 
   def test_passthrough_args_facility_single_style(self):

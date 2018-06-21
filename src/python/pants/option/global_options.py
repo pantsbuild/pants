@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import multiprocessing
 import os
 import sys
 
@@ -16,7 +17,7 @@ from pants.option.custom_types import dir_option
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_classproperty
 from pants.util.objects import datatype
 
 
@@ -37,10 +38,7 @@ class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
 
   default_option_value = WARN
 
-  # FIXME(cosmicexplorer): add helpers in pants.util.memo for class properties and memoized class
-  # properties!
-  @classmethod
-  @memoized_method
+  @memoized_classproperty
   def _singletons(cls):
     return { behavior: cls(behavior) for behavior in cls.allowed_values }
 
@@ -50,7 +48,7 @@ class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
       return value
     if not value:
       value = cls.default_value
-    return cls._singletons()[value]
+    return cls._singletons[value]
 
   def __new__(cls, *args, **kwargs):
     this_object = super(GlobMatchErrorBehavior, cls).__new__(cls, *args, **kwargs)
@@ -60,6 +58,42 @@ class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
                                 .format(this_object.failure_behavior, cls.allowed_values))
 
     return this_object
+
+
+class ExecutionOptions(datatype([
+  'remote_store_server',
+  'remote_store_thread_count',
+  'remote_execution_server',
+  'remote_store_chunk_bytes',
+  'remote_store_chunk_upload_timeout_seconds',
+  'process_execution_parallelism',
+])):
+  """A collection of all options related to (remote) execution of processes.
+
+  TODO: These options should move to a Subsystem once we add support for "bootstrap" Subsystems (ie,
+  allowing Subsystems to be consumed before the Scheduler has been created).
+  """
+
+  @classmethod
+  def from_bootstrap_options(cls, bootstrap_options):
+    cls(
+      remote_store_server=bootstrap_options.remote_store_server,
+      remote_execution_server=bootstrap_options.remote_execution_server,
+      remote_store_thread_count=bootstrap_options.remote_store_thread_count,
+      remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
+      remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
+      process_execution_parallelism=bootstrap_options.process_execution_parallelism,
+    )
+
+
+DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
+    remote_store_server=None,
+    remote_store_thread_count=1,
+    remote_execution_server=None,
+    remote_store_chunk_bytes=1024*1024,
+    remote_store_chunk_upload_timeout_seconds=60,
+    process_execution_parallelism=multiprocessing.cpu_count()*2,
+  )
 
 
 class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
@@ -162,7 +196,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--target-spec-file', type=list, dest='target_spec_files', daemon=False,
              help='Read additional specs from this file, one per line')
     register('--verify-config', type=bool, default=True, daemon=False,
+             advanced=True,
              help='Verify that all config file values correspond to known options.')
+
     register('--build-ignore', advanced=True, type=list, fromfile=True,
              default=['.*/', default_rel_distdir, 'bower_components/',
                       'node_modules/', '*.egg-info/'],
@@ -174,11 +210,23 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Paths to ignore for all filesystem operations performed by pants '
                   '(e.g. BUILD file scanning, glob matching, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore).')
+    register('--glob-expansion-failure', type=str,
+             choices=GlobMatchErrorBehavior.allowed_values,
+             default=GlobMatchErrorBehavior.default_option_value,
+             advanced=True,
+             help="Raise an exception if any targets declaring source files "
+                  "fail to match any glob provided in the 'sources' argument.")
+
     register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,
              metavar='<regexp>', help='Exclude target roots that match these regexes.')
     register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
              help='Paths that correspond with build roots for any subproject that this '
                   'project depends on.')
+    register('--owner-of', type=list, default=[], daemon=False, fromfile=True, metavar='<path>',
+             help='Select the targets that own these files. '
+                  'This is the third target calculation strategy along with the --changed '
+                  'options and specifying the targets directly. These three types of target '
+                  'selection are mutually exclusive.')
 
     # These logging options are registered in the bootstrap phase so that plugins can log during
     # registration and not so that their values can be interpolated in configs.
@@ -195,6 +243,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option, daemon=False,
              help='A directory to write execution and rule graphs to as `dot` files. The contents '
                   'of the directory will be overwritten if any filenames collide.')
+    register('--print-exception-stacktrace', advanced=True, type=bool,
+             help='Print to console the full exception stack trace if encountered.')
 
     # BinaryUtil options.
     register('--binaries-baseurls', type=list, advanced=True,
@@ -243,12 +293,28 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # This option changes the parser behavior in a fundamental way (which currently invalidates
     # all caches), and needs to be parsed out early, so we make it a bootstrap option.
     register('--build-file-imports', choices=['allow', 'warn', 'error'], default='warn',
-      help='Whether to allow import statements in BUILD files')
+             advanced=True,
+             help='Whether to allow import statements in BUILD files')
 
-    register('--remote-store-server',
-             help='host:port of grpc server to use as remote execution file store')
-    register('--remote-execution-server',
-             help='host:port of grpc server to use as remote execution scheduler')
+    register('--remote-store-server', advanced=True,
+             help='host:port of grpc server to use as remote execution file store.')
+    register('--remote-store-thread-count', type=int, advanced=True,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_store_thread_count,
+             help='Thread count to use for the pool that interacts with the remote file store.')
+    register('--remote-execution-server', advanced=True,
+             help='host:port of grpc server to use as remote execution scheduler.')
+    register('--remote-store-chunk-bytes', type=int, advanced=True,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_bytes,
+             help='Size in bytes of chunks transferred to/from the remote file store.')
+    register('--remote-store-chunk-upload-timeout-seconds', type=int, advanced=True,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_upload_timeout_seconds,
+             help='Timeout (in seconds) for uploads of individual chunks to the remote file store.')
+
+    # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
+    # lookups via CacheSetup in TaskBase.
+    register('--process-execution-parallelism', type=int, default=multiprocessing.cpu_count(),
+             advanced=True,
+             help='Number of concurrent processes that may be executed either locally and remotely.')
 
   @classmethod
   def register_options(cls, register):
@@ -283,16 +349,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,
              help='Used to limit the number of arguments passed to some subprocesses by breaking '
              'the command up into multiple invocations.')
-    register('--print-exception-stacktrace', advanced=True, type=bool,
-             help='Print to console the full exception stack trace if encountered.')
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
-    # TODO: Make a custom type abstract class (or something) to automate the production of an option
-    # with specific allowed values from a datatype (ideally using singletons for the allowed
-    # values).
-    register('--glob-expansion-failure', type=str,
-             choices=GlobMatchErrorBehavior.allowed_values,
-             default=GlobMatchErrorBehavior.default_option_value,
-             help="Raise an exception if any targets declaring source files "
-                  "fail to match any glob provided in the 'sources' argument.")

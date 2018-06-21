@@ -7,17 +7,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pkg_resources import WorkingSet
-
 from pants.base.exceptions import BuildConfigurationError
-from pants.init.options_initializer import OptionsInitializer
+from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
 class OptionsInitializerTest(unittest.TestCase):
   def test_invalid_version(self):
     options_bootstrapper = OptionsBootstrapper(args=['--pants-version=99.99.9999'])
-    initializer = OptionsInitializer(options_bootstrapper, WorkingSet())
+    build_config = BuildConfigInitializer(options_bootstrapper)
 
     with self.assertRaises(BuildConfigurationError):
-      initializer.setup()
+      OptionsInitializer.create(options_bootstrapper, build_config)

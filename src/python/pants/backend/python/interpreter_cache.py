@@ -8,11 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 
-from pex.interpreter import PythonIdentity, PythonInterpreter
+from pex.interpreter import PythonInterpreter
 from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import resolve
 from pex.variables import Variables
 
+from pants.backend.python.pex_util import create_bare_interpreter, get_local_platform
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
 from pants.process.lock import OwnerPrintingInterProcessFileLock
@@ -94,19 +95,17 @@ class PythonInterpreterCache(object):
       tgts_with_compatibilities_strs = [t.address.spec for t in tgts_with_compatibilities]
       raise self.UnsatisfiableInterpreterConstraintsError(
         'Unable to detect a suitable interpreter for compatibilities: {} '
-        '(Conflicting targets: {})'.format(' && '.join(unique_compatibilities_strs),
+        '(Conflicting targets: {})'.format(' && '.join(sorted(unique_compatibilities_strs)),
                                            ', '.join(tgts_with_compatibilities_strs)))
     # Return the lowest compatible interpreter.
     return min(allowed_interpreters)
 
   def _interpreter_from_path(self, path, filters):
-    interpreter_dir = os.path.basename(path)
-    identity = PythonIdentity.from_path(interpreter_dir)
     try:
       executable = os.readlink(os.path.join(path, 'python'))
     except OSError:
       return None
-    interpreter = PythonInterpreter(executable, identity)
+    interpreter = create_bare_interpreter(executable)
     if self._matches(interpreter, filters):
       return self._resolve(interpreter)
     return None
@@ -157,6 +156,9 @@ class PythonInterpreterCache(object):
                    or self.pex_python_paths()
                    or self._python_setup.interpreter_search_paths
                    or os.getenv('PATH').split(os.pathsep))
+    self._logger(
+      'Initializing Python interpreter cache matching filters `{}` from paths `{}`'.format(
+        ':'.join(filters), ':'.join(setup_paths)))
 
     def unsatisfied_filters(interpreters):
       return filter(lambda f: len(list(self._matching(interpreters, [f]))) == 0, filters)
@@ -174,6 +176,8 @@ class PythonInterpreterCache(object):
     if len(matches) == 0:
       self._logger('Found no valid interpreters!')
 
+    self._logger(
+      'Initialized Python interpreter cache with {}'.format(', '.join([x.binary for x in matches])))
     return matches
 
   def _resolve(self, interpreter, interpreter_dir=None):
@@ -218,6 +222,7 @@ class PythonInterpreterCache(object):
     distributions = resolve(requirements=[requirement],
                             fetchers=self._python_repos.get_fetchers(),
                             interpreter=interpreter,
+                            platform=get_local_platform(),
                             context=self._python_repos.get_network_context(),
                             precedence=precedence)
     if not distributions:

@@ -10,36 +10,40 @@ cd ${REPO_ROOT}
 source build-support/common.sh
 
 function usage() {
-  echo "Runs commons tests for local or hosted CI."
-  echo
-  echo "Usage: $0 (-h|-fxbkmsrjlpuyncia)"
-  echo " -h           print out this help message"
-  echo " -f           skip python code formatting checks"
-  echo " -x           skip bootstrap clean-all (assume bootstrapping from a"
-  echo "              fresh clone)"
-  echo " -b           skip bootstraping pants from local sources"
-  echo " -k           skip bootstrapped pants self compile check"
-  echo " -m           skip sanity checks of bootstrapped pants and repo BUILD"
-  echo "              files"
-  echo " -r           skip doc generation tests"
-  echo " -j           skip core jvm tests"
-  echo " -l           skip internal backends python tests"
-  echo " -p           skip core python tests"
-  echo " -u SHARD_NUMBER/TOTAL_SHARDS"
-  echo "              if running core python tests, divide them into"
-  echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
-  echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
-  echo " -n           skip contrib python tests"
-  echo " -e           skip rust tests"
-  echo " -y SHARD_NUMBER/TOTAL_SHARDS"
-  echo "              if running contrib python tests, divide them into"
-  echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
-  echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
-  echo " -c           skip pants integration tests (includes examples and testprojects)"
-  echo " -i SHARD_NUMBER/TOTAL_SHARDS"
-  echo "              if running integration tests, divide them into"
-  echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
-  echo "              to run only even tests: '-i 0/2', odd: '-i 1/2'"
+  cat <<EOF
+Runs commons tests for local or hosted CI.
+
+Usage: $0 (-h|-fxbkmsrjlpuyncia)
+ -h           print out this help message
+ -f           skip python code formatting checks
+ -x           skip bootstrap clean-all (assume bootstrapping from a
+              fresh clone)
+ -b           skip bootstraping pants from local sources
+ -k           skip bootstrapped pants self compile check
+ -m           skip sanity checks of bootstrapped pants and repo BUILD
+              files
+ -r           skip doc generation tests
+ -j           skip core jvm tests
+ -l           skip internal backends python tests
+ -p           skip core python tests
+ -u SHARD_NUMBER/TOTAL_SHARDS
+              if running core python tests, divide them into
+              TOTAL_SHARDS shards and just run those in SHARD_NUMBER
+              to run only even tests: '-u 0/2', odd: '-u 1/2'
+ -n           skip contrib python tests
+ -e           skip rust tests
+ -y SHARD_NUMBER/TOTAL_SHARDS
+              if running contrib python tests, divide them into
+              TOTAL_SHARDS shards and just run those in SHARD_NUMBER
+              to run only even tests: '-u 0/2', odd: '-u 1/2'
+ -c           skip pants integration tests (includes examples and testprojects)
+ -i SHARD_NUMBER/TOTAL_SHARDS
+              if running integration tests, divide them into
+              TOTAL_SHARDS shards and just run those in SHARD_NUMBER
+              to run only even tests: '-i 0/2', odd: '-i 1/2'
+ -t           skip lint
+ -z           test platform-specific behavior
+EOF
   if (( $# > 0 )); then
     die "$@"
   else
@@ -57,7 +61,7 @@ python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
 
-while getopts "hfxbkmsrjlpeu:ny:ci:at" opt; do
+while getopts "hfxbkmrjlpeu:ny:ci:tz" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_pre_commit_checks="true" ;;
@@ -76,6 +80,7 @@ while getopts "hfxbkmsrjlpeu:ny:ci:at" opt; do
     c) skip_integration="true" ;;
     i) python_intg_shard=${OPTARG} ;;
     t) skip_lint="true" ;;
+    z) test_platform_specific_behavior="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -221,6 +226,18 @@ if [[ "${skip_rust_tests:-false}" == "false" ]]; then
     RUST_BACKTRACE=1 "${REPO_ROOT}/build-support/bin/native/cargo" test --all \
       --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" -- "${test_threads_flag}"
   ) || die "Pants rust test failure"
+  end_travis_section
+fi
+
+# NB: this only tests python tests right now -- the command needs to be edited if test targets in
+# other languages are tagged with 'platform_specific_behavior' in the future.
+if [[ "${test_platform_specific_behavior:-false}" == 'true' ]]; then
+  start_travis_section "Platform-specific tests" \
+                       "Running platform-specific testing on platform: $(uname)"
+  (
+    ./pants.pex ${PANTS_ARGS[@]} --tag='+platform_specific_behavior' test \
+                tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
+  ) || die "Pants platform-specific test failure"
   end_travis_section
 fi
 

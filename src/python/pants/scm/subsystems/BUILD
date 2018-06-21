@@ -8,7 +8,6 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/goal:workspace',
-    'src/python/pants/scm:change_calculator',
     'src/python/pants/subsystem',
   ]
 )

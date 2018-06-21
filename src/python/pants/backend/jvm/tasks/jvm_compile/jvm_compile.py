@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import functools
 import os
-from collections import defaultdict
 from multiprocessing import cpu_count
 
 from twitter.common.collections import OrderedSet
@@ -292,6 +291,25 @@ class JvmCompile(NailgunTaskBase):
     """
     pass
 
+  def create_empty_extra_products(self):
+    """Create any products the subclass task supports in addition to the runtime_classpath.
+
+    The runtime_classpath is constructed by default.
+    """
+
+  def register_extra_products_from_contexts(self, targets, compile_contexts):
+    """Allows subclasses to register additional products for targets.
+
+    It is called for valid targets at start, then for each completed invalid target,
+    separately, during compilation.
+    """
+
+  def select_runtime_context(self, ccs):
+    """Select the context that contains the paths for runtime classpath artifacts.
+
+    Subclasses may have more than one type of context."""
+    return ccs
+
   def __init__(self, *args, **kwargs):
     super(JvmCompile, self).__init__(*args, **kwargs)
     self._targets_to_compile_settings = None
@@ -333,23 +351,18 @@ class JvmCompile(NailgunTaskBase):
     return MissingDependencyFinder(dep_analyzer, CompileErrorExtractor(
       self.get_options().class_not_found_error_patterns))
 
-  def _compile_context(self, target, target_workdir):
-    analysis_file = os.path.join(target_workdir, 'z.analysis')
-    classes_dir = os.path.join(target_workdir, 'classes')
-    jar_file = os.path.join(target_workdir, 'z.jar')
-    log_dir = os.path.join(target_workdir, 'logs')
-    zinc_args_file = os.path.join(target_workdir, 'zinc_args')
+  def create_compile_context(self, target, target_workdir):
     return CompileContext(target,
-                          analysis_file,
-                          classes_dir,
-                          jar_file,
-                          log_dir,
-                          zinc_args_file,
+                          os.path.join(target_workdir, 'z.analysis'),
+                          os.path.join(target_workdir, 'classes'),
+                          os.path.join(target_workdir, 'z.jar'),
+                          os.path.join(target_workdir, 'logs'),
+                          os.path.join(target_workdir, 'zinc_args'),
                           self._compute_sources_for_target(target))
 
   def execute(self):
-    # In case we have no relevant targets and return early create the requested product maps.
-    self._create_empty_products()
+    # In case we have no relevant targets and return early, create the requested product maps.
+    self.create_empty_extra_products()
 
     relevant_targets = list(self.context.targets(predicate=self.select))
 
@@ -374,16 +387,18 @@ class JvmCompile(NailgunTaskBase):
                           fingerprint_strategy=fingerprint_strategy,
                           topological_order=True) as invalidation_check:
 
-      # Initialize the classpath for all targets.
-      compile_contexts = {vt.target: self._compile_context(vt.target, vt.results_dir)
+
+      # Register runtime classpath products for all targets.
+      compile_contexts = {vt.target: self.create_compile_context(vt.target, vt.results_dir)
                           for vt in invalidation_check.all_vts}
-      for cc in compile_contexts.values():
+      for ccs in compile_contexts.values():
+        cc = self.select_runtime_context(ccs)
         classpath_product.add_for_target(cc.target, [(conf, classpath_for_context(cc))
                                                      for conf in self._confs])
 
       # Register products for valid targets.
       valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
-      self._register_vts([compile_contexts[t] for t in valid_targets])
+      self.register_extra_products_from_contexts(valid_targets, compile_contexts)
 
       # Build any invalid targets (which will register products in the background).
       if invalidation_check.invalid_vts:
@@ -395,7 +410,8 @@ class JvmCompile(NailgunTaskBase):
       if not self.get_options().use_classpath_jars:
         # Once compilation has completed, replace the classpath entry for each target with
         # its jar'd representation.
-        for cc in compile_contexts.values():
+        for ccs in compile_contexts.values():
+          cc = self.select_runtime_context(ccs)
           for conf in self._confs:
             classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
             classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
@@ -428,13 +444,12 @@ class JvmCompile(NailgunTaskBase):
 
     # Prepare the output directory for each invalid target, and confirm that analysis is valid.
     for target in invalid_targets:
-      cc = compile_contexts[target]
+      cc = self.select_runtime_context(compile_contexts[target])
       safe_mkdir(cc.classes_dir)
 
     # Now create compile jobs for each invalid target one by one, using the classpath
     # generated by upstream JVM tasks and our own prepare_compile().
-    jobs = self._create_compile_jobs('runtime_classpath',
-                                     compile_contexts,
+    jobs = self._create_compile_jobs(compile_contexts,
                                      invalid_targets,
                                      invalidation_check.invalid_vts)
 
@@ -569,29 +584,6 @@ class JvmCompile(NailgunTaskBase):
         if output_name in ('stdout', 'stderr'):
           yield idx, workunit.name, output_name, outpath
 
-  def _create_empty_products(self):
-    if self.context.products.is_required_data('zinc_analysis'):
-      self.context.products.safe_create_data('zinc_analysis', dict)
-
-    if self.context.products.is_required_data('zinc_args'):
-      self.context.products.safe_create_data('zinc_args', lambda: defaultdict(list))
-
-  def _register_vts(self, compile_contexts):
-    zinc_analysis = self.context.products.get_data('zinc_analysis')
-    zinc_args = self.context.products.get_data('zinc_args')
-
-    if zinc_analysis is not None:
-      for compile_context in compile_contexts:
-        zinc_analysis[compile_context.target] = (compile_context.classes_dir,
-                                                 compile_context.jar_file,
-                                                 compile_context.analysis_file)
-
-    if zinc_args is not None:
-      for compile_context in compile_contexts:
-        with open(compile_context.zinc_args_file, 'r') as fp:
-          args = fp.read().split()
-        zinc_args[compile_context.target] = args
-
   def _find_missing_deps(self, compile_logs, target):
     with self.context.new_workunit('missing-deps-suggest', labels=[WorkUnitLabel.COMPILER]):
       compile_failure_log = '\n'.join(read_file(log).decode('utf-8') for log in compile_logs)
@@ -640,6 +632,7 @@ class JvmCompile(NailgunTaskBase):
     # Reorganize the compile_contexts by class directory.
     compile_contexts_by_directory = {}
     for compile_context in compile_contexts.values():
+      compile_context = self.select_runtime_context(compile_context)
       compile_contexts_by_directory[compile_context.classes_dir] = compile_context
     # If we have a compile context for the target, include it.
     for entry in classpath_entries:
@@ -653,8 +646,7 @@ class JvmCompile(NailgunTaskBase):
   def exec_graph_key_for_target(self, compile_target):
     return "compile({})".format(compile_target.address.spec)
 
-  def _create_compile_jobs(self, classpath_product_key, compile_contexts,
-                           invalid_targets, invalid_vts):
+  def _create_compile_jobs(self, compile_contexts, invalid_targets, invalid_vts):
     class Counter(object):
       def __init__(self, size, initial=0):
         self.size = size
@@ -668,52 +660,35 @@ class JvmCompile(NailgunTaskBase):
         return len(str(self.size))
     counter = Counter(len(invalid_vts))
 
-    def check_cache(vts):
-      """Manually checks the artifact cache (usually immediately before compilation.)
+    jobs = []
+    invalid_target_set = set(invalid_targets)
+    for ivts in invalid_vts:
+      # Invalidated targets are a subset of relevant targets: get the context for this one.
+      compile_target = ivts.target
+      invalid_dependencies = self._collect_invalid_compile_dependencies(compile_target,
+                                                                        invalid_target_set)
 
-      Returns true if the cache was hit successfully, indicating that no compilation is necessary.
-      """
-      if not self.artifact_cache_reads_enabled():
-        return False
-      cached_vts, _, _ = self.check_artifact_cache([vts])
-      if not cached_vts:
-        self.context.log.debug('Missed cache during double check for {}'
-                               .format(vts.target.address.spec))
-        return False
-      assert cached_vts == [vts], (
-          'Cache returned unexpected target: {} vs {}'.format(cached_vts, [vts])
-      )
-      self.context.log.info('Hit cache during double check for {}'.format(vts.target.address.spec))
-      counter()
-      return True
+      jobs.extend(
+        self.create_compile_jobs(compile_target, compile_contexts, invalid_dependencies, ivts,
+          counter))
+    return jobs
 
-    def should_compile_incrementally(vts, ctx):
-      """Check to see if the compile should try to re-use the existing analysis.
-
-      Returns true if we should try to compile the target incrementally.
-      """
-      if not vts.is_incremental:
-        return False
-      if not self._clear_invalid_analysis:
-        return True
-      return os.path.exists(ctx.analysis_file)
+  def create_compile_jobs(self, compile_target, all_compile_contexts, invalid_dependencies, ivts,
+    counter):
 
     def work_for_vts(vts, ctx):
       progress_message = ctx.target.address.spec
 
       # Double check the cache before beginning compilation
-      hit_cache = check_cache(vts)
+      hit_cache = self.check_cache(vts, counter)
 
       if not hit_cache:
         # Compute the compile classpath for this target.
-        cp_entries = [ctx.classes_dir]
-        cp_entries.extend(self._zinc.compile_classpath(classpath_product_key,
-                                                       ctx.target,
-                                                       extra_cp_entries=self._extra_compile_time_classpath,
-                                                       zinc_compile_instance=self))
-        upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
+        cp_entries = self._cp_entries_for_ctx(ctx, 'runtime_classpath')
 
-        is_incremental = should_compile_incrementally(vts, ctx)
+        upstream_analysis = dict(self._upstream_analysis(all_compile_contexts, cp_entries))
+
+        is_incremental = self.should_compile_incrementally(vts, ctx)
         if not is_incremental:
           # Purge existing analysis file in non-incremental mode.
           safe_delete(ctx.analysis_file)
@@ -738,7 +713,8 @@ class JvmCompile(NailgunTaskBase):
                                   len(cp_entries),
                                   len(ctx.sources),
                                   timer.elapsed,
-                                  is_incremental)
+                                  is_incremental,
+                                  'compile')
 
         # Write any additional resources for this target to the target workdir.
         self.write_extra_resources(ctx)
@@ -747,30 +723,63 @@ class JvmCompile(NailgunTaskBase):
         self._create_context_jar(ctx)
 
       # Update the products with the latest classes.
-      self._register_vts([ctx])
+      self.register_extra_products_from_contexts([ctx.target], all_compile_contexts)
 
-    jobs = []
-    invalid_target_set = set(invalid_targets)
-    for ivts in invalid_vts:
-      # Invalidated targets are a subset of relevant targets: get the context for this one.
-      compile_target = ivts.target
-      compile_context = compile_contexts[compile_target]
-      invalid_dependencies = self._collect_invalid_compile_dependencies(compile_target,
-                                                                        invalid_target_set)
+    context_for_target = all_compile_contexts[compile_target]
+    compile_context = self.select_runtime_context(context_for_target)
 
-      jobs.append(Job(self.exec_graph_key_for_target(compile_target),
-                      functools.partial(work_for_vts, ivts, compile_context),
-                      [self.exec_graph_key_for_target(target) for target in invalid_dependencies],
-                      self._size_estimator(compile_context.sources),
-                      # If compilation and analysis work succeeds, validate the vts.
-                      # Otherwise, fail it.
-                      on_success=ivts.update,
-                      on_failure=ivts.force_invalidate))
-    return jobs
+    job = Job(self.exec_graph_key_for_target(compile_target),
+              functools.partial(work_for_vts, ivts, compile_context),
+              [self.exec_graph_key_for_target(target) for target in invalid_dependencies],
+              self._size_estimator(compile_context.sources),
+              # If compilation and analysis work succeeds, validate the vts.
+              # Otherwise, fail it.
+              on_success=ivts.update,
+              on_failure=ivts.force_invalidate)
+    return [job]
 
-  def _record_target_stats(self, target, classpath_len, sources_len, compiletime, is_incremental):
+  def check_cache(self, vts, counter):
+    """Manually checks the artifact cache (usually immediately before compilation.)
+
+    Returns true if the cache was hit successfully, indicating that no compilation is necessary.
+    """
+    if not self.artifact_cache_reads_enabled():
+      return False
+    cached_vts, _, _ = self.check_artifact_cache([vts])
+    if not cached_vts:
+      self.context.log.debug('Missed cache during double check for {}'
+        .format(vts.target.address.spec))
+      return False
+    assert cached_vts == [vts], (
+      'Cache returned unexpected target: {} vs {}'.format(cached_vts, [vts])
+    )
+    self.context.log.info('Hit cache during double check for {}'.format(vts.target.address.spec))
+    counter()
+    return True
+
+  def should_compile_incrementally(self, vts, ctx):
+    """Check to see if the compile should try to re-use the existing analysis.
+
+    Returns true if we should try to compile the target incrementally.
+    """
+    if not vts.is_incremental:
+      return False
+    if not self._clear_invalid_analysis:
+      return True
+    return os.path.exists(ctx.analysis_file)
+
+  def _cp_entries_for_ctx(self, ctx, classpath_product_key):
+    cp_entries = [ctx.classes_dir]
+    cp_entries.extend(self._zinc.compile_classpath(classpath_product_key,
+      ctx.target,
+      extra_cp_entries=self._extra_compile_time_classpath,
+      zinc_compile_instance=self))
+    return cp_entries
+
+  def _record_target_stats(self, target, classpath_len, sources_len, compiletime, is_incremental,
+    stats_key):
     def record(k, v):
-      self.context.run_tracker.report_target_info(self.options_scope, target, ['compile', k], v)
+      self.context.run_tracker.report_target_info(self.options_scope, target, [stats_key, k], v)
     record('time', compiletime)
     record('classpath_len', classpath_len)
     record('sources_len', sources_len)
