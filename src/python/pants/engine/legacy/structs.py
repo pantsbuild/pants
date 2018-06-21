@@ -312,6 +312,16 @@ class PythonTestsAdaptor(PythonTargetAdaptor):
     return self.python_test_globs
 
 
+class PythonDistributionAdaptor(TargetAdaptor):
+  @property
+  def default_sources(self):
+    return True
+
+  @property
+  def default_sources_globs(self):
+    return ('*.py',)
+
+
 class GoTargetAdaptor(TargetAdaptor):
 
   @property
@@ -332,6 +342,26 @@ class GoTargetAdaptor(TargetAdaptor):
 class PantsPluginAdaptor(TargetAdaptor):
   def get_sources(self):
     return ['register.py']
+
+
+class ProtobufLibraryAdaptor(TargetAdaptor):
+  @property
+  def default_sources(self):
+    return True
+
+  @property
+  def default_sources_globs(self):
+    return ('*.proto',)
+
+
+class ThriftLibraryAdaptor(TargetAdaptor):
+  @property
+  def default_sources(self):
+    return True
+
+  @property
+  def default_sources_globs(self):
+    return ('*.thrift',)
 
 
 class BaseGlobs(Locatable, AbstractClass):

@@ -16,4 +16,4 @@ class JavaThriftyLibrary(JvmTarget):
 
   For details, see https://github.com/Microsoft/thrifty
   """
-  default_sources_globs = '*.thrift'
+  pass
