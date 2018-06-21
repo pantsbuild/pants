@@ -202,7 +202,7 @@ class JavacCompile(JvmCompile):
     input_files.add(os.path.relpath(ctx.classes_dir, get_buildroot()))
     for source in ctx.target.sources_relative_to_buildroot():
       input_files.add(source)
-      
+
     # Once remoting provides the output directory in the ExecuteProcessResponse, then we
     # will use the output directory over output files. This will then cover cases like
     # compilation of scala classes and anonymous classes.
