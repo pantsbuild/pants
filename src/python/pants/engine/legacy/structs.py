@@ -141,35 +141,6 @@ class SourcesField(
       type(self).__name__, self.address, self.base_globs, self.arg, self.filespecs)
 
 
-class JavaLibraryAdaptor(TargetAdaptor):
-  @property
-  def default_sources_globs(self):
-    return ('*.java',)
-
-  @property
-  def default_sources_exclude_globs(self):
-    return JunitTestsAdaptor.java_test_globs
-
-
-class ScalaLibraryAdaptor(TargetAdaptor):
-  @property
-  def default_sources_globs(self):
-    return ('*.scala',)
-
-  @property
-  def default_sources_exclude_globs(self):
-    return JunitTestsAdaptor.scala_test_globs
-
-
-class JunitTestsAdaptor(TargetAdaptor):
-  java_test_globs = ('*Test.java',)
-  scala_test_globs = ('*Test.scala', '*Spec.scala')
-
-  @property
-  def default_sources_globs(self):
-    return self.java_test_globs + self.scala_test_globs
-
-
 class JvmBinaryAdaptor(TargetAdaptor):
   def validate_sources(self, sources):
     if len(sources.files) > 1:
@@ -294,16 +265,6 @@ class PythonBinaryAdaptor(PythonTargetAdaptor):
       )
 
 
-class PythonLibraryAdaptor(PythonTargetAdaptor):
-  @property
-  def default_sources_globs(self):
-    return ('*.py',)
-
-  @property
-  def default_sources_exclude_globs(self):
-    return PythonTestsAdaptor.python_test_globs
-
-
 class PythonTestsAdaptor(PythonTargetAdaptor):
   python_test_globs = ('test_*.py', '*_test.py')
 
@@ -312,24 +273,7 @@ class PythonTestsAdaptor(PythonTargetAdaptor):
     return self.python_test_globs
 
 
-class GoTargetAdaptor(TargetAdaptor):
-
-  @property
-  def default_sources(self):
-    # Go has always used implicit_sources: override to ignore the option.
-    return True
-
-  @property
-  def default_sources_globs(self):
-    # N.B. Go targets glob on `*` due to the way resources and .c companion files are handled.
-    return ('*',)
-
-  @property
-  def default_sources_exclude_globs(self):
-    return ('BUILD', 'BUILD.*')
-
-
-class PantsPluginAdaptor(TargetAdaptor):
+class PantsPluginAdaptor(PythonTargetAdaptor):
   def get_sources(self):
     return ['register.py']
 
