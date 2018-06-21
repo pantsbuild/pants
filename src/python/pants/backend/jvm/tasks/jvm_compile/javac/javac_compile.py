@@ -21,7 +21,7 @@ from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.fs import FilesContent, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import DistributionLocator
-from pants.util.dirutil import safe_open
+from pants.util.dirutil import safe_file_dump, safe_open
 from pants.util.process_handler import subprocess
 
 
@@ -120,7 +120,6 @@ class JavacCompile(JvmCompile):
   def compile(self, ctx, args, classpath, upstream_analysis,
               settings, fatal_warnings, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
-    print("NANANANANANLALALALALALALALLAALALALLA")
     try:
       distribution = JvmPlatform.preferred_jvm_distribution([settings], strict=True)
     except DistributionLocator.Error:
@@ -142,6 +141,8 @@ class JavacCompile(JvmCompile):
 
     if self.execution_strategy() == 'hermetic':
       javac_cmd.extend([
+        # The comment below is how we will add the output directory once it
+        # is supported on the rust/remoting side.
         # '-d', os.path.relpath(ctx.classes_dir, get_buildroot()),
         # TODO: support -release
         '-source', str(settings.source_level),
@@ -194,17 +195,22 @@ class JavacCompile(JvmCompile):
     return ret
 
   def _execute_compile_remotely(self, cmd, ctx):
+    # For now, executing a compile remotely only works for targets that
+    # do not have any dependencies or inner classes.
     
     input_files = set()
     input_files.add(os.path.relpath(ctx.classes_dir, get_buildroot()))
     for source in ctx.target.sources_relative_to_buildroot():
       input_files.add(source)
     
+    # Once remoting provides the output directory in the ExecuteProcessResponse, then we
+    # will use the output directory over output files. This will then cover cases like
+    # compilation of scala classes and anonymous classes.
+    # TODO: Add support for specifying an output directory from remote exectuion. This won't work
+    # remotely until https://github.com/pantsbuild/pants/issues/5995 is complete
     output_files = set()
     for source in ctx.target.sources_relative_to_buildroot():
       output_file = source.replace(".java", ".class")
-      # output_file = os.path.join(ctx.classes_dir, output_file)
-      # output_file = os.path.relpath(output_file, get_buildroot())
       output_files.add(output_file)
 
     print(output_files)
@@ -216,17 +222,20 @@ class JavacCompile(JvmCompile):
     exec_result = self.context.execute_process_synchronously(exec_process_request,
                                                              'jvm_task',
                                                              (WorkUnitLabel.TASK, WorkUnitLabel.JVM))
-
+ 
     # TODO: Remove this check when https://github.com/pantsbuild/pants/issues/5719 is resolved.
     if exec_result.exit_code != 0:
       print(exec_result.stderr, exec_result.stdout)
       raise TaskError('{} ... exited non-zero ({}) due to {}.'.format(' '.join(cmd), exec_result.exit_code, exec_result.stderr))
-
-    print("HEEEEEEEEEYYYYYYY", exec_result.stderr, exec_result.stdout)
     
     files_content_tuple = self.context._scheduler.product_request(
       FilesContent,
       [exec_result.output_directory_digest]
     )[0].dependencies
     
-    print(files_content_tuple)
+    # dump the files content into directory
+    classes_directory = ctx.classes_dir
+    for file_content in files_content_tuple:
+      file_path = os.path.relpath(file_content.path, ctx.target.target_base)
+      output_file_path = os.path.join(classes_directory, file_path)
+      safe_file_dump(output_file_path, file_content.content)

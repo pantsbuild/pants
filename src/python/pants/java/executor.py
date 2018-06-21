@@ -264,6 +264,7 @@ class RemoteExecutor(Executor):
   
   This class isn't intended to create an executor that can actually run anything locally.
   """
+  
   def __init__(self, distribution):
     super(RemoteExecutor, self).__init__(distribution=distribution)
     self._process = None
