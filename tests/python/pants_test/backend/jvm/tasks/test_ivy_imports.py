@@ -53,7 +53,7 @@ class IvyImportsTest(NailgunTaskTestBase):
                                     libraries=[jar_library.address.spec],
                                     include_patterns=['a/b/c/*.proto'])
 
-      self.set_options(use_nailgun=False)
+      self.set_options(execution_strategy='subprocess')
       ivy_imports_task = self.execute(self.context(target_roots=[foo_target]))
 
       # Make sure the product is properly populated
