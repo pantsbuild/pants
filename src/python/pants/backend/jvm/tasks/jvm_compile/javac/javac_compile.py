@@ -201,7 +201,7 @@ class JavacCompile(JvmCompile):
       input_files.add(source)
     
     output_files = set()
-    for source in ctx.target.sources_relative_to_source_root():
+    for source in ctx.target.sources_relative_to_buildroot():
       output_file = source.replace(".java", ".class")
       # output_file = os.path.join(ctx.classes_dir, output_file)
       # output_file = os.path.relpath(output_file, get_buildroot())
@@ -225,7 +225,7 @@ class JavacCompile(JvmCompile):
     print("HEEEEEEEEEYYYYYYY", exec_result.stderr, exec_result.stdout)
     
     files_content_tuple = self.context._scheduler.product_request(
-      Snapshot,
+      FilesContent,
       [exec_result.output_directory_digest]
     )[0].dependencies
     
