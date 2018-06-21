@@ -11,7 +11,8 @@ import unittest
 
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, FileContent, FilesContent,
                              PathGlobs, Snapshot, create_fs_rules)
-from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
+from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
+                                           ProcessExecutionFailure, create_process_rules)
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
 from pants.util.objects import TypeCheckError, datatype
@@ -86,6 +87,8 @@ def create_cat_stdout_rules():
 
 class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)])):
 
+  description = 'obtaining javac version'
+
   @property
   def bin_path(self):
     return self.binary_location.bin_path
@@ -99,35 +102,11 @@ def process_request_from_javac_version(javac_version_exe_req):
   yield ExecuteProcessRequest.create_with_empty_snapshot(
     argv=javac_version_exe_req.gen_argv(),
     env=dict(),
-    output_files=())
+    output_files=(),
+    description=javac_version_exe_req.description)
 
 
 class JavacVersionOutput(datatype([('value', str)])): pass
-
-
-class ProcessExecutionFailure(Exception):
-  """Used to denote that a process exited, but was unsuccessful in some way.
-
-  For example, exiting with a non-zero code.
-  """
-
-  MSG_FMT = """process '{desc}' failed with code {code}.
-stdout:
-{stdout}
-stderr:
-{stderr}
-"""
-
-  def __init__(self, exit_code, stdout, stderr, process_description):
-    # These are intentionally "public" members.
-    self.exit_code = exit_code
-    self.stdout = stdout
-    self.stderr = stderr
-
-    msg = self.MSG_FMT.format(
-      desc=process_description, code=exit_code, stdout=stdout, stderr=stderr)
-
-    super(ProcessExecutionFailure, self).__init__(msg)
 
 
 @rule(JavacVersionOutput, [Select(JavacVersionExecutionRequest)])
@@ -136,15 +115,6 @@ def get_javac_version_output(javac_version_command):
     ExecuteProcessRequest, JavacVersionExecutionRequest, javac_version_command)
   javac_version_proc_result = yield Get(
     ExecuteProcessResult, ExecuteProcessRequest, javac_version_proc_req)
-
-  exit_code = javac_version_proc_result.exit_code
-  if exit_code != 0:
-    stdout = javac_version_proc_result.stdout
-    stderr = javac_version_proc_result.stderr
-    # TODO(cosmicexplorer): We should probably make this automatic for most
-    # process invocations (see #5719).
-    raise ProcessExecutionFailure(
-      exit_code, stdout, stderr, 'obtaining javac version')
 
   yield JavacVersionOutput(str(javac_version_proc_result.stderr))
 
@@ -201,15 +171,12 @@ def javac_compile_process_result(javac_compile_req):
     env=dict(),
     snapshot=sources_snapshot,
     output_directories=output_dirs,
+    description='javac compilation'
   )
   javac_proc_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
 
-  exit_code = javac_proc_result.exit_code
   stdout = javac_proc_result.stdout
   stderr = javac_proc_result.stderr
-  if exit_code != 0:
-    raise ProcessExecutionFailure(
-      exit_code, stdout, stderr, 'javac compilation')
 
   yield JavacCompileResult(
     stdout,
@@ -403,6 +370,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       self.execute_raising_throw(scheduler, JavacCompileResult, request)
     e = cm.exception
     self.assertEqual(1, e.exit_code)
+    self.assertIn('javac compilation', str(e))
     self.assertIn("NOT VALID JAVA", e.stderr)
 
   def mk_example_fs_tree(self):
@@ -413,5 +381,5 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     return fs_tree
 
   def mk_scheduler_in_example_fs(self, rules):
-    rules = list(rules) + create_fs_rules() + [RootRule(ExecuteProcessRequest)]
+    rules = list(rules) + create_fs_rules() + create_process_rules()
     return self.mk_scheduler(rules=rules, project_tree=self.mk_example_fs_tree())
