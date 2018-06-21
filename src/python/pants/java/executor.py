@@ -261,32 +261,32 @@ class SubprocessExecutor(Executor):
 
 class RemoteExecutor(Executor):
   """Primarily to create the correct command line to run remotely.
-  
+
   This class isn't intended to create an executor that can actually run anything locally.
   """
-  
+
   def __init__(self, distribution):
     super(RemoteExecutor, self).__init__(distribution=distribution)
     self._process = None
-  
+
   def _runner(self, classpath, main, jvm_options, args, cwd=None):
     self._command = self._create_command(classpath, main, jvm_options, args, cwd=cwd)
-    
+
     class Runner(self.Runner):
       @property
       def executor(_):
         return self
-      
+
       @property
       def command(_):
         return list(self._command)
-    
+
     return Runner()
-  
+
   @property
   def cmd(self):
     return self._command
-  
+
   def execute(self, classpath, main, jvm_options=None, args=None, stdout=None, stderr=None,
       cwd=None):
     raise self.Error("RemoteExecutor should not execute commands locally.")
