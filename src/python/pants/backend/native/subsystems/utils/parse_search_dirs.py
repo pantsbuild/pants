@@ -35,15 +35,14 @@ class ParseSearchDirs(Subsystem):
     # This argument is supported by at least gcc and clang.
     cmd = [compiler_exe, '-print-search-dirs']
 
-    if not path_entries:
-      path_entries = []
+    # FIXME: document the path_entries arg!
+    env = {}
+    if path_entries is not None:
+      env['PATH'] = create_path_env_var(path_entries)
 
     try:
       # Get stderr interspersed in the error message too -- this should not affect output parsing.
-      compiler_output = subprocess.check_output(
-        cmd,
-        env={'PATH': create_path_env_var(path_entries)},
-        stderr=subprocess.STDOUT)
+      compiler_output = subprocess.check_output(cmd, env=env, stderr=subprocess.STDOUT)
     except OSError as e:
       # We use `safe_shlex_join` here to pretty-print the command.
       raise self.ParseSearchDirsError(
