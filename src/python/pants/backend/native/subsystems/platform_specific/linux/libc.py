@@ -5,23 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import logging
 import os
-import re
 
-from twitter.common.collections import OrderedSet
-
+from pants.backend.native.subsystems.utils.parse_search_dirs import ParseSearchDirs
 from pants.base.hash_utils import hash_file
 from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import is_readable_dir
-from pants.util.memo import memoized_classproperty, memoized_property
+from pants.util.memo import memoized_property
 from pants.util.objects import datatype
-from pants.util.process_handler import subprocess
-from pants.util.strutil import safe_shlex_join
-
-
-logger = logging.getLogger(__name__)
 
 
 # FIXME: make this an @rule, after we can automatically produce LibcDev (see #5788).
@@ -39,15 +30,15 @@ class LibcDev(Subsystem):
 
   options_scope = 'libc'
 
-  class HostLibcDevResolutionError(Exception):
+  class HostLibcDevResolutionError(Exception): pass
 
-    def __init__(self, compiler, cmd, err_msg, *args, **kwargs):
-      # We use `safe_shlex_join` here to pretty-print the command.
-      msg = ("In command={cmd!r} with --host-compiler={compiler!r}: {err_msg}"
-             .format(cmd=safe_shlex_join(cmd),
-                     compiler=compiler,
-                     err_msg=err_msg))
-      super(LibcDev.HostLibcDevResolutionError, self).__init__(msg, *args, **kwargs)
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(LibcDev, cls).subsystem_dependencies() + (ParseSearchDirs.scoped(cls),)
+
+  @memoized_property
+  def _parse_search_dirs(self):
+    return ParseSearchDirs.scoped_instance(self)
 
   @classmethod
   def register_options(cls, register):
@@ -55,34 +46,8 @@ class LibcDev(Subsystem):
 
     register('--libc-dir', type=dir_option, default='/usr/lib', advanced=True,
              help='A directory containing a host-specific crti.o from libc.')
-    # TODO: make something in custom_types.py for "a path to an existing executable file (absolute
-    # or relative to buildroot), or a filename that will be resolved against the PATH in some
-    # subprocess".
     register('--host-compiler', type=str, default='gcc', advanced=True,
              help='The host compiler to invoke with -print-search-dirs to find the host libc.')
-
-  @memoized_classproperty
-  def _search_dirs_libraries_regex(cls):
-    return re.compile('^libraries: =(.*)$', flags=re.MULTILINE)
-
-  def _parse_libraries_from_compiler_search_dirs(self, compiler_exe):
-    # This argument is supported by at least gcc and clang.
-    cmd = [compiler_exe, '-print-search-dirs']
-
-    try:
-      # Get stderr interspersed in the error message too -- this should not affect output parsing.
-      compiler_output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-    except OSError as e:
-      raise self.HostLibcDevResolutionError(compiler_exe, cmd, "invocation failed.", e)
-
-    libs_line = self._search_dirs_libraries_regex.search(compiler_output)
-
-    if not libs_line:
-      raise self.HostLibcDevResolutionError(
-        compiler_exe, cmd,
-        "Could not parse libraries from output:\n{}".format(compiler_output))
-
-    return cmd, libs_line.group(1).split(':')
 
   # NB: crti.o is required to create executables on Linux. Our provided gcc can find it if the
   # containing directory is within the LIBRARY_PATH environment variable when we invoke gcc.
@@ -97,21 +62,11 @@ class LibcDev(Subsystem):
     """Locate the host's libc-dev installation using a specified host compiler's search dirs."""
     compiler_exe = self.get_options().host_compiler
 
-    # We use `cmd` for error messages below.
-    cmd, compiler_search_libraries = self._parse_libraries_from_compiler_search_dirs(compiler_exe)
-
-    real_lib_dirs = OrderedSet()
-
-    for lib_dir_path in compiler_search_libraries:
-      # Could use a `seen_dir_paths` set if we want to avoid pinging the fs for duplicate entries.
-      if is_readable_dir(lib_dir_path):
-        real_lib_dirs.add(os.path.realpath(lib_dir_path))
-      else:
-        logger.debug("non-existent or non-accessible program directory at {} while locating libc."
-                     .format(lib_dir_path))
+    # These directories are checked to exist!
+    library_dirs = self._parse_search_dirs.get_compiler_library_dirs(compiler_exe)
 
     libc_crti_object_file = None
-    for libc_dir_candidate in real_lib_dirs:
+    for libc_dir_candidate in library_dirs:
       maybe_libc_crti = os.path.join(libc_dir_candidate, self._LIBC_INIT_OBJECT_FILE)
       if os.path.isfile(maybe_libc_crti):
         libc_crti_object_file = maybe_libc_crti
@@ -119,11 +74,10 @@ class LibcDev(Subsystem):
 
     if not libc_crti_object_file:
       raise self.HostLibcDevResolutionError(
-        compiler_exe, cmd,
-        "Could not locate {fname} in library search dirs {dirs}. "
+        "Could not locate {fname} in library search dirs {dirs} from compiler: {compiler!r}. "
         "You may need to install a libc dev package for the current system. "
         "For many operating systems, this package is named 'libc-dev' or 'libc6-dev'."
-        .format(fname=self._LIBC_INIT_OBJECT_FILE, dirs=real_lib_dirs))
+        .format(fname=self._LIBC_INIT_OBJECT_FILE, dirs=library_dirs, compiler=compiler_exe))
 
     return HostLibcDev(crti_object=libc_crti_object_file,
                        fingerprint=hash_file(libc_crti_object_file))

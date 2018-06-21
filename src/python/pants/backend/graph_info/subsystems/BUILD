@@ -2,7 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  dependencies = [
+  dependencies=[
+    'src/python/pants/backend/native/subsystems/utils',
     'src/python/pants/binaries',
   ],
 )

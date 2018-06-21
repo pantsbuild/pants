@@ -62,9 +62,7 @@ int main() {
     gcc_out = self._invoke_capturing_output(['./hello_gcc'])
     self.assertEqual('hello, world!\n', gcc_out)
 
-    self._invoke_capturing_output(['clang', '-c', 'hello.c', '-o', 'hello_clang.o'])
-    self.assertTrue(os.path.isfile(self._get_test_file_path('hello_clang.o')))
-    self._invoke_capturing_output(['gcc', 'hello_clang.o', '-o', 'hello_clang'])
+    self._invoke_capturing_output(['clang', 'hello.c', '-o', 'hello_clang'])
     clang_compile_out = self._invoke_capturing_output(['./hello_clang'])
     self.assertEqual('hello, world!\n', clang_compile_out)
 
@@ -81,8 +79,6 @@ int main() {
     gpp_output = self._invoke_capturing_output(['./hello_g++'])
     self.assertEqual(gpp_output, 'hello, world!\n')
 
-    self._invoke_capturing_output(['clang++', '-c', 'hello.cpp', '-o', 'hello_clang++.o'])
-    self.assertTrue(os.path.isfile(self._get_test_file_path('hello_clang++.o')))
-    self._invoke_capturing_output(['g++', 'hello_clang++.o', '-o', 'hello_clang++'])
+    self._invoke_capturing_output(['clang++', 'hello.cpp', '-o', 'hello_clang++'])
     clangpp_output = self._invoke_capturing_output(['./hello_clang++'])
     self.assertEqual(clangpp_output, 'hello, world!\n')
