@@ -27,10 +27,10 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   def register_options(cls, register):
     super(NailgunTaskBase, cls).register_options(register)
     # --use-nailgun is deprecated
-    register('--use-nailgun', type=bool, default=True,
+    register('--use-nailgun', type=bool,
              help='Use nailgun to make repeated invocations of this task quicker.',
-             removal_version='1.9.0.dev0', removal_hint='Please use --execution-strategy instead.')
-    register('--execution-strategy', default='nailgun', choices=['nailgun', 'subprocess'],
+             removal_version='1.10.0.dev0', removal_hint='Please use --execution-strategy instead.')
+    register('--execution-strategy', choices=[cls.NAILGUN, cls.SUBPROCESS],
              help='If set to nailgun, nailgun will be enabled and repeated invocations of this '
                   'task will be quicker. If set to subprocess, then the task will be run without nailgun.')
     register('--nailgun-timeout-seconds', advanced=True, default=10, type=float,
@@ -65,9 +65,12 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   def set_execution_strategy(self):
     # This will be more complex as we add more execution strategies are added
     # Expected behavior: if execution-strategy is set, it will override use-nailgun
-    if self.get_options().execution_strategy:
+    if not self.get_options().execution_strategy and not self.get_options().use_nailgun:
+      # If both flags are None
+      return self.NAILGUN
+    elif self.get_options().execution_strategy:
       return self.get_options().execution_strategy
-    elif not self.get_options().use_nailgun:
+    elif self.get_options().use_nailgun is False:
       return self.SUBPROCESS
     return self.NAILGUN
   
