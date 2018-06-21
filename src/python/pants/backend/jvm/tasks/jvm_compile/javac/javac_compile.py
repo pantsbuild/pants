@@ -213,7 +213,6 @@ class JavacCompile(JvmCompile):
       output_file = source.replace(".java", ".class")
       output_files.add(output_file)
 
-    print(output_files)
     input_pathglobs = PathGlobs(tuple(input_files), ())
     input_snapshot = self.context._scheduler.product_request(Snapshot, [input_pathglobs])[0]
 
@@ -225,7 +224,6 @@ class JavacCompile(JvmCompile):
 
     # TODO: Remove this check when https://github.com/pantsbuild/pants/issues/5719 is resolved.
     if exec_result.exit_code != 0:
-      print(exec_result.stderr, exec_result.stdout)
       raise TaskError('{} ... exited non-zero ({}) due to {}.'.format(' '.join(cmd), exec_result.exit_code, exec_result.stderr))
 
     files_content_tuple = self.context._scheduler.product_request(
