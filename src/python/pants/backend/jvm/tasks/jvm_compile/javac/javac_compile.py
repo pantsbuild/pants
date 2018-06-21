@@ -196,13 +196,13 @@ class JavacCompile(JvmCompile):
 
   def _execute_compile_remotely(self, cmd, ctx):
     # For now, executing a compile remotely only works for targets that
-    # do not have any dependencies or inner classes.
-    
+    # do not have any dependencies or inner classes
+
     input_files = set()
     input_files.add(os.path.relpath(ctx.classes_dir, get_buildroot()))
     for source in ctx.target.sources_relative_to_buildroot():
       input_files.add(source)
-    
+      
     # Once remoting provides the output directory in the ExecuteProcessResponse, then we
     # will use the output directory over output files. This will then cover cases like
     # compilation of scala classes and anonymous classes.
@@ -222,17 +222,17 @@ class JavacCompile(JvmCompile):
     exec_result = self.context.execute_process_synchronously(exec_process_request,
                                                              'jvm_task',
                                                              (WorkUnitLabel.TASK, WorkUnitLabel.JVM))
- 
+
     # TODO: Remove this check when https://github.com/pantsbuild/pants/issues/5719 is resolved.
     if exec_result.exit_code != 0:
       print(exec_result.stderr, exec_result.stdout)
       raise TaskError('{} ... exited non-zero ({}) due to {}.'.format(' '.join(cmd), exec_result.exit_code, exec_result.stderr))
-    
+
     files_content_tuple = self.context._scheduler.product_request(
       FilesContent,
       [exec_result.output_directory_digest]
     )[0].dependencies
-    
+
     # dump the files content into directory
     classes_directory = ctx.classes_dir
     for file_content in files_content_tuple:
