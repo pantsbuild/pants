@@ -26,8 +26,10 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   @classmethod
   def register_options(cls, register):
     super(NailgunTaskBase, cls).register_options(register)
+    # --use-nailgun is deprecated
     register('--use-nailgun', type=bool, default=True,
-             help='Use nailgun to make repeated invocations of this task quicker.')
+             help='Use nailgun to make repeated invocations of this task quicker.',
+             removal_version='1.9.0.dev0', removal_hint='Please use --execution-strategy instead.')
     register('--execution-strategy', default='nailgun', choices=['nailgun', 'subprocess'],
              help='If set to nailgun, nailgun will be enabled and repeated invocations of this '
                   'task will be quicker. If set to subprocess, then the task will be run without nailgun.')
