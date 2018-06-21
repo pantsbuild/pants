@@ -549,6 +549,14 @@ class Target(AbstractTarget):
     """Returns the count of source files owned by the target."""
     return len(self._sources_field.sources.files)
 
+  def sources_snapshot(self, scheduler=None):
+    """
+    Get a Snapshot of the sources attribute of this target.
+
+    This API is experimental, and is subject to change.
+    """
+    return self._sources_field.snapshot(scheduler=scheduler)
+
   @property
   def derived_from(self):
     """Returns the target this target was derived from.

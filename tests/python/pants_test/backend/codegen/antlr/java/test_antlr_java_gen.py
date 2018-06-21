@@ -16,7 +16,6 @@ from pants.backend.codegen.antlr.java.antlr_java_gen import AntlrJavaGen
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.invalidation.build_invalidator import CacheKey
 from pants.util.dirutil import safe_mkdtemp
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
@@ -78,8 +77,8 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
 
     # Generate code, then create a synthetic target.
     task.execute_codegen(target, target_workdir)
-    fingerprint = CacheKey("test", target.invalidation_hash())
-    syn_target = task._inject_synthetic_target(target, target_workdir, fingerprint)
+    sources = task._capture_sources(target, target_workdir)
+    syn_target = task._inject_synthetic_target(target, target_workdir, sources)
 
     actual_sources = [s for s in Fileset.rglobs('*.java', root=target_workdir)]
     expected_sources = syn_target.sources_relative_to_source_root()

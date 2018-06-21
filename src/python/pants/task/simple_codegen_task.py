@@ -13,10 +13,12 @@ from collections import OrderedDict
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.task.task import Task
 from pants.util.dirutil import fast_relpath, safe_delete, safe_walk
@@ -33,6 +35,15 @@ class SimpleCodegenTask(Task):
   # Subclasses may override to provide the type of gen targets the target acts on.
   # E.g., JavaThriftLibrary. If not provided, the subclass must implement is_gentarget.
   gentarget_type = None
+
+  # Subclasses may override to provide a list of glob patterns matching the generated sources,
+  # relative to the target's workdir.
+  # These must be a tuple of strings, e.g. ('**/*.java',).
+  # If this is not set, the deprecated find_sources will be used.
+  sources_globs = None
+
+  # Tuple of glob patterns to exclude from the above matches.
+  sources_exclude_globs = ()
 
   def __init__(self, context, workdir):
     """
@@ -210,17 +221,27 @@ class SimpleCodegenTask(Task):
 
       with self.context.new_workunit(name='execute', labels=[WorkUnitLabel.MULTITOOL]):
         for vt in invalidation_check.all_vts:
+
+          sources = None
+          must_recapture = False
+
           # Build the target and handle duplicate sources.
           if not vt.valid:
             if self._do_validate_sources_present(vt.target):
               self.execute_codegen(vt.target, vt.results_dir)
-              self._handle_duplicate_sources(vt.target, vt.results_dir)
+              sources = self._capture_sources(vt.target, vt.results_dir)
+              must_recapture = self._handle_duplicate_sources(vt.target, vt.results_dir, sources)
             vt.update()
+
+          # _handle_duplicate_sources may delete files from the filesystem, so we need to
+          # re-capture the sources.
+          if sources is None or must_recapture:
+            sources = self._capture_sources(vt.target, vt.results_dir)
 
           self._inject_synthetic_target(
             vt.target,
             vt.results_dir,
-            vt.cache_key,
+            sources,
           )
         self._mark_transitive_invalidation_hashes_dirty(
           vt.target.address for vt in invalidation_check.all_vts
@@ -246,35 +267,42 @@ class SimpleCodegenTask(Task):
     """
     return target_workdir
 
-  def _create_sources_with_fingerprint(self, target_workdir, fingerprint, files):
-    """Create an EagerFilesetWithSpec to pass to the sources argument for synthetic target injection.
+  def _capture_sources(self, target, target_workdir):
+    if self.sources_globs is None:
+      files = list(self.find_sources(target, target_workdir))
+    else:
+      files = self.sources_globs
 
-    We are creating and passing an EagerFilesetWithSpec to the synthetic target injection in the
-    hopes that it will save the time of having to refingerprint the sources.
-
-    :param target_workdir: The directory containing the generated code for the target.
-    :param fingerprint: the fingerprint of the VersionedTarget with which the EagerFilesetWithSpec
-           will be created.
-    :param files: a list of exact paths to generated sources.
-    """
     results_dir_relpath = os.path.relpath(target_workdir, get_buildroot())
-    filespec = FilesetRelPathWrapper.to_filespec(
-      [os.path.join(results_dir_relpath, file) for file in files])
-    return EagerFilesetWithSpec(results_dir_relpath, filespec=filespec,
-      files=files, files_hash='{}.{}'.format(fingerprint.id, fingerprint.hash))
+    buildroot_relative_globs = tuple(os.path.join(results_dir_relpath, file) for file in files)
+    buildroot_relative_excludes = tuple(
+      os.path.join(results_dir_relpath, file)
+        for file in self.sources_exclude_globs
+    )
+
+    snapshot = self.context._scheduler.capture_snapshots((
+      PathGlobsAndRoot(
+        PathGlobs(buildroot_relative_globs, buildroot_relative_excludes),
+        str(get_buildroot()),
+      ),
+    ))[0]
+
+    return EagerFilesetWithSpec(
+      results_dir_relpath,
+      FilesetRelPathWrapper.to_filespec(buildroot_relative_globs),
+      snapshot,
+    )
 
   def _inject_synthetic_target(
     self,
     target,
     target_workdir,
-    fingerprint,
+    sources,
   ):
     """Create, inject, and return a synthetic target for the given target and workdir.
 
     :param target: The target to inject a synthetic target for.
     :param target_workdir: The work directory containing the generated code for the target.
-    :param fingerprint: The fingerprint to create the synthetic target
-           with to avoid re-fingerprinting.
     """
 
     synthetic_target_type = self.synthetic_target_type(target)
@@ -300,10 +328,6 @@ class SimpleCodegenTask(Task):
       union = set(original_export_specs).union(extra_export_specs)
 
       copied_attributes['exports'] = sorted(union)
-
-    sources = list(self.find_sources(target, target_workdir))
-    if fingerprint:
-      sources = self._create_sources_with_fingerprint(target_workdir, fingerprint, sources)
 
     synthetic_target = self.context.add_new_target(
       address=self._get_synthetic_address(target, target_workdir),
@@ -372,6 +396,13 @@ class SimpleCodegenTask(Task):
     :return: A set of filepaths relative to the target_workdir.
     :rtype: OrderedSet
     """
+    deprecated_conditional(
+      lambda: True,
+      '1.10.0.dev0',
+      'SimpleCodegenTask.find_sources is deprecated. Subclasses should instead specify '
+      'sources_globs and sources_exclude_globs. '
+      'Class to update: {}'.format(self.__class__.__name__)
+    )
     return OrderedSet(self._find_sources_in_workdir(target_workdir))
 
   def _find_sources_in_workdir(self, target_workdir):
@@ -381,11 +412,13 @@ class SimpleCodegenTask(Task):
       for name in files:
         yield os.path.join(rel_root, name)
 
-  def _handle_duplicate_sources(self, target, target_workdir):
+  def _handle_duplicate_sources(self, target, target_workdir, sources):
     """Handles duplicate sources generated by the given gen target by either failure or deletion.
 
     This method should be called after all dependencies have been injected into the graph, but
     before injecting the synthetic version of this target.
+
+    Returns a boolean indicating whether it modified the underlying filesystem.
 
     NB(gm): Some code generators may re-generate code that their dependent libraries generate.
     This results in targets claiming to generate sources that they really don't, so we try to
@@ -394,16 +427,14 @@ class SimpleCodegenTask(Task):
     default, this behavior is disabled, and duplication in generated sources will raise a
     TaskError. This is controlled by the --allow-dups flag.
     """
-    # Compute the raw sources owned by this target.
-    by_target = self.find_sources(target, target_workdir)
 
     # Walk dependency gentargets and record any sources owned by those targets that are also
     # owned by this target.
     duplicates_by_target = OrderedDict()
     def record_duplicates(dep):
       if dep == target or not self.is_gentarget(dep.concrete_derived_from):
-        return
-      duped_sources = [s for s in dep.sources_relative_to_source_root() if s in by_target and
+        return False
+      duped_sources = [s for s in dep.sources_relative_to_source_root() if s in sources.files and
                        not self.ignore_dup(target, dep, s)]
       if duped_sources:
         duplicates_by_target[dep] = duped_sources
@@ -411,7 +442,7 @@ class SimpleCodegenTask(Task):
 
     # If there were no dupes, we're done.
     if not duplicates_by_target:
-      return
+      return False
 
     # If there were duplicates warn or error.
     messages = ['{target} generated sources that had already been generated by dependencies.'
@@ -425,11 +456,15 @@ class SimpleCodegenTask(Task):
     else:
       raise self.DuplicateSourceError(message)
 
+    did_modify = False
+
     # Finally, remove duplicates from the workdir. This prevents us from having to worry
     # about them during future incremental compiles.
     for dep, duped_sources in duplicates_by_target.items():
       for duped_source in duped_sources:
         safe_delete(os.path.join(target_workdir, duped_source))
+        did_modify = True
+    return did_modify
 
   class DuplicateSourceError(TaskError):
     """A target generated the same code that was generated by one of its dependencies.
