@@ -458,6 +458,8 @@ class TestBase(unittest.TestCase):
     Subsystem.reset(reset_options=True)
     Subsystem.set_options(fake_options)
 
+    scheduler = scheduler or self.scheduler
+
     context = create_context_from_options(fake_options,
                                           target_roots=target_roots,
                                           build_graph=self.build_graph,
