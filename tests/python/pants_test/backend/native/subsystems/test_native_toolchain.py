@@ -41,7 +41,9 @@ class TestNativeToolchain(BaseTest):
     compiler_library_dirs = []
     if is_compiler:
       compiler_exe = cmd[0]
-      compiler_library_dirs = self.parse_search_dirs.get_compiler_library_dirs(compiler_exe)
+      compiler_library_dirs = self.parse_search_dirs.get_compiler_library_dirs(
+        compiler_exe,
+        path_entries=toolchain_dirs)
 
     # FIXME: convert this to Platform#resolve_platform_specific() when #5815 is merged.
     if get_normalized_os_name() == 'linux':

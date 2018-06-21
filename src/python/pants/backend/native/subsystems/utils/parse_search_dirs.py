@@ -15,7 +15,7 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_classproperty
 from pants.util.process_handler import subprocess
-from pants.util.strutil import safe_shlex_join
+from pants.util.strutil import create_path_env_var, safe_shlex_join
 
 
 logger = logging.getLogger(__name__)
@@ -31,13 +31,19 @@ class ParseSearchDirs(Subsystem):
   def _search_dirs_libraries_regex(cls):
     return re.compile('^libraries: =(.*)$', flags=re.MULTILINE)
 
-  def _parse_libraries_from_compiler_search_dirs(self, compiler_exe):
+  def _parse_libraries_from_compiler_search_dirs(self, compiler_exe, path_entries=None):
     # This argument is supported by at least gcc and clang.
     cmd = [compiler_exe, '-print-search-dirs']
 
+    if not path_entries:
+      path_entries = []
+
     try:
       # Get stderr interspersed in the error message too -- this should not affect output parsing.
-      compiler_output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+      compiler_output = subprocess.check_output(
+        cmd,
+        env={'PATH': create_path_env_var(path_entries)},
+        stderr=subprocess.STDOUT)
     except OSError as e:
       # We use `safe_shlex_join` here to pretty-print the command.
       raise self.ParseSearchDirsError(
@@ -54,8 +60,10 @@ class ParseSearchDirs(Subsystem):
 
     return libs_line.group(1).split(':')
 
-  def get_compiler_library_dirs(self, compiler_exe):
-    all_dir_candidates = self._parse_libraries_from_compiler_search_dirs(compiler_exe)
+  def get_compiler_library_dirs(self, compiler_exe, path_entries=None):
+    all_dir_candidates = self._parse_libraries_from_compiler_search_dirs(
+      compiler_exe,
+      path_entries=path_entries)
 
     real_lib_dirs = OrderedSet()
 
