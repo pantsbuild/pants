@@ -11,10 +11,11 @@ from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
 from pants.init.subprocess import Subprocess
 from pants.java import util
-from pants.java.executor import SubprocessExecutor, Executor, RemoteExecutor
+from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
 from pants.task.task import Task, TaskBase
+
 
 class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   ID_PREFIX = 'ng'

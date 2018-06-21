@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.util.contextutil import temporary_dir
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
@@ -40,3 +42,8 @@ class JavacCompileIntegration(BaseCompileIT):
            ],
           workdir, config)
         self.assert_success(pants_run)
+        path = os.path.join(
+          workdir,
+          'compile/javac/current/testprojects.src.java.org.pantsbuild.testproject.publish.hello.greet.greet/current',
+          'classes/org/pantsbuild/testproject/publish/hello/greet/Greeting.class')
+        self.assertTrue(os.path.exists(path))
