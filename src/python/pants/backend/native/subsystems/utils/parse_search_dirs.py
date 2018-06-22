@@ -49,6 +49,11 @@ class ParseSearchDirs(Subsystem):
         "Invocation of '{}' with argv {!r} failed."
         .format(compiler_exe, safe_shlex_join(cmd)),
         e)
+    except subprocess.CalledProcessError as e:
+      raise self.ParseSearchDirsError(
+        "Invocation of '{}' with argv {!r} exited with non-zero code {}. output:\n{}"
+        .format(compiler_exe, safe_shlex_join(cmd), e.returncode, e.output),
+        e)
 
     libs_line = self._search_dirs_libraries_regex.search(compiler_output)
 
