@@ -24,29 +24,12 @@ from pants.util.dirutil import safe_concurrent_creation
 log = logging.getLogger(__name__)
 
 
-class ConanPrep(Subsystem):
-  """Prepares a PEX binary for the conan package manager."""
-  options_scope = 'conan-prep'
+class Conan(Subsystem):
+  """Pex binary for the conan package manager."""
+  options_scope = 'conan'
 
-  class ConanBinary(object):
-    """A `conan` PEX binary."""
-
-    def __init__(self, pex):
-      self._pex = pex
-
-    @property
-    def pex(self):
-      """Return the conan binary PEX.
-
-      :rtype: :class:`pex.pex.PEX`
-      """
-      return self._pex
-
-  @classmethod
-  def implementation_version(cls):
-    return super(ConanPrep, cls).implementation_version() + [('ConanPrep', 1)]
-
-  def conan_requirements(self):
+  @staticmethod
+  def default_conan_requirements():
     return (
       'conan==1.4.4',
       'PyJWT>=1.4.0, <2.0.0',
@@ -65,6 +48,30 @@ class ConanPrep(Subsystem):
       'deprecation>=2.0, <2.1'
     )
 
+  @classmethod
+  def register_options(cls, register):
+    super(Conan, cls).register_options(register)
+    register('--conan-requirements', type=str, default=cls.default_conan_requirements(),
+             advanced=True, help='The requirements used to build to conan client pex.')
+
+  class ConanBinary(object):
+    """A `conan` PEX binary."""
+
+    def __init__(self, pex):
+      self._pex = pex
+
+    @property
+    def pex(self):
+      """Return the conan binary PEX.
+
+      :rtype: :class:`pex.pex.PEX`
+      """
+      return self._pex
+
+  @classmethod
+  def implementation_version(cls):
+    return super(Conan, cls).implementation_version() + [('Conan', 1)]
+
   def bootstrap_conan(self):
     pex_info = PexInfo.default()
     pex_info.entry_point = 'conans.conan'
@@ -77,7 +84,7 @@ class ConanPrep(Subsystem):
     else:  
       with safe_concurrent_creation(conan_pex_path) as safe_path:
         builder = PEXBuilder(safe_path, pex_info=pex_info)
-        reqs = [PythonRequirement(req) for req in self.conan_requirements()]
+        reqs = [PythonRequirement(req) for req in self.get_options().conan_requirements]
         interpreter = builder.interpreter
         dump_requirements(builder, interpreter, reqs, log)
         builder.freeze()

@@ -6,17 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import textwrap
+import unittest
 
-from pants.backend.native.tasks.native_third_party_prep import NativeThirdPartyPrep
+from pants.backend.native.tasks.native_third_party_fetch import ConanRequirement
 from pants.util.osutil import get_normalized_os_name
-from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
-
-class TestNativeThirdPartyPrep(PythonTaskTestBase):
-  
-  @classmethod
-  def task_type(cls):
-    return NativeThirdPartyPrep
+class TestConanRequirement(unittest.TestCase):
 
   def test_parse_conan_stdout_for_pkg_hash(self):
     tc_1 = textwrap.dedent("""
@@ -38,18 +33,19 @@ class TestNativeThirdPartyPrep(PythonTaskTestBase):
     )
     pkg_spec = 'rang/3.1.0@rang/stable'
     expected_sha = '5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9'
-    sha1 = NativeThirdPartyPrep.parse_conan_stdout_for_pkg_sha(tc_1, pkg_spec)
+    cr = ConanRequirement.parse(pkg_spec)
+    sha1 = cr.parse_conan_stdout_for_pkg_sha(tc_1, pkg_spec)
     self.assertEqual(sha1, expected_sha)
-    sha2 = NativeThirdPartyPrep.parse_conan_stdout_for_pkg_sha(tc_2, pkg_spec)
+    sha2 = cr.parse_conan_stdout_for_pkg_sha(tc_2, pkg_spec)
     self.assertEqual(sha2, expected_sha)
 
   def test_parse_lib_name_from_library_filename(self):
     # TODO
     pass
 
-  def test_build_conan_cmdline(self):
+  def test_build_conan_cmdline_args(self):
     pkg_spec = 'test/1.0.0@conan/stable'
-    cmdline = NativeThirdPartyPrep.build_conan_cmdline(pkg_spec)
+    cmdline = cr._build_conan_cmdline_args(pkg_spec)
     os_name = get_normalized_os_name()
     if os_name == 'linux':
       expected = ['install', 'test/1.0.0@conan/stable', '-r=pants-conan-remote', '-s', 'os=Linux']
