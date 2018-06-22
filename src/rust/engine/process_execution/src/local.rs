@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use tokio_process::CommandExt;
 
-use super::{ExecuteProcessRequest, ExecuteProcessResult};
+use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
 
 use bytes::Bytes;
 
@@ -74,7 +74,7 @@ impl super::CommandRunner for CommandRunner {
   ///
   /// Runs a command on this machine in the passed working directory.
   ///
-  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<ExecuteProcessResult, String> {
+  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let workdir = try_future!(
       tempfile::Builder::new()
         .prefix("process-execution")
@@ -141,7 +141,7 @@ impl super::CommandRunner for CommandRunner {
         };
 
         output_snapshot
-          .map(|snapshot| ExecuteProcessResult {
+          .map(|snapshot| FallibleExecuteProcessResult {
             stdout: Bytes::from(output.stdout),
             stderr: Bytes::from(output.stderr),
             exit_code: output.status.code().unwrap(),
@@ -165,7 +165,7 @@ mod tests {
 
   use fs;
   use futures::Future;
-  use super::{ExecuteProcessRequest, ExecuteProcessResult};
+  use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
   use super::super::CommandRunner as CommandRunnerTrait;
   use std;
   use std::collections::{BTreeMap, BTreeSet};
@@ -193,7 +193,7 @@ mod tests {
 
     assert_eq!(
       result.unwrap(),
-      ExecuteProcessResult {
+      FallibleExecuteProcessResult {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
@@ -217,7 +217,7 @@ mod tests {
 
     assert_eq!(
       result.unwrap(),
-      ExecuteProcessResult {
+      FallibleExecuteProcessResult {
         stdout: as_bytes("foo"),
         stderr: as_bytes("bar"),
         exit_code: 1,
@@ -315,7 +315,7 @@ mod tests {
     });
     assert_eq!(
       result.unwrap(),
-      ExecuteProcessResult {
+      FallibleExecuteProcessResult {
         stdout: as_bytes(""),
         stderr: as_bytes(""),
         exit_code: 0,
@@ -342,7 +342,7 @@ mod tests {
 
     assert_eq!(
       result.unwrap(),
-      ExecuteProcessResult {
+      FallibleExecuteProcessResult {
         stdout: as_bytes(""),
         stderr: as_bytes(""),
         exit_code: 0,
@@ -374,7 +374,7 @@ mod tests {
 
     assert_eq!(
       result.unwrap(),
-      ExecuteProcessResult {
+      FallibleExecuteProcessResult {
         stdout: as_bytes(""),
         stderr: as_bytes(""),
         exit_code: 0,
@@ -407,7 +407,7 @@ mod tests {
 
     assert_eq!(
       result.unwrap(),
-      ExecuteProcessResult {
+      FallibleExecuteProcessResult {
         stdout: as_bytes(""),
         stderr: as_bytes(""),
         exit_code: 0,
@@ -438,7 +438,7 @@ mod tests {
 
     assert_eq!(
       result.unwrap(),
-      ExecuteProcessResult {
+      FallibleExecuteProcessResult {
         stdout: as_bytes(""),
         stderr: as_bytes(""),
         exit_code: 1,
@@ -467,7 +467,7 @@ mod tests {
 
     assert_eq!(
       result.unwrap(),
-      ExecuteProcessResult {
+      FallibleExecuteProcessResult {
         stdout: as_bytes(""),
         stderr: as_bytes(""),
         exit_code: 0,
@@ -476,13 +476,15 @@ mod tests {
     )
   }
 
-  fn run_command_locally(req: ExecuteProcessRequest) -> Result<ExecuteProcessResult, String> {
+  fn run_command_locally(
+    req: ExecuteProcessRequest,
+  ) -> Result<FallibleExecuteProcessResult, String> {
     run_command_locally_in_dir(req)
   }
 
   fn run_command_locally_in_dir(
     req: ExecuteProcessRequest,
-  ) -> Result<ExecuteProcessResult, String> {
+  ) -> Result<FallibleExecuteProcessResult, String> {
     let store_dir = TempDir::new().unwrap();
     let pool = Arc::new(fs::ResettablePool::new("test-pool-".to_owned()));
     let store = fs::Store::local_only(store_dir.path(), pool.clone()).unwrap();

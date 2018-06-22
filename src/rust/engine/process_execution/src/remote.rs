@@ -17,7 +17,7 @@ use protobuf::{self, Message, ProtobufEnum};
 use resettable::Resettable;
 use sha2::Sha256;
 
-use super::{ExecuteProcessRequest, ExecuteProcessResult};
+use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
 use std::cmp::min;
 
 #[derive(Clone)]
@@ -57,7 +57,7 @@ impl super::CommandRunner for CommandRunner {
   /// Loops until the server gives a response, either successful or error. Does not have any
   /// timeout: polls in a tight loop.
   ///
-  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<ExecuteProcessResult, String> {
+  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let execution_client = self.execution_client.clone();
     let execution_client2 = execution_client.clone();
     let operations_client = self.operations_client.clone();
@@ -231,7 +231,7 @@ impl CommandRunner {
   fn extract_execute_response(
     &self,
     mut operation: bazel_protos::operations::Operation,
-  ) -> BoxFuture<ExecuteProcessResult, ExecutionError> {
+  ) -> BoxFuture<FallibleExecuteProcessResult, ExecutionError> {
     // TODO: Log less verbosely
     debug!("Got operation response: {:?}", operation);
     if !operation.get_done() {
@@ -260,7 +260,7 @@ impl CommandRunner {
       .join(self.extract_output_files(&execute_response))
       .and_then(move |((stdout, stderr), output_directory)| {
         match grpcio::RpcStatusCode::from(execute_response.get_status().get_code()) {
-          grpcio::RpcStatusCode::Ok => future::ok(ExecuteProcessResult {
+          grpcio::RpcStatusCode::Ok => future::ok(FallibleExecuteProcessResult {
             stdout: stdout,
             stderr: stderr,
             exit_code: execute_response.get_result().get_exit_code(),
@@ -626,7 +626,7 @@ mod tests {
   use testutil::data::{TestData, TestDirectory};
   use testutil::{as_bytes, owned_string_vec};
 
-  use super::{CommandRunner, ExecuteProcessRequest, ExecuteProcessResult, ExecutionError};
+  use super::{CommandRunner, ExecuteProcessRequest, ExecutionError, FallibleExecuteProcessResult};
   use super::super::CommandRunner as CommandRunnerTrait;
   use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
@@ -750,7 +750,7 @@ mod tests {
 
     assert_eq!(
       result,
-      ExecuteProcessResult {
+      FallibleExecuteProcessResult {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
@@ -773,7 +773,7 @@ mod tests {
           0,
         ).0
       ),
-      Ok(ExecuteProcessResult {
+      Ok(FallibleExecuteProcessResult {
         stdout: testdata.bytes(),
         stderr: testdata_empty.bytes(),
         exit_code: 0,
@@ -796,7 +796,7 @@ mod tests {
           0,
         ).0
       ),
-      Ok(ExecuteProcessResult {
+      Ok(FallibleExecuteProcessResult {
         stdout: testdata_empty.bytes(),
         stderr: testdata.bytes(),
         exit_code: 0,
@@ -846,7 +846,7 @@ mod tests {
     let result = cmd_runner.run(echo_roland_request()).wait();
     assert_eq!(
       result,
-      Ok(ExecuteProcessResult {
+      Ok(FallibleExecuteProcessResult {
         stdout: test_stdout.bytes(),
         stderr: test_stderr.bytes(),
         exit_code: 0,
@@ -903,7 +903,7 @@ mod tests {
 
     assert_eq!(
       result,
-      ExecuteProcessResult {
+      FallibleExecuteProcessResult {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
@@ -1147,7 +1147,7 @@ mod tests {
       .wait();
     assert_eq!(
       result,
-      Ok(ExecuteProcessResult {
+      Ok(FallibleExecuteProcessResult {
         stdout: roland.bytes(),
         stderr: Bytes::from(""),
         exit_code: 0,
@@ -1223,7 +1223,7 @@ mod tests {
 
   #[test]
   fn extract_execute_response_success() {
-    let want_result = ExecuteProcessResult {
+    let want_result = FallibleExecuteProcessResult {
       stdout: as_bytes("roland"),
       stderr: Bytes::from("simba"),
       exit_code: 17,
@@ -1645,7 +1645,7 @@ mod tests {
   fn run_command_remote(
     address: String,
     request: ExecuteProcessRequest,
-  ) -> Result<ExecuteProcessResult, String> {
+  ) -> Result<FallibleExecuteProcessResult, String> {
     let cas = mock::StubCAS::with_roland_and_directory(1024);
     let command_runner = create_command_runner(address, &cas);
     command_runner.run(request).wait()
@@ -1667,7 +1667,7 @@ mod tests {
 
   fn extract_execute_response(
     operation: bazel_protos::operations::Operation,
-  ) -> Result<ExecuteProcessResult, ExecutionError> {
+  ) -> Result<FallibleExecuteProcessResult, ExecutionError> {
     let cas = mock::StubCAS::with_roland_and_directory(1024);
     let command_runner = create_command_runner("".to_owned(), &cas);
     command_runner.extract_execute_response(operation).wait()

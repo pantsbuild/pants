@@ -16,7 +16,7 @@ from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.fs import (DirectoryDigest, FileContent, FilesContent, Path, PathGlobs,
                              PathGlobsAndRoot, Snapshot)
-from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
+from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
@@ -127,7 +127,7 @@ class Scheduler(object):
       Dir,
       File,
       Link,
-      ExecuteProcessResult,
+      FallibleExecuteProcessResult,
       has_products_constraint,
       constraint_for(Address),
       constraint_for(Variants),
@@ -139,7 +139,7 @@ class Scheduler(object):
       constraint_for(File),
       constraint_for(Link),
       constraint_for(ExecuteProcessRequest),
-      constraint_for(ExecuteProcessResult),
+      constraint_for(FallibleExecuteProcessResult),
       constraint_for(GeneratorType),
     )
 
