@@ -15,10 +15,10 @@ from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.collections import assert_single_element
-from pants.util.strutil import create_path_env_var
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 from pants.util.process_handler import subprocess
+from pants.util.strutil import create_path_env_var
 
 
 class SharedLibrary(datatype(['name', 'path'])): pass

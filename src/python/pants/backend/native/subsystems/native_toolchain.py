@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.native.config.environment import CCompiler, CppCompiler, HostLibcDevInstallation, Linker, Platform
 from pants.backend.native.subsystems.binaries.binutils import Binutils
-from pants.backend.native.subsystems.glibc import GLibc
+from pants.backend.native.subsystems.libc_dev import LibcDev
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
 from pants.backend.native.subsystems.xcode_cli_tools import XCodeCLITools
@@ -38,7 +38,7 @@ class NativeToolchain(Subsystem):
     return super(NativeToolchain, cls).subsystem_dependencies() + (
       Binutils.scoped(cls),
       GCC.scoped(cls),
-      GLibc.scoped(cls),
+      LibcDev.scoped(cls),
       LLVM.scoped(cls),
       XCodeCLITools.scoped(cls),
     )
@@ -60,8 +60,8 @@ class NativeToolchain(Subsystem):
     return XCodeCLITools.scoped_instance(self)
 
   @memoized_property
-  def _libc(self):
-    return GLibc.scoped_instance(self)
+  def _libc_dev(self):
+    return LibcDev.scoped_instance(self)
 
 
 @rule(Linker, [Select(Platform), Select(NativeToolchain)])
@@ -102,10 +102,10 @@ def select_cpp_compiler(platform, native_toolchain):
 def select_libc_dev_install(platform, native_toolchain):
   lib_dir = platform.resolve_platform_specific({
     'darwin': lambda: None,
-    'linux': lambda: native_toolchain._libc.lib_dir(),
+    'linux': lambda: native_toolchain._libc_dev.host_libc,
   })
 
-  yield HostLibcDevInstallation(lib_dir=lib_dir)
+  yield HostLibcDevInstallation(lib_dir=lib_dir, platform=platform)
 
 
 def create_native_toolchain_rules():

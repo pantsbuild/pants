@@ -78,7 +78,7 @@ class CppCompiler(datatype([
   pass
 
 
-class HostLibcDevInstallation(datatype(['lib_dir'])):
+class HostLibcDevInstallation(datatype(['lib_dir', ('platform', Platform)])):
   """???/lib_dir may be None!"""
 
 

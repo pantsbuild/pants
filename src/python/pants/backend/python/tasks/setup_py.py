@@ -164,8 +164,13 @@ class SetupPyExecutionEnvironment(datatype([
 
       libc_install_dir = native_tools.libc_dev_install.lib_dir
       if libc_install_dir:
-        # FIXME: add DYLD_LIBRARY_PATH for osx!
-        ret['LD_LIBRARY_PATH'] = libc_install_dir
+        if not os.path.isdir(libc_install_dir):
+          raise Exception("???")
+        env_var = native_tools.libc_dev_install.platform.resolve_platform_specific({
+          'darwin': 'DYLD_LIBRARY_PATH',
+          'linux': 'LD_LIBRARY_PATH',
+        })
+        ret[env_var] = libc_install_dir
 
       # TODO(#5661): Overridding LD or LDSHARED causes setup.py to try to invoke that linker
       # directly without going through the compiler, which fails.
@@ -174,14 +179,7 @@ class SetupPyExecutionEnvironment(datatype([
         native_tools.cpp_compiler.path_entries +
         native_tools.linker.path_entries
       )
-      # FIXME(#5662): It seems that crti.o is provided by glibc, which we don't provide yet, so this
-      # lets Travis pass for now.
-      ret['PATH'] = native_tools.linker.platform.resolve_platform_specific({
-        'darwin': lambda: create_path_env_var(all_path_entries),
-        # Append our tools after the ones already on the PATH -- this is shameful and should be
-        # removed when glibc is introduced.
-        'linux': lambda: create_path_env_var(all_path_entries, os.environ.copy()),
-      })
+      ret['PATH'] = create_path_env_var(all_path_entries)
 
     return ret
 

@@ -15,11 +15,11 @@ from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.dependency_context import DependencyContext
-from pants.util.strutil import create_path_env_var
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import SubclassesOf, datatype
 from pants.util.process_handler import subprocess
+from pants.util.strutil import create_path_env_var
 
 
 class NativeCompileRequest(datatype([
