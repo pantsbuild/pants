@@ -522,7 +522,7 @@ impl ExecuteProcess {
 }
 
 #[derive(Clone, Debug)]
-pub struct ProcessResult(process_execution::ExecuteProcessResult);
+pub struct ProcessResult(process_execution::FallibleExecuteProcessResult);
 
 impl Node for ExecuteProcess {
   type Output = ProcessResult;

@@ -12,7 +12,8 @@ import unittest
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, FileContent, FilesContent,
                              PathGlobs, Snapshot, create_fs_rules)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
-                                           ProcessExecutionFailure, create_process_rules)
+                                           FallibleExecuteProcessResult, ProcessExecutionFailure,
+                                           create_process_rules)
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
 from pants.util.objects import TypeCheckError, datatype
@@ -372,6 +373,34 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertEqual(1, e.exit_code)
     self.assertIn('javac compilation', str(e))
     self.assertIn("NOT VALID JAVA", e.stderr)
+
+  def test_fallible_failing_command_returns_exited_result(self):
+    scheduler = self.mk_scheduler_in_example_fs(())
+
+    request = ExecuteProcessRequest.create_with_empty_snapshot(
+      ("/bin/bash", "-c", "exit 1"),
+      dict(),
+      tuple(),
+      description='one-cat',
+    )
+
+    result = self.execute_expecting_one_result(scheduler, FallibleExecuteProcessResult, request).value
+
+    self.assertEquals(result.exit_code, 1)
+
+  def test_non_fallible_failing_command_raises(self):
+    scheduler = self.mk_scheduler_in_example_fs(())
+
+    request = ExecuteProcessRequest.create_with_empty_snapshot(
+      ("/bin/bash", "-c", "exit 1"),
+      dict(),
+      tuple(),
+      description='one-cat',
+    )
+
+    with self.assertRaises(ProcessExecutionFailure) as cm:
+      self.execute_raising_throw(scheduler, ExecuteProcessResult, request)
+    self.assertIn("process 'one-cat' failed with exit code 1.", str(cm.exception))
 
   def mk_example_fs_tree(self):
     fs_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))

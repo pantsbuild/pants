@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.graph_info.subsystems.cloc_binary import ClocBinary
-from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import FilesContent, PathGlobs, PathGlobsAndRoot, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest
@@ -87,10 +86,6 @@ class CountLinesOfCode(ConsoleTask):
       'cloc'
     )
     exec_result = self.context.execute_process_synchronously(req, 'cloc', (WorkUnitLabel.TOOL,))
-
-    # TODO: Remove this check when https://github.com/pantsbuild/pants/issues/5719 is resolved.
-    if exec_result.exit_code != 0:
-      raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), exec_result.exit_code))
 
     files_content_tuple = self.context._scheduler.product_request(
       FilesContent,

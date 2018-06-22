@@ -86,12 +86,16 @@ class ExecuteProcessRequest(datatype([
       )
 
 
-class ExecuteProcessResult(datatype(['stdout', 'stderr', 'exit_code', 'output_directory_digest'])):
-  """Result of executing a process. Will raise an exception if the exit code is non-zero."""
+class ExecuteProcessResult(datatype(['stdout', 'stderr', 'output_directory_digest'])):
+  """Result of successfully executing a process.
+
+  Requesting one of these will raise an exception if the exit code is non-zero."""
 
 
 class FallibleExecuteProcessResult(datatype(['stdout', 'stderr', 'exit_code', 'output_directory_digest'])):
-  """An ExecuteProcessResult that will not raise an exception if the exit code is non-zero."""
+  """Result of executing a process.
+
+  Requesting one of these will not raise an exception if the exit code is non-zero."""
 
 
 class ProcessExecutionFailure(Exception):
@@ -100,7 +104,7 @@ class ProcessExecutionFailure(Exception):
   For example, exiting with a non-zero code.
   """
 
-  MSG_FMT = """process '{desc}' failed with code {code}.
+  MSG_FMT = """process '{desc}' failed with exit code {code}.
 stdout:
 {stdout}
 stderr:
@@ -127,7 +131,6 @@ def fallible_to_exec_result_or_raise(fallible_result, request):
     return ExecuteProcessResult(
       fallible_result.stdout,
       fallible_result.stderr,
-      fallible_result.exit_code,
       fallible_result.output_directory_digest
     )
   else:
