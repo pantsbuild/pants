@@ -25,9 +25,9 @@ def invoke_pex_for_output(pex_file_to_run):
 class CTypesIntegrationTest(PantsRunIntegrationTest):
 
   _binary_target = 'testprojects/src/python/python_distribution/ctypes:bin'
-  _binary_target_with_header_only_third_party = 'testprojects/src/python/'
+  _binary_target_with_header_only_third_party = ('testprojects/src/python/'
                                                 'python_distribution/'
-                                                'ctypes_with_third_party:bin_with_third_party'
+                                                'ctypes_with_third_party:bin_with_third_party')
 
   def test_run(self):
     pants_run = self.run_pants(command=['run', self._binary_target])
