@@ -20,7 +20,7 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 from wheel.install import WheelFile
 
-from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker
+from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
 from pants.backend.python.pex_util import get_local_platform
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -97,6 +97,7 @@ class SetupPyNativeTools(datatype([
     ('c_compiler', CCompiler),
     ('cpp_compiler', CppCompiler),
     ('linker', Linker),
+    ('platform', Platform),
 ])):
   """The native tools needed for a setup.py invocation.
 
@@ -104,12 +105,13 @@ class SetupPyNativeTools(datatype([
   """
 
 
-@rule(SetupPyNativeTools, [Select(CCompiler), Select(CppCompiler), Select(Linker)])
-def get_setup_py_native_tools(c_compiler, cpp_compiler, linker):
+@rule(SetupPyNativeTools, [Select(CCompiler), Select(CppCompiler), Select(Linker), Select(Platform)])
+def get_setup_py_native_tools(c_compiler, cpp_compiler, linker, platform):
   yield SetupPyNativeTools(
     c_compiler=c_compiler,
     cpp_compiler=cpp_compiler,
-    linker=linker)
+    linker=linker,
+    platform=platform)
 
 
 class SetupRequiresSiteDir(datatype(['site_dir'])): pass
@@ -151,7 +153,7 @@ class SetupPyExecutionEnvironment(datatype([
 
   class SetupPyExecutionEnvironmentError(Exception): pass
 
-  def as_environment(self, platform):
+  def as_environment(self):
     ret = {}
 
     if self.setup_requires_site_dir:
@@ -163,7 +165,7 @@ class SetupPyExecutionEnvironment(datatype([
       ret['CXX'] = native_tools.cpp_compiler.exe_filename
 
       # This sets PATH, but that gets overridden.
-      ret.update(native_tools.linker.get_invocation_environment_dict())
+      ret.update(native_tools.linker.get_invocation_environment_dict(native_tools.platform))
 
     return ret
 
