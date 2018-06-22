@@ -7,16 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.native.config.environment import HostLibcDev
 from pants.backend.native.subsystems.utils.parse_search_dirs import ParseSearchDirs
 from pants.base.hash_utils import hash_file
 from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
-from pants.util.objects import datatype
-
-
-# FIXME: make this an @rule, after we can automatically produce LibcDev (see #5788).
-class HostLibcDev(datatype(['crti_object', 'fingerprint'])): pass
 
 
 # TODO: think about how this could share any structure with XCodeCLITools, which is very similar in

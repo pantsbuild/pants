@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 from abc import abstractproperty
 
 from pants.engine.rules import SingletonRule
@@ -78,8 +79,19 @@ class CppCompiler(datatype([
   pass
 
 
-class HostLibcDevInstallation(datatype(['lib_dir', ('platform', Platform)])):
-  """???/lib_dir may be None!"""
+# FIXME: make this an @rule, after we can automatically produce LibcDev (see #5788).
+class HostLibcDev(datatype(['crti_object', 'fingerprint'])):
+
+  def get_lib_dir(self):
+    return os.path.dirname(self.crti_object)
+
+
+class HostLibcDevInstallation(datatype([
+    # This may be None.
+    'host_libc_dev',
+    ('platform', Platform),
+])):
+  pass
 
 
 def create_native_environment_rules():
