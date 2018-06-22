@@ -436,7 +436,7 @@ class BuildGraph(AbstractClass):
     return ret
 
   def transitive_subgraph_of_addresses(self, addresses, *vargs, **kwargs):
-    """Returns all transitive dependencies of `address`.
+    """Returns all transitive dependencies of `addresses`.
 
     Note that this uses `walk_transitive_dependencies_graph` and the predicate is passed through,
     hence it trims graphs rather than just filtering out Targets that do not match the predicate.

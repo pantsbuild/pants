@@ -1,0 +1,31 @@
+# coding=utf-8
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
+
+from hashlib import sha1
+
+from pants.base.payload_field import PayloadField
+from pants.util.objects import datatype
+
+
+class NativeArtifact(datatype(['lib_name']), PayloadField):
+  """A BUILD file object declaring a target can be exported to other languages with a native ABI."""
+
+  # TODO: This should probably be made into an @classproperty (see PR #5901).
+  @classmethod
+  def alias(cls):
+    return 'native_artifact'
+
+  def as_shared_lib(self, platform):
+    # TODO: check that the name conforms to some format in the constructor (e.g. no dots?).
+    return platform.resolve_platform_specific({
+      'darwin': lambda: 'lib{}.dylib'.format(self.lib_name),
+      'linux': lambda: 'lib{}.so'.format(self.lib_name),
+    })
+
+  def _compute_fingerprint(self):
+    # FIXME: can we just use the __hash__ method here somehow?
+    return sha1(self.lib_name).hexdigest()

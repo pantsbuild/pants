@@ -12,6 +12,7 @@ from abc import abstractproperty
 from six import string_types
 
 from pants.base.deprecated import deprecated_conditional
+from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_list
 from pants.engine.fs import PathGlobs
 from pants.engine.objects import Locatable
@@ -38,7 +39,24 @@ class TargetAdaptor(StructWithDeps):
     refactor how deferred sources are implemented.
       see: https://github.com/pantsbuild/pants/issues/2997
     """
+    source = getattr(self, 'source', None)
     sources = getattr(self, 'sources', None)
+
+    if source is not None and sources is not None:
+      raise Target.IllegalArgument(
+        self.address.spec,
+        'Cannot specify both source and sources attribute.'
+      )
+
+    if source is not None:
+      if not isinstance(source, string_types):
+        raise Target.IllegalArgument(
+          self.address.spec,
+          'source must be a string containing a path relative to the target, but got {} of type {}'
+            .format(source, type(source))
+        )
+      sources = [source]
+
     # N.B. Here we check specifically for `sources is None`, as it's possible for sources
     # to be e.g. an explicit empty list (sources=[]).
     if sources is None and self.default_sources_globs is not None:
@@ -56,7 +74,14 @@ class TargetAdaptor(StructWithDeps):
         return tuple()
       base_globs = BaseGlobs.from_sources_field(sources, self.address.spec_path)
       path_globs = base_globs.to_path_globs(self.address.spec_path)
-      return (SourcesField(self.address, 'sources', base_globs.filespecs, base_globs, path_globs),)
+      return (SourcesField(
+        self.address,
+        'sources',
+        base_globs.filespecs,
+        base_globs,
+        path_globs,
+        self.validate_sources,
+      ),)
 
   @property
   def default_sources_globs(self):
@@ -66,12 +91,29 @@ class TargetAdaptor(StructWithDeps):
   def default_sources_exclude_globs(self):
     return None
 
+  def validate_sources(self, sources):
+    """"
+    Validate that the sources argument is allowed.
+
+    Examples may be to check that the number of sources is correct, that file extensions are as
+    expected, etc.
+
+    TODO: Replace this with some kind of field subclassing, as per
+    https://github.com/pantsbuild/pants/issues/4535
+
+    :param sources EagerFilesetWithSpec resolved sources.
+    """
+    pass
+
 
 class Field(object):
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
 
 
-class SourcesField(datatype(['address', 'arg', 'filespecs', 'base_globs', 'path_globs']), Field):
+class SourcesField(
+  datatype(['address', 'arg', 'filespecs', 'base_globs', 'path_globs', 'validate_fn']),
+  Field
+):
   """Represents the `sources` argument for a particular Target.
 
   Sources are currently eagerly computed in-engine in order to provide the `BuildGraph`
@@ -84,6 +126,8 @@ class SourcesField(datatype(['address', 'arg', 'filespecs', 'base_globs', 'path_
     case of python resource globs.
   :param filespecs: The merged filespecs dict the describes the paths captured by this field.
   :param path_globs: A PathGlobs describing included files.
+  :param validate_fn: A function which takes an EagerFilesetWithSpec and throws if it's not
+    acceptable. This API will almost certainly change in the near future.
   """
 
   def __hash__(self):
@@ -97,33 +141,27 @@ class SourcesField(datatype(['address', 'arg', 'filespecs', 'base_globs', 'path_
       type(self).__name__, self.address, self.base_globs, self.arg, self.filespecs)
 
 
-class JavaLibraryAdaptor(TargetAdaptor):
-  @property
-  def default_sources_globs(self):
-    return ('*.java',)
-
-  @property
-  def default_sources_exclude_globs(self):
-    return JunitTestsAdaptor.java_test_globs
-
-
-class ScalaLibraryAdaptor(TargetAdaptor):
-  @property
-  def default_sources_globs(self):
-    return ('*.scala',)
-
-  @property
-  def default_sources_exclude_globs(self):
-    return JunitTestsAdaptor.scala_test_globs
+class JvmBinaryAdaptor(TargetAdaptor):
+  def validate_sources(self, sources):
+    if len(sources.files) > 1:
+      raise Target.IllegalArgument(self.address.spec,
+                'jvm_binary must have exactly 0 or 1 sources (typically used to specify the class '
+                'containing the main method). '
+                'Other sources should instead be placed in a java_library, which '
+                'should be referenced in the jvm_binary\'s dependencies.'
+              )
 
 
-class JunitTestsAdaptor(TargetAdaptor):
-  java_test_globs = ('*Test.java',)
-  scala_test_globs = ('*Test.scala', '*Spec.scala')
-
-  @property
-  def default_sources_globs(self):
-    return self.java_test_globs + self.scala_test_globs
+class PageAdaptor(TargetAdaptor):
+  def validate_sources(self, sources):
+    if len(sources.files) != 1:
+      raise Target.IllegalArgument(
+        self.address.spec,
+        'page targets must have exactly 1 source, but found {} ({})'.format(
+          len(sources.files),
+          ', '.join(sources.files),
+        )
+      )
 
 
 class BundlesField(datatype(['address', 'bundles', 'filespecs_list', 'path_globs_list']), Field):
@@ -211,18 +249,20 @@ class PythonTargetAdaptor(TargetAdaptor):
                                    'resources',
                                    base_globs.filespecs,
                                    base_globs,
-                                   path_globs)
+                                   path_globs,
+                                   lambda _: None)
       return field_adaptors + (sources_field,)
 
 
-class PythonLibraryAdaptor(PythonTargetAdaptor):
-  @property
-  def default_sources_globs(self):
-    return ('*.py',)
-
-  @property
-  def default_sources_exclude_globs(self):
-    return PythonTestsAdaptor.python_test_globs
+class PythonBinaryAdaptor(PythonTargetAdaptor):
+  def validate_sources(self, sources):
+    if len(sources.files) > 1:
+      raise Target.IllegalArgument(self.address.spec,
+        'python_binary must have exactly 0 or 1 sources (typically used to specify the file '
+        'containing the entry point). '
+        'Other sources should instead be placed in a python_library, which '
+        'should be referenced in the python_binary\'s dependencies.'
+      )
 
 
 class PythonTestsAdaptor(PythonTargetAdaptor):
@@ -233,21 +273,9 @@ class PythonTestsAdaptor(PythonTargetAdaptor):
     return self.python_test_globs
 
 
-class GoTargetAdaptor(TargetAdaptor):
-
-  @property
-  def default_sources(self):
-    # Go has always used implicit_sources: override to ignore the option.
-    return True
-
-  @property
-  def default_sources_globs(self):
-    # N.B. Go targets glob on `*` due to the way resources and .c companion files are handled.
-    return ('*',)
-
-  @property
-  def default_sources_exclude_globs(self):
-    return ('BUILD', 'BUILD.*')
+class PantsPluginAdaptor(PythonTargetAdaptor):
+  def get_sources(self):
+    return ['register.py']
 
 
 class BaseGlobs(Locatable, AbstractClass):

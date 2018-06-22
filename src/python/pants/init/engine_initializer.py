@@ -7,9 +7,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
+from pants.backend.docgen.targets.doc import Page
+from pants.backend.jvm.targets.jvm_app import JvmApp
+from pants.backend.jvm.targets.jvm_binary import JvmBinary
+from pants.backend.python.targets.python_app import PythonApp
+from pants.backend.python.targets.python_binary import PythonBinary
+from pants.backend.python.targets.python_library import PythonLibrary
+from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.base.specs import Specs
+from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.isolated_process import create_process_rules
@@ -18,10 +25,10 @@ from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTarge
                                        create_legacy_graph_tasks)
 from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
-from pants.engine.legacy.structs import (AppAdaptor, GoTargetAdaptor, JavaLibraryAdaptor,
-                                         JunitTestsAdaptor, PythonLibraryAdaptor,
+from pants.engine.legacy.structs import (AppAdaptor, JvmBinaryAdaptor, PageAdaptor,
+                                         PantsPluginAdaptor, PythonBinaryAdaptor,
                                          PythonTargetAdaptor, PythonTestsAdaptor,
-                                         RemoteSourcesAdaptor, ScalaLibraryAdaptor, TargetAdaptor)
+                                         RemoteSourcesAdaptor, TargetAdaptor)
 from pants.engine.mapper import AddressMapper
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
@@ -46,33 +53,88 @@ class LegacySymbolTable(SymbolTable):
     :type build_file_aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
     """
     self._build_file_aliases = build_file_aliases
-    self._table = {alias: TargetAdaptor for alias in build_file_aliases.target_types}
+    self._table = {
+      alias: self._make_target_adaptor(TargetAdaptor, target_type)
+      for alias, target_type in build_file_aliases.target_types.items()
+    }
+
+    for alias, factory in build_file_aliases.target_macro_factories.items():
+      # TargetMacro.Factory with more than one target type is deprecated.
+      # For default sources, this means that TargetMacro Factories with more than one target_type
+      # will not parse sources through the engine, and will fall back to the legacy python sources
+      # parsing.
+      # Conveniently, multi-target_type TargetMacro.Factory, and legacy python source parsing, are
+      # targeted to be removed in the same version of pants.
+      if len(factory.target_types) == 1:
+        self._table[alias] = self._make_target_adaptor(
+          TargetAdaptor,
+          tuple(factory.target_types)[0],
+        )
 
     # TODO: The alias replacement here is to avoid elevating "TargetAdaptors" into the public
     # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
     # These should likely move onto Target subclasses as the engine gets deeper into beta
     # territory.
-    for alias in ['java_library', 'java_agent', 'javac_plugin']:
-      self._table[alias] = JavaLibraryAdaptor
-    for alias in ['scala_library', 'scalac_plugin']:
-      self._table[alias] = ScalaLibraryAdaptor
-    for alias in ['python_library', 'pants_plugin']:
-      self._table[alias] = PythonLibraryAdaptor
-    for alias in ['go_library', 'go_binary']:
-      self._table[alias] = GoTargetAdaptor
+    self._table['python_library'] = self._make_target_adaptor(PythonTargetAdaptor, PythonLibrary)
 
-    self._table['junit_tests'] = JunitTestsAdaptor
-    self._table['jvm_app'] = AppAdaptor
-    self._table['python_app'] = AppAdaptor
-    self._table['python_tests'] = PythonTestsAdaptor
-    self._table['python_binary'] = PythonTargetAdaptor
-    self._table['remote_sources'] = RemoteSourcesAdaptor
+    self._table['jvm_app'] = self._make_target_adaptor(AppAdaptor, JvmApp)
+    self._table['jvm_binary'] = self._make_target_adaptor(JvmBinaryAdaptor, JvmBinary)
+    self._table['python_app'] = self._make_target_adaptor(AppAdaptor, PythonApp)
+    self._table['python_tests'] = self._make_target_adaptor(PythonTestsAdaptor, PythonTests)
+    self._table['python_binary'] = self._make_target_adaptor(PythonBinaryAdaptor, PythonBinary)
+    self._table['remote_sources'] = self._make_target_adaptor(RemoteSourcesAdaptor, RemoteSources)
+    self._table['page'] = self._make_target_adaptor(PageAdaptor, Page)
+
+    # Note that these don't call _make_target_adaptor because we don't have a handy reference to the
+    # types being constructed. They don't have any default_sources behavior, so this should be ok,
+    # but if we end up doing more things in _make_target_adaptor, we should make sure they're
+    # applied here too.
+    self._table['pants_plugin'] = PantsPluginAdaptor
+    self._table['contrib_plugin'] = PantsPluginAdaptor
 
   def aliases(self):
     return self._build_file_aliases
 
   def table(self):
     return self._table
+
+  @classmethod
+  def _make_target_adaptor(cls, base_class, target_type):
+    """
+    Look up the default source globs for the type, and apply them to parsing through the engine.
+    """
+    if not target_type.supports_default_sources() or target_type.default_sources_globs is None:
+      return base_class
+
+    globs = _tuplify(target_type.default_sources_globs)
+    excludes = _tuplify(target_type.default_sources_exclude_globs)
+
+    class GlobsHandlingTargetAdaptor(base_class):
+      @property
+      def default_sources_globs(self):
+        if globs is None:
+          return super(GlobsHandlingTargetAdaptor, self).default_sources_globs
+        else:
+          return globs
+
+      @property
+      def default_sources_exclude_globs(self):
+        if excludes is None:
+          return super(GlobsHandlingTargetAdaptor, self).default_sources_exclude_globs
+        else:
+          return excludes
+
+    return GlobsHandlingTargetAdaptor
+
+
+def _tuplify(v):
+  if v is None:
+    return None
+  if isinstance(v, tuple):
+    return v
+  if isinstance(v, (list, set)):
+    return tuple(v)
+  return (v,)
 
 
 class LegacyGraphScheduler(datatype(['scheduler', 'symbol_table'])):
@@ -92,7 +154,9 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table'])):
     :param TargetRoots target_roots: The targets root of the request.
     """
     logger.debug('warming target_roots for: %r', target_roots)
-    subjects = [Specs(tuple(target_roots.specs))]
+    subjects = target_roots.specs
+    if not subjects:
+      subjects = []
     request = self.scheduler_session.execution_request([TransitiveHydratedTargets], subjects)
     result = self.scheduler_session.execute(request)
     if result.error:

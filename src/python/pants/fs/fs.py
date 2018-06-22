@@ -9,10 +9,9 @@ import hashlib
 import os
 
 
-# This is the max filename length for HFS+, extX and NTFS - the most likely filesystems pants will
-# be run under.
-# TODO(John Sirois): consider a better isolation layer
-_MAX_FILENAME_LENGTH = 255
+# The max filename length for HFS+, extX and NTFS is 255, but many systems also have limits on the
+# total path length (made up of multiple filenames), so we include some additional buffer.
+_MAX_FILENAME_LENGTH = 100
 
 
 def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LENGTH):
@@ -43,8 +42,16 @@ def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LE
     return filename
   else:
     digest = digest or hashlib.sha1()
-    digest.update(name)
-    safe_name = digest.hexdigest() + ext
+    digest.update(filename)
+    hexdigest = digest.hexdigest()[:16]
+
+    # Prefix and suffix length: max length less 2 periods, the extension length, and the digest length.
+    ps_len = max(0, (max_length - (2 + len(ext) + len(hexdigest))) // 2)
+    sep = '.' if ps_len > 0 else ''
+    prefix = name[:ps_len]
+    suffix = name[-ps_len:] if ps_len > 0 else ''
+
+    safe_name = '{}{}{}{}{}{}'.format(prefix, sep, hexdigest, sep, suffix, ext)
     if len(safe_name) > max_length:
       raise ValueError('Digest {} failed to produce a filename <= {} '
                        'characters for {} - got {}'.format(digest, max_length, filename, safe_name))

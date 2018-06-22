@@ -12,6 +12,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Bardur Arantsson
 + Benjy Weinberger
 + Bill Farner
++ Billy "Hyun Joon" Seol
 + Brandon Milton
 + Brian Larson
 + Brian Wickman

@@ -9,6 +9,7 @@ from pants.backend.native.config.environment import CCompiler, CppCompiler, Link
 from pants.backend.native.subsystems.binaries.binutils import Binutils
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
+from pants.backend.native.subsystems.xcode_cli_tools import XCodeCLITools
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
 from pants.subsystem.subsystem import Subsystem
@@ -18,30 +19,16 @@ from pants.util.memo import memoized_property
 class NativeToolchain(Subsystem):
   """Abstraction over platform-specific tools to compile and link native code.
 
-  This "native toolchain" subsystem is an abstraction that exposes directories
-  containing executables to compile and link "native" code (for now, C and C++
-  are supported). Consumers of this subsystem can add these directories to their
-  PATH to invoke subprocesses which use these tools.
+  When this subsystem is consumed, Pants will download and unpack archives (if necessary) which
+  together provide an appropriate "native toolchain" for the host platform: a compiler and linker,
+  usually. This subsystem exposes the toolchain through `@rule`s, which tasks then request during
+  setup or execution (synchronously, for now).
 
-  This abstraction is necessary for two reasons. First, because there are
-  multiple binaries involved in compilation and linking, which often invoke
-  other binaries that must also be available on the PATH. Second, because unlike
-  other binary tools in Pants, we can't provide the same package built for both
-  OSX and Linux, because there is no open-source linker for OSX with a
-  compatible license.
-
-  So when this subsystem is consumed, Pants will download and unpack archives
-  (if necessary) which together provide an appropriate "native toolchain" for
-  the host platform. On OSX, Pants will also find and provide path entries for
-  the XCode command-line tools, or error out with installation instructions if
-  the XCode tools could not be found.
+  NB: Currently, on OSX, Pants will find and invoke the XCode command-line tools, or error out with
+  installation instructions if the XCode tools could not be found.
   """
 
   options_scope = 'native-toolchain'
-
-  # This is a list of subsystems which implement `ExecutablePathProvider` and
-  # can be provided for all supported platforms.
-  _CROSS_PLATFORM_SUBSYSTEMS = [LLVM, GCC]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -49,6 +36,7 @@ class NativeToolchain(Subsystem):
       Binutils.scoped(cls),
       GCC.scoped(cls),
       LLVM.scoped(cls),
+      XCodeCLITools.scoped(cls),
     )
 
   @memoized_property
@@ -63,27 +51,42 @@ class NativeToolchain(Subsystem):
   def _llvm(self):
     return LLVM.scoped_instance(self)
 
+  @memoized_property
+  def _xcode_cli_tools(self):
+    return XCodeCLITools.scoped_instance(self)
+
 
 @rule(Linker, [Select(Platform), Select(NativeToolchain)])
 def select_linker(platform, native_toolchain):
-  # TODO(cosmicexplorer): make it possible to yield Get with a non-static
-  # subject type and use `platform.resolve_platform_specific()`.
-  if platform.normed_os_name == 'darwin':
-    linker = yield Get(Linker, LLVM, native_toolchain._llvm)
+  # TODO(#5933): make it possible to yield Get with a non-static
+  # subject type and use `platform.resolve_platform_specific()`, something like:
+  # linker = platform.resolve_platform_specific({
+  #   'darwin': lambda: Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools),
+  #   'linux': lambda: Get(Linker, Binutils, native_toolchain._binutils),
+  # })
+  if platform.normalized_os_name == 'darwin':
+    # TODO(#5663): turn this into LLVM when lld works.
+    linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
   else:
     linker = yield Get(Linker, Binutils, native_toolchain._binutils)
   yield linker
 
 
-@rule(CCompiler, [Select(NativeToolchain)])
-def select_c_compiler(native_toolchain):
-  c_compiler = yield Get(CCompiler, LLVM, native_toolchain._llvm)
+@rule(CCompiler, [Select(Platform), Select(NativeToolchain)])
+def select_c_compiler(platform, native_toolchain):
+  if platform.normalized_os_name == 'darwin':
+    c_compiler = yield Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+  else:
+    c_compiler = yield Get(CCompiler, GCC, native_toolchain._gcc)
   yield c_compiler
 
 
-@rule(CppCompiler, [Select(NativeToolchain)])
-def select_cpp_compiler(native_toolchain):
-  cpp_compiler = yield Get(CppCompiler, LLVM, native_toolchain._llvm)
+@rule(CppCompiler, [Select(Platform), Select(NativeToolchain)])
+def select_cpp_compiler(platform, native_toolchain):
+  if platform.normalized_os_name == 'darwin':
+    cpp_compiler = yield Get(CppCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+  else:
+    cpp_compiler = yield Get(CppCompiler, GCC, native_toolchain._gcc)
   yield cpp_compiler
 
 

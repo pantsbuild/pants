@@ -7,6 +7,8 @@ use std::fs::OpenOptions;
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
+use std::collections::binary_heap::BinaryHeap;
 
 use petgraph::Direction;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph, StableGraph};
@@ -39,6 +41,11 @@ impl EntryStateGetter for EntryStateField {
   }
 }
 
+struct EntryState {
+  field: EntryStateField,
+  start_time: Instant,
+}
+
 ///
 /// Because there are guaranteed to be more edges than nodes in Graphs, we mark cyclic
 /// dependencies via a wrapper around the NodeKey (rather than adding a byte to every
@@ -67,7 +74,7 @@ pub struct Entry {
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
   node: EntryKey,
-  state: Option<EntryStateField>,
+  state: Option<EntryState>,
 }
 
 impl Entry {
@@ -102,8 +109,9 @@ impl Entry {
   ///
   fn state(&mut self, context_factory: &ContextFactory, entry_id: EntryId) -> EntryStateField {
     if let Some(ref state) = self.state {
-      state.clone()
+      state.field.clone()
     } else {
+      let start_time = Instant::now();
       let state = match &self.node {
         &EntryKey::Valid(ref n) => {
           // Wrap the launch in future::lazy to defer it until after we're outside the Graph lock.
@@ -114,7 +122,10 @@ impl Entry {
         &EntryKey::Cyclic(_) => future::err(Failure::Noop(Noop::Cycle)).to_boxed(),
       };
 
-      self.state = Some(state.shared());
+      self.state = Some(EntryState {
+        field: state.shared(),
+        start_time,
+      });
       self.state(context_factory, entry_id)
     }
   }
@@ -126,7 +137,21 @@ impl Entry {
     self
       .state
       .as_ref()
-      .and_then(|state| state.peek().map(|nr| Entry::unwrap::<N>(nr)))
+      .and_then(|state| state.field.peek().map(|nr| Entry::unwrap::<N>(nr)))
+  }
+
+  ///
+  /// If the Node has started and has not yet completed, returns its runtime.
+  ///
+  fn current_running_duration(&self, now: &Instant) -> Option<Duration> {
+    self.state.as_ref().and_then(|state| {
+      if state.field.peek().is_none() {
+        // Still running.
+        Some(now.duration_since(state.start_time))
+      } else {
+        None
+      }
+    })
   }
 
   fn clear(&mut self) {
@@ -448,6 +473,60 @@ impl InnerGraph {
     Ok(())
   }
 
+  ///
+  /// Computes the K longest running entries in a Graph-aware fashion.
+  ///
+  fn heavy_hitters(&self, roots: &[NodeKey], k: usize) -> Vec<(String, Duration)> {
+    let now = Instant::now();
+    let queue_entry = |id| {
+      self
+        .entry_for_id(id)
+        .and_then(|entry| entry.current_running_duration(&now))
+        .map(|d| (d, id))
+    };
+
+    let mut queue: BinaryHeap<(Duration, EntryId)> = BinaryHeap::with_capacity(k as usize);
+    let mut visited: HashSet<EntryId, FNV> = HashSet::default();
+    let mut res = Vec::new();
+
+    // Initialize the queue.
+    queue.extend(
+      roots
+        .iter()
+        .filter_map(|nk| self.entry_id(&EntryKey::Valid(nk.clone())))
+        .filter_map(|eid| queue_entry(*eid)),
+    );
+
+    while let Some((duration, id)) = queue.pop() {
+      if !visited.insert(id) {
+        continue;
+      }
+
+      // Compute the running dependencies of the node.
+      let mut deps = self
+        .pg
+        .neighbors_directed(id, Direction::Outgoing)
+        .filter_map(|id| queue_entry(id))
+        .peekable();
+
+      if deps.peek().is_none() {
+        // If the entry has no running deps, it is a leaf. Emit it.
+        res.push((
+          self.unsafe_entry_for_id(id).node.content().format(),
+          duration,
+        ));
+        if res.len() >= k {
+          break;
+        }
+      } else {
+        // Otherwise, assume it is blocked on the running dependencies and expand them.
+        queue.extend(deps);
+      }
+    }
+
+    res
+  }
+
   fn reachable_digest_count(&self, roots: &[NodeKey]) -> usize {
     let root_ids = roots
       .iter()
@@ -599,6 +678,12 @@ impl Graph {
   pub fn visualize(&self, roots: &[NodeKey], path: &Path) -> io::Result<()> {
     let inner = self.inner.lock().unwrap();
     inner.visualize(roots, path)
+  }
+
+  #[allow(dead_code)]
+  pub fn heavy_hitters(&self, roots: &[NodeKey], k: usize) -> Vec<(String, Duration)> {
+    let inner = self.inner.lock().unwrap();
+    inner.heavy_hitters(roots, k)
   }
 
   pub fn reachable_digest_count(&self, roots: &[NodeKey]) -> usize {

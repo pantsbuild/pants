@@ -25,10 +25,6 @@ from pants.util.dirutil import fast_relpath, safe_delete, safe_walk
 logger = logging.getLogger(__name__)
 
 
-class EmptyDepContext(object):
-  codegen_types = tuple()
-
-
 class SimpleCodegenTask(Task):
   """A base-class for code generation for a single target language.
 

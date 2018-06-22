@@ -1,0 +1,85 @@
+# coding=utf-8
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
+
+import logging
+import os
+
+from pex.interpreter import PythonInterpreter
+from pex.pex import PEX
+from pex.pex_builder import PEXBuilder
+from pex.pex_info import PexInfo
+
+from pants.backend.python.python_requirement import PythonRequirement
+from pants.backend.python.tasks.pex_build_util import dump_requirements
+from pants.backend.python.tasks.wrapped_pex import WrappedPEX
+from pants.base.build_environment import get_pants_cachedir
+from pants.subsystem.subsystem import Subsystem
+from pants.util.dirutil import safe_concurrent_creation
+
+
+log = logging.getLogger(__name__)
+
+
+class ConanPrep(Subsystem):
+  """Prepares a PEX binary for the conan package manager."""
+  options_scope = 'conan-prep'
+
+  class ConanBinary(object):
+    """A `conan` PEX binary."""
+
+    def __init__(self, pex):
+      self._pex = pex
+
+    @property
+    def pex(self):
+      """Return the conan binary PEX.
+
+      :rtype: :class:`pex.pex.PEX`
+      """
+      return self._pex
+
+  @classmethod
+  def implementation_version(cls):
+    return super(ConanPrep, cls).implementation_version() + [('ConanPrep', 1)]
+
+  def conan_requirements(self):
+    return (
+      'conan==1.4.4',
+      'PyJWT>=1.4.0, <2.0.0',
+      'requests>=2.7.0, <3.0.0',
+      'colorama>=0.3.3, <0.4.0',
+      'PyYAML>=3.11, <3.13.0',
+      'patch==1.16',
+      'fasteners>=0.14.1',
+      'six>=1.10.0',
+      'node-semver==0.2.0',
+      'distro>=1.0.2, <1.2.0',
+      'pylint>=1.8.1, <1.9.0',
+      'future==0.16.0',
+      'pygments>=2.0, <3.0',
+      'astroid>=1.6, <1.7',
+      'deprecation>=2.0, <2.1'
+    )
+
+  def bootstrap_conan(self):
+    pex_info = PexInfo.default()
+    pex_info.entry_point = 'conans.conan'
+    conan_bootstrap_dir = os.path.join(get_pants_cachedir(), 'conan_support')
+    conan_pex_path = os.path.join(conan_bootstrap_dir, 'conan_binary')
+    if os.path.exists(conan_pex_path):
+      interpreter = PythonInterpreter.get()
+      conan_binary = WrappedPEX(PEX(conan_pex_path, interpreter), interpreter)
+      return self.ConanBinary(conan_binary)
+    else:  
+      with safe_concurrent_creation(conan_pex_path) as safe_path:
+        builder = PEXBuilder(safe_path, pex_info=pex_info)
+        reqs = [PythonRequirement(req) for req in self.conan_requirements()]
+        interpreter = builder.interpreter
+        dump_requirements(builder, interpreter, reqs, log)
+        builder.freeze()
+      conan_binary = WrappedPEX(PEX(conan_pex_path, interpreter), interpreter)
+      return self.ConanBinary(conan_binary)

@@ -7,5 +7,9 @@ python_library(
     'src/python/pants/backend/native/config',
     'src/python/pants/backend/native/subsystems',
     'src/python/pants/backend/native/subsystems/binaries',
+    'src/python/pants/backend/native/targets',
+    'src/python/pants/backend/native/tasks',
+    'src/python/pants/build_graph',
+    'src/python/pants/goal:task_registrar',
   ],
 )
