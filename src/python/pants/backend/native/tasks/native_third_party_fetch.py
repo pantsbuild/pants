@@ -20,6 +20,7 @@ from pants.util.process_handler import subprocess
 
 
 class ConanRequirement(object):
+  """A wrapper class to encapsulate a Conan package requirement."""
 
   @staticmethod
   def _translate_conan_pkg_id_to_directory_path(pkg_string):
