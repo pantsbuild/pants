@@ -8,12 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
+from pants.backend.native.subsystems.utils.parse_search_dirs import ParseSearchDirs
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
 from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_executable
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 
 
 class XCodeCLITools(Subsystem):
@@ -38,9 +39,17 @@ class XCodeCLITools(Subsystem):
     register('--xcode-cli-install-location', type=dir_option, default='/usr/bin', advanced=True,
              help='Installation location for the XCode command-line developer tools.')
 
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(XCodeCLITools, cls).subsystem_dependencies() + (ParseSearchDirs.scoped(cls),)
+
   @memoized_property
   def _install_location(self):
     return self.get_options().xcode_cli_install_location
+
+  @memoized_property
+  def _parse_search_dirs_instance(self):
+    return ParseSearchDirs.scoped_instance(self)
 
   def _check_executables_exist(self):
     for filename in self._REQUIRED_TOOLS:
@@ -53,29 +62,41 @@ class XCodeCLITools(Subsystem):
           "(for file '{exe}' with --xcode_cli_install_location={loc!r})"
           .format(exe=filename, loc=self._install_location))
 
+  @memoized_method
   def path_entries(self):
     self._check_executables_exist()
     return [self._install_location]
 
+  @memoized_method
   def linker(self, platform):
     return Linker(
       path_entries=self.path_entries(),
-      # FIXME(#5951): This actually links correctly for both C and C++ sources -- there should
-      # probably be some testing to ensure this is correct in CI as well.
-      exe_filename='clang++',
-      platform=platform)
+      exe_filename='ld',
+      library_dirs=[])
 
+  @memoized_method
   def c_compiler(self, platform):
+    exe_filename = 'clang'
+    path_entries = self.path_entries()
+    lib_search_dirs = self._parse_search_dirs_instance.get_compiler_library_dirs(
+      compiler_exe=exe_filename,
+      path_entries=path_entries)
     return CCompiler(
-      path_entries=self.path_entries(),
-      exe_filename='clang',
-      platform=platform)
+      path_entries=path_entries,
+      exe_filename=exe_filename,
+      library_dirs=lib_search_dirs)
 
+  @memoized_method
   def cpp_compiler(self, platform):
+    exe_filename = 'clang++'
+    path_entries = self.path_entries()
+    lib_search_dirs = self._parse_search_dirs_instance.get_compiler_library_dirs(
+      compiler_exe=exe_filename,
+      path_entries=path_entries)
     return CppCompiler(
-      path_entries=self.path_entries(),
-      exe_filename='clang++',
-      platform=platform)
+      path_entries=path_entries,
+      exe_filename=exe_filename,
+      library_dirs=lib_search_dirs)
 
 
 @rule(Linker, [Select(Platform), Select(XCodeCLITools)])

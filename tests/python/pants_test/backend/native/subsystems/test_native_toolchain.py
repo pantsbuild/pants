@@ -7,96 +7,98 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
+from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
-from pants.backend.native.subsystems.utils.parse_search_dirs import ParseSearchDirs
-from pants.util.contextutil import environment_as
-from pants.util.osutil import get_normalized_os_name
+from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.dirutil import is_executable, safe_open
 from pants.util.process_handler import subprocess
-from pants.util.strutil import create_path_env_var
-from pants_test.base_test import BaseTest
+from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
+from pants_test.test_base import TestBase
 
 
-class TestNativeToolchain(BaseTest):
+class TestNativeToolchain(TestBase, SchedulerTestBase):
 
   def setUp(self):
     super(TestNativeToolchain, self).setUp()
+
+    self.platform = Platform.create()
     self.toolchain = global_subsystem_instance(NativeToolchain)
-    self.parse_search_dirs = global_subsystem_instance(ParseSearchDirs)
+    self.rules = native_backend_rules()
 
-  def _get_test_file_path(self, path):
-    return os.path.join(self.build_root, path)
+  def _sched(self, *args, **kwargs):
+    return self.mk_scheduler(rules=self.rules, *args, **kwargs)
 
-  def _invoke_output_file(self, fname):
-    return self._invoke_capturing_output([self._get_test_file_path(fname)],
-                                         is_compiler=False)
+  def _invoke_compiler(self, compiler, args, cwd, platform):
+    return self._invoke_capturing_output([compiler.exe_filename] + args,
+                                         cwd,
+                                         compiler.get_invocation_environment_dict(platform))
 
-  def _invoke_capturing_output(self, cmd, is_compiler=True, cwd=None):
-    if cwd is None:
-      cwd = self.build_root
+  def _invoke_linker(self, linker, args, cwd, platform):
+    return self._invoke_capturing_output([linker.exe_filename] + args,
+                                         cwd,
+                                         linker.get_invocation_environment_dict(platform))
 
-    toolchain_dirs = self.toolchain.path_entries()
-    process_invocation_env = dict(PATH=create_path_env_var(toolchain_dirs))
-
-    compiler_library_dirs = []
-    if is_compiler:
-      compiler_exe = cmd[0]
-      compiler_library_dirs = self.parse_search_dirs.get_compiler_library_dirs(
-        compiler_exe,
-        path_entries=toolchain_dirs)
-
-    # FIXME: convert this to Platform#resolve_platform_specific() when #5815 is merged.
-    if get_normalized_os_name() == 'linux':
-      libc_crti = self.toolchain.libc.host_libc.crti_object
-      compiler_library_dirs = [os.path.dirname(libc_crti)] + compiler_library_dirs
-
-    all_lib_dirs = create_path_env_var(compiler_library_dirs)
-
-    for env_var in ['LIBRARY_PATH', 'LD_LIBRARY_PATH']:
-      process_invocation_env[env_var] = all_lib_dirs
-
+  def _invoke_capturing_output(self, cmd, cwd, env):
     try:
-      with environment_as(**process_invocation_env):
+      with environment_as(**env):
         return subprocess.check_output(cmd, cwd=cwd, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
       raise Exception(
         "Command failed while invoking the native toolchain "
         "with code '{code}', cwd='{cwd}', cmd='{cmd}', env='{env}'. "
         "Combined stdout and stderr:\n{out}"
-        .format(code=e.returncode, cwd=cwd, cmd=' '.join(cmd), env=process_invocation_env,
+        .format(code=e.returncode, cwd=cwd, cmd=' '.join(cmd), env=env,
                 out=e.output),
         e)
 
   def test_hello_c(self):
-    self.create_file('hello.c', contents="""
+
+    with temporary_dir() as tmpdir:
+      _scheduler = self._sched(work_dir=tmpdir)
+
+      c_compiler = self.execute_expecting_one_result(_scheduler, CCompiler, self.toolchain).value
+      linker = self.execute_expecting_one_result(_scheduler, Linker, self.toolchain).value
+
+      source_file_path = os.path.join(tmpdir, 'hello.c')
+      with safe_open(source_file_path, mode='wb') as fp:
+        fp.write("""
 #include "stdio.h"
 
 int main() {
   printf("%s\\n", "hello, world!");
 }
 """)
-
-    self._invoke_capturing_output(['gcc', 'hello.c', '-o', 'hello_gcc'])
-    gcc_out = self._invoke_output_file('hello_gcc')
-    self.assertEqual('hello, world!\n', gcc_out)
-
-    self._invoke_capturing_output(['clang', 'hello.c', '-o', 'hello_clang'])
-    clang_compile_out = self._invoke_output_file('hello_clang')
-    self.assertEqual('hello, world!\n', clang_compile_out)
+      self._invoke_compiler(c_compiler, ['-c', 'hello.c', '-o', 'hello_gcc.o'], tmpdir, self.platform)
+      self.assertTrue(os.path.isfile(os.path.join(tmpdir, 'hello_gcc.o')))
+      self._invoke_linker(linker, ['hello_gcc.o', '-o', 'hello_gcc'], tmpdir, self.platform)
+      self.assertTrue(is_executable(os.path.join(tmpdir, 'hello_gcc')))
+      gcc_out = self._invoke_capturing_output(['./hello_gcc'], tmpdir, os.environ.copy())
+      self.assertEqual('hello, world!\n', gcc_out)
+      # FIXME: add clang testing!
 
   def test_hello_cpp(self):
-    self.create_file('hello.cpp', contents="""
+
+    with temporary_dir() as tmpdir:
+      _scheduler = self._sched(work_dir=tmpdir)
+
+      cpp_compiler = self.execute_expecting_one_result(_scheduler, CppCompiler, self.toolchain).value
+      linker = self.execute_expecting_one_result(_scheduler, Linker, self.toolchain).value
+
+      source_file_path = os.path.join(tmpdir, 'hello.cpp')
+      with safe_open(source_file_path, mode='wb') as fp:
+        fp.write("""
 #include <iostream>
 
 int main() {
   std::cout << "hello, world!" << std::endl;
 }
 """)
-
-    self._invoke_capturing_output(['g++', 'hello.cpp', '-o', 'hello_g++'])
-    gpp_output = self._invoke_output_file('hello_g++')
-    self.assertEqual(gpp_output, 'hello, world!\n')
-
-    self._invoke_capturing_output(['clang++', 'hello.cpp', '-o', 'hello_clang++'])
-    clangpp_output = self._invoke_output_file('hello_clang++')
-    self.assertEqual(clangpp_output, 'hello, world!\n')
+      self._invoke_compiler(cpp_compiler, ['-c', 'hello.cpp', '-o', 'hello_gpp.o'], tmpdir, self.platform)
+      self.assertTrue(os.path.isfile(os.path.join(tmpdir, 'hello_gpp.o')))
+      self._invoke_linker(linker, ['hello_gpp.o', '-o', 'hello_gpp'], tmpdir, self.platform)
+      self.assertTrue(is_executable(os.path.join(tmpdir, 'hello_gpp')))
+      gpp_out = self._invoke_capturing_output(['./hello_gpp'], tmpdir, os.environ.copy())
+      self.assertEqual('hello, world!\n', gpp_out)
+      # FIXME: add clang++ testing!

@@ -67,19 +67,29 @@ class LLVM(NativeTool):
       path_entries=self.path_entries(),
       exe_filename=platform.resolve_platform_specific(
         self._PLATFORM_SPECIFIC_LINKER_NAME),
-      platform=platform)
+      library_dirs=[])
 
   def c_compiler(self, platform):
+    exe_filename = 'clang'
+    path_entries = self.path_entries()
+    lib_search_dirs = self._parse_search_dirs_instance.get_compiler_library_dirs(
+      compiler_exe=exe_filename,
+      path_entries=path_entries)
     return CCompiler(
-      path_entries=self.path_entries(),
-      exe_filename='clang',
-      platform=platform)
+      path_entries=path_entries,
+      exe_filename=exe_filename,
+      library_dirs=lib_search_dirs)
 
   def cpp_compiler(self, platform):
+    exe_filename = 'clang++'
+    path_entries = self.path_entries()
+    lib_search_dirs = self._parse_search_dirs_instance.get_compiler_library_dirs(
+      compiler_exe=exe_filename,
+      path_entries=path_entries)
     return CppCompiler(
-      path_entries=self.path_entries(),
-      exe_filename='clang++',
-      platform=platform)
+      path_entries=path_entries,
+      exe_filename=exe_filename,
+      library_dirs=lib_search_dirs)
 
 
 @rule(Linker, [Select(Platform), Select(LLVM)])

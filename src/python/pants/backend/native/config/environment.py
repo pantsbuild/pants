@@ -11,6 +11,7 @@ from abc import abstractproperty
 from pants.engine.rules import SingletonRule
 from pants.util.objects import datatype
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
+from pants.util.strutil import create_path_env_var
 
 
 class Platform(datatype(['normalized_os_name'])):
@@ -51,22 +52,45 @@ class Executable(object):
     """
 
   @abstractproperty
+  def library_dirs(self):
+    """???"""
+
+  @abstractproperty
   def exe_filename(self):
     """The "entry point" -- which file to invoke when PATH is set to `path_entries()`."""
+
+  def get_invocation_environment_dict(self, platform):
+    lib_env_var = platform.resolve_platform_specific({
+      'darwin': lambda: 'DYLD_LIBRARY_PATH',
+      'linux': lambda: 'LD_LIBRARY_PATH',
+    })
+    return {
+      'PATH': create_path_env_var(self.path_entries),
+      lib_env_var: create_path_env_var(self.library_dirs),
+    }
 
 
 class Linker(datatype([
     'path_entries',
     'exe_filename',
-    ('platform', Platform),
+    'library_dirs',
 ]), Executable):
-  pass
+
+  def get_invocation_environment_dict(self, platform):
+    ret = super(Linker, self).get_invocation_environment_dict(platform).copy()
+
+    ret.update({
+      'LIBRARY_PATH': create_path_env_var(self.library_dirs),
+      'LDSHARED': self.exe_filename,
+    })
+
+    return ret
 
 
 class CCompiler(datatype([
     'path_entries',
     'exe_filename',
-    ('platform', Platform),
+    'library_dirs',
 ]), Executable):
   pass
 
@@ -74,7 +98,7 @@ class CCompiler(datatype([
 class CppCompiler(datatype([
     'path_entries',
     'exe_filename',
-    ('platform', Platform),
+    'library_dirs',
 ]), Executable):
   pass
 
@@ -89,9 +113,12 @@ class HostLibcDev(datatype(['crti_object', 'fingerprint'])):
 class HostLibcDevInstallation(datatype([
     # This may be None.
     'host_libc_dev',
-    ('platform', Platform),
 ])):
-  pass
+
+  def all_lib_dirs(self):
+    if not self.host_libc_dev:
+      return []
+    return [self.host_libc_dev.get_lib_dir()]
 
 
 def create_native_environment_rules():

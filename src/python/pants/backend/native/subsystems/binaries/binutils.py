@@ -25,7 +25,7 @@ class Binutils(NativeTool):
     return Linker(
       path_entries=self.path_entries(),
       exe_filename='ld',
-      platform=platform)
+      library_dirs=[])
 
 
 @rule(Linker, [Select(Platform), Select(Binutils)])

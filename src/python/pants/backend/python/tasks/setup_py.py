@@ -20,8 +20,7 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 from wheel.install import WheelFile
 
-from pants.backend.native.config.environment import (CCompiler, CppCompiler,
-                                                     HostLibcDevInstallation, Linker)
+from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker
 from pants.backend.python.pex_util import get_local_platform
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -40,7 +39,7 @@ from pants.util.dirutil import safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
-from pants.util.strutil import create_path_env_var, safe_shlex_split
+from pants.util.strutil import safe_shlex_split
 
 
 SETUP_BOILERPLATE = """
@@ -98,7 +97,6 @@ class SetupPyNativeTools(datatype([
     ('c_compiler', CCompiler),
     ('cpp_compiler', CppCompiler),
     ('linker', Linker),
-    ('libc_dev_install', HostLibcDevInstallation),
 ])):
   """The native tools needed for a setup.py invocation.
 
@@ -106,13 +104,12 @@ class SetupPyNativeTools(datatype([
   """
 
 
-@rule(SetupPyNativeTools, [Select(CCompiler), Select(CppCompiler), Select(Linker), Select(HostLibcDevInstallation)])
-def get_setup_py_native_tools(c_compiler, cpp_compiler, linker, libc_dev_install):
+@rule(SetupPyNativeTools, [Select(CCompiler), Select(CppCompiler), Select(Linker)])
+def get_setup_py_native_tools(c_compiler, cpp_compiler, linker):
   yield SetupPyNativeTools(
     c_compiler=c_compiler,
     cpp_compiler=cpp_compiler,
-    linker=linker,
-    libc_dev_install=libc_dev_install)
+    linker=linker)
 
 
 class SetupRequiresSiteDir(datatype(['site_dir'])): pass
@@ -154,7 +151,7 @@ class SetupPyExecutionEnvironment(datatype([
 
   class SetupPyExecutionEnvironmentError(Exception): pass
 
-  def as_environment(self):
+  def as_environment(self, platform):
     ret = {}
 
     if self.setup_requires_site_dir:
@@ -165,28 +162,8 @@ class SetupPyExecutionEnvironment(datatype([
       ret['CC'] = native_tools.c_compiler.exe_filename
       ret['CXX'] = native_tools.cpp_compiler.exe_filename
 
-      host_libc_dev = native_tools.libc_dev_install.host_libc_dev
-      if host_libc_dev:
-        lib_dir = host_libc_dev.get_lib_dir()
-        if not os.path.isdir(lib_dir):
-          raise self.SetupPyExecutionEnvironmentError(
-            "host_libc_dev {!r} was provided, but the lib dir {!r} does not exist "
-            "or is not a directory!"
-            .format(host_libc_dev, lib_dir))
-        env_var = native_tools.libc_dev_install.platform.resolve_platform_specific({
-          'darwin': lambda: 'DYLD_LIBRARY_PATH',
-          'linux': lambda: 'LD_LIBRARY_PATH',
-        })
-        ret[env_var] = lib_dir
-
-      # TODO(#5661): Overridding LD or LDSHARED causes setup.py to try to invoke that linker
-      # directly without going through the compiler, which fails.
-      all_path_entries = (
-        native_tools.c_compiler.path_entries +
-        native_tools.cpp_compiler.path_entries +
-        native_tools.linker.path_entries
-      )
-      ret['PATH'] = create_path_env_var(all_path_entries)
+      # This sets PATH, but that gets overridden.
+      ret.update(native_tools.linker.get_invocation_environment_dict())
 
     return ret
 

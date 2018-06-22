@@ -9,6 +9,7 @@ import os
 
 from pants.backend.native.config.environment import CCompiler, CppCompiler, Platform
 from pants.backend.native.subsystems.binaries.binutils import Binutils
+from pants.backend.native.subsystems.utils.parse_search_dirs import ParseSearchDirs
 from pants.binaries.binary_tool import NativeTool
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
@@ -22,11 +23,18 @@ class GCC(NativeTool):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(GCC, cls).subsystem_dependencies() + (Binutils.scoped(cls),)
+    return super(GCC, cls).subsystem_dependencies() + (
+      Binutils.scoped(cls),
+      ParseSearchDirs.scoped(cls),
+    )
 
   @memoized_property
   def _binutils(self):
     return Binutils.scoped_instance(self)
+
+  @memoized_property
+  def _parse_search_dirs_instance(self):
+    return ParseSearchDirs.scoped_instance(self)
 
   def _path_entries_for_platform(self, platform):
     # GCC requires an assembler 'as' to be on the path. We need to provide this on linux, so we pull
@@ -42,16 +50,26 @@ class GCC(NativeTool):
     return [os.path.join(self.select(), 'bin')]
 
   def c_compiler(self, platform):
+    exe_filename = 'gcc'
+    path_entries = self._path_entries_for_platform(platform)
+    lib_search_dirs = self._parse_search_dirs_instance.get_compiler_library_dirs(
+      compiler_exe=exe_filename,
+      path_entries=path_entries)
     return CCompiler(
-      path_entries=self._path_entries_for_platform(platform),
-      exe_filename='gcc',
-      platform=platform)
+      path_entries=path_entries,
+      exe_filename=exe_filename,
+      library_dirs=lib_search_dirs)
 
   def cpp_compiler(self, platform):
+    exe_filename = 'g++'
+    path_entries = self._path_entries_for_platform(platform)
+    lib_search_dirs = self._parse_search_dirs_instance.get_compiler_library_dirs(
+      compiler_exe=exe_filename,
+      path_entries=path_entries)
     return CppCompiler(
-      path_entries=self._path_entries_for_platform(platform),
-      exe_filename='g++',
-      platform=platform)
+      path_entries=path_entries,
+      exe_filename=exe_filename,
+      library_dirs=lib_search_dirs)
 
 
 @rule(CCompiler, [Select(Platform), Select(GCC)])

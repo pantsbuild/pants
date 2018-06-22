@@ -76,6 +76,23 @@ def select_linker(platform, native_toolchain):
     linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
   else:
     linker = yield Get(Linker, Binutils, native_toolchain._binutils)
+
+  # We need to link through a provided compiler's frontend.
+  c_compiler = yield Get(CCompiler, NativeToolchain, native_toolchain)
+  cpp_compiler = yield Get(CppCompiler, NativeToolchain, native_toolchain)
+  host_libc_dev = yield Get(HostLibcDevInstallation, NativeToolchain, native_toolchain)
+
+  linker = Linker(
+    path_entries=(
+      c_compiler.path_entries +
+      cpp_compiler.path_entries +
+      linker.path_entries),
+    exe_filename=cpp_compiler.exe_filename,
+    library_dirs=(
+      c_compiler.library_dirs +
+      cpp_compiler.library_dirs +
+      linker.library_dirs +
+      host_libc_dev.all_lib_dirs()))
   yield linker
 
 
@@ -85,6 +102,7 @@ def select_c_compiler(platform, native_toolchain):
     c_compiler = yield Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
   else:
     c_compiler = yield Get(CCompiler, GCC, native_toolchain._gcc)
+
   yield c_compiler
 
 
@@ -94,6 +112,7 @@ def select_cpp_compiler(platform, native_toolchain):
     cpp_compiler = yield Get(CppCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
   else:
     cpp_compiler = yield Get(CppCompiler, GCC, native_toolchain._gcc)
+
   yield cpp_compiler
 
 
@@ -104,7 +123,7 @@ def select_libc_dev_install(platform, native_toolchain):
     'linux': lambda: native_toolchain._libc_dev.host_libc,
   })
 
-  yield HostLibcDevInstallation(host_libc_dev=host_libc_dev, platform=platform)
+  yield HostLibcDevInstallation(host_libc_dev=host_libc_dev)
 
 
 def create_native_toolchain_rules():
