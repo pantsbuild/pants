@@ -217,7 +217,7 @@ def register_goals():
 
   # Formatting.
   task(name='scalafmt', action=ScalaFmtFormat, serialize=False).install('fmt')
-  task(name='scalafix', action=ScalaFixFix).install('fmt')
+  task(name='scalafix', action=ScalaFixFix).install(goal='fmt', before='scalafmt')
 
   # Running.
   task(name='jvm', action=JvmRun, serialize=False).install('run')
