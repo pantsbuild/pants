@@ -13,6 +13,7 @@ from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
+from pants.backend.native.subsystems.xcode_cli_tools import XCodeCLITools
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import is_executable, safe_open
 from pants.util.process_handler import subprocess
@@ -31,22 +32,35 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     self.toolchain = global_subsystem_instance(NativeToolchain)
     self.gcc = global_subsystem_instance(GCC)
     self.llvm = global_subsystem_instance(LLVM)
+    self.xcode_cli_tools = global_subsystem_instance(XCodeCLITools)
     self.rules = native_backend_rules()
+
+    self.clang_compiler_source = self.platform.resolve_platform_specific({
+      'darwin': lambda: self.xcode_cli_tools,
+      'linux': lambda: self.llvm,
+    })
 
   def _sched(self, *args, **kwargs):
     return self.mk_scheduler(rules=self.rules, *args, **kwargs)
 
   @contextmanager
-  def _hello_world_source_environment(self, file_name, contents):
+  def _hello_world_source_environment(self, file_name, contents, scheduler_request_specs):
     with temporary_dir() as tmpdir:
-      _scheduler = self._sched(work_dir=tmpdir)
+      scheduler = self._sched(work_dir=tmpdir)
 
       source_file_path = os.path.join(tmpdir, file_name)
       with safe_open(source_file_path, mode='wb') as fp:
         fp.write(contents)
 
+      products, subjects = zip(*scheduler_request_specs)
+      # raise Exception("products: {}, subjects: {}".format(products, subjects))
+      execution_request = scheduler.execution_request_literal(scheduler_request_specs)
+
+      # raise Exception("products: {}, subjects: {}, execution_request: {}"
+      #                 .format(products, subjects, execution_request))
+
       with pushd(tmpdir):
-        yield _scheduler
+        yield tuple(self.execute_literal(scheduler, execution_request))
 
   def _invoke_compiler(self, compiler, args):
     return self._invoke_capturing_output([compiler.exe_filename] + args,
@@ -88,27 +102,37 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
 
   def test_hello_c(self):
 
+    scheduler_request_specs = [
+      (self.gcc, CCompiler),
+      (self.clang_compiler_source, CCompiler),
+      (self.toolchain, Linker),
+    ]
+
     with self._hello_world_source_environment('hello.c', contents="""
 #include "stdio.h"
 
 int main() {
   printf("%s\\n", "I C the world!");
 }
-""") as scheduler:
+""", scheduler_request_specs=scheduler_request_specs) as products:
 
-      gcc = self.execute_expecting_one_result(scheduler, CCompiler, self.gcc).value
-      clang = self.execute_expecting_one_result(scheduler, CCompiler, self.llvm).value
-      linker = self.execute_expecting_one_result(scheduler, Linker, self.toolchain).value
+      gcc, clang, linker = products
 
       clang_with_gcc_libs = CCompiler(
         path_entries=clang.path_entries,
         exe_filename=clang.exe_filename,
-        library_dirs=(clang.library_dirs + gcc.library_dirs))
+        library_dirs=(gcc.library_dirs + clang.library_dirs))
 
       self._do_compile_link(gcc, linker, 'hello.c', 'hello_gcc', "I C the world!")
       self._do_compile_link(clang_with_gcc_libs, linker, 'hello.c', 'hello_clang', "I C the world!")
 
   def test_hello_cpp(self):
+
+    scheduler_request_specs = [
+      (self.gcc, CppCompiler),
+      (self.clang_compiler_source, CppCompiler),
+      (self.toolchain, Linker),
+    ]
 
     with self._hello_world_source_environment('hello.cpp', contents="""
 #include <iostream>
@@ -116,16 +140,14 @@ int main() {
 int main() {
   std::cout << "I C the world, ++ more!" << std::endl;
 }
-""") as scheduler:
+""", scheduler_request_specs=scheduler_request_specs) as products:
 
-      gpp = self.execute_expecting_one_result(scheduler, CppCompiler, self.gcc).value
-      clangpp = self.execute_expecting_one_result(scheduler, CppCompiler, self.llvm).value
-      linker = self.execute_expecting_one_result(scheduler, Linker, self.toolchain).value
+      gpp, clangpp, linker = products
 
       clangpp_with_gpp_libs = CppCompiler(
         path_entries=clangpp.path_entries,
         exe_filename=clangpp.exe_filename,
-        library_dirs=(clangpp.library_dirs + gpp.library_dirs))
+        library_dirs=(gpp.library_dirs + clangpp.library_dirs))
 
       self._do_compile_link(gpp, linker, 'hello.cpp', 'hello_gpp', "I C the world, ++ more!")
       self._do_compile_link(clangpp_with_gpp_libs, linker, 'hello.cpp', 'hello_clangpp',

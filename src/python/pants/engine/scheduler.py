@@ -427,6 +427,13 @@ class SchedulerSession(object):
   def visualize_rule_graph_to_file(self, filename):
     self._scheduler.visualize_rule_graph_to_file(filename)
 
+  def execution_request_literal(self, request_specs):
+    native_execution_request = self._scheduler._native.new_execution_request()
+    for subject, product in request_specs:
+      self._scheduler.add_root_selection(native_execution_request, subject, product)
+    return ExecutionRequest(request_specs, native_execution_request)
+
+  # FIXME: note that this does a cross prod!
   def execution_request(self, products, subjects):
     """Create and return an ExecutionRequest for the given products and subjects.
 
@@ -445,10 +452,7 @@ class SchedulerSession(object):
     :returns: An ExecutionRequest for the given products and subjects.
     """
     roots = (tuple((s, p) for s in subjects for p in products))
-    native_execution_request = self._scheduler._native.new_execution_request()
-    for subject, product in roots:
-      self._scheduler.add_root_selection(native_execution_request, subject, product)
-    return ExecutionRequest(roots, native_execution_request)
+    return self.execution_request_literal(roots)
 
   def invalidate_files(self, direct_filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
