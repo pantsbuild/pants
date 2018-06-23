@@ -71,6 +71,14 @@ class Executable(object):
     }
 
 
+class Assembler(datatype([
+    'path_entries',
+    'exe_filename',
+    'library_dirs',
+]), Executable):
+  pass
+
+
 class Linker(datatype([
     'path_entries',
     'exe_filename',

@@ -10,10 +10,11 @@ import os
 from pants.backend.native.config.environment import CCompiler, CppCompiler, Platform
 from pants.backend.native.subsystems.binaries.binutils import Binutils
 from pants.backend.native.subsystems.utils.parse_search_dirs import ParseSearchDirs
+from pants.backend.native.subsystems.xcode_cli_tools import XCodeCLITools
 from pants.binaries.binary_tool import NativeTool
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 from pants.util.strutil import create_path_env_var
 
 
@@ -24,9 +25,12 @@ class GCC(NativeTool):
 
   @classmethod
   def subsystem_dependencies(cls):
+    # FIXME: Binutils and XCodeCLITools should just become Select(Assembler) in @rules
+    # below, when #5788 is resolved.
     return super(GCC, cls).subsystem_dependencies() + (
       Binutils.scoped(cls),
       ParseSearchDirs.scoped(cls),
+      XCodeCLITools.scoped(cls),
     )
 
   @memoized_property
@@ -34,41 +38,55 @@ class GCC(NativeTool):
     return Binutils.scoped_instance(self)
 
   @memoized_property
+  def _xcode_cli_tools(self):
+    return XCodeCLITools.scoped_instance(self)
+
+  @memoized_property
   def _parse_search_dirs_instance(self):
     return ParseSearchDirs.scoped_instance(self)
 
-  def _path_entries_for_platform(self, platform):
-    # GCC requires an assembler 'as' to be on the path. We need to provide this on linux, so we pull
-    # it from our Binutils package.
-    as_assembler_path_entries = platform.resolve_platform_specific({
-      'darwin': lambda: [],
-      'linux': lambda: self._binutils.path_entries(),
+  @memoized_method
+  def _get_assembler(self, platform):
+    """Get a platform-specific assembler to use for compilation.
+
+    GCC requires an assembler 'as' to be on the path. We need to provide this
+    separately, so we pull it from our Binutils or XCodeCLITools packages.
+
+    :rtype: :class:`pants.backend.native.config.environment.Assembler`
+    """
+    return platform.resolve_platform_specific({
+      'darwin': lambda: self._xcode_cli_tools.assembler(),
+      'linux': lambda: self._binutils.assembler(),
     })
-    all_path_entries = self.path_entries() + as_assembler_path_entries
-    return all_path_entries
 
   def path_entries(self):
     return [os.path.join(self.select(), 'bin')]
 
   def c_compiler(self, platform):
     exe_filename = 'gcc'
-    path_entries = self._path_entries_for_platform(platform)
+    assembler = self._get_assembler(platform)
+    own_path_entries = self.path_entries()
+
     lib_search_dirs = self._parse_search_dirs_instance.get_compiler_library_dirs(
       compiler_exe=exe_filename,
-      env={'PATH': create_path_env_var(path_entries)})
+      env={'PATH': create_path_env_var(own_path_entries)})
+
     return CCompiler(
-      path_entries=path_entries,
+      path_entries=(own_path_entries + assembler.path_entries),
       exe_filename=exe_filename,
       library_dirs=lib_search_dirs)
 
   def cpp_compiler(self, platform):
     exe_filename = 'g++'
-    path_entries = self._path_entries_for_platform(platform)
+    assembler = self._get_assembler(platform)
+    own_path_entries = self.path_entries()
+
     lib_search_dirs = self._parse_search_dirs_instance.get_compiler_library_dirs(
       compiler_exe=exe_filename,
-      env={'PATH': create_path_env_var(path_entries)})
+      env={'PATH': create_path_env_var(own_path_entries)})
+
     return CppCompiler(
-      path_entries=path_entries,
+      path_entries=(own_path_entries + assembler.path_entries),
       exe_filename=exe_filename,
       library_dirs=lib_search_dirs)
 
