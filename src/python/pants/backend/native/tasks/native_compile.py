@@ -9,7 +9,7 @@ import os
 from abc import abstractmethod
 from collections import defaultdict
 
-from pants.backend.native.config.environment import Executable
+from pants.backend.native.config.environment import Executable, Platform
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.exceptions import TaskError
@@ -206,7 +206,9 @@ class NativeCompile(NativeTask, AbstractClass):
     compiler = compile_request.compiler
     err_flags = ['-Werror'] if compile_request.fatal_warnings else []
 
-    platform_specific_flags = compiler.platform.resolve_platform_specific({
+    platform = Platform.create()
+
+    platform_specific_flags = platform.resolve_platform_specific({
       'linux': lambda: [],
       'darwin': lambda: ['-mmacosx-version-min=10.11'],
     })

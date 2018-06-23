@@ -89,10 +89,10 @@ def select_linker(platform, native_toolchain):
       linker.path_entries),
     exe_filename=cpp_compiler.exe_filename,
     library_dirs=(
+      host_libc_dev.all_lib_dirs() +
       c_compiler.library_dirs +
       cpp_compiler.library_dirs +
-      linker.library_dirs +
-      host_libc_dev.all_lib_dirs()))
+      linker.library_dirs))
   yield linker
 
 

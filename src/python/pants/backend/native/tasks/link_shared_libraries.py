@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.native.config.environment import Linker
+from pants.backend.native.config.environment import Linker, Platform
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_compile import NativeTargetDependencies, ObjectFiles
@@ -139,8 +139,8 @@ class LinkSharedLibraries(NativeTask):
     'linux': lambda: ['-shared'],
   }
 
-  def _get_shared_lib_cmdline_args(self):
-    return self.linker.platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
+  def _get_shared_lib_cmdline_args(self, platform):
+    return platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
 
   def _execute_link_request(self, link_request):
     object_files = link_request.object_files
@@ -149,10 +149,11 @@ class LinkSharedLibraries(NativeTask):
       raise self.LinkSharedLibrariesError("No object files were provided in request {}!"
                                           .format(link_request))
 
+    platform = Platform.create()
     linker = link_request.linker
     native_artifact = link_request.native_artifact
     output_dir = link_request.output_dir
-    resulting_shared_lib_path = os.path.join(output_dir, native_artifact.as_shared_lib(linker.platform))
+    resulting_shared_lib_path = os.path.join(output_dir, native_artifact.as_shared_lib(platform))
     # We are executing in the results_dir, so get absolute paths for everything.
     cmd = ([linker.exe_filename] +
            self._get_shared_lib_cmdline_args() +
