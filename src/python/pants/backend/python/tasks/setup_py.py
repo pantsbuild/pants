@@ -170,7 +170,6 @@ class SetupPyExecutionEnvironment(datatype([
       all_ldflags = native_tools.platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
       ret['LDFLAGS'] = safe_shlex_join(all_ldflags)
 
-      # This sets PATH, but that gets overridden.
       ret.update(native_tools.linker.get_invocation_environment_dict(native_tools.platform))
 
     return ret

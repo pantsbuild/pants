@@ -77,11 +77,19 @@ def select_linker(platform, native_toolchain):
   else:
     linker = yield Get(Linker, Binutils, native_toolchain._binutils)
 
-  # We need to link through a provided compiler's frontend.
+  # NB: We need to link through a provided compiler's frontend, and we need to know where all the
+  # compiler's libraries/etc are, so we set the executable name to the C++ compiler, which can find
+  # its own set of C++-specific files for the linker if necessary. Using e.g. 'g++' as the linker
+  # appears to produce byte-identical output when linking even C-only object files, and also
+  # happens to work when C++ is used.
   c_compiler = yield Get(CCompiler, NativeToolchain, native_toolchain)
   cpp_compiler = yield Get(CppCompiler, NativeToolchain, native_toolchain)
   host_libc_dev = yield Get(HostLibcDevInstallation, NativeToolchain, native_toolchain)
 
+  # NB: If needing to create an environment for process invocation that could use either a compiler
+  # or a linker (e.g. when we compile native code from `python_dist()`s), use the environment from
+  # the linker object (in addition to any further customizations), which has the paths from the C
+  # and C++ compilers baked in.
   linker = Linker(
     path_entries=(
       c_compiler.path_entries +
@@ -93,6 +101,7 @@ def select_linker(platform, native_toolchain):
       c_compiler.library_dirs +
       cpp_compiler.library_dirs +
       linker.library_dirs))
+
   yield linker
 
 
