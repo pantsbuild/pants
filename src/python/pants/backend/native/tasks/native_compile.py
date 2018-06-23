@@ -19,7 +19,6 @@ from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import SubclassesOf, datatype
 from pants.util.process_handler import subprocess
-from pants.util.strutil import create_path_env_var
 
 
 class NativeCompileRequest(datatype([
@@ -245,6 +244,8 @@ class NativeCompile(NativeTask, AbstractClass):
 
     argv = self._make_compile_argv(compile_request)
 
+    platform = Platform.create()
+
     with self.context.new_workunit(
         name=self.workunit_label, labels=[WorkUnitLabel.COMPILER]) as workunit:
       try:
@@ -253,7 +254,7 @@ class NativeCompile(NativeTask, AbstractClass):
           cwd=output_dir,
           stdout=workunit.output('stdout'),
           stderr=workunit.output('stderr'),
-          env={'PATH': create_path_env_var(compiler.path_entries)})
+          env=compiler.get_invocation_environment_dict(platform))
       except OSError as e:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.NativeCompileError(

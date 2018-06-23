@@ -18,7 +18,6 @@ from pants.util.collections import assert_single_element
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 from pants.util.process_handler import subprocess
-from pants.util.strutil import create_path_env_var
 
 
 class SharedLibrary(datatype(['name', 'path'])): pass
@@ -168,7 +167,7 @@ class LinkSharedLibraries(NativeTask):
           cwd=output_dir,
           stdout=workunit.output('stdout'),
           stderr=workunit.output('stderr'),
-          env={'PATH': create_path_env_var(linker.path_entries)})
+          env=linker.get_invocation_environment_dict(platform))
       except OSError as e:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.LinkSharedLibrariesError(
