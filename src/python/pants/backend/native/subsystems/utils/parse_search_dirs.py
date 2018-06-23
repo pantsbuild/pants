@@ -22,6 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 class ParseSearchDirs(Subsystem):
+  """Parse the output of invoking a compiler with the '-print-search-dirs' argument for lib dirs.
+
+  This is used to expose resources from one compiler (e.g. a compiler preinstalled on the host which
+  has knowledge of distro-maintained system libraries such as libc) to the compilers/linkers that
+  Pants provides. This is also used to share resources between different :class:`BinaryTool`s with
+  compiler executables.
+  """
 
   options_scope = 'parse-search-dirs'
 
@@ -34,8 +41,6 @@ class ParseSearchDirs(Subsystem):
   def _parse_libraries_from_compiler_search_dirs(self, compiler_exe, env):
     # This argument is supported by at least gcc and clang.
     cmd = [compiler_exe, '-print-search-dirs']
-
-    # FIXME: document the path_entries arg!
 
     try:
       # Get stderr interspersed in the error message too -- this should not affect output parsing.
