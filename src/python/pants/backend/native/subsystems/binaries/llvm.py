@@ -8,11 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
+from pants.backend.native.subsystems.utils.parse_search_dirs import ParseSearchDirs
 from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_method, memoized_property
 
 
 class LLVMReleaseUrlGenerator(BinaryToolUrlGenerator):
@@ -41,6 +42,14 @@ class LLVM(NativeTool):
 
   def get_external_url_generator(self):
     return LLVMReleaseUrlGenerator()
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(LLVM, cls).subsystem_dependencies() + (ParseSearchDirs.scoped(cls),)
+
+  @memoized_property
+  def _parse_search_dirs_instance(self):
+    return ParseSearchDirs.scoped_instance(self)
 
   @memoized_method
   def select(self):

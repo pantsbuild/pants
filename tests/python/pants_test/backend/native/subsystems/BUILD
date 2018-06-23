@@ -3,6 +3,7 @@ python_tests(
     'src/python/pants/backend/native',
     'src/python/pants/backend/native/config',
     'src/python/pants/backend/native/subsystems',
+    'src/python/pants/backend/native/subsystems/binaries',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:osutil',
     'src/python/pants/util:process_handler',
