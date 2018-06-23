@@ -216,8 +216,10 @@ def register_goals():
   task(name='jvm-dep-check', action=JvmDependencyCheck, serialize=False).install('lint')
 
   # Formatting.
+  # Scalafix has to go before scalafmt in order not to
+  # further change Scala files after scalafmt.
+  task(name='scalafix', action=ScalaFixFix).install('fmt')
   task(name='scalafmt', action=ScalaFmtFormat, serialize=False).install('fmt')
-  task(name='scalafix', action=ScalaFixFix).install(goal='fmt', before='scalafmt')
 
   # Running.
   task(name='jvm', action=JvmRun, serialize=False).install('run')
