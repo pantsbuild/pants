@@ -730,3 +730,68 @@ impl<'a, N: Node + 'a, P: Fn(EntryId, Level) -> bool> Iterator for LeveledWalk<'
     None
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use std::path::Path;
+
+  use boxfuture::{BoxFuture, Boxable};
+  use futures::future::{self, Future};
+  use hashing::Digest;
+
+  use super::{EntryId, Graph, Node, NodeContext, NodeError};
+
+  #[test]
+  fn create() {
+    let graph = Graph::new();
+    assert_eq!(graph.create(TNode(1), &TContext).wait(), Ok(1));
+  }
+
+  #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+  struct TNode(usize);
+  impl Node for TNode {
+    type Context = TContext;
+    type Item = usize;
+    type Error = TError;
+
+    fn run(self, _context: TContext) -> BoxFuture<usize, TError> {
+      future::ok(self.0).to_boxed()
+    }
+
+    fn format(&self) -> String {
+      format!("{:?}", self)
+    }
+
+    fn fs_subject(&self) -> Option<&Path> {
+      None
+    }
+
+    fn digest(_result: Self::Item) -> Option<Digest> {
+      None
+    }
+  }
+
+  #[derive(Clone)]
+  struct TContext;
+  impl NodeContext for TContext {
+    type CloneFor = TContext;
+    fn clone_for(&self, _entry_id: EntryId) -> TContext {
+      TContext
+    }
+  }
+
+  #[derive(Clone, Debug, Eq, PartialEq)]
+  enum TError {
+    Cyclic,
+    Invalidated,
+  }
+  impl NodeError for TError {
+    fn invalidated() -> Self {
+      TError::Invalidated
+    }
+
+    fn cyclic() -> Self {
+      TError::Cyclic
+    }
+  }
+}
