@@ -39,7 +39,7 @@ from pants.util.dirutil import safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
-from pants.util.strutil import create_path_env_var, safe_shlex_split
+from pants.util.strutil import safe_shlex_join, safe_shlex_split
 
 
 SETUP_BOILERPLATE = """
@@ -168,7 +168,7 @@ class SetupPyExecutionEnvironment(datatype([
       ret['CXX'] = native_tools.cpp_compiler.exe_filename
 
       all_ldflags = native_tools.platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
-      ret['LDFLAGS'] = create_path_env_var(all_ldflags)
+      ret['LDFLAGS'] = safe_shlex_join(all_ldflags)
 
       # This sets PATH, but that gets overridden.
       ret.update(native_tools.linker.get_invocation_environment_dict(native_tools.platform))
