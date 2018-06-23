@@ -158,47 +158,11 @@ class Zinc(object):
         ','.join('{}:{}'.format(src, dst) for src, dst in rebases.items())
       )
 
-  @staticmethod
-  def _select_jvm_tool_mixin(left, right, options):
-    if left is None:
-      return right
-    if any(not left.get_options().is_default(opt)
-           for opt in options
-           if getattr(left.get_options(), opt, None) is not None):
-      return left
-    return right
-
   @memoized_method
-  def javac_compiler_plugins_src(self, zinc_compile_instance=None):
-    """Returns an instance of JvmToolMixin that should provide javac compiler plugins.
-
-    TODO: Remove this method once the deprecation of `(scalac|javac)_plugins` on Zinc has
-    completed in `1.9.0.dev0`.
-    """
-    return Zinc._select_jvm_tool_mixin(zinc_compile_instance,
-                                       Java.global_instance(),
-                                       ['javac_plugins', 'javac_plugin_args', 'javac_plugin_dep'])
-
-  @memoized_method
-  def scalac_compiler_plugins_src(self, zinc_compile_instance=None):
-    """Returns an instance of JvmToolMixin that should provide scalac compiler plugins.
-
-    TODO: Remove this method once the deprecation of `(scalac|javac)_plugins` on Zinc has
-    completed in `1.9.0.dev0`.
-    """
-    return Zinc._select_jvm_tool_mixin(zinc_compile_instance,
-                                       ScalaPlatform.global_instance(),
-                                       ['scalac_plugins', 'scalac_plugin_args', 'scalac_plugin_dep'])
-
-  @memoized_method
-  def _compiler_plugins_cp_entries(self, zinc_compile_instance=None):
-    """Any additional global compiletime classpath entries for compiler plugins.
-
-    TODO: Remove parameter once the deprecation of `(scalac|javac)_plugins` on Zinc has
-    completed in `1.9.0.dev0`.
-    """
-    java_options_src = self.javac_compiler_plugins_src(zinc_compile_instance)
-    scala_options_src = self.scalac_compiler_plugins_src(zinc_compile_instance)
+  def _compiler_plugins_cp_entries(self):
+    """Any additional global compiletime classpath entries for compiler plugins."""
+    java_options_src = Java.global_instance()
+    scala_options_src = ScalaPlatform.global_instance()
 
     def cp(instance, toolname):
       scope = instance.options_scope
@@ -212,7 +176,7 @@ class Zinc(object):
                                                            self.ZINC_EXTRACTOR_TOOL_NAME,
                                                            scope=self._zinc_factory.options_scope)
 
-  def compile_classpath(self, classpath_product_key, target, extra_cp_entries=None, zinc_compile_instance=None):
+  def compile_classpath(self, classpath_product_key, target, extra_cp_entries=None):
     """Compute the compile classpath for the given target."""
     classpath_product = self._products.get_data(classpath_product_key)
 
@@ -221,7 +185,7 @@ class Zinc(object):
     else:
       dependencies = DependencyContext.global_instance().all_dependencies(target)
 
-    all_extra_cp_entries = list(self._compiler_plugins_cp_entries(zinc_compile_instance))
+    all_extra_cp_entries = list(self._compiler_plugins_cp_entries())
     if extra_cp_entries:
       all_extra_cp_entries.extend(extra_cp_entries)
 

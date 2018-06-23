@@ -60,11 +60,6 @@ class JvmCompile(NailgunTaskBase):
              default=list(cls.get_args_default(register.bootstrap)), fingerprint=True,
              help='Pass these extra args to the compiler.')
 
-    register('--confs', advanced=True, type=list, default=Zinc.DEFAULT_CONFS,
-             removal_version='1.9.0.dev0',
-             removal_hint='Compiling for confs other than `default` is no longer supported.',
-             help='Compile for these Ivy confs.')
-
     register('--clear-invalid-analysis', advanced=True, type=bool,
              help='When set, any invalid/incompatible analysis files will be deleted '
                   'automatically.  When unset, an error is raised instead.')
@@ -110,24 +105,10 @@ class JvmCompile(NailgunTaskBase):
                   'constraints). Choose \'random\' to choose random sizes for each target, which '
                   'may be useful for distributed builds.')
 
-    register('--capture-log', advanced=True, type=bool,
-             removal_version='1.9.0.dev0',
-             removal_hint='Now enabled by default: this option has no effect.',
-             help='Capture compilation output to per-target logs.')
-
     register('--capture-classpath', advanced=True, type=bool, default=True,
              fingerprint=True,
              help='Capture classpath to per-target newline-delimited text files. These files will '
                   'be packaged into any jar artifacts that are created from the jvm targets.')
-
-    register('--unused-deps', choices=['ignore', 'warn', 'fatal'], default='ignore',
-             fingerprint=True,
-             removal_version='1.9.0.dev0',
-             removal_hint='Option has moved to `--lint-jvm-dep-check-unnecessary-deps` and is '
-                          'ignored in this location.',
-             help='Controls whether unused deps are checked, and whether they cause warnings or '
-                  'errors. This option uses zinc\'s analysis to determine which deps are unused, '
-                  'and can thus result in false negatives: thus it is disabled by default.')
 
     register('--suggest-missing-deps', type=bool,
              help='Suggest missing dependencies on a best-effort basis from target\'s transitive'
@@ -327,7 +308,7 @@ class JvmCompile(NailgunTaskBase):
       self._args.extend(self.get_options().debug_symbol_args)
 
     # The ivy confs for which we're building.
-    self._confs = self.get_options().confs
+    self._confs = Zinc.DEFAULT_CONFS
 
     # Determines which sources are relevant to this target.
     self._sources_predicate = self.select_source
@@ -772,8 +753,7 @@ class JvmCompile(NailgunTaskBase):
     cp_entries = [ctx.classes_dir]
     cp_entries.extend(self._zinc.compile_classpath(classpath_product_key,
       ctx.target,
-      extra_cp_entries=self._extra_compile_time_classpath,
-      zinc_compile_instance=self))
+      extra_cp_entries=self._extra_compile_time_classpath))
     return cp_entries
 
   def _record_target_stats(self, target, classpath_len, sources_len, compiletime, is_incremental,
