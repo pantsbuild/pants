@@ -8,12 +8,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
+from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.utils.parse_search_dirs import ParseSearchDirs
 from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.strutil import create_path_env_var
 
 
 class LLVMReleaseUrlGenerator(BinaryToolUrlGenerator):
@@ -45,7 +47,16 @@ class LLVM(NativeTool):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(LLVM, cls).subsystem_dependencies() + (ParseSearchDirs.scoped(cls),)
+    return super(LLVM, cls).subsystem_dependencies() + (
+      # We need a specific version of GLIBCXX to run ParseSearchDirs, which gcc can provide for this
+      # bootstrap phase.
+      GCC.scoped(cls),
+      ParseSearchDirs.scoped(cls),
+    )
+
+  @memoized_property
+  def _gcc(self):
+    return GCC.scoped_instance(self)
 
   @memoized_property
   def _parse_search_dirs_instance(self):
@@ -81,9 +92,11 @@ class LLVM(NativeTool):
   def c_compiler(self, platform):
     exe_filename = 'clang'
     path_entries = self.path_entries()
+    gcc_env = self._gcc.c_compiler(platform).get_invocation_environment_dict(platform)
+    gcc_env['PATH'] = create_path_env_var(path_entries, gcc_env, prepend=True)
     lib_search_dirs = self._parse_search_dirs_instance.get_compiler_library_dirs(
       compiler_exe=exe_filename,
-      path_entries=path_entries)
+      env=gcc_env)
     return CCompiler(
       path_entries=path_entries,
       exe_filename=exe_filename,
@@ -92,9 +105,11 @@ class LLVM(NativeTool):
   def cpp_compiler(self, platform):
     exe_filename = 'clang++'
     path_entries = self.path_entries()
+    gpp_env = self._gcc.cpp_compiler(platform).get_invocation_environment_dict(platform)
+    gpp_env['PATH'] = create_path_env_var(path_entries, gpp_env, prepend=True)
     lib_search_dirs = self._parse_search_dirs_instance.get_compiler_library_dirs(
       compiler_exe=exe_filename,
-      path_entries=path_entries)
+      env=gpp_env)
     return CppCompiler(
       path_entries=path_entries,
       exe_filename=exe_filename,
@@ -108,12 +123,12 @@ def get_lld(platform, llvm):
 
 @rule(CCompiler, [Select(Platform), Select(LLVM)])
 def get_clang(platform, llvm):
-  return llvm.c_compiler(platform)
+  yield llvm.c_compiler(platform)
 
 
 @rule(CppCompiler, [Select(Platform), Select(LLVM)])
 def get_clang_plusplus(platform, llvm):
-  return llvm.cpp_compiler(platform)
+  yield llvm.cpp_compiler(platform)
 
 
 def create_llvm_rules():

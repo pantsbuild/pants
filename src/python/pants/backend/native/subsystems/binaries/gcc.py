@@ -14,6 +14,7 @@ from pants.binaries.binary_tool import NativeTool
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
 from pants.util.memo import memoized_property
+from pants.util.strutil import create_path_env_var
 
 
 class GCC(NativeTool):
@@ -54,7 +55,7 @@ class GCC(NativeTool):
     path_entries = self._path_entries_for_platform(platform)
     lib_search_dirs = self._parse_search_dirs_instance.get_compiler_library_dirs(
       compiler_exe=exe_filename,
-      path_entries=path_entries)
+      env={'PATH': create_path_env_var(path_entries)})
     return CCompiler(
       path_entries=path_entries,
       exe_filename=exe_filename,
@@ -65,7 +66,7 @@ class GCC(NativeTool):
     path_entries = self._path_entries_for_platform(platform)
     lib_search_dirs = self._parse_search_dirs_instance.get_compiler_library_dirs(
       compiler_exe=exe_filename,
-      path_entries=path_entries)
+      env={'PATH': create_path_env_var(path_entries)})
     return CppCompiler(
       path_entries=path_entries,
       exe_filename=exe_filename,

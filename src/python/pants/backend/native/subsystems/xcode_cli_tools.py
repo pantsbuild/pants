@@ -15,6 +15,7 @@ from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_executable
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.strutil import create_path_env_var
 
 
 class XCodeCLITools(Subsystem):
@@ -80,7 +81,7 @@ class XCodeCLITools(Subsystem):
     path_entries = self.path_entries()
     lib_search_dirs = self._parse_search_dirs_instance.get_compiler_library_dirs(
       compiler_exe=exe_filename,
-      path_entries=path_entries)
+      env={'PATH': create_path_env_var(path_entries)})
     return CCompiler(
       path_entries=path_entries,
       exe_filename=exe_filename,
@@ -92,7 +93,7 @@ class XCodeCLITools(Subsystem):
     path_entries = self.path_entries()
     lib_search_dirs = self._parse_search_dirs_instance.get_compiler_library_dirs(
       compiler_exe=exe_filename,
-      path_entries=path_entries)
+      env={'PATH': create_path_env_var(path_entries)})
     return CppCompiler(
       path_entries=path_entries,
       exe_filename=exe_filename,
