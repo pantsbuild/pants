@@ -127,6 +127,7 @@ class XCodeCLITools(Subsystem):
       exe_filename=exe_filename,
       library_dirs=lib_search_dirs)
 
+
 @rule(Assembler, [Select(XCodeCLITools)])
 def get_assembler(xcode_cli_tools):
   return xcode_cli_tools.assembler()
