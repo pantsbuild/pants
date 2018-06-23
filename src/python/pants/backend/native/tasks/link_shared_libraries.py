@@ -156,7 +156,7 @@ class LinkSharedLibraries(NativeTask):
     resulting_shared_lib_path = os.path.join(output_dir, native_artifact.as_shared_lib(platform))
     # We are executing in the results_dir, so get absolute paths for everything.
     cmd = ([linker.exe_filename] +
-           self._get_shared_lib_cmdline_args() +
+           self._get_shared_lib_cmdline_args(platform) +
            ['-o', os.path.abspath(resulting_shared_lib_path)] +
            [os.path.abspath(obj) for obj in object_files])
 

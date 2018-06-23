@@ -67,6 +67,7 @@ class Executable(object):
     return {
       'PATH': create_path_env_var(self.path_entries),
       lib_env_var: create_path_env_var(self.library_dirs),
+      'LIBRARY_PATH': create_path_env_var(self.library_dirs),
     }
 
 
@@ -80,7 +81,6 @@ class Linker(datatype([
     ret = super(Linker, self).get_invocation_environment_dict(platform).copy()
 
     ret.update({
-      'LIBRARY_PATH': create_path_env_var(self.library_dirs),
       'LDSHARED': self.exe_filename,
     })
 
