@@ -13,7 +13,7 @@ use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
 use core::{Failure, Key, TypeConstraint, TypeId, Value};
 use fs::{self, GlobMatching, PosixFS};
-use graph::{EntryId, Node, NodeContext};
+use graph::{EntryId, Graph, Node, NodeContext};
 use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
 use rule_graph;
 use selectors;
@@ -287,9 +287,13 @@ struct RootContext {
 }
 
 impl NodeContext for RootContext {
-  type CloneFor = Context;
+  type Node = NodeKey;
 
   fn clone_for(&self, entry_id: EntryId) -> Context {
     Context::new(entry_id, self.core.clone())
+  }
+
+  fn graph(&self) -> &Graph<NodeKey> {
+    &self.core.graph
   }
 }

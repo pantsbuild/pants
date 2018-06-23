@@ -166,7 +166,7 @@ impl Context {
 }
 
 impl NodeContext for Context {
-  type CloneFor = Context;
+  type Node = NodeKey;
 
   ///
   /// Clones this Context for a new EntryId. Because the Core of the context is an Arc, this
@@ -177,5 +177,9 @@ impl NodeContext for Context {
       entry_id: entry_id,
       core: self.core.clone(),
     }
+  }
+
+  fn graph(&self) -> &Graph<NodeKey> {
+    &self.core.graph
   }
 }

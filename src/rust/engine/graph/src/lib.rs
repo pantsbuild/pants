@@ -96,7 +96,7 @@ impl<N: Node> Entry<N> {
   ///
   fn state<C>(&mut self, context: &C, entry_id: EntryId) -> EntryStateField<N::Item, N::Error>
   where
-    C: NodeContext<CloneFor = N::Context>,
+    C: NodeContext<Node = N>,
   {
     if let Some(ref state) = self.state {
       state.field.clone()
@@ -166,10 +166,6 @@ struct InnerGraph<N: Node> {
 }
 
 impl<N: Node> InnerGraph<N> {
-  fn entry(&self, node: &EntryKey<N>) -> Option<&Entry<N>> {
-    self.entry_id(node).and_then(|&id| self.entry_for_id(id))
-  }
-
   fn entry_id(&self, node: &EntryKey<N>) -> Option<&EntryId> {
     self.nodes.get(node)
   }
@@ -546,21 +542,12 @@ impl<N: Node> Graph<N> {
   }
 
   ///
-  /// If the given Node has completed, returns a clone of its state.
-  ///
-  pub fn peek(&self, node: N) -> Option<Result<N::Item, N::Error>> {
-    let node = node.into();
-    let inner = self.inner.lock().unwrap();
-    inner.entry(&EntryKey::Valid(node)).and_then(|e| e.peek())
-  }
-
-  ///
   /// In the context of the given src Node, declare a dependency on the given dst Node and
   /// begin its execution if it has not already started.
   ///
   pub fn get<C>(&self, src_id: EntryId, context: &C, dst_node: N) -> BoxFuture<N::Item, N::Error>
   where
-    C: NodeContext<CloneFor = N::Context>,
+    C: NodeContext<Node = N>,
   {
     // Get or create the destination, and then insert the dep and return its state.
     let dst_state = {
@@ -596,7 +583,7 @@ impl<N: Node> Graph<N> {
   ///
   pub fn create<C>(&self, node: N, context: &C) -> BoxFuture<N::Item, N::Error>
   where
-    C: NodeContext<CloneFor = N::Context>,
+    C: NodeContext<Node = N>,
   {
     // Initialize the state while under the lock...
     let state = {
@@ -639,7 +626,6 @@ impl<N: Node> Graph<N> {
     inner.visualize(visualizer, roots, path)
   }
 
-  #[allow(dead_code)]
   pub fn heavy_hitters(&self, roots: &[N], k: usize) -> Vec<(String, Duration)> {
     let inner = self.inner.lock().unwrap();
     inner.heavy_hitters(roots, k)
@@ -734,6 +720,7 @@ impl<'a, N: Node + 'a, P: Fn(EntryId, Level) -> bool> Iterator for LeveledWalk<'
 #[cfg(test)]
 mod tests {
   use std::path::Path;
+  use std::sync::Arc;
 
   use boxfuture::{BoxFuture, Boxable};
   use futures::future::{self, Future};
@@ -743,8 +730,9 @@ mod tests {
 
   #[test]
   fn create() {
-    let graph = Graph::new();
-    assert_eq!(graph.create(TNode(1), &TContext).wait(), Ok(1));
+    let graph = Arc::new(Graph::new());
+    let context = TContext(graph.clone());
+    assert_eq!(graph.create(TNode(1), &context).wait(), Ok(1));
   }
 
   #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -772,11 +760,15 @@ mod tests {
   }
 
   #[derive(Clone)]
-  struct TContext;
+  struct TContext(Arc<Graph<TNode>>);
   impl NodeContext for TContext {
-    type CloneFor = TContext;
+    type Node = TNode;
     fn clone_for(&self, _entry_id: EntryId) -> TContext {
-      TContext
+      self.clone()
+    }
+
+    fn graph(&self) -> &Graph<TNode> {
+      &self.0
     }
   }
 

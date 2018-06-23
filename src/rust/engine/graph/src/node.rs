@@ -10,6 +10,8 @@ use hashing::Digest;
 
 use petgraph::stable_graph;
 
+use Graph;
+
 // 2^32 Nodes ought to be more than enough for anyone!
 pub type EntryId = stable_graph::NodeIndex<u32>;
 
@@ -17,7 +19,7 @@ pub type EntryId = stable_graph::NodeIndex<u32>;
 /// Defines executing a cacheable/memoizable step within the given NodeContext.
 ///
 pub trait Node: Clone + Eq + Hash + Send + 'static {
-  type Context: NodeContext;
+  type Context: NodeContext<Node = Self>;
 
   type Item: Clone + Debug + Send + 'static;
   type Error: NodeError;
@@ -89,12 +91,17 @@ pub trait NodeContext: Clone + Send + 'static {
   ///
   /// The type generated when this Context is cloned for another Node.
   ///
-  type CloneFor: NodeContext;
+  type Node: Node;
 
   ///
   /// Creates a clone of this NodeContext to be used for a different Node.
   ///
   /// To clone a Context for use for the same Node, `Clone` is used directly.
   ///
-  fn clone_for(&self, entry_id: EntryId) -> Self::CloneFor;
+  fn clone_for(&self, entry_id: EntryId) -> <Self::Node as Node>::Context;
+
+  ///
+  /// Returns a reference to the Graph for this Context.
+  ///
+  fn graph(&self) -> &Graph<Self::Node>;
 }
