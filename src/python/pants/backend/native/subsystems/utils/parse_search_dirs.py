@@ -58,12 +58,10 @@ class ParseSearchDirs(Subsystem):
         e)
 
     libs_line = self._search_dirs_libraries_regex.search(compiler_output)
-
     if not libs_line:
       raise self.ParseSearchDirsError(
         "Could not parse libraries from output of {!r}:\n{}"
         .format(safe_shlex_join(cmd), compiler_output))
-
     return libs_line.group(1).split(':')
 
   def get_compiler_library_dirs(self, compiler_exe, env=None):

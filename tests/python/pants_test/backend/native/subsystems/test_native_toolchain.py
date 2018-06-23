@@ -100,8 +100,13 @@ int main() {
       clang = self.execute_expecting_one_result(scheduler, CCompiler, self.llvm).value
       linker = self.execute_expecting_one_result(scheduler, Linker, self.toolchain).value
 
+      clang_with_gcc_libs = CCompiler(
+        path_entries=clang.path_entries,
+        exe_filename=clang.exe_filename,
+        library_dirs=(clang.library_dirs + gcc.library_dirs))
+
       self._do_compile_link(gcc, linker, 'hello.c', 'hello_gcc', "I C the world!")
-      self._do_compile_link(clang, linker, 'hello.c', 'hello_clang', "I C the world!")
+      self._do_compile_link(clang_with_gcc_libs, linker, 'hello.c', 'hello_clang', "I C the world!")
 
   def test_hello_cpp(self):
 
@@ -117,5 +122,11 @@ int main() {
       clangpp = self.execute_expecting_one_result(scheduler, CppCompiler, self.llvm).value
       linker = self.execute_expecting_one_result(scheduler, Linker, self.toolchain).value
 
+      clangpp_with_gpp_libs = CppCompiler(
+        path_entries=clangpp.path_entries,
+        exe_filename=clangpp.exe_filename,
+        library_dirs=(clangpp.library_dirs + gpp.library_dirs))
+
       self._do_compile_link(gpp, linker, 'hello.cpp', 'hello_gpp', "I C the world, ++ more!")
-      self._do_compile_link(clangpp, linker, 'hello.cpp', 'hello_clangpp', "I C the world, ++ more!")
+      self._do_compile_link(clangpp_with_gpp_libs, linker, 'hello.cpp', 'hello_clangpp',
+                            "I C the world, ++ more!")
