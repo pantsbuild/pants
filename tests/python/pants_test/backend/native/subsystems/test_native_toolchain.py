@@ -125,6 +125,7 @@ int main() {
 
       gcc, clang, linker = products
 
+      # TODO: ???
       clang_with_gcc_libs = CCompiler(
         path_entries=clang.path_entries,
         exe_filename=clang.exe_filename,
@@ -132,10 +133,14 @@ int main() {
 
       self._do_compile_link(clang_with_gcc_libs, linker, 'hello.c', 'hello_clang', "I C the world!")
 
+      # TODO: ???
       gcc_with_clang_libs = CCompiler(
         path_entries=gcc.path_entries,
         exe_filename=gcc.exe_filename,
-        library_dirs=(gcc.library_dirs + clang.library_dirs))
+        # FIXME: these should be ordered the other way, but this is needed to pass on OSX for
+        # now. Variants should be used to express the difference between gcc and clang, and each
+        # variant should be specifically requested here.
+        library_dirs=(clang.library_dirs + gcc.library_dirs))
 
       self._do_compile_link(gcc_with_clang_libs, linker, 'hello.c', 'hello_gcc', "I C the world!")
 
@@ -157,6 +162,7 @@ int main() {
 
       gpp, clangpp, linker = products
 
+      # TODO: ???
       clangpp_with_gpp_libs = CppCompiler(
         path_entries=clangpp.path_entries,
         exe_filename=clangpp.exe_filename,
@@ -165,10 +171,16 @@ int main() {
       self._do_compile_link(clangpp_with_gpp_libs, linker, 'hello.cpp', 'hello_clangpp',
                             "I C the world, ++ more!")
 
+      # TODO: ???
+      gpp_with_clangpp_libs = CppCompiler(
+        path_entries=gpp.path_entries,
+        exe_filename=gpp.exe_filename,
+        library_dirs=(clangpp.library_dirs + gpp.library_dirs))
+
       gpp_with_gpp_linker = Linker(
         path_entries=(gpp.path_entries + linker.path_entries),
         exe_filename=gpp.exe_filename,
         library_dirs=(gpp.library_dirs + linker.library_dirs))
 
-      self._do_compile_link(gpp, gpp_with_gpp_linker, 'hello.cpp',
+      self._do_compile_link(gpp_with_clangpp_libs, gpp_with_gpp_linker, 'hello.cpp',
                             'hello_gpp', "I C the world, ++ more!")
