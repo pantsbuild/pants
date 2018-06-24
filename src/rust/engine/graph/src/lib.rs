@@ -23,7 +23,7 @@ use fnv::FnvHasher;
 
 use futures::future::{self, Future};
 use futures::sync::oneshot;
-use petgraph::stable_graph::{StableDiGraph, StableGraph};
+use petgraph::graph::DiGraph;
 use petgraph::Direction;
 
 use boxfuture::{BoxFuture, Boxable};
@@ -31,7 +31,7 @@ pub use node::{EntryId, Node, NodeContext, NodeError, NodeTracer, NodeVisualizer
 
 type FNV = BuildHasherDefault<FnvHasher>;
 
-type PGraph<N> = StableDiGraph<Entry<N>, (), u32>;
+type PGraph<N> = DiGraph<Entry<N>, (), u32>;
 
 type RunToken = usize;
 
@@ -572,7 +572,7 @@ impl<N: Node> Graph<N> {
   pub fn new() -> Graph<N> {
     let inner = InnerGraph {
       nodes: HashMap::default(),
-      pg: StableGraph::new(),
+      pg: DiGraph::new(),
     };
     Graph {
       inner: Mutex::new(inner),
