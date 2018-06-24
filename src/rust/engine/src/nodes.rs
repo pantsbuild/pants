@@ -518,7 +518,7 @@ impl ExecuteProcess {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProcessResult(process_execution::FallibleExecuteProcessResult);
 
 impl WrappedNode for ExecuteProcess {
@@ -549,7 +549,7 @@ impl From<ExecuteProcess> for NodeKey {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ReadLink(Link);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LinkDest(PathBuf);
 
 impl WrappedNode for ReadLink {
@@ -613,7 +613,7 @@ impl From<DigestFile> for NodeKey {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Scandir(Dir);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DirectoryListing(Vec<fs::Stat>);
 
 impl WrappedNode for Scandir {
@@ -1060,7 +1060,7 @@ impl NodeError for Failure {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NodeResult {
   Digest(hashing::Digest),
   DirectoryListing(DirectoryListing),

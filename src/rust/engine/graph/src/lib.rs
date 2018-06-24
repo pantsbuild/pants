@@ -52,22 +52,71 @@ impl RunToken {
   }
 }
 
+///
+/// A token associated with a Node that is incremented whenever its output value has (or might
+/// have) changed. When a dependent consumes a dependency at a particular generation, that
+/// generation is recorded on the consuming edge, and can later used to determine whether the
+/// inputs to a node have changed.
+///
+/// Unlike the RunToken (which is incremented whenever a node re-runs), the Generation is only
+/// incremented when the output of a node has changed.
+///
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct Generation(u32);
+
+impl Generation {
+  fn initial() -> Generation {
+    Generation(0)
+  }
+
+  fn next(&self) -> Generation {
+    Generation(self.0 + 1)
+  }
+}
+
 enum EntryState<N: Node> {
-  NotStarted(RunToken),
-  Running {
-    waiters: Vec<oneshot::Sender<Result<N::Item, N::Error>>>,
-    start_time: Instant,
+  // A node that has either been explicitly cleared, or has not yet started Running for the first
+  // time. In this state there is no need for a dirty bit because the generation is either in its
+  // initial state, or has been explicitly incremented when the node was cleared.
+  //
+  // The previous_result value is _not_ a valid value for this Entry: rather, it is preserved in
+  // order to compute the generation value for this Node by comparing it to the new result the next
+  // time the Node runs.
+  NotStarted {
     run_token: RunToken,
+    generation: Generation,
+    previous_result: Option<Result<N::Item, N::Error>>,
   },
-  Completed {
-    result: Result<N::Item, N::Error>,
+  // A node that is running. A running node that has been marked dirty re-runs rather than
+  // completing.
+  //
+  // The `previous_result` value for a Running node is not a valid value. See NotStarted.
+  Running {
     run_token: RunToken,
+    generation: Generation,
+    start_time: Instant,
+    waiters: Vec<oneshot::Sender<Result<(N::Item, Generation), N::Error>>>,
+    previous_result: Option<Result<N::Item, N::Error>>,
+    dirty: bool,
+  },
+  // A node that has completed, and then possibly been marked dirty. Because marking a node
+  // dirty does not eagerly re-execute any logic, it will stay this way until a caller moves it
+  // back to Running.
+  Completed {
+    run_token: RunToken,
+    generation: Generation,
+    result: Result<N::Item, N::Error>,
+    dirty: bool,
   },
 }
 
 impl<N: Node> EntryState<N> {
   fn initial() -> EntryState<N> {
-    EntryState::NotStarted(RunToken::initial())
+    EntryState::NotStarted {
+      run_token: RunToken::initial(),
+      generation: Generation::initial(),
+      previous_result: None,
+    }
   }
 }
 
@@ -116,42 +165,71 @@ impl<N: Node> Entry<N> {
   }
 
   ///
-  /// Returns a Future for the Node's field.
+  /// Spawn the execution of the work on an Executor, which will cause it to execute
+  /// outside of the Graph lock, and allow us to call back into the graph lock to set the
+  /// final value.
   ///
-  fn get<C>(&mut self, context: &C, entry_id: EntryId) -> BoxFuture<N::Item, N::Error>
+  fn start<C>(
+    context: &C,
+    entry_key: &EntryKey<N>,
+    entry_id: EntryId,
+    run_token: RunToken,
+    generation: Generation,
+    previous_result: Option<Result<N::Item, N::Error>>,
+  ) -> EntryState<N>
   where
     C: NodeContext<Node = N>,
   {
-    let next_state = match &mut self.state {
-      &mut EntryState::NotStarted(run_token) => {
-        match &self.node {
-          &EntryKey::Valid(ref n) => {
-            let context2 = context.clone_for(entry_id);
-            let node = n.clone();
+    // Increment the RunToken to uniquely identify this work.
+    let run_token = run_token.next();
+    match entry_key {
+      &EntryKey::Valid(ref n) => {
+        let context2 = context.clone_for(entry_id);
+        let node = n.clone();
 
-            // Spawn the execution of the work on an Executor, which will cause it to execute
-            // outside of the Graph lock, and allow us to call back into the graph lock to set the
-            // final value.
-            context.spawn(future::lazy(move || {
-              let context = context2.clone();
-              node.run(context2).then(move |res| {
-                context.graph().complete(entry_id, run_token, res);
-                Ok(())
-              })
-            }));
+        context.spawn(future::lazy(move || {
+          let context = context2.clone();
+          node.run(context2).then(move |res| {
+            context
+              .graph()
+              .complete(&context, entry_id, run_token, Some(res));
+            Ok(())
+          })
+        }));
 
-            EntryState::Running {
-              waiters: Vec::new(),
-              start_time: Instant::now(),
-              run_token,
-            }
-          }
-          &EntryKey::Cyclic(_) => EntryState::Completed {
-            result: Err(N::Error::cyclic()),
-            run_token: run_token,
-          },
+        EntryState::Running {
+          waiters: Vec::new(),
+          start_time: Instant::now(),
+          run_token,
+          generation,
+          previous_result,
+          dirty: false,
         }
       }
+      &EntryKey::Cyclic(_) => EntryState::Completed {
+        result: Err(N::Error::cyclic()),
+        run_token,
+        generation,
+        dirty: false,
+      },
+    }
+  }
+
+  ///
+  /// Returns a Future for the Node's value and Generation.
+  ///
+  /// The two separate state matches handle two cases: in the first case we simply want to mutate
+  /// or clone the state, so we take it by reference without swapping it. In the second case, we
+  /// need to consume the state (which avoids cloning some of the values held there), so we take it
+  /// by value.
+  ///
+  fn get<C>(&mut self, context: &C, entry_id: EntryId) -> BoxFuture<(N::Item, Generation), N::Error>
+  where
+    C: NodeContext<Node = N>,
+  {
+    // First check whether the Node is already complete, or is currently running: in both of these
+    // cases we don't swap the state of the Node.
+    match &mut self.state {
       &mut EntryState::Running {
         ref mut waiters, ..
       } => {
@@ -162,12 +240,63 @@ impl<N: Node> Entry<N> {
           .flatten()
           .to_boxed();
       }
-      &mut EntryState::Completed { ref result, .. } => {
-        return future::result(result.clone()).to_boxed();
+      &mut EntryState::Completed {
+        ref result,
+        generation,
+        dirty,
+        ..
+      } if !dirty =>
+      {
+        return future::result(result.clone())
+          .map(move |res| (res, generation))
+          .to_boxed();
+      }
+      _ => {}
+    };
+
+    // Otherwise, we'll need to swap the state of the Node, so take it by value.
+    let next_state = match mem::replace(&mut self.state, EntryState::initial()) {
+      EntryState::NotStarted {
+        run_token,
+        generation,
+        previous_result,
+      } => Self::start(
+        context,
+        &self.node,
+        entry_id,
+        run_token,
+        generation,
+        previous_result,
+      ),
+      EntryState::Completed {
+        result,
+        run_token,
+        generation,
+        dirty,
+      } => {
+        assert!(
+          dirty,
+          "A clean Node should not reach this point: {:?}",
+          result
+        );
+        // The Node has already completed but is now marked dirty. This indicates that we are the
+        // first caller to request it since it was marked dirty. We must transition it back to
+        // running.
+        Self::start(
+          context,
+          &self.node,
+          entry_id,
+          run_token,
+          generation,
+          Some(result),
+        )
+      }
+      EntryState::Running { .. } => {
+        panic!("A Running Node should not reach this point.");
       }
     };
 
-    // swap in the new state and then recurse.
+    // Swap in the new state and then recurse.
     self.state = next_state;
     self.get(context, entry_id)
   }
@@ -177,7 +306,12 @@ impl<N: Node> Entry<N> {
   ///
   fn peek(&self) -> Option<Result<N::Item, N::Error>> {
     match &self.state {
-      &EntryState::Completed { ref result, .. } => Some(result.clone()),
+      &EntryState::Completed {
+        ref result, dirty, ..
+      } if !dirty =>
+      {
+        Some(result.clone())
+      }
       _ => None,
     }
   }
@@ -185,32 +319,81 @@ impl<N: Node> Entry<N> {
   ///
   /// Called from the Executor when a Node completes.
   ///
-  fn complete(&mut self, result_run_token: RunToken, result: Result<N::Item, N::Error>) {
-    // Temporarily swap in `NotStarted` in order to take ownership of the state.
-    let state = mem::replace(&mut self.state, EntryState::initial());
-
+  /// A `result` value of `None` indicates that the Node was found to be clean, and its previous
+  /// result should be used. This special case exists to avoid 1) cloning the result to call this
+  /// method, and 2) comparing the current/previous results unnecessarily.
+  ///
+  fn complete<C>(
+    &mut self,
+    context: &C,
+    entry_id: EntryId,
+    result_run_token: RunToken,
+    result: Option<Result<N::Item, N::Error>>,
+  ) where
+    C: NodeContext<Node = N>,
+  {
     // We care about exactly one case: a Running state with the same run_token. All other states
     // represent various (legal) race conditions. See `RunToken`'s docs for more information.
-    self.state = match state {
+    match &self.state {
+      &EntryState::Running { run_token, .. } if result_run_token == run_token => {}
+      _ => {
+        // We care about exactly one case: a Running state with the same run_token. All other states
+        // represent various (legal) race conditions.
+        return;
+      }
+    }
+
+    self.state = match mem::replace(&mut self.state, EntryState::initial()) {
       EntryState::Running {
         waiters,
-        start_time,
         run_token,
+        generation,
+        previous_result,
+        dirty,
+        ..
       } => {
-        if result_run_token == run_token {
+        if dirty {
+          // The node was dirtied while we were running. The newly computed result value was
+          // never published, so we continue to use the previous result.
+          Self::start(
+            context,
+            &self.node,
+            entry_id,
+            run_token,
+            generation,
+            previous_result,
+          )
+        } else {
+          // If the new result does not match the previous result, the generation increments.
+          let (generation, next_result) = if let Some(result) = result {
+            if Some(&result) == previous_result.as_ref() {
+              // Node was re-executed, but had the same result value.
+              (generation, result)
+            } else {
+              (generation.next(), result)
+            }
+          } else {
+            // Node was marked clean.
+            // NB: The unwrap here avoids a clone and a comparison: see the method docs.
+            (
+              generation,
+              previous_result.unwrap_or_else(|| {
+                panic!("A Node cannot be marked clean without a previous result.")
+              }),
+            )
+          };
           // Notify all waiters (ignoring any that have gone away), and then store the value.
           // A waiter will go away whenever they drop the `Future` `Receiver` of the value, perhaps
           // due to failure of another Future in a `join` or `join_all`, or due to a timeout at the
           // root of a request.
           for waiter in waiters {
-            let _ = waiter.send(result.clone());
+            let _ = waiter.send(next_result.clone().map(|res| (res, generation)));
           }
-          EntryState::Completed { result, run_token }
-        } else {
-          EntryState::Running {
-            waiters,
-            start_time,
+          EntryState::Completed {
+            result: next_result,
             run_token,
+            generation,
+            dirty: false,
           }
         }
       }
@@ -228,15 +411,52 @@ impl<N: Node> Entry<N> {
     }
   }
 
+  ///
+  /// Clears the state of this Node, forcing it to be recomputed.
+  ///
   fn clear(&mut self) {
-    let run_token = match mem::replace(&mut self.state, EntryState::initial()) {
-      EntryState::NotStarted(run_token) => run_token,
-      EntryState::Running { run_token, .. } => run_token,
-      EntryState::Completed { run_token, .. } => run_token,
-    };
+    let (run_token, generation, previous_result) =
+      match mem::replace(&mut self.state, EntryState::initial()) {
+        EntryState::NotStarted {
+          run_token,
+          generation,
+          previous_result,
+        }
+        | EntryState::Running {
+          run_token,
+          generation,
+          previous_result,
+          ..
+        } => (run_token, generation, previous_result),
+        EntryState::Completed {
+          run_token,
+          generation,
+          result,
+          ..
+        } => (run_token, generation, Some(result)),
+      };
 
     // Swap in a state with a new RunToken value, which invalidates any outstanding work.
-    self.state = EntryState::NotStarted(run_token.next());
+    self.state = EntryState::NotStarted {
+      run_token: run_token.next(),
+      generation,
+      previous_result,
+    };
+  }
+
+  ///
+  /// Dirties this Node, which will cause it to examine its dependencies the next time it is
+  /// requested, and re-run if any of them have changed generations.
+  ///
+  fn dirty(&mut self) {
+    match &mut self.state {
+      &mut EntryState::Running { ref mut dirty, .. }
+      | &mut EntryState::Completed { ref mut dirty, .. } => {
+        // Mark dirty.
+        *dirty = true;
+      }
+      &mut EntryState::NotStarted { .. } => {}
+    }
   }
 
   fn format(&self) -> String {
@@ -247,6 +467,12 @@ impl<N: Node> Entry<N> {
     };
     format!("{} == {}", self.node.content().format(), state).replace("\"", "\\\"")
   }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct InvalidationResult {
+  pub cleared: usize,
+  pub dirtied: usize,
 }
 
 type Nodes<N> = HashMap<EntryKey<N>, EntryId>;
@@ -338,49 +564,44 @@ impl<N: Node> InnerGraph<N> {
   }
 
   ///
-  /// Finds all "invalidation root" Nodes by applying the given predicate, and invalidates
-  /// their transitive dependents.
+  /// Clears the values of all "invalidation root" Nodes and dirties their transitive dependents.
   ///
   /// An "invalidation root" is a Node in the graph which can be invalidated for a reason other
-  /// than having had its dependencies changed. When an invalidation root Node is invalidated,
-  /// its dependencies are invalidated as well (regardless of whether they are also roots).
+  /// than having had its dependencies changed.
   ///
-  fn invalidate_from_roots<P: Fn(&N) -> bool>(&mut self, predicate: P) -> usize {
-    // Collect all entries that will be deleted.
-    let ids: HashSet<EntryId, FNV> = {
-      let root_ids = self
-        .nodes
-        .iter()
-        .filter_map(|(entry, &entry_id)| {
-          if predicate(entry.content()) {
-            Some(entry_id)
-          } else {
-            None
-          }
-        })
-        .collect();
-      self
-        .walk(root_ids, Direction::Incoming)
-        .map(|eid| eid)
-        .collect()
-    };
-    let invalidated_count = ids.len();
+  fn invalidate_from_roots<P: Fn(&N) -> bool>(&mut self, predicate: P) -> InvalidationResult {
+    // Collect all entries that will be cleared.
+    let root_ids: HashSet<_, FNV> = self
+      .nodes
+      .iter()
+      .filter_map(|(entry, &entry_id)| {
+        if predicate(entry.content()) {
+          Some(entry_id)
+        } else {
+          None
+        }
+      })
+      .collect();
+    // And their transitive dependencies, which will be dirtied.
+    let transitive_ids: Vec<_> = self
+      .walk(root_ids.iter().cloned().collect(), Direction::Incoming)
+      .filter(|eid| !root_ids.contains(eid))
+      .collect();
 
-    // Clear entry states.
-    for id in &ids {
+    let invalidation_result = InvalidationResult {
+      cleared: root_ids.len(),
+      dirtied: transitive_ids.len(),
+    };
+
+    // Clear roots, and dirty transitive entries.
+    for id in &root_ids {
       self.pg.node_weight_mut(*id).map(|entry| entry.clear());
     }
+    for id in &transitive_ids {
+      self.pg.node_weight_mut(*id).map(|entry| entry.dirty());
+    }
 
-    // Then prune all edges adjacent to the entries.
-    self.pg.retain_edges(|pg, edge| {
-      if let Some((src, dst)) = pg.edge_endpoints(edge) {
-        !(ids.contains(&src) || ids.contains(&dst))
-      } else {
-        true
-      }
-    });
-
-    invalidated_count
+    invalidation_result
   }
 
   fn visualize<V: NodeVisualizer<N>>(
@@ -695,7 +916,7 @@ impl<N: Node> Graph<N> {
     // Declare the dep, and return the state of the destination.
     inner.pg.add_edge(src_id, dst_id, ());
     if let Some(entry) = inner.entry_for_id_mut(dst_id) {
-      entry.get(context, dst_id)
+      entry.get(context, dst_id).map(|(res, _)| res).to_boxed()
     } else {
       future::err(N::Error::invalidated()).to_boxed()
     }
@@ -711,7 +932,7 @@ impl<N: Node> Graph<N> {
     let mut inner = self.inner.lock().unwrap();
     let id = inner.ensure_entry(EntryKey::Valid(node));
     if let Some(entry) = inner.entry_for_id_mut(id) {
-      entry.get(context, id)
+      entry.get(context, id).map(|(res, _)| res).to_boxed()
     } else {
       future::err(N::Error::invalidated()).to_boxed()
     }
@@ -722,10 +943,18 @@ impl<N: Node> Graph<N> {
   /// the run_token value to determine whether the Node changed while we were busy executing it,
   /// so that we can discard the work.
   ///
-  fn complete(&self, entry_id: EntryId, run_token: RunToken, result: Result<N::Item, N::Error>) {
+  fn complete<C>(
+    &self,
+    context: &C,
+    entry_id: EntryId,
+    run_token: RunToken,
+    result: Option<Result<N::Item, N::Error>>,
+  ) where
+    C: NodeContext<Node = N>,
+  {
     let mut inner = self.inner.lock().unwrap();
     if let Some(entry) = inner.entry_for_id_mut(entry_id) {
-      entry.complete(run_token, result);
+      entry.complete(context, entry_id, run_token, result);
     }
   }
 
@@ -737,7 +966,7 @@ impl<N: Node> Graph<N> {
     inner.clear()
   }
 
-  pub fn invalidate_from_roots<P: Fn(&N) -> bool>(&self, predicate: P) -> usize {
+  pub fn invalidate_from_roots<P: Fn(&N) -> bool>(&self, predicate: P) -> InvalidationResult {
     let mut inner = self.inner.lock().unwrap();
     inner.invalidate_from_roots(predicate)
   }
@@ -813,7 +1042,7 @@ mod tests {
   use futures::future::{self, Future};
   use hashing::Digest;
 
-  use super::{EntryId, Graph, Node, NodeContext, NodeError};
+  use super::{EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError};
 
   #[test]
   fn create() {
@@ -838,7 +1067,13 @@ mod tests {
     assert_eq!(context.spawn_count(), 3);
 
     // Invalidate and re-request the upper two nodes.
-    assert_eq!(graph.invalidate_from_roots(|&TNode(n)| n == 1), 2);
+    assert_eq!(
+      graph.invalidate_from_roots(|&TNode(n)| n == 1),
+      InvalidationResult {
+        cleared: 1,
+        dirtied: 1
+      }
+    );
 
     // Confirm that the right number of nodes re-run.
     assert_eq!(
@@ -847,6 +1082,8 @@ mod tests {
     );
     assert_eq!(context.spawn_count(), 5);
   }
+
+  // TODO: Test the case where a Node is re-dirtied while it is running.
 
   ///
   /// A node that builds a string by recursively requesting itself and prepending its value

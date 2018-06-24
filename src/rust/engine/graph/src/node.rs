@@ -21,7 +21,7 @@ pub type EntryId = stable_graph::NodeIndex<u32>;
 pub trait Node: Clone + Eq + Hash + Send + 'static {
   type Context: NodeContext<Node = Self>;
 
-  type Item: Clone + Debug + Send + 'static;
+  type Item: Clone + Debug + Eq + Send + 'static;
   type Error: NodeError;
 
   fn run(self, context: Self::Context) -> BoxFuture<Self::Item, Self::Error>;
@@ -35,7 +35,7 @@ pub trait Node: Clone + Eq + Hash + Send + 'static {
   fn digest(result: Self::Item) -> Option<Digest>;
 }
 
-pub trait NodeError: Clone + Debug + Send {
+pub trait NodeError: Clone + Debug + Eq + Send {
   ///
   /// Creates an instance that represents that a Node was invalidated out of the
   /// Graph (generally while running).

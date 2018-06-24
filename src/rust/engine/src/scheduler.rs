@@ -137,13 +137,15 @@ impl Scheduler {
   /// Invalidate the invalidation roots represented by the given Paths.
   ///
   pub fn invalidate(&self, paths: &HashSet<PathBuf>) -> usize {
-    self.core.graph.invalidate_from_roots(move |node| {
+    let invalidation_result = self.core.graph.invalidate_from_roots(move |node| {
       if let Some(fs_subject) = node.fs_subject() {
         paths.contains(fs_subject)
       } else {
         false
       }
-    })
+    });
+    // TODO: Expose.
+    invalidation_result.cleared + invalidation_result.dirtied
   }
 
   ///
