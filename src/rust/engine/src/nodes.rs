@@ -14,8 +14,8 @@ use context::{Context, Core};
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
 use fs::{
-  self, Dir, File, FileContent, GlobMatching, Link, PathGlobs, PathStat, StoreFileByDigest,
-  StrictGlobMatching, VFS,
+  self, Dir, DirectoryListing, File, FileContent, GlobMatching, Link, PathGlobs, PathStat,
+  StoreFileByDigest, StrictGlobMatching, VFS,
 };
 use hashing;
 use process_execution::{self, CommandRunner};
@@ -47,12 +47,12 @@ fn was_required(failure: Failure) -> Failure {
 }
 
 impl VFS<Failure> for Context {
-  fn read_link(&self, link: Link) -> NodeFuture<PathBuf> {
-    self.get(ReadLink(link)).map(|res| res.0).to_boxed()
+  fn read_link(&self, link: &Link) -> NodeFuture<PathBuf> {
+    self.get(ReadLink(link.clone())).map(|res| res.0).to_boxed()
   }
 
-  fn scandir(&self, dir: Dir) -> NodeFuture<Vec<fs::Stat>> {
-    self.get(Scandir(dir)).map(|res| res.0).to_boxed()
+  fn scandir(&self, dir: Dir) -> NodeFuture<Arc<DirectoryListing>> {
+    self.get(Scandir(dir))
   }
 
   fn is_ignored(&self, stat: &fs::Stat) -> bool {
@@ -617,20 +617,17 @@ impl From<DigestFile> for NodeKey {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Scandir(Dir);
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DirectoryListing(Vec<fs::Stat>);
-
 impl WrappedNode for Scandir {
-  type Item = DirectoryListing;
+  type Item = Arc<DirectoryListing>;
 
-  fn run(self, context: Context) -> NodeFuture<DirectoryListing> {
+  fn run(self, context: Context) -> NodeFuture<Arc<DirectoryListing>> {
     let dir = self.0.clone();
     context
       .core
       .vfs
       .scandir(&self.0)
       .then(move |listing_res| match listing_res {
-        Ok(listing) => Ok(DirectoryListing(listing)),
+        Ok(listing) => Ok(Arc::new(listing)),
         Err(e) => Err(throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
       })
       .to_boxed()
@@ -1068,7 +1065,7 @@ impl NodeError for Failure {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NodeResult {
   Digest(hashing::Digest),
-  DirectoryListing(DirectoryListing),
+  DirectoryListing(Arc<DirectoryListing>),
   LinkDest(LinkDest),
   ProcessResult(ProcessResult),
   Snapshot(Arc<fs::Snapshot>),
@@ -1105,8 +1102,8 @@ impl From<LinkDest> for NodeResult {
   }
 }
 
-impl From<DirectoryListing> for NodeResult {
-  fn from(v: DirectoryListing) -> Self {
+impl From<Arc<DirectoryListing>> for NodeResult {
+  fn from(v: Arc<DirectoryListing>) -> Self {
     NodeResult::DirectoryListing(v)
   }
 }
@@ -1197,7 +1194,7 @@ impl TryFrom<NodeResult> for LinkDest {
   }
 }
 
-impl TryFrom<NodeResult> for DirectoryListing {
+impl TryFrom<NodeResult> for Arc<DirectoryListing> {
   type Err = ();
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
