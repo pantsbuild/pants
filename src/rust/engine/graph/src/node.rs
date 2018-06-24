@@ -7,6 +7,7 @@ use std::hash::Hash;
 use boxfuture::BoxFuture;
 use hashing::Digest;
 
+use futures::future::Future;
 use petgraph::stable_graph;
 
 use Graph;
@@ -102,4 +103,14 @@ pub trait NodeContext: Clone + Send + 'static {
   /// Returns a reference to the Graph for this Context.
   ///
   fn graph(&self) -> &Graph<Self::Node>;
+
+  ///
+  /// Spawns a Future on an Executor provided by the context.
+  ///
+  /// NB: Unlike the futures `Executor` trait itself, this implementation _must_ spawn the work
+  /// on another thread, as it is called from within the Graph lock.
+  ///
+  fn spawn<F>(&self, future: F)
+  where
+    F: Future<Item = (), Error = ()> + Send + 'static;
 }

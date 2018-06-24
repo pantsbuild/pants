@@ -314,4 +314,11 @@ impl NodeContext for RootContext {
   fn graph(&self) -> &Graph<NodeKey> {
     &self.core.graph
   }
+
+  fn spawn<F>(&self, future: F)
+  where
+    F: Future<Item = (), Error = ()> + Send + 'static,
+  {
+    self.core.runtime.get().executor().spawn(future);
+  }
 }

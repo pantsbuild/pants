@@ -14,6 +14,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::{File, OpenOptions};
 use std::hash::BuildHasherDefault;
 use std::io::{self, BufWriter, Write};
+use std::mem;
 use std::path::Path;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -21,6 +22,7 @@ use std::time::{Duration, Instant};
 use fnv::FnvHasher;
 
 use futures::future::{self, Future};
+use futures::sync::oneshot;
 use petgraph::stable_graph::{StableDiGraph, StableGraph};
 use petgraph::Direction;
 
@@ -31,11 +33,19 @@ type FNV = BuildHasherDefault<FnvHasher>;
 
 type PGraph<N> = StableDiGraph<Entry<N>, (), u32>;
 
-type EntryStateField<Item, Error> = future::Shared<BoxFuture<Item, Error>>;
+type RunToken = usize;
 
-struct EntryState<N: Node> {
-  field: EntryStateField<N::Item, N::Error>,
-  start_time: Instant,
+enum EntryState<N: Node> {
+  NotStarted(RunToken),
+  Running {
+    waiters: Vec<oneshot::Sender<Result<N::Item, N::Error>>>,
+    start_time: Instant,
+    run_token: RunToken,
+  },
+  Completed {
+    result: Result<N::Item, N::Error>,
+    run_token: RunToken,
+  },
 }
 
 ///
@@ -58,15 +68,6 @@ impl<N: Node> EntryKey<N> {
   }
 }
 
-fn unwrap_entry_res<N: Node>(
-  res: Result<future::SharedItem<N::Item>, future::SharedError<N::Error>>,
-) -> Result<N::Item, N::Error> {
-  match res {
-    Ok(nr) => Ok((*nr).clone()),
-    Err(failure) => Err((*failure).clone()),
-  }
-}
-
 ///
 /// An Entry and its adjacencies.
 ///
@@ -75,77 +76,141 @@ pub struct Entry<N: Node> {
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
   node: EntryKey<N>,
-  state: Option<EntryState<N>>,
+  state: EntryState<N>,
 }
 
 impl<N: Node> Entry<N> {
   ///
-  /// Creates an Entry, wrapping its execution in `future::lazy` to defer execution until a
-  /// a caller actually pulls on it. This indirection exists in order to allow Nodes to start
-  /// outside of the Graph lock.
+  /// Creates an Entry without starting it. This indirection exists because we cannot know
+  /// the EntryId of an Entry until after it is stored in the Graph, and we need the EntryId
+  /// in order to run the Entry.
   ///
   fn new(node: EntryKey<N>) -> Entry<N> {
     Entry {
       node: node,
-      state: None,
+      state: EntryState::NotStarted(0),
     }
   }
 
   ///
-  /// Returns a reference to the Node's Future, starting it if need be.
+  /// Returns a Future for the Node's field.
   ///
-  fn state<C>(&mut self, context: &C, entry_id: EntryId) -> EntryStateField<N::Item, N::Error>
+  fn get<C>(&mut self, context: &C, entry_id: EntryId) -> BoxFuture<N::Item, N::Error>
   where
     C: NodeContext<Node = N>,
   {
-    if let Some(ref state) = self.state {
-      state.field.clone()
-    } else {
-      let start_time = Instant::now();
-      let state = match &self.node {
-        &EntryKey::Valid(ref n) => {
-          // Wrap the launch in future::lazy to defer it until after we're outside the Graph lock.
-          let context = context.clone_for(entry_id);
-          let node = n.clone();
-          future::lazy(move || node.run(context)).to_boxed()
-        }
-        &EntryKey::Cyclic(_) => future::err(N::Error::cyclic()).to_boxed(),
-      };
+    let next_state = match &mut self.state {
+      &mut EntryState::NotStarted(run_token) => {
+        match &self.node {
+          &EntryKey::Valid(ref n) => {
+            let context2 = context.clone_for(entry_id);
+            let node = n.clone();
 
-      self.state = Some(EntryState {
-        field: state.shared(),
-        start_time,
-      });
-      self.state(context, entry_id)
-    }
+            // Spawn the execution of the work on an Executor, which will cause it to execute
+            // outside of the Graph lock, and allow us to call back into the graph lock to set the
+            // final value.
+            context.spawn(future::lazy(move || {
+              let context = context2.clone();
+              node.run(context2).then(move |res| {
+                context.graph().complete(entry_id, run_token, res);
+                Ok(())
+              })
+            }));
+
+            EntryState::Running {
+              waiters: Vec::new(),
+              start_time: Instant::now(),
+              run_token,
+            }
+          }
+          &EntryKey::Cyclic(_) => EntryState::Completed {
+            result: Err(N::Error::cyclic()),
+            run_token: run_token,
+          },
+        }
+      }
+      &mut EntryState::Running {
+        ref mut waiters, ..
+      } => {
+        let (send, recv) = oneshot::channel();
+        waiters.push(send);
+        return recv
+          .map_err(|_| N::Error::invalidated())
+          .and_then(|res| res)
+          .to_boxed();
+      }
+      &mut EntryState::Completed { ref result, .. } => {
+        return future::result(result.clone()).to_boxed();
+      }
+    };
+
+    // swap in the new state and then recurse.
+    self.state = next_state;
+    self.get(context, entry_id)
   }
 
   ///
   /// If the Future for this Node has already completed, returns a clone of its result.
   ///
   fn peek(&self) -> Option<Result<N::Item, N::Error>> {
-    self
-      .state
-      .as_ref()
-      .and_then(|state| state.field.peek().map(unwrap_entry_res::<N>))
+    match &self.state {
+      &EntryState::Completed { ref result, .. } => Some(result.clone()),
+      _ => None,
+    }
+  }
+
+  ///
+  /// Called from the Executor when a Node completes.
+  ///
+  fn complete(&mut self, result_run_token: RunToken, result: Result<N::Item, N::Error>) {
+    // Temporarily swap in `NotStarted` in order to take ownership of the state.
+    let state = mem::replace(&mut self.state, EntryState::NotStarted(0));
+
+    // We care about exactly one case: a Running state with the same run_token. All other states
+    // represent various (legal) race conditions.
+    self.state = match state {
+      EntryState::Running {
+        waiters,
+        start_time,
+        run_token,
+      } => {
+        if result_run_token == run_token {
+          // Notify all waiters (ignoring any that have gone away), and then store the value.
+          for waiter in waiters {
+            let _ = waiter.send(result.clone());
+          }
+          EntryState::Completed { result, run_token }
+        } else {
+          EntryState::Running {
+            waiters,
+            start_time,
+            run_token,
+          }
+        }
+      }
+      s => s,
+    };
   }
 
   ///
   /// If the Node has started and has not yet completed, returns its runtime.
   ///
-  fn current_running_duration(&self, now: Instant) -> Option<Duration> {
-    self.state.as_ref().and_then(|state| {
-      if state.field.peek().is_none() {
-        // Still running.
-        Some(now.duration_since(state.start_time))
-      } else {
-        None
-      }
-    })
+  fn current_running_duration(&self, now: &Instant) -> Option<Duration> {
+    match &self.state {
+      &EntryState::Running { start_time, .. } => Some(now.duration_since(start_time)),
+      _ => None,
+    }
   }
 
   fn clear(&mut self) {
-    self.state = None;
+    let run_token = match mem::replace(&mut self.state, EntryState::NotStarted(0)) {
+      EntryState::NotStarted(run_token) => run_token,
+      EntryState::Running { run_token, .. } => run_token,
+      EntryState::Completed { run_token, .. } => run_token,
+    };
+
+    // Swap in a state with a new RunToken value, which invalidates any outstanding work.
+    self.state = EntryState::NotStarted(run_token + 1);
   }
 
   fn format(&self) -> String {
@@ -296,44 +361,23 @@ impl<N: Node> InnerGraph<N> {
         .map(|eid| eid)
         .collect()
     };
+    let invalidated_count = ids.len();
 
-    // Then remove all entries in one shot.
-    let result = ids.len();
-    InnerGraph::invalidate_internal(&mut self.pg, &mut self.nodes, &ids);
-
-    // And return the removed count.
-    result
-  }
-
-  fn invalidate_internal(pg: &mut PGraph<N>, nodes: &mut Nodes<N>, ids: &HashSet<EntryId, FNV>) {
-    if ids.is_empty() {
-      return;
+    // Clear entry states.
+    for id in &ids {
+      self.pg.node_weight_mut(*id).map(|entry| entry.clear());
     }
 
-    for &id in ids {
-      // Validate that all dependents of the id are also scheduled for removal.
-      assert!(
-        pg.neighbors_directed(id, Direction::Incoming)
-          .all(|dep| ids.contains(&dep))
-      );
+    // Then prune all edges adjacent to the entries.
+    self.pg.retain_edges(|pg, edge| {
+      if let Some((src, dst)) = pg.edge_endpoints(edge) {
+        !(ids.contains(&src) || ids.contains(&dst))
+      } else {
+        true
+      }
+    });
 
-      // Remove the entry from the graph (which will also remove dependent edges).
-      pg.remove_node(id);
-    }
-
-    // Filter the Nodes to delete any with matching ids.
-    let filtered: Vec<(EntryKey<N>, EntryId)> = nodes
-      .drain()
-      .filter(|&(_, id)| !ids.contains(&id))
-      .collect();
-    nodes.extend(filtered);
-
-    assert!(
-      nodes.len() == pg.node_count(),
-      "The Nodes and Entries maps are mismatched: {} vs {}",
-      nodes.len(),
-      pg.node_count()
-    );
+    invalidated_count
   }
 
   fn visualize<V: NodeVisualizer<N>>(
@@ -439,7 +483,7 @@ impl<N: Node> InnerGraph<N> {
     let queue_entry = |id| {
       self
         .entry_for_id(id)
-        .and_then(|entry| entry.current_running_duration(now))
+        .and_then(|entry| entry.current_running_duration(&now))
         .map(|d| (d, id))
     };
 
@@ -549,32 +593,27 @@ impl<N: Node> Graph<N> {
     C: NodeContext<Node = N>,
   {
     // Get or create the destination, and then insert the dep and return its state.
-    let dst_state = {
-      let mut inner = self.inner.lock().unwrap();
-      let dst_id = {
-        // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
-        // without a much more complicated algorithm.
-        let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
-        if inner.detect_cycle(src_id, potential_dst_id) {
-          // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
-          inner.ensure_entry(EntryKey::Cyclic(dst_node))
-        } else {
-          // Valid dependency.
-          potential_dst_id
-        }
-      };
-
-      // Declare the dep, and return the state of the destination.
-      inner.pg.add_edge(src_id, dst_id, ());
-      inner
-        .entry_for_id_mut(dst_id)
-        .map(|entry| entry.state(context, dst_id))
-        .unwrap_or_else(|| future::err(N::Error::invalidated()).to_boxed().shared())
+    let mut inner = self.inner.lock().unwrap();
+    let dst_id = {
+      // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
+      // without a much more complicated algorithm.
+      let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
+      if inner.detect_cycle(src_id, potential_dst_id) {
+        // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
+        inner.ensure_entry(EntryKey::Cyclic(dst_node))
+      } else {
+        // Valid dependency.
+        potential_dst_id
+      }
     };
 
-    // Got the destination's state. Now that we're outside the graph locks, we can safely
-    // retrieve it.
-    dst_state.then(unwrap_entry_res::<N>).to_boxed()
+    // Declare the dep, and return the state of the destination.
+    inner.pg.add_edge(src_id, dst_id, ());
+    if let Some(entry) = inner.entry_for_id_mut(dst_id) {
+      entry.get(context, dst_id)
+    } else {
+      future::err(N::Error::invalidated()).to_boxed()
+    }
   }
 
   ///
@@ -584,17 +623,25 @@ impl<N: Node> Graph<N> {
   where
     C: NodeContext<Node = N>,
   {
-    // Initialize the state while under the lock...
-    let state = {
-      let mut inner = self.inner.lock().unwrap();
-      let id = inner.ensure_entry(EntryKey::Valid(node));
-      inner
-        .entry_for_id_mut(id)
-        .map(|entry| entry.state(context, id))
-        .unwrap_or_else(|| future::err(N::Error::invalidated()).to_boxed().shared())
-    };
-    // ...but only `get` it outside the lock.
-    state.then(unwrap_entry_res::<N>).to_boxed()
+    let mut inner = self.inner.lock().unwrap();
+    let id = inner.ensure_entry(EntryKey::Valid(node));
+    if let Some(entry) = inner.entry_for_id_mut(id) {
+      entry.get(context, id)
+    } else {
+      future::err(N::Error::invalidated()).to_boxed()
+    }
+  }
+
+  ///
+  /// When the Executor finishes executing a Node it calls back to store the result value. We use
+  /// the run_token value to determine whether the Node changed while we were busy executing it,
+  /// so that we can discard the work.
+  ///
+  fn complete(&self, entry_id: EntryId, run_token: RunToken, result: Result<N::Item, N::Error>) {
+    let mut inner = self.inner.lock().unwrap();
+    if let Some(entry) = inner.entry_for_id_mut(entry_id) {
+      entry.complete(run_token, result);
+    }
   }
 
   ///
@@ -719,6 +766,7 @@ impl<'a, N: Node + 'a, P: Fn(EntryId, Level) -> bool> Iterator for LeveledWalk<'
 #[cfg(test)]
 mod tests {
   use std::sync::Arc;
+  use std::thread;
 
   use boxfuture::{BoxFuture, Boxable};
   use futures::future::{self, Future};
@@ -784,6 +832,16 @@ mod tests {
 
     fn graph(&self) -> &Graph<TNode> {
       &self.graph
+    }
+
+    fn spawn<F>(&self, future: F)
+    where
+      F: Future<Item = (), Error = ()> + Send + 'static,
+    {
+      // Avoids introducing a dependency on a threadpool.
+      thread::spawn(move || {
+        future.wait().unwrap();
+      });
     }
   }
 
