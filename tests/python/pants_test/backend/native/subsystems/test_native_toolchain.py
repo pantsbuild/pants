@@ -132,7 +132,12 @@ int main() {
 
       self._do_compile_link(clang_with_gcc_libs, linker, 'hello.c', 'hello_clang', "I C the world!")
 
-      self._do_compile_link(gcc, linker, 'hello.c', 'hello_gcc', "I C the world!")
+      gcc_with_clang_libs = CCompiler(
+        path_entries=gcc.path_entries,
+        exe_filename=gcc.exe_filename,
+        library_dirs=(gcc.library_dirs + clang.library_dirs))
+
+      self._do_compile_link(gcc_with_clang_libs, linker, 'hello.c', 'hello_gcc', "I C the world!")
 
   def test_hello_cpp(self):
 
