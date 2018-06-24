@@ -257,8 +257,12 @@ impl Select {
     }
   }
 
-  fn snapshot(&self, context: &Context, entry: &rule_graph::Entry) -> NodeFuture<fs::Snapshot> {
-    let edges = &context
+  fn snapshot(
+    &self,
+    context: &Context,
+    entry: &rule_graph::Entry,
+  ) -> NodeFuture<Arc<fs::Snapshot>> {
+    let edges = context
       .core
       .rule_graph
       .edges_for_inner(entry)
@@ -269,7 +273,7 @@ impl Select {
       context.core.types.path_globs.clone(),
       self.subject,
       self.variants.clone(),
-      edges,
+      &edges,
     ).run(context.clone())
       .and_then(move |path_globs_val| context.get(Snapshot(externs::key_for(path_globs_val))))
       .to_boxed()
@@ -750,13 +754,14 @@ impl Snapshot {
 }
 
 impl WrappedNode for Snapshot {
-  type Item = fs::Snapshot;
+  type Item = Arc<fs::Snapshot>;
 
-  fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
+  fn run(self, context: Context) -> NodeFuture<Arc<fs::Snapshot>> {
     let lifted_path_globs = Self::lift_path_globs(&externs::val_for(&self.0));
     future::result(lifted_path_globs)
       .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))
       .and_then(move |path_globs| Self::create(context, path_globs))
+      .map(Arc::new)
       .to_boxed()
   }
 }
@@ -1066,7 +1071,7 @@ pub enum NodeResult {
   DirectoryListing(DirectoryListing),
   LinkDest(LinkDest),
   ProcessResult(ProcessResult),
-  Snapshot(fs::Snapshot),
+  Snapshot(Arc<fs::Snapshot>),
   Value(Value),
 }
 
@@ -1076,8 +1081,8 @@ impl From<Value> for NodeResult {
   }
 }
 
-impl From<fs::Snapshot> for NodeResult {
-  fn from(v: fs::Snapshot) -> Self {
+impl From<Arc<fs::Snapshot>> for NodeResult {
+  fn from(v: Arc<fs::Snapshot>) -> Self {
     NodeResult::Snapshot(v)
   }
 }
@@ -1148,7 +1153,7 @@ impl TryFrom<NodeResult> for Value {
   }
 }
 
-impl TryFrom<NodeResult> for fs::Snapshot {
+impl TryFrom<NodeResult> for Arc<fs::Snapshot> {
   type Err = ();
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
