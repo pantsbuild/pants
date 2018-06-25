@@ -34,6 +34,9 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Add .vscode/ folder to .gitignore (#6020)
+  `PR #6020 <https://github.com/pantsbuild/pants/pull/6020>`_
+
 * [engine] Selecting for ExecuteProcessResult will Throw on non-zero exit (#6000)
   `PR #6000 <https://github.com/pantsbuild/pants/pull/6000>`_
 
