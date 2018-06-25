@@ -33,7 +33,9 @@ class Zinc(object):
 
     @classmethod
     def subsystem_dependencies(cls):
-      return super(Zinc.Factory, cls).subsystem_dependencies() + (DependencyContext, Java, ScalaPlatform)
+      return super(Zinc.Factory, cls).subsystem_dependencies() + (DependencyContext,
+                                                                  Java,
+                                                                  ScalaPlatform)
 
     @classmethod
     def register_options(cls, register):
@@ -73,11 +75,13 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             'compiler-interface',
                             classpath=[
-                              JarDependency(org='org.scala-sbt', name='compiler-interface', rev=zinc_rev),
+                              JarDependency(org='org.scala-sbt',
+                                            name='compiler-interface',
+                                            rev=zinc_rev),
                             ],
-                            # NB: We force a noop-jarjar'ing of the interface, since it is now broken
-                            # up into multiple jars, but zinc does not yet support a sequence of jars
-                            # for the interface.
+                            # NB: We force a noop-jarjar'ing of the interface, since it is now
+                            # broken up into multiple jars, but zinc does not yet support a sequence
+                            # of jars for the interface.
                             main='no.such.main.Main',
                             custom_rules=shader_rules)
 
@@ -158,52 +162,17 @@ class Zinc(object):
         ','.join('{}:{}'.format(src, dst) for src, dst in rebases.items())
       )
 
-  @staticmethod
-  def _select_jvm_tool_mixin(left, right, options):
-    if left is None:
-      return right
-    if any(not left.get_options().is_default(opt)
-           for opt in options
-           if getattr(left.get_options(), opt, None) is not None):
-      return left
-    return right
-
   @memoized_method
-  def javac_compiler_plugins_src(self, zinc_compile_instance=None):
-    """Returns an instance of JvmToolMixin that should provide javac compiler plugins.
-
-    TODO: Remove this method once the deprecation of `(scalac|javac)_plugins` on Zinc has
-    completed in `1.9.0.dev0`.
-    """
-    return Zinc._select_jvm_tool_mixin(zinc_compile_instance,
-                                       Java.global_instance(),
-                                       ['javac_plugins', 'javac_plugin_args', 'javac_plugin_dep'])
-
-  @memoized_method
-  def scalac_compiler_plugins_src(self, zinc_compile_instance=None):
-    """Returns an instance of JvmToolMixin that should provide scalac compiler plugins.
-
-    TODO: Remove this method once the deprecation of `(scalac|javac)_plugins` on Zinc has
-    completed in `1.9.0.dev0`.
-    """
-    return Zinc._select_jvm_tool_mixin(zinc_compile_instance,
-                                       ScalaPlatform.global_instance(),
-                                       ['scalac_plugins', 'scalac_plugin_args', 'scalac_plugin_dep'])
-
-  @memoized_method
-  def _compiler_plugins_cp_entries(self, zinc_compile_instance=None):
-    """Any additional global compiletime classpath entries for compiler plugins.
-
-    TODO: Remove parameter once the deprecation of `(scalac|javac)_plugins` on Zinc has
-    completed in `1.9.0.dev0`.
-    """
-    java_options_src = self.javac_compiler_plugins_src(zinc_compile_instance)
-    scala_options_src = self.scalac_compiler_plugins_src(zinc_compile_instance)
+  def _compiler_plugins_cp_entries(self):
+    """Any additional global compiletime classpath entries for compiler plugins."""
+    java_options_src = Java.global_instance()
+    scala_options_src = ScalaPlatform.global_instance()
 
     def cp(instance, toolname):
       scope = instance.options_scope
       return instance.tool_classpath_from_products(self._products, toolname, scope=scope)
-    classpaths = cp(java_options_src, 'javac-plugin-dep') + cp(scala_options_src, 'scalac-plugin-dep')
+    classpaths = (cp(java_options_src, 'javac-plugin-dep') +
+                  cp(scala_options_src, 'scalac-plugin-dep'))
     return [(conf, jar) for conf in self.DEFAULT_CONFS for jar in classpaths]
 
   @memoized_property
@@ -212,7 +181,7 @@ class Zinc(object):
                                                            self.ZINC_EXTRACTOR_TOOL_NAME,
                                                            scope=self._zinc_factory.options_scope)
 
-  def compile_classpath(self, classpath_product_key, target, extra_cp_entries=None, zinc_compile_instance=None):
+  def compile_classpath(self, classpath_product_key, target, extra_cp_entries=None):
     """Compute the compile classpath for the given target."""
     classpath_product = self._products.get_data(classpath_product_key)
 
@@ -221,7 +190,7 @@ class Zinc(object):
     else:
       dependencies = DependencyContext.global_instance().all_dependencies(target)
 
-    all_extra_cp_entries = list(self._compiler_plugins_cp_entries(zinc_compile_instance))
+    all_extra_cp_entries = list(self._compiler_plugins_cp_entries())
     if extra_cp_entries:
       all_extra_cp_entries.extend(extra_cp_entries)
 

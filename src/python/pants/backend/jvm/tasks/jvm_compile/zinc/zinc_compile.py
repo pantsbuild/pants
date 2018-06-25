@@ -500,37 +500,6 @@ class ZincCompile(BaseZincCompile):
   """Compile Scala and Java code to classfiles using Zinc."""
 
   @classmethod
-  def register_options(cls, register):
-    super(ZincCompile, cls).register_options(register)
-    register('--javac-plugins', advanced=True, type=list, fingerprint=True,
-             removal_version='1.9.0.dev0',
-             removal_hint='Use `--java-javac-plugins` instead.',
-             help='Use these javac plugins.')
-    register('--javac-plugin-args', advanced=True, type=dict, default={}, fingerprint=True,
-             removal_version='1.9.0.dev0',
-             removal_hint='Use `--java-javac-plugin-args` instead.',
-             help='Map from javac plugin name to list of arguments for that plugin.')
-    cls.register_jvm_tool(register, 'javac-plugin-dep', classpath=[],
-                          removal_version='1.9.0.dev0',
-                          removal_hint='Use `--java-javac-plugin-dep` instead.',
-                          help='Search for javac plugins here, as well as in any '
-                               'explicit dependencies.')
-
-    register('--scalac-plugins', advanced=True, type=list, fingerprint=True,
-             removal_version='1.9.0.dev0',
-             removal_hint='Use `--scala-scalac-plugins` instead.',
-             help='Use these scalac plugins.')
-    register('--scalac-plugin-args', advanced=True, type=dict, default={}, fingerprint=True,
-             removal_version='1.9.0.dev0',
-             removal_hint='Use `--scala-scalac-plugin-args` instead.',
-             help='Map from scalac plugin name to list of arguments for that plugin.')
-    cls.register_jvm_tool(register, 'scalac-plugin-dep', classpath=[],
-                          removal_version='1.9.0.dev0',
-                          removal_hint='Use `--scala-scalac-plugin-dep` instead.',
-                          help='Search for scalac plugins here, as well as in any '
-                               'explicit dependencies.')
-
-  @classmethod
   def product_types(cls):
     return ['runtime_classpath', 'zinc_analysis', 'zinc_args']
 
