@@ -89,6 +89,7 @@ class Linker(datatype([
 
     ret.update({
       'LDSHARED': self.exe_filename,
+      'LIBRARY_PATH': create_path_env_var(self.library_dirs),
     })
 
     return ret
@@ -107,10 +108,6 @@ class CompilerMixin(Executable):
 
     if self.include_dirs:
       ret['CPATH'] = create_path_env_var(self.include_dirs)
-
-    ret.update({
-      'LIBRARY_PATH': create_path_env_var(self.library_dirs),
-    })
 
     return ret
 
