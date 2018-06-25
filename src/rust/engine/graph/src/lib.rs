@@ -722,7 +722,6 @@ impl<'a, N: Node + 'a, P: Fn(EntryId, Level) -> bool> Iterator for LeveledWalk<'
 
 #[cfg(test)]
 mod tests {
-  use std::path::Path;
   use std::sync::Arc;
 
   use boxfuture::{BoxFuture, Boxable};
@@ -734,27 +733,38 @@ mod tests {
   #[test]
   fn create() {
     let graph = Arc::new(Graph::new());
-    let context = TContext(graph.clone());
-    assert_eq!(graph.create(TNode(1), &context).wait(), Ok(1));
+    let context = TContext::new(graph.clone());
+    assert_eq!(
+      graph.create(TNode(2), &context).wait(),
+      Ok("2/1/0".to_string())
+    );
   }
 
+  ///
+  /// A node that builds a string by recursively requesting itself and prepending its value
+  /// to the result.
+  ///
   #[derive(Clone, Debug, Eq, Hash, PartialEq)]
   struct TNode(usize);
   impl Node for TNode {
     type Context = TContext;
-    type Item = usize;
+    type Item = String;
     type Error = TError;
 
-    fn run(self, _context: TContext) -> BoxFuture<usize, TError> {
-      future::ok(self.0).to_boxed()
+    fn run(self, context: TContext) -> BoxFuture<String, TError> {
+      let depth = self.0;
+      if depth > 0 {
+        context
+          .get(TNode(depth - 1))
+          .map(move |v| format!("{}/{}", depth, v))
+          .to_boxed()
+      } else {
+        future::ok(format!("{}", depth)).to_boxed()
+      }
     }
 
     fn format(&self) -> String {
       format!("{:?}", self)
-    }
-
-    fn fs_subject(&self) -> Option<&Path> {
-      None
     }
 
     fn digest(_result: Self::Item) -> Option<Digest> {
@@ -763,15 +773,34 @@ mod tests {
   }
 
   #[derive(Clone)]
-  struct TContext(Arc<Graph<TNode>>);
+  struct TContext {
+    graph: Arc<Graph<TNode>>,
+    entry_id: Option<EntryId>,
+  }
   impl NodeContext for TContext {
     type Node = TNode;
-    fn clone_for(&self, _entry_id: EntryId) -> TContext {
-      self.clone()
+    fn clone_for(&self, entry_id: EntryId) -> TContext {
+      TContext {
+        graph: self.graph.clone(),
+        entry_id: Some(entry_id),
+      }
     }
 
     fn graph(&self) -> &Graph<TNode> {
-      &self.0
+      &self.graph
+    }
+  }
+
+  impl TContext {
+    fn new(graph: Arc<Graph<TNode>>) -> TContext {
+      TContext {
+        graph,
+        entry_id: None,
+      }
+    }
+
+    fn get(&self, dst: TNode) -> BoxFuture<String, TError> {
+      self.graph.get(self.entry_id.unwrap(), self, dst)
     }
   }
 
