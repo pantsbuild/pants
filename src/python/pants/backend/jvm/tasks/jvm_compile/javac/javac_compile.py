@@ -15,7 +15,6 @@ from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
-from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.fs import FilesContent, PathGlobs, Snapshot
@@ -199,7 +198,6 @@ class JavacCompile(JvmCompile):
     # do not have any dependencies or inner classes
 
     input_files = set()
-    input_files.add(os.path.relpath(ctx.classes_dir, get_buildroot()))
     for source in ctx.target.sources_relative_to_buildroot():
       input_files.add(source)
 
@@ -216,8 +214,8 @@ class JavacCompile(JvmCompile):
     input_pathglobs = PathGlobs(tuple(input_files), ())
     input_snapshot = self.context._scheduler.product_request(Snapshot, [input_pathglobs])[0]
 
-    exec_process_request = ExecuteProcessRequest(tuple(cmd), (), input_snapshot.directory_digest, tuple(output_files), 15 * 60,
-                                                 'jvm_task')
+    exec_process_request = ExecuteProcessRequest(tuple(cmd), (), input_snapshot.directory_digest, tuple(output_files),
+                                                 (), 15 * 60, 'jvm_task')
     exec_result = self.context.execute_process_synchronously(exec_process_request,
                                                              'jvm_task',
                                                              (WorkUnitLabel.TASK, WorkUnitLabel.JVM))
