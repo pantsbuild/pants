@@ -18,7 +18,7 @@ Usage: $0 (-h|-fxbkmsrjlpuyncia)
  -f           skip python code formatting checks
  -x           skip bootstrap clean-all (assume bootstrapping from a
               fresh clone)
- -b           skip bootstraping pants from local sources
+ -b           skip bootstrapping pants from local sources
  -k           skip bootstrapped pants self compile check
  -m           skip sanity checks of bootstrapped pants and repo BUILD
               files
