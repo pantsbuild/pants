@@ -23,7 +23,7 @@ class ScalacPluginIntegrationTest(BaseCompileIT):
   # all targets, and "local" means specified on an individual target.
   def _do_test_global(self, args):
     config = {
-      'compile.zinc': {
+      'scala': {
         'scalac_plugins': ['simple_scalac_plugin'],
         'scalac_plugin_args': {
           'simple_scalac_plugin': args
@@ -35,7 +35,7 @@ class ScalacPluginIntegrationTest(BaseCompileIT):
 
   def _do_test_local_with_global_args(self, args):
     config = {
-      'compile.zinc': {
+      'scala': {
         'scalac_plugin_args': {
           'simple_scalac_plugin': args
         }
@@ -51,7 +51,7 @@ class ScalacPluginIntegrationTest(BaseCompileIT):
   def test_global_with_local_args(self):
     self._do_test(['args', 'from', 'target', 'global_with_local_args'],
                   {
-                    'compile.zinc': {
+                    'scala': {
                       'scalac_plugins': ['simple_scalac_plugin'],
                     },
                   },
@@ -70,7 +70,7 @@ class ScalacPluginIntegrationTest(BaseCompileIT):
     # we will use other_simple_scalac_plugin (because it's globally specified).
     # This is a regression test for https://github.com/pantsbuild/pants/issues/4475.
     config = {
-      'compile.zinc': {
+      'scala': {
         'scalac_plugins': ['other_simple_scalac_plugin'],
         'scalac_plugin_args': {
           'other_simple_scalac_plugin': ['foo']
