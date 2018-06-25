@@ -16,7 +16,7 @@
 .buildcache/
 .coverage*
 .idea
-.vscode/
+/.vscode/
 .cache
 .pants.d
 .pants.run
