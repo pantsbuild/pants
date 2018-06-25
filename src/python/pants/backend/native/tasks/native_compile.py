@@ -12,7 +12,7 @@ from collections import defaultdict
 from pants.backend.native.config.environment import Executable
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_task import NativeTask
-from pants.backend.native.tasks.native_third_party_fetch import NativeThirdPartyFetch
+from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFetch
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.dependency_context import DependencyContext
@@ -189,7 +189,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
   def get_third_party_include_dirs(self):
     inc_dir = []
-    tp_files_product = self.context.products.get_data(NativeThirdPartyFetch.ThirdPartyLibraryFiles)
+    tp_files_product = self.context.products.get_data(NativeExternalLibraryFetch.NativeExternalLibFiles)
     directory = tp_files_product.include
     if directory:
       inc_dir = [directory]

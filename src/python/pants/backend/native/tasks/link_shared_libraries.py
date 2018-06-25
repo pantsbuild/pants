@@ -12,7 +12,7 @@ from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_compile import NativeTargetDependencies, ObjectFiles
 from pants.backend.native.tasks.native_task import NativeTask
-from pants.backend.native.tasks.native_third_party_fetch import NativeThirdPartyFetch
+from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFetch
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.collections import assert_single_element
@@ -145,7 +145,7 @@ class LinkSharedLibraries(NativeTask):
 
   def _get_third_party_lib_args(self):
     lib_args = []
-    tp_files_product = self.context.products.get_data(NativeThirdPartyFetch.ThirdPartyLibraryFiles)
+    tp_files_product = self.context.products.get_data(NativeExternalLibraryFetch.NativeExternalLibFiles)
     if tp_files_product.lib_names:
       for lib_name in tp_files_product.lib_names:
         lib_args.append('-l{}'.format(lib_name))

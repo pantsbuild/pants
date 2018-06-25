@@ -10,7 +10,7 @@ import re
 from distutils.dir_util import copy_tree
 
 from pants.backend.native.subsystems.conan import Conan
-from pants.backend.native.targets.third_party_native_library import ThirdPartyNativeLibrary
+from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
 from pants.base.exceptions import TaskError
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
@@ -63,11 +63,11 @@ class ConanRequirement(object):
     return pkg_sha
 
 
-class NativeThirdPartyFetch(Task):
+class NativeExternalLibraryFetch(Task):
   options_scope = 'native-third-party-fetch'
-  native_library_constraint = Exactly(ThirdPartyNativeLibrary)
+  native_library_constraint = Exactly(ExternalNativeLibrary)
 
-  class ThirdPartyLibraryFiles(object):
+  class NativeExternalLibFiles(object):
     def __init__(self):
       self._include = None
       self._lib = None
@@ -96,7 +96,7 @@ class NativeThirdPartyFetch(Task):
     def add_lib_name(self, lib_name):
       self._lib_names.append(lib_name)
 
-  class NativeThirdPartyFetchError(TaskError):
+  class NativeExternalLibraryFetchError(TaskError):
     pass
 
   @staticmethod
@@ -108,17 +108,17 @@ class NativeThirdPartyFetch(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(NativeThirdPartyFetch, cls).register_options(register)
+    super(NativeExternalLibraryFetch, cls).register_options(register)
     register('--conan-remotes', type=list, default=['https://conan.bintray.com'], advanced=True,
              fingerprint=True, help='The conan remote to download conan packages from.')
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(NativeThirdPartyFetch, cls).subsystem_dependencies() + (Conan,)
+    return super(NativeExternalLibraryFetch, cls).subsystem_dependencies() + (Conan,)
 
   @classmethod
   def product_types(cls):
-    return [cls.ThirdPartyLibraryFiles]
+    return [cls.NativeExternalLibFiles]
 
   @property
   def cache_target_dirs(self):
@@ -137,8 +137,8 @@ class NativeThirdPartyFetch(Task):
     otherwise, resolve each into a temp dir and copy all of them into the VT set results dir.
     """
 
-    task_product = self.context.products.get_data(self.ThirdPartyLibraryFiles,
-                                                  self.ThirdPartyLibraryFiles)
+    task_product = self.context.products.get_data(self.NativeExternalLibFiles,
+                                                  self.NativeExternalLibFiles)
 
     native_lib_tgts = self.context.targets(self.native_library_constraint.satisfied_by)
     if native_lib_tgts:
@@ -236,7 +236,7 @@ class NativeThirdPartyFetch(Task):
   def fetch_packages(self, vt, vts_results_dir):
     """
     Invoke the conan pex to fetch conan packages specified by a
-    `NativeThirdPartyLibrary` target.
+    `ExternalLibLibrary` target.
     """
     task_product = {}
     task_product['lib_names'] = []
@@ -260,13 +260,13 @@ class NativeThirdPartyFetch(Task):
             stdout=subprocess.PIPE
           )
         except OSError as e:
-          raise self.NativeThirdPartyFetchError(
+          raise self.NativeExternalLibraryFetchError(
             "Error invoking conan for fetch task. Command {}:".format(cmdline), e
           )
         rc = process.wait()
         stdout = process.stdout.read()
         if rc != 0:
-          raise self.NativeThirdPartyFetchError(
+          raise self.NativeExternalLibraryFetchError(
             "Error fetching native third party artifacts from the conan server ({}). "
             "Command: {}\n\nConan output: {}\nExit code: {}\n"
             .format(self.get_options().conan_remote, cmdline, stdout, rc))

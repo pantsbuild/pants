@@ -11,12 +11,12 @@ from pants.base.validation import assert_list
 from pants.build_graph.target import Target
 
 
-class ThirdPartyNativeLibrary(Target):
+class ExternalNativeLibrary(Target):
   """A set of Conan package strings to be passed to the Conan package manager."""
 
   @classmethod
   def alias(cls):
-    return 'third_party_native_library'
+    return 'external_native_library'
 
   def __init__(self, payload=None, packages=None, **kwargs):
     """
@@ -31,7 +31,7 @@ class ThirdPartyNativeLibrary(Target):
     payload.add_fields({
       'packages': PrimitiveField(packages),
     })
-    super(ThirdPartyNativeLibrary, self).__init__(payload=payload, **kwargs)
+    super(ExternalNativeLibrary, self).__init__(payload=payload, **kwargs)
 
   @property
   def packages(self):

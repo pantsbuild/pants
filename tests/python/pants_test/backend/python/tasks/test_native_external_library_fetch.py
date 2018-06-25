@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import textwrap
 import unittest
 
-from pants.backend.native.tasks.native_third_party_fetch import (ConanRequirement,
-                                                                 NativeThirdPartyFetch)
+from pants.backend.native.tasks.native_external_library_fetch import (ConanRequirement,
+                                                                      NativeExternalLibraryFetch)
 from pants.util.osutil import get_normalized_os_name
 
 
@@ -55,7 +55,7 @@ class TestConanRequirement(unittest.TestCase):
     self.assertEqual(cmdline, expected)
 
 
-class TestNativeThirdPartyFetch(unittest.TestCase):
+class TestNativeExternalLibraryFetch(unittest.TestCase):
 
   def test_parse_lib_name_from_library_filename(self):
     tc_1 = 'liblzo.a'
@@ -63,13 +63,13 @@ class TestNativeThirdPartyFetch(unittest.TestCase):
     tc_3 = 'libz.dylib'
     tc_4 = 'libbadextension.lol'
     tc_5 = 'badfilename.so'
-    res = NativeThirdPartyFetch._parse_lib_name_from_library_filename(tc_1)
+    res = NativeExternalLibraryFetch._parse_lib_name_from_library_filename(tc_1)
     self.assertEqual(res, 'lzo')
-    res = NativeThirdPartyFetch._parse_lib_name_from_library_filename(tc_2)
+    res = NativeExternalLibraryFetch._parse_lib_name_from_library_filename(tc_2)
     self.assertEqual(res, 'tensorflow')
-    res = NativeThirdPartyFetch._parse_lib_name_from_library_filename(tc_3)
+    res = NativeExternalLibraryFetch._parse_lib_name_from_library_filename(tc_3)
     self.assertEqual(res, 'z')
-    res = NativeThirdPartyFetch._parse_lib_name_from_library_filename(tc_4)
+    res = NativeExternalLibraryFetch._parse_lib_name_from_library_filename(tc_4)
     self.assertEqual(res, None)
-    res = NativeThirdPartyFetch._parse_lib_name_from_library_filename(tc_5)
+    res = NativeExternalLibraryFetch._parse_lib_name_from_library_filename(tc_5)
     self.assertEqual(res, None)

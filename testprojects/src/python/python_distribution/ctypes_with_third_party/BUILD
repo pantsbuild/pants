@@ -37,7 +37,7 @@ python_binary(
   ],
 )
 
-third_party_native_library(
+external_native_library(
   name='rang',
   packages=[
      'rang/3.1.0@rang/stable',
