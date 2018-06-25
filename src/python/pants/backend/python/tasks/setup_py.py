@@ -8,6 +8,7 @@ import ast
 import itertools
 import os
 import pprint
+import re
 import shutil
 from abc import abstractmethod
 from builtins import map, object, str, zip
@@ -143,6 +144,7 @@ def ensure_setup_requires_site_dir(reqs_to_resolve, interpreter, site_dir,
 
 
 class SetupPyExecutionEnvironment(datatype([
+    'version',
     # TODO: It might be pretty useful to have an Optional TypeConstraint.
     'setup_requires_site_dir',
     # If None, don't execute in the toolchain environment.
@@ -159,8 +161,16 @@ class SetupPyExecutionEnvironment(datatype([
     'linux': lambda: ['-shared'],
   }
 
+  PEP_0440_DISALLOWED = re.compile(r'[^a-zA-Z0-9\.]')
+
+  _local_version_replacer_char = '.'
+
   def as_environment(self):
     ret = {}
+
+    if self.version:
+      ret['_SETUP_PY_LOCAL_VERSION'] = self.PEP_0440_DISALLOWED.sub(
+        self._local_version_replacer_char, self.version)
 
     if self.setup_requires_site_dir:
       ret['PYTHONPATH'] = self.setup_requires_site_dir.site_dir

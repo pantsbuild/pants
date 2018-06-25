@@ -6,16 +6,15 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from builtins import str
 
-from pex.interpreter import PythonIdentity
 from twitter.common.collections import maybe_list
 
+from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
-from pants.build_graph.target import Target
 
 
-class PythonDistribution(Target):
+class PythonDistribution(PythonTarget):
   """A Python distribution target that accepts a user-defined setup.py."""
 
   default_sources_globs = '*.py'
@@ -28,7 +27,6 @@ class PythonDistribution(Target):
                address=None,
                payload=None,
                sources=None,
-               compatibility=None,
                setup_requires=None,
                **kwargs):
     """
@@ -45,25 +43,16 @@ class PythonDistribution(Target):
       format, e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements
       agnostic to interpreter class.
     """
-    payload = payload or Payload()
-    payload.add_fields({
-      'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
-      'compatibility': PrimitiveField(maybe_list(compatibility or ())),
-      'setup_requires': PrimitiveField(maybe_list(setup_requires or ()))
-    })
-    super(PythonDistribution, self).__init__(address=address, payload=payload, **kwargs)
-
     if not 'setup.py' in sources:
       raise TargetDefinitionException(
-        self, 'A setup.py in the top-level directory relative to the target definition is required.'
-      )
+        self, 'A setup.py in the top-level directory relative to the target definition is required.')
 
-    # Check that the compatibility requirements are well-formed.
-    for req in self.payload.compatibility:
-      try:
-        PythonIdentity.parse_requirement(req)
-      except ValueError as e:
-        raise TargetDefinitionException(self, str(e))
+    payload = payload or Payload()
+    payload.add_fields({
+      'setup_requires': PrimitiveField(maybe_list(setup_requires or ()))
+    })
+    super(PythonDistribution, self).__init__(
+      address=address, payload=payload, sources=sources, **kwargs)
 
   @property
   def has_native_sources(self):
