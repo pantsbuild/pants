@@ -69,6 +69,10 @@ pub trait NodeTracer<N: Node> {
   ///
   /// Returns true if the given Node Result represents the "bottom" of a trace.
   ///
+  /// A trace represents a sub-dag of the entire Graph, and a "bottom" Node result represents
+  /// a boundary that the trace stops before (ie, a bottom Node will not be rendered in the trace,
+  /// but anything that depends on a bottom Node will be).
+  ///
   fn is_bottom(result: Option<Result<N::Item, N::Error>>) -> bool;
 
   ///

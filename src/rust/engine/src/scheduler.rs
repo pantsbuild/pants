@@ -294,6 +294,11 @@ type Root = Select;
 
 pub type RootResult = Result<Value, Failure>;
 
+///
+/// NB: This basic wrapper exists to allow us to implement the `NodeContext` trait (which lives
+/// outside of this crate) for the `Arc` struct (which also lives outside our crate), which is not
+/// possible without the wrapper due to "trait coherence".
+///
 #[derive(Clone)]
 struct RootContext {
   core: Arc<Core>,
