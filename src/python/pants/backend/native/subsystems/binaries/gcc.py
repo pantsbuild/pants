@@ -74,7 +74,8 @@ class GCC(NativeTool):
     return CCompiler(
       path_entries=(own_path_entries + assembler.path_entries),
       exe_filename=exe_filename,
-      library_dirs=lib_search_dirs)
+      library_dirs=lib_search_dirs,
+      include_dirs=[])
 
   def cpp_compiler(self, platform):
     exe_filename = 'g++'
@@ -88,7 +89,8 @@ class GCC(NativeTool):
     return CppCompiler(
       path_entries=(own_path_entries + assembler.path_entries),
       exe_filename=exe_filename,
-      library_dirs=lib_search_dirs)
+      library_dirs=lib_search_dirs,
+      include_dirs=[])
 
 
 @rule(CCompiler, [Select(Platform), Select(GCC)])

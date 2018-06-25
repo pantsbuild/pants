@@ -129,7 +129,8 @@ int main() {
       clang_with_gcc_libs = CCompiler(
         path_entries=clang.path_entries,
         exe_filename=clang.exe_filename,
-        library_dirs=(gcc.library_dirs + clang.library_dirs))
+        library_dirs=(gcc.library_dirs + clang.library_dirs),
+        include_dirs=(clang.include_dirs + gcc.include_dirs))
 
       self._do_compile_link(clang_with_gcc_libs, linker, 'hello.c', 'hello_clang', "I C the world!")
 
@@ -140,7 +141,8 @@ int main() {
         # FIXME: these should be ordered the other way, but this is needed to pass on OSX for
         # now. Variants should be used to express the difference between gcc and clang, and each
         # variant should be specifically requested here.
-        library_dirs=(clang.library_dirs + gcc.library_dirs))
+        library_dirs=(gcc.library_dirs + clang.library_dirs),
+        include_dirs=(clang.include_dirs + gcc.include_dirs))
 
       self._do_compile_link(gcc_with_clang_libs, linker, 'hello.c', 'hello_gcc', "I C the world!")
 
@@ -166,7 +168,8 @@ int main() {
       clangpp_with_gpp_libs = CppCompiler(
         path_entries=clangpp.path_entries,
         exe_filename=clangpp.exe_filename,
-        library_dirs=(clangpp.library_dirs + gpp.library_dirs))
+        library_dirs=(gpp.library_dirs + clangpp.library_dirs),
+        include_dirs=(clangpp.include_dirs + gpp.include_dirs))
 
       self._do_compile_link(clangpp_with_gpp_libs, linker, 'hello.cpp', 'hello_clangpp',
                             "I C the world, ++ more!")
@@ -175,7 +178,8 @@ int main() {
       gpp_with_clangpp_libs = CppCompiler(
         path_entries=gpp.path_entries,
         exe_filename=gpp.exe_filename,
-        library_dirs=(clangpp.library_dirs + gpp.library_dirs))
+        library_dirs=(clangpp.library_dirs + gpp.library_dirs),
+        include_dirs=(clangpp.include_dirs + gpp.include_dirs))
 
       gpp_with_gpp_linker = Linker(
         path_entries=(gpp.path_entries + linker.path_entries),

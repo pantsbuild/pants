@@ -67,7 +67,6 @@ class Executable(object):
     return {
       'PATH': create_path_env_var(self.path_entries),
       lib_env_var: create_path_env_var(self.library_dirs),
-      'LIBRARY_PATH': create_path_env_var(self.library_dirs),
     }
 
 
@@ -95,11 +94,34 @@ class Linker(datatype([
     return ret
 
 
+class CompilerMixin(Executable):
+
+  @abstractproperty
+  def include_dirs(self):
+    """???"""
+
+  # FIXME: LIBRARY_PATH and (DY)?LD_LIBRARY_PATH are used for entirely different purposes, but are
+  # both sourced from the same `self.library_dirs`!
+  def get_invocation_environment_dict(self, platform):
+    ret = super(CompilerMixin, self).get_invocation_environment_dict(platform).copy()
+
+    if self.include_dirs:
+      ret['CPATH'] = create_path_env_var(self.include_dirs)
+
+    ret.update({
+      'LIBRARY_PATH': create_path_env_var(self.library_dirs),
+    })
+
+    return ret
+
+
 class CCompiler(datatype([
     'path_entries',
     'exe_filename',
     'library_dirs',
-]), Executable):
+    'include_dirs',
+]), CompilerMixin):
+  # TODO: set CC in this datatype's env dict, and CXX in CppCompiler!
   pass
 
 
@@ -107,7 +129,8 @@ class CppCompiler(datatype([
     'path_entries',
     'exe_filename',
     'library_dirs',
-]), Executable):
+    'include_dirs',
+]), CompilerMixin):
   pass
 
 
