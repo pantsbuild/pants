@@ -392,16 +392,12 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
       None,
     ));
   }
-
   fn get_tree(
     &self,
     _ctx: grpcio::RpcContext,
     _req: bazel_protos::remote_execution::GetTreeRequest,
-    sink: grpcio::UnarySink<bazel_protos::remote_execution::GetTreeResponse>,
+    _sink: grpcio::ServerStreamingSink<bazel_protos::remote_execution::GetTreeResponse>,
   ) {
-    sink.fail(grpcio::RpcStatus::new(
-      grpcio::RpcStatusCode::Unimplemented,
-      None,
-    ));
+    unimplemented!()
   }
 }
