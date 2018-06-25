@@ -3,7 +3,6 @@
 
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::path::Path;
 
 use boxfuture::BoxFuture;
 use hashing::Digest;
@@ -28,11 +27,6 @@ pub trait Node: Clone + Eq + Hash + Send + 'static {
 
   // TODO: Use a `Display` bound instead.
   fn format(&self) -> String;
-
-  ///
-  /// If this Node represents an FS operation, returns its input Path.
-  ///
-  fn fs_subject(&self) -> Option<&Path>;
 
   ///
   /// If the given Node output represents an FS operation, returns its Digest.

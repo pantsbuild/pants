@@ -3,7 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use futures::future::{self, Future};
@@ -130,6 +130,19 @@ impl Scheduler {
           rule_graph::type_str(subject_type)
         )
       })
+  }
+
+  ///
+  /// Invalidate the invalidation roots represented by the given Paths.
+  ///
+  pub fn invalidate(&self, paths: HashSet<PathBuf>) -> usize {
+    self.core.graph.invalidate_from_roots(move |node| {
+      if let Some(fs_subject) = node.fs_subject() {
+        paths.contains(fs_subject)
+      } else {
+        false
+      }
+    })
   }
 
   ///

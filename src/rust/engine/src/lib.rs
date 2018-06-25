@@ -434,7 +434,7 @@ pub extern "C" fn graph_invalidate(scheduler_ptr: *mut Scheduler, paths_buf: Buf
       .into_iter()
       .map(|os_str| PathBuf::from(os_str))
       .collect();
-    scheduler.core.graph.invalidate(paths) as u64
+    scheduler.invalidate(paths) as u64
   })
 }
 

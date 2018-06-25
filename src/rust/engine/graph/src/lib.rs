@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::BuildHasherDefault;
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufWriter, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use std::collections::binary_heap::BinaryHeap;
@@ -272,22 +272,25 @@ impl<N: Node> InnerGraph<N> {
   }
 
   ///
-  /// Finds all Nodes with the given subjects, and invalidates their transitive dependents.
+  /// Finds all "invalidation root" Nodes by applying the given predicate, and invalidates
+  /// their transitive dependents.
   ///
-  fn invalidate(&mut self, paths: HashSet<PathBuf>) -> usize {
+  /// An "invalidation root" is a Node in the graph which can be invalidated for a reason other
+  /// than having had its dependencies changed. When an invalidation root Node is invalidated,
+  /// its dependencies are invalidated as well (regardless of whether they are also roots).
+  ///
+  fn invalidate_from_roots<P: Fn(&N) -> bool>(&mut self, predicate: P) -> usize {
     // Collect all entries that will be deleted.
     let ids: HashSet<EntryId, FNV> = {
       let root_ids = self
         .nodes
         .iter()
-        .filter_map(|(node, &entry_id)| {
-          node.content().fs_subject().and_then(|path| {
-            if paths.contains(path) {
-              Some(entry_id)
-            } else {
-              None
-            }
-          })
+        .filter_map(|(entry, &entry_id)| {
+          if predicate(entry.content()) {
+            Some(entry_id)
+          } else {
+            None
+          }
         })
         .collect();
       self
@@ -606,9 +609,9 @@ impl<N: Node> Graph<N> {
     inner.clear()
   }
 
-  pub fn invalidate(&self, paths: HashSet<PathBuf>) -> usize {
+  pub fn invalidate_from_roots<P: Fn(&N) -> bool>(&self, predicate: P) -> usize {
     let mut inner = self.inner.lock().unwrap();
-    inner.invalidate(paths)
+    inner.invalidate_from_roots(predicate)
   }
 
   pub fn trace<T: NodeTracer<N>>(&self, root: &N, path: &Path) -> io::Result<()> {

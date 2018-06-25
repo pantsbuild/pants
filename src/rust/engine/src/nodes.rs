@@ -980,6 +980,23 @@ impl NodeKey {
       &NodeKey::Scandir(..) => "DirectoryListing".to_string(),
     }
   }
+
+  pub fn fs_subject(&self) -> Option<&Path> {
+    match self {
+      &NodeKey::DigestFile(ref s) => Some(s.0.path.as_path()),
+      &NodeKey::ReadLink(ref s) => Some((s.0).0.as_path()),
+      &NodeKey::Scandir(ref s) => Some((s.0).0.as_path()),
+
+      // Not FS operations:
+      // Explicitly listed so that if people add new NodeKeys they need to consider whether their
+      // NodeKey represents an FS operation, and accordingly whether they need to add it to the
+      // above list or the below list.
+      &NodeKey::ExecuteProcess { .. }
+      | &NodeKey::Select { .. }
+      | &NodeKey::Snapshot { .. }
+      | &NodeKey::Task { .. } => None,
+    }
+  }
 }
 
 impl Node for NodeKey {
@@ -1026,23 +1043,6 @@ impl Node for NodeKey {
         typstr(&s.product)
       ),
       &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.0)),
-    }
-  }
-
-  fn fs_subject(&self) -> Option<&Path> {
-    match self {
-      &NodeKey::DigestFile(ref s) => Some(s.0.path.as_path()),
-      &NodeKey::ReadLink(ref s) => Some((s.0).0.as_path()),
-      &NodeKey::Scandir(ref s) => Some((s.0).0.as_path()),
-
-      // Not FS operations:
-      // Explicitly listed so that if people add new NodeKeys they need to consider whether their
-      // NodeKey represents an FS operation, and accordingly whether they need to add it to the
-      // above list or the below list.
-      &NodeKey::ExecuteProcess { .. }
-      | &NodeKey::Select { .. }
-      | &NodeKey::Snapshot { .. }
-      | &NodeKey::Task { .. } => None,
     }
   }
 
