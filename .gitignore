@@ -42,6 +42,8 @@ out/
 /build-support/phab/
 /dist/
 /lib/
+# This is created by the very handy `build-support/bin/get_failing_travis_targets_for_pr.sha`.
+/logs/
 arc.sh
 BUILD.release*
 pants.ini.sitegen
