@@ -6,13 +6,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 from distutils.dir_util import copy_tree
 
 from pants.backend.native.subsystems.conan import Conan
 from pants.backend.native.targets.third_party_native_library import ThirdPartyNativeLibrary
 from pants.base.exceptions import TaskError
+from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.contextutil import environment_as
+from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 from pants.util.objects import Exactly
 from pants.util.osutil import get_normalized_os_name
@@ -36,7 +39,7 @@ class ConanRequirement(object):
       conan_os_opt = 'Macos'
     else:
       raise ValueError('Unsupported platform: {}'.format(conan_os_opt))
-    args = ['install', pkg_spec, '-r=pants-conan-remote']
+    args = ['install', pkg_spec]
     if conan_os_opt:
       args.extend(['-s', 'os=' + conan_os_opt])
     return args
@@ -65,20 +68,48 @@ class NativeThirdPartyFetch(Task):
   native_library_constraint = Exactly(ThirdPartyNativeLibrary)
 
   class ThirdPartyLibraryFiles(object):
-    pass
+    def __init__(self):
+      self._include = None
+      self._lib = None
+      self._lib_names = []
+
+    @property
+    def include(self):
+      return self._include
+
+    @include.setter
+    def include(self, include_dir):
+      self._include = include_dir
+
+    @property
+    def lib(self):
+      return self._lib
+
+    @lib.setter
+    def lib(self, lib_dir):
+      self._lib = lib_dir
+
+    @property
+    def lib_names(self):
+      return self._lib_names
+
+    def add_lib_name(self, lib_name):
+      self._lib_names.append(lib_name)
 
   class NativeThirdPartyFetchError(TaskError):
     pass
 
   @staticmethod
   def _parse_lib_name_from_library_filename(filename):
-    # TODO(cmlivingston): regex this
-    return filename.split('lib')[1].split('.')[0]
+    match_group = re.match( r"^lib(.*)\.(a|so|dylib)$", filename)
+    if match_group:
+      return match_group.group(1)
+    return None
 
   @classmethod
   def register_options(cls, register):
     super(NativeThirdPartyFetch, cls).register_options(register)
-    register('--conan-remote', type=str, default='https://conan.bintray.com', advanced=True,
+    register('--conan-remotes', type=list, default=['https://conan.bintray.com'], advanced=True,
              fingerprint=True, help='The conan remote to download conan packages from.')
 
   @classmethod
@@ -98,33 +129,49 @@ class NativeThirdPartyFetch(Task):
     return Conan.global_instance().bootstrap_conan()
 
   def execute(self):
+    """
+    After speaking with Yi, I need to do something similar to couriser resolve.
+    I need to put all targets into one versioned target set and invalidate on that.
+    Ex: resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+    If all are valid, no-op, and populate from the results dir of the vt set (that I create)
+    otherwise, resolve each into a temp dir and copy all of them into the VT set results dir.
+    """
+
+    task_product = self.context.products.get_data(self.ThirdPartyLibraryFiles,
+                                                  self.ThirdPartyLibraryFiles)
+
     native_lib_tgts = self.context.targets(self.native_library_constraint.satisfied_by)
-    with self.invalidated(native_lib_tgts,
-                          invalidate_dependents=True) as invalidation_check:
-      for vt in invalidation_check.all_vts:
-        if vt.valid:
-          self.populate_task_product(vt)
-        else:
-          self.fetch_packages(vt)
+    if native_lib_tgts:
+      with self.invalidated(native_lib_tgts,
+                            invalidate_dependents=True) as invalidation_check:
+        resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+        vts_results_dir = self._prepare_vts_results_dir(resolve_vts)
+        if invalidation_check.invalid_vts or not resolve_vts.valid:
+          for vt in invalidation_check.all_vts:
+            self.fetch_packages(vt, vts_results_dir)
+        self.populate_task_product(vts_results_dir, task_product)
 
-  def populate_task_product(self, vt):
-    task_product = {}
-    task_product['lib_names'] = []
+  def _prepare_vts_results_dir(self, vts):
+    """
+    Given a `VergetTargetSet`, prepare its results dir.
+    """
+    vt_set_results_dir = os.path.join(self.workdir, vts.cache_key.hash)
+    safe_mkdir(vt_set_results_dir)
+    return vt_set_results_dir
 
-    lib = os.path.join(vt.results_dir, 'lib')
-    include = os.path.join(vt.results_dir, 'include')
+  def populate_task_product(self, results_dir, task_product):
+    lib = os.path.join(results_dir, 'lib')
+    include = os.path.join(results_dir, 'include')
 
     if os.path.exists(lib):
-      task_product['lib'] = lib
+      task_product.lib = lib
       for filename in os.listdir(lib):
-        lib_name = self.parse_lib_name_from_library_filename(filename)
+        lib_name = self._parse_lib_name_from_library_filename(filename)
         if lib_name:
-          task_product['lib_names'].append(lib_name)
+          task_product.add_lib_name(lib_name)
 
     if os.path.exists(include):
-      task_product['include'] = include
-
-    self.context.products.register_data(self.ThirdPartyLibraryFiles, task_product)
+      task_product.include = include
 
   def ensure_conan_remote_configuration(self, conan_binary):
     """
@@ -146,18 +193,22 @@ class NativeThirdPartyFetch(Task):
         raise TaskError('Error deleting conan-center from conan registry: {}'.format(e.output))
 
     # Add the pants-specific conan remote.
-    remote_url = self.get_options().conan_remote
-    add_pants_conan_remote_cmdline = conan_binary.pex.cmdline(['remote',
-                                                               'add',
-                                                               'pants-conan-remote',
-                                                               remote_url,
-                                                               '--insert'])
-    try:
-      stdout = subprocess.check_output(add_pants_conan_remote_cmdline.split())
-      self.context.log.debug(stdout)
-    except subprocess.CalledProcessError as e:
-      if not "Remote 'pants-conan-remote' already exists in remotes" in e.output:
-        raise TaskError('Error adding pants-specific conan remote: {}'.format(e.output))
+    index_num = 0
+    for remote_url in reversed(self.get_options().conan_remotes):
+      index_num += 1
+      # NB: --insert prepends a remote to conan's remote list. We reverse the options remote
+      # list to maintain a sensible default for conan emote search order.
+      add_pants_conan_remote_cmdline = conan_binary.pex.cmdline(['remote',
+                                                                 'add',
+                                                                 'pants-conan-remote-' + str(index_num),
+                                                                 remote_url,
+                                                                 '--insert'])
+      try:
+        stdout = subprocess.check_output(add_pants_conan_remote_cmdline.split())
+        self.context.log.debug(stdout)
+      except subprocess.CalledProcessError as e:
+        if not "already exists in remotes" in e.output:
+          raise TaskError('Error adding pants-specific conan remote: {}'.format(e.output))
 
   def copy_package_contents_from_conan_dir(self, results_dir, conan_requirement, pkg_sha):
     """
@@ -182,7 +233,7 @@ class NativeThirdPartyFetch(Task):
     if os.path.exists(src_include):
       copy_tree(src_include, dest_include)
 
-  def fetch_packages(self, vt):
+  def fetch_packages(self, vt, vts_results_dir):
     """
     Invoke the conan pex to fetch conan packages specified by a
     `NativeThirdPartyLibrary` target.
@@ -205,7 +256,7 @@ class NativeThirdPartyFetch(Task):
         try:
           process = subprocess.Popen(
             cmdline.split(),
-            cwd=vt.results_dir,
+            cwd=vts_results_dir,
             stdout=subprocess.PIPE
           )
         except OSError as e:
@@ -221,23 +272,4 @@ class NativeThirdPartyFetch(Task):
             .format(self.get_options().conan_remote, cmdline, stdout, rc))
 
         pkg_sha = conan_requirement.parse_conan_stdout_for_pkg_sha(stdout)
-        self.copy_package_contents_from_conan_dir(vt.results_dir, conan_requirement, pkg_sha)
-
-        # Populate the task product.
-        dest_lib = os.path.join(vt.results_dir, 'lib')
-        dest_include = os.path.join(vt.results_dir, 'include')
-        if os.path.exists(dest_lib):
-          task_product['lib'] = dest_lib
-          for filename in os.listdir(dest_lib):
-            lib_name = self.parse_lib_name_from_library_filename(filename)
-            if lib_name:
-              task_product['lib_names'].append(lib_name)
-        else:
-          self.context.log.debug('{} package did not define a lib directory.'.format(pkg_spec))
-        if os.path.exists(dest_include):
-          task_product['include'] = dest_include
-        else:
-          self.context.log.warn('{} package did not define an include directory. The compile task '
-                                'may not function properly.'.format(pkg_spec))
-
-      self.context.products.register_data(self.ThirdPartyLibraryFiles, task_product)
+        self.copy_package_contents_from_conan_dir(vts_results_dir, conan_requirement, pkg_sha)

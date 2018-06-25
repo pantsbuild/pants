@@ -145,14 +145,12 @@ class LinkSharedLibraries(NativeTask):
 
   def _get_third_party_lib_args(self):
     lib_args = []
-    tp_lib_tgts = self.context.targets(NativeThirdPartyFetch.native_library_constraint.satisfied_by)
-    if tp_lib_tgts:
-      tp_files_product = self.context.products.get_data(NativeThirdPartyFetch.ThirdPartyLibraryFiles)
-      if tp_files_product['lib_names']:
-        for lib_name in tp_files_product['lib_names']:
-          lib_args.append('-l{}'.format(lib_name))
-        lib_dir_arg = '-L{}'.format(tp_files_product['lib'])
-        lib_args.append(lib_dir_arg)
+    tp_files_product = self.context.products.get_data(NativeThirdPartyFetch.ThirdPartyLibraryFiles)
+    if tp_files_product.lib_names:
+      for lib_name in tp_files_product.lib_names:
+        lib_args.append('-l{}'.format(lib_name))
+      lib_dir_arg = '-L{}'.format(tp_files_product.lib)
+      lib_args.append(lib_dir_arg)
     return lib_args
 
   def _execute_link_request(self, link_request):

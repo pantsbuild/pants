@@ -189,12 +189,10 @@ class NativeCompile(NativeTask, AbstractClass):
 
   def get_third_party_include_dirs(self):
     inc_dir = []
-    tp_lib_tgts = self.context.targets(NativeThirdPartyFetch.native_library_constraint.satisfied_by)
-    if tp_lib_tgts:
-      tp_files_product = self.context.products.get_data(NativeThirdPartyFetch.ThirdPartyLibraryFiles)
-      directory = tp_files_product.get('include')
-      if directory:
-        inc_dir = [directory]
+    tp_files_product = self.context.products.get_data(NativeThirdPartyFetch.ThirdPartyLibraryFiles)
+    directory = tp_files_product.include
+    if directory:
+      inc_dir = [directory]
     return inc_dir
 
   def _make_compile_request(self, versioned_target, dependencies):
