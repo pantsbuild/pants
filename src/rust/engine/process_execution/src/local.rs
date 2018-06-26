@@ -17,12 +17,23 @@ use bytes::Bytes;
 pub struct CommandRunner {
   store: fs::Store,
   fs_pool: Arc<fs::ResettablePool>,
-  work_dir: PathBuf
+  work_dir: PathBuf,
+  cleanup_local_dirs: bool,
 }
 
 impl CommandRunner {
-  pub fn new(store: fs::Store, fs_pool: Arc<fs::ResettablePool>, work_dir: PathBuf) -> CommandRunner {
-    CommandRunner { store, fs_pool, work_dir }
+  pub fn new(
+    store: fs::Store,
+    fs_pool: Arc<fs::ResettablePool>,
+    work_dir: PathBuf,
+    cleanup_local_dirs: bool,
+  ) -> CommandRunner {
+    CommandRunner {
+      store,
+      fs_pool,
+      work_dir,
+      cleanup_local_dirs,
+    }
   }
 
   fn construct_output_snapshot(
@@ -495,7 +506,8 @@ mod tests {
     let runner = super::CommandRunner {
       store: store,
       fs_pool: pool,
-      work_dir: work_dir.into_path()
+      work_dir: work_dir.into_path(),
+      cleanup_local_dirs: true,
     };
     runner.run(req).wait()
   }

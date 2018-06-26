@@ -223,6 +223,7 @@ pub extern "C" fn scheduler_create(
   remote_store_chunk_bytes: u64,
   remote_store_chunk_upload_timeout_seconds: u64,
   process_execution_parallelism: u64,
+  process_execution_cleanup_local_dirs: bool,
 ) -> *const Scheduler {
   let root_type_ids = root_type_ids.to_vec();
   let ignore_patterns = ignore_patterns_buf
@@ -284,6 +285,7 @@ pub extern "C" fn scheduler_create(
     remote_store_chunk_bytes as usize,
     Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
     process_execution_parallelism as usize,
+    process_execution_cleanup_local_dirs as bool,
   ))))
 }
 

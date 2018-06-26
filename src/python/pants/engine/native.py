@@ -209,7 +209,8 @@ Scheduler* scheduler_create(Tasks*,
                             uint64_t,
                             uint64_t,
                             uint64_t,
-                            uint64_t);
+                            uint64_t,
+                            uint8_t);
 void scheduler_pre_fork(Scheduler*);
 Value scheduler_metrics(Scheduler*, Session*);
 RawNodes* scheduler_execute(Scheduler*, Session*, ExecutionRequest*);
@@ -793,6 +794,7 @@ class Native(object):
         execution_options.remote_store_chunk_bytes,
         execution_options.remote_store_chunk_upload_timeout_seconds,
         execution_options.process_execution_parallelism,
+        execution_options.process_execution_cleanup_local_dirs
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)
 
