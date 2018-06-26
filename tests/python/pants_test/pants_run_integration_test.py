@@ -442,6 +442,27 @@ class PantsRunIntegrationTest(unittest.TestCase):
       os.unlink(path)
 
   @contextmanager
+  def rewrite_file_content(self, path, transform_content_fun):
+    """Temporarily rewrite the contents of a file for the purpose of an integration test."""
+    base_name = os.path.basename(path)
+    path = os.path.realpath(path)
+    assert path.startswith(
+      os.path.realpath(get_buildroot())), 'cannot write paths outside of the buildroot!'
+    assert os.path.isfile(path), "path '{}' does not exist or is not a file!".format(path)
+    file_content = None
+    with open(path, 'r') as fh:
+      file_content = fh.read()
+    new_content = transform_content_fun(file_content)
+    with temporary_dir() as containing_dir:
+      tmp_src_filename = os.path.join(containing_dir, base_name)
+      try:
+        shutil.move(path, tmp_src_filename)
+        with self.temporary_file_content(path, new_content):
+          yield
+      finally:
+        shutil.move(tmp_src_filename, path)
+
+  @contextmanager
   def mock_buildroot(self, dirs_to_copy=None):
     """Construct a mock buildroot and return a helper object for interacting with it."""
     Manager = namedtuple('Manager', 'write_file pushd dir')

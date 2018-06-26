@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import glob
 import os
+import re
 
 from pants.backend.native.config.environment import Platform
 from pants.base.build_environment import get_buildroot
@@ -52,6 +53,22 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       # Check that text was properly printed to stdout.
       self._assert_native_greeting(pants_run.stdout_data)
+
+  @staticmethod
+  def rewrite_hello_c_source(orig_content):
+    return re.sub('"Hello from C!"', '"Hello from C?"', orig_content)
+
+  def test_invalidation(self):
+    run_command = ['run', '{}:main_with_no_conflict'.format(self.fasthello_install_requires)]
+    unmodified_pants_run = self.run_pants(command=run_command)
+    self.assert_success(unmodified_pants_run)
+    self.assertIn('Hello from C!\n', unmodified_pants_run.stdout_data)
+
+    c_source_file = '{}/c_greet.c'.format(self.fasthello_install_requires)
+    with self.rewrite_file_content(c_source_file, self.rewrite_hello_c_source):
+      modified_pants_run = self.run_pants(command=run_command)
+      self.assert_success(modified_pants_run)
+      self.assertIn('Hello from C?\n', modified_pants_run.stdout_data)
 
   def test_pants_test(self):
     with temporary_dir() as tmp_dir:
