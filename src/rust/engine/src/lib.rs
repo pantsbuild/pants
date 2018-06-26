@@ -695,10 +695,9 @@ pub extern "C" fn materialize_directories(
         .map(|(dir, digest)| store.materialize_directory(dir, digest))
         .collect::<Vec<_>>(),
     )
-  })
-//      .map(|values| externs::store_tuple(&values))
-//    .wait()
-//    .into()
+  }).map(|values| ())
+    .wait()
+    .into()
 }
 
 fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {

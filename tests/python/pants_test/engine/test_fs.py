@@ -12,7 +12,7 @@ import unittest
 from contextlib import contextmanager
 
 from pants.base.project_tree import Dir, Link
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, FilesContent, PathGlobs,
+from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, DirectoryToMaterialize, FilesContent, PathGlobs,
                              PathGlobsAndRoot, Snapshot, create_fs_rules)
 from pants.util.contextutil import temporary_dir
 from pants.util.meta import AbstractClass
@@ -356,6 +356,17 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       ))
 
       self.assertEquals(both_snapshot.directory_digest, both_merged)
+  
+  def test_materialize_directories(self):
+    with temporary_dir() as temp_dir:
+      dir_path = os.path.join(temp_dir, "roland")
+      digest = DirectoryDigest(
+        str("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        80
+      )
+      scheduler = self.mk_scheduler(rules=create_fs_rules())
+      scheduler.materialize_directories((DirectoryToMaterialize(str(dir_path), digest),))
+      self.assertTrue(os.path.exists(dir_path))
 
   def test_glob_match_error(self):
     with self.assertRaises(ValueError) as cm:
