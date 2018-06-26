@@ -77,7 +77,7 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
 
     # Generate code, then create a synthetic target.
     task.execute_codegen(target, target_workdir)
-    sources = task._capture_sources(target, target_workdir)
+    sources = task._capture_sources(((target, target_workdir),))[0]
     syn_target = task._inject_synthetic_target(target, target_workdir, sources)
 
     actual_sources = [s for s in Fileset.rglobs('*.java', root=target_workdir)]

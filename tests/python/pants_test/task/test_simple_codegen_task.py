@@ -209,10 +209,10 @@ class SimpleCodegenTaskTest(TaskTestBase):
       for target in targets:
         target_workdir = target_workdirs[target]
         task.execute_codegen(target, target_workdir)
-        sources = task._capture_sources(target, target_workdir)
+        sources = task._capture_sources(((target, target_workdir),))[0]
         task._handle_duplicate_sources(target, target_workdir, sources)
         # _handle_duplicate_sources may delete files from the filesystem, so we need to re-capture.
-        sources = task._capture_sources(target, target_workdir)
+        sources = task._capture_sources(((target, target_workdir),))[0]
         syn_targets.append(task._inject_synthetic_target(target, target_workdir, sources))
 
     if should_fail:
