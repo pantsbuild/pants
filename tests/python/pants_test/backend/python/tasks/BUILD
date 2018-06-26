@@ -64,7 +64,6 @@ python_tests(
     'src/python/pants/base:run_info',
     'src/python/pants/build_graph',
     'src/python/pants/fs',
-    'src/python/pants/python',
     'src/python/pants/source',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

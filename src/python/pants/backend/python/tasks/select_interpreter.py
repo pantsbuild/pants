@@ -12,11 +12,11 @@ from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.pex_util import create_bare_interpreter
+from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
-from pants.python.python_repos import PythonRepos
 from pants.task.task import Task
 from pants.util.dirutil import safe_mkdir_for
 

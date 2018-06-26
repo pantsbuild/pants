@@ -10,6 +10,7 @@ import os
 import pkgutil
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
+from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -21,7 +22,6 @@ from pants.backend.python.tasks.resolve_requirements_task_base import ResolveReq
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.python.python_repos import PythonRepos
 from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
 from pants.util.memo import memoized_property
