@@ -11,6 +11,7 @@ use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter::Iterator;
+use std::path::PathBuf;
 use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
@@ -26,6 +27,13 @@ fn main() {
   env_logger::init();
 
   let args = App::new("process_executor")
+    .arg(
+      Arg::with_name("work-dir")
+        .long("work-dir")
+        .takes_value(true)
+        .required(true)
+        .help("Path to workdir"),
+    )
     .arg(
       Arg::with_name("local-store-path")
         .long("local-store-path")
@@ -95,6 +103,7 @@ fn main() {
       .collect(),
     None => BTreeMap::new(),
   };
+  let work_dir = PathBuf::from(args.value_of("work-dir").unwrap());
   let local_store_path = args.value_of("local-store-path").unwrap();
   let pool = Arc::new(fs::ResettablePool::new("process-executor-".to_owned()));
   let server_arg = args.value_of("server");
@@ -138,7 +147,14 @@ fn main() {
       1,
       store,
     )),
-    None => Box::new(process_execution::local::CommandRunner::new(store, pool)),
+    None => Box::new(
+      process_execution::local::CommandRunner::new(
+        store,
+        pool,
+        work_dir.clone(),
+        true
+      )
+    ),
   };
 
   let result = runner.run(request).wait().expect("Error executing");
