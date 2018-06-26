@@ -518,37 +518,28 @@ mod tests {
         description: "bash".to_string(),
       },
       preserved_work_root.clone(),
-      false
+      false,
     );
     result.unwrap();
 
-    assert_eq!(
-      preserved_work_root.exists(),
-      true
-    );
+    assert_eq!(preserved_work_root.exists(), true);
 
     // Collect all of the top level sub-dirs under our test workdir.
     let subdirs: Vec<PathBuf> = preserved_work_root
       .read_dir()
       .expect("failed to read test root")
       .into_iter()
-      .map(|dirent| { dirent.unwrap().path().to_owned() })
+      .map(|dirent| dirent.unwrap().path().to_owned())
       .collect();
 
-    assert_eq!(
-      subdirs.len(),
-      1
-    );
+    assert_eq!(subdirs.len(), 1);
 
     // Then look for a file like e.g. `/tmp/abc1234/process-execution7zt4pH/roland`
     let mut rolands_path = preserved_work_root.clone();
     rolands_path.push(subdirs.first().unwrap());
     rolands_path.push("roland");
 
-    assert_eq!(
-      rolands_path.exists(),
-      true
-    );
+    assert_eq!(rolands_path.exists(), true);
   }
 
   fn run_command_locally(
@@ -568,7 +559,7 @@ mod tests {
   fn run_command_locally_in_dir(
     req: ExecuteProcessRequest,
     dir: PathBuf,
-    cleanup: bool
+    cleanup: bool,
   ) -> Result<FallibleExecuteProcessResult, String> {
     let store_dir = TempDir::new().unwrap();
     let pool = Arc::new(fs::ResettablePool::new("test-pool-".to_owned()));
@@ -577,7 +568,7 @@ mod tests {
       store: store,
       fs_pool: pool,
       work_dir: dir.clone(),
-      cleanup_local_dirs: cleanup
+      cleanup_local_dirs: cleanup,
     };
     runner.run(req).wait()
   }
