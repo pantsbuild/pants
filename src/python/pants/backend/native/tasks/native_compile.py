@@ -189,7 +189,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
   def get_third_party_include_dirs(self):
     inc_dir = []
-    tp_files_product = self.context.products.get_data(NativeExternalLibraryFetch.NativeExternalLibFiles)
+    tp_files_product = self.context.products.get_data(NativeExternalLibraryFetch.NativeExternalLibraryFiles)
     directory = tp_files_product.include
     if directory:
       inc_dir = [directory]

@@ -64,10 +64,13 @@ class ConanRequirement(object):
 
 
 class NativeExternalLibraryFetch(Task):
-  options_scope = 'native-third-party-fetch'
+  options_scope = 'native-external-library-fetch'
   native_library_constraint = Exactly(ExternalNativeLibrary)
 
-  class NativeExternalLibFiles(object):
+  class NativeExternalLibraryFetchError(TaskError):
+    pass
+
+  class NativeExternalLibraryFiles(object):
     def __init__(self):
       self._include = None
       self._lib = None
@@ -96,9 +99,6 @@ class NativeExternalLibraryFetch(Task):
     def add_lib_name(self, lib_name):
       self._lib_names.append(lib_name)
 
-  class NativeExternalLibraryFetchError(TaskError):
-    pass
-
   @staticmethod
   def _parse_lib_name_from_library_filename(filename):
     match_group = re.match( r"^lib(.*)\.(a|so|dylib)$", filename)
@@ -118,7 +118,7 @@ class NativeExternalLibraryFetch(Task):
 
   @classmethod
   def product_types(cls):
-    return [cls.NativeExternalLibFiles]
+    return [cls.NativeExternalLibraryFiles]
 
   @property
   def cache_target_dirs(self):
@@ -129,16 +129,8 @@ class NativeExternalLibraryFetch(Task):
     return Conan.global_instance().bootstrap_conan()
 
   def execute(self):
-    """
-    After speaking with Yi, I need to do something similar to couriser resolve.
-    I need to put all targets into one versioned target set and invalidate on that.
-    Ex: resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
-    If all are valid, no-op, and populate from the results dir of the vt set (that I create)
-    otherwise, resolve each into a temp dir and copy all of them into the VT set results dir.
-    """
-
-    task_product = self.context.products.get_data(self.NativeExternalLibFiles,
-                                                  self.NativeExternalLibFiles)
+    task_product = self.context.products.get_data(self.NativeExternalLibraryFiles,
+                                                  self.NativeExternalLibraryFiles)
 
     native_lib_tgts = self.context.targets(self.native_library_constraint.satisfied_by)
     if native_lib_tgts:
@@ -148,7 +140,7 @@ class NativeExternalLibraryFetch(Task):
         vts_results_dir = self._prepare_vts_results_dir(resolve_vts)
         if invalidation_check.invalid_vts or not resolve_vts.valid:
           for vt in invalidation_check.all_vts:
-            self.fetch_packages(vt, vts_results_dir)
+            self._fetch_packages(vt, vts_results_dir)
         self._populate_task_product(vts_results_dir, task_product)
 
   def _prepare_vts_results_dir(self, vts):
@@ -160,6 +152,9 @@ class NativeExternalLibraryFetch(Task):
     return vt_set_results_dir
 
   def _populate_task_product(self, results_dir, task_product):
+    """
+    Sets the relevant properties of the task product (`NativeExternalLibraryFiles`) object.
+    """
     lib = os.path.join(results_dir, 'lib')
     include = os.path.join(results_dir, 'include')
 
@@ -210,12 +205,12 @@ class NativeExternalLibraryFetch(Task):
         if not "already exists in remotes" in e.output:
           raise TaskError('Error adding pants-specific conan remote: {}'.format(e.output))
 
-  def copy_package_contents_from_conan_dir(self, results_dir, conan_requirement, pkg_sha):
+  def _copy_package_contents_from_conan_dir(self, results_dir, conan_requirement, pkg_sha):
     """
     Copy the contents of the fetched pacakge into the results directory of the versioned
     target from the conan data directory.
 
-    :param results_dir: The versioned-target results directory.
+    :param results_dir: A results directory to copy conan package contents to.
     :param conan_requirement: The `ConanRequirement` object that produced the package sha.
     :param pkg_sha: The sha of the local conan package corresponding to the specification.
     """
@@ -233,16 +228,18 @@ class NativeExternalLibraryFetch(Task):
     if os.path.exists(src_include):
       copy_tree(src_include, dest_include)
 
-  def fetch_packages(self, vt, vts_results_dir):
+  def _fetch_packages(self, vt, vts_results_dir):
     """
     Invoke the conan pex to fetch conan packages specified by a
     `ExternalLibLibrary` target.
+
+    :param vt: a versioned target containing conan package specifications.
+    :param vts_results_dir: the results directory of the VersionedTargetSet
+      for the purpose of aggregating package contents.
     """
-    task_product = {}
-    task_product['lib_names'] = []
 
     # NB: CONAN_USER_HOME specifies the directory to use for the .conan data directory.
-    # This will initially live under the workdir to provie easy debugging on the initial
+    # This will initially live under the workdir to provide easy debugging on the initial
     # iteration of this system (a 'clean-all' will nuke the conan dir). In the future,
     # it would be good to migrate this under ~/.cache/pants/conan for persistence.
     with environment_as(CONAN_USER_HOME=self.workdir):
@@ -254,26 +251,17 @@ class NativeExternalLibraryFetch(Task):
         self.ensure_conan_remote_configuration(self._conan_binary)
         args = conan_requirement.fetch_cmdline_args
         cmdline = self._conan_binary.pex.cmdline(args)
+
         self.context.log.debug('Running conan.pex cmdline: {}'.format(cmdline))
+        self.context.log.debug('Conan remotes: {}'.format(self.get_options().conan_remotes))
 
         # Invoke conan to pull package from remote.
         try:
-          process = subprocess.Popen(
-            cmdline.split(),
-            cwd=vts_results_dir,
-            stdout=subprocess.PIPE
-          )
-        except OSError as e:
+          stdout = subprocess.check_output(cmdline.split())
+        except subprocess.CalledProcessError as e:
           raise self.NativeExternalLibraryFetchError(
-            "Error invoking conan for fetch task. Command {}:".format(cmdline), e
+            "Error invoking conan for fetch task: {}\n".format(e.output)
           )
-        rc = process.wait()
-        stdout = process.stdout.read()
-        if rc != 0:
-          raise self.NativeExternalLibraryFetchError(
-            "Error fetching native third party artifacts from one of the configured "
-            "conan servers ({}). Command: {}\n\nConan output: {}\nExit code: {}\n"
-            .format(self.get_options().conan_remotes, cmdline, stdout, rc))
 
         pkg_sha = conan_requirement.parse_conan_stdout_for_pkg_sha(stdout)
-        self.copy_package_contents_from_conan_dir(vts_results_dir, conan_requirement, pkg_sha)
+        self._copy_package_contents_from_conan_dir(vts_results_dir, conan_requirement, pkg_sha)

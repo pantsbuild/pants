@@ -17,7 +17,7 @@ ctypes_compatible_cpp_library(
 )
 
 python_dist(
-  name='ctypes_with_third_party',
+  name='python_dist_with_third_party_cpp',
   sources=[
     'setup.py',
     'ctypes_python_pkg/__init__.py',
@@ -33,7 +33,7 @@ python_binary(
   name='bin_with_third_party',
   source='main.py',
   dependencies=[
-    ':ctypes_with_third_party',
+    ':python_dist_with_third_party_cpp',
   ],
 )
 

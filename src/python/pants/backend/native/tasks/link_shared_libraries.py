@@ -145,7 +145,7 @@ class LinkSharedLibraries(NativeTask):
 
   def _get_third_party_lib_args(self):
     lib_args = []
-    tp_files_product = self.context.products.get_data(NativeExternalLibraryFetch.NativeExternalLibFiles)
+    tp_files_product = self.context.products.get_data(NativeExternalLibraryFetch.NativeExternalLibraryFiles)
     if tp_files_product.lib_names:
       for lib_name in tp_files_product.lib_names:
         lib_args.append('-l{}'.format(lib_name))
