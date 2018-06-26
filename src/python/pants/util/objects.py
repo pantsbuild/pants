@@ -63,7 +63,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       try:
         this_object = super(DataType, cls).__new__(cls, *args, **kwargs)
       except TypeError as e:
-        raise TypeError("Error constructing {}: {}".format(cls.__name__, str(e)))
+        raise cls.make_type_error(e)
 
       # TODO(cosmicexplorer): Make this kind of exception pattern (filter for
       # errors then display them all at once) more ergonomic.
@@ -168,8 +168,7 @@ class TypedDatatypeClassConstructionError(Exception):
       full_msg, *args, **kwargs)
 
 
-# FIXME: make this subclass TypeError!
-class TypedDatatypeInstanceConstructionError(Exception):
+class TypedDatatypeInstanceConstructionError(TypeError):
 
   def __init__(self, type_name, msg, *args, **kwargs):
     full_msg = "error: in constructor of type {}: {}".format(type_name, msg)
