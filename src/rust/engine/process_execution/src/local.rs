@@ -348,7 +348,7 @@ mod tests {
 
   #[test]
   fn output_files_one() {
-    let result = run_command_locally_in_dir(ExecuteProcessRequest {
+    let result = run_command_locally(ExecuteProcessRequest {
       argv: vec![
         find_bash(),
         "-c".to_owned(),
@@ -375,7 +375,7 @@ mod tests {
 
   #[test]
   fn output_dirs() {
-    let result = run_command_locally_in_dir(ExecuteProcessRequest {
+    let result = run_command_locally(ExecuteProcessRequest {
       argv: vec![
         find_bash(),
         "-c".to_owned(),
@@ -407,7 +407,7 @@ mod tests {
 
   #[test]
   fn output_files_many() {
-    let result = run_command_locally_in_dir(ExecuteProcessRequest {
+    let result = run_command_locally(ExecuteProcessRequest {
       argv: vec![
         find_bash(),
         "-c".to_owned(),
@@ -440,7 +440,7 @@ mod tests {
 
   #[test]
   fn output_files_execution_failure() {
-    let result = run_command_locally_in_dir(ExecuteProcessRequest {
+    let result = run_command_locally(ExecuteProcessRequest {
       argv: vec![
         find_bash(),
         "-c".to_owned(),
@@ -471,7 +471,7 @@ mod tests {
 
   #[test]
   fn output_files_partial_output() {
-    let result = run_command_locally_in_dir(ExecuteProcessRequest {
+    let result = run_command_locally(ExecuteProcessRequest {
       argv: vec![
         find_bash(),
         "-c".to_owned(),
@@ -501,20 +501,21 @@ mod tests {
   fn run_command_locally(
     req: ExecuteProcessRequest,
   ) -> Result<FallibleExecuteProcessResult, String> {
-    run_command_locally_in_dir(req)
+    let work_dir = TempDir::new().unwrap();
+    run_command_locally_in_dir(req, work_dir.path().to_owned())
   }
 
   fn run_command_locally_in_dir(
     req: ExecuteProcessRequest,
+    dir: PathBuf
   ) -> Result<FallibleExecuteProcessResult, String> {
     let store_dir = TempDir::new().unwrap();
-    let work_dir = TempDir::new().unwrap();
     let pool = Arc::new(fs::ResettablePool::new("test-pool-".to_owned()));
     let store = fs::Store::local_only(store_dir.path(), pool.clone()).unwrap();
     let runner = super::CommandRunner {
       store: store,
       fs_pool: pool,
-      work_dir: work_dir.path().to_owned(),
+      work_dir: dir.clone(),
       cleanup_local_dirs: true,
     };
     runner.run(req).wait()
