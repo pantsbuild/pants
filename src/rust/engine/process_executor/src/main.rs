@@ -31,7 +31,6 @@ fn main() {
       Arg::with_name("work-dir")
         .long("work-dir")
         .takes_value(true)
-        .required(true)
         .help("Path to workdir"),
     )
     .arg(
@@ -103,7 +102,10 @@ fn main() {
       .collect(),
     None => BTreeMap::new(),
   };
-  let work_dir = PathBuf::from(args.value_of("work-dir").unwrap());
+  let work_dir = args
+    .value_of("work-dir")
+    .map(|s| PathBuf::from(s))
+    .unwrap_or_else(std::env::temp_dir);
   let local_store_path = args.value_of("local-store-path").unwrap();
   let pool = Arc::new(fs::ResettablePool::new("process-executor-".to_owned()));
   let server_arg = args.value_of("server");
@@ -150,7 +152,7 @@ fn main() {
     None => Box::new(process_execution::local::CommandRunner::new(
       store,
       pool,
-      work_dir.clone(),
+      work_dir,
       true,
     )),
   };

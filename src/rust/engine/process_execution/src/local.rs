@@ -105,8 +105,9 @@ impl super::CommandRunner for CommandRunner {
     let env = req.env;
     let output_file_paths = req.output_files;
     let output_dir_paths = req.output_directories;
-    let cleanup_local_dirs = self.cleanup_local_dirs.clone();
+    let cleanup_local_dirs = self.cleanup_local_dirs;
     let argv = req.argv;
+    let req_description = req.description;
     self
       .store
       .materialize_directory(workdir.path().to_owned(), req.input_files)
@@ -151,13 +152,17 @@ impl super::CommandRunner for CommandRunner {
             )
           })
           // Force workdir not to get dropped until after we've ingested the outputs
-          .map(move |result| (result, workdir, cleanup_local_dirs) )
-          .map(move |(result, workdir, cleanup_local_dirs)| {
-            if cleanup_local_dirs == false {
+          .map(move |result| (result, workdir) )
+          .map(move |(result, workdir)| {
+            if !cleanup_local_dirs {
               // This consumes the `TempDir` without deleting directory on the filesystem, meaning
               // that the temporary directory will no longer be automatically deleted when dropped.
               let preserved_path = workdir.into_path();
-              info!("preserved local process execution dir: {:?}", preserved_path.into_os_string());
+              info!(
+                "preserved local process execution dir `{:?}` for {:?}",
+                preserved_path,
+                req_description
+              );
             }
             result
           })
@@ -527,18 +532,12 @@ mod tests {
     assert_eq!(preserved_work_root.exists(), true);
 
     // Collect all of the top level sub-dirs under our test workdir.
-    let subdirs: Vec<PathBuf> = preserved_work_root
-      .read_dir()
-      .expect("failed to read test root")
-      .into_iter()
-      .map(|dirent| dirent.unwrap().path().to_owned())
-      .collect();
-
+    let subdirs = testutil::file::list_dir(&preserved_work_root);
     assert_eq!(subdirs.len(), 1);
 
     // Then look for a file like e.g. `/tmp/abc1234/process-execution7zt4pH/roland`
     let mut rolands_path = preserved_work_root.clone();
-    rolands_path.push(subdirs.first().unwrap());
+    rolands_path.push(subdirs[0].clone());
     rolands_path.push("roland");
 
     assert_eq!(rolands_path.exists(), true);
@@ -569,7 +568,7 @@ mod tests {
     let runner = super::CommandRunner {
       store: store,
       fs_pool: pool,
-      work_dir: dir.clone(),
+      work_dir: dir,
       cleanup_local_dirs: cleanup,
     };
     runner.run(req).wait()
