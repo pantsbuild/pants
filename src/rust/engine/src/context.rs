@@ -97,6 +97,7 @@ impl Core {
         None => Box::new(process_execution::local::CommandRunner::new(
           store.clone(),
           fs_pool.clone(),
+          work_dir.clone().to_path_buf()
         )),
       };
 

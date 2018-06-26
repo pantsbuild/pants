@@ -17,11 +17,12 @@ use bytes::Bytes;
 pub struct CommandRunner {
   store: fs::Store,
   fs_pool: Arc<fs::ResettablePool>,
+  work_dir: PathBuf
 }
 
 impl CommandRunner {
-  pub fn new(store: fs::Store, fs_pool: Arc<fs::ResettablePool>) -> CommandRunner {
-    CommandRunner { store, fs_pool }
+  pub fn new(store: fs::Store, fs_pool: Arc<fs::ResettablePool>, work_dir: PathBuf) -> CommandRunner {
+    CommandRunner { store, fs_pool, work_dir }
   }
 
   fn construct_output_snapshot(
@@ -78,7 +79,7 @@ impl super::CommandRunner for CommandRunner {
     let workdir = try_future!(
       tempfile::Builder::new()
         .prefix("process-execution")
-        .tempdir()
+        .tempdir_in(&self.work_dir)
         .map_err(|err| {
           format!(
             "Error making tempdir for local process execution: {:?}",
@@ -488,11 +489,13 @@ mod tests {
     req: ExecuteProcessRequest,
   ) -> Result<FallibleExecuteProcessResult, String> {
     let store_dir = TempDir::new().unwrap();
+    let work_dir = TempDir::new().unwrap();
     let pool = Arc::new(fs::ResettablePool::new("test-pool-".to_owned()));
     let store = fs::Store::local_only(store_dir.path(), pool.clone()).unwrap();
     let runner = super::CommandRunner {
       store: store,
       fs_pool: pool,
+      work_dir: work_dir.into_path()
     };
     runner.run(req).wait()
   }
