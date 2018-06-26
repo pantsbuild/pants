@@ -37,15 +37,16 @@ class PythonDistribution(PythonTarget):
     :type payload: :class:`pants.base.payload.Payload`
     :param sources: Files to "include". Paths are relative to the
       BUILD file's directory.
-    :type sources: ``Fileset`` or list of strings. Must include setup.py.
-    :param compatibility: either a string or list of strings that represents
-      interpreter compatibility for this target, using the Requirement-style
-      format, e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements
-      agnostic to interpreter class.
+    :type sources: :class:`twitter.common.dirutil.Fileset` or list of strings. Must include
+                   setup.py.
+    :param list setup_requires: A list of python requirements to provide during the invocation of
+                                setup.py.
     """
     if not 'setup.py' in sources:
       raise TargetDefinitionException(
-        self, 'A setup.py in the top-level directory relative to the target definition is required.')
+        self,
+        'A file named setup.py must be in the same '
+        'directory as the BUILD file containing this target.')
 
     payload = payload or Payload()
     payload.add_fields({
