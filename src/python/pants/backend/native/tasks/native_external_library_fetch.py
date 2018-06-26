@@ -149,7 +149,7 @@ class NativeExternalLibraryFetch(Task):
         if invalidation_check.invalid_vts or not resolve_vts.valid:
           for vt in invalidation_check.all_vts:
             self.fetch_packages(vt, vts_results_dir)
-        self.populate_task_product(vts_results_dir, task_product)
+        self._populate_task_product(vts_results_dir, task_product)
 
   def _prepare_vts_results_dir(self, vts):
     """
@@ -159,7 +159,7 @@ class NativeExternalLibraryFetch(Task):
     safe_mkdir(vt_set_results_dir)
     return vt_set_results_dir
 
-  def populate_task_product(self, results_dir, task_product):
+  def _populate_task_product(self, results_dir, task_product):
     lib = os.path.join(results_dir, 'lib')
     include = os.path.join(results_dir, 'include')
 
@@ -241,6 +241,10 @@ class NativeExternalLibraryFetch(Task):
     task_product = {}
     task_product['lib_names'] = []
 
+    # NB: CONAN_USER_HOME specifies the directory to use for the .conan data directory.
+    # This will initially live under the workdir to provie easy debugging on the initial
+    # iteration of this system (a 'clean-all' will nuke the conan dir). In the future,
+    # it would be good to migrate this under ~/.cache/pants/conan for persistence.
     with environment_as(CONAN_USER_HOME=self.workdir):
       for pkg_spec in vt.target.packages:
 
@@ -267,9 +271,9 @@ class NativeExternalLibraryFetch(Task):
         stdout = process.stdout.read()
         if rc != 0:
           raise self.NativeExternalLibraryFetchError(
-            "Error fetching native third party artifacts from the conan server ({}). "
-            "Command: {}\n\nConan output: {}\nExit code: {}\n"
-            .format(self.get_options().conan_remote, cmdline, stdout, rc))
+            "Error fetching native third party artifacts from one of the configured "
+            "conan servers ({}). Command: {}\n\nConan output: {}\nExit code: {}\n"
+            .format(self.get_options().conan_remotes, cmdline, stdout, rc))
 
         pkg_sha = conan_requirement.parse_conan_stdout_for_pkg_sha(stdout)
         self.copy_package_contents_from_conan_dir(vts_results_dir, conan_requirement, pkg_sha)

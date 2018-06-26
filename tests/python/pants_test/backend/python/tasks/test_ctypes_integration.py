@@ -10,6 +10,7 @@ import os
 from zipfile import ZipFile
 
 from pants.backend.native.config.environment import Platform
+from pants.base.build_environment import get_buildroot
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import is_executable
@@ -75,13 +76,18 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
   def test_header_only_third_party_integration(self):
     with temporary_dir() as tmp_dir:
-      pants_run = self.run_pants(
-          command=['clean-all', 'run', self._binary_target_with_header_only_third_party],
-          config={
-            GLOBAL_SCOPE_CONFIG_SECTION: {
-              'pants_distdir': tmp_dir,
+      cereal_outfile = os.path.join(get_buildroot(), 'out.cereal')
+      try:
+        pants_run = self.run_pants(
+            command=['clean-all', 'run', self._binary_target_with_header_only_third_party],
+            config={
+              GLOBAL_SCOPE_CONFIG_SECTION: {
+                'pants_distdir': tmp_dir,
+              }
             }
-          }
-      )
-      self.assert_success(pants_run)
-      self.assertIn('Text from 3rdparty!', pants_run.stdout_data)
+        )
+        self.assert_success(pants_run)
+        self.assertIn('Text from 3rdparty!', pants_run.stdout_data)
+        self.assertTrue(os.path.exists(cereal_outfile))
+      finally:
+        os.remove(cereal_outfile)

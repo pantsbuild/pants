@@ -51,7 +51,7 @@ class Conan(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(Conan, cls).register_options(register)
-    register('--conan-requirements', type=str, default=cls.default_conan_requirements(),
+    register('--conan-requirements', type=list, default=cls.default_conan_requirements(),
              advanced=True, help='The requirements used to build to conan client pex.')
 
   class ConanBinary(object):

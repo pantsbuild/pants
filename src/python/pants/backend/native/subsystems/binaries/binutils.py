@@ -24,7 +24,7 @@ class Binutils(NativeTool):
   def linker(self, platform):
     return Linker(
       path_entries=self.path_entries(),
-      exe_filename='clang',  # TODO: Change this back to 'ld' per #5943
+      exe_filename='gcc',  # TODO: Change this back to 'ld' per #5943
       platform=platform)
 
 

@@ -13,7 +13,7 @@ ctypes_compatible_cpp_library(
   name='cpp_library_with_third_party',
   sources=['some_more_math.hpp', 'some_more_math_with_third_party.cpp'],
   ctypes_native_library=native_artifact(lib_name='asdf-cpp-tp'),
-  dependencies=[':rang']
+  dependencies=[':rang', ':cereal']
 )
 
 python_dist(
@@ -41,5 +41,12 @@ external_native_library(
   name='rang',
   packages=[
      'rang/3.1.0@rang/stable',
+  ],
+)
+
+external_native_library(
+  name='cereal',
+  packages=[
+     'cereal/1.2.2@conan/stable',
   ],
 )
