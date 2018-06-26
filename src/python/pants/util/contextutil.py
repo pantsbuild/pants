@@ -86,7 +86,7 @@ def environment_as(**kwargs):
       setenv(key, val)
 
 
-def _copy_env(env):
+def _copy_and_decode_env(env):
   return {k: _os_decode(v) for k, v in env.items()}
 
 
@@ -107,7 +107,7 @@ def _restore_env(env):
 @contextmanager
 def hermetic_environment_as(**kwargs):
   """Set the environment to the supplied values from an empty state."""
-  old_environment = _copy_env(os.environ)
+  old_environment = _copy_and_decode_env(os.environ)
   _purge_env()
   try:
     with environment_as(**kwargs):
