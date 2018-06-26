@@ -3,9 +3,8 @@
 
 extern crate bazel_protos;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
-use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -24,6 +23,8 @@ use process_execution::{self, CommandRunner};
 use rule_graph;
 use selectors;
 use tasks::{self, Intrinsic, IntrinsicKind};
+
+use graph::{Node, NodeError, NodeTracer, NodeVisualizer};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -44,10 +45,6 @@ fn was_required(failure: Failure) -> Failure {
     Failure::Noop(noop) => throw(&format!("No source of required dependency: {:?}", noop)),
     f => f,
   }
-}
-
-pub trait GetNode {
-  fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output>;
 }
 
 impl VFS<Failure> for Context {
@@ -78,18 +75,19 @@ impl StoreFileByDigest<Failure> for Context {
 }
 
 ///
-/// Defines executing a cacheable/memoizable step for the given context.
+/// A simplified implementation of graph::Node for members of the NodeKey enum to implement.
+/// NodeKey's impl of graph::Node handles the rest.
 ///
-/// The Output type of a Node is bounded to values that can be stored and retrieved from
-/// the NodeResult enum. Due to the semantics of memoization, retrieving the typed result
+/// The Item type of a WrappedNode is bounded to values that can be stored and retrieved
+/// from the NodeResult enum. Due to the semantics of memoization, retrieving the typed result
 /// stored inside the NodeResult requires an implementation of TryFrom<NodeResult>. But the
 /// combination of bounds at usage sites should mean that a failure to unwrap the result is
 /// exceedingly rare.
 ///
-pub trait Node: Into<NodeKey> {
-  type Output: Clone + fmt::Debug + Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
+pub trait WrappedNode: Into<NodeKey> {
+  type Item: TryFrom<NodeResult>;
 
-  fn run(self, context: Context) -> NodeFuture<Self::Output>;
+  fn run(self, context: Context) -> BoxFuture<Self::Item, Failure>;
 }
 
 ///
@@ -403,8 +401,8 @@ impl Select {
 
 // TODO: This is a Node only because it is used as a root in the graph, but it should never be
 // requested using context.get
-impl Node for Select {
-  type Output = Value;
+impl WrappedNode for Select {
+  type Item = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
     // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
@@ -524,8 +522,8 @@ impl ExecuteProcess {
 #[derive(Clone, Debug)]
 pub struct ProcessResult(process_execution::FallibleExecuteProcessResult);
 
-impl Node for ExecuteProcess {
-  type Output = ProcessResult;
+impl WrappedNode for ExecuteProcess {
+  type Item = ProcessResult;
 
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0;
@@ -555,8 +553,8 @@ pub struct ReadLink(Link);
 #[derive(Clone, Debug)]
 pub struct LinkDest(PathBuf);
 
-impl Node for ReadLink {
-  type Output = LinkDest;
+impl WrappedNode for ReadLink {
+  type Item = LinkDest;
 
   fn run(self, context: Context) -> NodeFuture<LinkDest> {
     let link = self.0.clone();
@@ -582,8 +580,8 @@ impl From<ReadLink> for NodeKey {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DigestFile(pub File);
 
-impl Node for DigestFile {
-  type Output = hashing::Digest;
+impl WrappedNode for DigestFile {
+  type Item = hashing::Digest;
 
   fn run(self, context: Context) -> NodeFuture<hashing::Digest> {
     let file = self.0.clone();
@@ -625,8 +623,8 @@ pub struct Scandir(Dir);
 #[derive(Clone, Debug)]
 pub struct DirectoryListing(Vec<fs::Stat>);
 
-impl Node for Scandir {
-  type Output = DirectoryListing;
+impl WrappedNode for Scandir {
+  type Item = DirectoryListing;
 
   fn run(self, context: Context) -> NodeFuture<DirectoryListing> {
     let dir = self.0.clone();
@@ -758,8 +756,8 @@ impl Snapshot {
   }
 }
 
-impl Node for Snapshot {
-  type Output = fs::Snapshot;
+impl WrappedNode for Snapshot {
+  type Item = fs::Snapshot;
 
   fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
     let lifted_path_globs = Self::lift_path_globs(&externs::val_for(&self.0));
@@ -839,8 +837,8 @@ impl Task {
   }
 }
 
-impl Node for Task {
-  type Output = Value;
+impl WrappedNode for Task {
+  type Item = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
     let deps = {
@@ -891,6 +889,71 @@ impl From<Task> for NodeKey {
   }
 }
 
+#[derive(Default)]
+pub struct Visualizer {
+  viz_colors: HashMap<String, String>,
+}
+
+impl NodeVisualizer<NodeKey> for Visualizer {
+  fn color_scheme(&self) -> &str {
+    "set312"
+  }
+
+  fn color(&mut self, node: &NodeKey, result: Option<Result<NodeResult, Failure>>) -> String {
+    let max_colors = 12;
+    match result {
+      None | Some(Err(Failure::Noop(_))) => "white".to_string(),
+      Some(Err(Failure::Throw(..))) => "4".to_string(),
+      Some(Err(Failure::Invalidated)) => "12".to_string(),
+      Some(Ok(_)) => {
+        let viz_colors_len = self.viz_colors.len();
+        self
+          .viz_colors
+          .entry(node.product_str())
+          .or_insert_with(|| format!("{}", viz_colors_len % max_colors + 1))
+          .clone()
+      }
+    }
+  }
+}
+
+pub struct Tracer;
+
+impl NodeTracer<NodeKey> for Tracer {
+  fn is_bottom(result: Option<Result<NodeResult, Failure>>) -> bool {
+    match result {
+      Some(Err(Failure::Invalidated)) => false,
+      Some(Err(Failure::Noop(..))) => true,
+      Some(Err(Failure::Throw(..))) => false,
+      Some(Ok(_)) => true,
+      None => {
+        // A Node with no state is either still running, or effectively cancelled
+        // because a dependent failed. In either case, it's not useful to render
+        // them, as we don't know whether they would have succeeded or failed.
+        true
+      }
+    }
+  }
+
+  fn state_str(indent: &str, result: Option<Result<NodeResult, Failure>>) -> String {
+    match result {
+      None => "<None>".to_string(),
+      Some(Ok(ref x)) => format!("{:?}", x),
+      Some(Err(Failure::Throw(ref x, ref traceback))) => format!(
+        "Throw({})\n{}",
+        externs::val_to_str(x),
+        traceback
+          .split("\n")
+          .map(|l| format!("{}    {}", indent, l))
+          .collect::<Vec<_>>()
+          .join("\n")
+      ),
+      Some(Err(Failure::Noop(ref x))) => format!("Noop({:?})", x),
+      Some(Err(Failure::Invalidated)) => "Invalidated".to_string(),
+    }
+  }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum NodeKey {
   DigestFile(DigestFile),
@@ -903,7 +966,58 @@ pub enum NodeKey {
 }
 
 impl NodeKey {
-  pub fn format(&self) -> String {
+  fn product_str(&self) -> String {
+    fn typstr(tc: &TypeConstraint) -> String {
+      externs::key_to_str(&tc.0)
+    }
+    match self {
+      &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
+      &NodeKey::Select(ref s) => typstr(&s.selector.product),
+      &NodeKey::Task(ref s) => typstr(&s.product),
+      &NodeKey::Snapshot(..) => "Snapshot".to_string(),
+      &NodeKey::DigestFile(..) => "DigestFile".to_string(),
+      &NodeKey::ReadLink(..) => "LinkDest".to_string(),
+      &NodeKey::Scandir(..) => "DirectoryListing".to_string(),
+    }
+  }
+
+  pub fn fs_subject(&self) -> Option<&Path> {
+    match self {
+      &NodeKey::DigestFile(ref s) => Some(s.0.path.as_path()),
+      &NodeKey::ReadLink(ref s) => Some((s.0).0.as_path()),
+      &NodeKey::Scandir(ref s) => Some((s.0).0.as_path()),
+
+      // Not FS operations:
+      // Explicitly listed so that if people add new NodeKeys they need to consider whether their
+      // NodeKey represents an FS operation, and accordingly whether they need to add it to the
+      // above list or the below list.
+      &NodeKey::ExecuteProcess { .. }
+      | &NodeKey::Select { .. }
+      | &NodeKey::Snapshot { .. }
+      | &NodeKey::Task { .. } => None,
+    }
+  }
+}
+
+impl Node for NodeKey {
+  type Context = Context;
+
+  type Item = NodeResult;
+  type Error = Failure;
+
+  fn run(self, context: Context) -> NodeFuture<NodeResult> {
+    match self {
+      NodeKey::DigestFile(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::ExecuteProcess(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::ReadLink(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Select(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Task(n) => n.run(context).map(|v| v.into()).to_boxed(),
+    }
+  }
+
+  fn format(&self) -> String {
     fn keystr(key: &Key) -> String {
       externs::key_to_str(&key)
     }
@@ -932,73 +1046,36 @@ impl NodeKey {
     }
   }
 
-  pub fn product_str(&self) -> String {
-    fn typstr(tc: &TypeConstraint) -> String {
-      externs::key_to_str(&tc.0)
-    }
-    match self {
-      &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
-      &NodeKey::Select(ref s) => typstr(&s.selector.product),
-      &NodeKey::Task(ref s) => typstr(&s.product),
-      &NodeKey::Snapshot(..) => "Snapshot".to_string(),
-      &NodeKey::DigestFile(..) => "DigestFile".to_string(),
-      &NodeKey::ReadLink(..) => "LinkDest".to_string(),
-      &NodeKey::Scandir(..) => "DirectoryListing".to_string(),
-    }
-  }
-
-  ///
-  /// If this NodeKey represents an FS operation, returns its Path.
-  ///
-  pub fn fs_subject(&self) -> Option<&Path> {
-    match self {
-      &NodeKey::DigestFile(ref s) => Some(s.0.path.as_path()),
-      &NodeKey::ReadLink(ref s) => Some((s.0).0.as_path()),
-      &NodeKey::Scandir(ref s) => Some((s.0).0.as_path()),
-
-      // Not FS operations:
-      // Explicitly listed so that if people add new NodeKeys they need to consider whether their
-      // NodeKey represents an FS operation, and accordingly whether they need to add it to the
-      // above list or the below list.
-      &NodeKey::ExecuteProcess { .. }
-      | &NodeKey::Select { .. }
-      | &NodeKey::Snapshot { .. }
-      | &NodeKey::Task { .. } => None,
+  fn digest(res: NodeResult) -> Option<hashing::Digest> {
+    match res {
+      NodeResult::Digest(d) => Some(d),
+      NodeResult::DirectoryListing(_)
+      | NodeResult::LinkDest(_)
+      | NodeResult::ProcessResult(_)
+      | NodeResult::Snapshot(_)
+      | NodeResult::Value(_) => None,
     }
   }
 }
 
-impl Node for NodeKey {
-  type Output = NodeResult;
+impl NodeError for Failure {
+  fn invalidated() -> Failure {
+    Failure::Invalidated
+  }
 
-  fn run(self, context: Context) -> NodeFuture<NodeResult> {
-    match self {
-      NodeKey::DigestFile(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::ExecuteProcess(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::ReadLink(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::Select(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::Task(n) => n.run(context).map(|v| v.into()).to_boxed(),
-    }
+  fn cyclic() -> Failure {
+    Failure::Noop(Noop::Cycle)
   }
 }
 
 #[derive(Clone, Debug)]
 pub enum NodeResult {
-  Unit,
   Digest(hashing::Digest),
   DirectoryListing(DirectoryListing),
   LinkDest(LinkDest),
   ProcessResult(ProcessResult),
   Snapshot(fs::Snapshot),
   Value(Value),
-}
-
-impl From<()> for NodeResult {
-  fn from(_: ()) -> Self {
-    NodeResult::Unit
-  }
 }
 
 impl From<Value> for NodeResult {
@@ -1065,17 +1142,6 @@ impl TryFrom<NodeResult> for NodeResult {
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
     Ok(nr)
-  }
-}
-
-impl TryFrom<NodeResult> for () {
-  type Err = ();
-
-  fn try_from(nr: NodeResult) -> Result<Self, ()> {
-    match nr {
-      NodeResult::Unit => Ok(()),
-      _ => Err(()),
-    }
   }
 }
 
