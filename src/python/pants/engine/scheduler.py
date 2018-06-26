@@ -360,10 +360,10 @@ class Scheduler(object):
     return self._raise_or_return(result)
 
   def materialize_directories(self, directories_paths_and_digests):
-    """Creates the specified directory on the file system.
+    """Creates the specified directories on the file system.
 
-    :param directories_paths_and_digests tuple<DirectoryToMaterialize>: The path and digest of the
-           directory to materialize.
+    :param directories_paths_and_digests tuple<DirectoryToMaterialize>: Tuple of the path and
+           digest of the directories to materialize.
     :returns: Nothing or an error.
     """
     result = self._native.lib.materialize_directories(
@@ -571,10 +571,10 @@ class SchedulerSession(object):
     return self._scheduler.merge_directories(directory_digests)
 
   def materialize_directories(self, directories_paths_and_digests):
-    """Creates the specified directory on the file system.
+    """Creates the specified directories on the file system.
 
-    :param directories_paths_and_digests tuple<DirectoryToMaterialize>: The path and digest of the
-           directory to materialize.
+    :param directories_paths_and_digests tuple<DirectoryToMaterialize>: Tuple of the path and
+           digest of the directories to materialize.
     :returns: Nothing or an error.
     """
     return self._scheduler.materialize_directories(directories_paths_and_digests)
