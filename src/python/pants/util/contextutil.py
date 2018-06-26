@@ -48,6 +48,16 @@ def get_joined_path(new_entries, env=None, env_var='PATH', delimiter=':', prepen
   return delimiter.join(path_dirs)
 
 
+def _os_encode(u, enc=sys.getfilesystemencoding()):
+  """Turns a `unicode` into `bytes` via encoding."""
+  return u.encode(enc, 'strict')
+
+
+def _os_decode(b, enc=sys.getfilesystemencoding()):
+  """Turns a `bytes` into `unicode` via decoding."""
+  return b.decode(enc, 'strict')
+
+
 @contextmanager
 def environment_as(**kwargs):
   """Update the environment to the supplied values, for example:
@@ -61,7 +71,7 @@ def environment_as(**kwargs):
 
   def setenv(key, val):
     if val is not None:
-      os.environ[key] = val
+      os.environ[key] = _os_encode(val)
     else:
       if key in os.environ:
         del os.environ[key]
@@ -76,6 +86,10 @@ def environment_as(**kwargs):
       setenv(key, val)
 
 
+def _copy_env(env):
+  return {k: _os_decode(v) for k, v in env.items()}
+
+
 def _purge_env():
   # N.B. Without the use of `del` here (which calls `os.unsetenv` under the hood), subprocess32
   # invokes or other things that may access the environment at the C level may not see the
@@ -87,13 +101,13 @@ def _purge_env():
 
 def _restore_env(env):
   for k, v in env.items():
-    os.environ[k] = v
+    os.environ[k] = _os_encode(v)
 
 
 @contextmanager
 def hermetic_environment_as(**kwargs):
   """Set the environment to the supplied values from an empty state."""
-  old_environment = os.environ.copy()
+  old_environment = _copy_env(os.environ)
   _purge_env()
   try:
     with environment_as(**kwargs):
