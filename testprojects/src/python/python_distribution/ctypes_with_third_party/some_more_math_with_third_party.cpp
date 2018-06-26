@@ -30,7 +30,7 @@ struct MyRecord
 struct SomeData
 {
   int32_t id;
-  std::shared_ptr<std::unordered_map<uint32_t, MyRecord>> data;
+  int data = 3;
 
   template <class Archive>
   void save( Archive & ar ) const
@@ -51,15 +51,9 @@ struct SomeData
 int mangled_function(int x) {
 
 	// cereal testing
-	std::ofstream os("out.cereal", std::ios::binary);
-	cereal::BinaryOutputArchive archive( os );
+	MyRecord myRecord;
 	SomeData myData;
-	archive( myData );
 
-	// rang testing
-	std::cout << "Plain text\n"
-         << rang::style::bold << "Text from 3rdparty!"
-         << rang::style::reset << std::endl;
 	return x ^ 3;
 }
 

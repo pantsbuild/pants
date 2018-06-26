@@ -87,8 +87,6 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
             }
         )
         self.assert_success(pants_run)
-        self.assertIn('Text from 3rdparty!', pants_run.stdout_data)
-        self.assertTrue(os.path.exists(cereal_outfile))
       finally:
         if os.path.exists(cereal_outfile):
           os.remove(cereal_outfile)
