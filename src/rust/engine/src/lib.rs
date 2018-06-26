@@ -695,7 +695,7 @@ pub extern "C" fn materialize_directories(
         .map(|(dir, digest)| store.materialize_directory(dir, digest))
         .collect::<Vec<_>>(),
     )
-  }).map(|values| ())
+  }).map(|_| ())
     .wait()
     .into()
 }
