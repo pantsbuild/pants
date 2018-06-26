@@ -356,7 +356,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       ))
 
       self.assertEquals(both_snapshot.directory_digest, both_merged)
-  
+
   def test_materialize_directories(self):
     with temporary_dir() as temp_dir:
       dir_path = os.path.join(temp_dir, "roland")
@@ -367,6 +367,12 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       scheduler.materialize_directories((DirectoryToMaterialize(str(dir_path), digest),))
       self.assertTrue(os.path.exists(dir_path))
+
+      created_file = os.path.join(dir_path, "roland")
+      self.assertTrue(os.path.isfile(created_file))
+      with open(created_file) as f:
+        content = f.read()
+        self.assertEquals(content, "European Burmese")
 
   def test_glob_match_error(self):
     with self.assertRaises(ValueError) as cm:
