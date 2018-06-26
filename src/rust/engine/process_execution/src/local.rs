@@ -1,3 +1,4 @@
+extern crate log;
 extern crate tempfile;
 
 use boxfuture::{BoxFuture, Boxable};
@@ -155,7 +156,8 @@ impl super::CommandRunner for CommandRunner {
             if cleanup_local_dirs == false {
               // This consumes the `TempDir` without deleting directory on the filesystem, meaning
               // that the temporary directory will no longer be automatically deleted when dropped.
-              workdir.into_path();
+              let preserved_path = workdir.into_path();
+              info!("preserved local process execution dir: {:?}", preserved_path.into_os_string());
             }
             result
           })
