@@ -104,6 +104,7 @@ impl super::CommandRunner for CommandRunner {
     let env = req.env;
     let output_file_paths = req.output_files;
     let output_dir_paths = req.output_directories;
+    let cleanup_local_dirs = self.cleanup_local_dirs.clone();
     let argv = req.argv;
     self
       .store
@@ -121,7 +122,7 @@ impl super::CommandRunner for CommandRunner {
                   .map_err(|e| format!("Error executing process: {:?}", e))
                   .map(|output| (output, workdir))
       })
-      .and_then(|(output, workdir)| {
+      .and_then(move|(output, workdir)| {
         let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
           future::ok(fs::Snapshot::empty()).to_boxed()
         } else {
@@ -149,8 +150,15 @@ impl super::CommandRunner for CommandRunner {
             )
           })
           // Force workdir not to get dropped until after we've ingested the outputs
-          .map(|result| (result, workdir))
-          .map(|(result, _workdir)| result)
+          .map(move|result| (result, workdir, cleanup_local_dirs) )
+          .map(move|(result, workdir, cleanup_local_dirs)| {
+            if cleanup_local_dirs == false {
+              // This consumes the `TempDir` without deleting directory on the filesystem, meaning
+              // that the temporary directory will no longer be automatically deleted when dropped.
+              workdir.into_path();
+            }
+            result
+          })
           .to_boxed()
         };
 
