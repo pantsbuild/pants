@@ -168,6 +168,7 @@ class LinkSharedLibraries(NativeTask):
     cmd = ([linker.exe_filename] +
            self._get_shared_lib_cmdline_args() +
            self._get_third_party_lib_args() +
+           ['-lstdc++'] +
            ['-o', os.path.abspath(resulting_shared_lib_path)] +
            [os.path.abspath(obj) for obj in object_files])
 
