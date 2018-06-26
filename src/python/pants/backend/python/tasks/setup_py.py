@@ -161,15 +161,17 @@ class SetupPyExecutionEnvironment(datatype([
     'linux': lambda: ['-shared'],
   }
 
-  PEP_0440_DISALLOWED = re.compile(r'[^a-zA-Z0-9\.]')
-
+  # A "local" extension to a version string, as per
+  # https://www.python.org/dev/peps/pep-0440/#local-version-identifiers
+  PEP_0440_DISALLOWED_LOCAL = re.compile(r'[^a-zA-Z0-9\.]')
+  # Replace all the disallowed characters with dots.
   _local_version_replacer_char = '.'
 
   def as_environment(self):
     ret = {}
 
     if self.version:
-      ret['_SETUP_PY_LOCAL_VERSION'] = self.PEP_0440_DISALLOWED.sub(
+      ret['_SETUP_PY_LOCAL_VERSION'] = self.PEP_0440_DISALLOWED_LOCAL.sub(
         self._local_version_replacer_char, self.version)
 
     if self.setup_requires_site_dir:

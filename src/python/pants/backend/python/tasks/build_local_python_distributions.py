@@ -212,8 +212,6 @@ class BuildLocalPythonDistributions(Task):
                              .format(setup_requires_site_dir))
 
     setup_py_execution_environment = SetupPyExecutionEnvironment(
-      # TODO: consider conformance to
-      # https://www.python.org/dev/peps/pep-0440/#local-version-identifiers
       version=versioned_target.cache_key.hash,
       setup_requires_site_dir=setup_requires_site_dir,
       setup_py_native_tools=native_tools)
