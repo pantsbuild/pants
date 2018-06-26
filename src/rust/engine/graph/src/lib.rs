@@ -791,7 +791,7 @@ impl<'a, N: Node + 'a, P: Fn(EntryId, Level) -> bool> Iterator for LeveledWalk<'
 
 #[cfg(test)]
 mod tests {
-  use std::sync::Arc;
+  use std::sync::{Arc, Mutex};
   use std::thread;
 
   use boxfuture::{BoxFuture, Boxable};
@@ -808,6 +808,29 @@ mod tests {
       graph.create(TNode(2), &context).wait(),
       Ok("2/1/0".to_string())
     );
+  }
+
+  #[test]
+  fn invalidate() {
+    let graph = Arc::new(Graph::new());
+    let context = TContext::new(graph.clone());
+
+    // Create three nodes.
+    assert_eq!(
+      graph.create(TNode(2), &context).wait(),
+      Ok("2/1/0".to_string())
+    );
+    assert_eq!(context.spawn_count(), 3);
+
+    // Invalidate and re-request the upper two nodes.
+    assert_eq!(graph.invalidate_from_roots(|&TNode(n)| n == 1), 2);
+
+    // Confirm that the right number of nodes re-run.
+    assert_eq!(
+      graph.create(TNode(2), &context).wait(),
+      Ok("2/1/0".to_string())
+    );
+    assert_eq!(context.spawn_count(), 5);
   }
 
   ///
@@ -842,9 +865,17 @@ mod tests {
     }
   }
 
+  ///
+  /// A context that keeps a count of spawned Nodes. This is a very basic way to confirm that Nodes
+  /// have (re-)run.
+  ///
+  /// TODO: This is potentially error prone, but is much simpler than actually tracking precisely
+  /// which Nodes ran and in which order. Future work.
+  ///
   #[derive(Clone)]
   struct TContext {
     graph: Arc<Graph<TNode>>,
+    spawn_count: Arc<Mutex<usize>>,
     entry_id: Option<EntryId>,
   }
   impl NodeContext for TContext {
@@ -852,6 +883,7 @@ mod tests {
     fn clone_for(&self, entry_id: EntryId) -> TContext {
       TContext {
         graph: self.graph.clone(),
+        spawn_count: self.spawn_count.clone(),
         entry_id: Some(entry_id),
       }
     }
@@ -868,6 +900,8 @@ mod tests {
       thread::spawn(move || {
         future.wait().unwrap();
       });
+      let mut spawn_count = self.spawn_count.lock().unwrap();
+      *spawn_count += 1
     }
   }
 
@@ -875,12 +909,17 @@ mod tests {
     fn new(graph: Arc<Graph<TNode>>) -> TContext {
       TContext {
         graph,
+        spawn_count: Arc::new(Mutex::new(0)),
         entry_id: None,
       }
     }
 
     fn get(&self, dst: TNode) -> BoxFuture<String, TError> {
       self.graph.get(self.entry_id.unwrap(), self, dst)
+    }
+
+    fn spawn_count(&self) -> usize {
+      *self.spawn_count.lock().unwrap()
     }
   }
 
