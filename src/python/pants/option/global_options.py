@@ -76,7 +76,7 @@ class ExecutionOptions(datatype([
 
   @classmethod
   def from_bootstrap_options(cls, bootstrap_options):
-    cls(
+    return cls(
       remote_store_server=bootstrap_options.remote_store_server,
       remote_execution_server=bootstrap_options.remote_execution_server,
       remote_store_thread_count=bootstrap_options.remote_store_thread_count,
