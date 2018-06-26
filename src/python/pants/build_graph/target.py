@@ -898,8 +898,7 @@ class Target(AbstractTarget):
         ('Passing collections as the value of the sources argument to create_sources_field is '
          'deprecated, and now takes a slow path. Instead, class {} should have its sources '
          'argument populated by the engine, either by using the standard parsing pipeline, or by '
-         'requesting a SourcesField product.'
-         'the v2 engine.').format(self.__class__.__name__)
+         'requesting a SourcesField product from the v2 engine.').format(self.__class__.__name__)
       )
       sources = Files.create_fileset_with_spec(sources_rel_path, *sources)
     elif not isinstance(sources, FilesetWithSpec):

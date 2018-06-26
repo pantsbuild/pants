@@ -220,30 +220,33 @@ class SimpleCodegenTask(Task):
                           fingerprint_strategy=self.get_fingerprint_strategy()) as invalidation_check:
 
       with self.context.new_workunit(name='execute', labels=[WorkUnitLabel.MULTITOOL]):
+        vts_to_sources = OrderedDict()
         for vt in invalidation_check.all_vts:
-
-          sources = None
-          must_recapture = False
-
           synthetic_target_dir = self.synthetic_target_dir(vt.target, vt.results_dir)
+
+          key = (vt, synthetic_target_dir)
+          vts_to_sources[key] = None
 
           # Build the target and handle duplicate sources.
           if not vt.valid:
             if self._do_validate_sources_present(vt.target):
               self.execute_codegen(vt.target, vt.results_dir)
-              sources = self._capture_sources(vt.target, synthetic_target_dir)
-              must_recapture = self._handle_duplicate_sources(vt.target, vt.results_dir, sources)
+              sources = self._capture_sources(((vt.target, synthetic_target_dir),))[0]
+              # _handle_duplicate_sources may delete files from the filesystem, so we need to
+              # re-capture the sources.
+              if not self._handle_duplicate_sources(vt.target, vt.results_dir, sources):
+                vts_to_sources[key] = sources
             vt.update()
 
-          # _handle_duplicate_sources may delete files from the filesystem, so we need to
-          # re-capture the sources.
-          if sources is None or must_recapture:
-            sources = self._capture_sources(vt.target, synthetic_target_dir)
-
+        vts_to_capture = tuple(key for key, sources in vts_to_sources.items() if sources is None)
+        filesets = self._capture_sources(vts_to_capture)
+        for key, fileset in zip(vts_to_capture, filesets):
+          vts_to_sources[key] = fileset
+        for (vt, synthetic_target_dir), fileset in vts_to_sources.items():
           self._inject_synthetic_target(
             vt.target,
             vt.results_dir,
-            sources,
+            fileset,
           )
         self._mark_transitive_invalidation_hashes_dirty(
           vt.target.address for vt in invalidation_check.all_vts
@@ -269,31 +272,37 @@ class SimpleCodegenTask(Task):
     """
     return target_workdir
 
-  def _capture_sources(self, target, synthetic_target_dir):
-    if self.sources_globs is None:
-      files = list(self.find_sources(target, synthetic_target_dir))
-    else:
-      files = self.sources_globs
+  # Accepts tuple of tuples of (target, synthetic_target_dir)
+  # Returns tuple of EagerFilesetWithSpecs in matching order.
+  def _capture_sources(self, targets_and_dirs):
+    to_capture = []
 
-    results_dir_relpath = os.path.relpath(synthetic_target_dir, get_buildroot())
-    buildroot_relative_globs = tuple(os.path.join(results_dir_relpath, file) for file in files)
-    buildroot_relative_excludes = tuple(
-      os.path.join(results_dir_relpath, file)
-        for file in self.sources_exclude_globs
-    )
+    for (target, synthetic_target_dir) in targets_and_dirs:
+      if self.sources_globs is None:
+        files = list(self.find_sources(target, synthetic_target_dir))
+      else:
+        files = self.sources_globs
 
-    snapshot = self.context._scheduler.capture_snapshots((
-      PathGlobsAndRoot(
-        PathGlobs(buildroot_relative_globs, buildroot_relative_excludes),
-        str(get_buildroot()),
-      ),
-    ))[0]
+      results_dir_relpath = os.path.relpath(synthetic_target_dir, get_buildroot())
+      buildroot_relative_globs = tuple(os.path.join(results_dir_relpath, file) for file in files)
+      buildroot_relative_excludes = tuple(
+        os.path.join(results_dir_relpath, file)
+          for file in self.sources_exclude_globs
+      )
+      to_capture.append(
+        PathGlobsAndRoot(
+          PathGlobs(buildroot_relative_globs, buildroot_relative_excludes),
+          str(get_buildroot()),
+        )
+      )
 
-    return EagerFilesetWithSpec(
+    snapshots = self.context._scheduler.capture_snapshots(tuple(to_capture))
+
+    return tuple(EagerFilesetWithSpec(
       results_dir_relpath,
       FilesetRelPathWrapper.to_filespec(buildroot_relative_globs),
       snapshot,
-    )
+    ) for snapshot in snapshots)
 
   def _inject_synthetic_target(
     self,
