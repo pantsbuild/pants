@@ -137,7 +137,7 @@ class LinkSharedLibraries(NativeTask):
 
   _SHARED_CMDLINE_ARGS = {
     'darwin': lambda: ['-mmacosx-version-min=10.11', '-Wl,-dylib'],
-    'linux': lambda: ['-Wl,-shared'],
+    'linux': lambda: ['-shared'],
   }
 
   def _get_shared_lib_cmdline_args(self):
