@@ -225,18 +225,20 @@ class SimpleCodegenTask(Task):
           sources = None
           must_recapture = False
 
+          synthetic_target_dir = self.synthetic_target_dir(vt.target, vt.results_dir)
+
           # Build the target and handle duplicate sources.
           if not vt.valid:
             if self._do_validate_sources_present(vt.target):
               self.execute_codegen(vt.target, vt.results_dir)
-              sources = self._capture_sources(vt.target, vt.results_dir)
+              sources = self._capture_sources(vt.target, synthetic_target_dir)
               must_recapture = self._handle_duplicate_sources(vt.target, vt.results_dir, sources)
             vt.update()
 
           # _handle_duplicate_sources may delete files from the filesystem, so we need to
           # re-capture the sources.
           if sources is None or must_recapture:
-            sources = self._capture_sources(vt.target, vt.results_dir)
+            sources = self._capture_sources(vt.target, synthetic_target_dir)
 
           self._inject_synthetic_target(
             vt.target,
@@ -267,13 +269,13 @@ class SimpleCodegenTask(Task):
     """
     return target_workdir
 
-  def _capture_sources(self, target, target_workdir):
+  def _capture_sources(self, target, synthetic_target_dir):
     if self.sources_globs is None:
-      files = list(self.find_sources(target, target_workdir))
+      files = list(self.find_sources(target, synthetic_target_dir))
     else:
       files = self.sources_globs
 
-    results_dir_relpath = os.path.relpath(target_workdir, get_buildroot())
+    results_dir_relpath = os.path.relpath(synthetic_target_dir, get_buildroot())
     buildroot_relative_globs = tuple(os.path.join(results_dir_relpath, file) for file in files)
     buildroot_relative_excludes = tuple(
       os.path.join(results_dir_relpath, file)
