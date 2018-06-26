@@ -147,14 +147,12 @@ fn main() {
       1,
       store,
     )),
-    None => Box::new(
-      process_execution::local::CommandRunner::new(
-        store,
-        pool,
-        work_dir.clone(),
-        true
-      )
-    ),
+    None => Box::new(process_execution::local::CommandRunner::new(
+      store,
+      pool,
+      work_dir.clone(),
+      true,
+    )),
   };
 
   let result = runner.run(request).wait().expect("Error executing");
