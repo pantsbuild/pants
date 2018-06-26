@@ -33,7 +33,24 @@ type FNV = BuildHasherDefault<FnvHasher>;
 
 type PGraph<N> = DiGraph<Entry<N>, (), u32>;
 
-type RunToken = usize;
+///
+/// A token that uniquely identifies one run of a Node in the Graph. Each run of a Node (via
+/// `N::Context::spawn`) has a different RunToken associated with it. When a run completes, if
+/// the current RunToken of its Node no longer matches the RunToken of the spawned work (because
+/// the Node was `cleared`), the work is discarded. See `Entry::complete` for more information.
+///
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct RunToken(u32);
+
+impl RunToken {
+  fn initial() -> RunToken {
+    RunToken(0)
+  }
+
+  fn next(&self) -> RunToken {
+    RunToken(self.0 + 1)
+  }
+}
 
 enum EntryState<N: Node> {
   NotStarted(RunToken),
@@ -46,6 +63,12 @@ enum EntryState<N: Node> {
     result: Result<N::Item, N::Error>,
     run_token: RunToken,
   },
+}
+
+impl<N: Node> EntryState<N> {
+  fn initial() -> EntryState<N> {
+    EntryState::NotStarted(RunToken::initial())
+  }
 }
 
 ///
@@ -88,7 +111,7 @@ impl<N: Node> Entry<N> {
   fn new(node: EntryKey<N>) -> Entry<N> {
     Entry {
       node: node,
-      state: EntryState::NotStarted(0),
+      state: EntryState::initial(),
     }
   }
 
@@ -136,7 +159,7 @@ impl<N: Node> Entry<N> {
         waiters.push(send);
         return recv
           .map_err(|_| N::Error::invalidated())
-          .and_then(|res| res)
+          .flatten()
           .to_boxed();
       }
       &mut EntryState::Completed { ref result, .. } => {
@@ -164,10 +187,10 @@ impl<N: Node> Entry<N> {
   ///
   fn complete(&mut self, result_run_token: RunToken, result: Result<N::Item, N::Error>) {
     // Temporarily swap in `NotStarted` in order to take ownership of the state.
-    let state = mem::replace(&mut self.state, EntryState::NotStarted(0));
+    let state = mem::replace(&mut self.state, EntryState::initial());
 
     // We care about exactly one case: a Running state with the same run_token. All other states
-    // represent various (legal) race conditions.
+    // represent various (legal) race conditions. See `RunToken`'s docs for more information.
     self.state = match state {
       EntryState::Running {
         waiters,
@@ -176,6 +199,9 @@ impl<N: Node> Entry<N> {
       } => {
         if result_run_token == run_token {
           // Notify all waiters (ignoring any that have gone away), and then store the value.
+          // A waiter will go away whenever they drop the `Future` `Receiver` of the value, perhaps
+          // due to failure of another Future in a `join` or `join_all`, or due to a timeout at the
+          // root of a request.
           for waiter in waiters {
             let _ = waiter.send(result.clone());
           }
@@ -203,14 +229,14 @@ impl<N: Node> Entry<N> {
   }
 
   fn clear(&mut self) {
-    let run_token = match mem::replace(&mut self.state, EntryState::NotStarted(0)) {
+    let run_token = match mem::replace(&mut self.state, EntryState::initial()) {
       EntryState::NotStarted(run_token) => run_token,
       EntryState::Running { run_token, .. } => run_token,
       EntryState::Completed { run_token, .. } => run_token,
     };
 
     // Swap in a state with a new RunToken value, which invalidates any outstanding work.
-    self.state = EntryState::NotStarted(run_token + 1);
+    self.state = EntryState::NotStarted(run_token.next());
   }
 
   fn format(&self) -> String {
