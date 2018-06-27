@@ -163,10 +163,10 @@ impl Snapshot {
     // `Directory` structure. Only `Dir+Dir` collisions are legal.
     let path_stats = {
       let mut uniq_paths: IndexMap<PathBuf, PathStat> = IndexMap::new();
-      for path_stat in snapshots
+      for path_stat in Itertools::flatten(snapshots
         .iter()
         .map(|s| s.path_stats.iter().cloned())
-        .flatten()
+        )
       {
         match uniq_paths.entry(path_stat.path().to_owned()) {
           indexmap::map::Entry::Occupied(e) => match (&path_stat, e.get()) {
@@ -223,10 +223,10 @@ impl Snapshot {
 
         // Merge FileNodes.
         out_dir.set_files(protobuf::RepeatedField::from_vec(
-          directories
+          Itertools::flatten(directories
             .iter_mut()
             .map(|directory| directory.take_files().into_iter())
-            .flatten()
+            )
             .collect(),
         ));
         out_dir.mut_files().sort_by(|a, b| a.name.cmp(&b.name));
@@ -253,10 +253,10 @@ impl Snapshot {
 
         // Group and recurse for DirectoryNodes.
         let sorted_child_directories = {
-          let mut merged_directories = directories
+          let mut merged_directories = Itertools::flatten(directories
             .iter_mut()
             .map(|directory| directory.take_directories().into_iter())
-            .flatten()
+            )
             .collect::<Vec<_>>();
           merged_directories.sort_by(|a, b| a.name.cmp(&b.name));
           merged_directories
