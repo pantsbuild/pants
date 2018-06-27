@@ -415,7 +415,7 @@ class SimpleCodegenTask(Task):
       '1.10.0.dev0',
       'SimpleCodegenTask.find_sources is deprecated. Subclasses should instead specify '
       'sources_globs and sources_exclude_globs. '
-      'Class to update: {}'.format(self.__class__.__name__)
+      'Class to update: {}. find_sources'.format(self.__class__.__name__)
     )
     return OrderedSet(self._find_sources_in_workdir(target_workdir))
 
