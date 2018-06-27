@@ -120,13 +120,16 @@ class NativeCompile(NativeTask, AbstractClass):
   def execute(self):
     object_files_product = self.context.products.get(ObjectFiles)
     native_deps_product = self.context.products.get(NativeTargetDependencies)
+    external_libs_product = self.context.products.get_data(
+      NativeExternalLibraryFetch.NativeExternalLibraryFiles
+    )
     source_targets = self.context.targets(self.source_target_constraint.satisfied_by)
 
     with self.invalidated(source_targets, invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.invalid_vts:
         deps = self.native_deps(vt.target)
         self._add_product_at_target_base(native_deps_product, vt.target, deps)
-        compile_request = self._make_compile_request(vt, deps)
+        compile_request = self._make_compile_request(vt, deps, external_libs_product)
         self.context.log.debug("compile_request: {}".format(compile_request))
         self._compile(compile_request)
 
@@ -187,18 +190,16 @@ class NativeCompile(NativeTask, AbstractClass):
   def _compiler(self):
     return self.get_compiler()
 
-  def get_third_party_include_dirs(self):
-    inc_dir = []
-    tp_files_product = self.context.products.get_data(NativeExternalLibraryFetch.NativeExternalLibraryFiles)
-    directory = tp_files_product.include
-    if directory:
-      inc_dir = [directory]
-    return inc_dir
+  def _get_third_party_include_dirs(self, external_libs_product):
+    directory = external_libs_product.include
+    return [directory] if directory else []
 
-  def _make_compile_request(self, versioned_target, dependencies):
+  def _make_compile_request(self, versioned_target, dependencies, external_libs_product):
     target = versioned_target.target
+
     include_dirs = [self._include_dirs_for_target(dep_tgt) for dep_tgt in dependencies]
-    include_dirs.extend(self.get_third_party_include_dirs())
+    include_dirs.extend(self._get_third_party_include_dirs(external_libs_product))
+
     sources_and_headers = self.get_sources_headers_for_target(target)
 
     return NativeCompileRequest(

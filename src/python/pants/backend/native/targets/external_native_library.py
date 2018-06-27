@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import re
+
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.base.validation import assert_list
@@ -39,4 +41,4 @@ class ExternalNativeLibrary(Target):
 
   @property
   def lib_names(self):
-    return [pkg_name.split('/')[0] for pkg_name in self.payload.packages]
+    return [re.match(r'^([^\/]+)\/', pkg_name).group(1) for pkg_name in self.payload.packages]

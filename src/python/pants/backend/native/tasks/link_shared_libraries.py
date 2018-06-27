@@ -30,6 +30,7 @@ class LinkSharedLibraryRequest(datatype([
     'object_files',
     'native_artifact',
     'output_dir',
+    'external_libs_info'
 ])): pass
 
 
@@ -43,6 +44,7 @@ class LinkSharedLibraries(NativeTask):
   def prepare(cls, options, round_manager):
     round_manager.require(NativeTargetDependencies)
     round_manager.require(ObjectFiles)
+    round_manager.require(NativeExternalLibraryFetch.NativeExternalLibraryFiles)
 
   @property
   def cache_target_dirs(self):
@@ -79,6 +81,7 @@ class LinkSharedLibraries(NativeTask):
     native_target_deps_product = self.context.products.get(NativeTargetDependencies)
     compiled_objects_product = self.context.products.get(ObjectFiles)
     shared_libs_product = self.context.products.get(SharedLibrary)
+    external_libs_product = self.context.products.get_data(NativeExternalLibraryFetch.NativeExternalLibraryFiles)
 
     all_shared_libs_by_name = {}
 
@@ -89,7 +92,7 @@ class LinkSharedLibraries(NativeTask):
           shared_library = self._retrieve_shared_lib_from_cache(vt)
         else:
           link_request = self._make_link_request(
-            vt, compiled_objects_product, native_target_deps_product)
+            vt, compiled_objects_product, native_target_deps_product, external_libs_product)
           shared_library = self._execute_link_request(link_request)
 
         same_name_shared_lib = all_shared_libs_by_name.get(shared_library.name, None)
@@ -114,7 +117,11 @@ class LinkSharedLibraries(NativeTask):
                                           .format(path_to_cached_lib))
     return SharedLibrary(name=native_artifact.lib_name, path=path_to_cached_lib)
 
-  def _make_link_request(self, vt, compiled_objects_product, native_target_deps_product):
+  def _make_link_request(self,
+                         vt,
+                         compiled_objects_product,
+                         native_target_deps_product,
+                         external_libs_product):
     self.context.log.debug("link target: {}".format(vt.target))
 
     deps = self._retrieve_single_product_at_target_base(native_target_deps_product, vt.target)
@@ -133,7 +140,8 @@ class LinkSharedLibraries(NativeTask):
       linker=self.linker,
       object_files=all_compiled_object_files,
       native_artifact=vt.target.ctypes_native_library,
-      output_dir=vt.results_dir)
+      output_dir=vt.results_dir,
+      external_libs_info=external_libs_product)
 
   _SHARED_CMDLINE_ARGS = {
     'darwin': lambda: ['-mmacosx-version-min=10.11', '-Wl,-dylib'],
@@ -143,13 +151,12 @@ class LinkSharedLibraries(NativeTask):
   def _get_shared_lib_cmdline_args(self):
     return self.linker.platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
 
-  def _get_third_party_lib_args(self):
+  def _get_third_party_lib_args(self, external_libs_product):
     lib_args = []
-    tp_files_product = self.context.products.get_data(NativeExternalLibraryFetch.NativeExternalLibraryFiles)
-    if tp_files_product.lib_names:
-      for lib_name in tp_files_product.lib_names:
+    if external_libs_product.lib_names:
+      for lib_name in external_libs_product.lib_names:
         lib_args.append('-l{}'.format(lib_name))
-      lib_dir_arg = '-L{}'.format(tp_files_product.lib)
+      lib_dir_arg = '-L{}'.format(external_libs_product.lib)
       lib_args.append(lib_dir_arg)
     return lib_args
 
@@ -167,7 +174,7 @@ class LinkSharedLibraries(NativeTask):
     # We are executing in the results_dir, so get absolute paths for everything.
     cmd = ([linker.exe_filename] +
            self._get_shared_lib_cmdline_args() +
-           self._get_third_party_lib_args() +
+           self._get_third_party_lib_args(link_request.external_libs_info) +
            ['-o', os.path.abspath(resulting_shared_lib_path)] +
            [os.path.abspath(obj) for obj in object_files])
 

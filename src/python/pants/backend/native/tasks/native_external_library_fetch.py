@@ -72,32 +72,12 @@ class NativeExternalLibraryFetch(Task):
 
   class NativeExternalLibraryFiles(object):
     def __init__(self):
-      self._include = None
-      self._lib = None
-      self._lib_names = []
-
-    @property
-    def include(self):
-      return self._include
-
-    @include.setter
-    def include(self, include_dir):
-      self._include = include_dir
-
-    @property
-    def lib(self):
-      return self._lib
-
-    @lib.setter
-    def lib(self, lib_dir):
-      self._lib = lib_dir
-
-    @property
-    def lib_names(self):
-      return self._lib_names
+      self.include = None
+      self.lib = None
+      self.lib_names = []
 
     def add_lib_name(self, lib_name):
-      self._lib_names.append(lib_name)
+      self.lib_names.append(lib_name)
 
   @staticmethod
   def _parse_lib_name_from_library_filename(filename):
