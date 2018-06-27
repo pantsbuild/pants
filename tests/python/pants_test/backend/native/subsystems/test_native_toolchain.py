@@ -8,9 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from contextlib import contextmanager
 
-from pants.backend.native.config.environment import (CCompiler, CppCompiler, GCCCCompiler,
-                                                     GCCCppCompiler, Linker, LLVMCCompiler,
-                                                     LLVMCppCompiler, Platform)
+from pants.backend.native.config.environment import (GCCCCompiler, GCCCppCompiler, Linker,
+                                                     LLVMCCompiler, LLVMCppCompiler, Platform)
 from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.util.contextutil import environment_as, pushd, temporary_dir
@@ -100,7 +99,6 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
   def test_hello_c_gcc(self):
     scheduler_request_specs = [
       (self.toolchain, GCCCCompiler),
-      (self.toolchain, LLVMCCompiler),
       (self.toolchain, Linker),
     ]
 
@@ -112,17 +110,10 @@ int main() {
 }
 """, scheduler_request_specs=scheduler_request_specs) as products:
 
-      gcc_wrapper, clang_wrapper, linker = products
+      gcc_wrapper, linker = products
       gcc = gcc_wrapper.c_compiler
-      clang = clang_wrapper.c_compiler
 
-      gcc_with_clang_libs = CCompiler(
-        path_entries=gcc.path_entries,
-        exe_filename=gcc.exe_filename,
-        library_dirs=(gcc.library_dirs + clang.library_dirs),
-        include_dirs=(clang.include_dirs + gcc.include_dirs))
-
-      self._do_compile_link(gcc_with_clang_libs, linker, 'hello.c', 'hello_gcc', "I C the world!")
+      self._do_compile_link(gcc, linker, 'hello.c', 'hello_gcc', "I C the world!")
 
   def test_hello_c_clang(self):
 
@@ -160,22 +151,15 @@ int main() {
 }
 """, scheduler_request_specs=scheduler_request_specs) as products:
 
-      gpp_wrapper, clangpp_wrapper, linker = products
+      gpp_wrapper, linker = products
       gpp = gpp_wrapper.cpp_compiler
-      clangpp = clangpp_wrapper.cpp_compiler
-
-      gpp_with_clangpp_libs = CppCompiler(
-        path_entries=gpp.path_entries,
-        exe_filename=gpp.exe_filename,
-        library_dirs=(gpp.library_dirs + clangpp.library_dirs),
-        include_dirs=(clangpp.include_dirs + gpp.include_dirs))
 
       gpp_with_gpp_linker = Linker(
         path_entries=(gpp.path_entries + linker.path_entries),
         exe_filename=gpp.exe_filename,
         library_dirs=(gpp.library_dirs + linker.library_dirs))
 
-      self._do_compile_link(gpp_with_clangpp_libs, gpp_with_gpp_linker, 'hello.cpp', 'hello_gpp',
+      self._do_compile_link(gpp, gpp_with_gpp_linker, 'hello.cpp', 'hello_gpp',
                             "I C the world, ++ more!")
 
   def test_hello_cpp_clangpp(self):

@@ -127,7 +127,8 @@ def select_llvm_c_compiler(platform, native_toolchain):
     clang_with_gcc_libs = CCompiler(
       path_entries=provided_clang.path_entries,
       exe_filename=provided_clang.exe_filename,
-      library_dirs=(provided_clang.library_dirs + provided_gcc.library_dirs),
+      # We need this version of GLIBCXX to be able to run, unfortunately.
+      library_dirs=(provided_gcc.library_dirs + provided_clang.library_dirs),
       include_dirs=(provided_clang.include_dirs + provided_gcc.include_dirs))
     final_llvm_c_compiler = LLVMCCompiler(clang_with_gcc_libs)
 
@@ -153,7 +154,8 @@ def select_llvm_cpp_compiler(platform, native_toolchain):
     clang_with_gpp_libs = CppCompiler(
       path_entries=provided_clangpp.path_entries,
       exe_filename=provided_clangpp.exe_filename,
-      library_dirs=(provided_clangpp.library_dirs + provided_gpp.library_dirs),
+      # We need this version of GLIBCXX to be able to run, unfortunately.
+      library_dirs=(provided_gpp.library_dirs + provided_clangpp.library_dirs),
       include_dirs=(provided_clangpp.include_dirs + provided_gpp.include_dirs))
     final_llvm_cpp_compiler = LLVMCppCompiler(clang_with_gpp_libs)
 
@@ -165,18 +167,33 @@ def select_gcc_c_compiler(platform, native_toolchain):
   original_gcc_c_compiler = yield Get(GCCCCompiler, GCC, native_toolchain._gcc)
   provided_gcc = original_gcc_c_compiler.c_compiler
 
+  # GCC needs an assembler, so we provide that (platform-specific) tool here.
   if platform.normalized_os_name == 'darwin':
     xcode_tools_assembler = yield Get(Assembler, XCodeCLITools, native_toolchain._xcode_cli_tools)
     assembler_paths = xcode_tools_assembler.path_entries
+
+    # GCC needs access to some headers that are only provided by the XCode toolchain
+    # currently (e.g. "_stdio.h"). These headers are unlikely to change across versions, so this is
+    # probably safe.
+    # TODO: we should be providing all of these (so we can eventually phase out XCodeCLITools
+    # entirely).
+    clang_c_compiler = yield Get(LLVMCCompiler, LLVM, native_toolchain._llvm)
+    provided_clang = clang_c_compiler.c_compiler
+
+    new_library_dirs = provided_gcc.library_dirs + provided_clang.library_dirs
+    new_include_dirs = provided_clang.include_dirs + provided_gcc.include_dirs
   else:
     binutils_assembler = yield Get(Assembler, Binutils, native_toolchain._binutils)
     assembler_paths = binutils_assembler.path_entries
 
+    new_library_dirs = provided_gcc.library_dirs
+    new_include_dirs = provided_gcc.include_dirs
+
   gcc_with_assembler = CCompiler(
     path_entries=(provided_gcc.path_entries + assembler_paths),
     exe_filename=provided_gcc.exe_filename,
-    library_dirs=provided_gcc.library_dirs,
-    include_dirs=provided_gcc.include_dirs)
+    library_dirs=new_library_dirs,
+    include_dirs=new_include_dirs)
 
   final_gcc_c_compiler = GCCCCompiler(gcc_with_assembler)
   yield final_gcc_c_compiler
