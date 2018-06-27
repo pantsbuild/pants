@@ -9,20 +9,20 @@ extern crate petgraph;
 
 mod node;
 
+use std::collections::binary_heap::BinaryHeap;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::hash::BuildHasherDefault;
 use std::fs::{File, OpenOptions};
+use std::hash::BuildHasherDefault;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use std::collections::binary_heap::BinaryHeap;
 
 use fnv::FnvHasher;
 
-use petgraph::Direction;
-use petgraph::stable_graph::{StableDiGraph, StableGraph};
 use futures::future::{self, Future};
+use petgraph::stable_graph::{StableDiGraph, StableGraph};
+use petgraph::Direction;
 
 use boxfuture::{BoxFuture, Boxable};
 pub use node::{EntryId, Node, NodeContext, NodeError, NodeTracer, NodeVisualizer};
@@ -379,7 +379,7 @@ impl<N: Node> InnerGraph<N> {
 
         // Write an entry per edge.
         let dep_str = dep_entry.format();
-        try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"\n", node_str, dep_str),));
+        try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"\n", node_str, dep_str)));
       }
     }
 

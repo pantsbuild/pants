@@ -2,9 +2,9 @@ use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::ops::Deref;
+use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
-use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use bazel_protos;

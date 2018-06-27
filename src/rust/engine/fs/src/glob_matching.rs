@@ -6,13 +6,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use boxfuture::{BoxFuture, Boxable};
-use futures::Future;
 use futures::future;
+use futures::Future;
 use glob::Pattern;
-use indexmap::{IndexMap, IndexSet, map::Entry::Occupied};
+use indexmap::{map::Entry::Occupied, IndexMap, IndexSet};
 
-use {Dir, GitignoreStyleExcludes, GlobParsedSource, GlobSource, GlobWithSource, Link, PathGlob,
-     PathGlobs, PathStat, Stat, VFS};
+use {
+  Dir, GitignoreStyleExcludes, GlobParsedSource, GlobSource, GlobWithSource, Link, PathGlob,
+  PathGlobs, PathStat, Stat, VFS,
+};
 
 pub trait GlobMatching<E: Send + Sync + 'static>: VFS<E> {
   ///

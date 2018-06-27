@@ -14,8 +14,8 @@ extern crate time;
 
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
-use std::collections::HashMap;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
+use std::collections::HashMap;
 use std::ffi::{CString, OsStr, OsString};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -655,12 +655,14 @@ mod test {
   extern crate tempfile;
   extern crate testutil;
 
+  use self::testutil::{
+    data::{TestData, TestDirectory}, file,
+  };
+  use super::mount;
   use fs;
   use futures::future::Future;
   use hashing;
   use std::sync::Arc;
-  use super::mount;
-  use self::testutil::{file, data::{TestData, TestDirectory}};
 
   #[test]
   fn missing_digest() {
@@ -898,15 +900,15 @@ mod syscall_tests {
   extern crate tempfile;
   extern crate testutil;
 
+  use self::testutil::data::TestData;
+  use super::mount;
+  use super::test::digest_to_filepath;
   use fs;
   use futures::Future;
   use libc;
-  use std::sync::Arc;
-  use super::mount;
-  use super::test::digest_to_filepath;
-  use self::testutil::data::TestData;
   use std::ffi::CString;
   use std::path::Path;
+  use std::sync::Arc;
   use test::make_dirs;
 
   #[test]

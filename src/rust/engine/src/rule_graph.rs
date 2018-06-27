@@ -76,9 +76,9 @@ impl EntryWithDeps {
       &EntryWithDeps::Inner(InnerEntry {
         rule: Rule::Intrinsic(Intrinsic { ref input, .. }),
         ..
-      }) => vec![
-        SelectKey::JustSelect(Select::without_variant(input.clone())),
-      ],
+      }) => vec![SelectKey::JustSelect(Select::without_variant(
+        input.clone(),
+      ))],
     }
   }
 }
@@ -360,12 +360,10 @@ impl<'t> GraphMaker<'t> {
     } else {
       Some(RootEntry {
         subject_type: subject_type.clone(),
-        clause: vec![
-          Select {
-            product: product_type.clone(),
-            variant_key: None,
-          },
-        ],
+        clause: vec![Select {
+          product: product_type.clone(),
+          variant_key: None,
+        }],
         gets: vec![],
       })
     }

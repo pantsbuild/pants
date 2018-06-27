@@ -4,8 +4,9 @@
 mod glob_matching;
 pub use glob_matching::GlobMatching;
 mod snapshot;
-pub use snapshot::{OneOffStoreFileByDigest, Snapshot, StoreFileByDigest, EMPTY_DIGEST,
-                   EMPTY_FINGERPRINT};
+pub use snapshot::{
+  OneOffStoreFileByDigest, Snapshot, StoreFileByDigest, EMPTY_DIGEST, EMPTY_FINGERPRINT,
+};
 mod store;
 pub use store::Store;
 mod pool;
@@ -365,19 +366,19 @@ impl PathGlob {
       PathGlob::parse_globs(canonical_dir_parent, symbolic_path_parent, &parts[1..])
     } else if parts.len() == 1 {
       // This is the path basename.
-      Ok(vec![
-        PathGlob::wildcard(canonical_dir, symbolic_path, parts[0].clone()),
-      ])
+      Ok(vec![PathGlob::wildcard(
+        canonical_dir,
+        symbolic_path,
+        parts[0].clone(),
+      )])
     } else {
       // This is a path dirname.
-      Ok(vec![
-        PathGlob::dir_wildcard(
-          canonical_dir,
-          symbolic_path,
-          parts[0].clone(),
-          parts[1..].to_vec(),
-        ),
-      ])
+      Ok(vec![PathGlob::dir_wildcard(
+        canonical_dir,
+        symbolic_path,
+        parts[0].clone(),
+        parts[1..].to_vec(),
+      )])
     }
   }
 }

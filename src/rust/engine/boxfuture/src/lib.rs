@@ -30,12 +30,12 @@ where
 ///
 #[macro_export]
 macro_rules! try_future {
-( $x:expr) => {
-    {
-        match $x {
-            Ok(value) => {value}
-            Err(error) => {return future::err(error).to_boxed();}
-        }
+  ($x:expr) => {{
+    match $x {
+      Ok(value) => value,
+      Err(error) => {
+        return future::err(error).to_boxed();
+      }
     }
-};
+  }};
 }

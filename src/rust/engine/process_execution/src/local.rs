@@ -79,10 +79,12 @@ impl super::CommandRunner for CommandRunner {
       tempfile::Builder::new()
         .prefix("process-execution")
         .tempdir()
-        .map_err(|err| format!(
-          "Error making tempdir for local process execution: {:?}",
-          err
-        ))
+        .map_err(|err| {
+          format!(
+            "Error making tempdir for local process execution: {:?}",
+            err
+          )
+        })
     );
 
     let store = self.store.clone();
@@ -163,19 +165,19 @@ mod tests {
   extern crate tempfile;
   extern crate testutil;
 
+  use self::testutil::{as_bytes, owned_string_vec};
+  use super::super::CommandRunner as CommandRunnerTrait;
+  use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
   use fs;
   use futures::Future;
-  use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
-  use super::super::CommandRunner as CommandRunnerTrait;
   use std;
   use std::collections::{BTreeMap, BTreeSet};
-  use std::time::Duration;
   use std::env;
   use std::os::unix::fs::PermissionsExt;
   use std::path::{Path, PathBuf};
   use std::sync::Arc;
+  use std::time::Duration;
   use tempfile::TempDir;
-  use self::testutil::{as_bytes, owned_string_vec};
   use testutil::data::{TestData, TestDirectory};
 
   #[test]
