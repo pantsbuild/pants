@@ -151,6 +151,16 @@ class SetupPyExecutionEnvironment(datatype([
     'setup_py_native_tools',
 ])):
 
+  _SHARED_CMDLINE_ARGS = {
+    'darwin': lambda: [
+      '-mmacosx-version-min=10.11',
+      '-Wl,-dylib',
+      '-undefined',
+      'dynamic_lookup',
+    ],
+    'linux': lambda: ['-shared'],
+  }
+
   def as_environment(self):
     ret = {}
 
@@ -170,10 +180,7 @@ class SetupPyExecutionEnvironment(datatype([
       # use safe shlex methods, but we should probably be composing each datatype's members, and
       # only creating an environment at the very end.
       prev_ldflags = safe_shlex_split(ret.get('LDFLAGS', ''))
-      all_new_ldflags = plat.resolve_platform_specific({
-        'darwin': lambda: prev_ldflags + ['-undefined', 'dynamic_lookup'],
-        'linux': lambda: prev_ldflags,
-      })
+      all_new_ldflags = prev_ldflags + plat.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
       ret['LDFLAGS'] = safe_shlex_join(all_new_ldflags)
 
     return ret

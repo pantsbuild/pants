@@ -122,7 +122,8 @@ def select_llvm_c_compiler(platform, native_toolchain):
       include_dirs=(xcode_clang.include_dirs + provided_clang.include_dirs))
     final_llvm_c_compiler = LLVMCCompiler(clang_with_xcode_paths)
   else:
-    provided_gcc = yield Get(GCCCCompiler, GCC, native_toolchain._gcc)
+    gcc_c_compiler = yield Get(GCCCCompiler, GCC, native_toolchain._gcc)
+    provided_gcc = gcc_c_compiler.c_compiler
     clang_with_gcc_libs = CCompiler(
       path_entries=provided_clang.path_entries,
       exe_filename=provided_clang.exe_filename,
@@ -147,7 +148,8 @@ def select_llvm_cpp_compiler(platform, native_toolchain):
       include_dirs=(xcode_clang.include_dirs + provided_clangpp.include_dirs))
     final_llvm_cpp_compiler = LLVMCppCompiler(clang_with_xcode_paths)
   else:
-    provided_gpp = yield Get(GCCCppCompiler, GCC, native_toolchain._gpp)
+    gcc_cpp_compiler = yield Get(GCCCppCompiler, GCC, native_toolchain._gcc)
+    provided_gpp = gcc_cpp_compiler.cpp_compiler
     clang_with_gpp_libs = CppCompiler(
       path_entries=provided_clangpp.path_entries,
       exe_filename=provided_clangpp.exe_filename,
