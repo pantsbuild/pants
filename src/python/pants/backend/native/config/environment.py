@@ -53,7 +53,7 @@ class Executable(object):
 
   @abstractproperty
   def library_dirs(self):
-    """???"""
+    """Directories containing shared libraries required for a subprocess to run."""
 
   @abstractproperty
   def exe_filename(self):
@@ -101,6 +101,9 @@ class Linker(datatype([
     })
     ret.update({
       'LDSHARED': self.exe_filename,
+      # FIXME(???): this overloads the meaning of 'library_dirs' to also mean "directories
+      # containing static libraries required for creating an executable" (currently, libc). These
+      # concepts should be distinct.
       'LIBRARY_PATH': create_path_env_var(self.library_dirs),
       'LDFLAGS': safe_shlex_join(all_ldflags_for_platform),
     })
@@ -112,7 +115,7 @@ class CompilerMixin(Executable):
 
   @abstractproperty
   def include_dirs(self):
-    """???"""
+    """Directories to search for header files to #include during compilation."""
 
   # FIXME: LIBRARY_PATH and (DY)?LD_LIBRARY_PATH are used for entirely different purposes, but are
   # both sourced from the same `self.library_dirs`!
@@ -180,17 +183,6 @@ class HostLibcDev(datatype(['crti_object', 'fingerprint'])):
 
   def get_lib_dir(self):
     return os.path.dirname(self.crti_object)
-
-
-class HostLibcDevInstallation(datatype([
-    # This may be None.
-    'host_libc_dev',
-])):
-
-  def all_lib_dirs(self):
-    if not self.host_libc_dev:
-      return []
-    return [self.host_libc_dev.get_lib_dir()]
 
 
 def create_native_environment_rules():

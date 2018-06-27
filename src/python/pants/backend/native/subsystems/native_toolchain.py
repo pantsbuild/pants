@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.native.config.environment import (Assembler, CCompiler, CppCompiler,
                                                      GCCCCompiler, GCCCppCompiler,
-                                                     HostLibcDevInstallation, Linker, LLVMCCompiler,
-                                                     LLVMCppCompiler, Platform)
+                                                     Linker, LLVMCCompiler, LLVMCppCompiler,
+                                                     Platform)
 from pants.backend.native.subsystems.binaries.binutils import Binutils
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
@@ -76,8 +76,10 @@ def select_linker(platform, native_toolchain):
   if platform.normalized_os_name == 'darwin':
     # TODO(#5663): turn this into LLVM when lld works.
     linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    libc_dirs = []
   else:
     linker = yield Get(Linker, Binutils, native_toolchain._binutils)
+    libc_dirs = [native_toolchain._libc_dev.host_libc.get_lib_dir()]
 
   # NB: We need to link through a provided compiler's frontend, and we need to know where all the
   # compiler's libraries/etc are, so we set the executable name to the C++ compiler, which can find
@@ -86,7 +88,6 @@ def select_linker(platform, native_toolchain):
   # happens to work when C++ is used.
   c_compiler = yield Get(CCompiler, NativeToolchain, native_toolchain)
   cpp_compiler = yield Get(CppCompiler, NativeToolchain, native_toolchain)
-  host_libc_dev = yield Get(HostLibcDevInstallation, NativeToolchain, native_toolchain)
 
   # NB: If needing to create an environment for process invocation that could use either a compiler
   # or a linker (e.g. when we compile native code from `python_dist()`s), use the environment from
@@ -100,7 +101,7 @@ def select_linker(platform, native_toolchain):
       linker.path_entries),
     exe_filename=cpp_compiler.exe_filename,
     library_dirs=(
-      host_libc_dev.all_lib_dirs() +
+      libc_dirs +
       c_compiler.library_dirs +
       cpp_compiler.library_dirs +
       linker.library_dirs))
@@ -179,11 +180,11 @@ def select_gcc_c_compiler(platform, native_toolchain):
     # entirely).
     # This mutual recursion with select_llvm_c_compiler() works because we only pull in gcc in that
     # method if we are on Linux.
-    clang_c_compiler = yield Get(LLVMCCompiler, NativeToolchain, native_toolchain)
-    provided_clang = clang_c_compiler.c_compiler
+    xcode_clang_c_compiler = yield Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    xcode_clang = xcode_clang_c_compiler.c_compiler
 
-    new_library_dirs = provided_gcc.library_dirs + provided_clang.library_dirs
-    new_include_dirs = provided_clang.include_dirs + provided_gcc.include_dirs
+    new_library_dirs = provided_gcc.library_dirs + xcode_clang.library_dirs
+    new_include_dirs = xcode_clang.include_dirs + provided_gcc.include_dirs
   else:
     binutils_assembler = yield Get(Assembler, Binutils, native_toolchain._binutils)
     assembler_paths = binutils_assembler.path_entries
@@ -210,11 +211,11 @@ def select_gcc_cpp_compiler(platform, native_toolchain):
     xcode_tools_assembler = yield Get(Assembler, XCodeCLITools, native_toolchain._xcode_cli_tools)
     assembler_paths = xcode_tools_assembler.path_entries
 
-    clang_cpp_compiler = yield Get(LLVMCppCompiler, NativeToolchain, native_toolchain)
-    provided_clangpp = clang_cpp_compiler.cpp_compiler
+    xcode_clang_cpp_compiler = yield Get(CppCompiler, NativeToolchain, native_toolchain)
+    xcode_clangpp = xcode_clang_cpp_compiler.cpp_compiler
 
-    new_library_dirs = provided_gpp.library_dirs + provided_clangpp.library_dirs
-    new_include_dirs = provided_clangpp.include_dirs + provided_gpp.include_dirs
+    new_library_dirs = provided_gpp.library_dirs + xcode_clangpp.library_dirs
+    new_include_dirs = xcode_clangpp.include_dirs + provided_gpp.include_dirs
   else:
     binutils_assembler = yield Get(Assembler, Binutils, native_toolchain._binutils)
     assembler_paths = binutils_assembler.path_entries
@@ -244,16 +245,6 @@ def select_cpp_compiler(native_toolchain):
   yield llvm_cpp_compiler.cpp_compiler
 
 
-@rule(HostLibcDevInstallation, [Select(Platform), Select(NativeToolchain)])
-def select_libc_dev_install(platform, native_toolchain):
-  host_libc_dev = platform.resolve_platform_specific({
-    'darwin': lambda: None,
-    'linux': lambda: native_toolchain._libc_dev.host_libc,
-  })
-
-  yield HostLibcDevInstallation(host_libc_dev=host_libc_dev)
-
-
 def create_native_toolchain_rules():
   return [
     select_linker,
@@ -263,6 +254,5 @@ def create_native_toolchain_rules():
     select_gcc_cpp_compiler,
     select_c_compiler,
     select_cpp_compiler,
-    select_libc_dev_install,
     RootRule(NativeToolchain),
   ]
