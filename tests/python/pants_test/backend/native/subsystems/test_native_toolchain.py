@@ -35,12 +35,6 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     self.xcode_cli_tools = global_subsystem_instance(XCodeCLITools)
     self.rules = native_backend_rules()
 
-    # TODO: ???
-    self.extra_compile_link_args = self.platform.resolve_platform_specific({
-      'darwin': lambda: ['-mmacosx-version-min=10.11'],
-      'linux': lambda: [],
-    })
-
   def _sched(self, *args, **kwargs):
     return self.mk_scheduler(rules=self.rules, *args, **kwargs)
 
@@ -60,13 +54,13 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
         yield tuple(self.execute_literal(scheduler, execution_request))
 
   def _invoke_compiler(self, compiler, args):
-    cmd = [compiler.exe_filename] + args + self.extra_compile_link_args
+    cmd = [compiler.exe_filename] + args
     return self._invoke_capturing_output(
       cmd,
       compiler.get_invocation_environment_dict(self.platform))
 
   def _invoke_linker(self, linker, args):
-    cmd = [linker.exe_filename] + args + self.extra_compile_link_args
+    cmd = [linker.exe_filename] + args
     return self._invoke_capturing_output(
       cmd,
       linker.get_invocation_environment_dict(self.platform))

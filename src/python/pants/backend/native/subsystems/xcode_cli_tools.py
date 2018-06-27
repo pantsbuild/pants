@@ -116,7 +116,15 @@ class XCodeCLITools(Subsystem):
 
   @memoized_method
   def include_dirs(self):
-    return self._get_existing_subdirs('include')
+    base_inc_dirs = self._get_existing_subdirs('include')
+
+    all_inc_dirs = base_inc_dirs
+    for d in base_inc_dirs:
+      secure_inc_dir = os.path.join(d, 'secure')
+      if os.path.isdir(secure_inc_dir):
+        all_inc_dirs.append(secure_inc_dir)
+
+    return all_inc_dirs
 
   @memoized_method
   def assembler(self):
