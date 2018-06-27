@@ -90,6 +90,7 @@ def select_linker(platform, native_toolchain):
   # or a linker (e.g. when we compile native code from `python_dist()`s), use the environment from
   # the linker object (in addition to any further customizations), which has the paths from the C
   # and C++ compilers baked in.
+  # FIXME(???): we need a way to compose executables hygienically.
   linker = Linker(
     path_entries=(
       c_compiler.path_entries +
@@ -107,6 +108,8 @@ def select_linker(platform, native_toolchain):
 
 @rule(CCompiler, [Select(Platform), Select(NativeToolchain)])
 def select_c_compiler(platform, native_toolchain):
+  # FIXME(???): we should be using our clang, not the provided one, in all cases, and just using
+  # XCodeCLITools to get the lib and include dirs we need from the host.
   if platform.normalized_os_name == 'darwin':
     c_compiler = yield Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
   else:

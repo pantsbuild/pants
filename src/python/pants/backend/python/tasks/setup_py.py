@@ -151,11 +151,6 @@ class SetupPyExecutionEnvironment(datatype([
     'setup_py_native_tools',
 ])):
 
-  _SHARED_CMDLINE_ARGS = {
-    'darwin': lambda: ['-mmacosx-version-min=10.11', '-Wl,-dylib'],
-    'linux': lambda: ['-shared'],
-  }
-
   def as_environment(self):
     ret = {}
 
@@ -164,13 +159,22 @@ class SetupPyExecutionEnvironment(datatype([
 
     native_tools = self.setup_py_native_tools
     if native_tools:
-      ret['CC'] = native_tools.c_compiler.exe_filename
-      ret['CXX'] = native_tools.cpp_compiler.exe_filename
+      plat = native_tools.platform
 
-      all_ldflags = native_tools.platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
-      ret['LDFLAGS'] = safe_shlex_join(all_ldflags)
+      # FIXME: add an as_tuple() method to datatype so we can do this with a for loop!
+      ret.update(native_tools.c_compiler.get_invocation_environment_dict(plat))
+      ret.update(native_tools.cpp_compiler.get_invocation_environment_dict(plat))
+      ret.update(native_tools.linker.get_invocation_environment_dict(plat))
 
-      ret.update(native_tools.linker.get_invocation_environment_dict(native_tools.platform))
+      # FIXME(???): we need a way to compose executables hygienically -- this will work because we
+      # use safe shlex methods, but we should probably be composing each datatype's members, and
+      # only creating an environment at the very end.
+      prev_ldflags = safe_shlex_split(ret.get('LDFLAGS', ''))
+      all_new_ldflags = plat.resolve_platform_specific({
+        'darwin': lambda: prev_ldflags + ['-undefined', 'dynamic_lookup'],
+        'linux': lambda: prev_ldflags,
+      })
+      ret['LDFLAGS'] = safe_shlex_join(all_new_ldflags)
 
     return ret
 

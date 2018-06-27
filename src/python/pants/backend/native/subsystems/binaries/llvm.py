@@ -100,7 +100,8 @@ class LLVM(NativeTool):
     return CCompiler(
       path_entries=path_entries,
       exe_filename=exe_filename,
-      library_dirs=lib_search_dirs)
+      library_dirs=lib_search_dirs,
+      include_dirs=[])
 
   def cpp_compiler(self, platform):
     exe_filename = 'clang++'
@@ -113,7 +114,8 @@ class LLVM(NativeTool):
     return CppCompiler(
       path_entries=path_entries,
       exe_filename=exe_filename,
-      library_dirs=lib_search_dirs)
+      library_dirs=lib_search_dirs,
+      include_dirs=[])
 
 
 @rule(Linker, [Select(Platform), Select(LLVM)])

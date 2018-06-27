@@ -11,7 +11,7 @@ from abc import abstractproperty
 from pants.engine.rules import SingletonRule
 from pants.util.objects import datatype
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
-from pants.util.strutil import create_path_env_var
+from pants.util.strutil import create_path_env_var, safe_shlex_join
 
 
 class Platform(datatype(['normalized_os_name'])):
@@ -78,18 +78,30 @@ class Assembler(datatype([
   pass
 
 
+# FIXME: rename this to SharedLibLinker or something!
 class Linker(datatype([
     'path_entries',
     'exe_filename',
     'library_dirs',
 ]), Executable):
 
+  # FIXME(???): we need a way to compose executables hygienically -- this will work because we use
+  # safe shlex methods, but we should really be composing each datatype's members, and only
+  # creating an environment at the very end. This could be done declaratively -- something like:
+  # { 'LIBRARY_PATH': DelimitedPathDirectoryEnvVar(...) }.
+  # We could also just use safe_shlex_join() and create_path_env_var() and keep all the state in the
+  # environment -- but then we have to remember to use those each time we specialize.
   def get_invocation_environment_dict(self, platform):
     ret = super(Linker, self).get_invocation_environment_dict(platform).copy()
 
+    all_ldflags_for_platform = platform.resolve_platform_specific({
+      'darwin': lambda: ['-mmacosx-version-min=10.11', '-Wl,-dylib'],
+      'linux': lambda: ['-shared'],
+    })
     ret.update({
       'LDSHARED': self.exe_filename,
       'LIBRARY_PATH': create_path_env_var(self.library_dirs),
+      'LDFLAGS': safe_shlex_join(all_ldflags_for_platform),
     })
 
     return ret
@@ -109,6 +121,12 @@ class CompilerMixin(Executable):
     if self.include_dirs:
       ret['CPATH'] = create_path_env_var(self.include_dirs)
 
+    all_cflags_for_platform = platform.resolve_platform_specific({
+      'darwin': lambda: ['-mmacosx-version-min=10.11'],
+      'linux': lambda: [],
+    })
+    ret['CFLAGS'] = safe_shlex_join(all_cflags_for_platform)
+
     return ret
 
 
@@ -118,8 +136,13 @@ class CCompiler(datatype([
     'library_dirs',
     'include_dirs',
 ]), CompilerMixin):
-  # TODO: set CC in this datatype's env dict, and CXX in CppCompiler!
-  pass
+
+  def get_invocation_environment_dict(self, platform):
+    ret = super(CCompiler, self).get_invocation_environment_dict(platform).copy()
+
+    ret['CC'] = self.exe_filename
+
+    return ret
 
 
 class CppCompiler(datatype([
@@ -128,7 +151,13 @@ class CppCompiler(datatype([
     'library_dirs',
     'include_dirs',
 ]), CompilerMixin):
-  pass
+
+  def get_invocation_environment_dict(self, platform):
+    ret = super(CppCompiler, self).get_invocation_environment_dict(platform).copy()
+
+    ret['CXX'] = self.exe_filename
+
+    return ret
 
 
 # FIXME: make this an @rule, after we can automatically produce LibcDev (see #5788).

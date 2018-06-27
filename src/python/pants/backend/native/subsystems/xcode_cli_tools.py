@@ -10,9 +10,7 @@ import os
 from pants.backend.native.config.environment import Assembler, CCompiler, CppCompiler, Linker
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
-from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import is_executable
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -26,7 +24,7 @@ class XCodeCLITools(Subsystem):
 
   options_scope = 'xcode-cli-tools'
 
-  REQUIRED_FILES_DEFAULT = {
+  REQUIRED_FILES = {
     'bin': [
       'as',
       'cc',
@@ -36,19 +34,23 @@ class XCodeCLITools(Subsystem):
       'ld',
       'lipo',
     ],
-    'include': ['_stdio.h'],
+    'include': [
+      '_stdio.h',
+    ],
     'lib': [],
   }
 
-  _OSX_BASE_PREFIX = '/usr'
-  _XCODE_TOOLCHAIN_BASE = '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr'
-
-  # This comes from running clang -###.
-  INCLUDE_SEARCH_DIRS_DEFAULT = [
-    os.path.join(_OSX_BASE_PREFIX, 'local/include'),
-    os.path.join(_XCODE_TOOLCHAIN_BASE, 'lib/clang/9.1.0/include'),
-    os.path.join(_XCODE_TOOLCHAIN_BASE, 'include'),
-    os.path.join(_OSX_BASE_PREFIX, 'include'),
+  INSTALL_PREFIXES_DEFAULT = [
+    # Prefer files from this installation directory, if available. This doesn't appear to be
+    # populated with e.g. header files on travis.
+    '/usr',
+    # Populated by the XCode CLI tools.
+    '/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr',
+    # Populated by the XCode app.
+    # TODO: ???/where do all these directories come from?
+    '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr',
+    '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/9.1.0',
+    '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr',
   ]
 
   class XCodeToolsUnavailable(Exception):
@@ -61,102 +63,90 @@ class XCodeCLITools(Subsystem):
   def register_options(cls, register):
     super(XCodeCLITools, cls).register_options(register)
 
-    register('--install-prefix', type=dir_option, default=cls._OSX_BASE_PREFIX, advanced=True,
-             help='Location where the XCode command-line developer tools have been installed. '
-                  'Under this directory should be at least {} subdirectories.'
-                  .format(cls.REQUIRED_FILES_DEFAULT.keys()))
-
-    register('--required-files', type=dict, default=cls.REQUIRED_FILES_DEFAULT, advanced=True,
-             help='Files that should exist within the XCode CLI tools installation.')
-
-    register('--include-search-dirs', type=list, default=cls.INCLUDE_SEARCH_DIRS_DEFAULT,
-             advanced=True,
-             help='Directories to search, in order, for files in #include directives.')
-
-  # TODO: Obtaining options values from a subsystem should be made ergonomic as we move to complete
-  # #5788.
-  @memoized_property
-  def _install_prefix(self):
-    return self.get_options().install_prefix
+    register('--install-prefixes', type=list, default=cls.INSTALL_PREFIXES_DEFAULT, advanced=True,
+             help='Locations to search for resources from the XCode CLI tools, including a '
+                  'compiler, linker, header files, and some libraries. '
+                  'Under this directory should be some selection of these subdirectories: {}.'
+                  .format(cls.REQUIRED_FILES.keys()))
 
   @memoized_property
-  def _required_files(self):
-    return self.get_options().required_files
+  def _all_existing_install_prefixes(self):
+    return [pfx for pfx in self.get_options().install_prefixes if os.path.isdir(pfx)]
 
-  @memoized_property
-  def _include_search_dirs(self):
-    return self.get_options().include_search_dirs
+  # NB: We use @memoized_method in this file for methods which may raise.
+  @memoized_method
+  def _get_existing_subdirs(self, subdir_name):
+    maybe_subdirs = [os.path.join(pfx, subdir_name) for pfx in self._all_existing_install_prefixes]
+    existing_dirs = [existing_dir for existing_dir in maybe_subdirs if os.path.isdir(existing_dir)]
 
-  @memoized_property
-  def _lib_dir(self):
-    return os.path.join(self._install_prefix, 'lib')
+    required_files_for_dir = self.REQUIRED_FILES.get(subdir_name)
+    if required_files_for_dir:
+      for fname in required_files_for_dir:
+        found = False
+        for subdir in existing_dirs:
+          full_path = os.path.join(subdir, fname)
+          if os.path.isfile(full_path):
+            found = True
+            continue
 
-  def _check_executables_exist(self):
-    for subdir, items in self._required_files.items():
-      for fname in items:
-        file_path = os.path.join(self._install_prefix, subdir, fname)
-        if subdir == 'bin':
-          if not is_executable(file_path):
-            raise self.XCodeToolsUnavailable(
-              "'{exe}' is not an executable file, but it is required to build "
-              "native code on this platform. You may need to install the XCode "
-              "command line developer tools from the Mac App Store. "
-              "(with --required-files={req}, --install-prefix={pfx})"
-              .format(exe=file_path, req=self._required_files, pfx=self._install_prefix))
-        else:
-          if not os.path.isfile(file_path):
-            raise self.XCodeToolsUnavailable(
-              "The file at path '{path}' does not exist, but it is required to build "
-              "native code on this platform. You may need to install the XCode "
-              "command line developer tools from the Mac App Store. "
-              "(with --required-files={req}, --install-prefix={pfx})"
-              .format(path=file_path, req=self._required_files, pfx=self._install_prefix))
+        if not found:
+          raise self.XCodeToolsUnavailable(
+            "File '{fname}' in subdirectory '{subdir_name}' does not exist at any of the specified "
+            "prefixes. This file is required to build native code on this platform. You may need "
+            "to install the XCode command line developer tools from the Mac App Store.\n\n"
+            "If the XCode tools are installed and you are still seeing this message, please file "
+            "an issue at https://github.com/pantsbuild/pants/issues/new describing your "
+            "OSX environment and which file could not be found.\n"
+            "The existing install prefixes were: {pfxs}. These can be extended with "
+            "--{scope}-install-prefixes."
+            .format(fname=fname,
+                    subdir_name=subdir_name,
+                    pfxs=self._all_existing_install_prefixes,
+                    scope=self.get_options_scope_equivalent_flag_component()))
+
+    return existing_dirs
 
   @memoized_method
   def path_entries(self):
-    self._check_executables_exist()
-    return [os.path.join(self._install_prefix, 'bin')]
+    return self._get_existing_subdirs('bin')
 
-  def _verify_tool_name(self, name):
-    # TODO: introduce some more generic way to do this that can be applied to
-    # provided tools as well, and actually checks whether the file exists within
-    # some set of PATH entries and is executable.
-    known_tools = self._required_files['bin']
-    if name in known_tools:
-      return name
-    raise self.XCodeToolsInvalid(
-      "Internal error: {!r} is not a valid tool. Known tools are: {!r}."
-      .format(name, known_tools))
+  @memoized_method
+  def lib_dirs(self):
+    return self._get_existing_subdirs('lib')
+
+  @memoized_method
+  def include_dirs(self):
+    return self._get_existing_subdirs('include')
 
   @memoized_method
   def assembler(self):
     return Assembler(
       path_entries=self.path_entries(),
-      exe_filename=self._verify_tool_name('as'),
+      exe_filename='as',
       library_dirs=[])
 
   @memoized_method
   def linker(self):
     return Linker(
       path_entries=self.path_entries(),
-      exe_filename=self._verify_tool_name('ld'),
+      exe_filename='ld',
       library_dirs=[])
 
   @memoized_method
   def c_compiler(self):
     return CCompiler(
       path_entries=self.path_entries(),
-      exe_filename=self._verify_tool_name('clang'),
-      library_dirs=[self._lib_dir],
-      include_dirs=self._include_search_dirs)
+      exe_filename='clang',
+      library_dirs=self.lib_dirs(),
+      include_dirs=self.include_dirs())
 
   @memoized_method
   def cpp_compiler(self):
     return CppCompiler(
       path_entries=self.path_entries(),
-      exe_filename=self._verify_tool_name('clang++'),
-      library_dirs=[self._lib_dir],
-      include_dirs=self._include_search_dirs)
+      exe_filename='clang++',
+      library_dirs=self.lib_dirs(),
+      include_dirs=self.include_dirs())
 
 
 @rule(Assembler, [Select(XCodeCLITools)])
