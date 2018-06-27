@@ -205,18 +205,10 @@ class NativeCompile(NativeTask, AbstractClass):
     compiler = compile_request.compiler
     err_flags = ['-Werror'] if compile_request.fatal_warnings else []
 
-    platform = Platform.create()
-
-    platform_specific_flags = platform.resolve_platform_specific({
-      'linux': lambda: [],
-      'darwin': lambda: ['-mmacosx-version-min=10.11'],
-    })
-
     # We are going to execute in the target output, so get absolute paths for everything.
     # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
     argv = (
       [compiler.exe_filename] +
-      platform_specific_flags +
       self.extra_compile_args() +
       err_flags +
       ['-c', '-fPIC'] +
@@ -244,6 +236,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
     argv = self._make_compile_argv(compile_request)
 
+    # TODO(#5788): get this from the v2 engine when requesting singletons is easier!
     platform = Platform.create()
 
     with self.context.new_workunit(
