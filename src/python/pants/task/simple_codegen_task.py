@@ -276,8 +276,10 @@ class SimpleCodegenTask(Task):
   # Returns tuple of EagerFilesetWithSpecs in matching order.
   def _capture_sources(self, targets_and_dirs):
     to_capture = []
+    results_dirs = []
+    filespecs = []
 
-    for (target, synthetic_target_dir) in targets_and_dirs:
+    for target, synthetic_target_dir in targets_and_dirs:
       if self.sources_globs is None:
         files = list(self.find_sources(target, synthetic_target_dir))
       else:
@@ -295,14 +297,16 @@ class SimpleCodegenTask(Task):
           str(get_buildroot()),
         )
       )
+      results_dirs.append(results_dir_relpath)
+      filespecs.append(FilesetRelPathWrapper.to_filespec(buildroot_relative_globs))
 
     snapshots = self.context._scheduler.capture_snapshots(tuple(to_capture))
 
     return tuple(EagerFilesetWithSpec(
       results_dir_relpath,
-      FilesetRelPathWrapper.to_filespec(buildroot_relative_globs),
+      filespec,
       snapshot,
-    ) for snapshot in snapshots)
+    ) for (results_dir_relpath, filespec, snapshot) in zip(results_dirs, filespecs, snapshots))
 
   def _inject_synthetic_target(
     self,
