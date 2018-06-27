@@ -39,7 +39,7 @@ from pants.util.dirutil import safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
-from pants.util.strutil import safe_shlex_join, safe_shlex_split
+from pants.util.strutil import create_path_env_var, safe_shlex_join, safe_shlex_split
 
 
 SETUP_BOILERPLATE = """
@@ -169,18 +169,44 @@ class SetupPyExecutionEnvironment(datatype([
 
     native_tools = self.setup_py_native_tools
     if native_tools:
+      # TODO: an as_tuple() method for datatypes would make this destructuring cleaner
       plat = native_tools.platform
+      cc = native_tools.c_compiler
+      cxx = native_tools.cpp_compiler
+      linker = native_tools.linker
 
-      # FIXME: add an as_tuple() method to datatype so we can do this with a for loop!
-      ret.update(native_tools.c_compiler.get_invocation_environment_dict(plat))
-      ret.update(native_tools.cpp_compiler.get_invocation_environment_dict(plat))
-      ret.update(native_tools.linker.get_invocation_environment_dict(plat))
+      all_path_entries = cc.path_entries + cxx.path_entries + linker.path_entries
+      ret['PATH'] = create_path_env_var(all_path_entries)
+
+      all_library_dirs = cc.library_dirs + cxx.library_dirs + linker.library_dirs
+      if all_library_dirs:
+        joined_library_dirs = create_path_env_var(all_library_dirs)
+        ret['LIBRARY_PATH'] = joined_library_dirs
+        dynamic_lib_env_var = plat.resolve_platform_specific({
+          'darwin': lambda: 'DYLD_LIBRARY_PATH',
+          'linux': lambda: 'LD_LIBRARY_PATH',
+        })
+        ret[dynamic_lib_env_var] = joined_library_dirs
+
+      all_include_dirs = cc.include_dirs + cxx.include_dirs
+      if all_include_dirs:
+        ret['CPATH'] = all_include_dirs
+
+      all_cflags_for_platform = plat.resolve_platform_specific({
+        'darwin': lambda: ['-mmacosx-version-min=10.11'],
+        'linux': lambda: [],
+      })
+      if all_cflags_for_platform:
+        ret['CFLAGS'] = safe_shlex_join(all_cflags_for_platform)
+
+      ret['CC'] = cc.exe_filename
+      ret['CXX'] = cxx.exe_filename
+      ret['LDSHARED'] = linker.exe_filename
 
       # FIXME(???): we need a way to compose executables hygienically -- this will work because we
       # use safe shlex methods, but we should probably be composing each datatype's members, and
       # only creating an environment at the very end.
-      prev_ldflags = safe_shlex_split(ret.get('LDFLAGS', ''))
-      all_new_ldflags = prev_ldflags + plat.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
+      all_new_ldflags = plat.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
       ret['LDFLAGS'] = safe_shlex_join(all_new_ldflags)
 
     return ret
