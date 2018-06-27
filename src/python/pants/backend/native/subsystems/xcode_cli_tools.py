@@ -35,7 +35,7 @@ class XCodeCLITools(Subsystem):
       'lipo',
     ],
     'include': [
-      '_stdio.h',
+      # '_stdio.h',
     ],
     'lib': [],
   }

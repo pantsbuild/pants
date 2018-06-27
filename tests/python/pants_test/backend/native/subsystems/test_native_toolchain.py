@@ -36,12 +36,6 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     self.rules = native_backend_rules()
 
     # TODO: ???
-    self.clang_compiler_source = self.platform.resolve_platform_specific({
-      'darwin': lambda: self.xcode_cli_tools,
-      'linux': lambda: self.llvm,
-    })
-
-    # TODO: ???
     self.extra_compile_link_args = self.platform.resolve_platform_specific({
       'darwin': lambda: ['-mmacosx-version-min=10.11'],
       'linux': lambda: [],
@@ -111,7 +105,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
 
     scheduler_request_specs = [
       (self.gcc, CCompiler),
-      (self.clang_compiler_source, CCompiler),
+      (self.llvm, CCompiler),
       (self.toolchain, Linker),
     ]
 
@@ -150,7 +144,7 @@ int main() {
 
     scheduler_request_specs = [
       (self.gcc, CppCompiler),
-      (self.clang_compiler_source, CppCompiler),
+      (self.llvm, CppCompiler),
       (self.toolchain, Linker),
     ]
 
