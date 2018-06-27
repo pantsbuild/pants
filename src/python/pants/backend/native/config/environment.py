@@ -161,6 +161,7 @@ class CppCompiler(datatype([
     return ret
 
 
+# TODO(#4020): These classes are performing the work of variants.
 class GCCCCompiler(datatype([('c_compiler', CCompiler)])): pass
 
 
@@ -173,7 +174,8 @@ class GCCCppCompiler(datatype([('cpp_compiler', CppCompiler)])): pass
 class LLVMCppCompiler(datatype([('cpp_compiler', CppCompiler)])): pass
 
 
-# FIXME: make this an @rule, after we can automatically produce LibcDev (see #5788).
+# FIXME: make this an @rule, after we can automatically produce LibcDev and other subsystems in the
+# v2 engine (see #5788).
 class HostLibcDev(datatype(['crti_object', 'fingerprint'])):
 
   def get_lib_dir(self):
