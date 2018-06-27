@@ -14,6 +14,7 @@ from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.pex_util import create_bare_interpreter
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
@@ -55,9 +56,12 @@ class SelectInterpreter(Task):
     return [PythonInterpreter]
 
   def execute(self):
-    python_tgts = self.context.targets(lambda tgt: isinstance(tgt, PythonTarget))
-    if not python_tgts:
+    python_tgts_and_reqs = self.context.targets(
+      lambda tgt: isinstance(tgt, (PythonTarget, PythonRequirementLibrary))
+    )
+    if not python_tgts_and_reqs:
       return
+    python_tgts = filter(lambda tgt: isinstance(tgt, PythonTarget), python_tgts_and_reqs)
     fs = PythonInterpreterFingerprintStrategy()
     with self.invalidated(python_tgts, fingerprint_strategy=fs) as invalidation_check:
       if (PythonSetup.global_instance().interpreter_search_paths

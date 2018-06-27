@@ -44,10 +44,10 @@ class GatherSources(Task):
     round_manager.require_data('python')  # For codegen.
 
   def execute(self):
-    interpreter = self.context.products.get_data(PythonInterpreter)
     targets = self._collect_source_targets()
     if not targets:
       return
+    interpreter = self.context.products.get_data(PythonInterpreter)
 
     with self.invalidated(targets) as invalidation_check:
       pex = self._get_pex_for_versioned_targets(interpreter, invalidation_check.all_vts)
