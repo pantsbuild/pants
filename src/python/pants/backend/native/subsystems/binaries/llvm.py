@@ -55,7 +55,6 @@ class LLVM(NativeTool):
       return llvm_base_dir
     return unpacked_path
 
-  @memoized_method
   def path_entries(self):
     return [os.path.join(self.select(), 'bin')]
 

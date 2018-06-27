@@ -34,9 +34,7 @@ class XCodeCLITools(Subsystem):
       'ld',
       'lipo',
     ],
-    'include': [
-      # '_stdio.h',
-    ],
+    'include': [],
     'lib': [],
   }
 
@@ -46,8 +44,8 @@ class XCodeCLITools(Subsystem):
     '/usr',
     # Populated by the XCode CLI tools.
     '/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr',
-    # Populated by the XCode app.
-    # TODO: ???/where do all these directories come from?
+    # Populated by the XCode app. These are derived from using the -v or -H switches invoking the
+    # osx clang compiler.
     '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr',
     '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/9.1.0',
     '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr',

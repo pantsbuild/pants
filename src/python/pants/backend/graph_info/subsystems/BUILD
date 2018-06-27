@@ -3,7 +3,6 @@
 
 python_library(
   dependencies = [
-    'src/python/pants/backend/native/subsystems/utils',
     'src/python/pants/binaries',
   ],
 )
