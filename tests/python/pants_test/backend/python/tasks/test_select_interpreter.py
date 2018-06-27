@@ -14,6 +14,7 @@ from pex.interpreter import PythonInterpreter
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import chmod_plus_x, safe_mkdtemp
@@ -56,6 +57,11 @@ class SelectInterpreterTest(TaskTestBase):
       fake_interpreter('ip ip2 2 2 99 999')
     ]
 
+    self.reqtgt = self.make_target(
+      spec='req',
+      target_type=PythonRequirementLibrary,
+      requirements=[],
+    )
     self.tgt1 = self._fake_target('tgt1')
     self.tgt2 = self._fake_target('tgt2', compatibility=['IronPython>2.77.777'])
     self.tgt3 = self._fake_target('tgt3', compatibility=['IronPython>2.88.888'])
@@ -95,7 +101,7 @@ class SelectInterpreterTest(TaskTestBase):
     return interpreter.version_string
 
   def test_interpreter_selection(self):
-    self.assertEquals('IronPython-2.77.777', self._select_interpreter([]))
+    self.assertEquals('IronPython-2.77.777', self._select_interpreter([self.reqtgt]))
     self.assertEquals('IronPython-2.77.777', self._select_interpreter([self.tgt1]))
     self.assertEquals('IronPython-2.88.888', self._select_interpreter([self.tgt2]))
     self.assertEquals('IronPython-2.99.999', self._select_interpreter([self.tgt3]))
