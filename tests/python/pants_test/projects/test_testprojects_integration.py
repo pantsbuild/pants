@@ -67,7 +67,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/java/org/pantsbuild/testproject/depman:old-tests',
       'testprojects/tests/java/org/pantsbuild/testproject/htmlreport:htmlreport',
       'testprojects/tests/java/org/pantsbuild/testproject/parallel.*',
-      'testprojects/src/python/python_distribution/fasthello_with_install_requires.*u',
+      'testprojects/src/python/python_distribution/fasthello_with_install_requires.*',
       'testprojects/src/python/unicode/compilation_failure',
     ]
 
