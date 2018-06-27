@@ -688,11 +688,10 @@ pub extern "C" fn materialize_directories(
   };
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    let store = scheduler.core.store.clone();
     futures::future::join_all(
       dir_and_digests
         .into_iter()
-        .map(|(dir, digest)| store.materialize_directory(dir, digest))
+        .map(|(dir, digest)| scheduler.core.store.materialize_directory(dir, digest))
         .collect::<Vec<_>>(),
     )
   }).map(|_| ())

@@ -358,18 +358,18 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       self.assertEquals(both_snapshot.directory_digest, both_merged)
 
   def test_materialize_directories(self):
+    self.prime_store_with_roland_digest()
+
     with temporary_dir() as temp_dir:
-      dir_path = os.path.join(temp_dir, "roland")
+      dir_path = os.path.join(temp_dir, "containing_roland")
       digest = DirectoryDigest(
         str("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       )
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       scheduler.materialize_directories((DirectoryToMaterialize(str(dir_path), digest),))
-      self.assertTrue(os.path.exists(dir_path))
 
       created_file = os.path.join(dir_path, "roland")
-      self.assertTrue(os.path.isfile(created_file))
       with open(created_file) as f:
         content = f.read()
         self.assertEquals(content, "European Burmese")
@@ -417,3 +417,16 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       self.assertEqual(1, len(all_warnings))
       single_warning = all_warnings[0]
       self.assertEqual("???", str(single_warning))
+
+  def prime_store_with_roland_digest(self):
+    """This method primes the store with the digest of a file named 'roland' and contents 'European Burmese'."""
+    with temporary_dir() as temp_dir:
+      with open(os.path.join(temp_dir, "roland"), "w") as f:
+        f.write("European Burmese")
+      scheduler = self.mk_scheduler(rules=create_fs_rules())
+      globs = PathGlobs(("*",), ())
+      snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, temp_dir),))[0]
+      self.assert_snapshot_equals(snapshot, ["roland"], DirectoryDigest(
+        str("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        80
+      ))
