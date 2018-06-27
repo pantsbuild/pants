@@ -514,8 +514,8 @@ pub extern "C" fn execution_request_destroy(ptr: *mut ExecutionRequest) {
 pub extern "C" fn validator_run(scheduler_ptr: *mut Scheduler) -> Value {
   with_scheduler(scheduler_ptr, |scheduler| {
     match scheduler.core.rule_graph.validate() {
-      Result::Ok(_) => externs::store_tuple(&[]),
-      Result::Err(msg) => externs::create_exception(&msg),
+      Ok(_) => externs::store_tuple(&[]),
+      Err(msg) => externs::create_exception(&msg),
     }
   })
 }

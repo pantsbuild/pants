@@ -261,7 +261,7 @@ impl Scheduler {
     let posix_fs = Arc::new(try_future!(PosixFS::new(
       root_path,
       self.core.fs_pool.clone(),
-      vec![]
+      &[]
     )));
     let store = self.core.store.clone();
 

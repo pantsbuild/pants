@@ -2,7 +2,7 @@ extern crate log;
 extern crate tempfile;
 
 use boxfuture::{BoxFuture, Boxable};
-use fs::{self, GlobMatching, PathGlobs, PathStatGetter, Snapshot, Store, StrictGlobMatching};
+use fs::{self, GlobMatching, PathGlobs, PathStatGetter, Snapshot, StrictGlobMatching};
 use futures::{future, Future};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -38,7 +38,7 @@ impl CommandRunner {
   }
 
   fn construct_output_snapshot(
-    store: Store,
+    store: fs::Store,
     posix_fs: Arc<fs::PosixFS>,
     output_file_paths: BTreeSet<PathBuf>,
     output_dir_paths: BTreeSet<PathBuf>,
@@ -133,7 +133,7 @@ impl super::CommandRunner for CommandRunner {
             fs::PosixFS::new(
               workdir.path(),
               fs_pool,
-              vec![],
+              &[],
             )
           )
           .map_err(|err| {

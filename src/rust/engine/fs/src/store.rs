@@ -247,7 +247,7 @@ impl Store {
     let remote = match self.remote {
       Some(ref remote) => remote,
       None => {
-        return future::err(format!("Cannot ensure remote has blobs without a remote")).to_boxed()
+        return future::err("Cannot ensure remote has blobs without a remote".to_owned()).to_boxed()
       }
     };
 
@@ -296,7 +296,7 @@ impl Store {
           filtered_digests
             .into_iter()
             .map(move |digest| {
-              let entry_type = digest_entry_types.get(&digest).unwrap();
+              let entry_type = digest_entry_types[&digest];
               let remote = remote2.clone();
               local
                 .load_bytes_with(entry_type.clone(), digest.0, move |bytes| {
@@ -464,10 +464,9 @@ impl Store {
           .and_then(|mut f| f.write_all(&bytes))
           .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
       })
-      .map_err(|e| e.into())
       .and_then(move |write_result| match write_result {
         Some(Ok(())) => Ok(()),
-        Some(Err(e)) => Err(e.into()),
+        Some(Err(e)) => Err(e),
         None => Err(format!("File with digest {:?} not found", digest)),
       })
       .to_boxed()
@@ -476,7 +475,7 @@ impl Store {
   // Returns files sorted by their path.
   pub fn contents_for_directory(
     &self,
-    directory: bazel_protos::remote_execution::Directory,
+    directory: &bazel_protos::remote_execution::Directory,
   ) -> BoxFuture<Vec<FileContent>, String> {
     let accumulator = Arc::new(Mutex::new(HashMap::new()));
     self
@@ -496,7 +495,7 @@ impl Store {
   // Assumes that all fingerprints it encounters are valid.
   fn contents_for_directory_helper(
     &self,
-    directory: bazel_protos::remote_execution::Directory,
+    directory: &bazel_protos::remote_execution::Directory,
     path_so_far: PathBuf,
     contents_wrapped: Arc<Mutex<HashMap<PathBuf, Bytes>>>,
   ) -> BoxFuture<(), String> {
@@ -540,7 +539,7 @@ impl Store {
               maybe_dir
                 .ok_or_else(|| format!("Could not find sub-directory with digest {:?}", digest))
             })
-            .and_then(move |dir| store.contents_for_directory_helper(dir, path, contents_wrapped))
+            .and_then(move |dir| store.contents_for_directory_helper(&dir, path, contents_wrapped))
             .to_boxed()
         })
         .collect::<Vec<_>>(),
@@ -974,21 +973,21 @@ mod local {
 
     // First Database is content, second is leases.
     pub fn get(&self, fingerprint: &Fingerprint) -> (Arc<Environment>, Database, Database) {
-      self.lmdbs.get(&(fingerprint.0[0] & 0xF0)).unwrap().clone()
+      self.lmdbs[&(fingerprint.0[0] & 0xF0)].clone()
     }
 
     pub fn all_lmdbs(&self) -> Vec<(Arc<Environment>, Database, Database)> {
-      self.lmdbs.values().map(|v| v.clone()).collect()
+      self.lmdbs.values().cloned().collect()
     }
   }
 
   #[derive(Eq, PartialEq, Ord, PartialOrd)]
   struct AgedFingerprint {
     // expired_seconds_ago must be the first field for the Ord implementation.
-    pub expired_seconds_ago: u64,
-    pub fingerprint: Fingerprint,
-    pub size_bytes: usize,
-    pub entry_type: EntryType,
+    expired_seconds_ago: u64,
+    fingerprint: Fingerprint,
+    size_bytes: usize,
+    entry_type: EntryType,
   }
 
   #[cfg(test)]
@@ -1606,7 +1605,7 @@ mod remote {
           let chunk_size_bytes = self.chunk_size_bytes;
           let stream =
             futures::stream::unfold::<_, _, futures::future::FutureResult<_, grpcio::Error>, _>(
-              (0 as usize, false),
+              (0, false),
               move |(offset, has_sent_any)| {
                 if offset >= bytes.len() && has_sent_any {
                   None
@@ -2919,7 +2918,7 @@ mod tests {
     let store = new_local_store(store_dir.path());
 
     let file_contents = store
-      .contents_for_directory(TestDirectory::empty().directory())
+      .contents_for_directory(&TestDirectory::empty().directory())
       .wait()
       .expect("Getting FileContents");
 
@@ -2953,7 +2952,7 @@ mod tests {
       .expect("Error saving catnip file bytes");
 
     let file_contents = store
-      .contents_for_directory(recursive_testdir.directory())
+      .contents_for_directory(&recursive_testdir.directory())
       .wait()
       .expect("Getting FileContents");
 

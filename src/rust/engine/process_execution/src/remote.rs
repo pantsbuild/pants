@@ -308,7 +308,7 @@ impl CommandRunner {
                 ))).to_boxed();
               }
               let parts: Vec<_> = violation.get_subject().split('/').collect();
-              if parts.len() != 3 || parts.get(0).unwrap() != &"blobs" {
+              if parts.len() != 3 || parts[0] != "blobs" {
                 return future::err(ExecutionError::Fatal(format!(
                   "Received FailedPrecondition MISSING but didn't recognize subject {}",
                   violation.get_subject()
@@ -316,25 +316,25 @@ impl CommandRunner {
               }
               let digest = Digest(
                 try_future!(
-                  Fingerprint::from_hex_string(parts.get(1).unwrap()).map_err(|e| {
+                  Fingerprint::from_hex_string(parts[1]).map_err(|e| {
                     ExecutionError::Fatal(format!(
                       "Bad digest in missing blob: {}: {}",
-                      parts.get(1).unwrap(),
+                      parts[1],
                       e
                     ))
                   })
                 ),
-                try_future!(parts.get(2).unwrap().parse::<usize>().map_err(|e| {
+                try_future!(parts[2].parse::<usize>().map_err(|e| {
                   ExecutionError::Fatal(format!(
                     "Missing blob had bad size: {}: {}",
-                    parts.get(2).unwrap(),
+                    parts[2],
                     e
                   ))
                 })),
               );
               missing_digests.push(digest);
             }
-            if missing_digests.len() == 0 {
+            if missing_digests.is_empty() {
               return future::err(ExecutionError::Fatal(
                 "Error from remote execution: FailedPrecondition, but no details".to_owned(),
               )).to_boxed();
@@ -355,7 +355,7 @@ impl CommandRunner {
     &self,
     execute_response: &bazel_protos::remote_execution::ExecuteResponse,
   ) -> BoxFuture<Bytes, ExecutionError> {
-    let stdout = if execute_response.get_result().has_stdout_digest() {
+    if execute_response.get_result().has_stdout_digest() {
       let stdout_digest_result: Result<Digest, String> =
         execute_response.get_result().get_stdout_digest().into();
       let stdout_digest = try_future!(
@@ -391,15 +391,14 @@ impl CommandRunner {
         })
         .map(|_| stdout_copy)
         .to_boxed()
-    };
-    stdout
+    }
   }
 
   fn extract_stderr(
     &self,
     execute_response: &bazel_protos::remote_execution::ExecuteResponse,
   ) -> BoxFuture<Bytes, ExecutionError> {
-    let stderr = if execute_response.get_result().has_stderr_digest() {
+    if execute_response.get_result().has_stderr_digest() {
       let stderr_digest_result: Result<Digest, String> =
         execute_response.get_result().get_stderr_digest().into();
       let stderr_digest = try_future!(
@@ -435,8 +434,7 @@ impl CommandRunner {
         })
         .map(|_| stderr_copy)
         .to_boxed()
-    };
-    stderr
+    }
   }
 
   fn extract_output_files(
@@ -495,7 +493,7 @@ impl CommandRunner {
     }
 
     impl StoreOneOffRemoteDigest {
-      pub fn new(map: HashMap<PathBuf, Digest>) -> StoreOneOffRemoteDigest {
+      fn new(map: HashMap<PathBuf, Digest>) -> StoreOneOffRemoteDigest {
         StoreOneOffRemoteDigest {
           map_of_paths_to_digests: map,
         }
@@ -516,14 +514,14 @@ impl CommandRunner {
 
     let store = self.store.clone();
     future::join_all(futures)
-      .and_then(|_| {
+      .and_then(move |_| {
         // The unwrap() below is safe because we have joined any futures that had references to the Arc
         let path_wrap_mutex = Arc::try_unwrap(path_map_2).unwrap();
         let underlying_path_map = path_wrap_mutex.into_inner().unwrap();
         fs::Snapshot::digest_from_path_stats(
           store,
           StoreOneOffRemoteDigest::new(underlying_path_map),
-          path_stats,
+          &path_stats,
         ).map_err(move |error| {
           ExecutionError::Fatal(format!(
             "Error when storing the output file directory info in the remote CAS: {:?}",
@@ -595,7 +593,7 @@ fn map_grpc_result<T>(result: grpcio::Result<T>) -> Result<T, String> {
   }
 }
 
-fn digest(message: &protobuf::Message) -> Result<bazel_protos::remote_execution::Digest, String> {
+fn digest(message: &Message) -> Result<bazel_protos::remote_execution::Digest, String> {
   let bytes = message.write_to_bytes().map_err(|e| format!("{:?}", e))?;
 
   let mut hasher = Sha256::default();
@@ -1662,7 +1660,7 @@ mod tests {
       .wait()
   }
 
-  fn make_any_proto(message: &protobuf::Message) -> protobuf::well_known_types::Any {
+  fn make_any_proto(message: &Message) -> protobuf::well_known_types::Any {
     let mut any = protobuf::well_known_types::Any::new();
     any.set_type_url(format!(
       "type.googleapis.com/{}",

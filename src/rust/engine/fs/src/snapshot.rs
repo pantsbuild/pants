@@ -45,7 +45,7 @@ impl Snapshot {
   ) -> BoxFuture<Snapshot, String> {
     let mut sorted_path_stats = path_stats.clone();
     sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, sorted_path_stats)
+    Snapshot::ingest_directory_from_sorted_path_stats(store, &file_digester, &sorted_path_stats)
       .map(|digest| Snapshot { digest, path_stats })
       .to_boxed()
   }
@@ -56,11 +56,11 @@ impl Snapshot {
   >(
     store: Store,
     file_digester: S,
-    path_stats: Vec<PathStat>,
+    path_stats: &[PathStat],
   ) -> BoxFuture<Digest, String> {
-    let mut sorted_path_stats = path_stats.clone();
+    let mut sorted_path_stats = path_stats.to_owned();
     sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, sorted_path_stats)
+    Snapshot::ingest_directory_from_sorted_path_stats(store, &file_digester, &sorted_path_stats)
   }
 
   fn ingest_directory_from_sorted_path_stats<
@@ -68,8 +68,8 @@ impl Snapshot {
     Error: fmt::Debug + 'static + Send,
   >(
     store: Store,
-    file_digester: S,
-    path_stats: Vec<PathStat>,
+    file_digester: &S,
+    path_stats: &[PathStat],
   ) -> BoxFuture<Digest, String> {
     let mut file_futures: Vec<BoxFuture<bazel_protos::remote_execution::FileNode, String>> =
       Vec::new();
@@ -82,7 +82,7 @@ impl Snapshot {
       .group_by(|s| s.path().components().next().unwrap().as_os_str().to_owned())
     {
       let mut path_group: Vec<PathStat> = group.collect();
-      if path_group.len() == 1 && path_group.get(0).unwrap().path().components().count() == 1 {
+      if path_group.len() == 1 && path_group[0].path().components().count() == 1 {
         // Exactly one entry with exactly one component indicates either a file in this directory,
         // or an empty directory.
         // If the child is a non-empty directory, or a file therein, there must be multiple
@@ -127,8 +127,8 @@ impl Snapshot {
           // TODO: Memoize this in the graph
           Snapshot::ingest_directory_from_sorted_path_stats(
             store.clone(),
-            file_digester.clone(),
-            paths_of_child_dir(path_group),
+            file_digester,
+            &paths_of_child_dir(path_group),
           ).and_then(move |digest| {
             let mut dir_node = bazel_protos::remote_execution::DirectoryNode::new();
             dir_node.set_name(osstring_as_utf8(first_component)?);
@@ -282,7 +282,7 @@ impl Snapshot {
           out_dir.set_directories(protobuf::RepeatedField::from_vec(child_directories));
           store.record_directory(&out_dir, true)
         })
-          .to_boxed() as BoxFuture<_, _>
+          .to_boxed()
       })
       .to_boxed()
   }

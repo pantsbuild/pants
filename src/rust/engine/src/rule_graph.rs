@@ -354,12 +354,12 @@ impl<'t> GraphMaker<'t> {
     subject_type: TypeId,
     product_type: &TypeConstraint,
   ) -> Option<RootEntry> {
-    let candidates = rhs(&self.tasks, subject_type.clone(), product_type);
+    let candidates = rhs(&self.tasks, subject_type, product_type);
     if candidates.is_empty() {
       None
     } else {
       Some(RootEntry {
-        subject_type: subject_type.clone(),
+        subject_type: subject_type,
         clause: vec![Select {
           product: product_type.clone(),
           variant_key: None,

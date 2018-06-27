@@ -14,7 +14,6 @@ futures-cpupool = "0.1"
 glob = "0.2.11"
 grpcio = { version = "0.2.0", features = ["secure"] }
 hashing = { path = "../hashing" }
-hex = "0.3.1"
 ignore = "0.3.1"
 indexmap = "1"
 itertools = "0.7.2"
@@ -24,7 +23,6 @@ log = "0.4"
 protobuf = { version = "1.4.1", features = ["with-bytes"] }
 resettable = { path = "../resettable" }
 sha2 = "0.6.0"
-tempfile = "3"
 
 [dev-dependencies]
 mock = { path = "../testutil/mock" }
