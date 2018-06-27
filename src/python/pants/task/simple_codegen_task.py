@@ -231,7 +231,7 @@ class SimpleCodegenTask(Task):
           if not vt.valid:
             if self._do_validate_sources_present(vt.target):
               self.execute_codegen(vt.target, vt.results_dir)
-              sources = self._capture_sources(((vt.target, synthetic_target_dir),))[0]
+              sources = self._capture_sources((key,))[0]
               # _handle_duplicate_sources may delete files from the filesystem, so we need to
               # re-capture the sources.
               if not self._handle_duplicate_sources(vt.target, vt.results_dir, sources):
@@ -245,7 +245,7 @@ class SimpleCodegenTask(Task):
         for (vt, synthetic_target_dir), fileset in vts_to_sources.items():
           self._inject_synthetic_target(
             vt.target,
-            vt.results_dir,
+            synthetic_target_dir,
             fileset,
           )
         self._mark_transitive_invalidation_hashes_dirty(
@@ -321,7 +321,6 @@ class SimpleCodegenTask(Task):
     """
 
     synthetic_target_type = self.synthetic_target_type(target)
-    target_workdir = self.synthetic_target_dir(target, target_workdir)
     synthetic_extra_dependencies = self.synthetic_target_extra_dependencies(target, target_workdir)
 
     copied_attributes = {}
