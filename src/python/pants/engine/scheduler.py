@@ -437,12 +437,15 @@ class SchedulerSession(object):
   def execution_request(self, products, subjects):
     """Create and return an ExecutionRequest for the given products and subjects.
 
-    The resulting ExecutionRequest object will contain keys tied to this scheduler's product Graph, and
-    so it will not be directly usable with other scheduler instances without being re-created.
+    The resulting ExecutionRequest object will contain keys tied to this scheduler's product Graph,
+    and so it will not be directly usable with other scheduler instances without being re-created.
 
-    An ExecutionRequest for an Address represents exactly one product output, as does SingleAddress. But
-    we differentiate between them here in order to normalize the output for all Spec objects
-    as "list of product".
+    An ExecutionRequest for an Address represents exactly one product output, as does
+    SingleAddress. But we differentiate between them here in order to normalize the output for all
+    Spec objects as "list of product".
+
+    NB: This method does a "cross product", mapping all subjects to all products. To create a
+    request for just the given list of subject -> product tuples, use `execution_request_literal()`!
 
     :param products: A list of product types to request for the roots.
     :type products: list of types

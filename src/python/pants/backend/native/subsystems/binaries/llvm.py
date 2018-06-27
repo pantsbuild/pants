@@ -85,7 +85,7 @@ class LLVM(NativeTool):
       include_dirs=[])
 
 
-# FIXME(#???): use this over the XCode linker!
+# FIXME(#5663): use this over the XCode linker!
 @rule(Linker, [Select(Platform), Select(LLVM)])
 def get_lld(platform, llvm):
   return llvm.linker(platform)

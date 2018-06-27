@@ -15,8 +15,6 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
 
-# TODO: think about how this could share any structure with XCodeCLITools, which is very similar in
-# spirit.
 class LibcDev(Subsystem):
   """Subsystem to detect and provide the host's installed version of a libc "dev" package.
 
