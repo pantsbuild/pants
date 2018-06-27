@@ -506,16 +506,14 @@ impl<N: Node> InnerGraph<N> {
   fn digests_internal<'g>(
     &'g self,
     entryids: Vec<EntryId>,
-  ) -> Box<Iterator<Item = hashing::Digest> + 'g> {
-    Box::new(
-      entryids
-        .into_iter()
-        .filter_map(move |eid| self.entry_for_id(eid))
-        .filter_map(|entry| match entry.peek() {
-          Some(Ok(item)) => N::digest(item),
-          _ => None,
-        }),
-    )
+  ) -> impl Iterator<Item = hashing::Digest> + 'g {
+    entryids
+      .into_iter()
+      .filter_map(move |eid| self.entry_for_id(eid))
+      .filter_map(|entry| match entry.peek() {
+        Some(Ok(item)) => N::digest(item),
+        _ => None,
+      })
   }
 }
 
