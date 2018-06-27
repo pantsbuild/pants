@@ -20,6 +20,9 @@ from pants.util.process_handler import subprocess
 
 
 class RagelGen(SimpleCodegenTask):
+
+  sources_globs = ('**/*',)
+
   @classmethod
   def subsystem_dependencies(cls):
     return super(RagelGen, cls).subsystem_dependencies() + (Ragel.scoped(cls),)

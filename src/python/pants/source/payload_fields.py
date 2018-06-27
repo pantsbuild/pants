@@ -8,9 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from hashlib import sha1
 
 from pants.base.payload_field import PayloadField
+from pants.engine.fs import PathGlobs, Snapshot
 from pants.source.filespec import matches_filespec
 from pants.source.source_root import SourceRootConfig
-from pants.source.wrapped_globs import FilesetWithSpec
+from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetWithSpec
 from pants.util.memo import memoized_property
 
 
@@ -63,6 +64,19 @@ class SourcesField(PayloadField):
   def address(self):
     """Returns the address this sources field refers to (used by some derived classes)"""
     return self._ref_address
+
+  def snapshot(self, scheduler=None):
+    """
+    Returns a Snapshot containing the sources, relative to the build root.
+
+    This API is experimental, and subject to change.
+    """
+    if isinstance(self._sources, EagerFilesetWithSpec):
+      snapshot = self._sources.snapshot
+      if snapshot is not None:
+        return snapshot
+    input_pathglobs = PathGlobs(tuple(self.relative_to_buildroot()))
+    return scheduler.product_request(Snapshot, [input_pathglobs])[0]
 
   def relative_to_buildroot(self):
     """All sources joined with their relative paths."""
