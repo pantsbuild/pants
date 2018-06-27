@@ -275,7 +275,8 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
             )),
             Some(resource_name) => {
               let parts: Vec<_> = resource_name.splitn(6, "/").collect();
-              if parts.len() != 6 || parts.get(1) != Some(&"uploads")
+              if parts.len() != 6
+                || parts.get(1) != Some(&"uploads")
                 || parts.get(3) != Some(&"blobs")
               {
                 return Err(grpcio::RpcStatus::new(

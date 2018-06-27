@@ -11,8 +11,8 @@ use digest::{Digest as DigestTrait, FixedOutput};
 use fs::{self, File, PathStat, Store};
 use futures::{future, Future};
 use futures_timer::Delay;
-use hashing::{Digest, Fingerprint};
 use grpcio;
+use hashing::{Digest, Fingerprint};
 use protobuf::{self, Message, ProtobufEnum};
 use resettable::Resettable;
 use sha2::Sha256;
@@ -290,10 +290,12 @@ impl CommandRunner {
             try_future!(
               precondition_failure
                 .merge_from_bytes(details.get_value())
-                .map_err(|e| ExecutionError::Fatal(format!(
-                  "Error deserializing FailedPrecondition proto: {:?}",
-                  e
-                )))
+                .map_err(|e| {
+                  ExecutionError::Fatal(format!(
+                    "Error deserializing FailedPrecondition proto: {:?}",
+                    e
+                  ))
+                })
             );
 
             let mut missing_digests =
@@ -620,20 +622,20 @@ mod tests {
   use futures::Future;
   use grpcio;
   use hashing::{Digest, Fingerprint};
-  use protobuf::{self, Message, ProtobufEnum};
   use mock;
+  use protobuf::{self, Message, ProtobufEnum};
   use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
   use testutil::{as_bytes, owned_string_vec};
 
-  use super::{CommandRunner, ExecuteProcessRequest, ExecutionError, FallibleExecuteProcessResult};
   use super::super::CommandRunner as CommandRunnerTrait;
+  use super::{CommandRunner, ExecuteProcessRequest, ExecutionError, FallibleExecuteProcessResult};
   use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
+  use std::ops::Sub;
   use std::path::PathBuf;
   use std::sync::Arc;
   use std::time::Duration;
-  use std::ops::Sub;
 
   #[derive(Debug, PartialEq)]
   enum StdoutType {
@@ -818,14 +820,12 @@ mod tests {
         super::make_execute_request(&echo_roland_request())
           .unwrap()
           .1,
-        vec![
-          make_successful_operation(
-            &op_name.clone(),
-            StdoutType::Raw(test_stdout.string()),
-            StderrType::Raw(test_stderr.string()),
-            0,
-          ),
-        ],
+        vec![make_successful_operation(
+          &op_name.clone(),
+          StdoutType::Raw(test_stdout.string()),
+          StderrType::Raw(test_stderr.string()),
+          0,
+        )],
       ))
     };
 
@@ -956,26 +956,23 @@ mod tests {
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
         super::make_execute_request(&execute_request).unwrap().1,
-        vec![
-          make_incomplete_operation(&op_name),
-          {
-            let mut op = bazel_protos::operations::Operation::new();
-            op.set_name(op_name.clone());
-            op.set_done(true);
-            op.set_response({
-              let mut response_wrapper = protobuf::well_known_types::Any::new();
-              response_wrapper.set_type_url(format!(
-                "type.googleapis.com/{}",
-                bazel_protos::remote_execution::ExecuteResponse::new()
-                  .descriptor()
-                  .full_name()
-              ));
-              response_wrapper.set_value(vec![0x00, 0x00, 0x00]);
-              response_wrapper
-            });
-            (op, None)
-          },
-        ],
+        vec![make_incomplete_operation(&op_name), {
+          let mut op = bazel_protos::operations::Operation::new();
+          op.set_name(op_name.clone());
+          op.set_done(true);
+          op.set_response({
+            let mut response_wrapper = protobuf::well_known_types::Any::new();
+            response_wrapper.set_type_url(format!(
+              "type.googleapis.com/{}",
+              bazel_protos::remote_execution::ExecuteResponse::new()
+                .descriptor()
+                .full_name()
+            ));
+            response_wrapper.set_value(vec![0x00, 0x00, 0x00]);
+            response_wrapper
+          });
+          (op, None)
+        }],
       ))
     };
 
@@ -992,20 +989,18 @@ mod tests {
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
         super::make_execute_request(&execute_request).unwrap().1,
-        vec![
-          {
-            let mut op = bazel_protos::operations::Operation::new();
-            op.set_name(op_name.to_string());
-            op.set_done(true);
-            op.set_error({
-              let mut error = bazel_protos::status::Status::new();
-              error.set_code(bazel_protos::code::Code::INTERNAL.value());
-              error.set_message("Something went wrong".to_string());
-              error
-            });
-            (op, None)
-          },
-        ],
+        vec![{
+          let mut op = bazel_protos::operations::Operation::new();
+          op.set_name(op_name.to_string());
+          op.set_done(true);
+          op.set_error({
+            let mut error = bazel_protos::status::Status::new();
+            error.set_code(bazel_protos::code::Code::INTERNAL.value());
+            error.set_message("Something went wrong".to_string());
+            error
+          });
+          (op, None)
+        }],
       ))
     };
 
@@ -1024,21 +1019,18 @@ mod tests {
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
         super::make_execute_request(&execute_request).unwrap().1,
-        vec![
-          make_incomplete_operation(&op_name),
-          {
-            let mut op = bazel_protos::operations::Operation::new();
-            op.set_name(op_name.to_string());
-            op.set_done(true);
-            op.set_error({
-              let mut error = bazel_protos::status::Status::new();
-              error.set_code(bazel_protos::code::Code::INTERNAL.value());
-              error.set_message("Something went wrong".to_string());
-              error
-            });
-            (op, None)
-          },
-        ],
+        vec![make_incomplete_operation(&op_name), {
+          let mut op = bazel_protos::operations::Operation::new();
+          op.set_name(op_name.to_string());
+          op.set_done(true);
+          op.set_error({
+            let mut error = bazel_protos::status::Status::new();
+            error.set_code(bazel_protos::code::Code::INTERNAL.value());
+            error.set_message("Something went wrong".to_string());
+            error
+          });
+          (op, None)
+        }],
       ))
     };
 
@@ -1057,14 +1049,12 @@ mod tests {
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
         super::make_execute_request(&execute_request).unwrap().1,
-        vec![
-          {
-            let mut op = bazel_protos::operations::Operation::new();
-            op.set_name(op_name.to_string());
-            op.set_done(true);
-            (op, None)
-          },
-        ],
+        vec![{
+          let mut op = bazel_protos::operations::Operation::new();
+          op.set_name(op_name.to_string());
+          op.set_done(true);
+          (op, None)
+        }],
       ))
     };
 
@@ -1083,15 +1073,12 @@ mod tests {
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
         super::make_execute_request(&execute_request).unwrap().1,
-        vec![
-          make_incomplete_operation(&op_name),
-          {
-            let mut op = bazel_protos::operations::Operation::new();
-            op.set_name(op_name.to_string());
-            op.set_done(true);
-            (op, None)
-          },
-        ],
+        vec![make_incomplete_operation(&op_name), {
+          let mut op = bazel_protos::operations::Operation::new();
+          op.set_name(op_name.to_string());
+          op.set_done(true);
+          (op, None)
+        }],
       ))
     };
 
@@ -1114,9 +1101,9 @@ mod tests {
           .1,
         vec![
           make_incomplete_operation(&op_name),
-          make_precondition_failure_operation(vec![
-            missing_preconditionfailure_violation(&roland.digest()),
-          ]),
+          make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
+            &roland.digest()
+          )]),
           make_successful_operation(
             "cat2",
             StdoutType::Raw(roland.string()),
@@ -1174,9 +1161,9 @@ mod tests {
           .1,
         vec![
           make_incomplete_operation(&op_name),
-          make_precondition_failure_operation(vec![
-            missing_preconditionfailure_violation(&missing_digest),
-          ]),
+          make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
+            &missing_digest,
+          )]),
         ],
       ))
     };
@@ -1311,13 +1298,11 @@ mod tests {
 
   #[test]
   fn extract_execute_response_other_failed_precondition() {
-    let missing = vec![
-      {
-        let mut violation = bazel_protos::error_details::PreconditionFailure_Violation::new();
-        violation.set_field_type("OUT_OF_CAPACITY".to_owned());
-        violation
-      },
-    ];
+    let missing = vec![{
+      let mut violation = bazel_protos::error_details::PreconditionFailure_Violation::new();
+      violation.set_field_type("OUT_OF_CAPACITY".to_owned());
+      violation
+    }];
 
     let (operation, _duration) = make_precondition_failure_operation(missing);
 
