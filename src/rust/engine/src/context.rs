@@ -149,9 +149,9 @@ impl Context {
   ///
   pub fn get<N: WrappedNode>(&self, node: N) -> BoxFuture<N::Item, Failure> {
     // TODO: Odd place for this... could do it periodically in the background?
-    maybe_drain_handles().map(|handles| {
-      externs::drop_handles(handles);
-    });
+    if let Some(handles) = maybe_drain_handles() {
+      externs::drop_handles(&handles);
+    }
     self
       .core
       .graph

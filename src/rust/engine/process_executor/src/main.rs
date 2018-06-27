@@ -86,7 +86,7 @@ fn main() {
   let env: BTreeMap<String, String> = match args.values_of("env") {
     Some(values) => values
       .map(|v| {
-        let mut parts = v.splitn(2, "=");
+        let mut parts = v.splitn(2, '=');
         (
           parts.next().unwrap().to_string(),
           parts.next().unwrap_or_default().to_string(),
