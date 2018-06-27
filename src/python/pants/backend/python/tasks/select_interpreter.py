@@ -56,6 +56,8 @@ class SelectInterpreter(Task):
 
   def execute(self):
     python_tgts = self.context.targets(lambda tgt: isinstance(tgt, PythonTarget))
+    if not python_tgts:
+      return
     fs = PythonInterpreterFingerprintStrategy()
     with self.invalidated(python_tgts, fingerprint_strategy=fs) as invalidation_check:
       if (PythonSetup.global_instance().interpreter_search_paths

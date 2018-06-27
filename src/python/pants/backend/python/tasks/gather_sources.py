@@ -14,6 +14,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.python.tasks.pex_build_util import (dump_sources, has_python_sources,
                                                        has_resources, is_python_target)
+from pants.base.exceptions import TaskError
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
@@ -45,6 +46,8 @@ class GatherSources(Task):
   def execute(self):
     interpreter = self.context.products.get_data(PythonInterpreter)
     targets = self._collect_source_targets()
+    if not targets:
+      return
 
     with self.invalidated(targets) as invalidation_check:
       pex = self._get_pex_for_versioned_targets(interpreter, invalidation_check.all_vts)
@@ -68,10 +71,7 @@ class GatherSources(Task):
     if versioned_targets:
       target_set_id = VersionedTargetSet.from_versioned_targets(versioned_targets).cache_key.hash
     else:
-      # If there are no relevant targets, we still go through the motions of gathering
-      # an empty set of sources, to prevent downstream tasks from having to check
-      # for this special case.
-      target_set_id = 'no_targets'
+      raise TaskError('Tried to get pex for no targets in gather_sources')
     source_pex_path = os.path.realpath(os.path.join(self.workdir, target_set_id))
     # Note that we check for the existence of the directory, instead of for invalid_vts,
     # to cover the empty case.
