@@ -93,7 +93,7 @@ def select_linker(platform, native_toolchain):
   # or a linker (e.g. when we compile native code from `python_dist()`s), use the environment from
   # the linker object (in addition to any further customizations), which has the paths from the C
   # and C++ compilers baked in.
-  # FIXME(???): we need a way to compose executables hygienically.
+  # FIXME(#5951): we need a way to compose executables more hygienically.
   linker = Linker(
     path_entries=(
       c_compiler.path_entries +

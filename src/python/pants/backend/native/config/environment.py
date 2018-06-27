@@ -84,11 +84,9 @@ class Linker(datatype([
     'library_dirs',
 ]), Executable):
 
-  # FIXME(???): we need a way to compose executables hygienically -- this will work because we use
-  # safe shlex methods, but we should really be composing each datatype's members, and only
-  # creating an environment at the very end. This could be done declaratively -- something like:
-  # { 'LIBRARY_PATH': DelimitedPathDirectoryEnvVar(...) }.
-  # We could also just use safe_shlex_join() and create_path_env_var() and keep all the state in the
+  # FIXME(#5951): We need a way to compose executables more hygienically. This could be done
+  # declaratively -- something like: { 'LIBRARY_PATH': DelimitedPathDirectoryEnvVar(...) }.  We
+  # could also just use safe_shlex_join() and create_path_env_var() and keep all the state in the
   # environment -- but then we have to remember to use those each time we specialize.
   def get_invocation_environment_dict(self, platform):
     ret = super(Linker, self).get_invocation_environment_dict(platform).copy()
@@ -101,9 +99,9 @@ class Linker(datatype([
     })
     ret.update({
       'LDSHARED': self.exe_filename,
-      # FIXME(???): this overloads the meaning of 'library_dirs' to also mean "directories
-      # containing static libraries required for creating an executable" (currently, libc). These
-      # concepts should be distinct.
+      # FIXME: this overloads the meaning of 'library_dirs' to also mean "directories containing
+      # static libraries required for creating an executable" (currently, libc). These concepts
+      # should be distinct.
       'LIBRARY_PATH': create_path_env_var(self.library_dirs),
       'LDFLAGS': safe_shlex_join(all_ldflags_for_platform),
     })

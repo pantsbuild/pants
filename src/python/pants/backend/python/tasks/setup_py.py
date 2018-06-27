@@ -167,9 +167,12 @@ class SetupPyExecutionEnvironment(datatype([
     if self.setup_requires_site_dir:
       ret['PYTHONPATH'] = self.setup_requires_site_dir.site_dir
 
+    # FIXME(#5951): the below is a lot of error-prone repeated logic -- we need a way to compose
+    # executables more hygienically. We should probably be composing each datatype's members, and
+    # only creating an environment at the very end.
     native_tools = self.setup_py_native_tools
     if native_tools:
-      # TODO: an as_tuple() method for datatypes would make this destructuring cleaner
+      # TODO: an as_tuple() method for datatypes would make this destructuring cleaner!
       plat = native_tools.platform
       cc = native_tools.c_compiler
       cxx = native_tools.cpp_compiler
@@ -203,9 +206,6 @@ class SetupPyExecutionEnvironment(datatype([
       ret['CXX'] = cxx.exe_filename
       ret['LDSHARED'] = linker.exe_filename
 
-      # FIXME(???): we need a way to compose executables hygienically -- this will work because we
-      # use safe shlex methods, but we should probably be composing each datatype's members, and
-      # only creating an environment at the very end.
       all_new_ldflags = plat.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
       ret['LDFLAGS'] = safe_shlex_join(all_new_ldflags)
 
