@@ -21,6 +21,8 @@ class ApacheThriftPyGen(ApacheThriftGenBase):
     'new_style': None
   }
 
+  sources_globs = ('**/*',)
+
   def synthetic_target_type(self, target):
     return PythonLibrary
 

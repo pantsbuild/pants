@@ -23,6 +23,8 @@ AVRO_REV = '1.8.2'
 class AvroJavaGenTask(SimpleCodegenTask, NailgunTask):
   """Compile Avro schema, protocol, and IDL files to Java code."""
 
+  sources_globs = ('**/*',)
+
   @classmethod
   def register_options(cls, register):
     super(AvroJavaGenTask, cls).register_options(register)

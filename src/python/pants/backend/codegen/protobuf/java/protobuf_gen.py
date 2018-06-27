@@ -27,6 +27,8 @@ from pants.util.process_handler import subprocess
 
 class ProtobufGen(SimpleCodegenTask):
 
+  sources_globs = ('**/*',)
+
   @classmethod
   def subsystem_dependencies(cls):
     return super(ProtobufGen, cls).subsystem_dependencies() + (Protoc.scoped(cls),)

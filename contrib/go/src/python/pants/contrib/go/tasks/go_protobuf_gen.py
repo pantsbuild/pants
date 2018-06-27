@@ -25,6 +25,8 @@ from pants.contrib.go.targets.go_protobuf_library import GoProtobufGenLibrary, G
 
 class GoProtobufGen(SimpleCodegenTask):
 
+  sources_globs = ('**/*',)
+
   _NAMESPACE_PARSER = re.compile(r'^\s*option\s+go_package\s*=\s*"([^\s]+)"\s*;', re.MULTILINE)
   _PACKAGE_PARSER = re.compile(r'^\s*package\s+([^\s]+)\s*;', re.MULTILINE)
 

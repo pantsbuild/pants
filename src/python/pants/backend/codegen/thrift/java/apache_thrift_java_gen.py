@@ -25,6 +25,8 @@ class ApacheThriftJavaGen(ApacheThriftGenBase):
 
   _COMPILER = 'thrift'
 
+  sources_globs = ('**/*',)
+
   @classmethod
   def subsystem_dependencies(cls):
     return super(ApacheThriftJavaGen, cls).subsystem_dependencies() + (ThriftDefaults,)
