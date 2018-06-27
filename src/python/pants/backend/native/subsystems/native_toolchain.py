@@ -177,7 +177,9 @@ def select_gcc_c_compiler(platform, native_toolchain):
     # probably safe.
     # TODO: we should be providing all of these (so we can eventually phase out XCodeCLITools
     # entirely).
-    clang_c_compiler = yield Get(LLVMCCompiler, LLVM, native_toolchain._llvm)
+    # This mutual recursion with select_llvm_c_compiler() works because we only pull in gcc in that
+    # method if we are on Linux.
+    clang_c_compiler = yield Get(LLVMCCompiler, NativeToolchain, native_toolchain)
     provided_clang = clang_c_compiler.c_compiler
 
     new_library_dirs = provided_gcc.library_dirs + provided_clang.library_dirs
@@ -207,15 +209,24 @@ def select_gcc_cpp_compiler(platform, native_toolchain):
   if platform.normalized_os_name == 'darwin':
     xcode_tools_assembler = yield Get(Assembler, XCodeCLITools, native_toolchain._xcode_cli_tools)
     assembler_paths = xcode_tools_assembler.path_entries
+
+    clang_cpp_compiler = yield Get(LLVMCppCompiler, NativeToolchain, native_toolchain)
+    provided_clangpp = clang_cpp_compiler.cpp_compiler
+
+    new_library_dirs = provided_gpp.library_dirs + provided_clangpp.library_dirs
+    new_include_dirs = provided_clangpp.include_dirs + provided_gpp.include_dirs
   else:
     binutils_assembler = yield Get(Assembler, Binutils, native_toolchain._binutils)
     assembler_paths = binutils_assembler.path_entries
 
+    new_library_dirs = provided_gpp.library_dirs
+    new_include_dirs = provided_gpp.include_dirs
+
   gcc_with_assembler = CppCompiler(
     path_entries=(provided_gpp.path_entries + assembler_paths),
     exe_filename=provided_gpp.exe_filename,
-    library_dirs=provided_gpp.library_dirs,
-    include_dirs=provided_gpp.include_dirs)
+    library_dirs=new_library_dirs,
+    include_dirs=new_include_dirs)
 
   final_gcc_cpp_compiler = GCCCppCompiler(gcc_with_assembler)
   yield final_gcc_cpp_compiler
