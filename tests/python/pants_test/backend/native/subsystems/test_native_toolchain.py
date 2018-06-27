@@ -8,12 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from contextlib import contextmanager
 
-from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
+from pants.backend.native.config.environment import (GCCCCompiler, GCCCppCompiler, Linker,
+                                                     LLVMCCompiler, LLVMCppCompiler, Platform)
 from pants.backend.native.register import rules as native_backend_rules
-from pants.backend.native.subsystems.binaries.gcc import GCC
-from pants.backend.native.subsystems.binaries.llvm import LLVM
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
-from pants.backend.native.subsystems.xcode_cli_tools import XCodeCLITools
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import is_executable, safe_open
 from pants.util.process_handler import subprocess
@@ -30,10 +28,13 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
 
     self.platform = Platform.create()
     self.toolchain = global_subsystem_instance(NativeToolchain)
-    self.gcc = global_subsystem_instance(GCC)
-    self.llvm = global_subsystem_instance(LLVM)
-    self.xcode_cli_tools = global_subsystem_instance(XCodeCLITools)
     self.rules = native_backend_rules()
+
+    # TODO: ???
+    self.extra_compile_link_args = self.platform.resolve_platform_specific({
+      'darwin': lambda: ['-mmacosx-version-min=10.11'],
+      'linux': lambda: [],
+    })
 
   def _sched(self, *args, **kwargs):
     return self.mk_scheduler(rules=self.rules, *args, **kwargs)
@@ -54,13 +55,13 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
         yield tuple(self.execute_literal(scheduler, execution_request))
 
   def _invoke_compiler(self, compiler, args):
-    cmd = [compiler.exe_filename] + args
+    cmd = [compiler.exe_filename] + args + self.extra_compile_link_args
     return self._invoke_capturing_output(
       cmd,
       compiler.get_invocation_environment_dict(self.platform))
 
   def _invoke_linker(self, linker, args):
-    cmd = [linker.exe_filename] + args
+    cmd = [linker.exe_filename] + args + self.extra_compile_link_args
     return self._invoke_capturing_output(
       cmd,
       linker.get_invocation_environment_dict(self.platform))
@@ -98,8 +99,8 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
   def test_hello_c(self):
 
     scheduler_request_specs = [
-      (self.gcc, CCompiler),
-      (self.llvm, CCompiler),
+      (self.toolchain, GCCCCompiler),
+      (self.toolchain, LLVMCCompiler),
       (self.toolchain, Linker),
     ]
 
@@ -111,34 +112,19 @@ int main() {
 }
 """, scheduler_request_specs=scheduler_request_specs) as products:
 
-      gcc, clang, linker = products
+      gcc_wrapper, clang_wrapper, linker = products
+      gcc = gcc_wrapper.c_compiler
+      clang = clang_wrapper.c_compiler
 
-      # TODO: ???
-      clang_with_gcc_libs = CCompiler(
-        path_entries=clang.path_entries,
-        exe_filename=clang.exe_filename,
-        library_dirs=(gcc.library_dirs + clang.library_dirs),
-        include_dirs=(clang.include_dirs + gcc.include_dirs))
+      self._do_compile_link(clang, linker, 'hello.c', 'hello_clang', "I C the world!")
 
-      self._do_compile_link(clang_with_gcc_libs, linker, 'hello.c', 'hello_clang', "I C the world!")
-
-      # TODO: ???
-      gcc_with_clang_libs = CCompiler(
-        path_entries=gcc.path_entries,
-        exe_filename=gcc.exe_filename,
-        # FIXME: these should be ordered the other way, but this is needed to pass on OSX for
-        # now. Variants should be used to express the difference between gcc and clang, and each
-        # variant should be specifically requested here.
-        library_dirs=(gcc.library_dirs + clang.library_dirs),
-        include_dirs=(clang.include_dirs + gcc.include_dirs))
-
-      self._do_compile_link(gcc_with_clang_libs, linker, 'hello.c', 'hello_gcc', "I C the world!")
+      self._do_compile_link(gcc, linker, 'hello.c', 'hello_gcc', "I C the world!")
 
   def test_hello_cpp(self):
 
     scheduler_request_specs = [
-      (self.gcc, CppCompiler),
-      (self.llvm, CppCompiler),
+      (self.toolchain, GCCCppCompiler),
+      (self.toolchain, LLVMCppCompiler),
       (self.toolchain, Linker),
     ]
 
@@ -150,29 +136,16 @@ int main() {
 }
 """, scheduler_request_specs=scheduler_request_specs) as products:
 
-      gpp, clangpp, linker = products
+      gpp_wrapper, clangpp_wrapper, linker = products
+      gpp = gpp_wrapper.cpp_compiler
+      clangpp = clangpp_wrapper.cpp_compiler
 
-      # TODO: ???
-      clangpp_with_gpp_libs = CppCompiler(
-        path_entries=clangpp.path_entries,
-        exe_filename=clangpp.exe_filename,
-        library_dirs=(gpp.library_dirs + clangpp.library_dirs),
-        include_dirs=(clangpp.include_dirs + gpp.include_dirs))
-
-      self._do_compile_link(clangpp_with_gpp_libs, linker, 'hello.cpp', 'hello_clangpp',
-                            "I C the world, ++ more!")
-
-      # TODO: ???
-      gpp_with_clangpp_libs = CppCompiler(
-        path_entries=gpp.path_entries,
-        exe_filename=gpp.exe_filename,
-        library_dirs=(clangpp.library_dirs + gpp.library_dirs),
-        include_dirs=(clangpp.include_dirs + gpp.include_dirs))
+      self._do_compile_link(clangpp, linker, 'hello.cpp', 'hello_clangpp', "I C the world, ++ more!")
 
       gpp_with_gpp_linker = Linker(
         path_entries=(gpp.path_entries + linker.path_entries),
         exe_filename=gpp.exe_filename,
         library_dirs=(gpp.library_dirs + linker.library_dirs))
 
-      self._do_compile_link(gpp_with_clangpp_libs, gpp_with_gpp_linker, 'hello.cpp',
-                            'hello_gpp', "I C the world, ++ more!")
+      self._do_compile_link(gpp, gpp_with_gpp_linker, 'hello.cpp', 'hello_gpp',
+                            "I C the world, ++ more!")

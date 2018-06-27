@@ -78,7 +78,6 @@ class Assembler(datatype([
   pass
 
 
-# FIXME: rename this to SharedLibLinker or something!
 class Linker(datatype([
     'path_entries',
     'exe_filename',
@@ -94,9 +93,11 @@ class Linker(datatype([
   def get_invocation_environment_dict(self, platform):
     ret = super(Linker, self).get_invocation_environment_dict(platform).copy()
 
+    # TODO: set all LDFLAGS in here or in further specializations of Linker instead of in individual
+    # tasks.
     all_ldflags_for_platform = platform.resolve_platform_specific({
-      'darwin': lambda: ['-mmacosx-version-min=10.11', '-Wl,-dylib'],
-      'linux': lambda: ['-shared'],
+      'darwin': lambda: ['-mmacosx-version-min=10.11'],
+      'linux': lambda: [],
     })
     ret.update({
       'LDSHARED': self.exe_filename,
@@ -158,6 +159,18 @@ class CppCompiler(datatype([
     ret['CXX'] = self.exe_filename
 
     return ret
+
+
+class GCCCCompiler(datatype([('c_compiler', CCompiler)])): pass
+
+
+class LLVMCCompiler(datatype([('c_compiler', CCompiler)])): pass
+
+
+class GCCCppCompiler(datatype([('cpp_compiler', CppCompiler)])): pass
+
+
+class LLVMCppCompiler(datatype([('cpp_compiler', CppCompiler)])): pass
 
 
 # FIXME: make this an @rule, after we can automatically produce LibcDev (see #5788).

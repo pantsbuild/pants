@@ -5,8 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.native.config.environment import (CCompiler, CppCompiler,
-                                                     HostLibcDevInstallation, Linker, Platform)
+from pants.backend.native.config.environment import (Assembler, CCompiler, CppCompiler,
+                                                     GCCCCompiler, GCCCppCompiler,
+                                                     HostLibcDevInstallation, Linker, LLVMCCompiler,
+                                                     LLVMCppCompiler, Platform)
 from pants.backend.native.subsystems.binaries.binutils import Binutils
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
@@ -106,26 +108,110 @@ def select_linker(platform, native_toolchain):
   yield linker
 
 
-@rule(CCompiler, [Select(Platform), Select(NativeToolchain)])
-def select_c_compiler(platform, native_toolchain):
-  # FIXME(???): we should be using our clang, not the provided one, in all cases, and just using
-  # XCodeCLITools to get the lib and include dirs we need from the host.
+@rule(LLVMCCompiler, [Select(Platform), Select(NativeToolchain)])
+def select_llvm_c_compiler(platform, native_toolchain):
+  original_llvm_c_compiler = yield Get(LLVMCCompiler, LLVM, native_toolchain._llvm)
+  provided_clang = original_llvm_c_compiler.c_compiler
+
   if platform.normalized_os_name == 'darwin':
-    c_compiler = yield Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    xcode_clang = yield Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    clang_with_xcode_paths = CCompiler(
+      path_entries=(provided_clang.path_entries + xcode_clang.path_entries),
+      exe_filename=provided_clang.exe_filename,
+      library_dirs=(provided_clang.library_dirs + xcode_clang.library_dirs),
+      include_dirs=(xcode_clang.include_dirs + provided_clang.include_dirs))
+    final_llvm_c_compiler = LLVMCCompiler(clang_with_xcode_paths)
   else:
-    c_compiler = yield Get(CCompiler, GCC, native_toolchain._gcc)
+    provided_gcc = yield Get(GCCCCompiler, GCC, native_toolchain._gcc)
+    clang_with_gcc_libs = CCompiler(
+      path_entries=provided_clang.path_entries,
+      exe_filename=provided_clang.exe_filename,
+      library_dirs=(provided_clang.library_dirs + provided_gcc.library_dirs),
+      include_dirs=(provided_clang.include_dirs + provided_gcc.include_dirs))
+    final_llvm_c_compiler = LLVMCCompiler(clang_with_gcc_libs)
 
-  yield c_compiler
+  yield final_llvm_c_compiler
 
 
-@rule(CppCompiler, [Select(Platform), Select(NativeToolchain)])
-def select_cpp_compiler(platform, native_toolchain):
+@rule(LLVMCppCompiler, [Select(Platform), Select(NativeToolchain)])
+def select_llvm_cpp_compiler(platform, native_toolchain):
+  original_llvm_cpp_compiler = yield Get(LLVMCppCompiler, LLVM, native_toolchain._llvm)
+  provided_clangpp = original_llvm_cpp_compiler.cpp_compiler
+
   if platform.normalized_os_name == 'darwin':
-    cpp_compiler = yield Get(CppCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    xcode_clang = yield Get(CppCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    clang_with_xcode_paths = CppCompiler(
+      path_entries=(provided_clangpp.path_entries + xcode_clang.path_entries),
+      exe_filename=provided_clangpp.exe_filename,
+      library_dirs=(provided_clangpp.library_dirs + xcode_clang.library_dirs),
+      include_dirs=(xcode_clang.include_dirs + provided_clangpp.include_dirs))
+    final_llvm_cpp_compiler = LLVMCppCompiler(clang_with_xcode_paths)
   else:
-    cpp_compiler = yield Get(CppCompiler, GCC, native_toolchain._gcc)
+    provided_gpp = yield Get(GCCCppCompiler, GCC, native_toolchain._gpp)
+    clang_with_gpp_libs = CppCompiler(
+      path_entries=provided_clangpp.path_entries,
+      exe_filename=provided_clangpp.exe_filename,
+      library_dirs=(provided_clangpp.library_dirs + provided_gpp.library_dirs),
+      include_dirs=(provided_clangpp.include_dirs + provided_gpp.include_dirs))
+    final_llvm_cpp_compiler = LLVMCppCompiler(clang_with_gpp_libs)
 
-  yield cpp_compiler
+  yield final_llvm_cpp_compiler
+
+
+@rule(GCCCCompiler, [Select(Platform), Select(NativeToolchain)])
+def select_gcc_c_compiler(platform, native_toolchain):
+  original_gcc_c_compiler = yield Get(GCCCCompiler, GCC, native_toolchain._gcc)
+  provided_gcc = original_gcc_c_compiler.c_compiler
+
+  if platform.normalized_os_name == 'darwin':
+    xcode_tools_assembler = yield Get(Assembler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    assembler_paths = xcode_tools_assembler.path_entries
+  else:
+    binutils_assembler = yield Get(Assembler, Binutils, native_toolchain._binutils)
+    assembler_paths = binutils_assembler.path_entries
+
+  gcc_with_assembler = CCompiler(
+    path_entries=(provided_gcc.path_entries + assembler_paths),
+    exe_filename=provided_gcc.exe_filename,
+    library_dirs=provided_gcc.library_dirs,
+    include_dirs=provided_gcc.include_dirs)
+
+  final_gcc_c_compiler = GCCCCompiler(gcc_with_assembler)
+  yield final_gcc_c_compiler
+
+
+@rule(GCCCppCompiler, [Select(Platform), Select(NativeToolchain)])
+def select_gcc_cpp_compiler(platform, native_toolchain):
+  original_gcc_cpp_compiler = yield Get(GCCCppCompiler, GCC, native_toolchain._gcc)
+  provided_gpp = original_gcc_cpp_compiler.cpp_compiler
+
+  if platform.normalized_os_name == 'darwin':
+    xcode_tools_assembler = yield Get(Assembler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    assembler_paths = xcode_tools_assembler.path_entries
+  else:
+    binutils_assembler = yield Get(Assembler, Binutils, native_toolchain._binutils)
+    assembler_paths = binutils_assembler.path_entries
+
+  gcc_with_assembler = CppCompiler(
+    path_entries=(provided_gpp.path_entries + assembler_paths),
+    exe_filename=provided_gpp.exe_filename,
+    library_dirs=provided_gpp.library_dirs,
+    include_dirs=provided_gpp.include_dirs)
+
+  final_gcc_cpp_compiler = GCCCppCompiler(gcc_with_assembler)
+  yield final_gcc_cpp_compiler
+
+
+@rule(CCompiler, [Select(NativeToolchain)])
+def select_c_compiler(native_toolchain):
+  llvm_c_compiler = yield Get(LLVMCCompiler, NativeToolchain, native_toolchain)
+  yield llvm_c_compiler.c_compiler
+
+
+@rule(CppCompiler, [Select(NativeToolchain)])
+def select_cpp_compiler(native_toolchain):
+  llvm_cpp_compiler = yield Get(LLVMCppCompiler, NativeToolchain, native_toolchain)
+  yield llvm_cpp_compiler.cpp_compiler
 
 
 @rule(HostLibcDevInstallation, [Select(Platform), Select(NativeToolchain)])
@@ -141,6 +227,10 @@ def select_libc_dev_install(platform, native_toolchain):
 def create_native_toolchain_rules():
   return [
     select_linker,
+    select_llvm_c_compiler,
+    select_llvm_cpp_compiler,
+    select_gcc_c_compiler,
+    select_gcc_cpp_compiler,
     select_c_compiler,
     select_cpp_compiler,
     select_libc_dev_install,
