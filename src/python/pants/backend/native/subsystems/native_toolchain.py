@@ -180,8 +180,7 @@ def select_gcc_c_compiler(platform, native_toolchain):
     # entirely).
     # This mutual recursion with select_llvm_c_compiler() works because we only pull in gcc in that
     # method if we are on Linux.
-    xcode_clang_c_compiler = yield Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
-    xcode_clang = xcode_clang_c_compiler.c_compiler
+    xcode_clang = yield Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
 
     new_library_dirs = provided_gcc.library_dirs + xcode_clang.library_dirs
     new_include_dirs = xcode_clang.include_dirs + provided_gcc.include_dirs
@@ -211,8 +210,7 @@ def select_gcc_cpp_compiler(platform, native_toolchain):
     xcode_tools_assembler = yield Get(Assembler, XCodeCLITools, native_toolchain._xcode_cli_tools)
     assembler_paths = xcode_tools_assembler.path_entries
 
-    xcode_clang_cpp_compiler = yield Get(CppCompiler, NativeToolchain, native_toolchain)
-    xcode_clangpp = xcode_clang_cpp_compiler.cpp_compiler
+    xcode_clangpp = yield Get(CppCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
 
     new_library_dirs = provided_gpp.library_dirs + xcode_clangpp.library_dirs
     new_include_dirs = xcode_clangpp.include_dirs + provided_gpp.include_dirs
