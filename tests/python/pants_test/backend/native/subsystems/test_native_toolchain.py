@@ -8,8 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from contextlib import contextmanager
 
-from pants.backend.native.config.environment import (GCCCCompiler, GCCCppCompiler, Linker,
-                                                     LLVMCCompiler, LLVMCppCompiler, Platform)
+from pants.backend.native.config.environment import (CCompiler, CppCompiler, GCCCCompiler,
+                                                     GCCCppCompiler, Linker, LLVMCCompiler,
+                                                     LLVMCppCompiler, Platform)
 from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.util.contextutil import environment_as, pushd, temporary_dir
@@ -96,8 +97,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     program_out = self._invoke_capturing_output([os.path.abspath(outfile)])
     self.assertEqual((output + '\n'), program_out)
 
-  def test_hello_c(self):
-
+  def test_hello_c_gcc(self):
     scheduler_request_specs = [
       (self.toolchain, GCCCCompiler),
       (self.toolchain, LLVMCCompiler),
@@ -116,11 +116,35 @@ int main() {
       gcc = gcc_wrapper.c_compiler
       clang = clang_wrapper.c_compiler
 
+      gcc_with_clang_libs = CCompiler(
+        path_entries=gcc.path_entries,
+        exe_filename=gcc.exe_filename,
+        library_dirs=(gcc.library_dirs + clang.library_dirs),
+        include_dirs=(clang.include_dirs + gcc.include_dirs))
+
+      self._do_compile_link(gcc_with_clang_libs, linker, 'hello.c', 'hello_gcc', "I C the world!")
+
+  def test_hello_c_clang(self):
+
+    scheduler_request_specs = [
+      (self.toolchain, LLVMCCompiler),
+      (self.toolchain, Linker),
+    ]
+
+    with self._hello_world_source_environment('hello.c', contents="""
+#include "stdio.h"
+
+int main() {
+  printf("%s\\n", "I C the world!");
+}
+""", scheduler_request_specs=scheduler_request_specs) as products:
+
+      clang_wrapper, linker = products
+      clang = clang_wrapper.c_compiler
+
       self._do_compile_link(clang, linker, 'hello.c', 'hello_clang', "I C the world!")
 
-      self._do_compile_link(gcc, linker, 'hello.c', 'hello_gcc', "I C the world!")
-
-  def test_hello_cpp(self):
+  def test_hello_cpp_gpp(self):
 
     scheduler_request_specs = [
       (self.toolchain, GCCCppCompiler),
@@ -140,12 +164,37 @@ int main() {
       gpp = gpp_wrapper.cpp_compiler
       clangpp = clangpp_wrapper.cpp_compiler
 
-      self._do_compile_link(clangpp, linker, 'hello.cpp', 'hello_clangpp', "I C the world, ++ more!")
+      gpp_with_clangpp_libs = CppCompiler(
+        path_entries=gpp.path_entries,
+        exe_filename=gpp.exe_filename,
+        library_dirs=(gpp.library_dirs + clangpp.library_dirs),
+        include_dirs=(clangpp.include_dirs + gpp.include_dirs))
 
       gpp_with_gpp_linker = Linker(
         path_entries=(gpp.path_entries + linker.path_entries),
         exe_filename=gpp.exe_filename,
         library_dirs=(gpp.library_dirs + linker.library_dirs))
 
-      self._do_compile_link(gpp, gpp_with_gpp_linker, 'hello.cpp', 'hello_gpp',
+      self._do_compile_link(gpp_with_clangpp_libs, gpp_with_gpp_linker, 'hello.cpp', 'hello_gpp',
+                            "I C the world, ++ more!")
+
+  def test_hello_cpp_clangpp(self):
+
+    scheduler_request_specs = [
+      (self.toolchain, LLVMCppCompiler),
+      (self.toolchain, Linker),
+    ]
+
+    with self._hello_world_source_environment('hello.cpp', contents="""
+#include <iostream>
+
+int main() {
+  std::cout << "I C the world, ++ more!" << std::endl;
+}
+""", scheduler_request_specs=scheduler_request_specs) as products:
+
+      clangpp_wrapper, linker = products
+      clangpp = clangpp_wrapper.cpp_compiler
+
+      self._do_compile_link(clangpp, linker, 'hello.cpp', 'hello_clangpp',
                             "I C the world, ++ more!")
