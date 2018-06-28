@@ -208,10 +208,7 @@ int main() {
       gpp_wrapper, linker = products
       gpp = gpp_wrapper.cpp_compiler
 
-      # FIXME(#5951): we should be matching the linker to the compiler here, instead of trying to
-      # use the same linker for everything.
-      self._do_compile_link(gpp, linker, 'hello.cpp', 'hello_gpp',
-                            "I C the world, ++ more!")
+      self._do_compile_link(gpp, linker, 'hello.cpp', 'hello_gpp', "I C the world, ++ more!")
 
   def test_hello_cpp_clangpp(self):
 
@@ -231,5 +228,12 @@ int main() {
       clangpp_wrapper, linker = products
       clangpp = clangpp_wrapper.cpp_compiler
 
-      self._do_compile_link(clangpp, linker, 'hello.cpp', 'hello_clangpp',
+      # FIXME(#5951): we should be matching the linker to the compiler here, instead of trying to
+      # use the same linker for everything. This is a temporary workaround.
+      linker_with_clangpp_workaround = Linker(
+        path_entries=(clangpp.path_entries + linker.path_entries),
+        exe_filename=clangpp.exe_filename,
+        library_dirs=(linker.library_dirs + clangpp.library_dirs))
+
+      self._do_compile_link(clangpp, linker_with_clangpp_workaround, 'hello.cpp', 'hello_clangpp',
                             "I C the world, ++ more!")
