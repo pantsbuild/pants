@@ -536,10 +536,7 @@ mod tests {
     assert_eq!(subdirs.len(), 1);
 
     // Then look for a file like e.g. `/tmp/abc1234/process-execution7zt4pH/roland`
-    let mut rolands_path = preserved_work_root.clone();
-    rolands_path.push(subdirs[0].clone());
-    rolands_path.push("roland");
-
+    let rolands_path = preserved_work_root.join(&subdirs[0]).join("roland");
     assert_eq!(rolands_path.exists(), true);
   }
 

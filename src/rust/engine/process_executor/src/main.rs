@@ -104,7 +104,7 @@ fn main() {
   };
   let work_dir = args
     .value_of("work-dir")
-    .map(|s| PathBuf::from(s))
+    .map(PathBuf::from)
     .unwrap_or_else(std::env::temp_dir);
   let local_store_path = args.value_of("local-store-path").unwrap();
   let pool = Arc::new(fs::ResettablePool::new("process-executor-".to_owned()));

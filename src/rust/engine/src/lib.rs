@@ -270,7 +270,7 @@ pub extern "C" fn scheduler_create(
     types,
     build_root_buf.to_os_string().as_ref(),
     ignore_patterns,
-    work_dir_buf.to_os_string().as_ref(),
+    PathBuf::from(work_dir_buf.to_os_string()),
     if remote_store_server_string.is_empty() {
       None
     } else {
