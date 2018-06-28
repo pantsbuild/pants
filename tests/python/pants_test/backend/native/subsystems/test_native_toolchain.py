@@ -210,12 +210,7 @@ int main() {
 
       # FIXME(#5951): we should be matching the linker to the compiler here, instead of trying to
       # use the same linker for everything.
-      gpp_with_gpp_linker = Linker(
-        path_entries=(gpp.path_entries + linker.path_entries),
-        exe_filename=gpp.exe_filename,
-        library_dirs=(gpp.library_dirs + linker.library_dirs))
-
-      self._do_compile_link(gpp, gpp_with_gpp_linker, 'hello.cpp', 'hello_gpp',
+      self._do_compile_link(gpp, linker, 'hello.cpp', 'hello_gpp',
                             "I C the world, ++ more!")
 
   def test_hello_cpp_clangpp(self):
