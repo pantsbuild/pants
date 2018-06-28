@@ -67,6 +67,7 @@ class ExecutionOptions(datatype([
   'remote_store_chunk_bytes',
   'remote_store_chunk_upload_timeout_seconds',
   'process_execution_parallelism',
+  'process_execution_cleanup_local_dirs',
 ])):
   """A collection of all options related to (remote) execution of processes.
 
@@ -83,6 +84,7 @@ class ExecutionOptions(datatype([
       remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
       remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
       process_execution_parallelism=bootstrap_options.process_execution_parallelism,
+      process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
     )
 
 
@@ -93,6 +95,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_chunk_bytes=1024*1024,
     remote_store_chunk_upload_timeout_seconds=60,
     process_execution_parallelism=multiprocessing.cpu_count()*2,
+    process_execution_cleanup_local_dirs=True,
   )
 
 
@@ -315,6 +318,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--process-execution-parallelism', type=int, default=multiprocessing.cpu_count(),
              advanced=True,
              help='Number of concurrent processes that may be executed either locally and remotely.')
+    register('--process-execution-cleanup-local-dirs', type=bool, default=True,
+             help='Whether or not to cleanup directories used for local process execution '
+                  '(primarily useful for e.g. debugging).')
 
   @classmethod
   def register_options(cls, register):

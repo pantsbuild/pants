@@ -50,17 +50,15 @@ impl Core {
     types: Types,
     build_root: &Path,
     ignore_patterns: Vec<String>,
-    work_dir: &Path,
+    work_dir: PathBuf,
     remote_store_server: Option<String>,
     remote_execution_server: Option<String>,
     remote_store_thread_count: usize,
     remote_store_chunk_bytes: usize,
     remote_store_chunk_upload_timeout: Duration,
     process_execution_parallelism: usize,
+    process_execution_cleanup_local_dirs: bool,
   ) -> Core {
-    let mut snapshots_dir = PathBuf::from(work_dir);
-    snapshots_dir.push("snapshots");
-
     let fs_pool = Arc::new(ResettablePool::new("io-".to_string()));
     let runtime = Resettable::new(|| {
       Arc::new(Runtime::new().unwrap_or_else(|e| panic!("Could not initialize Runtime: {:?}", e)))
@@ -97,6 +95,8 @@ impl Core {
         None => Box::new(process_execution::local::CommandRunner::new(
           store.clone(),
           fs_pool.clone(),
+          work_dir,
+          process_execution_cleanup_local_dirs,
         )),
       };
 

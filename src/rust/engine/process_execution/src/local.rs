@@ -1,3 +1,4 @@
+extern crate log;
 extern crate tempfile;
 
 use boxfuture::{BoxFuture, Boxable};
@@ -17,11 +18,23 @@ use bytes::Bytes;
 pub struct CommandRunner {
   store: fs::Store,
   fs_pool: Arc<fs::ResettablePool>,
+  work_dir: PathBuf,
+  cleanup_local_dirs: bool,
 }
 
 impl CommandRunner {
-  pub fn new(store: fs::Store, fs_pool: Arc<fs::ResettablePool>) -> CommandRunner {
-    CommandRunner { store, fs_pool }
+  pub fn new(
+    store: fs::Store,
+    fs_pool: Arc<fs::ResettablePool>,
+    work_dir: PathBuf,
+    cleanup_local_dirs: bool,
+  ) -> CommandRunner {
+    CommandRunner {
+      store,
+      fs_pool,
+      work_dir,
+      cleanup_local_dirs,
+    }
   }
 
   fn construct_output_snapshot(
@@ -78,7 +91,7 @@ impl super::CommandRunner for CommandRunner {
     let workdir = try_future!(
       tempfile::Builder::new()
         .prefix("process-execution")
-        .tempdir()
+        .tempdir_in(&self.work_dir)
         .map_err(|err| {
           format!(
             "Error making tempdir for local process execution: {:?}",
@@ -92,7 +105,9 @@ impl super::CommandRunner for CommandRunner {
     let env = req.env;
     let output_file_paths = req.output_files;
     let output_dir_paths = req.output_directories;
+    let cleanup_local_dirs = self.cleanup_local_dirs;
     let argv = req.argv;
+    let req_description = req.description;
     self
       .store
       .materialize_directory(workdir.path().to_owned(), req.input_files)
@@ -109,7 +124,7 @@ impl super::CommandRunner for CommandRunner {
                   .map_err(|e| format!("Error executing process: {:?}", e))
                   .map(|output| (output, workdir))
       })
-      .and_then(|(output, workdir)| {
+      .and_then(move |(output, workdir)| {
         let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
           future::ok(fs::Snapshot::empty()).to_boxed()
         } else {
@@ -137,8 +152,20 @@ impl super::CommandRunner for CommandRunner {
             )
           })
           // Force workdir not to get dropped until after we've ingested the outputs
-          .map(|result| (result, workdir))
-          .map(|(result, _workdir)| result)
+          .map(move |result| (result, workdir) )
+          .map(move |(result, workdir)| {
+            if !cleanup_local_dirs {
+              // This consumes the `TempDir` without deleting directory on the filesystem, meaning
+              // that the temporary directory will no longer be automatically deleted when dropped.
+              let preserved_path = workdir.into_path();
+              info!(
+                "preserved local process execution dir `{:?}` for {:?}",
+                preserved_path,
+                req_description
+              );
+            }
+            result
+          })
           .to_boxed()
         };
 
@@ -328,7 +355,7 @@ mod tests {
 
   #[test]
   fn output_files_one() {
-    let result = run_command_locally_in_dir(ExecuteProcessRequest {
+    let result = run_command_locally(ExecuteProcessRequest {
       argv: vec![
         find_bash(),
         "-c".to_owned(),
@@ -355,7 +382,7 @@ mod tests {
 
   #[test]
   fn output_dirs() {
-    let result = run_command_locally_in_dir(ExecuteProcessRequest {
+    let result = run_command_locally(ExecuteProcessRequest {
       argv: vec![
         find_bash(),
         "-c".to_owned(),
@@ -387,7 +414,7 @@ mod tests {
 
   #[test]
   fn output_files_many() {
-    let result = run_command_locally_in_dir(ExecuteProcessRequest {
+    let result = run_command_locally(ExecuteProcessRequest {
       argv: vec![
         find_bash(),
         "-c".to_owned(),
@@ -420,7 +447,7 @@ mod tests {
 
   #[test]
   fn output_files_execution_failure() {
-    let result = run_command_locally_in_dir(ExecuteProcessRequest {
+    let result = run_command_locally(ExecuteProcessRequest {
       argv: vec![
         find_bash(),
         "-c".to_owned(),
@@ -451,7 +478,7 @@ mod tests {
 
   #[test]
   fn output_files_partial_output() {
-    let result = run_command_locally_in_dir(ExecuteProcessRequest {
+    let result = run_command_locally(ExecuteProcessRequest {
       argv: vec![
         find_bash(),
         "-c".to_owned(),
@@ -478,14 +505,59 @@ mod tests {
     )
   }
 
+  #[test]
+  fn test_directory_preservation() {
+    let preserved_work_tmpdir = TempDir::new().unwrap();
+    let preserved_work_root = preserved_work_tmpdir.path().to_owned();
+
+    let result = run_command_locally_in_dir(
+      ExecuteProcessRequest {
+        argv: vec![
+          find_bash(),
+          "-c".to_owned(),
+          format!("echo -n {} > {}", TestData::roland().string(), "roland"),
+        ],
+        env: BTreeMap::new(),
+        input_files: fs::EMPTY_DIGEST,
+        output_files: vec![PathBuf::from("roland")].into_iter().collect(),
+        output_directories: BTreeSet::new(),
+        timeout: Duration::from_millis(1000),
+        description: "bash".to_string(),
+      },
+      preserved_work_root.clone(),
+      false,
+    );
+    result.unwrap();
+
+    assert_eq!(preserved_work_root.exists(), true);
+
+    // Collect all of the top level sub-dirs under our test workdir.
+    let subdirs = testutil::file::list_dir(&preserved_work_root);
+    assert_eq!(subdirs.len(), 1);
+
+    // Then look for a file like e.g. `/tmp/abc1234/process-execution7zt4pH/roland`
+    let rolands_path = preserved_work_root.join(&subdirs[0]).join("roland");
+    assert_eq!(rolands_path.exists(), true);
+  }
+
   fn run_command_locally(
     req: ExecuteProcessRequest,
   ) -> Result<FallibleExecuteProcessResult, String> {
-    run_command_locally_in_dir(req)
+    let work_dir = TempDir::new().unwrap();
+    run_command_locally_in_dir_with_cleanup(req, work_dir.path().to_owned())
+  }
+
+  fn run_command_locally_in_dir_with_cleanup(
+    req: ExecuteProcessRequest,
+    dir: PathBuf,
+  ) -> Result<FallibleExecuteProcessResult, String> {
+    run_command_locally_in_dir(req, dir, true)
   }
 
   fn run_command_locally_in_dir(
     req: ExecuteProcessRequest,
+    dir: PathBuf,
+    cleanup: bool,
   ) -> Result<FallibleExecuteProcessResult, String> {
     let store_dir = TempDir::new().unwrap();
     let pool = Arc::new(fs::ResettablePool::new("test-pool-".to_owned()));
@@ -493,6 +565,8 @@ mod tests {
     let runner = super::CommandRunner {
       store: store,
       fs_pool: pool,
+      work_dir: dir,
+      cleanup_local_dirs: cleanup,
     };
     runner.run(req).wait()
   }
