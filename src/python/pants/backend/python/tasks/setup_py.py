@@ -193,7 +193,7 @@ class SetupPyExecutionEnvironment(datatype([
 
       all_include_dirs = cc.include_dirs + cxx.include_dirs
       if all_include_dirs:
-        ret['CPATH'] = all_include_dirs
+        ret['CPATH'] = create_path_env_var(all_include_dirs)
 
       all_cflags_for_platform = plat.resolve_platform_specific({
         'darwin': lambda: ['-mmacosx-version-min=10.11'],
