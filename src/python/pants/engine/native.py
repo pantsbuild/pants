@@ -210,7 +210,7 @@ Scheduler* scheduler_create(Tasks*,
                             uint64_t,
                             uint64_t,
                             uint64_t,
-                            uint8_t);
+                            _Bool);
 void scheduler_pre_fork(Scheduler*);
 Value scheduler_metrics(Scheduler*, Session*);
 RawNodes* scheduler_execute(Scheduler*, Session*, ExecutionRequest*);
