@@ -1,5 +1,3 @@
-extern crate bazel_protos;
-extern crate boxfuture;
 extern crate bytes;
 extern crate clap;
 extern crate env_logger;
@@ -27,7 +25,7 @@ enum ExitCode {
 }
 
 #[derive(Debug)]
-struct ExitError(pub String, pub ExitCode);
+struct ExitError(String, ExitCode);
 
 impl From<String> for ExitError {
   fn from(s: String) -> Self {
@@ -367,5 +365,5 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
 }
 
 fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::PosixFS {
-  fs::PosixFS::new(&root, pool, vec![]).unwrap()
+  fs::PosixFS::new(&root, pool, &[]).unwrap()
 }

@@ -1,8 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-extern crate bazel_protos;
-
 use std::collections::{BTreeMap, HashMap};
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -367,7 +365,7 @@ impl Select {
                   })
                   .and_then(move |directory| {
                     store
-                      .contents_for_directory(directory)
+                      .contents_for_directory(&directory)
                       .map_err(|str| throw(&str))
                   })
                   .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
@@ -644,7 +642,7 @@ impl From<Scandir> for NodeKey {
 ///
 /// A Node that captures an fs::Snapshot for a PathGlobs subject.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Snapshot(Key);
 
 impl Snapshot {
@@ -937,7 +935,7 @@ impl NodeTracer<NodeKey> for Tracer {
         "Throw({})\n{}",
         externs::val_to_str(x),
         traceback
-          .split("\n")
+          .split('\n')
           .map(|l| format!("{}    {}", indent, l))
           .collect::<Vec<_>>()
           .join("\n")
@@ -1112,7 +1110,7 @@ impl From<DirectoryListing> for NodeResult {
 //   see https://github.com/rust-lang/rust/issues/33417
 pub trait TryFrom<T>: Sized {
   type Err;
-  fn try_from(T) -> Result<Self, Self::Err>;
+  fn try_from(t: T) -> Result<Self, Self::Err>;
 }
 
 pub trait TryInto<T>: Sized {

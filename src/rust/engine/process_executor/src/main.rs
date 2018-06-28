@@ -1,4 +1,3 @@
-extern crate boxfuture;
 extern crate clap;
 extern crate env_logger;
 extern crate fs;

@@ -147,7 +147,7 @@ impl MockResponder {
     ));
   }
 
-  fn display_all<D: Debug>(items: &Vec<D>) -> String {
+  fn display_all<D: Debug>(items: &[D]) -> String {
     items
       .iter()
       .map(|i| format!("{:?}\n", i))

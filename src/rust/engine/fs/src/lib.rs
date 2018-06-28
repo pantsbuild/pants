@@ -23,7 +23,6 @@ extern crate futures_cpupool;
 extern crate glob;
 extern crate grpcio;
 extern crate hashing;
-extern crate hex;
 extern crate ignore;
 extern crate indexmap;
 extern crate itertools;
@@ -37,6 +36,7 @@ extern crate mock;
 extern crate protobuf;
 extern crate resettable;
 extern crate sha2;
+#[cfg(test)]
 extern crate tempfile;
 #[cfg(test)]
 extern crate testutil;
@@ -459,7 +459,7 @@ impl PathGlobs {
       })
       .collect();
     // An empty exclude becomes EMPTY_IGNORE.
-    PathGlobs::create_with_globs_and_match_behavior(include, &vec![], StrictGlobMatching::Ignore)
+    PathGlobs::create_with_globs_and_match_behavior(include, &[], StrictGlobMatching::Ignore)
   }
 }
 
@@ -488,7 +488,7 @@ impl PosixFS {
   pub fn new<P: AsRef<Path>>(
     root: P,
     pool: Arc<ResettablePool>,
-    ignore_patterns: Vec<String>,
+    ignore_patterns: &[String],
   ) -> Result<PosixFS, String> {
     let root: &Path = root.as_ref();
     let canonical_root = root
@@ -520,7 +520,7 @@ impl PosixFS {
     })
   }
 
-  fn scandir_sync(root: PathBuf, dir_relative_to_root: Dir) -> Result<Vec<Stat>, io::Error> {
+  fn scandir_sync(root: PathBuf, dir_relative_to_root: &Dir) -> Result<Vec<Stat>, io::Error> {
     let dir_abs = root.join(&dir_relative_to_root.0);
     let mut stats: Vec<Stat> = dir_abs
       .read_dir()?
@@ -654,7 +654,7 @@ impl PosixFS {
     let root = self.root.0.clone();
     self
       .pool
-      .spawn_fn(move || PosixFS::scandir_sync(root, dir))
+      .spawn_fn(move || PosixFS::scandir_sync(root, &dir))
       .to_boxed()
   }
 }
@@ -782,12 +782,12 @@ mod posixfs_test {
   extern crate tempfile;
   extern crate testutil;
 
-  use self::testutil::make_file;
   use super::{Dir, File, Link, PathStat, PathStatGetter, PosixFS, ResettablePool, Stat};
   use futures::Future;
   use std;
   use std::path::{Path, PathBuf};
   use std::sync::Arc;
+  use testutil::make_file;
 
   #[test]
   fn is_executable_false() {
@@ -1075,7 +1075,7 @@ mod posixfs_test {
     PosixFS::new(
       dir.as_ref(),
       Arc::new(ResettablePool::new("test-pool-".to_string())),
-      vec![],
+      &[],
     ).unwrap()
   }
 }

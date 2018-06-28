@@ -443,7 +443,7 @@ impl<N: Node> InnerGraph<N> {
         .map(|d| (d, id))
     };
 
-    let mut queue: BinaryHeap<(Duration, EntryId)> = BinaryHeap::with_capacity(k as usize);
+    let mut queue: BinaryHeap<(Duration, EntryId)> = BinaryHeap::with_capacity(k);
     let mut visited: HashSet<EntryId, FNV> = HashSet::default();
     let mut res = Vec::new();
 
@@ -506,16 +506,14 @@ impl<N: Node> InnerGraph<N> {
   fn digests_internal<'g>(
     &'g self,
     entryids: Vec<EntryId>,
-  ) -> Box<Iterator<Item = hashing::Digest> + 'g> {
-    Box::new(
-      entryids
-        .into_iter()
-        .filter_map(move |eid| self.entry_for_id(eid))
-        .filter_map(|entry| match entry.peek() {
-          Some(Ok(item)) => N::digest(item),
-          _ => None,
-        }),
-    )
+  ) -> impl Iterator<Item = hashing::Digest> + 'g {
+    entryids
+      .into_iter()
+      .filter_map(move |eid| self.entry_for_id(eid))
+      .filter_map(|entry| match entry.peek() {
+        Some(Ok(item)) => N::digest(item),
+        _ => None,
+      })
   }
 }
 
@@ -559,7 +557,7 @@ impl<N: Node> Graph<N> {
         let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
         if inner.detect_cycle(src_id, potential_dst_id) {
           // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
-          inner.ensure_entry(EntryKey::Cyclic(dst_node.clone()))
+          inner.ensure_entry(EntryKey::Cyclic(dst_node))
         } else {
           // Valid dependency.
           potential_dst_id
@@ -589,7 +587,7 @@ impl<N: Node> Graph<N> {
     // Initialize the state while under the lock...
     let state = {
       let mut inner = self.inner.lock().unwrap();
-      let id = inner.ensure_entry(EntryKey::Valid(node.into()));
+      let id = inner.ensure_entry(EntryKey::Valid(node));
       inner
         .entry_for_id_mut(id)
         .map(|entry| entry.state(context, id))

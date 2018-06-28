@@ -247,7 +247,7 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
         // reverse order of expansion (using .rev()), we ensure that we have already visited every
         // "child" glob of the glob we are operating on while iterating. This is a reverse
         // "topological ordering" which preserves the partial order from parent to child globs.
-        let all_globs: Vec<PathGlob> = completed.keys().rev().map(|pg| pg.clone()).collect();
+        let all_globs: Vec<PathGlob> = completed.keys().rev().cloned().collect();
         for cur_glob in all_globs {
           // Note that we talk of "parents" and "childen", but this structure is actually a DAG,
           // because different `DirWildcard`s can potentially expand (transitively) to the same

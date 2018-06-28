@@ -57,7 +57,7 @@ impl Interns {
       })
       .clone();
     if inserted {
-      self.reverse.insert(key.clone(), v);
+      self.reverse.insert(key, v);
       self.id_generator += 1;
     }
     key
