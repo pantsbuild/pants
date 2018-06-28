@@ -24,7 +24,7 @@ class XCodeCLITools(Subsystem):
 
   options_scope = 'xcode-cli-tools'
 
-  REQUIRED_FILES = {
+  _REQUIRED_FILES = {
     'bin': [
       'as',
       'cc',
@@ -34,6 +34,9 @@ class XCodeCLITools(Subsystem):
       'ld',
       'lipo',
     ],
+    # Any of the entries that would be here are not directly below the 'include' or 'lib' dirs, and
+    # we haven't yet encountered an invalid XCode/CLI tools installation which has the include dirs,
+    # but incorrect files. These would need to be updated if such an issue arises.
     'include': [],
     'lib': [],
   }
@@ -61,11 +64,12 @@ class XCodeCLITools(Subsystem):
   def register_options(cls, register):
     super(XCodeCLITools, cls).register_options(register)
 
-    register('--install-prefixes', type=list, default=cls.INSTALL_PREFIXES_DEFAULT, advanced=True,
+    register('--install-prefixes', type=list, default=cls.INSTALL_PREFIXES_DEFAULT,
+             fingerprint=True, advanced=True,
              help='Locations to search for resources from the XCode CLI tools, including a '
                   'compiler, linker, header files, and some libraries. '
                   'Under this directory should be some selection of these subdirectories: {}.'
-                  .format(cls.REQUIRED_FILES.keys()))
+                  .format(cls._REQUIRED_FILES.keys()))
 
   @memoized_property
   def _all_existing_install_prefixes(self):
@@ -77,7 +81,7 @@ class XCodeCLITools(Subsystem):
     maybe_subdirs = [os.path.join(pfx, subdir_name) for pfx in self._all_existing_install_prefixes]
     existing_dirs = [existing_dir for existing_dir in maybe_subdirs if os.path.isdir(existing_dir)]
 
-    required_files_for_dir = self.REQUIRED_FILES.get(subdir_name)
+    required_files_for_dir = self._REQUIRED_FILES.get(subdir_name)
     if required_files_for_dir:
       for fname in required_files_for_dir:
         found = False

@@ -38,9 +38,9 @@ class LibcDev(Subsystem):
   def register_options(cls, register):
     super(LibcDev, cls).register_options(register)
 
-    register('--libc-dir', type=dir_option, default='/usr/lib', advanced=True,
+    register('--libc-dir', type=dir_option, default='/usr/lib', fingerprint=True, advanced=True,
              help='A directory containing a host-specific crti.o from libc.')
-    register('--host-compiler', type=str, default='gcc', advanced=True,
+    register('--host-compiler', type=str, default='gcc', fingerprint=True, advanced=True,
              help='The host compiler to invoke with -print-search-dirs to find the host libc.')
 
   # NB: crti.o is required to create executables on Linux. Our provided gcc can find it if the
@@ -56,6 +56,8 @@ class LibcDev(Subsystem):
     """Locate the host's libc-dev installation using a specified host compiler's search dirs."""
     compiler_exe = self.get_options().host_compiler
 
+    # Implicitly, we are passing in the environment of the executing pants process to
+    # `get_compiler_library_dirs()`.
     # These directories are checked to exist!
     library_dirs = self._parse_search_dirs.get_compiler_library_dirs(compiler_exe)
 

@@ -433,16 +433,11 @@ class SchedulerSession(object):
       self._scheduler.add_root_selection(native_execution_request, subject, product)
     return ExecutionRequest(request_specs, native_execution_request)
 
-  # FIXME: note that this does a cross prod!
   def execution_request(self, products, subjects):
     """Create and return an ExecutionRequest for the given products and subjects.
 
     The resulting ExecutionRequest object will contain keys tied to this scheduler's product Graph,
     and so it will not be directly usable with other scheduler instances without being re-created.
-
-    An ExecutionRequest for an Address represents exactly one product output, as does
-    SingleAddress. But we differentiate between them here in order to normalize the output for all
-    Spec objects as "list of product".
 
     NB: This method does a "cross product", mapping all subjects to all products. To create a
     request for just the given list of subject -> product tuples, use `execution_request_literal()`!
