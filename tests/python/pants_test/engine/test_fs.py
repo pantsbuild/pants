@@ -367,7 +367,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         80
       )
       scheduler = self.mk_scheduler(rules=create_fs_rules())
-      scheduler.materialize_directories((DirectoryToMaterialize(str(dir_path), digest), DirectoryToMaterialize(str(dir_path), digest)),)
+      scheduler.materialize_directories((DirectoryToMaterialize(str(dir_path), digest),))
 
       created_file = os.path.join(dir_path, "roland")
       with open(created_file) as f:
@@ -377,6 +377,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
   def test_materialize_directories_error(self):
     with temporary_dir() as temp_dir:
       scheduler = self.mk_scheduler(rules=create_fs_rules())
+      #  Use a file to fail!!
       scheduler.materialize_directories((DirectoryToMaterialize(str(temp_dir), EMPTY_DIRECTORY_DIGEST),))
     # self.prime_store_with_roland_digest()
     #
