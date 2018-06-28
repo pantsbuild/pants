@@ -43,13 +43,9 @@ class LibcDev(Subsystem):
     register('--host-compiler', type=str, default='gcc', fingerprint=True, advanced=True,
              help='The host compiler to invoke with -print-search-dirs to find the host libc.')
 
-  # NB: crti.o is required to create executables on Linux. Our provided gcc can find it if the
-  # containing directory is within the LIBRARY_PATH environment variable when we invoke gcc.
-  # Note that clang is not able to use LIBRARY_PATH to find this file -- instead, you need to set
-  # --sysroot and provide a -Bprefix (may require a space?) such that this file is located at
-  # <sysroot>/<prefix>/lib/crti.o. Setting --sysroot requires adding so many more "-Bprefix"
-  # arguments to add other required files and libraries for linking that we do not try to link with
-  # clang at all currently.
+  # NB: crti.o is required to create executables on Linux. Our provided gcc and clang can find it if
+  # the containing directory is within the LIBRARY_PATH environment variable when we invoke the
+  # compiler.
   _LIBC_INIT_OBJECT_FILE = 'crti.o'
 
   def _get_host_libc_from_host_compiler(self):
