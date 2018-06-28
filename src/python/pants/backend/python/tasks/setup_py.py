@@ -8,7 +8,6 @@ import ast
 import itertools
 import os
 import pprint
-import re
 import shutil
 from abc import abstractmethod
 from builtins import map, object, str, zip
@@ -60,13 +59,21 @@ class SetupPyRunner(InstallerBase):
 
   DIST_DIR = 'dist'
 
+  # NB: "snapshot" refers to a "snapshot release", not a Snapshot.
   @classmethod
-  def for_bdist_wheel(cls, source_dir, is_platform_specific, **kw):
-    cmd = ['bdist_wheel']
+  def for_snapshot_bdist_wheel(cls, source_dir, snapshot_fingerprint, is_platform_specific, **kw):
+    # NB: adds a '+' before the fingerprint to the build tag!
+    egg_info_snapshot_tag_args = ['egg_info', '--tag-build=+{}'.format(snapshot_fingerprint)]
+    bdist_whl_args = ['bdist_wheel']
     if is_platform_specific:
-      cmd.extend(['--plat-name', pep425tags.get_platform()])
-    cmd.extend(['--dist-dir', cls.DIST_DIR])
-    return cls(source_dir, cmd, **kw)
+      platform_args = ['--plat-name', pep425tags.get_platform()]
+    else:
+      platform_args = []
+    dist_dir_args = ['--dist-dir', cls.DIST_DIR]
+
+    setup_py_command = (
+      egg_info_snapshot_tag_args + bdist_whl_args + platform_args + dist_dir_args)
+    return cls(source_dir, setup_py_command, **kw)
 
   def __init__(self, source_dir, setup_command, **kw):
     self.__setup_command = setup_command
@@ -144,7 +151,6 @@ def ensure_setup_requires_site_dir(reqs_to_resolve, interpreter, site_dir,
 
 
 class SetupPyExecutionEnvironment(datatype([
-    'version',
     # TODO: It might be pretty useful to have an Optional TypeConstraint.
     'setup_requires_site_dir',
     # If None, don't execute in the toolchain environment.
@@ -169,10 +175,6 @@ class SetupPyExecutionEnvironment(datatype([
 
   def as_environment(self):
     ret = {}
-
-    if self.version:
-      ret['_SETUP_PY_LOCAL_VERSION'] = self.PEP_0440_DISALLOWED_LOCAL.sub(
-        self._local_version_replacer_char, self.version)
 
     if self.setup_requires_site_dir:
       ret['PYTHONPATH'] = self.setup_requires_site_dir.site_dir

@@ -212,19 +212,25 @@ class BuildLocalPythonDistributions(Task):
                              .format(setup_requires_site_dir))
 
     setup_py_execution_environment = SetupPyExecutionEnvironment(
-      version=versioned_target.cache_key.hash,
       setup_requires_site_dir=setup_requires_site_dir,
       setup_py_native_tools=native_tools)
 
-    self._create_dist(dist_target, dist_output_dir, interpreter,
-                      setup_py_execution_environment, is_platform_specific)
+    versioned_target_fingerprint = versioned_target.cache_key.hash
+
+    self._create_dist(
+      dist_target,
+      dist_output_dir,
+      interpreter,
+      setup_py_execution_environment,
+      versioned_target_fingerprint,
+      is_platform_specific)
 
   def _create_dist(self, dist_tgt, dist_target_dir, interpreter,
-                   setup_py_execution_environment, is_platform_specific):
+                   setup_py_execution_environment, snapshot_version, is_platform_specific):
     """Create a .whl file for the specified python_distribution target."""
     self._copy_sources(dist_tgt, dist_target_dir)
 
-    setup_runner = SetupPyRunner.for_bdist_wheel(
+    setup_runner = SetupPyRunner.for_snapshot_bdist_wheel(
       source_dir=dist_target_dir,
       is_platform_specific=is_platform_specific,
       interpreter=interpreter)

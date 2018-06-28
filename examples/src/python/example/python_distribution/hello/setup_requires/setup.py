@@ -18,12 +18,8 @@ if os.getenv('PANTS_TEST_SETUP_REQUIRES', ''):
   output.extend(os.listdir(os.getenv('PYTHONPATH', '')))
   raise Exception(str(output))
 
-public_version = '1.0.0'
-local_version = os.getenv('_SETUP_PY_LOCAL_VERSION')
-version = '{}+{}'.format(public_version, local_version) if local_version else public_version
-
 setup(
   name='hello',
-  version=version,
+  version='1.0.0',
   packages=find_packages(),
 )
