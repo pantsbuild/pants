@@ -86,8 +86,10 @@ def select_linker(platform, native_toolchain):
   # its own set of C++-specific files for the linker if necessary. Using e.g. 'g++' as the linker
   # appears to produce byte-identical output when linking even C-only object files, and also
   # happens to work when C++ is used.
-  c_compiler = yield Get(CCompiler, NativeToolchain, native_toolchain)
-  cpp_compiler = yield Get(CppCompiler, NativeToolchain, native_toolchain)
+  gcc_c_compiler = yield Get(GCCCCompiler, NativeToolchain, native_toolchain)
+  c_compiler = gcc_c_compiler.c_compiler
+  gcc_cpp_compiler = yield Get(GCCCppCompiler, NativeToolchain, native_toolchain)
+  cpp_compiler = gcc_cpp_compiler.cpp_compiler
 
   # NB: If needing to create an environment for process invocation that could use either a compiler
   # or a linker (e.g. when we compile native code from `python_dist()`s), use the environment from
