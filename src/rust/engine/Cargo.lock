@@ -333,6 +333,7 @@ dependencies = [
  "protobuf 1.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "resettable 0.0.1",
  "sha2 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tempfile 3.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "testutil 0.0.1",
 ]
 

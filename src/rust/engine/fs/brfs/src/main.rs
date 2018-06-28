@@ -10,6 +10,10 @@ extern crate libc;
 #[macro_use]
 extern crate log;
 extern crate protobuf;
+#[cfg(test)]
+extern crate tempfile;
+#[cfg(test)]
+extern crate testutil;
 extern crate time;
 
 use futures::future::Future;
@@ -655,14 +659,14 @@ mod test {
   extern crate tempfile;
   extern crate testutil;
 
-  use self::testutil::{
-    data::{TestData, TestDirectory}, file,
-  };
   use super::mount;
   use fs;
   use futures::future::Future;
   use hashing;
   use std::sync::Arc;
+  use testutil::{
+    data::{TestData, TestDirectory}, file,
+  };
 
   #[test]
   fn missing_digest() {
@@ -897,10 +901,6 @@ mod test {
 // acts as we expect.
 #[cfg(test)]
 mod syscall_tests {
-  extern crate tempfile;
-  extern crate testutil;
-
-  use self::testutil::data::TestData;
   use super::mount;
   use super::test::digest_to_filepath;
   use fs;
@@ -910,6 +910,7 @@ mod syscall_tests {
   use std::path::Path;
   use std::sync::Arc;
   use test::make_dirs;
+  use testutil::data::TestData;
 
   #[test]
   fn read_file_by_digest_exact_bytes() {

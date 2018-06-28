@@ -291,8 +291,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
                     grpcio::RpcStatusCode::InvalidArgument,
                     Some(format!(
                       "Bad fingerprint in resource name: {}: {}",
-                      parts[4],
-                      err
+                      parts[4], err
                     )),
                   ))
                 }
@@ -302,11 +301,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
                 Err(err) => {
                   return Err(grpcio::RpcStatus::new(
                     grpcio::RpcStatusCode::InvalidArgument,
-                    Some(format!(
-                      "Bad size in resource name: {}: {}",
-                      parts[5],
-                      err
-                    )),
+                    Some(format!("Bad size in resource name: {}: {}", parts[5], err)),
                   ))
                 }
               };

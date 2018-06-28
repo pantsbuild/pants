@@ -364,16 +364,14 @@ impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
 #[cfg(test)]
 mod tests {
   extern crate tempfile;
-  extern crate testutil;
-
-  use self::testutil::data::TestDirectory;
-  use self::testutil::make_file;
   use futures::future::Future;
   use hashing::{Digest, Fingerprint};
+  use testutil::data::TestDirectory;
+  use testutil::make_file;
 
   use super::super::{
     Dir, File, GlobMatching, Path, PathGlobs, PathStat, PosixFS, ResettablePool, Snapshot, Store,
-    StrictGlobMatching, VFS,
+    StrictGlobMatching,
   };
   use super::OneOffStoreFileByDigest;
 
@@ -399,7 +397,7 @@ mod tests {
       pool.clone(),
     ).unwrap();
     let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();
-    let posix_fs = Arc::new(PosixFS::new(dir.path(), pool, vec![]).unwrap());
+    let posix_fs = Arc::new(PosixFS::new(dir.path(), pool, &[]).unwrap());
     let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone());
     (store, dir, posix_fs, file_saver)
   }

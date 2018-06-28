@@ -1731,9 +1731,6 @@ mod remote {
 
   #[cfg(test)]
   mod tests {
-
-    extern crate tempfile;
-
     use super::super::EntryType;
     use super::ByteStore;
     use bytes::Bytes;

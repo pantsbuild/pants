@@ -37,6 +37,8 @@ extern crate protobuf;
 extern crate resettable;
 extern crate sha2;
 #[cfg(test)]
+extern crate tempfile;
+#[cfg(test)]
 extern crate testutil;
 
 use std::cmp::min;
@@ -780,12 +782,12 @@ mod posixfs_test {
   extern crate tempfile;
   extern crate testutil;
 
-  use self::testutil::make_file;
   use super::{Dir, File, Link, PathStat, PathStatGetter, PosixFS, ResettablePool, Stat};
   use futures::Future;
   use std;
   use std::path::{Path, PathBuf};
   use std::sync::Arc;
+  use testutil::make_file;
 
   #[test]
   fn is_executable_false() {

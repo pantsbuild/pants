@@ -192,7 +192,6 @@ mod tests {
   extern crate tempfile;
   extern crate testutil;
 
-  use self::testutil::{as_bytes, owned_string_vec};
   use super::super::CommandRunner as CommandRunnerTrait;
   use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
   use fs;
@@ -206,6 +205,7 @@ mod tests {
   use std::time::Duration;
   use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
+  use testutil::{as_bytes, owned_string_vec};
 
   #[test]
   #[cfg(unix)]

@@ -84,21 +84,20 @@ impl Core {
       })
       .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
-    let underlying_command_runner: Box<CommandRunner> =
-      match remote_execution_server {
-        Some(address) => Box::new(process_execution::remote::CommandRunner::new(
-          address,
-          // Allow for some overhead for bookkeeping threads (if any).
-          process_execution_parallelism + 2,
-          store.clone(),
-        )),
-        None => Box::new(process_execution::local::CommandRunner::new(
-          store.clone(),
-          fs_pool.clone(),
-          work_dir,
-          process_execution_cleanup_local_dirs,
-        )),
-      };
+    let underlying_command_runner: Box<CommandRunner> = match remote_execution_server {
+      Some(address) => Box::new(process_execution::remote::CommandRunner::new(
+        address,
+        // Allow for some overhead for bookkeeping threads (if any).
+        process_execution_parallelism + 2,
+        store.clone(),
+      )),
+      None => Box::new(process_execution::local::CommandRunner::new(
+        store.clone(),
+        fs_pool.clone(),
+        work_dir,
+        process_execution_cleanup_local_dirs,
+      )),
+    };
 
     let command_runner =
       BoundedCommandRunner::new(underlying_command_runner, process_execution_parallelism);

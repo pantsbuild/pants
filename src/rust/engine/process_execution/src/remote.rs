@@ -315,22 +315,14 @@ impl CommandRunner {
                 ))).to_boxed();
               }
               let digest = Digest(
+                try_future!(Fingerprint::from_hex_string(parts[1]).map_err(|e| {
+                  ExecutionError::Fatal(format!("Bad digest in missing blob: {}: {}", parts[1], e))
+                })),
                 try_future!(
-                  Fingerprint::from_hex_string(parts[1]).map_err(|e| {
-                    ExecutionError::Fatal(format!(
-                      "Bad digest in missing blob: {}: {}",
-                      parts[1],
-                      e
-                    ))
+                  parts[2].parse::<usize>().map_err(|e| {
+                    ExecutionError::Fatal(format!("Missing blob had bad size: {}: {}", parts[2], e))
                   })
                 ),
-                try_future!(parts[2].parse::<usize>().map_err(|e| {
-                  ExecutionError::Fatal(format!(
-                    "Missing blob had bad size: {}: {}",
-                    parts[2],
-                    e
-                  ))
-                })),
               );
               missing_digests.push(digest);
             }
