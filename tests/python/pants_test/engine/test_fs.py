@@ -419,7 +419,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       self.assertEqual("???", str(single_warning))
 
   def prime_store_with_roland_digest(self):
-    """This method primes the store with the digest of a file named 'roland' and contents 'European Burmese'."""
+    """This method primes the store with a directory of a file named 'roland' and contents 'European Burmese'."""
     with temporary_dir() as temp_dir:
       with open(os.path.join(temp_dir, "roland"), "w") as f:
         f.write("European Burmese")

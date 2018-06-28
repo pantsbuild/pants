@@ -23,6 +23,7 @@ from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import Select, SelectVariant, constraint_for
 from pants.engine.struct import HasProducts, Variants
 from pants.util.contextutil import temporary_file_path
+from pants.util.dirutil import check_no_overlapping_paths
 from pants.util.objects import Collection, SubclassesOf, datatype
 
 
@@ -366,6 +367,10 @@ class Scheduler(object):
            digest of the directories to materialize.
     :returns: Nothing or an error.
     """
+    # Ensure there isn't more than one of the same directory paths and paths do not have the same prefix.
+    dir_list = [path for (path, _) in directories_paths_and_digests]
+    check_no_overlapping_paths(dir_list)
+
     result = self._native.lib.materialize_directories(
       self._scheduler,
       self._to_value(_DirectoriesToMaterialize(directories_paths_and_digests)),

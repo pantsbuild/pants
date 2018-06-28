@@ -500,3 +500,16 @@ def split_basename_and_dirname(path):
   if not os.path.isfile(path):
     raise ValueError("{} does not exist or is not a regular file.".format(path))
   return (os.path.dirname(path), os.path.basename(path))
+
+
+def check_no_overlapping_paths(paths):
+  """Given a list of paths, ensure that all are unique and do not have the same prefix."""
+  for path in paths:
+    list_copy_without_path = list(paths)
+    list_copy_without_path.remove(path)
+    if path in list_copy_without_path:
+      raise ValueError('{} appeared more than once. All paths must be unique.'.format(path))
+    for p in list_copy_without_path:
+      # common
+      if path in p:
+        raise ValueError('{} and {} have the same prefix. All paths must be unique and cannot overlap.'.format(path, p))
