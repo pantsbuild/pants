@@ -367,12 +367,32 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         80
       )
       scheduler = self.mk_scheduler(rules=create_fs_rules())
-      scheduler.materialize_directories((DirectoryToMaterialize(str(dir_path), digest),))
+      scheduler.materialize_directories((DirectoryToMaterialize(str(dir_path), digest), DirectoryToMaterialize(str(dir_path), digest)),)
 
       created_file = os.path.join(dir_path, "roland")
       with open(created_file) as f:
         content = f.read()
         self.assertEquals(content, "European Burmese")
+
+  def test_materialize_directories_error(self):
+    with temporary_dir() as temp_dir:
+      scheduler = self.mk_scheduler(rules=create_fs_rules())
+      scheduler.materialize_directories((DirectoryToMaterialize(str(temp_dir), EMPTY_DIRECTORY_DIGEST),))
+    # self.prime_store_with_roland_digest()
+    #
+    # with temporary_dir() as temp_dir:
+    #   dir_path = os.path.join(temp_dir, "containing_roland")
+    #   digest = DirectoryDigest(
+    #     str("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+    #     80
+    #   )
+    #   scheduler = self.mk_scheduler(rules=create_fs_rules())
+    #   scheduler.materialize_directories((DirectoryToMaterialize(str(dir_path), digest),))
+    #
+    #   created_file = os.path.join(dir_path, "roland")
+    #   with open(created_file) as f:
+    #     content = f.read()
+    #     self.assertEquals(content, "European Burmese")
 
   def test_glob_match_error(self):
     with self.assertRaises(ValueError) as cm:

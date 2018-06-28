@@ -368,7 +368,8 @@ class Scheduler(object):
     :returns: Nothing or an error.
     """
     # Ensure there isn't more than one of the same directory paths and paths do not have the same prefix.
-    dir_list = [path for (path, _) in directories_paths_and_digests]
+    print(directories_paths_and_digests)
+    dir_list = [path for (path, _) in list(directories_paths_and_digests)]
     check_no_overlapping_paths(dir_list)
 
     result = self._native.lib.materialize_directories(

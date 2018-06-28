@@ -510,6 +510,5 @@ def check_no_overlapping_paths(paths):
     if path in list_copy_without_path:
       raise ValueError('{} appeared more than once. All paths must be unique.'.format(path))
     for p in list_copy_without_path:
-      # common
       if path in p:
         raise ValueError('{} and {} have the same prefix. All paths must be unique and cannot overlap.'.format(path, p))
