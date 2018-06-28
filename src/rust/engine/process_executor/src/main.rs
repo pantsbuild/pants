@@ -150,10 +150,7 @@ fn main() {
       store,
     )),
     None => Box::new(process_execution::local::CommandRunner::new(
-      store,
-      pool,
-      work_dir,
-      true,
+      store, pool, work_dir, true,
     )),
   };
 
