@@ -75,7 +75,6 @@ class SelectInterpreterTest(TaskTestBase):
                             dependencies=dependencies, compatibility=compatibility)
 
   def _select_interpreter(self, target_roots, should_invalidate=None):
-    """Return the version string of the interpreter selected for the target roots."""
     context = self.context(target_roots=target_roots)
     task = self.create_task(context)
     if should_invalidate is not None:
@@ -96,24 +95,29 @@ class SelectInterpreterTest(TaskTestBase):
       else:
         task._create_interpreter_path_file.assert_not_called()
 
-    interpreter = context.products.get_data(PythonInterpreter)
+    return context.products.get_data(PythonInterpreter)
+
+  def _select_interpreter_and_get_version(self, target_roots, should_invalidate=None):
+    """Return the version string of the interpreter selected for the target roots."""
+    interpreter = self._select_interpreter(target_roots, should_invalidate)
     self.assertTrue(isinstance(interpreter, PythonInterpreter))
     return interpreter.version_string
 
   def test_interpreter_selection(self):
-    self.assertEquals('IronPython-2.77.777', self._select_interpreter([self.reqtgt]))
-    self.assertEquals('IronPython-2.77.777', self._select_interpreter([self.tgt1]))
-    self.assertEquals('IronPython-2.88.888', self._select_interpreter([self.tgt2]))
-    self.assertEquals('IronPython-2.99.999', self._select_interpreter([self.tgt3]))
-    self.assertEquals('IronPython-2.77.777', self._select_interpreter([self.tgt4]))
-    self.assertEquals('IronPython-2.88.888', self._select_interpreter([self.tgt20]))
-    self.assertEquals('IronPython-2.99.999', self._select_interpreter([self.tgt30]))
-    self.assertEquals('IronPython-2.77.777', self._select_interpreter([self.tgt40]))
-    self.assertEquals('IronPython-2.99.999', self._select_interpreter([self.tgt2, self.tgt3]))
-    self.assertEquals('IronPython-2.88.888', self._select_interpreter([self.tgt2, self.tgt4]))
+    self.assertIsNone(self._select_interpreter([]))
+    self.assertEquals('IronPython-2.77.777', self._select_interpreter_and_get_version([self.reqtgt]))
+    self.assertEquals('IronPython-2.77.777', self._select_interpreter_and_get_version([self.tgt1]))
+    self.assertEquals('IronPython-2.88.888', self._select_interpreter_and_get_version([self.tgt2]))
+    self.assertEquals('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt3]))
+    self.assertEquals('IronPython-2.77.777', self._select_interpreter_and_get_version([self.tgt4]))
+    self.assertEquals('IronPython-2.88.888', self._select_interpreter_and_get_version([self.tgt20]))
+    self.assertEquals('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt30]))
+    self.assertEquals('IronPython-2.77.777', self._select_interpreter_and_get_version([self.tgt40]))
+    self.assertEquals('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt2, self.tgt3]))
+    self.assertEquals('IronPython-2.88.888', self._select_interpreter_and_get_version([self.tgt2, self.tgt4]))
 
     with self.assertRaises(TaskError) as cm:
-      self._select_interpreter([self.tgt3, self.tgt4])
+      self._select_interpreter_and_get_version([self.tgt3, self.tgt4])
     self.assertIn('Unable to detect a suitable interpreter for compatibilities: '
                   'IronPython<2.99.999 && IronPython>2.88.888', str(cm.exception))
 
@@ -121,31 +125,31 @@ class SelectInterpreterTest(TaskTestBase):
     tgta = self._fake_target('tgta', compatibility=['IronPython>2.77.777'],
                              dependencies=[self.tgt3])
     self.assertEquals('IronPython-2.99.999',
-                      self._select_interpreter([tgta], should_invalidate=True))
+                      self._select_interpreter_and_get_version([tgta], should_invalidate=True))
 
     # A new target with different sources, but identical compatibility, shouldn't invalidate.
     self.create_file('tgtb/foo/bar/baz.py', 'fake content')
     tgtb = self._fake_target('tgtb', compatibility=['IronPython>2.77.777'],
                              dependencies=[self.tgt3], sources=['foo/bar/baz.py'])
     self.assertEquals('IronPython-2.99.999',
-                      self._select_interpreter([tgtb], should_invalidate=False))
+                      self._select_interpreter_and_get_version([tgtb], should_invalidate=False))
 
   def test_compatibility_AND(self):
     tgt = self._fake_target('tgt5', compatibility=['IronPython>2.77.777,<2.99.999'])
-    self.assertEquals('IronPython-2.88.888', self._select_interpreter([tgt]))
+    self.assertEquals('IronPython-2.88.888', self._select_interpreter_and_get_version([tgt]))
 
   def test_compatibility_AND_impossible(self):
     tgt = self._fake_target('tgt5', compatibility=['IronPython>2.77.777,<2.88.888'])
 
     with self.assertRaises(PythonInterpreterCache.UnsatisfiableInterpreterConstraintsError):
-      self._select_interpreter([tgt])
+      self._select_interpreter_and_get_version([tgt])
 
   def test_compatibility_OR(self):
     tgt = self._fake_target('tgt6', compatibility=['IronPython>2.88.888', 'IronPython<2.7'])
-    self.assertEquals('IronPython-2.99.999', self._select_interpreter([tgt]))
+    self.assertEquals('IronPython-2.99.999', self._select_interpreter_and_get_version([tgt]))
 
   def test_compatibility_OR_impossible(self):
     tgt = self._fake_target('tgt6', compatibility=['IronPython>2.99.999', 'IronPython<2.77.777'])
 
     with self.assertRaises(PythonInterpreterCache.UnsatisfiableInterpreterConstraintsError):
-      self._select_interpreter([tgt])
+      self._select_interpreter_and_get_version([tgt])

@@ -71,7 +71,7 @@ class GatherSources(Task):
     if versioned_targets:
       target_set_id = VersionedTargetSet.from_versioned_targets(versioned_targets).cache_key.hash
     else:
-      raise TaskError('Tried to get pex for no targets in gather_sources')
+      raise TaskError("Can't create pex in gather_sources: No python targets provided")
     source_pex_path = os.path.realpath(os.path.join(self.workdir, target_set_id))
     # Note that we check for the existence of the directory, instead of for invalid_vts,
     # to cover the empty case.
