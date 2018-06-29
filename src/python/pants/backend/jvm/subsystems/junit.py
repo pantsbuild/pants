@@ -49,6 +49,8 @@ class JUnit(JvmToolMixin, InjectablesMixin, Subsystem):
                             Shader.exclude_package('org.hamcrest', recursive=True),
                             Shader.exclude_package('org.pantsbuild.junit.annotations',
                                                    recursive=True),
+                            Shader.exclude_package('org.pantsbuild.junit.security',
+                                                   recursive=True),
                           ])
 
   def injectables(self, build_graph):

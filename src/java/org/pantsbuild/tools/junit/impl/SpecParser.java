@@ -7,9 +7,12 @@ import com.google.common.base.Optional;
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.concurrent.Callable;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
+
+import org.pantsbuild.tools.junit.impl.security.JunitSecViolationReportingManager;
 
 /**
  * Takes strings passed to the command line representing packages or individual methods
@@ -88,7 +91,14 @@ class SpecParser {
 
   private Class<?> loadClassOrThrow(final String className, String specString) {
     try {
-      return getClass().getClassLoader().loadClass(className);
+      return JunitSecViolationReportingManager.maybeWithSecurityManagerContext(
+          className,
+          new Callable<Class<?>>() {
+            @Override
+            public Class<?> call() throws ClassNotFoundException {
+              return getClass().getClassLoader().loadClass(className);
+            }
+          });
     } catch (ClassNotFoundException | NoClassDefFoundError e) {
       throw new SpecException(specString,
           String.format("Class %s not found in classpath.", className), e);
@@ -103,7 +113,7 @@ class SpecParser {
       // and dump the bad spec in question along with the underlying error message to help
       // narrow down issue.
       throw new SpecException(specString,
-          String.format("Error initializing %s.",className), e);
+          String.format("Error initializing %s. %s cause: %s",className, e, e.getCause()), e);
     }
   }
 

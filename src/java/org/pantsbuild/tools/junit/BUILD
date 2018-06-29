@@ -23,9 +23,27 @@ java_library(
     'src/java/org/pantsbuild/args4j',
     'src/java/org/pantsbuild/junit/annotations',
     'src/java/org/pantsbuild/tools/junit/withretry',
+    ':security-manager',
   ],
   sources=globs('*.java', 'impl/*.java', 'impl/experimental/*.java'),
   platform='java7',
+)
+
+java_library(
+  name='security-manager',
+  sources=globs('impl/security/*.java'),
+  dependencies=[
+    '3rdparty:junit',
+    'src/java/org/pantsbuild/junit/security',
+  ],
+  platform='java7',
+  provides=artifact(
+    org='org.pantsbuild',
+    name='junit-runner-security-manager',
+    repo=public,
+    publication_metadata=pants_library("""
+      A security manager implementation that integrates with the junit runner.
+    """))
 )
 
 jvm_binary(

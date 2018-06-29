@@ -28,6 +28,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Logger;
+
 import org.apache.commons.io.output.TeeOutputStream;
 import org.junit.runner.Computer;
 import org.junit.runner.Description;
@@ -50,8 +52,14 @@ import org.pantsbuild.args4j.InvalidCmdLineArgumentException;
 import org.pantsbuild.junit.annotations.TestParallel;
 import org.pantsbuild.junit.annotations.TestSerial;
 import org.pantsbuild.tools.junit.impl.experimental.ConcurrentComputer;
+import org.pantsbuild.tools.junit.impl.security.JunitSecViolationReportingManager;
+import org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig;
+import org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig.ThreadHandling;
+import org.pantsbuild.tools.junit.impl.security.SecurityManagedRunner;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+
+import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig.*;
 
 /**
  * An alternative to {@link JUnitCore} with stream capture and junit-report xml output capabilities.
@@ -61,6 +69,8 @@ public class ConsoleRunnerImpl {
   private static boolean callSystemExitOnFinish = true;
   /** Intended to be used in unit testing this class */
   private static RunListener testListener = null;
+  private JunitSecViolationReportingManager securityManager;
+  private static Logger logger = Logger.getLogger("pants-junit");
 
   /**
    * A stream that allows its underlying output to be swapped.
@@ -389,7 +399,9 @@ public class ConsoleRunnerImpl {
       int numRetries,
       boolean useExperimentalRunner,
       PrintStream out,
-      PrintStream err) {
+      PrintStream err,
+      JunitSecViolationReportingManager securityManager) {
+    this.securityManager = securityManager;
 
     Preconditions.checkNotNull(outputMode);
     Preconditions.checkNotNull(defaultConcurrency);
@@ -547,8 +559,10 @@ public class ConsoleRunnerImpl {
   }
 
   private Runner runnerFor(Request request) {
-    Runner reqRunner = request.getRunner();
-    return maybeWithFailFastRunner(reqRunner);
+    Runner runner = request.getRunner();
+    runner = maybeWithFailFastRunner(runner);
+    runner = maybeWrapWithSecurity(runner);
+    return runner;
   }
 
   private Runner maybeWithFailFastRunner(Runner runner) {
@@ -556,6 +570,26 @@ public class ConsoleRunnerImpl {
       return new FailFastRunner(runner);
     } else {
       return runner;
+    }
+  }
+
+  private boolean securityManagerDisabled() {
+    return null == securityManager;
+  }
+
+  private Runner maybeWrapWithSecurity(Runner reqRunner) {
+    if (securityManagerDisabled()) {
+      return reqRunner;
+    }else {
+      return new SecurityManagedRunner(reqRunner, securityManager);
+    }
+  }
+
+  private RunnerBuilder maybeWrapWithSecurityManagerBuilder(CustomAnnotationBuilder builder) {
+    if (securityManagerDisabled()) {
+      return builder;
+    } else {
+      return new SecurityManagerAwareCustomAnnotationBuilder(builder, securityManager);
     }
   }
 
@@ -606,11 +640,23 @@ public class ConsoleRunnerImpl {
   }
 
   private AnnotatedClassRequest createAnnotatedClassRequest(PrintStream err, Class<?> clazz) {
-    return new AnnotatedClassRequest(clazz, numRetries, err);
+    if (securityManagerDisabled()) {
+      return new AnnotatedClassRequest(clazz, numRetries, err);
+    } else {
+      return new AnnotatedClassRequest(clazz, numRetries, err) {
+        @Override
+        public Runner getRunner() {
+          Runner runner = super.getRunner();
+          return new SecurityManagedRunner(runner, securityManager);
+        }
+      };
+    }
   }
 
   private RunnerBuilder createCustomBuilder(PrintStream original) {
-    return new CustomAnnotationBuilder(numRetries, original);
+    CustomAnnotationBuilder builder =
+        new CustomAnnotationBuilder(numRetries, original);
+    return maybeWrapWithSecurityManagerBuilder(builder);
   }
 
   private boolean legacyShouldRunParallelMethods(Class<?> clazz) {
@@ -802,6 +848,23 @@ public class ConsoleRunnerImpl {
       @Option(name="-use-experimental-runner",
           usage="Use the experimental runner that has support for parallel methods")
       private boolean useExperimentalRunner = false;
+
+      @Option(name = "-use-security-manager",
+          usage = "Use the security to enforce restrictions on tests.")
+      private boolean useSecurityManager = false;
+
+      @Option(name = "-security-thread-handling",
+          usage = "Choose how thread lifetimes are controlled by the security manager.")
+      private ThreadHandling threadHandling = ThreadHandling.disallowLeakingTestSuiteThreads;
+
+      @Option(name = "-security-exit-handling",
+          usage = "Choose how thread lifetimes are controlled by the security manager.")
+      private SystemExitHandling exitHandling = SystemExitHandling.disallow;
+
+      @Option(name = "-security-network-handling",
+          usage = "Choose how thread lifetimes are controlled by the security manager.")
+      private NetworkHandling networkHandling = NetworkHandling.allowAll;
+
     }
 
     Options options = new Options();
@@ -815,6 +878,19 @@ public class ConsoleRunnerImpl {
 
     options.defaultConcurrency = computeConcurrencyOption(options.defaultConcurrency,
         options.defaultParallel);
+
+    JunitSecViolationReportingManager securityManager;
+    if (options.useSecurityManager) {
+      JunitSecurityManagerConfig securityManagerConfig = new JunitSecurityManagerConfig(
+          options.exitHandling,
+          options.threadHandling,
+          options.networkHandling);
+      securityManager = new JunitSecViolationReportingManager(securityManagerConfig);
+      System.setSecurityManager(securityManager);
+    } else {
+      securityManager = null;
+    }
+
 
     ConsoleRunnerImpl runner =
         new ConsoleRunnerImpl(options.failFast,
@@ -830,7 +906,8 @@ public class ConsoleRunnerImpl {
             options.useExperimentalRunner,
             // NB: Buffering helps speedup output-heavy tests.
             new PrintStream(new BufferedOutputStream(System.out), true),
-            new PrintStream(new BufferedOutputStream(System.err), true));
+            new PrintStream(new BufferedOutputStream(System.err), true),
+            securityManager);
 
     List<String> tests = Lists.newArrayList();
     for (String test : options.tests) {
@@ -889,4 +966,5 @@ public class ConsoleRunnerImpl {
   public static void addTestListener(RunListener listener) {
     testListener = listener;
   }
+
 }

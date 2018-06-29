@@ -39,7 +39,7 @@ public class CustomAnnotationBuilder extends AllDefaultPossibilitiesBuilder {
     return new ScalaTestAnnotatedBuilder(this);
   }
 
-  private static class ScalaTestAnnotatedBuilder extends AnnotatedBuilder {
+  static class ScalaTestAnnotatedBuilder extends AnnotatedBuilder {
     ScalaTestAnnotatedBuilder(RunnerBuilder suiteBuilder) {
       super(suiteBuilder);
     }

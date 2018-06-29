@@ -183,7 +183,31 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='If true, generate an html summary report of tests that were run.')
     register('--open', type=bool,
              help='Attempt to open the html summary report in a browser (implies --html-report)')
+    register('--integrated-security-manager', type=bool, advanced=True, fingerprint=True,
+             help='Enable a security manager that will report violations as test failures.')
+    register('--security-manager-allow-exits', type=bool, advanced=True, fingerprint=True,
+             help='If the security manager is enabled, fail tests that invoke System.exit.')
+    register('--security-manager-threads',
+             choices=['allow-all', 'disallow', 'disallow-leaks-from-test-cases', 'disallow-leaks-from-test-suites'],
+             default='allow-all',
+             advanced=True, fingerprint=True,
+             help='''If the security manager is enabled, this governs how it handles threads.
 
+                allow-all: Allow threads to be used and to live indefinitely.
+                disallow: Disallow thread use in tests.
+                disallow-leaks-from-test-cases: fail test cases that don't stop all the threads they started.
+                disallow-leaks-from-test-suites: add failures to test suites that don't stop all the threads they started.
+             ''')
+    register('--security-manager-network',
+         choices=['allow-all', 'disallow', 'only-localhost'],
+         default='allow-all',
+         advanced=True, fingerprint=True,
+         help='''If the security manager is enabled, this governs how it handles network calls.
+
+            allow-all: Allow any network call.
+            disallow: Disallow network use in tests.
+            only-localhost: fail tests that attempt to connect to other hosts besides localhost.
+         ''')
     # TODO(jtrobec): Remove direct register when coverage steps are moved to their own subsystem.
     CodeCoverage.register_junit_options(register, cls.register_jvm_tool)
 
@@ -289,6 +313,31 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       self.context.log.info('Using experimental junit-runner logic.')
       args.append('-use-experimental-runner')
 
+    if options.integrated_security_manager:
+      args.append('-use-security-manager')
+
+      thread_lookup = {
+        'allow-all': 'allowAll',
+        'disallow':'disallow',
+        'disallow-leaks-from-test-suites': 'disallowLeakingTestSuiteThreads',
+        'disallow-leaks-from-test-cases': 'disallowLeakingTestCaseThreads',
+      }
+      exit_lookup = {
+        True: 'allow',
+        False: 'disallow',
+      }
+      network_lookup = {
+        'allow-all': 'allowAll',
+        'disallow': 'disallow',
+        'only-localhost': 'onlyLocalhost'
+      }
+
+      args.append('-security-thread-handling={}'
+                  .format(thread_lookup[options.security_manager_threads]))
+      args.append('-security-exit-handling={}'
+                  .format(exit_lookup[options.security_manager_allow_exits]))
+      args.append('-security-network-handling={}'
+                  .format(network_lookup[options.security_manager_network]))
     return args
 
   def classpath(self, targets, classpath_product=None, **kwargs):
