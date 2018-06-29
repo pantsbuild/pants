@@ -7,7 +7,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 # + fingerprint_data: Fingerprints the data on stdin.
 source "${REPO_ROOT}/build-support/common.sh"
 
-readonly RUST_TOOLCHAIN="1.27.0"
+RUST_TOOLCHAIN="$(cat ${REPO_ROOT}/rust-toolchain)"
 readonly RUST_COMPONENTS=(
   "rustfmt-preview"
   "rust-src"
@@ -23,14 +23,7 @@ function cargo_bin() {
   "${RUSTUP}" which cargo
 }
 
-function set_rust_toolchain() {
-    (
-      cd "${REPO_ROOT}"
-      "${RUSTUP}" override set "${RUST_TOOLCHAIN}" >&2
-    )
-}
-
-function ensure_native_build_prerequisites() {
+function bootstrap_rust() {
   # Control a pants-specific rust toolchain.
   if [[ ! -x "${RUSTUP}" ]]
   then
@@ -54,13 +47,11 @@ function ensure_native_build_prerequisites() {
     "${RUSTUP}" toolchain install ${RUST_TOOLCHAIN}
     "${RUSTUP}" component add --toolchain ${RUST_TOOLCHAIN} ${RUST_COMPONENTS[@]} >&2
 
-    set_rust_toolchain
     ln -fs "$(cargo_bin)" "${rust_toolchain_root}/${cargo_versioned}"
   fi
 
   local -r symlink_farm_root="${REPO_ROOT}/build-support/bin/native"
   if [[ ! -x "${symlink_farm_root}/.${cargo_versioned}" ]]; then
-    set_rust_toolchain
     (
       cd "${symlink_farm_root}"
 
