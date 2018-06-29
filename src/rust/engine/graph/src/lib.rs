@@ -106,6 +106,7 @@ enum EntryState<N: Node> {
     run_token: RunToken,
     generation: Generation,
     result: Result<N::Item, N::Error>,
+    dep_generations: Vec<Generation>,
     dirty: bool,
   },
 }
@@ -208,6 +209,7 @@ impl<N: Node> Entry<N> {
       }
       &EntryKey::Cyclic(_) => EntryState::Completed {
         result: Err(N::Error::cyclic()),
+        dep_generations: Vec::new(),
         run_token,
         generation,
         dirty: false,
@@ -269,9 +271,10 @@ impl<N: Node> Entry<N> {
         previous_result,
       ),
       EntryState::Completed {
-        result,
         run_token,
         generation,
+        result,
+        dep_generations,
         dirty,
       } => {
         assert!(
@@ -282,6 +285,8 @@ impl<N: Node> Entry<N> {
         // The Node has already completed but is now marked dirty. This indicates that we are the
         // first caller to request it since it was marked dirty. We must transition it back to
         // running.
+        //
+        // TODO: clean!
         Self::start(
           context,
           &self.node,
@@ -328,6 +333,7 @@ impl<N: Node> Entry<N> {
     context: &C,
     entry_id: EntryId,
     result_run_token: RunToken,
+    dep_generations: Vec<Generation>,
     result: Option<Result<N::Item, N::Error>>,
   ) where
     C: NodeContext<Node = N>,
@@ -353,8 +359,8 @@ impl<N: Node> Entry<N> {
         ..
       } => {
         if dirty {
-          // The node was dirtied while we were running. The newly computed result value was
-          // never published, so we continue to use the previous result.
+          // The node was dirtied while it was running. The dep_generations and new result cannot
+          // be trusted and were never published. We continue to use the previous result.
           Self::start(
             context,
             &self.node,
@@ -391,6 +397,7 @@ impl<N: Node> Entry<N> {
           }
           EntryState::Completed {
             result: next_result,
+            dep_generations,
             run_token,
             generation,
             dirty: false,
@@ -399,6 +406,20 @@ impl<N: Node> Entry<N> {
       }
       s => s,
     };
+  }
+
+  ///
+  /// Get the current Generation of this entry.
+  ///
+  /// TODO: Consider moving the Generation and RunToken out of the EntryState once we decide what
+  /// we want the per-Entry locking strategy to be.
+  ///
+  fn generation(&self) -> Generation {
+    match &self.state {
+      &EntryState::NotStarted { generation, .. }
+      | &EntryState::Running { generation, .. }
+      | &EntryState::Completed { generation, .. } => generation,
+    }
   }
 
   ///
@@ -487,6 +508,7 @@ impl<N: Node> InnerGraph<N> {
     self.nodes.get(node)
   }
 
+  // TODO: Now that we never delete Entries, we should consider making this infalliable.
   fn entry_for_id(&self, id: EntryId) -> Option<&Entry<N>> {
     self.pg.node_weight(id)
   }
@@ -940,8 +962,14 @@ impl<N: Node> Graph<N> {
 
   ///
   /// When the Executor finishes executing a Node it calls back to store the result value. We use
-  /// the run_token value to determine whether the Node changed while we were busy executing it,
-  /// so that we can discard the work.
+  /// the run_token and dirty bits to determine whether the Node changed while we were busy
+  /// executing it, so that we can discard the work.
+  ///
+  /// We use the dirty bit in addition to the RunToken in order to avoid cases where dependencies
+  /// change while we're running. In order for a dependency to "change" it must have been cleared
+  /// or been marked dirty. But if our dependencies have been cleared or marked dirty, then we will
+  /// have been as well. We can thus use the dirty bit as a signal that the generation values of
+  /// our dependencies are still accurate.
   ///
   fn complete<C>(
     &self,
@@ -953,8 +981,16 @@ impl<N: Node> Graph<N> {
     C: NodeContext<Node = N>,
   {
     let mut inner = self.inner.lock().unwrap();
+    // Get the Generations of all dependencies of the Node. We can trust that these have not changed
+    // since we began executing, as long as we are not currently marked dirty (see the method doc).
+    let dep_generations = inner
+      .pg
+      .neighbors_directed(entry_id, Direction::Outgoing)
+      .filter_map(|dep_id| inner.entry_for_id(dep_id))
+      .map(|entry| entry.generation())
+      .collect();
     if let Some(entry) = inner.entry_for_id_mut(entry_id) {
-      entry.complete(context, entry_id, run_token, result);
+      entry.complete(context, entry_id, run_token, dep_generations, result);
     }
   }
 
