@@ -17,7 +17,8 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.engine.fs import FilesContent, PathGlobs, Snapshot
+from pants.engine.fs import (DirectoryDigest, DirectoryToMaterialize, FilesContent, PathGlobs,
+                             Snapshot)
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import safe_file_dump, safe_open
@@ -168,7 +169,7 @@ class JavacCompile(JvmCompile):
       javac_cmd.extend(batched_sources)
 
       if self.execution_strategy() == 'hermetic':
-        self._execute_compile_remotely(javac_cmd, ctx)
+        self._execute_hermetic_compile(javac_cmd, ctx)
       else:
         with self.context.new_workunit(name='javac',
                                        cmd=' '.join(javac_cmd),
@@ -193,7 +194,7 @@ class JavacCompile(JvmCompile):
       ret.append('-Xplugin:{} {}'.format(plugin, ' '.join(args)))
     return ret
 
-  def _execute_compile_remotely(self, cmd, ctx):
+  def _execute_hermetic_compile(self, cmd, ctx):
     # For now, executing a compile remotely only works for targets that
     # do not have any dependencies or inner classes
 
@@ -224,14 +225,23 @@ class JavacCompile(JvmCompile):
     if exec_result.exit_code != 0:
       raise TaskError('{} ... exited non-zero ({}) due to {}.'.format(' '.join(cmd), exec_result.exit_code, exec_result.stderr))
 
-    files_content_tuple = self.context._scheduler.product_request(
-      FilesContent,
+    # files_content_tuple = self.context._scheduler.product_request(
+    #   FilesContent,
+    #   [exec_result.output_directory_digest]
+    # )[0].dependencies
+
+    # classes_directory = ctx.classes_dir
+    # for file_content in files_content_tuple:
+    #   file_path = os.path.relpath(file_content.path, ctx.target.target_base)
+    #   output_file_path = os.path.join(classes_directory, file_path)
+    #   safe_file_dump(output_file_path, file_content.content)
+
+
+    dir_digest = self.context._scheduler.product_request(
+      DirectoryDigest,
       [exec_result.output_directory_digest]
-    )[0].dependencies
+    )
 
     # dump the files content into directory
     classes_directory = ctx.classes_dir
-    for file_content in files_content_tuple:
-      file_path = os.path.relpath(file_content.path, ctx.target.target_base)
-      output_file_path = os.path.join(classes_directory, file_path)
-      safe_file_dump(output_file_path, file_content.content)
+    self.context._scheduler.materialize_directories((DirectoryToMaterialize(str(classes_directory), dir_digest),))

@@ -27,7 +27,7 @@ class JavacCompileIntegration(BaseCompileIT):
           workdir, config)
         self.assert_success(pants_run)
 
-  def test_basic_binary_remote(self):
+  def test_basic_binary_hermetic(self):
     with temporary_dir() as cache_dir:
       config = {
         'cache.compile.javac': {'write_to': [cache_dir]},
