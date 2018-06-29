@@ -110,8 +110,9 @@ matrix:
       deploy:
         # See https://docs.travis-ci.com/user/deployment/releases/
         provider: releases
+        # The pantsbuild-ci-bot OAuth token, see the pantsbuild vault for details.
         api_key:
-          secure: "GH+on0frVmTZv0ZE/36ERktsucCkS2Z+KhOqQ/PGUiTOwYm+2D3EWUlaU0lXlIdEzqULXIhCi8ikfmwZMJF+6YxSD8CA+DrGQosgxVQ042OKndxy8IUsaiAezsXp94AGtgrPjIrzNFpUmps9r5hnLCzIK64NjTkZQJIH5LLGupY="
+          secure: "u0aCsiuVGOg28YxG0sQUovuUm29kKwQfFgHbNz2TT5L+cGoHxGl4aoVOCtuwWYEtbNGmYc8/3WRS3C/jOiqQj6JEgHUzWOsnfKUObEqNhisAmXbzBbKc0wPQTL8WNK+DKFh32sD3yPYcw+a5PTLO56+o7rqlI25LK7A17WesHC4="
         file_glob: true
         file: dist/deploy/pex/*
         skip_cleanup: true
