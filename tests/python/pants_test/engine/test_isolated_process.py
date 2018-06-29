@@ -71,7 +71,6 @@ def cat_files_process_result_concatted(cat_exe_req):
   cat_files_snapshot = yield Get(Snapshot, PathGlobs, cat_exe_req.path_globs)
   process_request = ExecuteProcessRequest.create_from_snapshot(
     argv=cat_bin.argv_from_snapshot(cat_files_snapshot),
-    env=dict(),
     snapshot=cat_files_snapshot,
     output_files=(),
   )
@@ -102,9 +101,8 @@ class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)
 def process_request_from_javac_version(javac_version_exe_req):
   yield ExecuteProcessRequest.create_with_empty_snapshot(
     argv=javac_version_exe_req.gen_argv(),
-    env=dict(),
-    output_files=(),
-    description=javac_version_exe_req.description)
+    description=javac_version_exe_req.description,
+  )
 
 
 class JavacVersionOutput(datatype([('value', str)])): pass
@@ -169,7 +167,6 @@ def javac_compile_process_result(javac_compile_req):
   output_dirs = tuple({os.path.dirname(java_file) for java_file in java_files})
   process_request = ExecuteProcessRequest.create_from_snapshot(
     argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
-    env=dict(),
     snapshot=sources_snapshot,
     output_directories=output_dirs,
     description='javac compilation'
@@ -198,6 +195,7 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
     env = env or dict()
     return ExecuteProcessRequest.create_with_empty_snapshot(
       argv=argv,
+      description='',
       env=env,
       output_files=(),
     )
@@ -296,9 +294,9 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs(())
 
     request = ExecuteProcessRequest.create_with_empty_snapshot(
-      ("/bin/bash", "-c", "echo -n 'European Burmese' > roland"),
-      dict(),
-      ("roland",)
+      argv=("/bin/bash", "-c", "echo -n 'European Burmese' > roland"),
+      description="echo roland",
+      output_files=("roland",)
     )
 
     execute_process_result = self.execute_expecting_one_result(scheduler, ExecuteProcessResult, request).value
@@ -329,9 +327,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs(())
 
     request = ExecuteProcessRequest.create_with_empty_snapshot(
-      ("/bin/bash", "-c", "/bin/sleep 1; echo -n 'European Burmese'"),
-      dict(),
-      tuple(),
+      argv=("/bin/bash", "-c", "/bin/sleep 1; echo -n 'European Burmese'"),
       timeout_seconds=0.1,
       description='sleepy-cat',
     )
@@ -378,9 +374,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs(())
 
     request = ExecuteProcessRequest.create_with_empty_snapshot(
-      ("/bin/bash", "-c", "exit 1"),
-      dict(),
-      tuple(),
+      argv=("/bin/bash", "-c", "exit 1"),
       description='one-cat',
     )
 
@@ -392,9 +386,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs(())
 
     request = ExecuteProcessRequest.create_with_empty_snapshot(
-      ("/bin/bash", "-c", "exit 1"),
-      dict(),
-      tuple(),
+      argv=("/bin/bash", "-c", "exit 1"),
       description='one-cat',
     )
 
