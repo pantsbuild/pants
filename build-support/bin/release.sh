@@ -561,10 +561,12 @@ function build_pex() {
       esac
       local platforms=("${platform}")
       local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.pex"
+      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.pex"
       ;;
     fetch)
       local platforms=("${linux_platform}" "${osx_platform}")
       local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
+      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.pex"
       ;;
     *)
       echo >&2 "Bad build_pex mode ${mode}"
@@ -604,6 +606,11 @@ function build_pex() {
     -f "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
     -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
     "${requirements[@]}"
+
+  if [[ "${PANTS_PEX_RELEASE}" == "stable" ]]; then
+    mkdir -p "$(dirname "${stable_dest}")"
+    cp "${dest}" "${stable_dest}"
+  fi
 
   banner "Successfully built ${dest}"
 }

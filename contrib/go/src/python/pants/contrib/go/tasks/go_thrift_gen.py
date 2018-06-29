@@ -25,6 +25,8 @@ from pants.contrib.go.targets.go_thrift_library import GoThriftGenLibrary, GoThr
 
 class GoThriftGen(SimpleCodegenTask):
 
+  sources_globs = ('**/*',)
+
   @classmethod
   def register_options(cls, register):
     super(GoThriftGen, cls).register_options(register)

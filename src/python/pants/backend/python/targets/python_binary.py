@@ -35,7 +35,7 @@ class PythonBinary(PythonTarget):
   # TODO(wickman) Consider splitting pex options out into a separate PexInfo builder that can be
   # attached to the binary target.  Ideally the PythonBinary target is agnostic about pex mechanics
   def __init__(self,
-               source=None,
+               sources=None,
                entry_point=None,
                inherit_path=False,        # pex option
                zip_safe=True,             # pex option
@@ -47,16 +47,13 @@ class PythonBinary(PythonTarget):
                platforms=(),
                **kwargs):
     """
-    :param source: relative path to one python source file that becomes this
-      binary's __main__.
-      If None specified, drops into an interpreter by default.
     :param string entry_point: the default entry point for this binary.  if None, drops into the entry
       point that is defined by source. Something like
       "pants.bin.pants_exe:main", where "pants.bin.pants_exe" is the package
       name and "main" is the function name (if ommitted, the module is
       executed directly, presuming it has a ``__main.py__``).
-    :param sources: Overridden by source. To specify more than one source file,
-      use a python_library and have the python_binary depend on that library.
+    :param sources: Zero or one source files. If more than one file is required, it should be put in
+      a python_library which should be added to dependencies.
     :param inherit_path: inherit the sys.path of the environment that this binary runs in
     :param zip_safe: whether or not this binary is safe to run in compacted (zip-file) form
     :param always_write_cache: whether or not the .deps cache of this PEX file should always
@@ -90,17 +87,16 @@ class PythonBinary(PythonTarget):
       'shebang': PrimitiveField(shebang),
     })
 
-    sources = [] if source is None else [source]
     super(PythonBinary, self).__init__(sources=sources, payload=payload, **kwargs)
 
-    if source is None and entry_point is None:
+    if (not sources or not sources.files) and entry_point is None:
       raise TargetDefinitionException(self,
-          'A python binary target must specify either source or entry_point.')
+          'A python binary target must specify either a single source or entry_point.')
 
     if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, string_types):
       raise TargetDefinitionException(self, 'platforms must be a list, tuple or string.')
 
-    if source and entry_point:
+    if sources and sources.files and entry_point:
       entry_point_module = entry_point.split(':', 1)[0]
       entry_source = list(self.sources_relative_to_source_root())[0]
       source_entry_point = self._translate_to_entry_point(entry_source)

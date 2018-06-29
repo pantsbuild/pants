@@ -5,15 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
+from pants.build_graph.aliased_target import AliasTarget
+from pants.build_graph.target import Target
 
-from pants.binaries.binary_tool import ExecutablePathProvider, NativeTool
 
+class DependencyContext(object):
 
-class Binutils(NativeTool, ExecutablePathProvider):
-  options_scope = 'binutils'
-  default_version = '2.30'
-  archive_type = 'tgz'
-
-  def path_entries(self):
-    return [os.path.join(self.select(), 'bin')]
+  alias_types = (AliasTarget, Target)
+  types_with_closure = ()
+  target_closure_kwargs = {}

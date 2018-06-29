@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pex.interpreter import PythonInterpreter
 
-from pants.backend.python.tasks.pex_build_util import has_python_requirements
+from pants.backend.python.tasks.pex_build_util import has_python_requirements, is_python_target
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 
 
@@ -24,6 +24,8 @@ class ResolveRequirements(ResolveRequirementsTaskBase):
     round_manager.require_data(PythonInterpreter)
 
   def execute(self):
+    if not self.context.targets(lambda t: is_python_target(t) or has_python_requirements(t)):
+      return
     interpreter = self.context.products.get_data(PythonInterpreter)
     pex = self.resolve_requirements(interpreter, self.context.targets(has_python_requirements))
     self.context.products.register_data(self.REQUIREMENTS_PEX, pex)

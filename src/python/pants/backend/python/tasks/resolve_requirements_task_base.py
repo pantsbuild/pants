@@ -13,13 +13,14 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.python_requirement import PythonRequirement
+from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.pex_build_util import (build_for_current_platform_only_check,
-                                                       dump_requirement_libs, dump_requirements)
+from pants.backend.python.tasks.pex_build_util import dump_requirement_libs, dump_requirements
 from pants.base.hash_utils import hash_all
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
+from pants.util.memo import memoized_property
 
 
 class ResolveRequirementsTaskBase(Task):
@@ -29,6 +30,16 @@ class ResolveRequirementsTaskBase(Task):
   This PEX can be merged with other PEXes to create a unified Python environment
   for running the relevant python code.
   """
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(ResolveRequirementsTaskBase, cls).subsystem_dependencies() + (
+      PythonNativeCode.scoped(cls),
+    )
+
+  @memoized_property
+  def _python_native_code_settings(self):
+    return PythonNativeCode.scoped_instance(self)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -55,7 +66,10 @@ class ResolveRequirementsTaskBase(Task):
       # We need to ensure that we are resolving for only the current platform if we are
       # including local python dist targets that have native extensions.
       tgts = self.context.targets()
-      maybe_platforms = ['current'] if build_for_current_platform_only_check(tgts) else None
+      if self._python_native_code_settings.check_build_for_current_platform_only(tgts):
+        maybe_platforms = ['current']
+      else:
+        maybe_platforms = None
 
       path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity), target_set_id))
       # Note that we check for the existence of the directory, instead of for invalid_vts,

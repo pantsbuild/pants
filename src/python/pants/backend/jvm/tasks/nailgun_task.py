@@ -58,12 +58,12 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
     id_tuple = (self.ID_PREFIX, self.__class__.__name__)
 
-    self._execution_strategy = self._set_execution_strategy()
+    self._execution_strategy = self.execution_strategy()
     self._identity = '_'.join(id_tuple)
     self._executor_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
                                           *id_tuple)
 
-  def _set_execution_strategy(self):
+  def execution_strategy(self):
     # This will be more complex as we add more execution strategies are added
     # Expected behavior: if execution-strategy is set, it will override use-nailgun
     if not self.get_options().execution_strategy and not self.get_options().use_nailgun:
@@ -74,9 +74,6 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     elif self.get_options().use_nailgun is False:
       return self.SUBPROCESS
     return self.NAILGUN
-
-  def execution_strategy(self):
-    return self._execution_strategy
 
   def create_java_executor(self, dist=None):
     """Create java executor that uses this task's ng daemon, if allowed.

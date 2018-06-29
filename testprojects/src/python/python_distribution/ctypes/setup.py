@@ -5,15 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
-from pants.binaries.binary_tool import ExecutablePathProvider, NativeTool
+from setuptools import setup, find_packages
 
 
-class GCC(NativeTool, ExecutablePathProvider):
-  options_scope = 'gcc'
-  default_version = '7.3.0'
-  archive_type = 'tgz'
-
-  def path_entries(self):
-    return [os.path.join(self.select(), 'bin')]
+setup(
+  name='ctypes_test',
+  version='0.0.1',
+  packages=find_packages(),
+  # Declare two files at the top-level directory (denoted by '').
+  data_files=[('', ['libasdf-c.so', 'libasdf-cpp.so'])],
+)

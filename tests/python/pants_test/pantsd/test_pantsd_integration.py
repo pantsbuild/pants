@@ -549,3 +549,11 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
 
       result = pantsd_run(['compile', 'examples/src/java/org/pantsbuild/example/hello/simple'])
       self.assert_success(result)
+
+  def test_pantsd_unicode_environment(self):
+    with self.pantsd_successful_run_context(
+      extra_env={'XXX': '¡'},
+    ) as (pantsd_run, checker, workdir, _):
+      result = pantsd_run(['help'])
+      checker.assert_started()
+      self.assert_success(result)

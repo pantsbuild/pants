@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 class JaxWsGen(SimpleCodegenTask, NailgunTask):
   """Generates Java files from wsdl files using the JAX-WS compiler."""
 
+  sources_globs = ('**/*',)
+
   @classmethod
   def register_options(cls, register):
     super(JaxWsGen, cls).register_options(register)

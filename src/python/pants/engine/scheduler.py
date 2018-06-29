@@ -14,15 +14,16 @@ from types import GeneratorType
 from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
-from pants.engine.fs import (DirectoryDigest, FileContent, FilesContent, Path, PathGlobs,
+from pants.engine.fs import (DirectoryDigest, DirectoryToMaterialize,FileContent, FilesContent, Path, PathGlobs,
                              PathGlobsAndRoot, Snapshot)
-from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
+from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import Select, SelectVariant, constraint_for
 from pants.engine.struct import HasProducts, Variants
 from pants.util.contextutil import temporary_file_path
+from pants.util.dirutil import check_no_overlapping_paths
 from pants.util.objects import Collection, SubclassesOf, datatype
 
 
@@ -127,7 +128,7 @@ class Scheduler(object):
       Dir,
       File,
       Link,
-      ExecuteProcessResult,
+      FallibleExecuteProcessResult,
       has_products_constraint,
       constraint_for(Address),
       constraint_for(Variants),
@@ -139,7 +140,7 @@ class Scheduler(object):
       constraint_for(File),
       constraint_for(Link),
       constraint_for(ExecuteProcessRequest),
-      constraint_for(ExecuteProcessResult),
+      constraint_for(FallibleExecuteProcessResult),
       constraint_for(GeneratorType),
     )
 
@@ -359,6 +360,23 @@ class Scheduler(object):
     )
     return self._raise_or_return(result)
 
+  def materialize_directories(self, directories_paths_and_digests):
+    """Creates the specified directories on the file system.
+
+    :param directories_paths_and_digests tuple<DirectoryToMaterialize>: Tuple of the path and
+           digest of the directories to materialize.
+    :returns: Nothing or an error.
+    """
+    # Ensure there isn't more than one of the same directory paths and paths do not have the same prefix.
+    dir_list = [dpad.path for dpad in directories_paths_and_digests]
+    check_no_overlapping_paths(dir_list)
+
+    result = self._native.lib.materialize_directories(
+      self._scheduler,
+      self._to_value(_DirectoriesToMaterialize(directories_paths_and_digests)),
+    )
+    return self._raise_or_return(result)
+
   def lease_files_in_graph(self):
     self._native.lib.lease_files_in_graph(self._scheduler)
 
@@ -374,6 +392,9 @@ _PathGlobsAndRootCollection = Collection.of(PathGlobsAndRoot)
 
 
 _DirectoryDigests = Collection.of(DirectoryDigest)
+
+
+_DirectoriesToMaterialize = Collection.of(DirectoryToMaterialize)
 
 
 class SchedulerSession(object):
@@ -553,6 +574,15 @@ class SchedulerSession(object):
 
   def merge_directories(self, directory_digests):
     return self._scheduler.merge_directories(directory_digests)
+
+  def materialize_directories(self, directories_paths_and_digests):
+    """Creates the specified directories on the file system.
+
+    :param directories_paths_and_digests tuple<DirectoryToMaterialize>: Tuple of the path and
+           digest of the directories to materialize.
+    :returns: Nothing or an error.
+    """
+    return self._scheduler.materialize_directories(directories_paths_and_digests)
 
   def lease_files_in_graph(self):
     self._scheduler.lease_files_in_graph()

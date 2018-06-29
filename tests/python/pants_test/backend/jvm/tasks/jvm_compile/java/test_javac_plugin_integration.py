@@ -27,7 +27,7 @@ class JavacPluginIntegrationTest(BaseCompileIT):
   # all targets, and "local" means specified on an individual target.
   def _do_test_global(self, args):
     config = {
-      'compile.zinc': {
+      'java': {
         'javac_plugins': ['simple_javac_plugin'],
         'javac_plugin_args': {
           'simple_javac_plugin': args
@@ -39,7 +39,7 @@ class JavacPluginIntegrationTest(BaseCompileIT):
 
   def _do_test_local_with_global_args(self, args):
     config = {
-      'compile.zinc': {
+      'java': {
         'javac_plugin_args': {
           'simple_javac_plugin': args
         }
@@ -55,7 +55,7 @@ class JavacPluginIntegrationTest(BaseCompileIT):
   def test_global_with_local_args(self):
     self._do_test(['args', 'from', 'target', 'global_with_local_args'],
                   {
-                    'compile.zinc': {
+                    'java': {
                       'javac_plugins': ['simple_javac_plugin'],
                     },
                   },

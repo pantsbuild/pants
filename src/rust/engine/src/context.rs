@@ -8,12 +8,15 @@ use std::time::Duration;
 
 use tokio::runtime::Runtime;
 
-use core::TypeId;
+use futures::Future;
+
+use boxfuture::{BoxFuture, Boxable};
+use core::{Failure, TypeId};
 use externs;
 use fs::{safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
-use graph::{EntryId, Graph};
+use graph::{EntryId, Graph, NodeContext};
 use handles::maybe_drain_handles;
-use nodes::{Node, NodeFuture};
+use nodes::{NodeKey, TryInto, WrappedNode};
 use process_execution::{self, BoundedCommandRunner, CommandRunner};
 use resettable::Resettable;
 use rule_graph::RuleGraph;
@@ -29,7 +32,7 @@ use types::Types;
 /// https://github.com/tokio-rs/tokio/issues/369 is resolved.
 ///
 pub struct Core {
-  pub graph: Graph,
+  pub graph: Graph<NodeKey>,
   pub tasks: Tasks,
   pub rule_graph: RuleGraph,
   pub types: Types,
@@ -47,17 +50,15 @@ impl Core {
     types: Types,
     build_root: &Path,
     ignore_patterns: Vec<String>,
-    work_dir: &Path,
+    work_dir: PathBuf,
     remote_store_server: Option<String>,
     remote_execution_server: Option<String>,
     remote_store_thread_count: usize,
     remote_store_chunk_bytes: usize,
     remote_store_chunk_upload_timeout: Duration,
     process_execution_parallelism: usize,
+    process_execution_cleanup_local_dirs: bool,
   ) -> Core {
-    let mut snapshots_dir = PathBuf::from(work_dir);
-    snapshots_dir.push("snapshots");
-
     let fs_pool = Arc::new(ResettablePool::new("io-".to_string()));
     let runtime = Resettable::new(|| {
       Arc::new(Runtime::new().unwrap_or_else(|e| panic!("Could not initialize Runtime: {:?}", e)))
@@ -83,19 +84,20 @@ impl Core {
       })
       .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
-    let underlying_command_runner: Box<process_execution::CommandRunner> =
-      match remote_execution_server {
-        Some(address) => Box::new(process_execution::remote::CommandRunner::new(
-          address,
-          // Allow for some overhead for bookkeeping threads (if any).
-          process_execution_parallelism + 2,
-          store.clone(),
-        )),
-        None => Box::new(process_execution::local::CommandRunner::new(
-          store.clone(),
-          fs_pool.clone(),
-        )),
-      };
+    let underlying_command_runner: Box<CommandRunner> = match remote_execution_server {
+      Some(address) => Box::new(process_execution::remote::CommandRunner::new(
+        address,
+        // Allow for some overhead for bookkeeping threads (if any).
+        process_execution_parallelism + 2,
+        store.clone(),
+      )),
+      None => Box::new(process_execution::local::CommandRunner::new(
+        store.clone(),
+        fs_pool.clone(),
+        work_dir,
+        process_execution_cleanup_local_dirs,
+      )),
+    };
 
     let command_runner =
       BoundedCommandRunner::new(underlying_command_runner, process_execution_parallelism);
@@ -112,7 +114,7 @@ impl Core {
       store: store,
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(build_root, fs_pool, ignore_patterns).unwrap_or_else(|e| {
+      vfs: PosixFS::new(build_root, fs_pool, &ignore_patterns).unwrap_or_else(|e| {
         panic!("Could not initialize VFS: {:?}", e);
       }),
       command_runner: command_runner,
@@ -144,28 +146,39 @@ impl Context {
   ///
   /// Get the future value for the given Node implementation.
   ///
-  pub fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output> {
+  pub fn get<N: WrappedNode>(&self, node: N) -> BoxFuture<N::Item, Failure> {
     // TODO: Odd place for this... could do it periodically in the background?
-    maybe_drain_handles().map(|handles| {
-      externs::drop_handles(handles);
-    });
-    self.core.graph.get(self.entry_id, self, node)
+    if let Some(handles) = maybe_drain_handles() {
+      externs::drop_handles(&handles);
+    }
+    self
+      .core
+      .graph
+      .get(self.entry_id, self, node.into())
+      .map(|node_result| {
+        node_result
+          .try_into()
+          .unwrap_or_else(|_| panic!("A Node implementation was ambiguous."))
+      })
+      .to_boxed()
   }
 }
 
-pub trait ContextFactory {
-  fn create(&self, entry_id: EntryId) -> Context;
-}
+impl NodeContext for Context {
+  type Node = NodeKey;
 
-impl ContextFactory for Context {
   ///
   /// Clones this Context for a new EntryId. Because the Core of the context is an Arc, this
   /// is a shallow clone.
   ///
-  fn create(&self, entry_id: EntryId) -> Context {
+  fn clone_for(&self, entry_id: EntryId) -> Context {
     Context {
       entry_id: entry_id,
       core: self.core.clone(),
     }
+  }
+
+  fn graph(&self) -> &Graph<NodeKey> {
+    &self.core.graph
   }
 }

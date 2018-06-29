@@ -1,3 +1,6 @@
+# Conditions are documented here: https://docs.travis-ci.com/user/conditions-v1
+conditions: v1
+
 env:
   global:
     - PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.ini"
@@ -48,16 +51,22 @@ cache:
     - build-support/isort.venv
     - build-support/pants_dev_deps.venv
 
+# Stages are documented here: https://docs.travis-ci.com/user/build-stages
+stages:
+  - Test Pants
+  - name: Deploy Pants Pex
+    if: tag IS present AND tag =~ ^release_.*$
+
 # NB: There is much repetition in include elements, but there is no known current way to factor
 # this duplication up.
 matrix:
   include:
     - os: osx
       # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
-      # We use 10.11 not 10.10 because 10.11 has a functioning version of lldb which can be useful
-      # for debugging native code issues.
+      # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
       # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
-      osx_image: xcode7.3
+      osx_image: xcode8
+      stage: Test Pants
       language: generic
       env:
         - SHARD="OSX Native Engine Binary Builder"
@@ -66,6 +75,7 @@ matrix:
         - ./pants --version && ./build-support/bin/release.sh -n
 
     - os: linux
+      stage: Test Pants
       language: generic
       services:
         - docker
@@ -91,6 +101,26 @@ matrix:
         - build-support/bin/ci-failure.sh
 
     - os: linux
+      language: python
+      stage: Deploy Pants Pex
+      env:
+        - PANTS_PEX_RELEASE=stable
+      script:
+        - ./build-support/bin/release.sh -p
+      deploy:
+        # See https://docs.travis-ci.com/user/deployment/releases/
+        provider: releases
+        api_key:
+          secure: "GH+on0frVmTZv0ZE/36ERktsucCkS2Z+KhOqQ/PGUiTOwYm+2D3EWUlaU0lXlIdEzqULXIhCi8ikfmwZMJF+6YxSD8CA+DrGQosgxVQ042OKndxy8IUsaiAezsXp94AGtgrPjIrzNFpUmps9r5hnLCzIK64NjTkZQJIH5LLGupY="
+        file_glob: true
+        file: dist/deploy/pex/*
+        skip_cleanup: true
+        on:
+          # We only release a pex for Pants releases, which are tagged.
+          tags: true
+          repo: pantsbuild/pants
+
+    - os: linux
       dist: trusty
       sudo: required
       addons:
@@ -103,6 +133,7 @@ matrix:
             - python-dev
             - openssl
             - libssl-dev
+      stage: Test Pants
       language: python
       python: "2.7.13"
       before_install:
@@ -129,6 +160,7 @@ matrix:
             - python-dev
             - openssl
             - libssl-dev
+      stage: Test Pants
       language: python
       python: "2.7.13"
       before_install:
@@ -155,6 +187,7 @@ matrix:
             - python-dev
             - openssl
             - libssl-dev
+      stage: Test Pants
       language: python
       python: "2.7.13"
       before_install:
@@ -181,6 +214,7 @@ matrix:
             - python-dev
             - openssl
             - libssl-dev
+      stage: Test Pants
       language: python
       python: "2.7.13"
       before_install:
@@ -207,6 +241,7 @@ matrix:
             - python-dev
             - openssl
             - libssl-dev
+      stage: Test Pants
       language: python
       python: "2.7.13"
       before_install:
@@ -233,6 +268,7 @@ matrix:
             - python-dev
             - openssl
             - libssl-dev
+      stage: Test Pants
       language: python
       python: "2.7.13"
       before_install:
@@ -259,6 +295,7 @@ matrix:
             - python-dev
             - openssl
             - libssl-dev
+      stage: Test Pants
       language: python
       python: "2.7.13"
       before_install:
@@ -285,6 +322,7 @@ matrix:
             - python-dev
             - openssl
             - libssl-dev
+      stage: Test Pants
       language: python
       python: "2.7.13"
       before_install:
@@ -311,6 +349,7 @@ matrix:
             - python-dev
             - openssl
             - libssl-dev
+      stage: Test Pants
       language: python
       python: "2.7.13"
       before_install:
@@ -337,6 +376,7 @@ matrix:
             - python-dev
             - openssl
             - libssl-dev
+      stage: Test Pants
       language: python
       python: "2.7.13"
       before_install:
@@ -363,6 +403,7 @@ matrix:
             - python-dev
             - openssl
             - libssl-dev
+      stage: Test Pants
       language: python
       python: "2.7.13"
       before_install:
@@ -389,6 +430,7 @@ matrix:
             - python-dev
             - openssl
             - libssl-dev
+      stage: Test Pants
       language: python
       python: "2.7.13"
       before_install:
@@ -406,6 +448,7 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
+      stage: Test Pants
       language: python
       python: "2.7.13"
       addons:
@@ -428,6 +471,7 @@ matrix:
     - os: osx
       # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.3
+      stage: Test Pants
       language: generic
       env:
         - SHARD="Rust + Platform-specific Tests OSX"

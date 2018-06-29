@@ -60,7 +60,10 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       return TypeCheckError(cls.__name__, msg, *args, **kwargs)
 
     def __new__(cls, *args, **kwargs):
-      this_object = super(DataType, cls).__new__(cls, *args, **kwargs)
+      try:
+        this_object = super(DataType, cls).__new__(cls, *args, **kwargs)
+      except TypeError as e:
+        raise cls.make_type_error(e)
 
       # TODO(cosmicexplorer): Make this kind of exception pattern (filter for
       # errors then display them all at once) more ergonomic.
@@ -109,7 +112,8 @@ def datatype(field_decls, superclass_name=None, **kwargs):
         raise ValueError('Got unexpected field names: %r' % kwds.keys())
       return result
 
-    # TODO(cosmicexplorer): would we want to expose a self.as_tuple() method so we can tuple assign?
+    # TODO: would we want to expose a self.as_tuple() method (which just calls __getnewargs__) so we
+    # can tuple assign? E.g.:
     # class A(datatype(['field'])): pass
     # x = A(field='asdf')
     # field_value, = x.as_tuple()
@@ -164,8 +168,7 @@ class TypedDatatypeClassConstructionError(Exception):
       full_msg, *args, **kwargs)
 
 
-# FIXME: make this subclass TypeError!
-class TypedDatatypeInstanceConstructionError(Exception):
+class TypedDatatypeInstanceConstructionError(TypeError):
 
   def __init__(self, type_name, msg, *args, **kwargs):
     full_msg = "error: in constructor of type {}: {}".format(type_name, msg)
@@ -310,12 +313,14 @@ class SubclassesOf(TypeConstraint):
 
 class Collection(object):
   """Constructs classes representing collections of objects of a particular type."""
+  # TODO: could we check that the input is iterable in the ctor?
 
   @classmethod
   @memoized
   def of(cls, *element_types):
     union = '|'.join(element_type.__name__ for element_type in element_types)
     type_name = b'{}.of({})'.format(cls.__name__, union)
+    # TODO: could we allow type checking in the datatype() invocation here?
     supertypes = (cls, datatype(['dependencies'], superclass_name='Collection'))
     properties = {'element_types': element_types}
     collection_of_type = type(type_name, supertypes, properties)

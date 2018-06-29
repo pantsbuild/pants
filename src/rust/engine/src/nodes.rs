@@ -1,11 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-extern crate bazel_protos;
-
-use std::collections::BTreeMap;
-use std::error::Error;
-use std::fmt;
+use std::collections::{BTreeMap, HashMap};
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -17,13 +13,17 @@ use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
-use fs::{self, Dir, File, FileContent, GlobMatching, Link, PathGlobs, PathStat, StoreFileByDigest,
-         StrictGlobMatching, VFS};
+use fs::{
+  self, Dir, File, FileContent, GlobMatching, Link, PathGlobs, PathStat, StoreFileByDigest,
+  StrictGlobMatching, VFS,
+};
 use hashing;
 use process_execution::{self, CommandRunner};
 use rule_graph;
 use selectors;
 use tasks::{self, Intrinsic, IntrinsicKind};
+
+use graph::{Node, NodeError, NodeTracer, NodeVisualizer};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -44,10 +44,6 @@ fn was_required(failure: Failure) -> Failure {
     Failure::Noop(noop) => throw(&format!("No source of required dependency: {:?}", noop)),
     f => f,
   }
-}
-
-pub trait GetNode {
-  fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output>;
 }
 
 impl VFS<Failure> for Context {
@@ -78,18 +74,19 @@ impl StoreFileByDigest<Failure> for Context {
 }
 
 ///
-/// Defines executing a cacheable/memoizable step for the given context.
+/// A simplified implementation of graph::Node for members of the NodeKey enum to implement.
+/// NodeKey's impl of graph::Node handles the rest.
 ///
-/// The Output type of a Node is bounded to values that can be stored and retrieved from
-/// the NodeResult enum. Due to the semantics of memoization, retrieving the typed result
+/// The Item type of a WrappedNode is bounded to values that can be stored and retrieved
+/// from the NodeResult enum. Due to the semantics of memoization, retrieving the typed result
 /// stored inside the NodeResult requires an implementation of TryFrom<NodeResult>. But the
 /// combination of bounds at usage sites should mean that a failure to unwrap the result is
 /// exceedingly rare.
 ///
-pub trait Node: Into<NodeKey> {
-  type Output: Clone + fmt::Debug + Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
+pub trait WrappedNode: Into<NodeKey> {
+  type Item: TryFrom<NodeResult>;
 
-  fn run(self, context: Context) -> NodeFuture<Self::Output>;
+  fn run(self, context: Context) -> BoxFuture<Self::Item, Failure>;
 }
 
 ///
@@ -171,13 +168,13 @@ impl Select {
     if !externs::satisfied_by(&self.selector.product, candidate) {
       return false;
     }
-    return match variant_value {
+    match variant_value {
       &Some(ref vv) if externs::project_str(candidate, "name") != *vv =>
         // There is a variant value, and it doesn't match.
         false,
       _ =>
         true,
-    };
+    }
   }
 
   ///
@@ -214,7 +211,7 @@ impl Select {
   ///
   fn choose_task_result(
     &self,
-    context: Context,
+    context: &Context,
     results: Vec<Result<Value, Failure>>,
     variant_value: &Option<String>,
   ) -> Result<Value, Failure> {
@@ -261,7 +258,7 @@ impl Select {
   }
 
   fn snapshot(&self, context: &Context, entry: &rule_graph::Entry) -> NodeFuture<fs::Snapshot> {
-    let ref edges = context
+    let edges = &context
       .core
       .rule_graph
       .edges_for_inner(entry)
@@ -270,7 +267,7 @@ impl Select {
     let context = context.clone();
     Select::new(
       context.core.types.path_globs.clone(),
-      self.subject.clone(),
+      self.subject,
       self.variants.clone(),
       edges,
     ).run(context.clone())
@@ -283,7 +280,7 @@ impl Select {
     context: &Context,
     entry: &rule_graph::Entry,
   ) -> NodeFuture<ProcessResult> {
-    let ref edges = context
+    let edges = &context
       .core
       .rule_graph
       .edges_for_inner(entry)
@@ -291,8 +288,8 @@ impl Select {
     // Compute an ExecuteProcessRequest for the subject.
     let context = context.clone();
     Select::new(
-      context.core.types.process_request.clone(),
-      self.subject.clone(),
+      context.core.types.process_request,
+      self.subject,
       self.variants.clone(),
       edges,
     ).run(context.clone())
@@ -319,7 +316,7 @@ impl Select {
       .map(
         |entry| match context.core.rule_graph.rule_for_inner(entry) {
           &rule_graph::Rule::Task(ref task) => context.get(Task {
-            subject: self.subject.clone(),
+            subject: self.subject,
             product: self.product().clone(),
             variants: self.variants.clone(),
             task: task.clone(),
@@ -339,15 +336,15 @@ impl Select {
             kind: IntrinsicKind::FilesContent,
             ..
           }) => {
-            let ref edges = context
+            let edges = &context
               .core
               .rule_graph
               .edges_for_inner(entry)
               .expect("Expected edges to exist for FilesContent intrinsic.");
             let context = context.clone();
             Select::new(
-              context.core.types.directory_digest.clone(),
-              self.subject.clone(),
+              context.core.types.directory_digest,
+              self.subject,
               self.variants.clone(),
               edges,
             ).run(context.clone())
@@ -368,7 +365,7 @@ impl Select {
                   })
                   .and_then(move |directory| {
                     store
-                      .contents_for_directory(directory)
+                      .contents_for_directory(&directory)
                       .map_err(|str| throw(&str))
                   })
                   .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
@@ -388,7 +385,7 @@ impl Select {
                   &[
                     externs::store_bytes(&result.0.stdout),
                     externs::store_bytes(&result.0.stderr),
-                    externs::store_i64(result.0.exit_code as i64),
+                    externs::store_i64(result.0.exit_code.into()),
                     Snapshot::store_directory(&context.core, &result.0.output_directory),
                   ],
                 )
@@ -403,8 +400,8 @@ impl Select {
 
 // TODO: This is a Node only because it is used as a root in the graph, but it should never be
 // requested using context.get
-impl Node for Select {
-  type Output = Value;
+impl WrappedNode for Select {
+  type Item = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
     // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
@@ -435,7 +432,7 @@ impl Node for Select {
         .into_iter()
         .map(|node_future| {
           // Don't fail the join if one fails.
-          node_future.then(|r| future::ok(r))
+          node_future.then(future::ok)
         })
         .collect::<Vec<_>>(),
     );
@@ -443,7 +440,7 @@ impl Node for Select {
     let variant_value = variant_value.map(|s| s.to_string());
     deps_future
       .and_then(move |dep_results| {
-        future::result(self.choose_task_result(context, dep_results, &variant_value))
+        future::result(self.choose_task_result(&context, dep_results, &variant_value))
       })
       .to_boxed()
   }
@@ -481,7 +478,7 @@ impl ExecuteProcess {
     let mut env: BTreeMap<String, String> = BTreeMap::new();
     let env_var_parts = externs::project_multi_strs(&value, "env");
     if env_var_parts.len() % 2 != 0 {
-      return Err(format!("Error parsing env: odd number of parts"));
+      return Err("Error parsing env: odd number of parts".to_owned());
     }
     for i in 0..(env_var_parts.len() / 2) {
       env.insert(
@@ -494,12 +491,12 @@ impl ExecuteProcess {
 
     let output_files = externs::project_multi_strs(&value, "output_files")
       .into_iter()
-      .map(|path: String| PathBuf::from(path))
+      .map(PathBuf::from)
       .collect();
 
     let output_directories = externs::project_multi_strs(&value, "output_directories")
       .into_iter()
-      .map(|path: String| PathBuf::from(path))
+      .map(PathBuf::from)
       .collect();
 
     let timeout_str = externs::project_str(&value, "timeout_seconds");
@@ -522,10 +519,10 @@ impl ExecuteProcess {
 }
 
 #[derive(Clone, Debug)]
-pub struct ProcessResult(process_execution::ExecuteProcessResult);
+pub struct ProcessResult(process_execution::FallibleExecuteProcessResult);
 
-impl Node for ExecuteProcess {
-  type Output = ProcessResult;
+impl WrappedNode for ExecuteProcess {
+  type Item = ProcessResult;
 
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0;
@@ -534,7 +531,7 @@ impl Node for ExecuteProcess {
       .core
       .command_runner
       .run(request)
-      .map(|result| ProcessResult(result))
+      .map(ProcessResult)
       .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
       .to_boxed()
   }
@@ -555,8 +552,8 @@ pub struct ReadLink(Link);
 #[derive(Clone, Debug)]
 pub struct LinkDest(PathBuf);
 
-impl Node for ReadLink {
-  type Output = LinkDest;
+impl WrappedNode for ReadLink {
+  type Item = LinkDest;
 
   fn run(self, context: Context) -> NodeFuture<LinkDest> {
     let link = self.0.clone();
@@ -564,7 +561,7 @@ impl Node for ReadLink {
       .core
       .vfs
       .read_link(&self.0)
-      .map(|dest_path| LinkDest(dest_path))
+      .map(LinkDest)
       .map_err(move |e| throw(&format!("Failed to read_link for {:?}: {:?}", link, e)))
       .to_boxed()
   }
@@ -582,8 +579,8 @@ impl From<ReadLink> for NodeKey {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DigestFile(pub File);
 
-impl Node for DigestFile {
-  type Output = hashing::Digest;
+impl WrappedNode for DigestFile {
+  type Item = hashing::Digest;
 
   fn run(self, context: Context) -> NodeFuture<hashing::Digest> {
     let file = self.0.clone();
@@ -591,13 +588,7 @@ impl Node for DigestFile {
       .core
       .vfs
       .read_file(&self.0)
-      .map_err(move |e| {
-        throw(&format!(
-          "Error reading file {:?}: {}",
-          file,
-          e.description()
-        ))
-      })
+      .map_err(move |e| throw(&format!("Error reading file {:?}: {:?}", file, e,)))
       .and_then(move |c| {
         context
           .core
@@ -625,8 +616,8 @@ pub struct Scandir(Dir);
 #[derive(Clone, Debug)]
 pub struct DirectoryListing(Vec<fs::Stat>);
 
-impl Node for Scandir {
-  type Output = DirectoryListing;
+impl WrappedNode for Scandir {
+  type Item = DirectoryListing;
 
   fn run(self, context: Context) -> NodeFuture<DirectoryListing> {
     let dir = self.0.clone();
@@ -651,7 +642,7 @@ impl From<Scandir> for NodeKey {
 ///
 /// A Node that captures an fs::Snapshot for a PathGlobs subject.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Snapshot(Key);
 
 impl Snapshot {
@@ -746,7 +737,7 @@ impl Snapshot {
     )
   }
 
-  fn store_files_content(context: &Context, item: &Vec<FileContent>) -> Value {
+  fn store_files_content(context: &Context, item: &[FileContent]) -> Value {
     let entries: Vec<_> = item
       .iter()
       .map(|e| Self::store_file_content(context, e))
@@ -758,8 +749,8 @@ impl Snapshot {
   }
 }
 
-impl Node for Snapshot {
-  type Output = fs::Snapshot;
+impl WrappedNode for Snapshot {
+  type Item = fs::Snapshot;
 
   fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
     let lifted_path_globs = Self::lift_path_globs(&externs::val_for(&self.0));
@@ -804,9 +795,9 @@ impl Task {
             product: product,
             subject: subject.type_id().clone(),
           }));
-        Select::new_with_entries(product, subject, Default::default(), entries)
+        Select::new_with_entries(product, subject, Variants::default(), entries)
           .run(context.clone())
-          .map_err(|e| was_required(e))
+          .map_err(was_required)
       })
       .collect::<Vec<_>>();
     future::join_all(get_futures).to_boxed()
@@ -839,12 +830,12 @@ impl Task {
   }
 }
 
-impl Node for Task {
-  type Output = Value;
+impl WrappedNode for Task {
+  type Item = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
     let deps = {
-      let ref edges = context
+      let edges = &context
         .core
         .rule_graph
         .edges_for_inner(&self.entry)
@@ -857,8 +848,7 @@ impl Node for Task {
           .clause
           .into_iter()
           .map(|s| {
-            Select::new_with_selector(s, subject.clone(), variants.clone(), edges)
-              .run(context.clone())
+            Select::new_with_selector(s, subject, variants.clone(), edges).run(context.clone())
           })
           .collect::<Vec<_>>(),
       )
@@ -891,6 +881,71 @@ impl From<Task> for NodeKey {
   }
 }
 
+#[derive(Default)]
+pub struct Visualizer {
+  viz_colors: HashMap<String, String>,
+}
+
+impl NodeVisualizer<NodeKey> for Visualizer {
+  fn color_scheme(&self) -> &str {
+    "set312"
+  }
+
+  fn color(&mut self, node: &NodeKey, result: Option<Result<NodeResult, Failure>>) -> String {
+    let max_colors = 12;
+    match result {
+      None | Some(Err(Failure::Noop(_))) => "white".to_string(),
+      Some(Err(Failure::Throw(..))) => "4".to_string(),
+      Some(Err(Failure::Invalidated)) => "12".to_string(),
+      Some(Ok(_)) => {
+        let viz_colors_len = self.viz_colors.len();
+        self
+          .viz_colors
+          .entry(node.product_str())
+          .or_insert_with(|| format!("{}", viz_colors_len % max_colors + 1))
+          .clone()
+      }
+    }
+  }
+}
+
+pub struct Tracer;
+
+impl NodeTracer<NodeKey> for Tracer {
+  fn is_bottom(result: Option<Result<NodeResult, Failure>>) -> bool {
+    match result {
+      Some(Err(Failure::Invalidated)) => false,
+      Some(Err(Failure::Noop(..))) => true,
+      Some(Err(Failure::Throw(..))) => false,
+      Some(Ok(_)) => true,
+      None => {
+        // A Node with no state is either still running, or effectively cancelled
+        // because a dependent failed. In either case, it's not useful to render
+        // them, as we don't know whether they would have succeeded or failed.
+        true
+      }
+    }
+  }
+
+  fn state_str(indent: &str, result: Option<Result<NodeResult, Failure>>) -> String {
+    match result {
+      None => "<None>".to_string(),
+      Some(Ok(ref x)) => format!("{:?}", x),
+      Some(Err(Failure::Throw(ref x, ref traceback))) => format!(
+        "Throw({})\n{}",
+        externs::val_to_str(x),
+        traceback
+          .split('\n')
+          .map(|l| format!("{}    {}", indent, l))
+          .collect::<Vec<_>>()
+          .join("\n")
+      ),
+      Some(Err(Failure::Noop(ref x))) => format!("Noop({:?})", x),
+      Some(Err(Failure::Invalidated)) => "Invalidated".to_string(),
+    }
+  }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum NodeKey {
   DigestFile(DigestFile),
@@ -903,7 +958,58 @@ pub enum NodeKey {
 }
 
 impl NodeKey {
-  pub fn format(&self) -> String {
+  fn product_str(&self) -> String {
+    fn typstr(tc: &TypeConstraint) -> String {
+      externs::key_to_str(&tc.0)
+    }
+    match self {
+      &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
+      &NodeKey::Select(ref s) => typstr(&s.selector.product),
+      &NodeKey::Task(ref s) => typstr(&s.product),
+      &NodeKey::Snapshot(..) => "Snapshot".to_string(),
+      &NodeKey::DigestFile(..) => "DigestFile".to_string(),
+      &NodeKey::ReadLink(..) => "LinkDest".to_string(),
+      &NodeKey::Scandir(..) => "DirectoryListing".to_string(),
+    }
+  }
+
+  pub fn fs_subject(&self) -> Option<&Path> {
+    match self {
+      &NodeKey::DigestFile(ref s) => Some(s.0.path.as_path()),
+      &NodeKey::ReadLink(ref s) => Some((s.0).0.as_path()),
+      &NodeKey::Scandir(ref s) => Some((s.0).0.as_path()),
+
+      // Not FS operations:
+      // Explicitly listed so that if people add new NodeKeys they need to consider whether their
+      // NodeKey represents an FS operation, and accordingly whether they need to add it to the
+      // above list or the below list.
+      &NodeKey::ExecuteProcess { .. }
+      | &NodeKey::Select { .. }
+      | &NodeKey::Snapshot { .. }
+      | &NodeKey::Task { .. } => None,
+    }
+  }
+}
+
+impl Node for NodeKey {
+  type Context = Context;
+
+  type Item = NodeResult;
+  type Error = Failure;
+
+  fn run(self, context: Context) -> NodeFuture<NodeResult> {
+    match self {
+      NodeKey::DigestFile(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::ExecuteProcess(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::ReadLink(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Select(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Task(n) => n.run(context).map(|v| v.into()).to_boxed(),
+    }
+  }
+
+  fn format(&self) -> String {
     fn keystr(key: &Key) -> String {
       externs::key_to_str(&key)
     }
@@ -932,73 +1038,36 @@ impl NodeKey {
     }
   }
 
-  pub fn product_str(&self) -> String {
-    fn typstr(tc: &TypeConstraint) -> String {
-      externs::key_to_str(&tc.0)
-    }
-    match self {
-      &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
-      &NodeKey::Select(ref s) => typstr(&s.selector.product),
-      &NodeKey::Task(ref s) => typstr(&s.product),
-      &NodeKey::Snapshot(..) => "Snapshot".to_string(),
-      &NodeKey::DigestFile(..) => "DigestFile".to_string(),
-      &NodeKey::ReadLink(..) => "LinkDest".to_string(),
-      &NodeKey::Scandir(..) => "DirectoryListing".to_string(),
-    }
-  }
-
-  ///
-  /// If this NodeKey represents an FS operation, returns its Path.
-  ///
-  pub fn fs_subject(&self) -> Option<&Path> {
-    match self {
-      &NodeKey::DigestFile(ref s) => Some(s.0.path.as_path()),
-      &NodeKey::ReadLink(ref s) => Some((s.0).0.as_path()),
-      &NodeKey::Scandir(ref s) => Some((s.0).0.as_path()),
-
-      // Not FS operations:
-      // Explicitly listed so that if people add new NodeKeys they need to consider whether their
-      // NodeKey represents an FS operation, and accordingly whether they need to add it to the
-      // above list or the below list.
-      &NodeKey::ExecuteProcess { .. }
-      | &NodeKey::Select { .. }
-      | &NodeKey::Snapshot { .. }
-      | &NodeKey::Task { .. } => None,
+  fn digest(res: NodeResult) -> Option<hashing::Digest> {
+    match res {
+      NodeResult::Digest(d) => Some(d),
+      NodeResult::DirectoryListing(_)
+      | NodeResult::LinkDest(_)
+      | NodeResult::ProcessResult(_)
+      | NodeResult::Snapshot(_)
+      | NodeResult::Value(_) => None,
     }
   }
 }
 
-impl Node for NodeKey {
-  type Output = NodeResult;
+impl NodeError for Failure {
+  fn invalidated() -> Failure {
+    Failure::Invalidated
+  }
 
-  fn run(self, context: Context) -> NodeFuture<NodeResult> {
-    match self {
-      NodeKey::DigestFile(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::ExecuteProcess(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::ReadLink(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::Select(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::Task(n) => n.run(context).map(|v| v.into()).to_boxed(),
-    }
+  fn cyclic() -> Failure {
+    Failure::Noop(Noop::Cycle)
   }
 }
 
 #[derive(Clone, Debug)]
 pub enum NodeResult {
-  Unit,
   Digest(hashing::Digest),
   DirectoryListing(DirectoryListing),
   LinkDest(LinkDest),
   ProcessResult(ProcessResult),
   Snapshot(fs::Snapshot),
   Value(Value),
-}
-
-impl From<()> for NodeResult {
-  fn from(_: ()) -> Self {
-    NodeResult::Unit
-  }
 }
 
 impl From<Value> for NodeResult {
@@ -1041,7 +1110,7 @@ impl From<DirectoryListing> for NodeResult {
 //   see https://github.com/rust-lang/rust/issues/33417
 pub trait TryFrom<T>: Sized {
   type Err;
-  fn try_from(T) -> Result<Self, Self::Err>;
+  fn try_from(t: T) -> Result<Self, Self::Err>;
 }
 
 pub trait TryInto<T>: Sized {
@@ -1065,17 +1134,6 @@ impl TryFrom<NodeResult> for NodeResult {
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
     Ok(nr)
-  }
-}
-
-impl TryFrom<NodeResult> for () {
-  type Err = ();
-
-  fn try_from(nr: NodeResult) -> Result<Self, ()> {
-    match nr {
-      NodeResult::Unit => Ok(()),
-      _ => Err(()),
-    }
   }
 }
 

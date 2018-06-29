@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import glob
 import os
-import sys
 
+from pants.backend.native.config.environment import Platform
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.process_handler import subprocess
@@ -141,10 +141,10 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       self._assert_native_greeting(output)
 
   def test_pants_tests_local_dists_for_current_platform_only(self):
-    if 'linux' in sys.platform:
-      platform_string = 'linux-x86_64'
-    else:
-      platform_string = 'macosx-10.12-x86_64'
+    platform_string = Platform.create().resolve_platform_specific({
+      'darwin': lambda: 'macosx-10.12-x86_64',
+      'linux': lambda: 'linux-x86_64',
+    })
     # Use a platform-specific string for testing because the test goal
     # requires the coverage package and the pex resolver raises an Untranslatable error when
     # attempting to translate the coverage sdist for incompatible platforms.

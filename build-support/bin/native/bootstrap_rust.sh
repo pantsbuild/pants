@@ -7,7 +7,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 # + fingerprint_data: Fingerprints the data on stdin.
 source "${REPO_ROOT}/build-support/common.sh"
 
-readonly RUST_TOOLCHAIN="1.25.0"
+readonly RUST_TOOLCHAIN="1.27.0"
 readonly RUST_COMPONENTS=(
   "rustfmt-preview"
   "rust-src"

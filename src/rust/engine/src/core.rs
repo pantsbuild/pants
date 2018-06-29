@@ -37,7 +37,7 @@ impl Variants {
     Variants(result)
   }
 
-  pub fn find(&self, key: &String) -> Option<&str> {
+  pub fn find(&self, key: &str) -> Option<&str> {
     self
       .0
       .iter()
@@ -165,7 +165,7 @@ pub enum Failure {
 
 // NB: enum members are listed in ascending priority order based on how likely they are
 // to be useful to users.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Noop {
   NoTask,
   NoVariant,

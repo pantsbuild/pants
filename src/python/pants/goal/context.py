@@ -16,7 +16,7 @@ from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
-from pants.engine.isolated_process import ExecuteProcessResult
+from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
 from pants.process.lock import OwnerPrintingInterProcessFileLock
@@ -394,7 +394,7 @@ class Context(object):
       labels=labels,
       cmd=' '.join(execute_process_request.argv),
     ) as workunit:
-      result = self._scheduler.product_request(ExecuteProcessResult, [execute_process_request])[0]
+      result = self._scheduler.product_request(FallibleExecuteProcessResult, [execute_process_request])[0]
       workunit.output("stdout").write(result.stdout)
       workunit.output("stderr").write(result.stderr)
       return result

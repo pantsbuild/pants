@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.base.payload import Payload
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.cache.cache_setup import CacheFactory, CacheSetup
 from pants.task.task import Task
@@ -22,11 +23,10 @@ DUMMY_FILE_CONTENT = 'dummy_content'
 
 
 class DummyCacheLibrary(Target):
-  def __init__(self, address, source, *args, **kwargs):
+  def __init__(self, address, sources, *args, **kwargs):
     payload = Payload()
-    payload.add_fields({'sources': self.create_sources_field(sources=[source],
+    payload.add_fields({'sources': self.create_sources_field(sources=sources,
                                                              sources_rel_path=address.spec_path)})
-    self.source = source
     super(DummyCacheLibrary, self).__init__(address=address, payload=payload, *args, **kwargs)
 
 
@@ -67,6 +67,10 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
   _filename = 'f'
 
   @classmethod
+  def alias_groups(cls):
+    return BuildFileAliases(targets={'dummy_cache_library': DummyCacheLibrary})
+
+  @classmethod
   def task_type(cls):
     return DummyCacheTask
 
@@ -83,7 +87,7 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
     return os.path.join(
       self.artifact_cache,
       CacheFactory.make_task_cache_dirname(self.task),
-      self.target.id,
+      self._target.id,
       '{}.tgz'.format(vt.cache_key.hash),
     )
 
@@ -113,8 +117,9 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
       regular_file=regular_file,
       regular_file_in_results_dir=regular_file_in_results_dir
     )
-    self.target = self.make_target(':t', target_type=DummyCacheLibrary, source=self._filename)
-    context = self.context(for_task_types=[DummyCacheTask], target_roots=[self.target])
+    self.add_to_build_file('', 'dummy_cache_library(name = "t", source = "{}")'.format(self._filename))
+    self._target = self.target(':t')
+    context = self.context(for_task_types=[DummyCacheTask], target_roots=[self._target])
     self.task = self.create_task(context)
 
   def _assert_dereferenced_symlink_in_cache(self, all_vts):

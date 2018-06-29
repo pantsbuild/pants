@@ -27,20 +27,9 @@ from pants.util.memo import memoized_property
 class JvmDependencyCheck(Task):
   """Checks true dependencies of a JVM target and ensures that they are consistent with BUILD files."""
 
-  deprecated_scope = 'compile.jvm-dep-check'
-  deprecated_scope_removal_version = '1.9.0.dev0'
-
   @classmethod
   def register_options(cls, register):
     super(JvmDependencyCheck, cls).register_options(register)
-    register('--missing-deps', choices=['off', 'warn', 'fatal'], default='off',
-             fingerprint=True,
-             removal_version='1.9.0.dev0',
-             removal_hint='Undeclared transitive dependencies are no longer possible.',
-             help='Check for missing dependencies in compiled code. Reports actual '
-                  'dependencies A -> B where there is no transitive BUILD file dependency path '
-                  'from A to B. If fatal, missing deps are treated as a build error.')
-
     register('--missing-direct-deps', choices=['off', 'warn', 'fatal'],
              default='off',
              fingerprint=True,
@@ -69,7 +58,7 @@ class JvmDependencyCheck(Task):
   @staticmethod
   def _skip(options):
     """Return true if the task should be entirely skipped, and thus have no product requirements."""
-    values = [options.missing_deps, options.missing_direct_deps, options.unnecessary_deps]
+    values = [options.missing_direct_deps, options.unnecessary_deps]
     return all(v == 'off' for v in values)
 
   @classmethod
@@ -88,7 +77,6 @@ class JvmDependencyCheck(Task):
       flag_value = self.get_options().get(flag, None)
       return None if flag_value == 'off' else flag_value
 
-    self._check_missing_deps = munge_flag('missing_deps')
     self._check_missing_direct_deps = munge_flag('missing_direct_deps')
     self._check_unnecessary_deps = munge_flag('unnecessary_deps')
     self._target_whitelist = [Address.parse(s) for s in self.get_options().missing_deps_whitelist]
@@ -125,8 +113,8 @@ class JvmDependencyCheck(Task):
 
     See docstring for _compute_missing_deps for details.
     """
-    if self._check_missing_deps or self._check_missing_direct_deps or self._check_unnecessary_deps:
-      missing_file_deps, missing_tgt_deps, missing_direct_tgt_deps = \
+    if self._check_missing_direct_deps or self._check_unnecessary_deps:
+      missing_file_deps, missing_direct_tgt_deps = \
         self._compute_missing_deps(src_tgt, actual_deps)
 
       buildroot = get_buildroot()
@@ -140,23 +128,6 @@ class JvmDependencyCheck(Task):
         # Removing any targets that exist in the whitelist from the list of dependency issues.
         return [(tgt_pair, evidence) for (tgt_pair, evidence) in missing_deps
                             if tgt_pair[0].address not in self._target_whitelist]
-
-      missing_tgt_deps = filter_whitelisted(missing_tgt_deps)
-
-      if self._check_missing_deps and (missing_file_deps or missing_tgt_deps):
-        log_fn = (self.context.log.error if self._check_missing_deps == 'fatal'
-                  else self.context.log.warn)
-        for (tgt_pair, evidence) in missing_tgt_deps:
-          evidence_str = '\n'.join(['  {} uses {}'.format(shorten(e[0]), shorten(e[1]))
-                                    for e in evidence])
-          log_fn('Missing BUILD dependency {} -> {} because:\n{}'
-                 .format(tgt_pair[0].address.spec, tgt_pair[1].address.spec,
-                         evidence_str))
-        for (src_tgt, dep) in missing_file_deps:
-          log_fn('Missing BUILD dependency {} -> {}'
-                 .format(src_tgt.address.spec, shorten(dep)))
-        if self._check_missing_deps == 'fatal':
-          raise TaskError('Missing deps.')
 
       missing_direct_tgt_deps = filter_whitelisted(missing_direct_tgt_deps)
 
@@ -193,14 +164,11 @@ class JvmDependencyCheck(Task):
     - actual_deps: a map src -> list of actual deps (source, class or jar file) as noted by the
       compiler.
 
-    Returns a triple (missing_file_deps, missing_tgt_deps, missing_direct_tgt_deps) where:
+    Returns a tuple (missing_file_deps, missing_direct_tgt_deps) where:
 
     - missing_file_deps: a list of dep_files where src_tgt requires dep_file, and we're unable
       to map to a target (because its target isn't in the total set of targets in play,
       and we don't want to parse every BUILD file in the workspace just to find it).
-
-    - missing_tgt_deps: a list of dep_tgt where src_tgt is missing a necessary transitive
-                        dependency on dep_tgt.
 
     - missing_direct_tgt_deps: a list of dep_tgts where src_tgt is missing a direct dependency
                                on dep_tgt but has a transitive dep on it.
@@ -227,14 +195,8 @@ class JvmDependencyCheck(Task):
       else:
         return False
 
-    # TODO: If recomputing these every time becomes a performance issue, memoize for
-    # already-seen targets and incrementally compute for new targets not seen in a previous
-    # partition, in this or a previous chunk.
-    transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(self.context.targets())
-
     # Find deps that are actual but not specified.
     missing_file_deps = OrderedSet()  # (src, src).
-    missing_tgt_deps_map = defaultdict(list)  # (tgt, tgt) -> a list of (src, src) as evidence.
     missing_direct_tgt_deps_map = defaultdict(list)  # The same, but for direct deps.
 
     targets_by_file = analyzer.targets_by_file(self.context.targets())
@@ -250,15 +212,12 @@ class JvmDependencyCheck(Task):
         elif not target_or_java_dep_in_targets(src_tgt, actual_dep_tgts):
           # Obviously intra-target deps are fine.
           canonical_actual_dep_tgt = next(iter(actual_dep_tgts))
-          if actual_dep_tgts.isdisjoint(transitive_deps_by_target.get(src_tgt, [])):
-            missing_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append((src, actual_dep))
-          elif canonical_actual_dep_tgt not in src_tgt.dependencies:
+          if canonical_actual_dep_tgt not in src_tgt.dependencies:
             # The canonical dep is the only one a direct dependency makes sense on.
             missing_direct_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append(
                 (src, actual_dep))
 
     return (list(missing_file_deps),
-            missing_tgt_deps_map.items(),
             missing_direct_tgt_deps_map.items())
 
   def _do_check_unnecessary_deps(self, target, actual_deps, log_fn):
