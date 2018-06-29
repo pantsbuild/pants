@@ -30,7 +30,9 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
   def test_pants_binary(self):
     with temporary_dir() as tmp_dir:
       pex = os.path.join(tmp_dir, 'main.pex')
-      wheel_glob = os.path.join(tmp_dir, 'fasthello-1.0.0-*.whl')
+      # The + is because we append the target's fingerprint to the version. We test this version
+      # string in test_build_local_python_distributions.py.
+      wheel_glob = os.path.join(tmp_dir, 'fasthello-1.0.0+*.whl')
       command=[
         '--pants-distdir={}'.format(tmp_dir), 'binary', '{}:main'.format(self.fasthello_project)]
       pants_run = self.run_pants(command=command)
@@ -72,7 +74,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
 
   def test_pants_test(self):
     with temporary_dir() as tmp_dir:
-      wheel_glob = os.path.join(tmp_dir, 'fasthello-1.0.0-*.whl')
+      wheel_glob = os.path.join(tmp_dir, '*.whl')
       command=[
         '--pants-distdir={}'.format(tmp_dir),
         'test',
