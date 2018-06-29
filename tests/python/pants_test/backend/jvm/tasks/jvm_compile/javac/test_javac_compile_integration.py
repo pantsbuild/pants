@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import zipfile
 
 from pants.util.contextutil import temporary_dir
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
@@ -32,7 +33,10 @@ class JavacCompileIntegration(BaseCompileIT):
       config = {
         'cache.compile.javac': {'write_to': [cache_dir]},
         'jvm-platform': {'compiler': 'javac'},
-        'compile.javac': {'execution_strategy': 'hermetic'}
+        'compile.javac': {
+          'execution_strategy': 'hermetic',
+          'use_classpath_jars': True,
+        }
       }
 
       with self.temporary_workdir() as workdir:
@@ -45,5 +49,12 @@ class JavacCompileIntegration(BaseCompileIT):
         path = os.path.join(
           workdir,
           'compile/javac/current/testprojects.src.java.org.pantsbuild.testproject.publish.hello.greet.greet/current',
-          'classes/org/pantsbuild/testproject/publish/hello/greet/Greeting.class')
+          'z.jar')
         self.assertTrue(os.path.exists(path))
+        zip = zipfile.ZipFile(path)
+        files_in_jar = zip.namelist()
+        self.assertIn('org/pantsbuild/testproject/publish/hello/greet/Greeting.class', files_in_jar)
+        self.assertIn(
+          'compile_classpath/testprojects.src.java.org.pantsbuild.testproject.publish.hello.greet.greet.txt',
+          files_in_jar,
+        )

@@ -353,11 +353,6 @@ class JvmCompile(NailgunTaskBase):
     # Clone the compile_classpath to the runtime_classpath.
     classpath_product = self.create_runtime_classpath()
 
-    def classpath_for_context(context):
-      if self.get_options().use_classpath_jars:
-        return context.jar_file
-      return context.classes_dir
-
     fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
         classpath_product)
     # Note, JVM targets are validated (`vts.update()`) as they succeed.  As a result,
@@ -374,7 +369,7 @@ class JvmCompile(NailgunTaskBase):
                           for vt in invalidation_check.all_vts}
       for ccs in compile_contexts.values():
         cc = self.select_runtime_context(ccs)
-        classpath_product.add_for_target(cc.target, [(conf, classpath_for_context(cc))
+        classpath_product.add_for_target(cc.target, [(conf, cc.classpath(self.get_options()))
                                                      for conf in self._confs])
 
       # Register products for valid targets.
@@ -793,7 +788,7 @@ class JvmCompile(NailgunTaskBase):
       see https://github.com/twitter-forks/sbt/tree/stuhood/output-jars
     """
     root = compile_context.classes_dir
-    with compile_context.open_jar(mode='w') as jar:
+    with compile_context.open_jar(mode='a') as jar:
       for abs_sub_dir, dirnames, filenames in safe_walk(root):
         for name in dirnames + filenames:
           abs_filename = os.path.join(abs_sub_dir, name)
