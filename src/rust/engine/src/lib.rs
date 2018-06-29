@@ -5,7 +5,6 @@ pub mod cffi_externs;
 mod context;
 mod core;
 mod externs;
-mod graph;
 mod handles;
 mod interning;
 mod nodes;
@@ -22,12 +21,12 @@ extern crate enum_primitive;
 extern crate fnv;
 extern crate fs;
 extern crate futures;
+extern crate graph;
 extern crate hashing;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
-extern crate petgraph;
 extern crate process_execution;
 extern crate resettable;
 extern crate tokio;
@@ -43,12 +42,13 @@ use std::time::Duration;
 
 use context::Core;
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
-use externs::{Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern,
-              DropHandlesExtern, EqualsExtern, EvalExtern, ExternContext, Externs,
-              GeneratorSendExtern, IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern,
-              ProjectMultiExtern, PyResult, SatisfiedByExtern, SatisfiedByTypeExtern,
-              StoreBytesExtern, StoreI64Extern, StoreTupleExtern, TypeIdBuffer, TypeToStrExtern,
-              ValToStrExtern};
+use externs::{
+  Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
+  EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, IdentifyExtern, LogExtern,
+  ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult, SatisfiedByExtern,
+  SatisfiedByTypeExtern, StoreBytesExtern, StoreI64Extern, StoreTupleExtern, TypeIdBuffer,
+  TypeToStrExtern, ValToStrExtern,
+};
 use futures::Future;
 use hashing::Digest;
 use rule_graph::{GraphMaker, RuleGraph};
@@ -224,6 +224,7 @@ pub extern "C" fn scheduler_create(
   remote_store_chunk_bytes: u64,
   remote_store_chunk_upload_timeout_seconds: u64,
   process_execution_parallelism: u64,
+  process_execution_cleanup_local_dirs: bool,
 ) -> *const Scheduler {
   let root_type_ids = root_type_ids.to_vec();
   let ignore_patterns = ignore_patterns_buf
@@ -270,7 +271,7 @@ pub extern "C" fn scheduler_create(
     types,
     build_root_buf.to_os_string().as_ref(),
     ignore_patterns,
-    work_dir_buf.to_os_string().as_ref(),
+    PathBuf::from(work_dir_buf.to_os_string()),
     if remote_store_server_string.is_empty() {
       None
     } else {
@@ -285,6 +286,7 @@ pub extern "C" fn scheduler_create(
     remote_store_chunk_bytes as usize,
     Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
     process_execution_parallelism as usize,
+    process_execution_cleanup_local_dirs as bool,
   ))))
 }
 
@@ -434,9 +436,9 @@ pub extern "C" fn graph_invalidate(scheduler_ptr: *mut Scheduler, paths_buf: Buf
     let paths = paths_buf
       .to_os_strings()
       .into_iter()
-      .map(|os_str| PathBuf::from(os_str))
+      .map(PathBuf::from)
       .collect();
-    scheduler.core.graph.invalidate(paths) as u64
+    scheduler.invalidate(&paths) as u64
   })
 }
 
@@ -513,8 +515,8 @@ pub extern "C" fn execution_request_destroy(ptr: *mut ExecutionRequest) {
 pub extern "C" fn validator_run(scheduler_ptr: *mut Scheduler) -> Value {
   with_scheduler(scheduler_ptr, |scheduler| {
     match scheduler.core.rule_graph.validate() {
-      Result::Ok(_) => externs::store_tuple(&[]),
-      Result::Err(msg) => externs::create_exception(&msg),
+      Ok(_) => externs::store_tuple(&[]),
+      Err(msg) => externs::create_exception(&msg),
     }
   })
 }
@@ -709,8 +711,8 @@ fn graph_sub(
   subject_type: TypeId,
   product_type: TypeConstraint,
 ) -> RuleGraph {
-  let graph_maker = GraphMaker::new(&scheduler.core.tasks, vec![subject_type.clone()]);
-  graph_maker.sub_graph(&subject_type, &product_type)
+  let graph_maker = GraphMaker::new(&scheduler.core.tasks, vec![subject_type]);
+  graph_maker.sub_graph(subject_type, &product_type)
 }
 
 fn write_to_file(path: &Path, graph: &RuleGraph) -> io::Result<()> {

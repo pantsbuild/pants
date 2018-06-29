@@ -74,6 +74,16 @@ class ContextutilTest(unittest.TestCase):
     self.assertIn('USER', os.environ)
     self.assertNotIn('AAA', os.environ)
 
+  def test_hermetic_environment_unicode(self):
+    UNICODE_CHAR = '¡'
+    ENCODED_CHAR = UNICODE_CHAR.encode('utf-8')
+    with environment_as(**dict(XXX=UNICODE_CHAR)):
+      self.assertEquals(os.environ['XXX'], ENCODED_CHAR)
+      with hermetic_environment_as(**dict(AAA=UNICODE_CHAR)):
+        self.assertIn('AAA', os.environ)
+        self.assertEquals(os.environ['AAA'], ENCODED_CHAR)
+      self.assertEquals(os.environ['XXX'], ENCODED_CHAR)
+
   def test_simple_pushd(self):
     pre_cwd = os.getcwd()
     with temporary_dir() as tempdir:

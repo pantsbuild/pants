@@ -40,7 +40,7 @@ pub fn clone_val(val: &Value) -> Value {
   with_externs(|e| (e.clone_val)(e.context, val))
 }
 
-pub fn drop_handles(handles: Vec<Handle>) {
+pub fn drop_handles(handles: &[Handle]) {
   with_externs(|e| (e.drop_handles)(e.context, handles.as_ptr(), handles.len() as u64))
 }
 
@@ -49,9 +49,9 @@ pub fn satisfied_by(constraint: &TypeConstraint, obj: &Value) -> bool {
   with_externs(|e| (e.satisfied_by)(e.context, interns.get(&constraint.0), obj))
 }
 
-pub fn satisfied_by_type(constraint: &TypeConstraint, cls: &TypeId) -> bool {
+pub fn satisfied_by_type(constraint: &TypeConstraint, cls: TypeId) -> bool {
   let interns = INTERNS.read().unwrap();
-  with_externs(|e| (e.satisfied_by_type)(e.context, interns.get(&constraint.0), cls))
+  with_externs(|e| (e.satisfied_by_type)(e.context, interns.get(&constraint.0), &cls))
 }
 
 pub fn store_tuple(values: &[Value]) -> Value {
@@ -445,7 +445,7 @@ impl BufferBuffer {
     self
       .to_bytes_vecs()
       .into_iter()
-      .map(|v| OsString::from_vec(v))
+      .map(OsString::from_vec)
       .collect()
   }
 
@@ -453,7 +453,7 @@ impl BufferBuffer {
     self
       .to_bytes_vecs()
       .into_iter()
-      .map(|v| String::from_utf8(v))
+      .map(String::from_utf8)
       .collect()
   }
 }

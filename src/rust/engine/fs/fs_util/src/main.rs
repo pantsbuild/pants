@@ -1,5 +1,3 @@
-extern crate bazel_protos;
-extern crate boxfuture;
 extern crate bytes;
 extern crate clap;
 extern crate env_logger;
@@ -10,11 +8,10 @@ extern crate protobuf;
 
 use bytes::Bytes;
 use clap::{App, Arg, SubCommand};
-use fs::{GlobMatching, ResettablePool, Snapshot, Store, StoreFileByDigest, VFS};
+use fs::{GlobMatching, ResettablePool, Snapshot, Store, StoreFileByDigest};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use protobuf::Message;
-use std::error::Error;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
@@ -28,7 +25,7 @@ enum ExitCode {
 }
 
 #[derive(Debug)]
-struct ExitError(pub String, pub ExitCode);
+struct ExitError(String, ExitCode);
 
 impl From<String> for ExitError {
   fn from(s: String) -> Self {
@@ -40,7 +37,7 @@ fn main() {
   env_logger::init();
 
   match execute(
-    App::new("fs_util")
+    &App::new("fs_util")
       .subcommand(
         SubCommand::with_name("file")
           .subcommand(
@@ -156,7 +153,7 @@ to this directory.",
   };
 }
 
-fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
+fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
   let store_dir = top_match.value_of("local-store-path").unwrap();
   let pool = Arc::new(ResettablePool::new("fsutil-pool-".to_string()));
   let (store, store_has_remote) = {
@@ -210,7 +207,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
           let posix_fs = make_posix_fs(
             path
               .canonicalize()
-              .map_err(|e| format!("Error canonicalizing path {:?}: {}", path, e.description()))?
+              .map_err(|e| format!("Error canonicalizing path {:?}: {:?}", path, e))?
               .parent()
               .ok_or_else(|| format!("File being saved must have parent but {:?} did not", path))?,
             pool,
@@ -227,7 +224,8 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
               if store_has_remote {
                 store.ensure_remote_has_recursive(vec![digest]).wait()?;
               }
-              Ok(println!("{} {}", digest.0, digest.1))
+              println!("{} {}", digest.0, digest.1);
+              Ok(())
             }
             o => Err(
               format!(
@@ -276,7 +274,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
             // something here, or we don't care. Is that a valid assumption?
             fs::StrictGlobMatching::Ignore,
           )?)
-          .map_err(|e| format!("Error expanding globs: {}", e.description()))
+          .map_err(|e| format!("Error expanding globs: {:?}", e))
           .and_then(move |paths| {
             Snapshot::from_path_stats(
               store_copy.clone(),
@@ -289,7 +287,8 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         if store_has_remote {
           store.ensure_remote_has_recursive(vec![digest]).wait()?;
         }
-        Ok(println!("{} {}", digest.0, digest.1))
+        println!("{} {}", digest.0, digest.1);
+        Ok(())
       }
       ("cat-proto", Some(args)) => {
         let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
@@ -351,7 +350,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
       };
       match v {
         Some(bytes) => {
-          io::stdout().write(&bytes).unwrap();
+          io::stdout().write_all(&bytes).unwrap();
           Ok(())
         }
         None => Err(ExitError(
@@ -366,5 +365,5 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
 }
 
 fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::PosixFS {
-  fs::PosixFS::new(&root, pool, vec![]).unwrap()
+  fs::PosixFS::new(&root, pool, &[]).unwrap()
 }

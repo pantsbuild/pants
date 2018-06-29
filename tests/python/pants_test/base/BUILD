@@ -207,3 +207,13 @@ python_tests(
     'tests/python/pants_test/option:testing',
   ],
 )
+
+python_tests(
+  name = 'exiter_integration',
+  sources = [ 'test_exiter_integration.py' ],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+  timeout = 120,
+)

@@ -12,7 +12,6 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
-    'src/python/pants/python',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',

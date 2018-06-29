@@ -33,6 +33,8 @@ class AntlrPyGen(SimpleCodegenTask, NailgunTask):
   """Generate Python source code from ANTLR grammar files."""
   gentarget_type = PythonAntlrLibrary
 
+  sources_globs = ('**/*.py',)
+
   @classmethod
   def register_options(cls, register):
     super(AntlrPyGen, cls).register_options(register)

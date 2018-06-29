@@ -26,3 +26,22 @@ class TestNailgunIntegration(PantsRunIntegrationTest):
     )
     self.assert_success(pants_run)
     self.assertIn('Hello, World!', pants_run.stdout_data.splitlines())
+    
+  def test_scala_repl_helloworld_input_use_execution_strategy(self):
+    """Integration test to exercise possible closed-loop breakages in NailgunClient, NailgunSession
+    and InputReader. This is exactly the same test as 'test_scala_repl_helloworld_input' but uses
+    the execution_strategy option to enable nailgun to ensure this flag is working properly
+    """
+    target = 'examples/src/scala/org/pantsbuild/example/hello/welcome'
+    pants_run = self.run_pants(
+      command=['repl', target, '--quiet'],
+      stdin_data=(
+        'import org.pantsbuild.example.hello.welcome.WelcomeEverybody\n'
+        'println(WelcomeEverybody("World" :: Nil).head)\n'
+      ),
+      # Override the PANTS_CONFIG_FILES="pants.travis-ci.ini" used within TravisCI to enable
+      # nailgun usage for the purpose of exercising that stack in the integration test.
+      config={'DEFAULT': {'execution_strategy': 'nailgun'}}
+    )
+    self.assert_success(pants_run)
+    self.assertIn('Hello, World!', pants_run.stdout_data.splitlines())

@@ -26,7 +26,6 @@ from pants.engine.rules import TaskRule, rule
 from pants.engine.selectors import Get, Select
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
-from pants.util.dirutil import fast_relpath
 from pants.util.objects import Collection, datatype
 
 
@@ -364,9 +363,6 @@ def hydrate_target(target_adaptor):
 
 
 def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
-  fds = snapshot.path_stats if include_dirs else snapshot.files
-  files = tuple(fast_relpath(fd.path, spec_path) for fd in fds)
-
   rel_include_globs = filespec['globs']
 
   relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(rel_include_globs, spec_path)
@@ -376,8 +372,8 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
 
   return EagerFilesetWithSpec(spec_path,
                               relpath_adjusted_filespec,
-                              files=files,
-                              files_hash=snapshot.directory_digest.fingerprint)
+                              snapshot,
+                              include_dirs=include_dirs)
 
 
 @rule(HydratedField, [Select(SourcesField), Select(GlobMatchErrorBehavior)])

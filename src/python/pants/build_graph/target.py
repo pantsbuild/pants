@@ -549,6 +549,14 @@ class Target(AbstractTarget):
     """Returns the count of source files owned by the target."""
     return len(self._sources_field.sources.files)
 
+  def sources_snapshot(self, scheduler=None):
+    """
+    Get a Snapshot of the sources attribute of this target.
+
+    This API is experimental, and is subject to change.
+    """
+    return self._sources_field.snapshot(scheduler=scheduler)
+
   @property
   def derived_from(self):
     """Returns the target this target was derived from.
@@ -890,8 +898,7 @@ class Target(AbstractTarget):
         ('Passing collections as the value of the sources argument to create_sources_field is '
          'deprecated, and now takes a slow path. Instead, class {} should have its sources '
          'argument populated by the engine, either by using the standard parsing pipeline, or by '
-         'requesting a SourcesField product.'
-         'the v2 engine.').format(self.__class__.__name__)
+         'requesting a SourcesField product from the v2 engine.').format(self.__class__.__name__)
       )
       sources = Files.create_fileset_with_spec(sources_rel_path, *sources)
     elif not isinstance(sources, FilesetWithSpec):

@@ -23,6 +23,8 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
   _XJC_MAIN = 'com.sun.tools.xjc.Driver'
   _XML_BIND_VERSION = '2.3.0'
 
+  sources_globs = ('**/*',)
+
   @classmethod
   def register_options(cls, register):
     super(JaxbGen, cls).register_options(register)

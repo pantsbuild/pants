@@ -23,6 +23,8 @@ class JavaThriftyGen(NailgunTaskBase, SimpleCodegenTask):
 
   gentarget_type = JavaThriftyLibrary
 
+  sources_globs = ('**/*',)
+
   @classmethod
   def register_options(cls, register):
     super(JavaThriftyGen, cls).register_options(register)

@@ -28,7 +28,7 @@ class SyntheticClasspathTest(JvmToolTaskTestBase):
 
   def setUp(self):
     super(SyntheticClasspathTest, self).setUp()
-    self.set_options(use_nailgun=False)
+    self.set_options(execution_strategy='subprocess')
 
   def test_execute_java_no_error_weird_path(self):
     """

@@ -409,19 +409,19 @@ class TypedDatatypeTest(BaseTest):
   def test_instance_construction_errors(self):
     with self.assertRaises(TypeError) as cm:
       SomeTypedDatatype(something=3)
-    expected_msg = "__new__() got an unexpected keyword argument 'something'"
+    expected_msg = "error: in constructor of type SomeTypedDatatype: type check error:\n__new__() got an unexpected keyword argument 'something'"
     self.assertEqual(str(cm.exception), expected_msg)
 
     # not providing all the fields
     with self.assertRaises(TypeError) as cm:
       SomeTypedDatatype()
-    expected_msg = "__new__() takes exactly 2 arguments (1 given)"
+    expected_msg = "error: in constructor of type SomeTypedDatatype: type check error:\n__new__() takes exactly 2 arguments (1 given)"
     self.assertEqual(str(cm.exception), expected_msg)
 
     # unrecognized fields
     with self.assertRaises(TypeError) as cm:
       SomeTypedDatatype(3, 4)
-    expected_msg = "__new__() takes exactly 2 arguments (3 given)"
+    expected_msg = "error: in constructor of type SomeTypedDatatype: type check error:\n__new__() takes exactly 2 arguments (3 given)"
     self.assertEqual(str(cm.exception), expected_msg)
 
     with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
@@ -434,7 +434,7 @@ field 'nonneg_int' was invalid: value 3 (with type 'int') must satisfy this type
     # test that kwargs with keywords that aren't field names fail the same way
     with self.assertRaises(TypeError) as cm:
       CamelCaseWrapper(4, a=3)
-    expected_msg = "__new__() got an unexpected keyword argument 'a'"
+    expected_msg = "error: in constructor of type CamelCaseWrapper: type check error:\n__new__() got an unexpected keyword argument 'a'"
     self.assertEqual(str(cm.exception), expected_msg)
 
   def test_type_check_errors(self):
