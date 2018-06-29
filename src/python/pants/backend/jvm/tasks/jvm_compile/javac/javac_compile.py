@@ -17,11 +17,10 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.engine.fs import (DirectoryDigest, DirectoryToMaterialize, FilesContent, PathGlobs,
-                             Snapshot)
+from pants.engine.fs import DirectoryToMaterialize
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import DistributionLocator
-from pants.util.dirutil import safe_file_dump, safe_open
+from pants.util.dirutil import safe_open
 from pants.util.process_handler import subprocess
 
 
@@ -141,9 +140,14 @@ class JavacCompile(JvmCompile):
 
     if self.execution_strategy() == 'hermetic':
       javac_cmd.extend([
-        # The comment below is how we will add the output directory once it
-        # is supported on the rust/remoting side.
-        # '-d', os.path.relpath(ctx.classes_dir, get_buildroot()),
+        # We need to strip the source root from our output files. Outputting to a directory, and
+        # capturing that directory, does the job.
+        # Unfortunately, javac errors if the directory you pass to -d doesn't exist, and we don't
+        # have a convenient way of making a directory in the output tree, so let's just use the
+        # working directory as our output dir.
+        # This also has the benefit of not needing to strip leading directories from the returned
+        # snapshot.
+        '-d', '.',
         # TODO: support -release
         '-source', str(settings.source_level),
         '-target', str(settings.target_level),
@@ -198,50 +202,28 @@ class JavacCompile(JvmCompile):
     # For now, executing a compile remotely only works for targets that
     # do not have any dependencies or inner classes
 
-    input_files = set()
-    for source in ctx.target.sources_relative_to_buildroot():
-      input_files.add(source)
-
-    # Once remoting provides the output directory in the ExecuteProcessResponse, then we
-    # will use the output directory over output files. This will then cover cases like
-    # compilation of scala classes and anonymous classes.
-    # TODO: Add support for specifying an output directory from remote exectuion. This won't work
-    # remotely until https://github.com/pantsbuild/pants/issues/5995 is complete
-    output_files = set()
-    for source in ctx.target.sources_relative_to_buildroot():
-      output_file = source.replace(".java", ".class")
-      output_files.add(output_file)
-
-    input_pathglobs = PathGlobs(tuple(input_files), ())
-    input_snapshot = self.context._scheduler.product_request(Snapshot, [input_pathglobs])[0]
-
-    exec_process_request = ExecuteProcessRequest(tuple(cmd), (), input_snapshot.directory_digest, tuple(output_files),
-                                                 (), 15 * 60, 'jvm_task')
-    exec_result = self.context.execute_process_synchronously(exec_process_request,
-                                                             'jvm_task',
-                                                             (WorkUnitLabel.TASK, WorkUnitLabel.JVM))
-
-    # TODO: Remove this check when https://github.com/pantsbuild/pants/issues/5719 is resolved.
-    if exec_result.exit_code != 0:
-      raise TaskError('{} ... exited non-zero ({}) due to {}.'.format(' '.join(cmd), exec_result.exit_code, exec_result.stderr))
-
-    # files_content_tuple = self.context._scheduler.product_request(
-    #   FilesContent,
-    #   [exec_result.output_directory_digest]
-    # )[0].dependencies
-
-    # classes_directory = ctx.classes_dir
-    # for file_content in files_content_tuple:
-    #   file_path = os.path.relpath(file_content.path, ctx.target.target_base)
-    #   output_file_path = os.path.join(classes_directory, file_path)
-    #   safe_file_dump(output_file_path, file_content.content)
-
-
-    dir_digest = self.context._scheduler.product_request(
-      DirectoryDigest,
-      [exec_result.output_directory_digest]
+    input_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
+    output_files = tuple(
+      # Assume no extra .class files to grab. We'll fix up that case soon.
+      # Drop the source_root from the file path.
+      # Assumes `-d .` has been put in the command.
+      os.path.relpath(f.path.replace('.java', '.class'), ctx.target.target_base)
+      for f in input_snapshot.files if f.path.endswith('.java')
+    )
+    exec_process_request = ExecuteProcessRequest.create_from_snapshot(
+      argv=tuple(cmd),
+      snapshot=input_snapshot,
+      output_files=output_files,
+      description='Compiling {} with javac'.format(ctx.target.address.spec),
+    )
+    exec_result = self.context.execute_process_synchronously(
+      exec_process_request,
+      'javac',
+      (WorkUnitLabel.TASK, WorkUnitLabel.JVM),
     )
 
-    # dump the files content into directory
+    # Dump the output to the .pants.d directory where it's expected by downstream tasks.
     classes_directory = ctx.classes_dir
-    self.context._scheduler.materialize_directories((DirectoryToMaterialize(str(classes_directory), dir_digest),))
+    self.context._scheduler.materialize_directories((
+      DirectoryToMaterialize(str(classes_directory), exec_result.output_directory_digest),
+    ))

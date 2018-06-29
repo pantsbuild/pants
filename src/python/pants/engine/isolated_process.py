@@ -36,17 +36,22 @@ class ExecuteProcessRequest(datatype([
   def create_from_snapshot(
     cls,
     argv,
-    env,
     snapshot,
+    description,
+    env=None,
     output_files=(),
     output_directories=(),
     timeout_seconds=_default_timeout_seconds,
-    description='process'
   ):
-    cls._verify_env_is_dict(env)
+    if env is None:
+      env = ()
+    else:
+      cls._verify_env_is_dict(env)
+      env = tuple(env.items())
+
     return ExecuteProcessRequest(
       argv=argv,
-      env=tuple(env.items()),
+      env=env,
       input_files=snapshot.directory_digest,
       output_files=output_files,
       output_directories=output_directories,
@@ -58,20 +63,20 @@ class ExecuteProcessRequest(datatype([
   def create_with_empty_snapshot(
     cls,
     argv,
-    env,
+    description,
+    env=None,
     output_files=(),
     output_directories=(),
     timeout_seconds=_default_timeout_seconds,
-    description='process'
   ):
     return cls.create_from_snapshot(
       argv,
-      env,
       EMPTY_SNAPSHOT,
+      description,
+      env,
       output_files,
       output_directories,
       timeout_seconds,
-      description
     )
 
   @classmethod
