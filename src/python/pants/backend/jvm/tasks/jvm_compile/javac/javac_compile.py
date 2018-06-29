@@ -138,6 +138,12 @@ class JavacCompile(JvmCompile):
         settings_args = (a.replace('$JAVA_HOME', distribution.home) for a in settings.args)
       javac_cmd.extend(settings_args)
 
+      javac_cmd.extend([
+        # TODO: support -release
+        '-source', str(settings.source_level),
+        '-target', str(settings.target_level),
+      ])
+
     if self.execution_strategy() == 'hermetic':
       javac_cmd.extend([
         # We need to strip the source root from our output files. Outputting to a directory, and
@@ -148,16 +154,10 @@ class JavacCompile(JvmCompile):
         # This also has the benefit of not needing to strip leading directories from the returned
         # snapshot.
         '-d', '.',
-        # TODO: support -release
-        '-source', str(settings.source_level),
-        '-target', str(settings.target_level),
       ])
     else:
       javac_cmd.extend([
         '-d', ctx.classes_dir,
-        # TODO: support -release
-        '-source', str(settings.source_level),
-        '-target', str(settings.target_level),
       ])
 
     javac_cmd.extend(self._javac_plugin_args(javac_plugin_map))
