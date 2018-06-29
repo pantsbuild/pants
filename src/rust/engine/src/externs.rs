@@ -66,6 +66,9 @@ pub fn store_i64(val: i64) -> Value {
   with_externs(|e| (e.store_i64)(e.context, val))
 }
 
+///
+/// Pulls out the value specified by the field name from a given Value
+///
 pub fn project_ignoring_type(value: &Value, field: &str) -> Value {
   with_externs(|e| (e.project_ignoring_type)(e.context, value, field.as_ptr(), field.len() as u64))
 }

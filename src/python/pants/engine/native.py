@@ -233,6 +233,8 @@ PyResult capture_snapshots(Scheduler*, Value);
 
 PyResult merge_directories(Scheduler*, Value);
 
+PyResult materialize_directories(Scheduler*, Value);
+
 Value validator_run(Scheduler*);
 
 void rule_graph_visualize(Scheduler*, TypeIdBuffer, char*);

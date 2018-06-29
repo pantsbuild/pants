@@ -50,6 +50,7 @@ use externs::{
   TypeToStrExtern, ValToStrExtern,
 };
 use futures::Future;
+use hashing::Digest;
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
 use tasks::Tasks;
@@ -662,6 +663,42 @@ pub extern "C" fn merge_directories(
       .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
       .into()
   })
+}
+
+#[no_mangle]
+pub extern "C" fn materialize_directories(
+  scheduler_ptr: *mut Scheduler,
+  directories_paths_and_digests_value: Value,
+) -> PyResult {
+  let values = externs::project_multi(&directories_paths_and_digests_value, "dependencies");
+  let directories_paths_and_digests_results: Result<Vec<(PathBuf, Digest)>, String> = values
+    .iter()
+    .map(|value| {
+      let dir = PathBuf::from(externs::project_str(&value, "path"));
+      let dir_digest =
+        nodes::lift_digest(&externs::project_ignoring_type(&value, "directory_digest"));
+      dir_digest.map(|dir_digest| (dir, dir_digest))
+    })
+    .collect();
+
+  let dir_and_digests = match directories_paths_and_digests_results {
+    Ok(d) => d,
+    Err(err) => {
+      let e: Result<Value, String> = Err(err);
+      return e.into();
+    }
+  };
+
+  with_scheduler(scheduler_ptr, |scheduler| {
+    futures::future::join_all(
+      dir_and_digests
+        .into_iter()
+        .map(|(dir, digest)| scheduler.core.store.materialize_directory(dir, digest))
+        .collect::<Vec<_>>(),
+    )
+  }).map(|_| ())
+    .wait()
+    .into()
 }
 
 fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
