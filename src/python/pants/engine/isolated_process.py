@@ -71,12 +71,12 @@ class ExecuteProcessRequest(datatype([
   ):
     return cls.create_from_snapshot(
       argv,
-      env,
       EMPTY_SNAPSHOT,
+      description,
+      env,
       output_files,
       output_directories,
       timeout_seconds,
-      description
     )
 
   @classmethod

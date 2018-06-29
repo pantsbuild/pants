@@ -72,7 +72,7 @@ def cat_files_process_result_concatted(cat_exe_req):
   process_request = ExecuteProcessRequest.create_from_snapshot(
     argv=cat_bin.argv_from_snapshot(cat_files_snapshot),
     snapshot=cat_files_snapshot,
-    output_files=(),
+    description='cat some files',
   )
   cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
   yield Concatted(str(cat_process_result.stdout))
