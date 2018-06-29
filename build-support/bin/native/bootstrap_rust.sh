@@ -39,7 +39,7 @@ function ensure_native_build_prerequisites() {
     local -r rustup_tmp=$(mktemp -t pants.rustup.XXXXXX)
     curl https://sh.rustup.rs -sSf > ${rustup_tmp}
     # NB: rustup installs itself into CARGO_HOME, but fetches toolchains into RUSTUP_HOME.
-    sh ${rustup_tmp} -y --no-modify-path --default-toolchain "${RUST_TOOLCHAIN}" 1>&2
+    sh ${rustup_tmp} -y --no-modify-path --default-toolchain none 1>&2
     rm -f ${rustup_tmp}
   fi
 
@@ -48,9 +48,13 @@ function ensure_native_build_prerequisites() {
   local -r cargo_versioned="cargo-${RUST_TOOLCHAIN}-${cargo_components_fp}"
   if [[ ! -x "${rust_toolchain_root}/${cargo_versioned}" ]]
   then
-    set_rust_toolchain
-    "${RUSTUP}" component add ${RUST_COMPONENTS[@]} >&2
+    # If rustup was already bootstrapped against a different toolchain in the past, freshen it and
+    # ensure the toolchain and components we need are installed.
+    "${RUSTUP}" self update
+    "${RUSTUP}" toolchain install ${RUST_TOOLCHAIN}
+    "${RUSTUP}" component add --toolchain ${RUST_TOOLCHAIN} ${RUST_COMPONENTS[@]} >&2
 
+    set_rust_toolchain
     ln -fs "$(cargo_bin)" "${rust_toolchain_root}/${cargo_versioned}"
   fi
 
