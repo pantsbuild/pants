@@ -15,6 +15,7 @@ from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
 from pants.task.task import Task, TaskBase
+from pants.util.memo import memoized_property
 
 
 class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
@@ -58,11 +59,11 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
     id_tuple = (self.ID_PREFIX, self.__class__.__name__)
 
-    self._execution_strategy = self.execution_strategy()
     self._identity = '_'.join(id_tuple)
     self._executor_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
                                           *id_tuple)
 
+  @memoized_property
   def execution_strategy(self):
     # This will be more complex as we add more execution strategies are added
     # Expected behavior: if execution-strategy is set, it will override use-nailgun
@@ -81,7 +82,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     Call only in execute() or later. TODO: Enforce this.
     """
     dist = dist or self.dist
-    if self._execution_strategy == self.NAILGUN:
+    if self.execution_strategy == self.NAILGUN:
       classpath = os.pathsep.join(self.tool_classpath('nailgun-server'))
       return NailgunExecutor(self._identity,
                              self._executor_workdir,
@@ -107,7 +108,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     # Creating synthetic jar to work around system arg length limit is not necessary
     # when `NailgunExecutor` is used because args are passed through socket, therefore turning off
     # creating synthetic jar if nailgun is used.
-    create_synthetic_jar = self._execution_strategy != self.NAILGUN
+    create_synthetic_jar = self.execution_strategy != self.NAILGUN
     try:
       return util.execute_java(classpath=classpath,
                                main=main,
