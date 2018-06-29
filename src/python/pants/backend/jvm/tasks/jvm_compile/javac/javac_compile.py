@@ -17,11 +17,10 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.engine.fs import (DirectoryDigest, DirectoryToMaterialize, FilesContent, PathGlobs,
-                             Snapshot)
+from pants.engine.fs import DirectoryToMaterialize, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import DistributionLocator
-from pants.util.dirutil import safe_file_dump, safe_open
+from pants.util.dirutil import safe_open
 from pants.util.process_handler import subprocess
 
 
@@ -225,23 +224,6 @@ class JavacCompile(JvmCompile):
     if exec_result.exit_code != 0:
       raise TaskError('{} ... exited non-zero ({}) due to {}.'.format(' '.join(cmd), exec_result.exit_code, exec_result.stderr))
 
-    # files_content_tuple = self.context._scheduler.product_request(
-    #   FilesContent,
-    #   [exec_result.output_directory_digest]
-    # )[0].dependencies
-
-    # classes_directory = ctx.classes_dir
-    # for file_content in files_content_tuple:
-    #   file_path = os.path.relpath(file_content.path, ctx.target.target_base)
-    #   output_file_path = os.path.join(classes_directory, file_path)
-    #   safe_file_dump(output_file_path, file_content.content)
-
-
-    dir_digest = self.context._scheduler.product_request(
-      DirectoryDigest,
-      [exec_result.output_directory_digest]
-    )
-
     # dump the files content into directory
     classes_directory = ctx.classes_dir
-    self.context._scheduler.materialize_directories((DirectoryToMaterialize(str(classes_directory), dir_digest),))
+    self.context._scheduler.materialize_directories((DirectoryToMaterialize(str(classes_directory), exec_result.output_directory_digest),))
