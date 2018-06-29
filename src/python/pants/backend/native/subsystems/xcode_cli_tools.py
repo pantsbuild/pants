@@ -11,6 +11,7 @@ from pants.backend.native.config.environment import Assembler, CCompiler, CppCom
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
 from pants.subsystem.subsystem import Subsystem
+from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -73,13 +74,13 @@ class XCodeCLITools(Subsystem):
 
   @memoized_property
   def _all_existing_install_prefixes(self):
-    return [pfx for pfx in self.get_options().install_prefixes if os.path.isdir(pfx)]
+    return [pfx for pfx in self.get_options().install_prefixes if is_readable_dir(pfx)]
 
   # NB: We use @memoized_method in this file for methods which may raise.
   @memoized_method
   def _get_existing_subdirs(self, subdir_name):
     maybe_subdirs = [os.path.join(pfx, subdir_name) for pfx in self._all_existing_install_prefixes]
-    existing_dirs = [existing_dir for existing_dir in maybe_subdirs if os.path.isdir(existing_dir)]
+    existing_dirs = [existing_dir for existing_dir in maybe_subdirs if is_readable_dir(existing_dir)]
 
     required_files_for_dir = self._REQUIRED_FILES.get(subdir_name)
     if required_files_for_dir:
@@ -123,7 +124,7 @@ class XCodeCLITools(Subsystem):
     all_inc_dirs = base_inc_dirs
     for d in base_inc_dirs:
       secure_inc_dir = os.path.join(d, 'secure')
-      if os.path.isdir(secure_inc_dir):
+      if is_readable_dir(secure_inc_dir):
         all_inc_dirs.append(secure_inc_dir)
 
     return all_inc_dirs

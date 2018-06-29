@@ -13,6 +13,7 @@ from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
+from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_method
 
 
@@ -51,7 +52,7 @@ class LLVM(NativeTool):
     children = os.listdir(unpacked_path)
     if len(children) == 1:
       llvm_base_dir = os.path.join(unpacked_path, children[0])
-      assert(os.path.isdir(llvm_base_dir))
+      assert(is_readable_dir(llvm_base_dir))
       return llvm_base_dir
     return unpacked_path
 
