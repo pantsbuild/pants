@@ -18,7 +18,7 @@ pub type EntryId = stable_graph::NodeIndex<u32>;
 ///
 /// Defines executing a cacheable/memoizable step within the given NodeContext.
 ///
-pub trait Node: Clone + Eq + Hash + Send + 'static {
+pub trait Node: Clone + Debug + Eq + Hash + Send + 'static {
   type Context: NodeContext<Node = Self>;
 
   type Item: Clone + Debug + Eq + Send + 'static;

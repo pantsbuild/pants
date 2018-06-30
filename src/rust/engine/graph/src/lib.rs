@@ -1047,26 +1047,26 @@ mod tests {
   #[test]
   fn create() {
     let graph = Arc::new(Graph::new());
-    let context = TContext::new(graph.clone());
+    let context = TContext::new(0, graph.clone());
     assert_eq!(
       graph.create(TNode(2), &context).wait(),
-      Ok("2/1/0".to_string())
+      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
     );
   }
 
   #[test]
-  fn invalidate() {
+  fn invalidate_and_clean() {
     let graph = Arc::new(Graph::new());
-    let context = TContext::new(graph.clone());
+    let context = TContext::new(0, graph.clone());
 
     // Create three nodes.
     assert_eq!(
       graph.create(TNode(2), &context).wait(),
-      Ok("2/1/0".to_string())
+      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
     );
-    assert_eq!(context.spawn_count(), 3);
+    assert_eq!(context.runs(), vec![TNode(2), TNode(1), TNode(0)]);
 
-    // Invalidate and re-request the upper two nodes.
+    // Clear the middle Node, which dirties the upper node.
     assert_eq!(
       graph.invalidate_from_roots(|&TNode(n)| n == 1),
       InvalidationResult {
@@ -1075,36 +1075,49 @@ mod tests {
       }
     );
 
-    // Confirm that the right number of nodes re-run.
+    // Confirm that the cleared Node re-runs, and the upper node is cleaned without re-running.
     assert_eq!(
       graph.create(TNode(2), &context).wait(),
-      Ok("2/1/0".to_string())
+      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
     );
-    assert_eq!(context.spawn_count(), 5);
+    assert_eq!(
+      context.runs(),
+      vec![TNode(2), TNode(1), TNode(0), TNode(2), TNode(1)]
+    );
   }
 
-  // TODO: Test the case where a Node is re-dirtied while it is running.
+  ///
+  /// A token containing the id of a Node and the id of a Context, respectively. Has a short name
+  /// to minimize the verbosity of tests.
+  ///
+  #[derive(Clone, Debug, Eq, PartialEq)]
+  struct T(usize, usize);
 
   ///
-  /// A node that builds a string by recursively requesting itself and prepending its value
+  /// A node that builds a Vec of tokens by recursively requesting itself and appending its value
   /// to the result.
   ///
   #[derive(Clone, Debug, Eq, Hash, PartialEq)]
   struct TNode(usize);
   impl Node for TNode {
     type Context = TContext;
-    type Item = String;
+    type Item = Vec<T>;
     type Error = TError;
 
-    fn run(self, context: TContext) -> BoxFuture<String, TError> {
+    fn run(self, context: TContext) -> BoxFuture<Vec<T>, TError> {
+      context.ran(self.clone());
       let depth = self.0;
+      let token = T(depth, context.id());
       if depth > 0 {
         context
           .get(TNode(depth - 1))
-          .map(move |v| format!("{}/{}", depth, v))
+          .map(move |mut v| {
+            v.push(token);
+            v
+          })
           .to_boxed()
       } else {
-        future::ok(format!("{}", depth)).to_boxed()
+        future::ok(vec![token]).to_boxed()
       }
     }
 
@@ -1118,24 +1131,22 @@ mod tests {
   }
 
   ///
-  /// A context that keeps a count of spawned Nodes. This is a very basic way to confirm that Nodes
-  /// have (re-)run.
-  ///
-  /// TODO: This is potentially error prone, but is much simpler than actually tracking precisely
-  /// which Nodes ran and in which order. Future work.
+  /// A context that keeps a record of Nodes that have been run.
   ///
   #[derive(Clone)]
   struct TContext {
+    id: usize,
     graph: Arc<Graph<TNode>>,
-    spawn_count: Arc<Mutex<usize>>,
+    runs: Arc<Mutex<Vec<TNode>>>,
     entry_id: Option<EntryId>,
   }
   impl NodeContext for TContext {
     type Node = TNode;
     fn clone_for(&self, entry_id: EntryId) -> TContext {
       TContext {
+        id: self.id,
         graph: self.graph.clone(),
-        spawn_count: self.spawn_count.clone(),
+        runs: self.runs.clone(),
         entry_id: Some(entry_id),
       }
     }
@@ -1152,26 +1163,34 @@ mod tests {
       thread::spawn(move || {
         future.wait().unwrap();
       });
-      let mut spawn_count = self.spawn_count.lock().unwrap();
-      *spawn_count += 1
     }
   }
 
   impl TContext {
-    fn new(graph: Arc<Graph<TNode>>) -> TContext {
+    fn new(id: usize, graph: Arc<Graph<TNode>>) -> TContext {
       TContext {
+        id,
         graph,
-        spawn_count: Arc::new(Mutex::new(0)),
+        runs: Arc::new(Mutex::new(Vec::new())),
         entry_id: None,
       }
     }
 
-    fn get(&self, dst: TNode) -> BoxFuture<String, TError> {
+    fn id(&self) -> usize {
+      self.id
+    }
+
+    fn get(&self, dst: TNode) -> BoxFuture<Vec<T>, TError> {
       self.graph.get(self.entry_id.unwrap(), self, dst)
     }
 
-    fn spawn_count(&self) -> usize {
-      *self.spawn_count.lock().unwrap()
+    fn ran(&self, node: TNode) {
+      let mut runs = self.runs.lock().unwrap();
+      runs.push(node);
+    }
+
+    fn runs(&self) -> Vec<TNode> {
+      self.runs.lock().unwrap().clone()
     }
   }
 
