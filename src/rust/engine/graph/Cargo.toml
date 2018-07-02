@@ -9,3 +9,6 @@ fnv = "1.0.5"
 futures = "^0.1.16"
 hashing = { path = "../hashing" }
 petgraph = "0.4.5"
+
+[dev-dependencies]
+rand = "0.5.3"

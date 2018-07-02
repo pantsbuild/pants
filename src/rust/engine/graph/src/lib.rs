@@ -1144,12 +1144,19 @@ impl<'a, N: Node + 'a> Iterator for Walk<'a, N> {
 
 #[cfg(test)]
 mod tests {
-  use std::sync::{Arc, Mutex};
+  extern crate rand;
+
+  use std::cmp;
+  use std::collections::HashSet;
+  use std::sync::{mpsc, Arc, Mutex};
   use std::thread;
+  use std::time::Duration;
 
   use boxfuture::{BoxFuture, Boxable};
   use futures::future::{self, Future};
   use hashing::Digest;
+
+  use self::rand::Rng;
 
   use super::{EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError};
 
@@ -1223,6 +1230,62 @@ mod tests {
     assert_eq!(context1.runs(), vec![TNode(1), TNode(2)]);
   }
 
+  #[test]
+  fn invalidate_randomly() {
+    let graph = Arc::new(Graph::new());
+
+    let invalidations = 10;
+    let sleep_per_invalidation = Duration::from_millis(100);
+    let range = 100;
+
+    // Spawn a background thread to randomly invalidate in the relevant range. Hold its handle so
+    // it doesn't detach.
+    let graph2 = graph.clone();
+    let (send, recv) = mpsc::channel();
+    let _join = thread::spawn(move || {
+      let mut rng = rand::thread_rng();
+      let mut invalidations = invalidations;
+      while invalidations > 0 {
+        invalidations -= 1;
+
+        // Invalidate a random node in the graph.
+        let candidate = rng.gen_range(0, range);
+        graph2.invalidate_from_roots(|&TNode(n)| n == candidate);
+
+        thread::sleep(sleep_per_invalidation);
+      }
+      send.send(()).unwrap();
+    });
+
+    // Continuously re-request the root with increasing context values, and assert that Node and
+    // context values are ascending.
+    let mut iterations = 0;
+    let mut max_distinct_context_values = 0;
+    loop {
+      let context = TContext::new(iterations, graph.clone());
+
+      // Compute the root, and validate its output.
+      let node_output = graph.create(TNode(100), &context).wait().unwrap();
+      max_distinct_context_values = cmp::max(
+        max_distinct_context_values,
+        TNode::validate(&node_output).unwrap(),
+      );
+
+      // Poll the channel to see whether the background thread has exited.
+      if let Ok(_) = recv.try_recv() {
+        break;
+      }
+      iterations += 1;
+    }
+
+    assert!(
+      max_distinct_context_values > 1,
+      "In {} iterations, observed a maximum of {} distinct context values.",
+      iterations,
+      max_distinct_context_values
+    );
+  }
+
   ///
   /// A token containing the id of a Node and the id of a Context, respectively. Has a short name
   /// to minimize the verbosity of tests.
@@ -1264,6 +1327,53 @@ mod tests {
 
     fn digest(_result: Self::Item) -> Option<Digest> {
       None
+    }
+  }
+
+  impl TNode {
+    ///
+    /// Validates the given TNode output. Both node ids and context ids should increase left to
+    /// right: node ids monotonically, and context ids non-monotonically.
+    ///
+    /// Valid:
+    ///   (0,0), (1,1), (2,2), (3,3)
+    ///   (0,0), (1,0), (2,1), (3,1)
+    ///
+    /// Invalid:
+    ///   (0,0), (1,1), (2,1), (3,0)
+    ///   (0,0), (1,0), (2,0), (1,0)
+    ///
+    /// If successful, returns the count of distinct context ids in the path.
+    ///
+    fn validate(output: &Vec<T>) -> Result<usize, String> {
+      let (node_ids, context_ids): (Vec<_>, Vec<_>) = output
+        .iter()
+        .map(|&T(node_id, context_id)| {
+          // We cast to isize to allow comparison to -1.
+          (node_id as isize, context_id)
+        })
+        .unzip();
+      // Confirm monotonically ordered.
+      let mut previous: isize = -1;
+      for node_id in node_ids {
+        if previous + 1 != node_id {
+          return Err(format!(
+            "Node ids in {:?} were not monotonically ordered.",
+            output
+          ));
+        }
+        previous = node_id;
+      }
+      // Confirm ordered (non-monotonically).
+      let mut previous: usize = 0;
+      for &context_id in &context_ids {
+        if previous > context_id {
+          return Err(format!("Context ids in {:?} were not ordered.", output));
+        }
+        previous = context_id;
+      }
+
+      Ok(context_ids.into_iter().collect::<HashSet<_>>().len())
     }
   }
 
