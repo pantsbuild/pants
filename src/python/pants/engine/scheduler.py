@@ -427,15 +427,20 @@ class SchedulerSession(object):
   def visualize_rule_graph_to_file(self, filename):
     self._scheduler.visualize_rule_graph_to_file(filename)
 
+  def execution_request_literal(self, request_specs):
+    native_execution_request = self._scheduler._native.new_execution_request()
+    for subject, product in request_specs:
+      self._scheduler.add_root_selection(native_execution_request, subject, product)
+    return ExecutionRequest(request_specs, native_execution_request)
+
   def execution_request(self, products, subjects):
     """Create and return an ExecutionRequest for the given products and subjects.
 
-    The resulting ExecutionRequest object will contain keys tied to this scheduler's product Graph, and
-    so it will not be directly usable with other scheduler instances without being re-created.
+    The resulting ExecutionRequest object will contain keys tied to this scheduler's product Graph,
+    and so it will not be directly usable with other scheduler instances without being re-created.
 
-    An ExecutionRequest for an Address represents exactly one product output, as does SingleAddress. But
-    we differentiate between them here in order to normalize the output for all Spec objects
-    as "list of product".
+    NB: This method does a "cross product", mapping all subjects to all products. To create a
+    request for just the given list of subject -> product tuples, use `execution_request_literal()`!
 
     :param products: A list of product types to request for the roots.
     :type products: list of types
@@ -445,10 +450,7 @@ class SchedulerSession(object):
     :returns: An ExecutionRequest for the given products and subjects.
     """
     roots = (tuple((s, p) for s in subjects for p in products))
-    native_execution_request = self._scheduler._native.new_execution_request()
-    for subject, product in roots:
-      self._scheduler.add_root_selection(native_execution_request, subject, product)
-    return ExecutionRequest(roots, native_execution_request)
+    return self.execution_request_literal(roots)
 
   def invalidate_files(self, direct_filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""

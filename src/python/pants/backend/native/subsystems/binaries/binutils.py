@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.native.config.environment import Linker, Platform
+from pants.backend.native.config.environment import Assembler, Linker
 from pants.binaries.binary_tool import NativeTool
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
@@ -21,20 +21,32 @@ class Binutils(NativeTool):
   def path_entries(self):
     return [os.path.join(self.select(), 'bin')]
 
-  def linker(self, platform):
+  def assembler(self):
+    return Assembler(
+      path_entries=self.path_entries(),
+      exe_filename='as',
+      library_dirs=[])
+
+  def linker(self):
     return Linker(
       path_entries=self.path_entries(),
       exe_filename='ld',
-      platform=platform)
+      library_dirs=[])
 
 
-@rule(Linker, [Select(Platform), Select(Binutils)])
-def get_ld(platform, binutils):
-  return binutils.linker(platform)
+@rule(Assembler, [Select(Binutils)])
+def get_as(binutils):
+  return binutils.assembler()
+
+
+@rule(Linker, [Select(Binutils)])
+def get_ld(binutils):
+  return binutils.linker()
 
 
 def create_binutils_rules():
   return [
+    get_as,
     get_ld,
     RootRule(Binutils),
   ]
