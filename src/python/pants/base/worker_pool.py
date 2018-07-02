@@ -107,7 +107,7 @@ class WorkerPool(object):
 
     def submit_next():
       try:
-        self.submit_async_work(work_iter.next(), workunit_parent=workunit_parent,
+        self.submit_async_work(next(work_iter), workunit_parent=workunit_parent,
                                on_success=lambda x: submit_next(), on_failure=error)
       except StopIteration:
         done()  # The success case.

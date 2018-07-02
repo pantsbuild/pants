@@ -84,9 +84,9 @@ class Exiter(object):
 
   def handle_unhandled_exception(self, exc_class=None, exc=None, tb=None, add_newline=False):
     """Default sys.excepthook implementation for unhandled exceptions."""
-    exc_class = exc_class or sys.exc_type
-    exc = exc or sys.exc_value
-    tb = tb or sys.exc_traceback
+    exc_class = exc_class or sys.exc_info()[0]
+    exc = exc or sys.exc_info()[1]
+    tb = tb or sys.exc_info()[2]
 
     def format_msg(print_backtrace=True):
       msg = 'Exception caught: ({})\n'.format(type(exc))

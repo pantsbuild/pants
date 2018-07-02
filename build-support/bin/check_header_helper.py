@@ -8,6 +8,8 @@
 #
 # usage: check_header_helper.py dir1 [ dir2 [ ... ] ]
 
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 import os
 import re
 import sys
@@ -61,12 +63,12 @@ def main():
   for directory in dirs:
     failed_files.extend(check_dir(directory))
   if failed_files:
-    print 'ERROR: All .py files other than __init__.py should start with the following header:'
-    print
-    print EXPECTED_HEADER
-    print '---'
-    print 'The following {} file(s) do not conform:'.format(len(failed_files))
-    print '  {}'.format('\n  '.join(failed_files))
+    print('ERROR: All .py files other than __init__.py should start with the following header:')
+    print()
+    print(EXPECTED_HEADER)
+    print('---')
+    print('The following {} file(s) do not conform:'.format(len(failed_files)))
+    print('  {}'.format('\n  '.join(failed_files)))
     sys.exit(1)
 
 if __name__ == '__main__':
