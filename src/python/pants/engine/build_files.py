@@ -72,14 +72,6 @@ class UnhydratedStruct(datatype(['address', 'struct', 'dependencies'])):
   the `dependencies` field of StructWithDeps.
   """
 
-  def __eq__(self, other):
-    if type(self) != type(other):
-      return NotImplemented
-    return self.struct == other.struct
-
-  def __ne__(self, other):
-    return not (self == other)
-
   def __hash__(self):
     return hash(self.struct)
 

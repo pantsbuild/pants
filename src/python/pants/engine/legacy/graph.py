@@ -280,14 +280,6 @@ class HydratedTarget(datatype(['address', 'adaptor', 'dependencies'])):
   def addresses(self):
     return self.dependencies
 
-  def __eq__(self, other):
-    if type(self) != type(other):
-      return False
-    return self.address == other.address
-
-  def __ne__(self, other):
-    return not (self == other)
-
   def __hash__(self):
     return hash(self.address)
 
