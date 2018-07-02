@@ -223,7 +223,7 @@ if [[ "${skip_rust_tests:-false}" == "false" ]]; then
       test_threads_flag="--test-threads=1"
     fi
 
-    RUST_BACKTRACE=1 "${REPO_ROOT}/build-support/bin/native/cargo" test --all \
+    RUST_BACKTRACE=all "${REPO_ROOT}/build-support/bin/native/cargo" test --all --nocapture \
       --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" -- "${test_threads_flag}"
   ) || die "Pants rust test failure"
   end_travis_section
