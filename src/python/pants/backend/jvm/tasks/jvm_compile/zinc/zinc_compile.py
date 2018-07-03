@@ -324,7 +324,7 @@ class BaseZincCompile(JvmCompile):
       enabled_args = self.get_options().compiler_option_sets_enabled_args.get(option_set, [])
       zinc_args.extend(enabled_args)
 
-    for option_set, disabled_args in self.get_options().compiler_option_sets_disabled_args:
+    for option_set, disabled_args in self.get_options().compiler_option_sets_disabled_args.items():
       if option_set not in compiler_option_sets:
         zinc_args.extend(disabled_args)
 

@@ -235,8 +235,8 @@ class JvmCompile(NailgunTaskBase):
     raise NotImplementedError()
 
   def compile(self, ctx, args, classpath, upstream_analysis,
-              settings, fatal_warnings, zinc_file_manager,
-              javac_plugin_map, scalac_plugin_map):
+              settings, fatal_warnings, compiler_option_sets,
+              zinc_file_manager, javac_plugin_map, scalac_plugin_map):
     """Invoke the compiler.
 
     Subclasses must implement. Must raise TaskError on compile failure.
@@ -457,8 +457,8 @@ class JvmCompile(NailgunTaskBase):
       with open(path, 'w') as f:
         f.write(text.encode('utf-8'))
 
-  def _compile_vts(self, vts, ctx, upstream_analysis, classpath, progress_message, settings, fatal_warnings,
-                   zinc_file_manager, counter):
+  def _compile_vts(self, vts, ctx, upstream_analysis, classpath, progress_message, settings, 
+                   fatal_warnings, compiler_option_sets, zinc_file_manager, counter):
     """Compiles sources for the given vts into the given output dir.
 
     :param vts: VersionedTargetSet with one entry for the target.
@@ -498,6 +498,7 @@ class JvmCompile(NailgunTaskBase):
             upstream_analysis,
             settings,
             fatal_warnings,
+            compiler_option_sets,
             zinc_file_manager,
             self._get_plugin_map('javac', Java.global_instance(), ctx.target),
             self._get_plugin_map('scalac', ScalaPlatform.global_instance(), ctx.target),
@@ -687,6 +688,7 @@ class JvmCompile(NailgunTaskBase):
         dep_context = DependencyContext.global_instance()
         tgt, = vts.targets
         fatal_warnings = dep_context.defaulted_property(tgt, lambda x: x.fatal_warnings)
+        compiler_option_sets = dep_context.defaulted_property(tgt, lambda x: x.compiler_option_sets)
         zinc_file_manager = dep_context.defaulted_property(tgt, lambda x: x.zinc_file_manager)
         with Timer() as timer:
           self._compile_vts(vts,
@@ -696,6 +698,7 @@ class JvmCompile(NailgunTaskBase):
                             progress_message,
                             tgt.platform,
                             fatal_warnings,
+                            compiler_option_sets,
                             zinc_file_manager,
                             counter)
         self._record_target_stats(tgt,
