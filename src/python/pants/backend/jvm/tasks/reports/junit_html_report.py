@@ -76,7 +76,7 @@ class ReportTestSuite(object):
                            'using first result:\n -> {}'.format(suite_name,
                                                                 ', '.join(s.file for s in suites),
                                                                 '\n    '.join(map(str, cases))))
-        case = iter(cases).next()
+        case = next(iter(cases))
         tests += 1
         time += case.time
         if case.error:

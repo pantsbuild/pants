@@ -58,7 +58,7 @@ class MypyTask(ResolveRequirementsTaskBase):
 
   @staticmethod
   def is_python_target(target):
-    return isinstance(target, (PythonTarget,))
+    return isinstance(target, PythonTarget)
 
   def _calculate_python_sources(self, targets):
     """Generate a set of source files from the given targets."""

@@ -194,7 +194,7 @@ class ContextutilTest(unittest.TestCase):
     falsey = (None, '', False)
     for invalid in falsey:
       with self.assertRaises(InvalidZipPath):
-        open_zip(invalid).gen.next()
+        next(open_zip(invalid).gen)
 
   def test_open_zip_returns_realpath_on_badzipfile(self):
     # In case of file corruption, deleting a Pants-constructed symlink would not resolve the error.
@@ -204,7 +204,7 @@ class ContextutilTest(unittest.TestCase):
         os.symlink(not_zip.name, file_symlink)
         self.assertEquals(os.path.realpath(file_symlink), os.path.realpath(not_zip.name))
         with self.assertRaisesRegexp(zipfile.BadZipfile, r'{}'.format(not_zip.name)):
-          open_zip(file_symlink).gen.next()
+          next(open_zip(file_symlink).gen)
 
   @contextmanager
   def _stdio_as_tempfiles(self):
@@ -295,11 +295,11 @@ class ContextutilTest(unittest.TestCase):
     ])
 
   def test_permissions(self):
-    with temporary_file(permissions=0700) as f:
-      self.assertEquals(0700, os.stat(f.name)[0] & 0777)
+    with temporary_file(permissions=0o700) as f:
+      self.assertEquals(0o700, os.stat(f.name)[0] & 0o777)
 
-    with temporary_dir(permissions=0644) as path:
-      self.assertEquals(0644, os.stat(path)[0] & 0777)
+    with temporary_dir(permissions=0o644) as path:
+      self.assertEquals(0o644, os.stat(path)[0] & 0o777)
 
   def test_exception_logging(self):
     fake_logger = mock.Mock()

@@ -276,9 +276,9 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
         if hasattr(current_target, 'test_platform'):
           info['test_platform'] = current_target.test_platform.name
 
-      info['roots'] = map(lambda (source_root, package_prefix): {
-        'source_root': source_root,
-        'package_prefix': package_prefix
+      info['roots'] = map(lambda source_root_package_prefix: {
+        'source_root': source_root_package_prefix[0],
+        'package_prefix': source_root_package_prefix[1]
       }, self._source_roots_for_target(current_target))
 
       if classpath_products:

@@ -358,7 +358,7 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
   rel_include_globs = filespec['globs']
 
   relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(rel_include_globs, spec_path)
-  if filespec.has_key('exclude'):
+  if 'exclude' in filespec:
     relpath_adjusted_filespec['exclude'] = [FilesetRelPathWrapper.to_filespec(e['globs'], spec_path)
                                             for e in filespec['exclude']]
 
