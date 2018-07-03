@@ -260,18 +260,15 @@ class Struct(Serializable, SerializableFactory, Validatable):
     return object.__getattribute__(self, item)
 
   def _key(self):
-    if self.address:
-      return self.address
-    else:
-      def hashable(value):
-        if isinstance(value, dict):
-          return tuple(sorted((k, hashable(v)) for k, v in value.items()))
-        elif isinstance(value, list):
-          return tuple(hashable(v) for v in value)
-        else:
-          return value
-      return tuple(sorted((k, hashable(v)) for k, v in self._kwargs.items()
-                          if k not in self._INHERITANCE_FIELDS))
+    def hashable(value):
+      if isinstance(value, dict):
+        return tuple(sorted((k, hashable(v)) for k, v in value.items()))
+      elif isinstance(value, list):
+        return tuple(hashable(v) for v in value)
+      else:
+        return value
+    return tuple(sorted((k, hashable(v)) for k, v in self._kwargs.items()
+                        if k not in self._INHERITANCE_FIELDS))
 
   def __hash__(self):
     return hash(self._key())

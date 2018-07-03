@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.native.config.environment import Linker
+from pants.backend.native.config.environment import Linker, Platform
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_compile import NativeTargetDependencies, ObjectFiles
@@ -15,7 +15,6 @@ from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.collections import assert_single_element
-from pants.util.contextutil import get_joined_path
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 from pants.util.process_handler import subprocess
@@ -139,8 +138,8 @@ class LinkSharedLibraries(NativeTask):
     'linux': lambda: ['-shared'],
   }
 
-  def _get_shared_lib_cmdline_args(self):
-    return self.linker.platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
+  def _get_shared_lib_cmdline_args(self, platform):
+    return platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
 
   def _execute_link_request(self, link_request):
     object_files = link_request.object_files
@@ -149,13 +148,14 @@ class LinkSharedLibraries(NativeTask):
       raise self.LinkSharedLibrariesError("No object files were provided in request {}!"
                                           .format(link_request))
 
+    platform = Platform.create()
     linker = link_request.linker
     native_artifact = link_request.native_artifact
     output_dir = link_request.output_dir
-    resulting_shared_lib_path = os.path.join(output_dir, native_artifact.as_shared_lib(linker.platform))
+    resulting_shared_lib_path = os.path.join(output_dir, native_artifact.as_shared_lib(platform))
     # We are executing in the results_dir, so get absolute paths for everything.
     cmd = ([linker.exe_filename] +
-           self._get_shared_lib_cmdline_args() +
+           self._get_shared_lib_cmdline_args(platform) +
            ['-o', os.path.abspath(resulting_shared_lib_path)] +
            [os.path.abspath(obj) for obj in object_files])
 
@@ -167,7 +167,7 @@ class LinkSharedLibraries(NativeTask):
           cwd=output_dir,
           stdout=workunit.output('stdout'),
           stderr=workunit.output('stderr'),
-          env={'PATH': get_joined_path(linker.path_entries)})
+          env=linker.get_invocation_environment_dict(platform))
       except OSError as e:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.LinkSharedLibrariesError(

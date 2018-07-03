@@ -447,9 +447,15 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # N.B. BUILD.tools, contrib, 3rdparty needs to be copied vs symlinked to avoid
     # symlink prefix check error in v1 and v2 engine.
     files_to_copy = ('BUILD.tools',)
-    files_to_link = ('pants', 'pants.ini', 'pants.travis-ci.ini', '.pants.d',
-                     'build-support', 'pants-plugins', 'src')
-    dirs_to_copy = ('contrib', '3rdparty') + tuple(dirs_to_copy or [])
+    files_to_link = ('.pants.d',
+                     'build-support',
+                     'pants',
+                     'pants-plugins',
+                     'pants.ini',
+                     'pants.travis-ci.ini',
+                     'rust-toolchain',
+                     'src')
+    dirs_to_copy = ('3rdparty', 'contrib') + tuple(dirs_to_copy or [])
 
     with self.temporary_workdir() as tmp_dir:
       for filename in files_to_copy:

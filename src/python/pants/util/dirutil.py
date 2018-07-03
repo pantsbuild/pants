@@ -512,3 +512,8 @@ def check_no_overlapping_paths(paths):
     for p in list_copy_without_path:
       if path in p:
         raise ValueError('{} and {} have the same prefix. All paths must be unique and cannot overlap.'.format(path, p))
+
+
+def is_readable_dir(path):
+  """Returns whether a path names an existing directory that we can read."""
+  return os.path.isdir(path) and os.access(path, os.R_OK)

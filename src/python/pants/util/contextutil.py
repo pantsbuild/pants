@@ -27,27 +27,6 @@ class InvalidZipPath(ValueError):
   """Indicates a bad zip file path."""
 
 
-def get_joined_path(new_entries, env=None, env_var='PATH', delimiter=':', prepend=False):
-  """Join path entries, combining with an environment variable if specified."""
-  if env is None:
-    env = {}
-
-  prev_path = env.get(env_var, None)
-  if prev_path is None:
-    path_dirs = list()
-  else:
-    path_dirs = list(prev_path.split(delimiter))
-
-  new_entries_list = list(new_entries)
-
-  if prepend:
-    path_dirs = new_entries_list + path_dirs
-  else:
-    path_dirs += new_entries_list
-
-  return delimiter.join(path_dirs)
-
-
 def _os_encode(u, enc=sys.getfilesystemencoding()):
   """Turns a `unicode` into `bytes` via encoding."""
   return u.encode(enc, 'strict')
