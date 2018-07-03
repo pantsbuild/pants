@@ -262,6 +262,14 @@ class DatatypeTest(BaseTest):
     with self.assertRaises(ValueError):
       datatype(['0isntanallowedfirstchar'])
 
+  def test_override_eq_disallowed(self):
+    class OverridesEq(datatype(['myval'])):
+      def __eq__(self, other):
+        return other.myval == self.myval
+    with self.assertRaises(TypeCheckError) as tce:
+      OverridesEq(1)
+    self.assertIn('Should not override __eq__.', str(tce.exception))
+
   def test_subclass_pickleable(self):
     before = ExportedDatatype(1)
     dumps = pickle.dumps(before, protocol=2)

@@ -60,6 +60,11 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       return TypeCheckError(cls.__name__, msg, *args, **kwargs)
 
     def __new__(cls, *args, **kwargs):
+      # TODO: Ideally we could execute this exactly once per `cls` but it should be a
+      # relatively cheap check.
+      if not hasattr(cls.__eq__, '_eq_override_canary'):
+        raise cls.make_type_error('Should not override __eq__.')
+
       try:
         this_object = super(DataType, cls).__new__(cls, *args, **kwargs)
       except TypeError as e:
@@ -89,6 +94,9 @@ def datatype(field_decls, superclass_name=None, **kwargs):
         return False
       # Explicitly return super.__eq__'s value in case super returns NotImplemented
       return super(DataType, self).__eq__(other)
+    # We define an attribute on the `cls` level definition of `__eq__` that will allow us to detect
+    # that it has been overridden.
+    __eq__._eq_override_canary = None
 
     def __ne__(self, other):
       return not (self == other)

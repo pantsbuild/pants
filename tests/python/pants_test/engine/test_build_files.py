@@ -146,9 +146,6 @@ class TestTable(SymbolTable):
 
 
 class GraphTestBase(unittest.TestCase, SchedulerTestBase):
-  def setUp(self):
-    super(GraphTestBase, self).setUp()
-
   def create(self, build_patterns=None, parser=None):
     address_mapper = AddressMapper(build_patterns=build_patterns,
                                    parser=parser)
@@ -188,30 +185,38 @@ class InlinedGraphTest(GraphTestBase):
 
     resolved_java1 = self.resolve(scheduler, address('java1'))
 
-    nonstrict = ApacheThriftConfiguration(address=address('nonstrict'),
+    nonstrict = ApacheThriftConfiguration(type_alias='ApacheThriftConfig',
+                                          address=address('nonstrict'),
                                           version='0.9.2',
                                           strict=False,
                                           lang='java')
-    public = Struct(address=address('public'),
+    public = Struct(type_alias='Struct',
+                    address=address('public'),
                     url='https://oss.sonatype.org/#stagingRepositories')
     thrift1 = Target(address=address('thrift1'))
     thrift2 = Target(address=address('thrift2'), dependencies=[thrift1])
     expected_java1 = Target(address=address('java1'),
                             configurations=[
-                              ApacheThriftConfiguration(version='0.9.2', strict=True, lang='java'),
-                              nonstrict,
                               PublishConfiguration(
+                                type_alias='PublishConfig',
                                 default_repo=public,
                                 repos={
                                   'jake':
-                                    Struct(url='https://dl.bintray.com/pantsbuild/maven'),
+                                    Struct(type_alias='Struct', url='https://dl.bintray.com/pantsbuild/maven'),
                                   'jane': public
                                 }
-                              )
+                              ),
+                              nonstrict,
+                              ApacheThriftConfiguration(type_alias='ApacheThriftConfig',
+                                                        version='0.9.2',
+                                                        strict=True,
+                                                        dependencies=[address('thrift2')],
+                                                        lang='java'),
                             ],
-                            dependencies=[thrift2])
+                            dependencies=[thrift2],
+                            type_alias='Target')
 
-    self.assertEqual(expected_java1, resolved_java1)
+    self.assertEqual(expected_java1.configurations, resolved_java1.configurations)
 
   def test_json(self):
     scheduler = self.create_json()
@@ -307,81 +312,3 @@ class InlinedGraphTest(GraphTestBase):
     self.assertEquals(type(failure),
                       expected_type,
                       'type was not {}. Instead was {}, {!r}'.format(expected_type.__name__, type(failure).__name__, failure))
-
-
-class LazyResolvingGraphTest(GraphTestBase):
-  def do_test_codegen_simple(self, scheduler):
-    def address(name):
-      return Address(spec_path='graph_test', target_name=name)
-
-    java1_address = address('java1')
-    resolved_java1 = self.resolve(scheduler, java1_address)
-
-    nonstrict_address = address('nonstrict')
-    expected_nonstrict = ApacheThriftConfiguration(address=nonstrict_address,
-                                                   version='0.9.2',
-                                                   strict=False,
-                                                   lang='java')
-
-    public_address = address('public')
-    expected_public = Struct(address=public_address,
-                             url='https://oss.sonatype.org/#stagingRepositories')
-
-    thrift2_address = address('thrift2')
-    expected_java1 = Target(address=java1_address,
-                            sources={},
-                            configurations=[
-                              PublishConfiguration(
-                                default_repo=expected_public,
-                                repos={
-                                  'jake':
-                                    Struct(url='https://dl.bintray.com/pantsbuild/maven'),
-                                  'jane': expected_public
-                                }
-                              ),
-                              expected_nonstrict,
-                              ApacheThriftConfiguration(
-                                version='0.9.2',
-                                strict=True,
-                                lang='java',
-                                dependencies=[thrift2_address]
-                              ),
-                            ])
-
-    self.assertEqual(expected_java1, resolved_java1)
-
-    resolved_nonstrict = self.resolve(scheduler, nonstrict_address)
-    self.assertEqual(expected_nonstrict, resolved_nonstrict)
-    self.assertEqual(expected_nonstrict, expected_java1.configurations[1])
-    self.assertEquals(resolved_java1.configurations[1], resolved_nonstrict)
-
-    resolved_public = self.resolve(scheduler, public_address)
-    self.assertEqual(expected_public, resolved_public)
-    self.assertEqual(expected_public, expected_java1.configurations[0].default_repo)
-    self.assertEqual(expected_public, expected_java1.configurations[0].repos['jane'])
-    self.assertEquals(resolved_java1.configurations[0].default_repo, resolved_public)
-    self.assertEquals(resolved_java1.configurations[0].repos['jane'], resolved_public)
-
-    # NB: `dependencies` lists must be explicitly requested by tasks, so we expect an Address.
-    thrift1_address = address('thrift1')
-    expected_thrift2 = Target(address=thrift2_address, dependencies=[thrift1_address])
-    resolved_thrift2 = self.resolve(scheduler, thrift2_address)
-    self.assertEqual(expected_thrift2, resolved_thrift2)
-
-    expected_thrift1 = Target(address=thrift1_address)
-    resolved_thrift1 = self.resolve(scheduler, thrift1_address)
-    self.assertEqual(expected_thrift1, resolved_thrift1)
-
-  def test_json_lazy(self):
-    scheduler = self.create_json()
-    self.do_test_codegen_simple(scheduler)
-
-  def test_python_lazy(self):
-    scheduler = self.create(build_patterns=('*.BUILD.python',),
-                            parser=PythonAssignmentsParser(TestTable()))
-    self.do_test_codegen_simple(scheduler)
-
-  def test_python_classic_lazy(self):
-    scheduler = self.create(build_patterns=('*.BUILD',),
-                            parser=PythonCallbacksParser(TestTable()))
-    self.do_test_codegen_simple(scheduler)
