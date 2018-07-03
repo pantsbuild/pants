@@ -17,7 +17,10 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.engine.fs import DirectoryToMaterialize, PathGlobsAndRoot, PathGlobs
+from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import DistributionLocator
+from pants.util.contextutil import temporary_file, temporary_dir
 from pants.util.dirutil import safe_open
 from pants.util.process_handler import subprocess
 
@@ -83,6 +86,9 @@ class JavacCompile(JvmCompile):
     super(JavacCompile, self).__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
 
+    if self.execution_strategy() == 'hermetic' and not self.get_options().use_classpath_jars:
+      raise Exception("Must --use-classpath-jars if --execution-strategy=hermetic")
+
   def select(self, target):
     if not isinstance(target, JvmTarget):
       return False
@@ -122,7 +128,17 @@ class JavacCompile(JvmCompile):
     except DistributionLocator.Error:
       distribution = JvmPlatform.preferred_jvm_distribution([settings], strict=False)
 
-    javac_cmd = ['{}/bin/javac'.format(distribution.real_home)]
+    javac_cmd = []
+
+    if self.get_options().use_classpath_jars:
+      javac_cmd.append('compile_and_jar.sh')
+      javac_cmd.append(distribution.real_home)
+      if self.execution_strategy() == 'hermetic':
+        javac_cmd.append(os.path.basename(ctx.jar_file))
+      else:
+        javac_cmd.append(ctx.jar_file)
+
+    javac_cmd.append('javac')
 
     javac_cmd.extend([
       '-classpath', ':'.join(classpath),
@@ -136,12 +152,27 @@ class JavacCompile(JvmCompile):
         settings_args = (a.replace('$JAVA_HOME', distribution.home) for a in settings.args)
       javac_cmd.extend(settings_args)
 
-    javac_cmd.extend([
-      '-d', ctx.classes_dir,
-      # TODO: support -release
-      '-source', str(settings.source_level),
-      '-target', str(settings.target_level),
-    ])
+    if self.execution_strategy() == 'hermetic':
+      javac_cmd.extend([
+        # We need to strip the source root from our output files. Outputting to a directory, and
+        # capturing that directory, does the job.
+        # Unfortunately, javac errors if the directory you pass to -d doesn't exist, and we don't
+        # have a convenient way of making a directory in the output tree, so let's just use the
+        # working directory as our output dir.
+        # This also has the benefit of not needing to strip leading directories from the returned
+        # snapshot.
+        '-d', '.',
+        # TODO: support -release
+        '-source', str(settings.source_level),
+        '-target', str(settings.target_level),
+      ])
+    else:
+      javac_cmd.extend([
+        '-d', ctx.classes_dir,
+        # TODO: support -release
+        '-source', str(settings.source_level),
+        '-target', str(settings.target_level),
+      ])
 
     javac_cmd.extend(self._javac_plugin_args(javac_plugin_map))
 
@@ -155,15 +186,25 @@ class JavacCompile(JvmCompile):
     with argfile.safe_args(ctx.sources, self.get_options()) as batched_sources:
       javac_cmd.extend(batched_sources)
 
-      with self.context.new_workunit(name='javac',
-                                     cmd=' '.join(javac_cmd),
-                                     labels=[WorkUnitLabel.COMPILER]) as workunit:
-        self.context.log.debug('Executing {}'.format(' '.join(javac_cmd)))
-        p = subprocess.Popen(javac_cmd, stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
-        return_code = p.wait()
-        workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
-        if return_code:
-          raise TaskError('javac exited with return code {rc}'.format(rc=return_code))
+      if self.execution_strategy() == 'hermetic':
+        self._execute_hermetic_compile(javac_cmd, ctx)
+      else:
+        with self.context.new_workunit(name='javac',
+                                       cmd=' '.join(javac_cmd),
+                                       labels=[WorkUnitLabel.COMPILER]) as workunit:
+          self.context.log.debug('Executing {}'.format(' '.join(javac_cmd)))
+          env = os.environ.copy()
+          env['PATH'] = '{}/bin:{}'.format(distribution.real_home, env.get('PATH', ''))
+          p = subprocess.Popen(
+            javac_cmd,
+            stdout=workunit.output('stdout'),
+            stderr=workunit.output('stderr'),
+            env=env,
+          )
+          return_code = p.wait()
+          workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
+          if return_code:
+            raise TaskError('javac exited with return code {rc}'.format(rc=return_code))
 
   @classmethod
   def _javac_plugin_args(cls, javac_plugin_map):
@@ -177,3 +218,68 @@ class JavacCompile(JvmCompile):
                           '(arg {} for plugin {})'.format(arg, plugin))
       ret.append('-Xplugin:{} {}'.format(plugin, ' '.join(args)))
     return ret
+
+  def _execute_hermetic_compile(self, cmd, ctx):
+    # For now, executing a compile remotely only works for targets that
+    # do not have any dependencies or inner classes
+
+    # This should probably be a binary_util or something, but let's experiment...
+    with temporary_dir() as d:
+      file_path = os.path.join(d, 'compile_and_jar.sh')
+      with open(file_path, 'w') as f:
+        f.write("""#!/bin/bash -e
+
+if [[ $# -lt 3 ]]; then
+  echo >&2 "Usage: $0 /abs/path/to/jdk/home rel/path/to/output/jar javac args"
+  exit 1
+fi
+
+# Absolute path to $JDK_HOME, which contains a bin directory.
+jdk_home=$1
+shift
+
+# Relative path to the .jar file to output.
+out_jar=$1
+shift
+
+# If the passed jdk_home exists, prepend it to $PATH to override which javac/jar will be used.
+if [[ -e "${jdk_home}" ]]; then
+  export PATH="${jdk_home}/bin:${PATH}"
+fi
+
+# Compile, outputting to a temporary directory
+tmpdir="$(/usr/bin/mktemp -d -t "javac.XXXXXX")"
+"$@" -d "${tmpdir}"
+out_jar_abs="$(/bin/pwd)/${out_jar}"
+/bin/mkdir -p "$(/usr/bin/dirname "${out_jar_abs}")"
+(cd "${tmpdir}" && jar cf "${out_jar_abs}" *)
+""")
+      os.chmod(file_path, 0755)
+      script_snapshot = self.context._scheduler.capture_snapshots((
+        PathGlobsAndRoot(
+          PathGlobs(('compile_and_jar.sh',)),
+          str(d),
+        ),
+      ))[0]
+
+    sources_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
+    input_directory = self.context._scheduler.merge_directories((
+      script_snapshot.directory_digest,
+      sources_snapshot.directory_digest,
+    ))
+    exec_process_request = ExecuteProcessRequest(
+      argv=tuple(cmd),
+      input_files=input_directory,
+      output_files=(os.path.basename(ctx.jar_file),),
+      description='Compiling {} with javac'.format(ctx.target.address.spec),
+    )
+    exec_result = self.context.execute_process_synchronously(
+      exec_process_request,
+      'javac',
+      (WorkUnitLabel.TASK, WorkUnitLabel.JVM),
+    )
+
+    # Dump the output to the .pants.d directory where it's expected by downstream tasks.
+    self.context._scheduler.materialize_directories((
+      DirectoryToMaterialize(str(os.path.dirname(ctx.jar_file)), exec_result.output_directory_digest),
+    ))

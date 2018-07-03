@@ -22,15 +22,43 @@ _default_timeout_seconds = 15 * 60
 
 class ExecuteProcessRequest(datatype([
   ('argv', tuple),
-  ('env', tuple),
+  ('description', SubclassesOf(*six.string_types)),
   ('input_files', DirectoryDigest),
+  ('env', tuple),
   ('output_files', tuple),
   ('output_directories', tuple),
   # NB: timeout_seconds covers the whole remote operation including queuing and setup.
   ('timeout_seconds', Exactly(float, int)),
-  ('description', SubclassesOf(*six.string_types)),
 ])):
   """Request for execution with args and snapshots to extract."""
+
+  def __new__(
+    cls,
+    argv,
+    input_files,
+    description,
+    env=(),
+    output_files=(),
+    output_directories=(),
+    timeout_seconds=_default_timeout_seconds,
+  ):
+    """Given various file patterns create a PathGlobs object (without using filesystem operations).
+
+    :param include: A list of filespecs to include.
+    :param exclude: A list of filespecs to exclude.
+    :param glob_match_error_behavior: The value to pass to GlobMatchErrorBehavior.create()
+    :rtype: :class:`PathGlobs`
+    """
+    return super(ExecuteProcessRequest, cls).__new__(
+      cls,
+      argv,
+      description,
+      input_files,
+      env,
+      output_files,
+      output_directories,
+      timeout_seconds,
+    )
 
   @classmethod
   def create_from_snapshot(

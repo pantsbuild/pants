@@ -22,6 +22,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   # Possible execution strategies:
   NAILGUN = 'nailgun'
   SUBPROCESS = 'subprocess'
+  HERMETIC = 'hermetic'
 
   @classmethod
   def register_options(cls, register):
@@ -30,7 +31,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     register('--use-nailgun', type=bool,
              help='Use nailgun to make repeated invocations of this task quicker.',
              removal_version='1.10.0.dev0', removal_hint='Please use --execution-strategy instead.')
-    register('--execution-strategy', choices=[cls.NAILGUN, cls.SUBPROCESS],
+    register('--execution-strategy', choices=[cls.NAILGUN, cls.SUBPROCESS, cls.HERMETIC],
              help='If set to nailgun, nailgun will be enabled and repeated invocations of this '
                   'task will be quicker. If set to subprocess, then the task will be run without nailgun.')
     register('--nailgun-timeout-seconds', advanced=True, default=10, type=float,
@@ -73,7 +74,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     elif self.get_options().use_nailgun is False:
       return self.SUBPROCESS
     return self.NAILGUN
-  
+
   def create_java_executor(self, dist=None):
     """Create java executor that uses this task's ng daemon, if allowed.
 

@@ -26,7 +26,7 @@ class TestNailgunIntegration(PantsRunIntegrationTest):
     )
     self.assert_success(pants_run)
     self.assertIn('Hello, World!', pants_run.stdout_data.splitlines())
-    
+
   def test_scala_repl_helloworld_input_use_execution_strategy(self):
     """Integration test to exercise possible closed-loop breakages in NailgunClient, NailgunSession
     and InputReader. This is exactly the same test as 'test_scala_repl_helloworld_input' but uses

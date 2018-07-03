@@ -28,6 +28,11 @@ class CompileContext(object):
     self.zinc_args_file = zinc_args_file
     self.sources = sources
 
+  def classpath(self, options):
+    if options.use_classpath_jars:
+      return self.jar_file
+    return self.classes_dir
+
   @contextmanager
   def open_jar(self, mode):
     with open_zip(self.jar_file, mode=mode, compression=zipfile.ZIP_STORED) as jar:

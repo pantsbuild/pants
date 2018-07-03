@@ -5,6 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+import zipfile
+
 from pants.util.contextutil import temporary_dir
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
@@ -24,3 +27,34 @@ class JavacCompileIntegration(BaseCompileIT):
            ],
           workdir, config)
         self.assert_success(pants_run)
+
+  def test_basic_binary_hermetic(self):
+    with temporary_dir() as cache_dir:
+      config = {
+        'cache.compile.javac': {'write_to': [cache_dir]},
+        'jvm-platform': {'compiler': 'javac'},
+        'compile.javac': {
+          'execution_strategy': 'hermetic',
+          'use_classpath_jars': True,
+        }
+      }
+
+      with self.temporary_workdir() as workdir:
+        pants_run = self.run_pants_with_workdir(
+          ['compile',
+           'testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
+           ],
+          workdir, config)
+        self.assert_success(pants_run)
+        path = os.path.join(
+          workdir,
+          'compile/javac/current/testprojects.src.java.org.pantsbuild.testproject.publish.hello.greet.greet/current',
+          'z.jar')
+        self.assertTrue(os.path.exists(path))
+        zip = zipfile.ZipFile(path)
+        files_in_jar = zip.namelist()
+        self.assertIn('org/pantsbuild/testproject/publish/hello/greet/Greeting.class', files_in_jar)
+        self.assertIn(
+          'compile_classpath/testprojects.src.java.org.pantsbuild.testproject.publish.hello.greet.greet.txt',
+          files_in_jar,
+        )
