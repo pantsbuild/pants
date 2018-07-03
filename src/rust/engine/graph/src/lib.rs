@@ -24,6 +24,7 @@ use fnv::FnvHasher;
 use futures::future::{self, Future};
 use futures::sync::oneshot;
 use petgraph::graph::DiGraph;
+use petgraph::visit::EdgeRef;
 use petgraph::Direction;
 
 use boxfuture::{BoxFuture, Boxable};
@@ -75,9 +76,9 @@ impl Generation {
 }
 
 enum EntryState<N: Node> {
-  // A node that has either been explicitly cleared, or has not yet started Running for the first
-  // time. In this state there is no need for a dirty bit because the generation is either in its
-  // initial state, or has been explicitly incremented when the node was cleared.
+  // A node that has either been explicitly cleared, or has not yet started Running. In this state
+  // there is no need for a dirty bit because the generation is either in its initial state, or has
+  // been explicitly incremented when the node was cleared.
   //
   // The previous_result value is _not_ a valid value for this Entry: rather, it is preserved in
   // order to compute the generation value for this Node by comparing it to the new result the next
@@ -193,6 +194,7 @@ impl<N: Node> Entry<N> {
           // generations (which, if they are dirty, will cause recursive cleaning). If they
           // match, we can consider the previous result value to be clean for reuse.
           let was_clean = if let Some(previous_dep_generations) = previous_dep_generations {
+            let context3 = context2.clone();
             context2
               .graph()
               .dep_generations(entry_id, &context2)
@@ -202,7 +204,9 @@ impl<N: Node> Entry<N> {
                   Ok(true)
                 }
                 _ => {
-                  // If dependency generations mismatched or failed to fetch, re-run the Node.
+                  // If dependency generations mismatched or failed to fetch, clear its
+                  // dependencies and indicate that it should re-run.
+                  context3.graph().clear_deps(entry_id, run_token);
                   Ok(false)
                 }
               })
@@ -462,6 +466,20 @@ impl<N: Node> Entry<N> {
   }
 
   ///
+  /// Get the current RunToken of this entry.
+  ///
+  /// TODO: Consider moving the Generation and RunToken out of the EntryState once we decide what
+  /// we want the per-Entry locking strategy to be.
+  ///
+  fn run_token(&self) -> RunToken {
+    match &self.state {
+      &EntryState::NotStarted { run_token, .. }
+      | &EntryState::Running { run_token, .. }
+      | &EntryState::Completed { run_token, .. } => run_token,
+    }
+  }
+
+  ///
   /// If the Node has started and has not yet completed, returns its runtime.
   ///
   fn current_running_duration(&self, now: &Instant) -> Option<Duration> {
@@ -654,10 +672,21 @@ impl<N: Node> InnerGraph<N> {
       dirtied: transitive_ids.len(),
     };
 
-    // Clear roots, and dirty transitive entries.
+    // Clear roots and remove their outbound edges.
     for id in &root_ids {
       self.pg.node_weight_mut(*id).map(|entry| entry.clear());
     }
+    self.pg.retain_edges(|pg, edge| {
+      if let Some((src, _)) = pg.edge_endpoints(edge) {
+        !root_ids.contains(&src)
+      } else {
+        true
+      }
+    });
+
+    // Dirty transitive entries, but do not yet clear their output edges. We wait to clear
+    // outbound edges until we decide whether we can clean an entry: if we can, all edges are
+    // preserved; if we can't, they are cleared in `Graph::clear_deps`.
     for id in &transitive_ids {
       self.pg.node_weight_mut(*id).map(|entry| entry.dirty());
     }
@@ -1034,6 +1063,29 @@ impl<N: Node> Graph<N> {
   }
 
   ///
+  /// Clears the dependency edges of the given EntryId if the RunToken matches.
+  ///
+  fn clear_deps(&self, entry_id: EntryId, run_token: RunToken) {
+    let mut inner = self.inner.lock().unwrap();
+    // If the RunToken mismatches, return.
+    if let Some(entry) = inner.entry_for_id(entry_id) {
+      if entry.run_token() != run_token {
+        return;
+      }
+    }
+
+    // Otherwise, clear the deps.
+    let dep_edges: Vec<_> = inner
+      .pg
+      .edges_directed(entry_id, Direction::Outgoing)
+      .map(|edge| edge.id())
+      .collect();
+    for dep_edge in dep_edges {
+      inner.pg.remove_edge(dep_edge);
+    }
+  }
+
+  ///
   /// When the Executor finishes executing a Node it calls back to store the result value. We use
   /// the run_token and dirty bits to determine whether the Node changed while we were busy
   /// executing it, so that we can discard the work.
@@ -1231,6 +1283,44 @@ mod tests {
   }
 
   #[test]
+  fn invalidate_with_changed_dependencies() {
+    let graph = Arc::new(Graph::new());
+    let context = TContext::new(0, graph.clone());
+
+    // Create three nodes.
+    assert_eq!(
+      graph.create(TNode(2), &context).wait(),
+      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+    );
+
+    // Clear the middle Node, which dirties the upper node.
+    assert_eq!(
+      graph.invalidate_from_roots(|&TNode(n)| n == 1),
+      InvalidationResult {
+        cleared: 1,
+        dirtied: 1
+      }
+    );
+
+    // Request with a new context that truncates execution at the middle Node.
+    let context = TContext::new_with_stop_at(0, TNode(1), graph.clone());
+    assert_eq!(
+      graph.create(TNode(2), &context).wait(),
+      Ok(vec![T(1, 0), T(2, 0)])
+    );
+
+    // Confirm that dirtying the bottom Node does not affect the middle/upper Nodes, which no
+    // longer depend on it.
+    assert_eq!(
+      graph.invalidate_from_roots(|&TNode(n)| n == 0),
+      InvalidationResult {
+        cleared: 1,
+        dirtied: 0,
+      }
+    );
+  }
+
+  #[test]
   fn invalidate_randomly() {
     let graph = Arc::new(Graph::new());
 
@@ -1308,7 +1398,7 @@ mod tests {
       context.ran(self.clone());
       let depth = self.0;
       let token = T(depth, context.id());
-      if depth > 0 {
+      if depth > 0 && !context.stop_at(&self) {
         context
           .get(TNode(depth - 1))
           .map(move |mut v| {
@@ -1383,6 +1473,7 @@ mod tests {
   #[derive(Clone)]
   struct TContext {
     id: usize,
+    stop_at: Option<TNode>,
     graph: Arc<Graph<TNode>>,
     runs: Arc<Mutex<Vec<TNode>>>,
     entry_id: Option<EntryId>,
@@ -1392,6 +1483,7 @@ mod tests {
     fn clone_for(&self, entry_id: EntryId) -> TContext {
       TContext {
         id: self.id,
+        stop_at: self.stop_at.clone(),
         graph: self.graph.clone(),
         runs: self.runs.clone(),
         entry_id: Some(entry_id),
@@ -1417,6 +1509,17 @@ mod tests {
     fn new(id: usize, graph: Arc<Graph<TNode>>) -> TContext {
       TContext {
         id,
+        stop_at: None,
+        graph,
+        runs: Arc::new(Mutex::new(Vec::new())),
+        entry_id: None,
+      }
+    }
+
+    fn new_with_stop_at(id: usize, stop_at: TNode, graph: Arc<Graph<TNode>>) -> TContext {
+      TContext {
+        id,
+        stop_at: Some(stop_at),
         graph,
         runs: Arc::new(Mutex::new(Vec::new())),
         entry_id: None,
@@ -1434,6 +1537,10 @@ mod tests {
     fn ran(&self, node: TNode) {
       let mut runs = self.runs.lock().unwrap();
       runs.push(node);
+    }
+
+    fn stop_at(&self, node: &TNode) -> bool {
+      Some(node) == self.stop_at.as_ref()
     }
 
     fn runs(&self) -> Vec<TNode> {

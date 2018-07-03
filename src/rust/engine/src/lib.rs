@@ -443,6 +443,13 @@ pub extern "C" fn graph_invalidate(scheduler_ptr: *mut Scheduler, paths_buf: Buf
 }
 
 #[no_mangle]
+pub extern "C" fn graph_invalidate_all_paths(scheduler_ptr: *mut Scheduler) -> u64 {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    scheduler.invalidate_all_paths() as u64
+  })
+}
+
+#[no_mangle]
 pub extern "C" fn graph_len(scheduler_ptr: *mut Scheduler) -> u64 {
   with_scheduler(scheduler_ptr, |scheduler| scheduler.core.graph.len() as u64)
 }

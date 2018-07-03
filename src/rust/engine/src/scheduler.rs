@@ -149,6 +149,18 @@ impl Scheduler {
   }
 
   ///
+  /// Invalidate all filesystem dependencies in the graph.
+  ///
+  pub fn invalidate_all_paths(&self) -> usize {
+    let invalidation_result = self
+      .core
+      .graph
+      .invalidate_from_roots(|node| node.fs_subject().is_some());
+    // TODO: Expose.
+    invalidation_result.cleared + invalidation_result.dirtied
+  }
+
+  ///
   /// Return Scheduler and per-Session metrics.
   ///
   pub fn metrics(&self, session: &Session) -> HashMap<&str, i64> {
