@@ -91,10 +91,11 @@ impl Scheduler {
       .visualize(Visualizer::default(), &session.root_nodes(), path)
   }
 
-  pub fn trace(&self, request: &ExecutionRequest, path: &Path) -> io::Result<()> {
-    for root in request.root_nodes() {
-      self.core.graph.trace::<Tracer>(&root, path)?;
-    }
+  pub fn trace(&self, request: &ExecutionRequest, path: &Path) -> Result<(), String> {
+    self
+      .core
+      .graph
+      .trace::<Tracer>(&request.root_nodes(), path)?;
     Ok(())
   }
 

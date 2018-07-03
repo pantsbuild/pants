@@ -329,29 +329,6 @@ impl<N: Node> InnerGraph<N> {
     }
   }
 
-  ///
-  /// Begins a topological walk from the given roots. Provides both the current entry as well as the
-  /// depth from the root.
-  ///
-  fn leveled_walk<P>(
-    &self,
-    roots: Vec<EntryId>,
-    predicate: P,
-    direction: Direction,
-  ) -> LeveledWalk<N, P>
-  where
-    P: Fn(EntryId, Level) -> bool,
-  {
-    let rrr = roots.into_iter().map(|r| (r, 0)).collect::<VecDeque<_>>();
-    LeveledWalk {
-      graph: self,
-      direction: direction,
-      deque: rrr,
-      walked: HashSet::default(),
-      predicate: predicate,
-    }
-  }
-
   fn clear(&mut self) {
     for eid in self.nodes.values() {
       if let Some(entry) = self.pg.node_weight_mut(*eid) {
@@ -455,28 +432,110 @@ impl<N: Node> InnerGraph<N> {
     Ok(())
   }
 
-  fn trace<T: NodeTracer<N>>(&self, root: &N, path: &Path) -> io::Result<()> {
-    let file = try!(OpenOptions::new().append(true).open(path));
-    let mut f = BufWriter::new(file);
+  fn trace<T: NodeTracer<N>>(&self, roots: &[N], file_path: &Path) -> Result<(), String> {
+    let root_ids: HashSet<EntryId, FNV> = roots
+      .into_iter()
+      .filter_map(|nk| self.entry_id(&EntryKey::Valid(nk.clone())))
+      .cloned()
+      .collect();
 
-    let is_bottom = |eid: EntryId| -> bool { T::is_bottom(self.unsafe_entry_for_id(eid).peek()) };
+    // Find all bottom Nodes for the trace by walking recursively under the roots.
+    let bottom_nodes = {
+      let mut queue: VecDeque<_> = root_ids.iter().cloned().collect();
+      let mut visited: HashSet<EntryId, FNV> = HashSet::default();
+      let mut bottom_nodes = Vec::new();
+      while let Some(id) = queue.pop_front() {
+        if !visited.insert(id) {
+          continue;
+        }
 
-    let is_one_level_above_bottom =
-      |eid: EntryId| -> bool { self.pg.neighbors(eid).all(&is_bottom) };
+        // If all dependencies are bottom nodes, then we represent a failure.
+        let mut non_bottom_deps = self
+          .pg
+          .neighbors_directed(id, Direction::Outgoing)
+          .filter(|dep_id| !T::is_bottom(self.unsafe_entry_for_id(*dep_id).peek()))
+          .peekable();
 
-    let _indent = |level: Level| -> String {
-      let mut indent = String::new();
-      for _ in 0..level {
-        indent.push_str("  ");
+        if non_bottom_deps.peek().is_none() {
+          bottom_nodes.push(id);
+        } else {
+          // Otherwise, continue recursing on `rest`.
+          queue.extend(non_bottom_deps);
+        }
       }
-      indent
+      bottom_nodes
     };
 
-    let _format = |eid: EntryId, level: Level| -> String {
+    // Invert the graph into a evenly-weighted dependent graph by cloning it and stripping out
+    // the Nodes (to avoid cloning them), adding equal edge weights, and then reversing it.
+    // Because we do not remove any Nodes or edges, all EntryIds remain stable.
+    let dependent_graph = {
+      let mut dg = self
+        .pg
+        .filter_map(|_, _| Some(()), |_, _| Some(1.0))
+        .clone();
+      dg.reverse();
+      dg
+    };
+
+    // Render the shortest path through the dependent graph to any root for each bottom_node.
+    for bottom_node in bottom_nodes {
+      // We use Bellman Ford because it actually records paths, unlike Dijkstra's.
+      let (path_weights, paths) = petgraph::algo::bellman_ford(&dependent_graph, bottom_node)
+        .unwrap_or_else(|e| {
+          panic!(
+            "There should not be any negative edge weights. Got: {:?}",
+            e
+          )
+        });
+
+      // Find the root with the shortest path weight.
+      let minimum_path_id = root_ids
+        .iter()
+        .min_by_key(|root_id| path_weights[root_id.index()] as usize)
+        .ok_or_else(|| format!("Encountered a Node that was not reachable from any roots."))?;
+
+      // Collect the path by walking through the `paths` Vec, which contains the indexes of
+      // predecessor Nodes along a path to the bottom Node.
+      let path = {
+        let mut next_id = *minimum_path_id;
+        let mut path = Vec::new();
+        path.push(next_id);
+        while let Some(current_id) = paths[next_id.index()] {
+          path.push(current_id);
+          if current_id == bottom_node {
+            break;
+          }
+          next_id = current_id;
+        }
+        path
+      };
+
+      // Render the path.
+      self
+        .trace_render_path_to_file::<T>(&path, file_path)
+        .map_err(|e| format!("Failed to render trace to {:?}: {}", file_path, e))?;
+    }
+
+    Ok(())
+  }
+
+  ///
+  /// Renders a Graph path to the given file path.
+  ///
+  fn trace_render_path_to_file<T: NodeTracer<N>>(
+    &self,
+    path: &[EntryId],
+    file_path: &Path,
+  ) -> io::Result<()> {
+    let file = try!(OpenOptions::new().append(true).open(file_path));
+    let mut f = BufWriter::new(file);
+
+    let _format = |eid: EntryId, depth: usize, is_last: bool| -> String {
       let entry = self.unsafe_entry_for_id(eid);
-      let indent = _indent(level);
+      let indent = "  ".repeat(depth);
       let output = format!("{}Computing {}", indent, entry.node.content().format());
-      if is_one_level_above_bottom(eid) {
+      if is_last {
         format!(
           "{}\n{}  {}",
           output,
@@ -488,13 +547,13 @@ impl<N: Node> InnerGraph<N> {
       }
     };
 
-    let root_entries = self
-      .entry_id(&EntryKey::Valid(root.clone()))
-      .map(|&eid| vec![eid])
-      .unwrap_or_else(|| vec![]);
-    for t in self.leveled_walk(root_entries, |eid, _| !is_bottom(eid), Direction::Outgoing) {
-      let (eid, level) = t;
-      try!(writeln!(&mut f, "{}", _format(eid, level)));
+    let mut path_iter = path.iter().enumerate().peekable();
+    while let Some((depth, id)) = path_iter.next() {
+      try!(writeln!(
+        &mut f,
+        "{}",
+        _format(*id, depth, path_iter.peek().is_none())
+      ));
     }
 
     try!(f.write_all(b"\n"));
@@ -683,9 +742,9 @@ impl<N: Node> Graph<N> {
     inner.invalidate_from_roots(predicate)
   }
 
-  pub fn trace<T: NodeTracer<N>>(&self, root: &N, path: &Path) -> io::Result<()> {
+  pub fn trace<T: NodeTracer<N>>(&self, roots: &[N], path: &Path) -> Result<(), String> {
     let inner = self.inner.lock().unwrap();
-    inner.trace::<T>(root, path)
+    inner.trace::<T>(roots, path)
   }
 
   pub fn visualize<V: NodeVisualizer<N>>(
@@ -739,50 +798,6 @@ impl<'a, N: Node + 'a> Iterator for Walk<'a, N> {
         .deque
         .extend(self.graph.pg.neighbors_directed(id, self.direction));
       return Some(id);
-    }
-
-    None
-  }
-}
-
-type Level = u32;
-
-///
-/// Represents the state of a particular topological walk through a Graph. Implements Iterator and
-/// has the same lifetime as the Graph itself.
-///
-struct LeveledWalk<'a, N: Node + 'a, P: Fn(EntryId, Level) -> bool> {
-  graph: &'a InnerGraph<N>,
-  direction: Direction,
-  deque: VecDeque<(EntryId, Level)>,
-  walked: HashSet<EntryId, FNV>,
-  predicate: P,
-}
-
-impl<'a, N: Node + 'a, P: Fn(EntryId, Level) -> bool> Iterator for LeveledWalk<'a, N, P> {
-  type Item = (EntryId, Level);
-
-  fn next(&mut self) -> Option<Self::Item> {
-    while let Some((id, level)) = self.deque.pop_front() {
-      if self.walked.contains(&id) {
-        continue;
-      }
-      self.walked.insert(id);
-
-      if !(self.predicate)(id, level) {
-        continue;
-      }
-
-      // Entry matches: queue its neighbors and then return it.
-      self.deque.extend(
-        self
-          .graph
-          .pg
-          .neighbors_directed(id, self.direction)
-          .into_iter()
-          .map(|d| (d, level + 1)),
-      );
-      return Some((id, level));
     }
 
     None
