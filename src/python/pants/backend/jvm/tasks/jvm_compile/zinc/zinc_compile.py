@@ -274,7 +274,7 @@ class BaseZincCompile(JvmCompile):
     return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
 
   def compile(self, ctx, args, classpath, upstream_analysis,
-              settings, fatal_warnings, zinc_file_manager,
+              settings, fatal_warnings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     self._verify_zinc_classpath(classpath)
     self._verify_zinc_classpath(upstream_analysis.keys())
@@ -320,10 +320,13 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(self._get_zinc_arguments(settings))
     zinc_args.append('-transactional')
 
-    if fatal_warnings:
-      zinc_args.extend(self.get_options().fatal_warnings_enabled_args)
-    else:
-      zinc_args.extend(self.get_options().fatal_warnings_disabled_args)
+    for option_set in compiler_option_sets:
+      enabled_args = self.get_options().compiler_option_sets_enabled_args.get(option_set, [])
+      zinc_args.extend(enabled_args)
+
+    for option_set, disabled_args in self.get_options().compiler_option_sets_disabled_args:
+      if option_set not in compiler_option_sets:
+        zinc_args.extend(disabled_args)
 
     if not self._clear_invalid_analysis:
       zinc_args.append('-no-clear-invalid-analysis')

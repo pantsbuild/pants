@@ -40,6 +40,7 @@ class JvmTarget(Target, Jarable):
                strict_deps=None,
                exports=None,
                fatal_warnings=None,
+               compiler_option_sets=None,
                zinc_file_manager=None,
                # Some subclasses can have both .java and .scala sources
                # (e.g., JUnitTests, JvmBinary, even ScalaLibrary), so it's convenient
@@ -104,6 +105,7 @@ class JvmTarget(Target, Jarable):
       'strict_deps': PrimitiveField(strict_deps),
       'exports': PrimitivesSetField(exports or []),
       'fatal_warnings': PrimitiveField(fatal_warnings),
+      'compiler_option_sets': SetOfPrimitivesField(compiler_option_sets),
       'zinc_file_manager': PrimitiveField(zinc_file_manager),
       'javac_plugins': PrimitivesSetField(javac_plugins or []),
       'javac_plugin_args': PrimitiveField(javac_plugin_args),
@@ -138,6 +140,15 @@ class JvmTarget(Target, Jarable):
     :rtype: bool or None
     """
     return self.payload.fatal_warnings
+
+  @memoized_property
+  def compiler_option_sets(self):
+    """For every element in this list, enable the corresponding flags on compilation
+    of targets.
+    :return: See constructor.
+    :rtype: list
+    """
+    return self.payload.compiler_option_sets
 
   @property
   def zinc_file_manager(self):

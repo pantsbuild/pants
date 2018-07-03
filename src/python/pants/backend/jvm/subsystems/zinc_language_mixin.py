@@ -22,6 +22,10 @@ class ZincLanguageMixin(object):
              fingerprint=True,
              help='The default for the "fatal_warnings" argument for targets of this language.')
 
+    register('--compiler-option-sets', advanced=True, default=[], type=list,
+             fingerprint=True,
+             help='The option sets to be enabled for the compilation of this target.')
+
     register('--zinc-file-manager', advanced=True, default=True, type=bool,
              fingerprint=True,
              help='Use zinc provided file manager to ensure transactional rollback.')
@@ -38,7 +42,18 @@ class ZincLanguageMixin(object):
     """If true, make warnings fatal for targets that do not specify fatal_warnings.
     :rtype: bool
     """
-    return self.get_options().fatal_warnings
+    return self.get_options().fatal_warnings or 'fatal_warnings' in self.compiler_option_sets
+
+  @property
+  def compiler_option_sets(self):
+    """For every element in this list, enable the corresponding flags on compilation
+    of targets.
+    :rtype: list
+    """
+    option_sets = self.get_options().compiler_option_sets
+    if self.get_options().fatal_warnings:
+      option_sets.append('fatal_warnings')
+    return option_sets
 
   @property
   def zinc_file_manager(self):

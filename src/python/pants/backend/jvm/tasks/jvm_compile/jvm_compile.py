@@ -83,6 +83,14 @@ class JvmCompile(NailgunTaskBase):
              default=list(cls.get_fatal_warnings_disabled_args_default()),
              help='Extra compiler args to use when fatal warnings are disabled.')
 
+    register('--compiler-option-sets-enabled-args', advanced=True, type=dict, fingerprint=True,
+             default={'fatal_warnings': list(cls.get_fatal_warnings_enabled_args_default())},
+             help='Extra compiler args to use for each enabled option set.')
+
+    register('--compiler-option-sets-disabled-args', advanced=True, type=dict, fingerprint=True,
+             default={'fatal_warnings': list(cls.get_fatal_warnings_disabled_args_default())},
+             help='Extra compiler args to use for each disabled option set.')
+
     register('--debug-symbols', type=bool, fingerprint=True,
              help='Compile with debug symbol enabled.')
 
