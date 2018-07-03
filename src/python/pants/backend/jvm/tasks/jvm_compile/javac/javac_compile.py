@@ -30,9 +30,6 @@ _JAVAC_PLUGIN_INFO_FILE = 'META-INF/services/com.sun.source.util.Plugin'
 # Well known metadata file to register annotation processors with a java 1.6+ compiler.
 _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
-# Execution stratetgies:
-_HERMETIC = 'hermetic'
-
 logger = logging.getLogger(__name__)
 
 
@@ -146,7 +143,7 @@ class JavacCompile(JvmCompile):
         '-target', str(settings.target_level),
       ])
 
-    if self.execution_strategy() == _HERMETIC:
+    if self.execution_strategy() == self.HERMETIC:
       javac_cmd.extend([
         # We need to strip the source root from our output files. Outputting to a directory, and
         # capturing that directory, does the job.
@@ -174,7 +171,7 @@ class JavacCompile(JvmCompile):
     with argfile.safe_args(ctx.sources, self.get_options()) as batched_sources:
       javac_cmd.extend(batched_sources)
 
-      if self.execution_strategy() == _HERMETIC:
+      if self.execution_strategy() == self.HERMETIC:
         self._execute_hermetic_compile(javac_cmd, ctx)
       else:
         with self.context.new_workunit(name='javac',
