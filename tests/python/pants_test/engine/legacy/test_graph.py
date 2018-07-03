@@ -141,19 +141,14 @@ class GraphTargetScanFailureTests(GraphTestBase):
 class GraphInvalidationTest(GraphTestBase):
 
   def test_invalidate_fsnode(self):
+    # NB: Invalidation is now more directly tested in unit tests in the `graph` crate.
     with self.open_scheduler(['3rdparty/python::']) as (_, _, scheduler):
-      initial_node_count = scheduler.node_count()
-      self.assertGreater(initial_node_count, 0)
-
       invalidated_count = scheduler.invalidate_files(['3rdparty/python/BUILD'])
       self.assertGreater(invalidated_count, 0)
-      self.assertLess(scheduler.node_count(), initial_node_count)
 
   def test_invalidate_fsnode_incremental(self):
+    # NB: Invalidation is now more directly tested in unit tests in the `graph` crate.
     with self.open_scheduler(['//:', '3rdparty/::']) as (_, _, scheduler):
-      node_count = scheduler.node_count()
-      self.assertGreater(node_count, 0)
-
       # Invalidate the '3rdparty/python' DirectoryListing, the `3rdparty` DirectoryListing,
       # and then the root DirectoryListing by "touching" files/dirs.
       for filename in ('3rdparty/python/BUILD', '3rdparty/jvm', 'non_existing_file'):
@@ -161,8 +156,6 @@ class GraphInvalidationTest(GraphTestBase):
         self.assertGreater(invalidated_count,
                            0,
                            'File {} did not invalidate any Nodes.'.format(filename))
-        node_count, last_node_count = scheduler.node_count(), node_count
-        self.assertLess(node_count, last_node_count)
 
   def _ordering_test(self, spec, expected_sources=None):
     expected_sources = expected_sources or ['p', 'a', 'n', 't', 's', 'b', 'u', 'i', 'l', 'd']

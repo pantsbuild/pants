@@ -14,6 +14,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::{File, OpenOptions};
 use std::hash::BuildHasherDefault;
 use std::io::{self, BufWriter, Write};
+use std::mem;
 use std::path::Path;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -21,7 +22,8 @@ use std::time::{Duration, Instant};
 use fnv::FnvHasher;
 
 use futures::future::{self, Future};
-use petgraph::stable_graph::{StableDiGraph, StableGraph};
+use futures::sync::oneshot;
+use petgraph::graph::DiGraph;
 use petgraph::Direction;
 
 use boxfuture::{BoxFuture, Boxable};
@@ -29,13 +31,44 @@ pub use node::{EntryId, Node, NodeContext, NodeError, NodeTracer, NodeVisualizer
 
 type FNV = BuildHasherDefault<FnvHasher>;
 
-type PGraph<N> = StableDiGraph<Entry<N>, (), u32>;
+type PGraph<N> = DiGraph<Entry<N>, (), u32>;
 
-type EntryStateField<Item, Error> = future::Shared<BoxFuture<Item, Error>>;
+///
+/// A token that uniquely identifies one run of a Node in the Graph. Each run of a Node (via
+/// `N::Context::spawn`) has a different RunToken associated with it. When a run completes, if
+/// the current RunToken of its Node no longer matches the RunToken of the spawned work (because
+/// the Node was `cleared`), the work is discarded. See `Entry::complete` for more information.
+///
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct RunToken(u32);
 
-struct EntryState<N: Node> {
-  field: EntryStateField<N::Item, N::Error>,
-  start_time: Instant,
+impl RunToken {
+  fn initial() -> RunToken {
+    RunToken(0)
+  }
+
+  fn next(&self) -> RunToken {
+    RunToken(self.0 + 1)
+  }
+}
+
+enum EntryState<N: Node> {
+  NotStarted(RunToken),
+  Running {
+    waiters: Vec<oneshot::Sender<Result<N::Item, N::Error>>>,
+    start_time: Instant,
+    run_token: RunToken,
+  },
+  Completed {
+    result: Result<N::Item, N::Error>,
+    run_token: RunToken,
+  },
+}
+
+impl<N: Node> EntryState<N> {
+  fn initial() -> EntryState<N> {
+    EntryState::NotStarted(RunToken::initial())
+  }
 }
 
 ///
@@ -58,15 +91,6 @@ impl<N: Node> EntryKey<N> {
   }
 }
 
-fn unwrap_entry_res<N: Node>(
-  res: Result<future::SharedItem<N::Item>, future::SharedError<N::Error>>,
-) -> Result<N::Item, N::Error> {
-  match res {
-    Ok(nr) => Ok((*nr).clone()),
-    Err(failure) => Err((*failure).clone()),
-  }
-}
-
 ///
 /// An Entry and its adjacencies.
 ///
@@ -75,77 +99,144 @@ pub struct Entry<N: Node> {
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
   node: EntryKey<N>,
-  state: Option<EntryState<N>>,
+  state: EntryState<N>,
 }
 
 impl<N: Node> Entry<N> {
   ///
-  /// Creates an Entry, wrapping its execution in `future::lazy` to defer execution until a
-  /// a caller actually pulls on it. This indirection exists in order to allow Nodes to start
-  /// outside of the Graph lock.
+  /// Creates an Entry without starting it. This indirection exists because we cannot know
+  /// the EntryId of an Entry until after it is stored in the Graph, and we need the EntryId
+  /// in order to run the Entry.
   ///
   fn new(node: EntryKey<N>) -> Entry<N> {
     Entry {
       node: node,
-      state: None,
+      state: EntryState::initial(),
     }
   }
 
   ///
-  /// Returns a reference to the Node's Future, starting it if need be.
+  /// Returns a Future for the Node's field.
   ///
-  fn state<C>(&mut self, context: &C, entry_id: EntryId) -> EntryStateField<N::Item, N::Error>
+  fn get<C>(&mut self, context: &C, entry_id: EntryId) -> BoxFuture<N::Item, N::Error>
   where
     C: NodeContext<Node = N>,
   {
-    if let Some(ref state) = self.state {
-      state.field.clone()
-    } else {
-      let start_time = Instant::now();
-      let state = match &self.node {
-        &EntryKey::Valid(ref n) => {
-          // Wrap the launch in future::lazy to defer it until after we're outside the Graph lock.
-          let context = context.clone_for(entry_id);
-          let node = n.clone();
-          future::lazy(move || node.run(context)).to_boxed()
-        }
-        &EntryKey::Cyclic(_) => future::err(N::Error::cyclic()).to_boxed(),
-      };
+    let next_state = match &mut self.state {
+      &mut EntryState::NotStarted(run_token) => {
+        match &self.node {
+          &EntryKey::Valid(ref n) => {
+            let context2 = context.clone_for(entry_id);
+            let node = n.clone();
 
-      self.state = Some(EntryState {
-        field: state.shared(),
-        start_time,
-      });
-      self.state(context, entry_id)
-    }
+            // Spawn the execution of the work on an Executor, which will cause it to execute
+            // outside of the Graph lock, and allow us to call back into the graph lock to set the
+            // final value.
+            context.spawn(future::lazy(move || {
+              let context = context2.clone();
+              node.run(context2).then(move |res| {
+                context.graph().complete(entry_id, run_token, res);
+                Ok(())
+              })
+            }));
+
+            EntryState::Running {
+              waiters: Vec::new(),
+              start_time: Instant::now(),
+              run_token,
+            }
+          }
+          &EntryKey::Cyclic(_) => EntryState::Completed {
+            result: Err(N::Error::cyclic()),
+            run_token: run_token,
+          },
+        }
+      }
+      &mut EntryState::Running {
+        ref mut waiters, ..
+      } => {
+        let (send, recv) = oneshot::channel();
+        waiters.push(send);
+        return recv
+          .map_err(|_| N::Error::invalidated())
+          .flatten()
+          .to_boxed();
+      }
+      &mut EntryState::Completed { ref result, .. } => {
+        return future::result(result.clone()).to_boxed();
+      }
+    };
+
+    // swap in the new state and then recurse.
+    self.state = next_state;
+    self.get(context, entry_id)
   }
 
   ///
   /// If the Future for this Node has already completed, returns a clone of its result.
   ///
   fn peek(&self) -> Option<Result<N::Item, N::Error>> {
-    self
-      .state
-      .as_ref()
-      .and_then(|state| state.field.peek().map(unwrap_entry_res::<N>))
+    match &self.state {
+      &EntryState::Completed { ref result, .. } => Some(result.clone()),
+      _ => None,
+    }
+  }
+
+  ///
+  /// Called from the Executor when a Node completes.
+  ///
+  fn complete(&mut self, result_run_token: RunToken, result: Result<N::Item, N::Error>) {
+    // Temporarily swap in `NotStarted` in order to take ownership of the state.
+    let state = mem::replace(&mut self.state, EntryState::initial());
+
+    // We care about exactly one case: a Running state with the same run_token. All other states
+    // represent various (legal) race conditions. See `RunToken`'s docs for more information.
+    self.state = match state {
+      EntryState::Running {
+        waiters,
+        start_time,
+        run_token,
+      } => {
+        if result_run_token == run_token {
+          // Notify all waiters (ignoring any that have gone away), and then store the value.
+          // A waiter will go away whenever they drop the `Future` `Receiver` of the value, perhaps
+          // due to failure of another Future in a `join` or `join_all`, or due to a timeout at the
+          // root of a request.
+          for waiter in waiters {
+            let _ = waiter.send(result.clone());
+          }
+          EntryState::Completed { result, run_token }
+        } else {
+          EntryState::Running {
+            waiters,
+            start_time,
+            run_token,
+          }
+        }
+      }
+      s => s,
+    };
   }
 
   ///
   /// If the Node has started and has not yet completed, returns its runtime.
   ///
-  fn current_running_duration(&self, now: Instant) -> Option<Duration> {
-    self.state.as_ref().and_then(|state| {
-      if state.field.peek().is_none() {
-        // Still running.
-        Some(now.duration_since(state.start_time))
-      } else {
-        None
-      }
-    })
+  fn current_running_duration(&self, now: &Instant) -> Option<Duration> {
+    match &self.state {
+      &EntryState::Running { start_time, .. } => Some(now.duration_since(start_time)),
+      _ => None,
+    }
   }
 
   fn clear(&mut self) {
-    self.state = None;
+    let run_token = match mem::replace(&mut self.state, EntryState::initial()) {
+      EntryState::NotStarted(run_token) => run_token,
+      EntryState::Running { run_token, .. } => run_token,
+      EntryState::Completed { run_token, .. } => run_token,
+    };
+
+    // Swap in a state with a new RunToken value, which invalidates any outstanding work.
+    self.state = EntryState::NotStarted(run_token.next());
   }
 
   fn format(&self) -> String {
@@ -238,29 +329,6 @@ impl<N: Node> InnerGraph<N> {
     }
   }
 
-  ///
-  /// Begins a topological walk from the given roots. Provides both the current entry as well as the
-  /// depth from the root.
-  ///
-  fn leveled_walk<P>(
-    &self,
-    roots: Vec<EntryId>,
-    predicate: P,
-    direction: Direction,
-  ) -> LeveledWalk<N, P>
-  where
-    P: Fn(EntryId, Level) -> bool,
-  {
-    let rrr = roots.into_iter().map(|r| (r, 0)).collect::<VecDeque<_>>();
-    LeveledWalk {
-      graph: self,
-      direction: direction,
-      deque: rrr,
-      walked: HashSet::default(),
-      predicate: predicate,
-    }
-  }
-
   fn clear(&mut self) {
     for eid in self.nodes.values() {
       if let Some(entry) = self.pg.node_weight_mut(*eid) {
@@ -296,44 +364,23 @@ impl<N: Node> InnerGraph<N> {
         .map(|eid| eid)
         .collect()
     };
+    let invalidated_count = ids.len();
 
-    // Then remove all entries in one shot.
-    let result = ids.len();
-    InnerGraph::invalidate_internal(&mut self.pg, &mut self.nodes, &ids);
-
-    // And return the removed count.
-    result
-  }
-
-  fn invalidate_internal(pg: &mut PGraph<N>, nodes: &mut Nodes<N>, ids: &HashSet<EntryId, FNV>) {
-    if ids.is_empty() {
-      return;
+    // Clear entry states.
+    for id in &ids {
+      self.pg.node_weight_mut(*id).map(|entry| entry.clear());
     }
 
-    for &id in ids {
-      // Validate that all dependents of the id are also scheduled for removal.
-      assert!(
-        pg.neighbors_directed(id, Direction::Incoming)
-          .all(|dep| ids.contains(&dep))
-      );
+    // Then prune all edges adjacent to the entries.
+    self.pg.retain_edges(|pg, edge| {
+      if let Some((src, dst)) = pg.edge_endpoints(edge) {
+        !(ids.contains(&src) || ids.contains(&dst))
+      } else {
+        true
+      }
+    });
 
-      // Remove the entry from the graph (which will also remove dependent edges).
-      pg.remove_node(id);
-    }
-
-    // Filter the Nodes to delete any with matching ids.
-    let filtered: Vec<(EntryKey<N>, EntryId)> = nodes
-      .drain()
-      .filter(|&(_, id)| !ids.contains(&id))
-      .collect();
-    nodes.extend(filtered);
-
-    assert!(
-      nodes.len() == pg.node_count(),
-      "The Nodes and Entries maps are mismatched: {} vs {}",
-      nodes.len(),
-      pg.node_count()
-    );
+    invalidated_count
   }
 
   fn visualize<V: NodeVisualizer<N>>(
@@ -385,28 +432,110 @@ impl<N: Node> InnerGraph<N> {
     Ok(())
   }
 
-  fn trace<T: NodeTracer<N>>(&self, root: &N, path: &Path) -> io::Result<()> {
-    let file = try!(OpenOptions::new().append(true).open(path));
-    let mut f = BufWriter::new(file);
+  fn trace<T: NodeTracer<N>>(&self, roots: &[N], file_path: &Path) -> Result<(), String> {
+    let root_ids: HashSet<EntryId, FNV> = roots
+      .into_iter()
+      .filter_map(|nk| self.entry_id(&EntryKey::Valid(nk.clone())))
+      .cloned()
+      .collect();
 
-    let is_bottom = |eid: EntryId| -> bool { T::is_bottom(self.unsafe_entry_for_id(eid).peek()) };
+    // Find all bottom Nodes for the trace by walking recursively under the roots.
+    let bottom_nodes = {
+      let mut queue: VecDeque<_> = root_ids.iter().cloned().collect();
+      let mut visited: HashSet<EntryId, FNV> = HashSet::default();
+      let mut bottom_nodes = Vec::new();
+      while let Some(id) = queue.pop_front() {
+        if !visited.insert(id) {
+          continue;
+        }
 
-    let is_one_level_above_bottom =
-      |eid: EntryId| -> bool { self.pg.neighbors(eid).all(&is_bottom) };
+        // If all dependencies are bottom nodes, then we represent a failure.
+        let mut non_bottom_deps = self
+          .pg
+          .neighbors_directed(id, Direction::Outgoing)
+          .filter(|dep_id| !T::is_bottom(self.unsafe_entry_for_id(*dep_id).peek()))
+          .peekable();
 
-    let _indent = |level: Level| -> String {
-      let mut indent = String::new();
-      for _ in 0..level {
-        indent.push_str("  ");
+        if non_bottom_deps.peek().is_none() {
+          bottom_nodes.push(id);
+        } else {
+          // Otherwise, continue recursing on `rest`.
+          queue.extend(non_bottom_deps);
+        }
       }
-      indent
+      bottom_nodes
     };
 
-    let _format = |eid: EntryId, level: Level| -> String {
+    // Invert the graph into a evenly-weighted dependent graph by cloning it and stripping out
+    // the Nodes (to avoid cloning them), adding equal edge weights, and then reversing it.
+    // Because we do not remove any Nodes or edges, all EntryIds remain stable.
+    let dependent_graph = {
+      let mut dg = self
+        .pg
+        .filter_map(|_, _| Some(()), |_, _| Some(1.0))
+        .clone();
+      dg.reverse();
+      dg
+    };
+
+    // Render the shortest path through the dependent graph to any root for each bottom_node.
+    for bottom_node in bottom_nodes {
+      // We use Bellman Ford because it actually records paths, unlike Dijkstra's.
+      let (path_weights, paths) = petgraph::algo::bellman_ford(&dependent_graph, bottom_node)
+        .unwrap_or_else(|e| {
+          panic!(
+            "There should not be any negative edge weights. Got: {:?}",
+            e
+          )
+        });
+
+      // Find the root with the shortest path weight.
+      let minimum_path_id = root_ids
+        .iter()
+        .min_by_key(|root_id| path_weights[root_id.index()] as usize)
+        .ok_or_else(|| format!("Encountered a Node that was not reachable from any roots."))?;
+
+      // Collect the path by walking through the `paths` Vec, which contains the indexes of
+      // predecessor Nodes along a path to the bottom Node.
+      let path = {
+        let mut next_id = *minimum_path_id;
+        let mut path = Vec::new();
+        path.push(next_id);
+        while let Some(current_id) = paths[next_id.index()] {
+          path.push(current_id);
+          if current_id == bottom_node {
+            break;
+          }
+          next_id = current_id;
+        }
+        path
+      };
+
+      // Render the path.
+      self
+        .trace_render_path_to_file::<T>(&path, file_path)
+        .map_err(|e| format!("Failed to render trace to {:?}: {}", file_path, e))?;
+    }
+
+    Ok(())
+  }
+
+  ///
+  /// Renders a Graph path to the given file path.
+  ///
+  fn trace_render_path_to_file<T: NodeTracer<N>>(
+    &self,
+    path: &[EntryId],
+    file_path: &Path,
+  ) -> io::Result<()> {
+    let file = try!(OpenOptions::new().append(true).open(file_path));
+    let mut f = BufWriter::new(file);
+
+    let _format = |eid: EntryId, depth: usize, is_last: bool| -> String {
       let entry = self.unsafe_entry_for_id(eid);
-      let indent = _indent(level);
+      let indent = "  ".repeat(depth);
       let output = format!("{}Computing {}", indent, entry.node.content().format());
-      if is_one_level_above_bottom(eid) {
+      if is_last {
         format!(
           "{}\n{}  {}",
           output,
@@ -418,13 +547,13 @@ impl<N: Node> InnerGraph<N> {
       }
     };
 
-    let root_entries = self
-      .entry_id(&EntryKey::Valid(root.clone()))
-      .map(|&eid| vec![eid])
-      .unwrap_or_else(|| vec![]);
-    for t in self.leveled_walk(root_entries, |eid, _| !is_bottom(eid), Direction::Outgoing) {
-      let (eid, level) = t;
-      try!(writeln!(&mut f, "{}", _format(eid, level)));
+    let mut path_iter = path.iter().enumerate().peekable();
+    while let Some((depth, id)) = path_iter.next() {
+      try!(writeln!(
+        &mut f,
+        "{}",
+        _format(*id, depth, path_iter.peek().is_none())
+      ));
     }
 
     try!(f.write_all(b"\n"));
@@ -439,7 +568,7 @@ impl<N: Node> InnerGraph<N> {
     let queue_entry = |id| {
       self
         .entry_for_id(id)
-        .and_then(|entry| entry.current_running_duration(now))
+        .and_then(|entry| entry.current_running_duration(&now))
         .map(|d| (d, id))
     };
 
@@ -528,7 +657,7 @@ impl<N: Node> Graph<N> {
   pub fn new() -> Graph<N> {
     let inner = InnerGraph {
       nodes: HashMap::default(),
-      pg: StableGraph::new(),
+      pg: DiGraph::new(),
     };
     Graph {
       inner: Mutex::new(inner),
@@ -549,32 +678,27 @@ impl<N: Node> Graph<N> {
     C: NodeContext<Node = N>,
   {
     // Get or create the destination, and then insert the dep and return its state.
-    let dst_state = {
-      let mut inner = self.inner.lock().unwrap();
-      let dst_id = {
-        // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
-        // without a much more complicated algorithm.
-        let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
-        if inner.detect_cycle(src_id, potential_dst_id) {
-          // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
-          inner.ensure_entry(EntryKey::Cyclic(dst_node))
-        } else {
-          // Valid dependency.
-          potential_dst_id
-        }
-      };
-
-      // Declare the dep, and return the state of the destination.
-      inner.pg.add_edge(src_id, dst_id, ());
-      inner
-        .entry_for_id_mut(dst_id)
-        .map(|entry| entry.state(context, dst_id))
-        .unwrap_or_else(|| future::err(N::Error::invalidated()).to_boxed().shared())
+    let mut inner = self.inner.lock().unwrap();
+    let dst_id = {
+      // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
+      // without a much more complicated algorithm.
+      let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
+      if inner.detect_cycle(src_id, potential_dst_id) {
+        // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
+        inner.ensure_entry(EntryKey::Cyclic(dst_node))
+      } else {
+        // Valid dependency.
+        potential_dst_id
+      }
     };
 
-    // Got the destination's state. Now that we're outside the graph locks, we can safely
-    // retrieve it.
-    dst_state.then(unwrap_entry_res::<N>).to_boxed()
+    // Declare the dep, and return the state of the destination.
+    inner.pg.add_edge(src_id, dst_id, ());
+    if let Some(entry) = inner.entry_for_id_mut(dst_id) {
+      entry.get(context, dst_id)
+    } else {
+      future::err(N::Error::invalidated()).to_boxed()
+    }
   }
 
   ///
@@ -584,17 +708,25 @@ impl<N: Node> Graph<N> {
   where
     C: NodeContext<Node = N>,
   {
-    // Initialize the state while under the lock...
-    let state = {
-      let mut inner = self.inner.lock().unwrap();
-      let id = inner.ensure_entry(EntryKey::Valid(node));
-      inner
-        .entry_for_id_mut(id)
-        .map(|entry| entry.state(context, id))
-        .unwrap_or_else(|| future::err(N::Error::invalidated()).to_boxed().shared())
-    };
-    // ...but only `get` it outside the lock.
-    state.then(unwrap_entry_res::<N>).to_boxed()
+    let mut inner = self.inner.lock().unwrap();
+    let id = inner.ensure_entry(EntryKey::Valid(node));
+    if let Some(entry) = inner.entry_for_id_mut(id) {
+      entry.get(context, id)
+    } else {
+      future::err(N::Error::invalidated()).to_boxed()
+    }
+  }
+
+  ///
+  /// When the Executor finishes executing a Node it calls back to store the result value. We use
+  /// the run_token value to determine whether the Node changed while we were busy executing it,
+  /// so that we can discard the work.
+  ///
+  fn complete(&self, entry_id: EntryId, run_token: RunToken, result: Result<N::Item, N::Error>) {
+    let mut inner = self.inner.lock().unwrap();
+    if let Some(entry) = inner.entry_for_id_mut(entry_id) {
+      entry.complete(run_token, result);
+    }
   }
 
   ///
@@ -610,9 +742,9 @@ impl<N: Node> Graph<N> {
     inner.invalidate_from_roots(predicate)
   }
 
-  pub fn trace<T: NodeTracer<N>>(&self, root: &N, path: &Path) -> io::Result<()> {
+  pub fn trace<T: NodeTracer<N>>(&self, roots: &[N], path: &Path) -> Result<(), String> {
     let inner = self.inner.lock().unwrap();
-    inner.trace::<T>(root, path)
+    inner.trace::<T>(roots, path)
   }
 
   pub fn visualize<V: NodeVisualizer<N>>(
@@ -672,53 +804,10 @@ impl<'a, N: Node + 'a> Iterator for Walk<'a, N> {
   }
 }
 
-type Level = u32;
-
-///
-/// Represents the state of a particular topological walk through a Graph. Implements Iterator and
-/// has the same lifetime as the Graph itself.
-///
-struct LeveledWalk<'a, N: Node + 'a, P: Fn(EntryId, Level) -> bool> {
-  graph: &'a InnerGraph<N>,
-  direction: Direction,
-  deque: VecDeque<(EntryId, Level)>,
-  walked: HashSet<EntryId, FNV>,
-  predicate: P,
-}
-
-impl<'a, N: Node + 'a, P: Fn(EntryId, Level) -> bool> Iterator for LeveledWalk<'a, N, P> {
-  type Item = (EntryId, Level);
-
-  fn next(&mut self) -> Option<Self::Item> {
-    while let Some((id, level)) = self.deque.pop_front() {
-      if self.walked.contains(&id) {
-        continue;
-      }
-      self.walked.insert(id);
-
-      if !(self.predicate)(id, level) {
-        continue;
-      }
-
-      // Entry matches: queue its neighbors and then return it.
-      self.deque.extend(
-        self
-          .graph
-          .pg
-          .neighbors_directed(id, self.direction)
-          .into_iter()
-          .map(|d| (d, level + 1)),
-      );
-      return Some((id, level));
-    }
-
-    None
-  }
-}
-
 #[cfg(test)]
 mod tests {
-  use std::sync::Arc;
+  use std::sync::{Arc, Mutex};
+  use std::thread;
 
   use boxfuture::{BoxFuture, Boxable};
   use futures::future::{self, Future};
@@ -734,6 +823,29 @@ mod tests {
       graph.create(TNode(2), &context).wait(),
       Ok("2/1/0".to_string())
     );
+  }
+
+  #[test]
+  fn invalidate() {
+    let graph = Arc::new(Graph::new());
+    let context = TContext::new(graph.clone());
+
+    // Create three nodes.
+    assert_eq!(
+      graph.create(TNode(2), &context).wait(),
+      Ok("2/1/0".to_string())
+    );
+    assert_eq!(context.spawn_count(), 3);
+
+    // Invalidate and re-request the upper two nodes.
+    assert_eq!(graph.invalidate_from_roots(|&TNode(n)| n == 1), 2);
+
+    // Confirm that the right number of nodes re-run.
+    assert_eq!(
+      graph.create(TNode(2), &context).wait(),
+      Ok("2/1/0".to_string())
+    );
+    assert_eq!(context.spawn_count(), 5);
   }
 
   ///
@@ -768,9 +880,17 @@ mod tests {
     }
   }
 
+  ///
+  /// A context that keeps a count of spawned Nodes. This is a very basic way to confirm that Nodes
+  /// have (re-)run.
+  ///
+  /// TODO: This is potentially error prone, but is much simpler than actually tracking precisely
+  /// which Nodes ran and in which order. Future work.
+  ///
   #[derive(Clone)]
   struct TContext {
     graph: Arc<Graph<TNode>>,
+    spawn_count: Arc<Mutex<usize>>,
     entry_id: Option<EntryId>,
   }
   impl NodeContext for TContext {
@@ -778,6 +898,7 @@ mod tests {
     fn clone_for(&self, entry_id: EntryId) -> TContext {
       TContext {
         graph: self.graph.clone(),
+        spawn_count: self.spawn_count.clone(),
         entry_id: Some(entry_id),
       }
     }
@@ -785,18 +906,35 @@ mod tests {
     fn graph(&self) -> &Graph<TNode> {
       &self.graph
     }
+
+    fn spawn<F>(&self, future: F)
+    where
+      F: Future<Item = (), Error = ()> + Send + 'static,
+    {
+      // Avoids introducing a dependency on a threadpool.
+      thread::spawn(move || {
+        future.wait().unwrap();
+      });
+      let mut spawn_count = self.spawn_count.lock().unwrap();
+      *spawn_count += 1
+    }
   }
 
   impl TContext {
     fn new(graph: Arc<Graph<TNode>>) -> TContext {
       TContext {
         graph,
+        spawn_count: Arc::new(Mutex::new(0)),
         entry_id: None,
       }
     }
 
     fn get(&self, dst: TNode) -> BoxFuture<String, TError> {
       self.graph.get(self.entry_id.unwrap(), self, dst)
+    }
+
+    fn spawn_count(&self) -> usize {
+      *self.spawn_count.lock().unwrap()
     }
   }
 
