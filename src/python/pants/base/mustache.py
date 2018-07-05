@@ -35,7 +35,7 @@ class MustacheRenderer(object):
         return [convert_val(e) for e in x]
       else:
         return x
-    items = [(key, convert_val(val)) for (key, val) in list(args.items())]
+    items = [(key, convert_val(val)) for (key, val) in args.items()]
     ret = dict([(key + '?', True) for (key, val) in items if val and not key.endswith('?')])
     ret.update(dict(items))
     return ret
