@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import pkgutil
+from builtins import object
 
 import pystache
 import six
@@ -34,7 +35,7 @@ class MustacheRenderer(object):
         return [convert_val(e) for e in x]
       else:
         return x
-    items = [(key, convert_val(val)) for (key, val) in args.items()]
+    items = [(key, convert_val(val)) for (key, val) in list(args.items())]
     ret = dict([(key + '?', True) for (key, val) in items if val and not key.endswith('?')])
     ret.update(dict(items))
     return ret

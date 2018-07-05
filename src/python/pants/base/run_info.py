@@ -10,6 +10,7 @@ import os
 import re
 import socket
 import time
+from builtins import object, str
 
 from pants import version
 from pants.base.build_environment import get_buildroot, get_scm
@@ -55,7 +56,7 @@ class RunInfo(object):
     """Adds the given info and returns a dict composed of just this added info."""
     infos = dict(keyvals)
     kv_pairs = []
-    for key, val in infos.items():
+    for key, val in list(infos.items()):
       key = key.strip()
       val = str(val).strip()
       if ':' in key:

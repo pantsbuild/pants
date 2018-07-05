@@ -11,6 +11,7 @@ import os
 import signal
 import sys
 import traceback
+from builtins import object
 
 import faulthandler
 import six

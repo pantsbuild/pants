@@ -6,9 +6,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import re
-from itertools import izip_longest
+from builtins import map, object, str
+from functools import total_ordering
+
+from future.moves.itertools import zip_longest
 
 
+@total_ordering
 class Revision(object):
   """Represents a software revision that is comparable to another revision describing the same
   software.
@@ -74,7 +78,7 @@ class Revision(object):
     """
     rev = re.sub(r'(\d)([a-zA-Z])', r'\1.\2', rev)
     rev = re.sub(r'([a-zA-Z])(\d)', r'\1.\2', rev)
-    return cls(*map(cls._parse_atom, re.split(r'[.+_\-]', rev)))
+    return cls(*list(map(cls._parse_atom, re.split(r'[.+_\-]', rev))))
 
   def __init__(self, *components):
     self._components = components
@@ -87,21 +91,24 @@ class Revision(object):
     """
     return list(self._components)
 
-  def __cmp__(self, other):
-    for ours, theirs in izip_longest(self._components, other._components, fillvalue=0):
-      difference = cmp(ours, theirs)
-      if difference != 0:
-        return difference
-    return 0
+  def _is_valid_operand(self, other):
+    return hasattr(other, '_components')
 
   def __repr__(self):
     return '{}({})'.format(self.__class__.__name__, ', '.join(map(repr, self._components)))
 
   def __eq__(self, other):
-    return hasattr(other, '_components') and tuple(self._components) == tuple(other._components)
+    if not self._is_valid_operand(other):
+      return NotImplemented
+    return tuple(self._components) == tuple(other._components)
 
-  def __ne__(self, other):
-    return not self.__eq__(other)
+  def __lt__(self, other):
+    if not self._is_valid_operand(other):
+      return NotImplemented
+    for ours, theirs in zip_longest(self._components, other._components, fillvalue=0):
+      if ours != theirs:
+        return ours < theirs
+    return False
 
   def __hash__(self):
     return hash(self._components)
