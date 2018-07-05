@@ -128,6 +128,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     logging.addLevelName(logging.WARNING, 'WARN')
     register('-l', '--level', choices=['debug', 'info', 'warn'], default='info', recursive=True,
              help='Set the logging level.')
+    # TODO: make `-v -v -v` -> options.verbosity == 3.
+    register('-v', '--verbosity', type=int, default=0, advanced=True,
+             help='Set the verbosity level for e.g. extended debug logging. Can be passed '
+                  'multiple times to increase verbosity from 0 (none) to 10 (max).')
     register('-q', '--quiet', type=bool, recursive=True, daemon=False,
              help='Squelches most console output. NOTE: Some tasks default to behaving quietly: '
                   'inverting this option supports making them noisier than they would be otherwise.')

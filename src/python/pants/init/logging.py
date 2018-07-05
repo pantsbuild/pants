@@ -5,12 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import httplib
 import logging
 import os
 import sys
 import time
 from collections import namedtuple
 from logging import FileHandler, Formatter, StreamHandler
+
+import six
 
 from pants.util.dirutil import safe_mkdir
 
@@ -19,13 +22,37 @@ class LoggingSetupResult(namedtuple('LoggingSetupResult', ['log_filename', 'log_
   """A structured result for logging setup."""
 
 
+def _configure_requests_debug_logging():
+  httplib.HTTPConnection.debuglevel = 1
+  requests_logger = logging.getLogger('requests.packages.urllib3')
+  requests_logger.setLevel(logging.DEBUG)
+  requests_logger.propagate = True
+
+
+def _maybe_configure_extended_logging(verbosity):
+  """Sets up extended logging based on the verbosity level."""
+  if not verbosity:
+    return
+
+  # Proxies the pants verbosity level forward to pex.
+  os.environ['PEX_VERBOSE'] = six.text_type(verbosity)
+
+  if verbosity >= 9:
+    _configure_requests_debug_logging()
+
+
 def setup_logging_from_options(bootstrap_options):
   # N.B. quiet help says 'Squelches all console output apart from errors'.
   level = 'ERROR' if bootstrap_options.quiet else bootstrap_options.level.upper()
-  return setup_logging(level, console_stream=sys.stderr, log_dir=bootstrap_options.logdir)
+  return setup_logging(
+    level,
+    console_stream=sys.stderr,
+    log_dir=bootstrap_options.logdir,
+    v=bootstrap_options.verbosity
+  )
 
 
-def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name=None):
+def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name=None, v=0):
   """Configures logging for a given scope, by default the global scope.
 
   :param str level: The logging level to enable, must be one of the level names listed here:
@@ -40,6 +67,7 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
                     The '.' separator providing the scope hierarchy.  By default the root logger is
                     configured.
   :param str log_name: The base name of the log file (defaults to 'pants.log').
+  :param int v: The verbosity level for extended log configuration.
   :returns: The full path to the main log file if file logging is configured or else `None`.
   :rtype: str
   """
@@ -99,5 +127,8 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
 
   # This routes warnings through our loggers instead of straight to raw stderr.
   logging.captureWarnings(True)
+
+  if v:
+    _maybe_configure_extended_logging(v)
 
   return LoggingSetupResult(log_filename, file_handler)
