@@ -147,7 +147,7 @@ class WorkUnit(object):
   def end(self):
     """Mark the time at which this workunit ended."""
     self.end_time = time.time()
-    for output in list(self._outputs.values()):
+    for output in self._outputs.values():
       output.close()
     return self.path(), self.duration(), self._self_time(), self.has_label(WorkUnitLabel.TOOL)
 
@@ -164,7 +164,7 @@ class WorkUnit(object):
     We can set the outcome on a work unit directly, but that outcome will also be affected by
     those of its subunits. The right thing happens: The outcome of a work unit is the
     worst outcome of any of its subunits and any outcome set on it directly."""
-    if outcome not in list(range(0, 5)):
+    if outcome not in range(0, 5):
       raise Exception('Invalid outcome: {}'.format(outcome))
 
     if outcome < self._outcome:

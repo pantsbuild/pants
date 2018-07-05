@@ -56,7 +56,7 @@ class RunInfo(object):
     """Adds the given info and returns a dict composed of just this added info."""
     infos = dict(keyvals)
     kv_pairs = []
-    for key, val in list(infos.items()):
+    for key, val in infos.items():
       key = key.strip()
       val = str(val).strip()
       if ':' in key:
