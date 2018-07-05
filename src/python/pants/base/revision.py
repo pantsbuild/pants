@@ -99,7 +99,7 @@ class Revision(object):
 
   def __eq__(self, other):
     if not self._is_valid_operand(other):
-      return NotImplemented
+      return False  # TODO: typically this should return NotImplemented. Returning False to avoid changing prior API.
     return tuple(self._components) == tuple(other._components)
 
   def __lt__(self, other):
