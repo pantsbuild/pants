@@ -105,7 +105,7 @@ class WorkerPool(object):
 
     # We filter out Nones defensively. There shouldn't be any, but if a bug causes one,
     # Pants might hang indefinitely without this filtering.
-    work_iter = iter([_f for _f in work_chain if _f])
+    work_iter = (_f for _f in work_chain if _f)
 
     def submit_next():
       try:
