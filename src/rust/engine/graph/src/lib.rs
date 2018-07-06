@@ -1355,7 +1355,17 @@ mod tests {
       let context = TContext::new(iterations, graph.clone());
 
       // Compute the root, and validate its output.
-      let node_output = graph.create(TNode(100), &context).wait().unwrap();
+      let node_output = match graph.create(TNode(range), &context).wait() {
+        Ok(output) => output,
+        Err(TError::Invalidated) => {
+          // Some amnount of concurrent invalidation is expected: retry.
+          continue;
+        }
+        Err(e) => panic!(
+          "Did not expect any errors other than Invalidation. Got: {:?}",
+          e
+        ),
+      };
       max_distinct_context_values = cmp::max(
         max_distinct_context_values,
         TNode::validate(&node_output).unwrap(),
