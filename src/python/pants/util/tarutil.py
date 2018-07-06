@@ -10,6 +10,7 @@ from builtins import str
 
 import future
 
+
 if future.utils.PY2:
   class TarFile(tarfile.TarFile):
     def __next__(self):
