@@ -10,6 +10,7 @@ import os
 import re
 import socket
 import time
+from builtins import object, str
 
 from pants import version
 from pants.base.build_environment import get_buildroot, get_scm

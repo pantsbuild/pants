@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import threading
 import unittest
+from builtins import object
 
 from pants.base.worker_pool import Work, WorkerPool
 from pants.base.workunit import WorkUnit

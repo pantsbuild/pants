@@ -1,11 +1,13 @@
 ansicolors==1.0.2
 beautifulsoup4>=4.3.2,<4.4
 cffi==1.11.1
+configparser==3.5.0
 contextlib2==0.5.5
 coverage>=4.5,<4.6
 docutils>=0.12,<0.13
 fasteners==0.14.1
 faulthandler==2.6
+future==0.16.0
 futures==3.0.5
 isort==4.2.5
 Markdown==2.1.1

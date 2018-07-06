@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import hashlib
 import json
+from builtins import object
 
 
 def hash_all(strs, digest=None):

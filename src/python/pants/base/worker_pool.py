@@ -8,9 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import multiprocessing
 import signal
 import sys
-import thread
 import threading
+from builtins import next, object
 from multiprocessing.pool import ThreadPool
+
+from future.moves import _thread
 
 from pants.reporting.report import Report
 
@@ -103,7 +105,7 @@ class WorkerPool(object):
 
     # We filter out Nones defensively. There shouldn't be any, but if a bug causes one,
     # Pants might hang indefinitely without this filtering.
-    work_iter = iter(filter(None, work_chain))
+    work_iter = (_f for _f in work_chain if _f)
 
     def submit_next():
       try:
@@ -149,7 +151,7 @@ class WorkerPool(object):
     except KeyboardInterrupt:
       # If a worker thread intercepts a KeyboardInterrupt, we want to propagate it to the main
       # thread.
-      thread.interrupt_main()
+      _thread.interrupt_main()
       raise
     except Exception as e:
       if on_failure:
