@@ -122,15 +122,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     default_distdir = os.path.join(buildroot, default_distdir_name)
     default_rel_distdir = '/{}/'.format(default_distdir_name)
 
-    # Although logging supports the WARN level, its not documented and could conceivably be yanked.
-    # Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
-    # setup a 'WARN' logging level name that maps to 'WARNING'.
-    logging.addLevelName(logging.WARNING, 'WARN')
-    register('-l', '--level', choices=['debug', 'info', 'warn'], default='info', recursive=True,
-             help='Set the logging level.')
-    # TODO: make `-v -v -v` -> options.verbosity == 3.
-    register('-v', '--verbosity', type=int, default=0, advanced=True,
-             help='Set the verbosity level for extended debug logging.')
+    register('-l', '--level', choices=['trace', 'debug', 'info', 'warn'], default='info',
+             recursive=True, help='Set the logging level.')
     register('-q', '--quiet', type=bool, recursive=True, daemon=False,
              help='Squelches most console output. NOTE: Some tasks default to behaving quietly: '
                   'inverting this option supports making them noisier than they would be otherwise.')

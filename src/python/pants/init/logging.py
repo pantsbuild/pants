@@ -18,6 +18,16 @@ import six
 from pants.util.dirutil import safe_mkdir
 
 
+# A custom log level for pants trace logging.
+TRACE = 5
+
+# Although logging supports the WARN level, its not documented and could conceivably be yanked.
+# Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
+# setup a 'WARN' logging level name that maps to 'WARNING'.
+logging.addLevelName(logging.WARNING, 'WARN')
+logging.addLevelName(TRACE, 'TRACE')
+
+
 class LoggingSetupResult(namedtuple('LoggingSetupResult', ['log_filename', 'log_handler'])):
   """A structured result for logging setup."""
 
@@ -25,34 +35,22 @@ class LoggingSetupResult(namedtuple('LoggingSetupResult', ['log_filename', 'log_
 def _configure_requests_debug_logging():
   httplib.HTTPConnection.debuglevel = 1
   requests_logger = logging.getLogger('requests.packages.urllib3')
-  requests_logger.setLevel(logging.DEBUG)
+  requests_logger.setLevel(TRACE)
   requests_logger.propagate = True
 
 
-def _maybe_configure_extended_logging(verbosity):
-  """Sets up extended logging based on the verbosity level."""
-  if not verbosity:
-    return
-
-  # Proxies the pants verbosity level forward to pex.
-  os.environ['PEX_VERBOSE'] = six.text_type(verbosity)
-
-  if verbosity >= 9:
+def _maybe_configure_extended_logging(level):
+  if logging.getLogger().isEnabledFor(TRACE):
     _configure_requests_debug_logging()
 
 
 def setup_logging_from_options(bootstrap_options):
   # N.B. quiet help says 'Squelches all console output apart from errors'.
   level = 'ERROR' if bootstrap_options.quiet else bootstrap_options.level.upper()
-  return setup_logging(
-    level,
-    console_stream=sys.stderr,
-    log_dir=bootstrap_options.logdir,
-    v=bootstrap_options.verbosity
-  )
+  return setup_logging(level, console_stream=sys.stderr, log_dir=bootstrap_options.logdir)
 
 
-def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name=None, v=0):
+def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name=None):
   """Configures logging for a given scope, by default the global scope.
 
   :param str level: The logging level to enable, must be one of the level names listed here:
@@ -67,7 +65,6 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
                     The '.' separator providing the scope hierarchy.  By default the root logger is
                     configured.
   :param str log_name: The base name of the log file (defaults to 'pants.log').
-  :param int v: The verbosity level for extended log configuration.
   :returns: The full path to the main log file if file logging is configured or else `None`.
   :rtype: str
   """
@@ -81,6 +78,13 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
 
   log_filename = None
   file_handler = None
+
+  # A custom log handler for sub-debug trace logging.
+  def trace(self, message, *args, **kwargs):
+    if self.isEnabledFor(TRACE):
+      self._log(TRACE, message, args, **kwargs)
+
+  logging.Logger.trace = trace
 
   logger = logging.getLogger(scope)
   for handler in logger.handlers:
@@ -103,7 +107,8 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
         logging.ERROR: 'E',
         logging.WARN: 'W',
         logging.INFO: 'I',
-        logging.DEBUG: 'D'
+        logging.DEBUG: 'D',
+        TRACE: 'T'
       }
 
       def format(self, record):
@@ -128,6 +133,6 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
   # This routes warnings through our loggers instead of straight to raw stderr.
   logging.captureWarnings(True)
 
-  _maybe_configure_extended_logging(v)
+  _maybe_configure_extended_logging(level)
 
   return LoggingSetupResult(log_filename, file_handler)
