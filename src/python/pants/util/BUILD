@@ -73,6 +73,9 @@ python_library(
 python_library(
   name = 'meta',
   sources = ['meta.py'],
+  dependencies = [
+    '3rdparty/python:future',
+  ]
 )
 
 python_library(
