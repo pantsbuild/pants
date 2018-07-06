@@ -13,8 +13,6 @@ import time
 from collections import namedtuple
 from logging import FileHandler, Formatter, StreamHandler
 
-import six
-
 from pants.util.dirutil import safe_mkdir
 
 
