@@ -128,7 +128,6 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
   # This routes warnings through our loggers instead of straight to raw stderr.
   logging.captureWarnings(True)
 
-  if v:
-    _maybe_configure_extended_logging(v)
+  _maybe_configure_extended_logging(v)
 
   return LoggingSetupResult(log_filename, file_handler)
