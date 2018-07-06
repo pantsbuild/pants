@@ -37,8 +37,8 @@ def _configure_requests_debug_logging():
   requests_logger.propagate = True
 
 
-def _maybe_configure_extended_logging(level):
-  if logging.getLogger().isEnabledFor(TRACE):
+def _maybe_configure_extended_logging(logger):
+  if logger.isEnabledFor(TRACE):
     _configure_requests_debug_logging()
 
 
@@ -131,6 +131,6 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
   # This routes warnings through our loggers instead of straight to raw stderr.
   logging.captureWarnings(True)
 
-  _maybe_configure_extended_logging(level)
+  _maybe_configure_extended_logging(logger)
 
   return LoggingSetupResult(log_filename, file_handler)
