@@ -77,7 +77,7 @@ impl Generation {
 
 enum EntryState<N: Node> {
   // A node that has either been explicitly cleared, or has not yet started Running. In this state
-  // there is no need for a dirty bit because the generation is either in its initial state, or has
+  // there is no need for a dirty bit because the RunToken is either in its initial state, or has
   // been explicitly incremented when the node was cleared.
   //
   // The previous_result value is _not_ a valid value for this Entry: rather, it is preserved in
@@ -171,7 +171,7 @@ impl<N: Node> Entry<N> {
   /// the Graph lock and call back into the graph lock to set the final value.
   ///
   fn run<C>(
-    context: &C,
+    context_factory: &C,
     entry_key: &EntryKey<N>,
     entry_id: EntryId,
     run_token: RunToken,
@@ -186,18 +186,18 @@ impl<N: Node> Entry<N> {
     let run_token = run_token.next();
     match entry_key {
       &EntryKey::Valid(ref n) => {
-        let context2 = context.clone_for(entry_id);
+        let context = context_factory.clone_for(entry_id);
         let node = n.clone();
 
-        context.spawn(future::lazy(move || {
+        context_factory.spawn(future::lazy(move || {
           // If we have previous result generations, compare them to all current dependency
           // generations (which, if they are dirty, will cause recursive cleaning). If they
           // match, we can consider the previous result value to be clean for reuse.
           let was_clean = if let Some(previous_dep_generations) = previous_dep_generations {
-            let context3 = context2.clone();
-            context2
+            let context2 = context.clone();
+            context
               .graph()
-              .dep_generations(entry_id, &context2)
+              .dep_generations(entry_id, &context)
               .then(move |generation_res| match generation_res {
                 Ok(ref dep_generations) if dep_generations == &previous_dep_generations => {
                   // Dependencies have not changed: Node is clean.
@@ -206,7 +206,7 @@ impl<N: Node> Entry<N> {
                 _ => {
                   // If dependency generations mismatched or failed to fetch, clear its
                   // dependencies and indicate that it should re-run.
-                  context3.graph().clear_deps(entry_id, run_token);
+                  context2.graph().clear_deps(entry_id, run_token);
                   Ok(false)
                 }
               })
@@ -220,19 +220,19 @@ impl<N: Node> Entry<N> {
             if was_clean {
               // No dependencies have changed: we can complete the Node without changing its
               // previous_result or generation.
-              context2
+              context
                 .graph()
-                .complete(&context2, entry_id, run_token, None);
+                .complete(&context, entry_id, run_token, None);
               future::ok(()).to_boxed()
             } else {
               // The Node needs to (re-)run!
-              let context = context2.clone();
+              let context2 = context.clone();
               node
-                .run(context2)
+                .run(context)
                 .then(move |res| {
-                  context
+                  context2
                     .graph()
-                    .complete(&context, entry_id, run_token, Some(res));
+                    .complete(&context2, entry_id, run_token, Some(res));
                   Ok(())
                 })
                 .to_boxed()
@@ -295,7 +295,9 @@ impl<N: Node> Entry<N> {
           .map(move |res| (res, generation))
           .to_boxed();
       }
-      _ => {}
+      _ => {
+        // Fall through to the second match.
+      }
     };
 
     // Otherwise, we'll need to swap the state of the Node, so take it by value.
@@ -423,12 +425,10 @@ impl<N: Node> Entry<N> {
             }
           } else {
             // Node was marked clean.
-            // NB: The unwrap here avoids a clone and a comparison: see the method docs.
+            // NB: The `expect` here avoids a clone and a comparison: see the method docs.
             (
               generation,
-              previous_result.unwrap_or_else(|| {
-                panic!("A Node cannot be marked clean without a previous result.")
-              }),
+              previous_result.expect("A Node cannot be marked clean without a previous result."),
             )
           };
           // Notify all waiters (ignoring any that have gone away), and then store the value.
