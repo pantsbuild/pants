@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import time
+from builtins import range
 
 
 logger = logging.getLogger(__name__)

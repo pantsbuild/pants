@@ -8,29 +8,29 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import re
 import shlex
 
-import six
+import future
 
 
 def ensure_binary(text_or_binary):
-  if isinstance(text_or_binary, six.binary_type):
+  if isinstance(text_or_binary, future.utils.binary_type):
     return text_or_binary
-  elif isinstance(text_or_binary, six.text_type):
+  elif isinstance(text_or_binary, future.utils.text_type):
     return text_or_binary.encode('utf8')
   else:
     raise TypeError('Argument is neither text nor binary type.({})'.format(type(text_or_binary)))
 
 
 def ensure_text(text_or_binary):
-  if isinstance(text_or_binary, six.binary_type):
+  if isinstance(text_or_binary, future.utils.binary_type):
     return text_or_binary.decode('utf-8')
-  elif isinstance(text_or_binary, six.text_type):
+  elif isinstance(text_or_binary, future.utils.text_type):
     return text_or_binary
   else:
     raise TypeError('Argument is neither text nor binary type ({})'.format(type(text_or_binary)))
 
 
 def is_text_or_binary(obj):
-  return isinstance(obj, (six.text_type, six.binary_type))
+  return isinstance(obj, (future.utils.text_type, future.utils.binary_type))
 
 
 def safe_shlex_split(text_or_binary):

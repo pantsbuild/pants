@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import operator
+from builtins import map
 
 
 _identity = lambda x: x
@@ -51,7 +52,7 @@ def create_filter(predicate_param, predicate_factory):
   modifier, param = _extract_modifier(predicate_param)
   predicates = map(predicate_factory, param.split(','))
   def filt(x):
-    return modifier(any(map(lambda pred: pred(x), predicates)))
+    return modifier(any(pred(x) for pred in predicates))
   return filt
 
 
