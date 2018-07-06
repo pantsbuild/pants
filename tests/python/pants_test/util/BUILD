@@ -82,6 +82,7 @@ python_tests(
   name = 'meta',
   sources = ['test_meta.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:meta',
     'tests/python/pants_test:test_base',
   ]
@@ -101,6 +102,7 @@ python_tests(
   sources = ['test_objects.py'],
   coverage = ['pants.util.objects'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:objects',
     'tests/python/pants_test:base_test',
   ]

@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import sys
 from abc import abstractmethod
+from builtins import map, object, zip
 from collections import OrderedDict, namedtuple
 
 from pants.util.memo import memoized
@@ -50,7 +51,6 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
   if not superclass_name:
     superclass_name = '_anonymous_namedtuple_subclass'
-  superclass_name = str(superclass_name)
 
   namedtuple_cls = namedtuple(superclass_name, field_names, **kwargs)
 
@@ -162,7 +162,10 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
   # Return a new type with the given name, inheriting from the DataType class
   # just defined, with an empty class body.
-  return type(superclass_name, (DataType,), {})
+  try:  # Python3
+    return type(superclass_name, (DataType,), {})
+  except TypeError:  # Python2
+    return type(superclass_name.encode('utf-8'), (DataType,), {})
 
 
 class TypedDatatypeClassConstructionError(Exception):
