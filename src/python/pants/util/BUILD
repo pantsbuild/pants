@@ -170,7 +170,7 @@ python_library(
   name = 'tarutil',
   sources = ['tarutil.py'],
   dependencies = [
-    '3rdparty/python:future',
+    '3rdparty/python:six',
   ],
 )
 
