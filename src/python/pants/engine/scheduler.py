@@ -296,6 +296,11 @@ class Scheduler(object):
     logger.info('invalidated %d nodes for: %s', invalidated, filenames)
     return invalidated
 
+  def invalidate_all_files(self):
+    invalidated =  self._native.lib.graph_invalidate_all_paths(self._scheduler)
+    logger.info('invalidated all %d nodes', invalidated)
+    return invalidated
+
   def graph_len(self):
     return self._native.lib.graph_len(self._scheduler)
 
@@ -453,8 +458,14 @@ class SchedulerSession(object):
     return self.execution_request_literal(roots)
 
   def invalidate_files(self, direct_filenames):
-    """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
+    """Invalidates the given filenames in an internal product Graph instance."""
     invalidated = self._scheduler.invalidate_files(direct_filenames)
+    self._maybe_visualize()
+    return invalidated
+
+  def invalidate_all_files(self):
+    """Invalidates all filenames in an internal product Graph instance."""
+    invalidated = self._scheduler.invalidate_all_files()
     self._maybe_visualize()
     return invalidated
 

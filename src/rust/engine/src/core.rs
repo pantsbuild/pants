@@ -137,6 +137,14 @@ impl Value {
   }
 }
 
+impl PartialEq for Value {
+  fn eq(&self, other: &Value) -> bool {
+    externs::equals(self, other)
+  }
+}
+
+impl Eq for Value {}
+
 ///
 /// Implemented by calling back to python to clone the underlying Handle.
 ///
@@ -152,7 +160,7 @@ impl fmt::Debug for Value {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Failure {
   /// A Node failed because a filesystem change invalidated it or its inputs.
   /// A root requestor should usually immediately retry their request.

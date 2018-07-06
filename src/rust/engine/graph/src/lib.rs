@@ -24,6 +24,7 @@ use fnv::FnvHasher;
 use futures::future::{self, Future};
 use futures::sync::oneshot;
 use petgraph::graph::DiGraph;
+use petgraph::visit::EdgeRef;
 use petgraph::Direction;
 
 use boxfuture::{BoxFuture, Boxable};
@@ -52,22 +53,72 @@ impl RunToken {
   }
 }
 
+///
+/// A token associated with a Node that is incremented whenever its output value has (or might
+/// have) changed. When a dependent consumes a dependency at a particular generation, that
+/// generation is recorded on the consuming edge, and can later used to determine whether the
+/// inputs to a node have changed.
+///
+/// Unlike the RunToken (which is incremented whenever a node re-runs), the Generation is only
+/// incremented when the output of a node has changed.
+///
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct Generation(u32);
+
+impl Generation {
+  fn initial() -> Generation {
+    Generation(0)
+  }
+
+  fn next(&self) -> Generation {
+    Generation(self.0 + 1)
+  }
+}
+
 enum EntryState<N: Node> {
-  NotStarted(RunToken),
-  Running {
-    waiters: Vec<oneshot::Sender<Result<N::Item, N::Error>>>,
-    start_time: Instant,
+  // A node that has either been explicitly cleared, or has not yet started Running. In this state
+  // there is no need for a dirty bit because the RunToken is either in its initial state, or has
+  // been explicitly incremented when the node was cleared.
+  //
+  // The previous_result value is _not_ a valid value for this Entry: rather, it is preserved in
+  // order to compute the generation value for this Node by comparing it to the new result the next
+  // time the Node runs.
+  NotStarted {
     run_token: RunToken,
+    generation: Generation,
+    previous_result: Option<Result<N::Item, N::Error>>,
   },
-  Completed {
-    result: Result<N::Item, N::Error>,
+  // A node that is running. A running node that has been marked dirty re-runs rather than
+  // completing.
+  //
+  // The `previous_result` value for a Running node is not a valid value. See NotStarted.
+  Running {
     run_token: RunToken,
+    generation: Generation,
+    start_time: Instant,
+    waiters: Vec<oneshot::Sender<Result<(N::Item, Generation), N::Error>>>,
+    previous_result: Option<Result<N::Item, N::Error>>,
+    dirty: bool,
+  },
+  // A node that has completed, and then possibly been marked dirty. Because marking a node
+  // dirty does not eagerly re-execute any logic, it will stay this way until a caller moves it
+  // back to Running.
+  Completed {
+    run_token: RunToken,
+    generation: Generation,
+    result: Result<N::Item, N::Error>,
+    dep_generations: Vec<Generation>,
+    dirty: bool,
   },
 }
 
 impl<N: Node> EntryState<N> {
   fn initial() -> EntryState<N> {
-    EntryState::NotStarted(RunToken::initial())
+    EntryState::NotStarted {
+      run_token: RunToken::initial(),
+      generation: Generation::initial(),
+      previous_result: None,
+    }
   }
 }
 
@@ -116,42 +167,113 @@ impl<N: Node> Entry<N> {
   }
 
   ///
-  /// Returns a Future for the Node's field.
+  /// Spawn the execution of the node on an Executor, which will cause it to execute outside of
+  /// the Graph lock and call back into the graph lock to set the final value.
   ///
-  fn get<C>(&mut self, context: &C, entry_id: EntryId) -> BoxFuture<N::Item, N::Error>
+  fn run<C>(
+    context_factory: &C,
+    entry_key: &EntryKey<N>,
+    entry_id: EntryId,
+    run_token: RunToken,
+    generation: Generation,
+    previous_dep_generations: Option<Vec<Generation>>,
+    previous_result: Option<Result<N::Item, N::Error>>,
+  ) -> EntryState<N>
   where
     C: NodeContext<Node = N>,
   {
-    let next_state = match &mut self.state {
-      &mut EntryState::NotStarted(run_token) => {
-        match &self.node {
-          &EntryKey::Valid(ref n) => {
-            let context2 = context.clone_for(entry_id);
-            let node = n.clone();
+    // Increment the RunToken to uniquely identify this work.
+    let run_token = run_token.next();
+    match entry_key {
+      &EntryKey::Valid(ref n) => {
+        let context = context_factory.clone_for(entry_id);
+        let node = n.clone();
 
-            // Spawn the execution of the work on an Executor, which will cause it to execute
-            // outside of the Graph lock, and allow us to call back into the graph lock to set the
-            // final value.
-            context.spawn(future::lazy(move || {
-              let context = context2.clone();
-              node.run(context2).then(move |res| {
-                context.graph().complete(entry_id, run_token, res);
-                Ok(())
+        context_factory.spawn(future::lazy(move || {
+          // If we have previous result generations, compare them to all current dependency
+          // generations (which, if they are dirty, will cause recursive cleaning). If they
+          // match, we can consider the previous result value to be clean for reuse.
+          let was_clean = if let Some(previous_dep_generations) = previous_dep_generations {
+            let context2 = context.clone();
+            context
+              .graph()
+              .dep_generations(entry_id, &context)
+              .then(move |generation_res| match generation_res {
+                Ok(ref dep_generations) if dep_generations == &previous_dep_generations => {
+                  // Dependencies have not changed: Node is clean.
+                  Ok(true)
+                }
+                _ => {
+                  // If dependency generations mismatched or failed to fetch, clear its
+                  // dependencies and indicate that it should re-run.
+                  context2.graph().clear_deps(entry_id, run_token);
+                  Ok(false)
+                }
               })
-            }));
+              .to_boxed()
+          } else {
+            future::ok(false).to_boxed()
+          };
 
-            EntryState::Running {
-              waiters: Vec::new(),
-              start_time: Instant::now(),
-              run_token,
+          // If the Node was clean, complete it. Otherwise, re-run.
+          was_clean.and_then(move |was_clean| {
+            if was_clean {
+              // No dependencies have changed: we can complete the Node without changing its
+              // previous_result or generation.
+              context
+                .graph()
+                .complete(&context, entry_id, run_token, None);
+              future::ok(()).to_boxed()
+            } else {
+              // The Node needs to (re-)run!
+              let context2 = context.clone();
+              node
+                .run(context)
+                .then(move |res| {
+                  context2
+                    .graph()
+                    .complete(&context2, entry_id, run_token, Some(res));
+                  Ok(())
+                })
+                .to_boxed()
             }
-          }
-          &EntryKey::Cyclic(_) => EntryState::Completed {
-            result: Err(N::Error::cyclic()),
-            run_token: run_token,
-          },
+          })
+        }));
+
+        EntryState::Running {
+          waiters: Vec::new(),
+          start_time: Instant::now(),
+          run_token,
+          generation,
+          previous_result,
+          dirty: false,
         }
       }
+      &EntryKey::Cyclic(_) => EntryState::Completed {
+        result: Err(N::Error::cyclic()),
+        dep_generations: Vec::new(),
+        run_token,
+        generation,
+        dirty: false,
+      },
+    }
+  }
+
+  ///
+  /// Returns a Future for the Node's value and Generation.
+  ///
+  /// The two separate state matches handle two cases: in the first case we simply want to mutate
+  /// or clone the state, so we take it by reference without swapping it. In the second case, we
+  /// need to consume the state (which avoids cloning some of the values held there), so we take it
+  /// by value.
+  ///
+  fn get<C>(&mut self, context: &C, entry_id: EntryId) -> BoxFuture<(N::Item, Generation), N::Error>
+  where
+    C: NodeContext<Node = N>,
+  {
+    // First check whether the Node is already complete, or is currently running: in both of these
+    // cases we don't swap the state of the Node.
+    match &mut self.state {
       &mut EntryState::Running {
         ref mut waiters, ..
       } => {
@@ -162,12 +284,68 @@ impl<N: Node> Entry<N> {
           .flatten()
           .to_boxed();
       }
-      &mut EntryState::Completed { ref result, .. } => {
-        return future::result(result.clone()).to_boxed();
+      &mut EntryState::Completed {
+        ref result,
+        generation,
+        dirty,
+        ..
+      } if !dirty =>
+      {
+        return future::result(result.clone())
+          .map(move |res| (res, generation))
+          .to_boxed();
+      }
+      _ => {
+        // Fall through to the second match.
       }
     };
 
-    // swap in the new state and then recurse.
+    // Otherwise, we'll need to swap the state of the Node, so take it by value.
+    let next_state = match mem::replace(&mut self.state, EntryState::initial()) {
+      EntryState::NotStarted {
+        run_token,
+        generation,
+        previous_result,
+      } => Self::run(
+        context,
+        &self.node,
+        entry_id,
+        run_token,
+        generation,
+        None,
+        previous_result,
+      ),
+      EntryState::Completed {
+        run_token,
+        generation,
+        result,
+        dep_generations,
+        dirty,
+      } => {
+        assert!(
+          dirty,
+          "A clean Node should not reach this point: {:?}",
+          result
+        );
+        // The Node has already completed but is now marked dirty. This indicates that we are the
+        // first caller to request it since it was marked dirty. We attempt to clean it (which will
+        // cause it to re-run if the dep_generations mismatch).
+        Self::run(
+          context,
+          &self.node,
+          entry_id,
+          run_token,
+          generation,
+          Some(dep_generations),
+          Some(result),
+        )
+      }
+      EntryState::Running { .. } => {
+        panic!("A Running Node should not reach this point.");
+      }
+    };
+
+    // Swap in the new state and then recurse.
     self.state = next_state;
     self.get(context, entry_id)
   }
@@ -177,7 +355,12 @@ impl<N: Node> Entry<N> {
   ///
   fn peek(&self) -> Option<Result<N::Item, N::Error>> {
     match &self.state {
-      &EntryState::Completed { ref result, .. } => Some(result.clone()),
+      &EntryState::Completed {
+        ref result, dirty, ..
+      } if !dirty =>
+      {
+        Some(result.clone())
+      }
       _ => None,
     }
   }
@@ -185,37 +368,115 @@ impl<N: Node> Entry<N> {
   ///
   /// Called from the Executor when a Node completes.
   ///
-  fn complete(&mut self, result_run_token: RunToken, result: Result<N::Item, N::Error>) {
-    // Temporarily swap in `NotStarted` in order to take ownership of the state.
-    let state = mem::replace(&mut self.state, EntryState::initial());
-
+  /// A `result` value of `None` indicates that the Node was found to be clean, and its previous
+  /// result should be used. This special case exists to avoid 1) cloning the result to call this
+  /// method, and 2) comparing the current/previous results unnecessarily.
+  ///
+  fn complete<C>(
+    &mut self,
+    context: &C,
+    entry_id: EntryId,
+    result_run_token: RunToken,
+    dep_generations: Vec<Generation>,
+    result: Option<Result<N::Item, N::Error>>,
+  ) where
+    C: NodeContext<Node = N>,
+  {
     // We care about exactly one case: a Running state with the same run_token. All other states
     // represent various (legal) race conditions. See `RunToken`'s docs for more information.
-    self.state = match state {
+    match &self.state {
+      &EntryState::Running { run_token, .. } if result_run_token == run_token => {}
+      _ => {
+        // We care about exactly one case: a Running state with the same run_token. All other states
+        // represent various (legal) race conditions.
+        return;
+      }
+    }
+
+    self.state = match mem::replace(&mut self.state, EntryState::initial()) {
       EntryState::Running {
         waiters,
-        start_time,
         run_token,
+        generation,
+        previous_result,
+        dirty,
+        ..
       } => {
-        if result_run_token == run_token {
+        if dirty {
+          // The node was dirtied while it was running. The dep_generations and new result cannot
+          // be trusted and were never published. We continue to use the previous result.
+          Self::run(
+            context,
+            &self.node,
+            entry_id,
+            run_token,
+            generation,
+            None,
+            previous_result,
+          )
+        } else {
+          // If the new result does not match the previous result, the generation increments.
+          let (generation, next_result) = if let Some(result) = result {
+            if Some(&result) == previous_result.as_ref() {
+              // Node was re-executed, but had the same result value.
+              (generation, result)
+            } else {
+              (generation.next(), result)
+            }
+          } else {
+            // Node was marked clean.
+            // NB: The `expect` here avoids a clone and a comparison: see the method docs.
+            (
+              generation,
+              previous_result.expect("A Node cannot be marked clean without a previous result."),
+            )
+          };
           // Notify all waiters (ignoring any that have gone away), and then store the value.
           // A waiter will go away whenever they drop the `Future` `Receiver` of the value, perhaps
           // due to failure of another Future in a `join` or `join_all`, or due to a timeout at the
           // root of a request.
           for waiter in waiters {
-            let _ = waiter.send(result.clone());
+            let _ = waiter.send(next_result.clone().map(|res| (res, generation)));
           }
-          EntryState::Completed { result, run_token }
-        } else {
-          EntryState::Running {
-            waiters,
-            start_time,
+          EntryState::Completed {
+            result: next_result,
+            dep_generations,
             run_token,
+            generation,
+            dirty: false,
           }
         }
       }
       s => s,
     };
+  }
+
+  ///
+  /// Get the current Generation of this entry.
+  ///
+  /// TODO: Consider moving the Generation and RunToken out of the EntryState once we decide what
+  /// we want the per-Entry locking strategy to be.
+  ///
+  fn generation(&self) -> Generation {
+    match &self.state {
+      &EntryState::NotStarted { generation, .. }
+      | &EntryState::Running { generation, .. }
+      | &EntryState::Completed { generation, .. } => generation,
+    }
+  }
+
+  ///
+  /// Get the current RunToken of this entry.
+  ///
+  /// TODO: Consider moving the Generation and RunToken out of the EntryState once we decide what
+  /// we want the per-Entry locking strategy to be.
+  ///
+  fn run_token(&self) -> RunToken {
+    match &self.state {
+      &EntryState::NotStarted { run_token, .. }
+      | &EntryState::Running { run_token, .. }
+      | &EntryState::Completed { run_token, .. } => run_token,
+    }
   }
 
   ///
@@ -228,15 +489,52 @@ impl<N: Node> Entry<N> {
     }
   }
 
+  ///
+  /// Clears the state of this Node, forcing it to be recomputed.
+  ///
   fn clear(&mut self) {
-    let run_token = match mem::replace(&mut self.state, EntryState::initial()) {
-      EntryState::NotStarted(run_token) => run_token,
-      EntryState::Running { run_token, .. } => run_token,
-      EntryState::Completed { run_token, .. } => run_token,
-    };
+    let (run_token, generation, previous_result) =
+      match mem::replace(&mut self.state, EntryState::initial()) {
+        EntryState::NotStarted {
+          run_token,
+          generation,
+          previous_result,
+        }
+        | EntryState::Running {
+          run_token,
+          generation,
+          previous_result,
+          ..
+        } => (run_token, generation, previous_result),
+        EntryState::Completed {
+          run_token,
+          generation,
+          result,
+          ..
+        } => (run_token, generation, Some(result)),
+      };
 
     // Swap in a state with a new RunToken value, which invalidates any outstanding work.
-    self.state = EntryState::NotStarted(run_token.next());
+    self.state = EntryState::NotStarted {
+      run_token: run_token.next(),
+      generation,
+      previous_result,
+    };
+  }
+
+  ///
+  /// Dirties this Node, which will cause it to examine its dependencies the next time it is
+  /// requested, and re-run if any of them have changed generations.
+  ///
+  fn dirty(&mut self) {
+    match &mut self.state {
+      &mut EntryState::Running { ref mut dirty, .. }
+      | &mut EntryState::Completed { ref mut dirty, .. } => {
+        // Mark dirty.
+        *dirty = true;
+      }
+      &mut EntryState::NotStarted { .. } => {}
+    }
   }
 
   fn format(&self) -> String {
@@ -247,6 +545,12 @@ impl<N: Node> Entry<N> {
     };
     format!("{} == {}", self.node.content().format(), state).replace("\"", "\\\"")
   }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct InvalidationResult {
+  pub cleared: usize,
+  pub dirtied: usize,
 }
 
 type Nodes<N> = HashMap<EntryKey<N>, EntryId>;
@@ -261,6 +565,7 @@ impl<N: Node> InnerGraph<N> {
     self.nodes.get(node)
   }
 
+  // TODO: Now that we never delete Entries, we should consider making this infalliable.
   fn entry_for_id(&self, id: EntryId) -> Option<&Entry<N>> {
     self.pg.node_weight(id)
   }
@@ -338,49 +643,55 @@ impl<N: Node> InnerGraph<N> {
   }
 
   ///
-  /// Finds all "invalidation root" Nodes by applying the given predicate, and invalidates
-  /// their transitive dependents.
+  /// Clears the values of all "invalidation root" Nodes and dirties their transitive dependents.
   ///
   /// An "invalidation root" is a Node in the graph which can be invalidated for a reason other
-  /// than having had its dependencies changed. When an invalidation root Node is invalidated,
-  /// its dependencies are invalidated as well (regardless of whether they are also roots).
+  /// than having had its dependencies changed.
   ///
-  fn invalidate_from_roots<P: Fn(&N) -> bool>(&mut self, predicate: P) -> usize {
-    // Collect all entries that will be deleted.
-    let ids: HashSet<EntryId, FNV> = {
-      let root_ids = self
-        .nodes
-        .iter()
-        .filter_map(|(entry, &entry_id)| {
-          if predicate(entry.content()) {
-            Some(entry_id)
-          } else {
-            None
-          }
-        })
-        .collect();
-      self
-        .walk(root_ids, Direction::Incoming)
-        .map(|eid| eid)
-        .collect()
-    };
-    let invalidated_count = ids.len();
+  fn invalidate_from_roots<P: Fn(&N) -> bool>(&mut self, predicate: P) -> InvalidationResult {
+    // Collect all entries that will be cleared.
+    let root_ids: HashSet<_, FNV> = self
+      .nodes
+      .iter()
+      .filter_map(|(entry, &entry_id)| {
+        if predicate(entry.content()) {
+          Some(entry_id)
+        } else {
+          None
+        }
+      })
+      .collect();
+    // And their transitive dependencies, which will be dirtied.
+    let transitive_ids: Vec<_> = self
+      .walk(root_ids.iter().cloned().collect(), Direction::Incoming)
+      .filter(|eid| !root_ids.contains(eid))
+      .collect();
 
-    // Clear entry states.
-    for id in &ids {
+    let invalidation_result = InvalidationResult {
+      cleared: root_ids.len(),
+      dirtied: transitive_ids.len(),
+    };
+
+    // Clear roots and remove their outbound edges.
+    for id in &root_ids {
       self.pg.node_weight_mut(*id).map(|entry| entry.clear());
     }
-
-    // Then prune all edges adjacent to the entries.
     self.pg.retain_edges(|pg, edge| {
-      if let Some((src, dst)) = pg.edge_endpoints(edge) {
-        !(ids.contains(&src) || ids.contains(&dst))
+      if let Some((src, _)) = pg.edge_endpoints(edge) {
+        !root_ids.contains(&src)
       } else {
         true
       }
     });
 
-    invalidated_count
+    // Dirty transitive entries, but do not yet clear their output edges. We wait to clear
+    // outbound edges until we decide whether we can clean an entry: if we can, all edges are
+    // preserved; if we can't, they are cleared in `Graph::clear_deps`.
+    for id in &transitive_ids {
+      self.pg.node_weight_mut(*id).map(|entry| entry.dirty());
+    }
+
+    invalidation_result
   }
 
   fn visualize<V: NodeVisualizer<N>>(
@@ -695,7 +1006,7 @@ impl<N: Node> Graph<N> {
     // Declare the dep, and return the state of the destination.
     inner.pg.add_edge(src_id, dst_id, ());
     if let Some(entry) = inner.entry_for_id_mut(dst_id) {
-      entry.get(context, dst_id)
+      entry.get(context, dst_id).map(|(res, _)| res).to_boxed()
     } else {
       future::err(N::Error::invalidated()).to_boxed()
     }
@@ -711,21 +1022,100 @@ impl<N: Node> Graph<N> {
     let mut inner = self.inner.lock().unwrap();
     let id = inner.ensure_entry(EntryKey::Valid(node));
     if let Some(entry) = inner.entry_for_id_mut(id) {
-      entry.get(context, id)
+      entry.get(context, id).map(|(res, _)| res).to_boxed()
     } else {
       future::err(N::Error::invalidated()).to_boxed()
     }
   }
 
   ///
-  /// When the Executor finishes executing a Node it calls back to store the result value. We use
-  /// the run_token value to determine whether the Node changed while we were busy executing it,
-  /// so that we can discard the work.
+  /// Gets the generations of the dependencies of the given EntryId, (re)computing or cleaning
+  /// them first if necessary.
   ///
-  fn complete(&self, entry_id: EntryId, run_token: RunToken, result: Result<N::Item, N::Error>) {
+  fn dep_generations<C>(
+    &self,
+    entry_id: EntryId,
+    context: &C,
+  ) -> BoxFuture<Vec<Generation>, N::Error>
+  where
+    C: NodeContext<Node = N>,
+  {
     let mut inner = self.inner.lock().unwrap();
+    let dep_ids = inner
+      .pg
+      .neighbors_directed(entry_id, Direction::Outgoing)
+      .collect::<Vec<_>>();
+
+    future::join_all(
+      dep_ids
+        .into_iter()
+        .map(|dep_id| {
+          let entry = inner
+            .entry_for_id_mut(dep_id)
+            .unwrap_or_else(|| panic!("Dependency not present in Graph."));
+          entry
+            .get(context, dep_id)
+            .map(|(_, generation)| generation)
+            .to_boxed()
+        })
+        .collect::<Vec<_>>(),
+    ).to_boxed()
+  }
+
+  ///
+  /// Clears the dependency edges of the given EntryId if the RunToken matches.
+  ///
+  fn clear_deps(&self, entry_id: EntryId, run_token: RunToken) {
+    let mut inner = self.inner.lock().unwrap();
+    // If the RunToken mismatches, return.
+    if let Some(entry) = inner.entry_for_id(entry_id) {
+      if entry.run_token() != run_token {
+        return;
+      }
+    }
+
+    // Otherwise, clear the deps.
+    let dep_edges: Vec<_> = inner
+      .pg
+      .edges_directed(entry_id, Direction::Outgoing)
+      .map(|edge| edge.id())
+      .collect();
+    for dep_edge in dep_edges {
+      inner.pg.remove_edge(dep_edge);
+    }
+  }
+
+  ///
+  /// When the Executor finishes executing a Node it calls back to store the result value. We use
+  /// the run_token and dirty bits to determine whether the Node changed while we were busy
+  /// executing it, so that we can discard the work.
+  ///
+  /// We use the dirty bit in addition to the RunToken in order to avoid cases where dependencies
+  /// change while we're running. In order for a dependency to "change" it must have been cleared
+  /// or been marked dirty. But if our dependencies have been cleared or marked dirty, then we will
+  /// have been as well. We can thus use the dirty bit as a signal that the generation values of
+  /// our dependencies are still accurate.
+  ///
+  fn complete<C>(
+    &self,
+    context: &C,
+    entry_id: EntryId,
+    run_token: RunToken,
+    result: Option<Result<N::Item, N::Error>>,
+  ) where
+    C: NodeContext<Node = N>,
+  {
+    let mut inner = self.inner.lock().unwrap();
+    // Get the Generations of all dependencies of the Node. We can trust that these have not changed
+    // since we began executing, as long as we are not currently marked dirty (see the method doc).
+    let dep_generations = inner
+      .pg
+      .neighbors_directed(entry_id, Direction::Outgoing)
+      .filter_map(|dep_id| inner.entry_for_id(dep_id))
+      .map(|entry| entry.generation())
+      .collect();
     if let Some(entry) = inner.entry_for_id_mut(entry_id) {
-      entry.complete(run_token, result);
+      entry.complete(context, entry_id, run_token, dep_generations, result);
     }
   }
 
@@ -737,7 +1127,7 @@ impl<N: Node> Graph<N> {
     inner.clear()
   }
 
-  pub fn invalidate_from_roots<P: Fn(&N) -> bool>(&self, predicate: P) -> usize {
+  pub fn invalidate_from_roots<P: Fn(&N) -> bool>(&self, predicate: P) -> InvalidationResult {
     let mut inner = self.inner.lock().unwrap();
     inner.invalidate_from_roots(predicate)
   }
@@ -806,68 +1196,228 @@ impl<'a, N: Node + 'a> Iterator for Walk<'a, N> {
 
 #[cfg(test)]
 mod tests {
-  use std::sync::{Arc, Mutex};
+  extern crate rand;
+
+  use std::cmp;
+  use std::collections::HashSet;
+  use std::sync::{mpsc, Arc, Mutex};
   use std::thread;
+  use std::time::Duration;
 
   use boxfuture::{BoxFuture, Boxable};
   use futures::future::{self, Future};
   use hashing::Digest;
 
-  use super::{EntryId, Graph, Node, NodeContext, NodeError};
+  use self::rand::Rng;
+
+  use super::{EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError};
 
   #[test]
   fn create() {
     let graph = Arc::new(Graph::new());
-    let context = TContext::new(graph.clone());
+    let context = TContext::new(0, graph.clone());
     assert_eq!(
       graph.create(TNode(2), &context).wait(),
-      Ok("2/1/0".to_string())
+      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
     );
   }
 
   #[test]
-  fn invalidate() {
+  fn invalidate_and_clean() {
     let graph = Arc::new(Graph::new());
-    let context = TContext::new(graph.clone());
+    let context = TContext::new(0, graph.clone());
 
     // Create three nodes.
     assert_eq!(
       graph.create(TNode(2), &context).wait(),
-      Ok("2/1/0".to_string())
+      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
     );
-    assert_eq!(context.spawn_count(), 3);
+    assert_eq!(context.runs(), vec![TNode(2), TNode(1), TNode(0)]);
 
-    // Invalidate and re-request the upper two nodes.
-    assert_eq!(graph.invalidate_from_roots(|&TNode(n)| n == 1), 2);
+    // Clear the middle Node, which dirties the upper node.
+    assert_eq!(
+      graph.invalidate_from_roots(|&TNode(n)| n == 1),
+      InvalidationResult {
+        cleared: 1,
+        dirtied: 1
+      }
+    );
 
-    // Confirm that the right number of nodes re-run.
+    // Confirm that the cleared Node re-runs, and the upper node is cleaned without re-running.
     assert_eq!(
       graph.create(TNode(2), &context).wait(),
-      Ok("2/1/0".to_string())
+      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
     );
-    assert_eq!(context.spawn_count(), 5);
+    assert_eq!(context.runs(), vec![TNode(2), TNode(1), TNode(0), TNode(1)]);
+  }
+
+  #[test]
+  fn invalidate_and_rerun() {
+    let graph = Arc::new(Graph::new());
+    let context0 = TContext::new(0, graph.clone());
+
+    // Create three nodes.
+    assert_eq!(
+      graph.create(TNode(2), &context0).wait(),
+      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+    );
+    assert_eq!(context0.runs(), vec![TNode(2), TNode(1), TNode(0)]);
+
+    // Clear the middle Node, which dirties the upper node.
+    assert_eq!(
+      graph.invalidate_from_roots(|&TNode(n)| n == 1),
+      InvalidationResult {
+        cleared: 1,
+        dirtied: 1
+      }
+    );
+
+    // Request with a new context, which will cause both the middle and upper nodes to rerun since
+    // their input values have changed.
+    let context1 = TContext::new(1, graph.clone());
+    assert_eq!(
+      graph.create(TNode(2), &context1).wait(),
+      Ok(vec![T(0, 0), T(1, 1), T(2, 1)])
+    );
+    assert_eq!(context1.runs(), vec![TNode(1), TNode(2)]);
+  }
+
+  #[test]
+  fn invalidate_with_changed_dependencies() {
+    let graph = Arc::new(Graph::new());
+    let context = TContext::new(0, graph.clone());
+
+    // Create three nodes.
+    assert_eq!(
+      graph.create(TNode(2), &context).wait(),
+      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+    );
+
+    // Clear the middle Node, which dirties the upper node.
+    assert_eq!(
+      graph.invalidate_from_roots(|&TNode(n)| n == 1),
+      InvalidationResult {
+        cleared: 1,
+        dirtied: 1
+      }
+    );
+
+    // Request with a new context that truncates execution at the middle Node.
+    let context = TContext::new_with_stop_at(0, TNode(1), graph.clone());
+    assert_eq!(
+      graph.create(TNode(2), &context).wait(),
+      Ok(vec![T(1, 0), T(2, 0)])
+    );
+
+    // Confirm that dirtying the bottom Node does not affect the middle/upper Nodes, which no
+    // longer depend on it.
+    assert_eq!(
+      graph.invalidate_from_roots(|&TNode(n)| n == 0),
+      InvalidationResult {
+        cleared: 1,
+        dirtied: 0,
+      }
+    );
+  }
+
+  #[test]
+  fn invalidate_randomly() {
+    let graph = Arc::new(Graph::new());
+
+    let invalidations = 10;
+    let sleep_per_invalidation = Duration::from_millis(100);
+    let range = 100;
+
+    // Spawn a background thread to randomly invalidate in the relevant range. Hold its handle so
+    // it doesn't detach.
+    let graph2 = graph.clone();
+    let (send, recv) = mpsc::channel();
+    let _join = thread::spawn(move || {
+      let mut rng = rand::thread_rng();
+      let mut invalidations = invalidations;
+      while invalidations > 0 {
+        invalidations -= 1;
+
+        // Invalidate a random node in the graph.
+        let candidate = rng.gen_range(0, range);
+        graph2.invalidate_from_roots(|&TNode(n)| n == candidate);
+
+        thread::sleep(sleep_per_invalidation);
+      }
+      send.send(()).unwrap();
+    });
+
+    // Continuously re-request the root with increasing context values, and assert that Node and
+    // context values are ascending.
+    let mut iterations = 0;
+    let mut max_distinct_context_values = 0;
+    loop {
+      let context = TContext::new(iterations, graph.clone());
+
+      // Compute the root, and validate its output.
+      let node_output = match graph.create(TNode(range), &context).wait() {
+        Ok(output) => output,
+        Err(TError::Invalidated) => {
+          // Some amnount of concurrent invalidation is expected: retry.
+          continue;
+        }
+        Err(e) => panic!(
+          "Did not expect any errors other than Invalidation. Got: {:?}",
+          e
+        ),
+      };
+      max_distinct_context_values = cmp::max(
+        max_distinct_context_values,
+        TNode::validate(&node_output).unwrap(),
+      );
+
+      // Poll the channel to see whether the background thread has exited.
+      if let Ok(_) = recv.try_recv() {
+        break;
+      }
+      iterations += 1;
+    }
+
+    assert!(
+      max_distinct_context_values > 1,
+      "In {} iterations, observed a maximum of {} distinct context values.",
+      iterations,
+      max_distinct_context_values
+    );
   }
 
   ///
-  /// A node that builds a string by recursively requesting itself and prepending its value
+  /// A token containing the id of a Node and the id of a Context, respectively. Has a short name
+  /// to minimize the verbosity of tests.
+  ///
+  #[derive(Clone, Debug, Eq, PartialEq)]
+  struct T(usize, usize);
+
+  ///
+  /// A node that builds a Vec of tokens by recursively requesting itself and appending its value
   /// to the result.
   ///
   #[derive(Clone, Debug, Eq, Hash, PartialEq)]
   struct TNode(usize);
   impl Node for TNode {
     type Context = TContext;
-    type Item = String;
+    type Item = Vec<T>;
     type Error = TError;
 
-    fn run(self, context: TContext) -> BoxFuture<String, TError> {
+    fn run(self, context: TContext) -> BoxFuture<Vec<T>, TError> {
+      context.ran(self.clone());
       let depth = self.0;
-      if depth > 0 {
+      let token = T(depth, context.id());
+      if depth > 0 && !context.stop_at(&self) {
         context
           .get(TNode(depth - 1))
-          .map(move |v| format!("{}/{}", depth, v))
+          .map(move |mut v| {
+            v.push(token);
+            v
+          })
           .to_boxed()
       } else {
-        future::ok(format!("{}", depth)).to_boxed()
+        future::ok(vec![token]).to_boxed()
       }
     }
 
@@ -880,25 +1430,72 @@ mod tests {
     }
   }
 
+  impl TNode {
+    ///
+    /// Validates the given TNode output. Both node ids and context ids should increase left to
+    /// right: node ids monotonically, and context ids non-monotonically.
+    ///
+    /// Valid:
+    ///   (0,0), (1,1), (2,2), (3,3)
+    ///   (0,0), (1,0), (2,1), (3,1)
+    ///
+    /// Invalid:
+    ///   (0,0), (1,1), (2,1), (3,0)
+    ///   (0,0), (1,0), (2,0), (1,0)
+    ///
+    /// If successful, returns the count of distinct context ids in the path.
+    ///
+    fn validate(output: &Vec<T>) -> Result<usize, String> {
+      let (node_ids, context_ids): (Vec<_>, Vec<_>) = output
+        .iter()
+        .map(|&T(node_id, context_id)| {
+          // We cast to isize to allow comparison to -1.
+          (node_id as isize, context_id)
+        })
+        .unzip();
+      // Confirm monotonically ordered.
+      let mut previous: isize = -1;
+      for node_id in node_ids {
+        if previous + 1 != node_id {
+          return Err(format!(
+            "Node ids in {:?} were not monotonically ordered.",
+            output
+          ));
+        }
+        previous = node_id;
+      }
+      // Confirm ordered (non-monotonically).
+      let mut previous: usize = 0;
+      for &context_id in &context_ids {
+        if previous > context_id {
+          return Err(format!("Context ids in {:?} were not ordered.", output));
+        }
+        previous = context_id;
+      }
+
+      Ok(context_ids.into_iter().collect::<HashSet<_>>().len())
+    }
+  }
+
   ///
-  /// A context that keeps a count of spawned Nodes. This is a very basic way to confirm that Nodes
-  /// have (re-)run.
-  ///
-  /// TODO: This is potentially error prone, but is much simpler than actually tracking precisely
-  /// which Nodes ran and in which order. Future work.
+  /// A context that keeps a record of Nodes that have been run.
   ///
   #[derive(Clone)]
   struct TContext {
+    id: usize,
+    stop_at: Option<TNode>,
     graph: Arc<Graph<TNode>>,
-    spawn_count: Arc<Mutex<usize>>,
+    runs: Arc<Mutex<Vec<TNode>>>,
     entry_id: Option<EntryId>,
   }
   impl NodeContext for TContext {
     type Node = TNode;
     fn clone_for(&self, entry_id: EntryId) -> TContext {
       TContext {
+        id: self.id,
+        stop_at: self.stop_at.clone(),
         graph: self.graph.clone(),
-        spawn_count: self.spawn_count.clone(),
+        runs: self.runs.clone(),
         entry_id: Some(entry_id),
       }
     }
@@ -915,26 +1512,49 @@ mod tests {
       thread::spawn(move || {
         future.wait().unwrap();
       });
-      let mut spawn_count = self.spawn_count.lock().unwrap();
-      *spawn_count += 1
     }
   }
 
   impl TContext {
-    fn new(graph: Arc<Graph<TNode>>) -> TContext {
+    fn new(id: usize, graph: Arc<Graph<TNode>>) -> TContext {
       TContext {
+        id,
+        stop_at: None,
         graph,
-        spawn_count: Arc::new(Mutex::new(0)),
+        runs: Arc::new(Mutex::new(Vec::new())),
         entry_id: None,
       }
     }
 
-    fn get(&self, dst: TNode) -> BoxFuture<String, TError> {
+    fn new_with_stop_at(id: usize, stop_at: TNode, graph: Arc<Graph<TNode>>) -> TContext {
+      TContext {
+        id,
+        stop_at: Some(stop_at),
+        graph,
+        runs: Arc::new(Mutex::new(Vec::new())),
+        entry_id: None,
+      }
+    }
+
+    fn id(&self) -> usize {
+      self.id
+    }
+
+    fn get(&self, dst: TNode) -> BoxFuture<Vec<T>, TError> {
       self.graph.get(self.entry_id.unwrap(), self, dst)
     }
 
-    fn spawn_count(&self) -> usize {
-      *self.spawn_count.lock().unwrap()
+    fn ran(&self, node: TNode) {
+      let mut runs = self.runs.lock().unwrap();
+      runs.push(node);
+    }
+
+    fn stop_at(&self, node: &TNode) -> bool {
+      Some(node) == self.stop_at.as_ref()
+    }
+
+    fn runs(&self) -> Vec<TNode> {
+      self.runs.lock().unwrap().clone()
     }
   }
 
