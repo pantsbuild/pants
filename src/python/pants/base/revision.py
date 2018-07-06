@@ -99,12 +99,14 @@ class Revision(object):
 
   def __eq__(self, other):
     if not self._is_valid_operand(other):
-      return False  # TODO: typically this should return NotImplemented. Returning False to avoid changing prior API.
+      return False  # TODO(python3port): typically this should return NotImplemented.
+                    # Returning False for now to avoid changing prior API.
     return tuple(self._components) == tuple(other._components)
 
   def __lt__(self, other):
     if not self._is_valid_operand(other):
-      return NotImplemented
+      return AttributeError  # TODO(python3port): typically this should return NotImplemented.
+                             # Returning AttributeError for now to avoid changing prior API.
     for ours, theirs in zip_longest(self._components, other._components, fillvalue=0):
       if ours != theirs:
         return ours < theirs
