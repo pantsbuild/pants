@@ -42,13 +42,14 @@ class LocalPantsRunner(object):
   def run(self):
     profile_path = self._env.get('PANTS_PROFILE')
     with hard_exit_handler(), maybe_profiled(profile_path):
-      self._run()
+      self._maybe_run()
 
-  def _run(self):
-    # Bootstrap options and logging.
+  def _maybe_run(self):
     options_bootstrapper = self._options_bootstrapper or OptionsBootstrapper(env=self._env,
                                                                              args=self._args)
     bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
+
+    # Bootstrap options and logging.
     setup_logging_from_options(bootstrap_options)
     build_config = BuildConfigInitializer.get(options_bootstrapper)
     options = OptionsInitializer.create(options_bootstrapper, build_config)

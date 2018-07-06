@@ -24,21 +24,19 @@ class NailgunClientSession(NailgunProtocol):
 
   def __init__(self, sock, in_file, out_file, err_file, exit_on_broken_pipe=False):
     self._sock = sock
-    self._input_writer = None
-    if in_file:
-      self._input_writer = NailgunStreamWriter(
-        (in_file.fileno(),),
-        self._sock,
-        (ChunkType.STDIN,),
-        ChunkType.STDIN_EOF
-      )
+    self._input_writer = None if not in_file else NailgunStreamWriter(
+      (in_file.fileno(),),
+      self._sock,
+      (ChunkType.STDIN,),
+      ChunkType.STDIN_EOF
+    )
     self._stdout = out_file
     self._stderr = err_file
     self._exit_on_broken_pipe = exit_on_broken_pipe
     self.remote_pid = None
 
   def _maybe_start_input_writer(self):
-    if self._input_writer:
+    if self._input_writer and not self._input_writer.is_alive():
       self._input_writer.start()
 
   def _maybe_stop_input_writer(self):

@@ -11,6 +11,7 @@ import threading
 
 from twitter.common.dirutil import Fileset
 
+from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.pantsd.service.pants_service import PantsService
 
 
@@ -156,8 +157,8 @@ class SchedulerService(PantsService):
     """
     return self._scheduler.graph_len()
 
-  def warm_product_graph(self, options, target_roots_calculator):
-    """Runs an execution request against the captive scheduler given a set of input specs to warm.
+  def prefork(self, options, build_config):
+    """Runs all pre-fork logic in the process context of the daemon.
 
     :returns: `(LegacyGraphSession, TargetRoots)`
     """
@@ -170,14 +171,22 @@ class SchedulerService(PantsService):
 
     session = self._graph_helper.new_session()
     with self.fork_lock:
-      target_roots = target_roots_calculator.create(
+      global_options = options.for_global_scope()
+      target_roots = TargetRootsCalculator.create(
         options=options,
         session=session.scheduler_session,
         symbol_table=session.symbol_table,
-        exclude_patterns=tuple(options.for_global_scope().exclude_target_regexp) if options.for_global_scope().exclude_target_regexp else tuple(),
-        tags=tuple(options.for_global_scope().tag) if options.for_global_scope().tag else tuple()
+        exclude_patterns=tuple(global_options.exclude_target_regexp) if global_options.exclude_target_regexp else tuple(),
+        tags=tuple(global_options.tag) if global_options.tag else tuple()
       )
-      session.warm_product_graph(target_roots)
+
+      if global_options.v1:
+        session.warm_product_graph(target_roots)
+
+      if global_options.v2:
+        # N.B. @console_rules run pre-fork in order to cache the products they request during execution.
+        session.run_console_rules(options.goals, target_roots)
+
       return session, target_roots
 
   def run(self):

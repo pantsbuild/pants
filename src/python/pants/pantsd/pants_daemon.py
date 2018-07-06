@@ -14,12 +14,11 @@ from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import Exiter
-from pants.bin.daemon_pants_runner import DaemonExiter, DaemonPantsRunner
+from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.native import Native
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import setup_logging
 from pants.init.options_initializer import BuildConfigInitializer
-from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionsFingerprinter
@@ -187,11 +186,9 @@ class PantsDaemon(FingerprintedProcessManager):
       )
 
       pailgun_service = PailgunService(
-        bind_addr=(bootstrap_options.pantsd_pailgun_host, bootstrap_options.pantsd_pailgun_port),
-        exiter_class=DaemonExiter,
-        runner_class=DaemonPantsRunner,
-        target_roots_calculator=TargetRootsCalculator,
-        scheduler_service=scheduler_service
+        (bootstrap_options.pantsd_pailgun_host, bootstrap_options.pantsd_pailgun_port),
+        DaemonPantsRunner,
+        scheduler_service
       )
 
       store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)

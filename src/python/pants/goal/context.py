@@ -61,7 +61,8 @@ class Context(object):
   def __init__(self, options, run_tracker, target_roots,
                requested_goals=None, target_base=None, build_graph=None,
                build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
-               workspace=None, invalidation_report=None, scheduler=None):
+               workspace=None, invalidation_report=None, scheduler=None, graph_helper=None,
+               v2_target_roots=None):
     self._options = options
     self.build_graph = build_graph
     self.build_file_parser = build_file_parser
@@ -81,6 +82,8 @@ class Context(object):
     self._replace_targets(target_roots)
     self._invalidation_report = invalidation_report
     self._scheduler = scheduler
+    self.graph_helper = graph_helper
+    self.v2_target_roots = v2_target_roots
 
   @property
   def options(self):
