@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import logging
 import multiprocessing
 import os
 import sys
@@ -122,12 +121,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     default_distdir = os.path.join(buildroot, default_distdir_name)
     default_rel_distdir = '/{}/'.format(default_distdir_name)
 
-    # Although logging supports the WARN level, its not documented and could conceivably be yanked.
-    # Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
-    # setup a 'WARN' logging level name that maps to 'WARNING'.
-    logging.addLevelName(logging.WARNING, 'WARN')
-    register('-l', '--level', choices=['debug', 'info', 'warn'], default='info', recursive=True,
-             help='Set the logging level.')
+    register('-l', '--level', choices=['trace', 'debug', 'info', 'warn'], default='info',
+             recursive=True, help='Set the logging level.')
     register('-q', '--quiet', type=bool, recursive=True, daemon=False,
              help='Squelches most console output. NOTE: Some tasks default to behaving quietly: '
                   'inverting this option supports making them noisier than they would be otherwise.')

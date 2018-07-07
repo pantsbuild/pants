@@ -6,9 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.native.config.environment import (Assembler, CCompiler, CppCompiler,
-                                                     GCCCCompiler, GCCCppCompiler,
-                                                     Linker, LLVMCCompiler, LLVMCppCompiler,
-                                                     Platform)
+                                                     GCCCCompiler, GCCCppCompiler, Linker,
+                                                     LLVMCCompiler, LLVMCppCompiler, Platform)
 from pants.backend.native.subsystems.binaries.binutils import Binutils
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
