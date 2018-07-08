@@ -12,10 +12,9 @@ use futures::Future;
 
 use boxfuture::{BoxFuture, Boxable};
 use core::{Failure, TypeId};
-use externs;
 use fs::{safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
 use graph::{EntryId, Graph, NodeContext};
-use handles::maybe_drain_handles;
+use handles::maybe_drop_handles;
 use nodes::{NodeKey, TryInto, WrappedNode};
 use process_execution::{self, BoundedCommandRunner, CommandRunner};
 use resettable::Resettable;
@@ -148,9 +147,7 @@ impl Context {
   ///
   pub fn get<N: WrappedNode>(&self, node: N) -> BoxFuture<N::Item, Failure> {
     // TODO: Odd place for this... could do it periodically in the background?
-    if let Some(handles) = maybe_drain_handles() {
-      externs::drop_handles(&handles);
-    }
+    maybe_drop_handles();
     self
       .core
       .graph

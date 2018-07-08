@@ -4,11 +4,11 @@
 use fnv::FnvHasher;
 
 use std::collections::HashMap;
-use std::ops::Drop;
+use std::ops::Deref;
 use std::{fmt, hash};
 
 use externs;
-use handles::{enqueue_drop_handle, Handle};
+use handles::Handle;
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
@@ -106,57 +106,46 @@ impl Key {
 }
 
 ///
-/// Represents a handle to a python object, explicitly without equality or hashing. Whenever
-/// the equality/identity of a Value matters, a Key should be computed for it and used instead.
+/// A wrapper around a handle: soon to contain an Arc.
 ///
-/// Value implements Clone by calling out to a python extern `clone_val` which clones the
-/// underlying CFFI handle.
-///
-#[repr(C)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Value(Handle);
 
-// By default, Values would not be marked Send because of the raw pointer they hold.
-// Because the handle is opaque and can't be cloned, we can safely implement Send.
-unsafe impl Send for Value {}
-unsafe impl Sync for Value {}
-
-impl Drop for Value {
-  fn drop(&mut self) {
-    enqueue_drop_handle(self.0);
-  }
-}
-
 impl Value {
-  ///
-  /// An escape hatch to allow for cloning a Value without cloning its handle. You should generally
-  /// not do this unless you are certain the input Value has been mem::forgotten (otherwise it
-  /// will be `Drop`ed twice).
-  ///
-  pub unsafe fn clone_without_handle(&self) -> Value {
-    Value(self.0)
+  pub fn new(handle: Handle) -> Value {
+    Value(handle)
   }
 }
 
-impl PartialEq for Value {
-  fn eq(&self, other: &Value) -> bool {
-    externs::equals(self, other)
-  }
-}
+impl Deref for Value {
+  type Target = Handle;
 
-impl Eq for Value {}
-
-///
-/// Implemented by calling back to python to clone the underlying Handle.
-///
-impl Clone for Value {
-  fn clone(&self) -> Value {
-    externs::clone_val(self)
+  fn deref(&self) -> &Handle {
+    &self.0
   }
 }
 
 impl fmt::Debug for Value {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "{}", externs::val_to_str(&self))
+  }
+}
+
+///
+/// Creates a Handle (which represents exclusive access) from a Value (which might be shared),
+/// cloning if necessary.
+///
+/// TODO: With Arc, this will use `make_mut`.
+///
+impl From<Value> for Handle {
+  fn from(value: Value) -> Self {
+    value.0
+  }
+}
+
+impl From<Handle> for Value {
+  fn from(handle: Handle) -> Self {
+    Value::new(handle)
   }
 }
 

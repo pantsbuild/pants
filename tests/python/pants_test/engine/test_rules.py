@@ -76,7 +76,7 @@ class RulesetValidatorTest(unittest.TestCase):
   def test_ruleset_with_missing_product_type(self):
     rules = _suba_root_rules + [TaskRule(A, [Select(B)], noop)]
 
-    with self.assertRaises(ValueError) as cm:
+    with self.assertRaises(Exception) as cm:
       create_scheduler(rules)
 
     self.assert_equal_with_printing(dedent("""
@@ -88,7 +88,7 @@ class RulesetValidatorTest(unittest.TestCase):
 
   def test_ruleset_with_rule_with_two_missing_selects(self):
     rules = _suba_root_rules + [TaskRule(A, [Select(B), Select(C)], noop)]
-    with self.assertRaises(ValueError) as cm:
+    with self.assertRaises(Exception) as cm:
       create_scheduler(rules)
 
     self.assert_equal_with_printing(dedent("""
@@ -110,7 +110,7 @@ class RulesetValidatorTest(unittest.TestCase):
       TaskRule(B, [Select(SubA)], noop)
     ]
 
-    with self.assertRaises(ValueError) as cm:
+    with self.assertRaises(Exception) as cm:
       create_scheduler(rules)
     self.assert_equal_with_printing(dedent("""
                                       Rules with errors: 2
@@ -135,7 +135,7 @@ class RulesetValidatorTest(unittest.TestCase):
       SingletonRule(B, B()),
     ]
 
-    with self.assertRaises(ValueError) as cm:
+    with self.assertRaises(Exception) as cm:
       create_scheduler(rules)
 
     # This error message could note near matches like the singleton.
@@ -155,7 +155,7 @@ class RulesetValidatorTest(unittest.TestCase):
       TaskRule(A, [Select(SubA)], noop)
     ]
 
-    with self.assertRaises(ValueError) as cm:
+    with self.assertRaises(Exception) as cm:
       create_scheduler(rules)
 
     self.assert_equal_with_printing(dedent("""
