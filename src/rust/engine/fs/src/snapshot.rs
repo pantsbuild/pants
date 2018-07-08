@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use bazel_protos;
-use boxfuture::{BoxFuture, Boxable};
+use boxfuture::{BoxFuture, Boxable, IFuture};
 use futures::future::{self, join_all};
 use futures::Future;
 use hashing::{Digest, Fingerprint};
@@ -42,12 +42,11 @@ impl Snapshot {
     store: Store,
     file_digester: S,
     path_stats: Vec<PathStat>,
-  ) -> BoxFuture<Snapshot, String> {
+  ) -> impl IFuture<Snapshot, String> {
     let mut sorted_path_stats = path_stats.clone();
     sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
     Snapshot::ingest_directory_from_sorted_path_stats(store, &file_digester, &sorted_path_stats)
       .map(|digest| Snapshot { digest, path_stats })
-      .to_boxed()
   }
 
   pub fn digest_from_path_stats<
@@ -57,7 +56,7 @@ impl Snapshot {
     store: Store,
     file_digester: S,
     path_stats: &[PathStat],
-  ) -> BoxFuture<Digest, String> {
+  ) -> impl IFuture<Digest, String> {
     let mut sorted_path_stats = path_stats.to_owned();
     sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
     Snapshot::ingest_directory_from_sorted_path_stats(store, &file_digester, &sorted_path_stats)

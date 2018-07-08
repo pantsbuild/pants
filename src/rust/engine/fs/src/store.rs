@@ -1,7 +1,7 @@
 use FileContent;
 
 use bazel_protos;
-use boxfuture::{BoxFuture, Boxable};
+use boxfuture::{BoxFuture, Boxable, IFuture};
 use bytes::Bytes;
 use futures::{future, Future};
 use hashing::Digest;
@@ -96,13 +96,16 @@ impl Store {
     }
   }
 
-  pub fn store_file_bytes(&self, bytes: Bytes, initial_lease: bool) -> BoxFuture<Digest, String> {
+  pub fn store_file_bytes(
+    &self,
+    bytes: Bytes,
+    initial_lease: bool,
+  ) -> impl IFuture<Digest, String> {
     let len = bytes.len();
     self
       .local
       .store_bytes(EntryType::File, bytes, initial_lease)
       .map(move |fingerprint| Digest(fingerprint, len))
-      .to_boxed()
   }
 
   ///
@@ -113,7 +116,7 @@ impl Store {
     &self,
     digest: Digest,
     f: F,
-  ) -> BoxFuture<Option<T>, String> {
+  ) -> impl IFuture<Option<T>, String> {
     // No transformation or verification is needed for files, so we pass in a pair of functions
     // which always succeed, whether the underlying bytes are coming from a local or remote store.
     // Unfortunately, we need to be a little verbose to do this.
@@ -135,7 +138,7 @@ impl Store {
     &self,
     directory: &bazel_protos::remote_execution::Directory,
     initial_lease: bool,
-  ) -> BoxFuture<Digest, String> {
+  ) -> impl IFuture<Digest, String> {
     let local = self.local.clone();
     future::result(
       directory
@@ -147,7 +150,6 @@ impl Store {
         .store_bytes(EntryType::Directory, Bytes::from(bytes), initial_lease)
         .map(move |fingerprint| Digest(fingerprint, len))
     })
-      .to_boxed()
   }
 
   ///
@@ -158,7 +160,7 @@ impl Store {
   pub fn load_directory(
     &self,
     digest: Digest,
-  ) -> BoxFuture<Option<bazel_protos::remote_execution::Directory>, String> {
+  ) -> impl IFuture<Option<bazel_protos::remote_execution::Directory>, String> {
     self.load_bytes_with(
       EntryType::Directory,
       digest,
@@ -200,7 +202,7 @@ impl Store {
     digest: Digest,
     f_local: FLocal,
     f_remote: FRemote,
-  ) -> BoxFuture<Option<T>, String> {
+  ) -> impl IFuture<Option<T>, String> {
     let local = self.local.clone();
     let maybe_remote = self.remote.clone();
     self
@@ -236,7 +238,6 @@ impl Store {
             .to_boxed(),
         },
       )
-      .to_boxed()
   }
 
   ///
@@ -355,7 +356,10 @@ impl Store {
     }
   }
 
-  pub fn expand_directory(&self, digest: Digest) -> BoxFuture<HashMap<Digest, EntryType>, String> {
+  pub fn expand_directory(
+    &self,
+    digest: Digest,
+  ) -> impl IFuture<HashMap<Digest, EntryType>, String> {
     let accumulator = Arc::new(Mutex::new(HashMap::new()));
 
     self
@@ -366,7 +370,6 @@ impl Store {
           .into_inner()
           .unwrap()
       })
-      .to_boxed()
   }
 
   fn expand_directory_helper(
@@ -428,7 +431,9 @@ impl Store {
             let store = store.clone();
             let path = destination.join(file_node.get_name());
             let digest = try_future!(file_node.get_digest().into());
-            store.materialize_file(path, digest, file_node.is_executable)
+            store
+              .materialize_file(path, digest, file_node.is_executable)
+              .to_boxed()
           })
           .collect::<Vec<_>>();
         let directory_futures = directory
@@ -453,7 +458,7 @@ impl Store {
     destination: PathBuf,
     digest: Digest,
     is_executable: bool,
-  ) -> BoxFuture<(), String> {
+  ) -> impl IFuture<(), String> {
     self
       .load_file_bytes_with(digest, move |bytes| {
         OpenOptions::new()
@@ -469,14 +474,13 @@ impl Store {
         Some(Err(e)) => Err(e),
         None => Err(format!("File with digest {:?} not found", digest)),
       })
-      .to_boxed()
   }
 
   // Returns files sorted by their path.
   pub fn contents_for_directory(
     &self,
     directory: &bazel_protos::remote_execution::Directory,
-  ) -> BoxFuture<Vec<FileContent>, String> {
+  ) -> impl IFuture<Vec<FileContent>, String> {
     let accumulator = Arc::new(Mutex::new(HashMap::new()));
     self
       .contents_for_directory_helper(directory, PathBuf::new(), accumulator.clone())
@@ -489,7 +493,6 @@ impl Store {
         vec.sort_by(|l, r| l.path.cmp(&r.path));
         vec
       })
-      .to_boxed()
   }
 
   // Assumes that all fingerprints it encounters are valid.
@@ -558,7 +561,7 @@ pub enum EntryType {
 mod local {
   use super::EntryType;
 
-  use boxfuture::{BoxFuture, Boxable};
+  use boxfuture::{BoxFuture, Boxable, IFuture};
   use byteorder::{ByteOrder, LittleEndian};
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
@@ -799,47 +802,43 @@ mod local {
       entry_type: EntryType,
       bytes: Bytes,
       initial_lease: bool,
-    ) -> BoxFuture<Fingerprint, String> {
+    ) -> impl IFuture<Fingerprint, String> {
       let dbs = match entry_type {
         EntryType::Directory => self.inner.directory_dbs.clone(),
         EntryType::File => self.inner.file_dbs.clone(),
       };
 
       let bytestore = self.clone();
-      self
-        .inner
-        .pool
-        .spawn_fn(move || {
-          let fingerprint = {
-            let mut hasher = Sha256::default();
-            hasher.input(&bytes);
-            Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
-          };
+      self.inner.pool.spawn_fn(move || {
+        let fingerprint = {
+          let mut hasher = Sha256::default();
+          hasher.input(&bytes);
+          Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
+        };
 
-          let (env, content_database, lease_database) = dbs.get()?.get(&fingerprint);
-          let put_res = env.begin_rw_txn().and_then(|mut txn| {
-            txn.put(content_database, &fingerprint, &bytes, NO_OVERWRITE)?;
-            if initial_lease {
-              bytestore.lease(
-                &lease_database,
-                &fingerprint,
-                Self::default_lease_until_secs_since_epoch(),
-                &mut txn,
-              )?;
-            }
-            txn.commit()
-          });
-
-          match put_res {
-            Ok(()) => Ok(fingerprint),
-            Err(KeyExist) => Ok(fingerprint),
-            Err(err) => Err(format!(
-              "Error storing fingerprint {}: {}",
-              fingerprint, err
-            )),
+        let (env, content_database, lease_database) = dbs.get()?.get(&fingerprint);
+        let put_res = env.begin_rw_txn().and_then(|mut txn| {
+          txn.put(content_database, &fingerprint, &bytes, NO_OVERWRITE)?;
+          if initial_lease {
+            bytestore.lease(
+              &lease_database,
+              &fingerprint,
+              Self::default_lease_until_secs_since_epoch(),
+              &mut txn,
+            )?;
           }
-        })
-        .to_boxed()
+          txn.commit()
+        });
+
+        match put_res {
+          Ok(()) => Ok(fingerprint),
+          Err(KeyExist) => Ok(fingerprint),
+          Err(err) => Err(format!(
+            "Error storing fingerprint {}: {}",
+            fingerprint, err
+          )),
+        }
+      })
     }
 
     pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
