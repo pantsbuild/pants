@@ -27,7 +27,7 @@ use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;
 
-use boxfuture::{BoxFuture, Boxable};
+use boxfuture::{BoxFuture, Boxable, IFuture};
 pub use node::{EntryId, Node, NodeContext, NodeError, NodeTracer, NodeVisualizer};
 
 type FNV = BuildHasherDefault<FnvHasher>;
@@ -1036,7 +1036,7 @@ impl<N: Node> Graph<N> {
     &self,
     entry_id: EntryId,
     context: &C,
-  ) -> BoxFuture<Vec<Generation>, N::Error>
+  ) -> impl IFuture<Vec<Generation>, N::Error>
   where
     C: NodeContext<Node = N>,
   {
@@ -1059,7 +1059,7 @@ impl<N: Node> Graph<N> {
             .to_boxed()
         })
         .collect::<Vec<_>>(),
-    ).to_boxed()
+    )
   }
 
   ///
