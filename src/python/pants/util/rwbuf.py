@@ -36,7 +36,7 @@ class _RWBuf(object):
 
   def write(self, s):
     if not isinstance(s, bytes):
-      raise ValueError('Argument not in bytes: {0}'.format(s))
+      raise ValueError('Expected bytes, not {}, for argument {}'.format(type(s), s))
     with self._lock:
       self.do_write(s)
       self._io.flush()
