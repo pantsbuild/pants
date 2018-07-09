@@ -71,19 +71,30 @@ class LLVM(NativeTool):
         self._PLATFORM_SPECIFIC_LINKER_NAME),
       library_dirs=[])
 
+  @property
+  def _common_include_dir(self):
+    return os.path.join(self.select(), 'lib/clang/6.0.0/include')
+
   def c_compiler(self):
     return CCompiler(
       path_entries=self.path_entries(),
       exe_filename='clang',
       library_dirs=[],
-      include_dirs=[])
+      include_dirs=[self._common_include_dir])
+
+  @property
+  def _cpp_include_dir(self):
+    return os.path.join(self.select(), 'include/c++/v1')
 
   def cpp_compiler(self):
     return CppCompiler(
       path_entries=self.path_entries(),
       exe_filename='clang++',
       library_dirs=[],
-      include_dirs=[])
+      include_dirs=[
+        self._cpp_include_dir,
+        self._common_include_dir,
+      ])
 
 
 # FIXME(#5663): use this over the XCode linker!

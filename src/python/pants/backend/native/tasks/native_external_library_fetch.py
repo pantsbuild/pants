@@ -9,6 +9,7 @@ import os
 import re
 from distutils.dir_util import copy_tree
 
+from pants.backend.native.config.environment import Platform
 from pants.backend.native.subsystems.conan import Conan
 from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
 from pants.base.exceptions import TaskError
@@ -17,43 +18,18 @@ from pants.task.task import Task
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
-from pants.util.objects import Exactly
+from pants.util.objects import datatype, Exactly
 from pants.util.osutil import get_normalized_os_name
 from pants.util.process_handler import subprocess
 
 
-class ConanRequirement(object):
+class ConanRequirement(datatype(['pkg_spec'])):
   """A wrapper class to encapsulate a Conan package requirement."""
 
-  @staticmethod
-  def _translate_conan_pkg_id_to_directory_path(pkg_string):
-    return pkg_string.replace('@', '/')
-
-  @staticmethod
-  def _build_conan_cmdline_args(pkg_spec, os_name=None):
-    os_name = os_name or get_normalized_os_name()
-    conan_os_opt = None
-    if os_name == 'linux':
-      conan_os_opt = 'Linux'
-    elif os_name == 'darwin':
-      conan_os_opt = 'Macos'
-    else:
-      raise ValueError('Unsupported platform: {}'.format(conan_os_opt))
-    args = ['install', pkg_spec]
-    if conan_os_opt:
-      args.extend(['-s', 'os=' + conan_os_opt])
-    return args
-
-  @classmethod
-  def parse(cls, conan_pkg_spec):
-    directory_path = cls._translate_conan_pkg_id_to_directory_path(conan_pkg_spec)
-    fetch_cmdline_args = cls._build_conan_cmdline_args(conan_pkg_spec)
-    return cls(conan_pkg_spec, directory_path, fetch_cmdline_args)
-
-  def __init__(self, pkg_spec, directory_path, fetch_cmdline_args):
-    self.pkg_spec = pkg_spec
-    self.directory_path = directory_path
-    self.fetch_cmdline_args = fetch_cmdline_args
+  CONAN_OS_NAME = {
+    'darwin': lambda: 'Macos',
+    'linux': lambda: 'Linux',
+  }
 
   def parse_conan_stdout_for_pkg_sha(self, stdout):
     # TODO(cmlivingston): regex this
@@ -62,26 +38,47 @@ class ConanRequirement(object):
     pkg_sha = collected_matches[0].split(':')[1]
     return pkg_sha
 
+  @memoized_property
+  def directory_path(self):
+    return self.pkg_spec.replace('@', '/')
+
+  @memoized_property
+  def fetch_cmdline_args(self):
+    platform = Platform.create()
+    conan_os_name = platform.resolve_platform_specific(self.CONAN_OS_NAME)
+    args = ['install', self.pkg_spec, '-s', 'os={}'.format(conan_os_name)]
+    return args
+
 
 class NativeExternalLibraryFetch(Task):
   options_scope = 'native-external-library-fetch'
   native_library_constraint = Exactly(ExternalNativeLibrary)
+  any_library_filename_regex = re.compile(r"^lib\.(a|so|dylib)$")
 
   class NativeExternalLibraryFetchError(TaskError):
     pass
 
   class NativeExternalLibraryFiles(object):
     def __init__(self):
-      self.include = None
-      self.lib = None
+      self.include_dir = None
+      self.lib_dir = None
       self.lib_names = []
 
     def add_lib_name(self, lib_name):
       self.lib_names.append(lib_name)
 
+    def get_third_party_lib_args(self):
+      lib_args = []
+      if self.lib_names:
+        for lib_name in self.lib_names:
+          lib_args.append('-l{}'.format(lib_name))
+        lib_dir_arg = '-L{}'.format(self.lib_dir)
+        lib_args.append(lib_dir_arg)
+      return lib_args
+
   @staticmethod
   def _parse_lib_name_from_library_filename(filename):
-    match_group = re.match( r"^lib(.*)\.(a|so|dylib)$", filename)
+    match_group = re.match(any_library_filename_regex, filename)
     if match_group:
       return match_group.group(1)
     return None
@@ -94,7 +91,7 @@ class NativeExternalLibraryFetch(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(NativeExternalLibraryFetch, cls).subsystem_dependencies() + (Conan,)
+    return super(NativeExternalLibraryFetch, cls).subsystem_dependencies() + (Conan.scoped(cls),)
 
   @classmethod
   def product_types(cls):
@@ -106,7 +103,7 @@ class NativeExternalLibraryFetch(Task):
 
   @memoized_property
   def _conan_binary(self):
-    return Conan.global_instance().bootstrap_conan()
+    return Conan.scoped_instance(self).bootstrap_conan()
 
   def execute(self):
     task_product = self.context.products.get_data(self.NativeExternalLibraryFiles,
@@ -139,14 +136,34 @@ class NativeExternalLibraryFetch(Task):
     include = os.path.join(results_dir, 'include')
 
     if os.path.exists(lib):
-      task_product.lib = lib
+      task_product.lib_dir = lib
       for filename in os.listdir(lib):
         lib_name = self._parse_lib_name_from_library_filename(filename)
         if lib_name:
           task_product.add_lib_name(lib_name)
 
     if os.path.exists(include):
-      task_product.include = include
+      task_product.include_dir = include
+
+  def _get_conan_data_dir_path_for_package(self, pkg_dir_path, pkg_sha):
+    return os.path.join(self.workdir,
+                        '.conan',
+                        'data',
+                        pkg_dir_path,
+                        'package',
+                        pkg_sha)
+
+  def _remove_conan_center_remote_cmdline(self, conan_binary):
+    return conan_binary.pex.cmdline(['remote',
+                                     'remove',
+                                     'conan-center'])
+
+  def _add_pants_conan_remote_cmdline(self, conan_binary, remote_index_num, remote_url):
+    return conan_binary.pex.cmdline(['remote',
+                                      'add',
+                                      'pants-conan-remote-' + str(remote_index_num),
+                                      remote_url,
+                                      '--insert'])
 
   def ensure_conan_remote_configuration(self, conan_binary):
     """
@@ -157,9 +174,7 @@ class NativeExternalLibraryFetch(Task):
     """
 
     # Delete the conan-center remote from conan's registry.
-    remove_conan_center_remote_cmdline = conan_binary.pex.cmdline(['remote',
-                                                                   'remove',
-                                                                   'conan-center'])
+    remove_conan_center_remote_cmdline = self._remove_conan_center_remote_cmdline(conan_binary)
     try:
       stdout = subprocess.check_output(remove_conan_center_remote_cmdline.split())
       self.context.log.debug(stdout)
@@ -173,11 +188,9 @@ class NativeExternalLibraryFetch(Task):
       index_num += 1
       # NB: --insert prepends a remote to conan's remote list. We reverse the options remote
       # list to maintain a sensible default for conan emote search order.
-      add_pants_conan_remote_cmdline = conan_binary.pex.cmdline(['remote',
-                                                                 'add',
-                                                                 'pants-conan-remote-' + str(index_num),
-                                                                 remote_url,
-                                                                 '--insert'])
+      add_pants_conan_remote_cmdline = self._add_pants_conan_remote_cmdline(conan_binary,
+                                                                            index_num,
+                                                                            remote_url)
       try:
         stdout = subprocess.check_output(add_pants_conan_remote_cmdline.split())
         self.context.log.debug(stdout)
@@ -187,18 +200,14 @@ class NativeExternalLibraryFetch(Task):
 
   def _copy_package_contents_from_conan_dir(self, results_dir, conan_requirement, pkg_sha):
     """
-    Copy the contents of the fetched pacakge into the results directory of the versioned
+    Copy the contents of the fetched package into the results directory of the versioned
     target from the conan data directory.
 
     :param results_dir: A results directory to copy conan package contents to.
     :param conan_requirement: The `ConanRequirement` object that produced the package sha.
     :param pkg_sha: The sha of the local conan package corresponding to the specification.
     """
-    src = os.path.join(os.path.join(self.workdir, '.conan'),
-                       'data',
-                       conan_requirement.directory_path,
-                       'package',
-                       pkg_sha)
+    src = self._get_conan_data_dir_path_for_package(conan_requirement.directory_path, pkg_sha)
     src_lib = os.path.join(src, 'lib')
     src_include = os.path.join(src, 'include')
     dest_lib = os.path.join(results_dir, 'lib')
@@ -225,7 +234,7 @@ class NativeExternalLibraryFetch(Task):
     with environment_as(CONAN_USER_HOME=self.workdir):
       for pkg_spec in vt.target.packages:
 
-        conan_requirement = ConanRequirement.parse(pkg_spec)
+        conan_requirement = ConanRequirement(pkg_spec=pkg_spec)
 
         # Prepare conan command line and ensure remote is configured properly.
         self.ensure_conan_remote_configuration(self._conan_binary)

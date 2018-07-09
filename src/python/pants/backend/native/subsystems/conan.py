@@ -19,58 +19,46 @@ from pants.backend.python.tasks.wrapped_pex import WrappedPEX
 from pants.base.build_environment import get_pants_cachedir
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_concurrent_creation
+from pants.util.objects import datatype
 
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class Conan(Subsystem):
   """Pex binary for the conan package manager."""
   options_scope = 'conan'
+  default_conan_requirements = (
+    'conan==1.4.4',
+    'PyJWT>=1.4.0, <2.0.0',
+    'requests>=2.7.0, <3.0.0',
+    'colorama>=0.3.3, <0.4.0',
+    'PyYAML>=3.11, <3.13.0',
+    'patch==1.16',
+    'fasteners>=0.14.1',
+    'six>=1.10.0',
+    'node-semver==0.2.0',
+    'distro>=1.0.2, <1.2.0',
+    'pylint>=1.8.1, <1.9.0',
+    'future==0.16.0',
+    'pygments>=2.0, <3.0',
+    'astroid>=1.6, <1.7',
+    'deprecation>=2.0, <2.1'
+  )
 
-  @staticmethod
-  def default_conan_requirements():
-    return (
-      'conan==1.4.4',
-      'PyJWT>=1.4.0, <2.0.0',
-      'requests>=2.7.0, <3.0.0',
-      'colorama>=0.3.3, <0.4.0',
-      'PyYAML>=3.11, <3.13.0',
-      'patch==1.16',
-      'fasteners>=0.14.1',
-      'six>=1.10.0',
-      'node-semver==0.2.0',
-      'distro>=1.0.2, <1.2.0',
-      'pylint>=1.8.1, <1.9.0',
-      'future==0.16.0',
-      'pygments>=2.0, <3.0',
-      'astroid>=1.6, <1.7',
-      'deprecation>=2.0, <2.1'
-    )
+  @classmethod
+  def implementation_version(cls):
+    return super(Conan, cls).implementation_version() + [('Conan', 0)]
 
   @classmethod
   def register_options(cls, register):
     super(Conan, cls).register_options(register)
-    register('--conan-requirements', type=list, default=cls.default_conan_requirements(),
-             advanced=True, help='The requirements used to build to conan client pex.')
+    register('--conan-requirements', type=list, default=cls.default_conan_requirements,
+             advanced=True, help='The requirements used to build the conan client pex.')
 
-  class ConanBinary(object):
+  class ConanBinary(datatype(['pex'])):
     """A `conan` PEX binary."""
-
-    def __init__(self, pex):
-      self._pex = pex
-
-    @property
-    def pex(self):
-      """Return the conan binary PEX.
-
-      :rtype: :class:`pex.pex.PEX`
-      """
-      return self._pex
-
-  @classmethod
-  def implementation_version(cls):
-    return super(Conan, cls).implementation_version() + [('Conan', 1)]
+    pass
 
   def bootstrap_conan(self):
     pex_info = PexInfo.default()
@@ -80,12 +68,12 @@ class Conan(Subsystem):
     interpreter = PythonInterpreter.get()
     if os.path.exists(conan_pex_path):
       conan_binary = WrappedPEX(PEX(conan_pex_path, interpreter), interpreter)
-      return self.ConanBinary(conan_binary)
+      return self.ConanBinary(pex=conan_binary)
     else:  
       with safe_concurrent_creation(conan_pex_path) as safe_path:
         builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
         reqs = [PythonRequirement(req) for req in self.get_options().conan_requirements]
-        dump_requirements(builder, interpreter, reqs, log)
+        dump_requirements(builder, interpreter, reqs, logger)
         builder.freeze()
       conan_binary = WrappedPEX(PEX(conan_pex_path, interpreter), interpreter)
-      return self.ConanBinary(conan_binary)
+      return self.ConanBinary(pex=conan_binary)

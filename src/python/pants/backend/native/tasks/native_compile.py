@@ -55,7 +55,6 @@ class NativeCompile(NativeTask, AbstractClass):
   # `NativeCompile` will use `workunit_label` as the name of the workunit when executing the
   # compiler process. `workunit_label` must be set to a string.
   workunit_label = None
-  workunit_name = 'native-compile'
 
   @classmethod
   def product_types(cls):
@@ -190,7 +189,7 @@ class NativeCompile(NativeTask, AbstractClass):
     return self.get_compiler()
 
   def _get_third_party_include_dirs(self, external_libs_product):
-    directory = external_libs_product.include
+    directory = external_libs_product.include_dir
     return [directory] if directory else []
 
   def _make_compile_request(self, versioned_target, dependencies, external_libs_product):
@@ -279,7 +278,7 @@ class NativeCompile(NativeTask, AbstractClass):
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.NativeCompileError(
           "Error in '{section_name}' with command {cmd} for request {req}. Exit code was: {rc}."
-          .format(section_name=self.workunit_name, cmd=argv, req=compile_request, rc=rc))
+          .format(section_name=self.workunit_label, cmd=argv, req=compile_request, rc=rc))
 
   def collect_cached_objects(self, versioned_target):
     """Scan `versioned_target`'s results directory and return the output files from that directory.

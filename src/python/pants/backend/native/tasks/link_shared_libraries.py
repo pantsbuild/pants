@@ -150,15 +150,6 @@ class LinkSharedLibraries(NativeTask):
   def _get_shared_lib_cmdline_args(self, platform):
     return platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
 
-  def _get_third_party_lib_args(self, external_libs_product):
-    lib_args = []
-    if external_libs_product.lib_names:
-      for lib_name in external_libs_product.lib_names:
-        lib_args.append('-l{}'.format(lib_name))
-      lib_dir_arg = '-L{}'.format(external_libs_product.lib)
-      lib_args.append(lib_dir_arg)
-    return lib_args
-
   def _execute_link_request(self, link_request):
     object_files = link_request.object_files
 
@@ -174,7 +165,7 @@ class LinkSharedLibraries(NativeTask):
     # We are executing in the results_dir, so get absolute paths for everything.
     cmd = ([linker.exe_filename] +
            self._get_shared_lib_cmdline_args(platform) +
-           self._get_third_party_lib_args(link_request.external_libs_info) +
+           link_request.external_libs_info.get_third_party_lib_args() +
            ['-o', os.path.abspath(resulting_shared_lib_path)] +
            [os.path.abspath(obj) for obj in object_files])
 

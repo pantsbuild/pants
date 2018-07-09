@@ -27,7 +27,7 @@ def build_file_aliases():
     targets={
       CLibrary.alias(): CLibrary,
       CppLibrary.alias(): CppLibrary,
-      ExternalNativeLibrary.alias(): ExternalNativeLibrary
+      ExternalNativeLibrary.alias(): ExternalNativeLibrary,
     },
     objects={
       NativeArtifact.alias(): NativeArtifact,

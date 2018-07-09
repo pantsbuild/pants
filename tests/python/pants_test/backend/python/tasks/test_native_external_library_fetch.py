@@ -35,7 +35,7 @@ class TestConanRequirement(unittest.TestCase):
     )
     pkg_spec = 'rang/3.1.0@rang/stable'
     expected_sha = '5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9'
-    cr = ConanRequirement.parse(pkg_spec)
+    cr = ConanRequirement(pkg_spec=pkg_spec)
     sha1 = cr.parse_conan_stdout_for_pkg_sha(tc_1)
     self.assertEqual(sha1, expected_sha)
     sha2 = cr.parse_conan_stdout_for_pkg_sha(tc_2)
@@ -43,8 +43,7 @@ class TestConanRequirement(unittest.TestCase):
 
   def test_build_conan_cmdline_args(self):
     pkg_spec = 'test/1.0.0@conan/stable'
-    cr = ConanRequirement.parse(pkg_spec)
-    cmdline = cr._build_conan_cmdline_args(pkg_spec)
+    cr = ConanRequirement(pkg_spec=pkg_spec)
     os_name = get_normalized_os_name()
     if os_name == 'linux':
       expected = ['install', 'test/1.0.0@conan/stable', '-s', 'os=Linux']
@@ -52,7 +51,7 @@ class TestConanRequirement(unittest.TestCase):
       expected = ['install', 'test/1.0.0@conan/stable', '-s', 'os=Macos']
     else:
       expected = 'Unsupported platform'
-    self.assertEqual(cmdline, expected)
+    self.assertEqual(cr.fetch_cmdline_args, expected)
 
 
 class TestNativeExternalLibraryFetch(unittest.TestCase):
