@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from abc import abstractproperty
+from builtins import object
 
 from pants.engine.rules import SingletonRule
 from pants.util.objects import datatype
