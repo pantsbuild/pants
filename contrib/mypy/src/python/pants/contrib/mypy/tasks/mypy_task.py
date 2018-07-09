@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
+from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -18,7 +19,6 @@ from pants.backend.python.tasks.wrapped_pex import WrappedPEX
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_file_path
 from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
@@ -58,7 +58,7 @@ class MypyTask(ResolveRequirementsTaskBase):
 
   @staticmethod
   def is_python_target(target):
-    return isinstance(target, (PythonTarget,))
+    return isinstance(target, PythonTarget)
 
   def _calculate_python_sources(self, targets):
     """Generate a set of source files from the given targets."""

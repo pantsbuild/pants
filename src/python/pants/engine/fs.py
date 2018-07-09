@@ -115,6 +115,10 @@ class Snapshot(datatype([('directory_digest', DirectoryDigest), ('path_stats', t
     return [p.stat for p in self.files]
 
 
+class DirectoryToMaterialize(datatype([('path', str), ('directory_digest', DirectoryDigest)])):
+  """A request to materialize the contents of a directory digest at the provided path."""
+  pass
+
 FilesContent = Collection.of(FileContent)
 
 

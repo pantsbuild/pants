@@ -186,7 +186,7 @@ class JvmDependencyUsage(Task):
         try:
           with open(self.nodes_json(vt.results_dir)) as fp:
             return Node.from_cacheable_dict(json.load(fp),
-                                            lambda spec: self.context.resolve(spec).__iter__().next())
+                                            lambda spec: next(self.context.resolve(spec).__iter__()))
         except Exception:
           self.context.log.warn("Can't deserialize json for target {}".format(target))
           return Node(target.concrete_derived_from)

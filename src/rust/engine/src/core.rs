@@ -37,7 +37,7 @@ impl Variants {
     Variants(result)
   }
 
-  pub fn find(&self, key: &String) -> Option<&str> {
+  pub fn find(&self, key: &str) -> Option<&str> {
     self
       .0
       .iter()
@@ -137,6 +137,14 @@ impl Value {
   }
 }
 
+impl PartialEq for Value {
+  fn eq(&self, other: &Value) -> bool {
+    externs::equals(self, other)
+  }
+}
+
+impl Eq for Value {}
+
 ///
 /// Implemented by calling back to python to clone the underlying Handle.
 ///
@@ -152,7 +160,7 @@ impl fmt::Debug for Value {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Failure {
   /// A Node failed because a filesystem change invalidated it or its inputs.
   /// A root requestor should usually immediately retry their request.
@@ -165,7 +173,7 @@ pub enum Failure {
 
 // NB: enum members are listed in ascending priority order based on how likely they are
 // to be useful to users.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Noop {
   NoTask,
   NoVariant,

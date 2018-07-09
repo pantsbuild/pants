@@ -3,17 +3,17 @@
 
 use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
-use futures::Future;
 use futures::future::{self, join_all};
+use futures::Future;
 use hashing::{Digest, Fingerprint};
 use indexmap::{self, IndexMap};
 use itertools::Itertools;
-use {File, PathStat, PosixFS, Store};
 use protobuf;
 use std::ffi::OsString;
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::Arc;
+use {File, PathStat, PosixFS, Store};
 
 pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
   0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
@@ -45,7 +45,7 @@ impl Snapshot {
   ) -> BoxFuture<Snapshot, String> {
     let mut sorted_path_stats = path_stats.clone();
     sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, sorted_path_stats)
+    Snapshot::ingest_directory_from_sorted_path_stats(store, &file_digester, &sorted_path_stats)
       .map(|digest| Snapshot { digest, path_stats })
       .to_boxed()
   }
@@ -56,11 +56,11 @@ impl Snapshot {
   >(
     store: Store,
     file_digester: S,
-    path_stats: Vec<PathStat>,
+    path_stats: &[PathStat],
   ) -> BoxFuture<Digest, String> {
-    let mut sorted_path_stats = path_stats.clone();
+    let mut sorted_path_stats = path_stats.to_owned();
     sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, sorted_path_stats)
+    Snapshot::ingest_directory_from_sorted_path_stats(store, &file_digester, &sorted_path_stats)
   }
 
   fn ingest_directory_from_sorted_path_stats<
@@ -68,8 +68,8 @@ impl Snapshot {
     Error: fmt::Debug + 'static + Send,
   >(
     store: Store,
-    file_digester: S,
-    path_stats: Vec<PathStat>,
+    file_digester: &S,
+    path_stats: &[PathStat],
   ) -> BoxFuture<Digest, String> {
     let mut file_futures: Vec<BoxFuture<bazel_protos::remote_execution::FileNode, String>> =
       Vec::new();
@@ -82,7 +82,7 @@ impl Snapshot {
       .group_by(|s| s.path().components().next().unwrap().as_os_str().to_owned())
     {
       let mut path_group: Vec<PathStat> = group.collect();
-      if path_group.len() == 1 && path_group.get(0).unwrap().path().components().count() == 1 {
+      if path_group.len() == 1 && path_group[0].path().components().count() == 1 {
         // Exactly one entry with exactly one component indicates either a file in this directory,
         // or an empty directory.
         // If the child is a non-empty directory, or a file therein, there must be multiple
@@ -127,8 +127,8 @@ impl Snapshot {
           // TODO: Memoize this in the graph
           Snapshot::ingest_directory_from_sorted_path_stats(
             store.clone(),
-            file_digester.clone(),
-            paths_of_child_dir(path_group),
+            file_digester,
+            &paths_of_child_dir(path_group),
           ).and_then(move |digest| {
             let mut dir_node = bazel_protos::remote_execution::DirectoryNode::new();
             dir_node.set_name(osstring_as_utf8(first_component)?);
@@ -163,11 +163,7 @@ impl Snapshot {
     // `Directory` structure. Only `Dir+Dir` collisions are legal.
     let path_stats = {
       let mut uniq_paths: IndexMap<PathBuf, PathStat> = IndexMap::new();
-      for path_stat in snapshots
-        .iter()
-        .map(|s| s.path_stats.iter().cloned())
-        .flatten()
-      {
+      for path_stat in Itertools::flatten(snapshots.iter().map(|s| s.path_stats.iter().cloned())) {
         match uniq_paths.entry(path_stat.path().to_owned()) {
           indexmap::map::Entry::Occupied(e) => match (&path_stat, e.get()) {
             (&PathStat::Dir { .. }, &PathStat::Dir { .. }) => (),
@@ -223,11 +219,11 @@ impl Snapshot {
 
         // Merge FileNodes.
         out_dir.set_files(protobuf::RepeatedField::from_vec(
-          directories
-            .iter_mut()
-            .map(|directory| directory.take_files().into_iter())
-            .flatten()
-            .collect(),
+          Itertools::flatten(
+            directories
+              .iter_mut()
+              .map(|directory| directory.take_files().into_iter()),
+          ).collect(),
         ));
         out_dir.mut_files().sort_by(|a, b| a.name.cmp(&b.name));
         let unique_count = out_dir
@@ -253,11 +249,11 @@ impl Snapshot {
 
         // Group and recurse for DirectoryNodes.
         let sorted_child_directories = {
-          let mut merged_directories = directories
-            .iter_mut()
-            .map(|directory| directory.take_directories().into_iter())
-            .flatten()
-            .collect::<Vec<_>>();
+          let mut merged_directories = Itertools::flatten(
+            directories
+              .iter_mut()
+              .map(|directory| directory.take_directories().into_iter()),
+          ).collect::<Vec<_>>();
           merged_directories.sort_by(|a, b| a.name.cmp(&b.name));
           merged_directories
         };
@@ -286,7 +282,7 @@ impl Snapshot {
           out_dir.set_directories(protobuf::RepeatedField::from_vec(child_directories));
           store.record_directory(&out_dir, true)
         })
-          .to_boxed() as BoxFuture<_, _>
+          .to_boxed()
       })
       .to_boxed()
   }
@@ -368,16 +364,16 @@ impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
 #[cfg(test)]
 mod tests {
   extern crate tempfile;
-  extern crate testutil;
-
   use futures::future::Future;
   use hashing::{Digest, Fingerprint};
-  use self::testutil::make_file;
-  use self::testutil::data::TestDirectory;
+  use testutil::data::TestDirectory;
+  use testutil::make_file;
 
+  use super::super::{
+    Dir, File, GlobMatching, Path, PathGlobs, PathStat, PosixFS, ResettablePool, Snapshot, Store,
+    StrictGlobMatching,
+  };
   use super::OneOffStoreFileByDigest;
-  use super::super::{Dir, File, GlobMatching, Path, PathGlobs, PathStat, PosixFS, ResettablePool,
-                     Snapshot, Store, StrictGlobMatching, VFS};
 
   use std;
   use std::path::PathBuf;
@@ -401,7 +397,7 @@ mod tests {
       pool.clone(),
     ).unwrap();
     let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();
-    let posix_fs = Arc::new(PosixFS::new(dir.path(), pool, vec![]).unwrap());
+    let posix_fs = Arc::new(PosixFS::new(dir.path(), pool, &[]).unwrap());
     let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone());
     (store, dir, posix_fs, file_saver)
   }

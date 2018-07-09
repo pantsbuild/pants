@@ -12,7 +12,6 @@ from pants.base.payload import Payload
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.build_graph.target import Target
-from pants.invalidation.build_invalidator import CacheKey
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdtemp
 from pants_test.task_test_base import TaskTestBase, ensure_cached
@@ -210,9 +209,11 @@ class SimpleCodegenTaskTest(TaskTestBase):
       for target in targets:
         target_workdir = target_workdirs[target]
         task.execute_codegen(target, target_workdir)
-        task._handle_duplicate_sources(target, target_workdir)
-        fingerprint = CacheKey("test", target.invalidation_hash())
-        syn_targets.append(task._inject_synthetic_target(target, target_workdir, fingerprint))
+        sources = task._capture_sources(((target, target_workdir),))[0]
+        task._handle_duplicate_sources(target, target_workdir, sources)
+        # _handle_duplicate_sources may delete files from the filesystem, so we need to re-capture.
+        sources = task._capture_sources(((target, target_workdir),))[0]
+        syn_targets.append(task._inject_synthetic_target(target, target_workdir, sources))
 
     if should_fail:
       # If we're expected to fail, validate the resulting message.
@@ -241,7 +242,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
     parent, good, bad = self._do_test_duplication(targets, allow_dups=True, should_fail=False)
     # Confirm that the duped sources were removed.
     for source in bad.sources_relative_to_source_root():
-      self.assertNotIn(source, parent.sources_relative_to_source_root())
+      self.assertNotIn(source, tuple(parent.sources_relative_to_source_root()))
 
   def test_duplicated_code_generation_nodupes(self):
     # Without the duplicated target, either mode is fine.

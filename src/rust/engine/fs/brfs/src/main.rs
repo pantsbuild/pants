@@ -10,12 +10,16 @@ extern crate libc;
 #[macro_use]
 extern crate log;
 extern crate protobuf;
+#[cfg(test)]
+extern crate tempfile;
+#[cfg(test)]
+extern crate testutil;
 extern crate time;
 
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
-use std::collections::HashMap;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
+use std::collections::HashMap;
 use std::ffi::{CString, OsStr, OsString};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -655,12 +659,14 @@ mod test {
   extern crate tempfile;
   extern crate testutil;
 
+  use super::mount;
   use fs;
   use futures::future::Future;
   use hashing;
   use std::sync::Arc;
-  use super::mount;
-  use self::testutil::{file, data::{TestData, TestDirectory}};
+  use testutil::{
+    data::{TestData, TestDirectory}, file,
+  };
 
   #[test]
   fn missing_digest() {
@@ -895,19 +901,16 @@ mod test {
 // acts as we expect.
 #[cfg(test)]
 mod syscall_tests {
-  extern crate tempfile;
-  extern crate testutil;
-
+  use super::mount;
+  use super::test::digest_to_filepath;
   use fs;
   use futures::Future;
   use libc;
-  use std::sync::Arc;
-  use super::mount;
-  use super::test::digest_to_filepath;
-  use self::testutil::data::TestData;
   use std::ffi::CString;
   use std::path::Path;
+  use std::sync::Arc;
   use test::make_dirs;
+  use testutil::data::TestData;
 
   #[test]
   fn read_file_by_digest_exact_bytes() {

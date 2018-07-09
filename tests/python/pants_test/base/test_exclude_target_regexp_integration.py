@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from builtins import object, zip
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot

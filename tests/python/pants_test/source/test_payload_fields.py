@@ -5,8 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.base.project_tree import File
+from pants.engine.fs import DirectoryDigest, Path, Snapshot
 from pants.source.payload_fields import SourcesField
-from pants.source.wrapped_globs import EagerFilesetWithSpec, Globs, LazyFilesetWithSpec
+from pants.source.wrapped_globs import Globs, LazyFilesetWithSpec
 from pants_test.test_base import TestBase
 
 
@@ -69,16 +71,22 @@ class PayloadTest(TestBase):
     self.assertEqual(['foo/a.txt'], list(sf.source_paths))
 
   def test_passes_eager_fileset_with_spec_through(self):
-    self.create_file('foo/a.txt', 'a_contents')
+    self.create_file('foo/foo/a.txt', 'a_contents')
 
-    fileset = EagerFilesetWithSpec(rel_root='foo',
-                                   # Glob spec is relative to build root
-                                   filespec={'globs': ['foo/foo/a.txt']},
-                                   # files are relative to `rel_root`
-                                   files=['foo/a.txt'],
-                                   files_hash={'foo/a.txt': b'12345'})
+    fileset = self.sources_for(['foo/a.txt'], 'foo')
+
     sf = SourcesField(sources=fileset)
 
     self.assertIs(fileset, sf.sources)
     self.assertEqual(['foo/a.txt'], list(sf.source_paths))
     self.assertEqual(['foo/foo/a.txt'], list(sf.relative_to_buildroot()))
+
+    digest = str('56001a7e48555f156420099a99da60a7a83acc90853046709341bf9f00a6f944')
+    want_snapshot = Snapshot(
+      DirectoryDigest(digest, 77),
+      (Path('foo/foo/a.txt', stat=File('foo/foo/a.txt')),)
+    )
+
+    # We explicitly pass a None scheduler because we expect no scheduler lookups to be required
+    # in order to get a Snapshot.
+    self.assertEqual(sf.snapshot(scheduler=None), want_snapshot)

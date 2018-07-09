@@ -3,18 +3,18 @@
 
 use std::collections::{HashMap, HashSet};
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use futures::future::{self, Future};
 use futures::sync::oneshot;
 
 use boxfuture::{BoxFuture, Boxable};
-use context::{Context, ContextFactory, Core};
-use core::{Failure, Key, TypeConstraint, TypeId, Value};
+use context::{Context, Core};
+use core::{Failure, Key, TypeConstraint, TypeId, Value, Variants};
 use fs::{self, GlobMatching, PosixFS};
-use graph::EntryId;
-use nodes::{NodeKey, Select};
+use graph::{EntryId, Graph, Node, NodeContext};
+use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
 use rule_graph;
 use selectors;
 
@@ -85,13 +85,17 @@ impl Scheduler {
   }
 
   pub fn visualize(&self, session: &Session, path: &Path) -> io::Result<()> {
-    self.core.graph.visualize(&session.root_nodes(), path)
+    self
+      .core
+      .graph
+      .visualize(Visualizer::default(), &session.root_nodes(), path)
   }
 
-  pub fn trace(&self, request: &ExecutionRequest, path: &Path) -> io::Result<()> {
-    for root in request.root_nodes() {
-      self.core.graph.trace(&root, path)?;
-    }
+  pub fn trace(&self, request: &ExecutionRequest, path: &Path) -> Result<(), String> {
+    self
+      .core
+      .graph
+      .trace::<Tracer>(&request.root_nodes(), path)?;
     Ok(())
   }
 
@@ -103,23 +107,23 @@ impl Scheduler {
   ) -> Result<(), String> {
     let edges = self.find_root_edges_or_update_rule_graph(
       subject.type_id().clone(),
-      selectors::Select::without_variant(product),
+      &selectors::Select::without_variant(product),
     )?;
     request
       .roots
-      .push(Select::new(product, subject, Default::default(), &edges));
+      .push(Select::new(product, subject, Variants::default(), &edges));
     Ok(())
   }
 
   fn find_root_edges_or_update_rule_graph(
     &self,
     subject_type: TypeId,
-    select: selectors::Select,
+    select: &selectors::Select,
   ) -> Result<rule_graph::RuleEdges, String> {
     self
       .core
       .rule_graph
-      .find_root_edges(subject_type.clone(), select.clone())
+      .find_root_edges(subject_type, select.clone())
       .ok_or_else(|| {
         format!(
           "No installed rules can satisfy {} for a root subject of type {}.",
@@ -127,6 +131,33 @@ impl Scheduler {
           rule_graph::type_str(subject_type)
         )
       })
+  }
+
+  ///
+  /// Invalidate the invalidation roots represented by the given Paths.
+  ///
+  pub fn invalidate(&self, paths: &HashSet<PathBuf>) -> usize {
+    let invalidation_result = self.core.graph.invalidate_from_roots(move |node| {
+      if let Some(fs_subject) = node.fs_subject() {
+        paths.contains(fs_subject)
+      } else {
+        false
+      }
+    });
+    // TODO: Expose.
+    invalidation_result.cleared + invalidation_result.dirtied
+  }
+
+  ///
+  /// Invalidate all filesystem dependencies in the graph.
+  ///
+  pub fn invalidate_all_paths(&self) -> usize {
+    let invalidation_result = self
+      .core
+      .graph
+      .invalidate_from_roots(|node| node.fs_subject().is_some());
+    // TODO: Expose.
+    invalidation_result.cleared + invalidation_result.dirtied
   }
 
   ///
@@ -155,20 +186,21 @@ impl Scheduler {
   /// give up.
   ///
   fn execute_helper(
-    core: Arc<Core>,
+    context: RootContext,
     roots: Vec<Root>,
     count: usize,
   ) -> BoxFuture<Vec<Result<Value, Failure>>, ()> {
-    let executor = core.runtime.get().executor();
+    let executor = context.core.runtime.get().executor();
     // Attempt all roots in parallel, failing fast to retry for `Invalidated`.
     let roots_res = future::join_all(
       roots
         .clone()
         .into_iter()
         .map(|root| {
-          core
+          context
+            .core
             .graph
-            .create(root.clone(), &core)
+            .create(root.clone().into(), &context)
             .then::<_, Result<Result<Value, Failure>, Failure>>(move |r| {
               match r {
                 Err(Failure::Invalidated) if count > 0 => {
@@ -180,7 +212,11 @@ impl Scheduler {
                   // out of retries) recover to complete the join, which will cause the results to
                   // propagate to the user.
                   debug!("Root {} completed.", NodeKey::Select(root).format());
-                  Ok(other)
+                  Ok(other.map(|res| {
+                    res
+                      .try_into()
+                      .unwrap_or_else(|_| panic!("A Node implementation was ambiguous."))
+                  }))
                 }
               }
             })
@@ -191,7 +227,7 @@ impl Scheduler {
     // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry
     // the entire set of roots.
     oneshot::spawn(
-      roots_res.or_else(move |_| Scheduler::execute_helper(core, roots, count - 1)),
+      roots_res.or_else(move |_| Scheduler::execute_helper(context, roots, count - 1)),
       &executor,
     ).to_boxed()
   }
@@ -211,7 +247,10 @@ impl Scheduler {
 
     // Wait for all roots to complete. Failure here should be impossible, because each
     // individual Future in the join was (eventually) mapped into success.
-    let results = Scheduler::execute_helper(self.core.clone(), request.roots.clone(), 8)
+    let context = RootContext {
+      core: self.core.clone(),
+    };
+    let results = Scheduler::execute_helper(context, request.roots.clone(), 8)
       .wait()
       .expect("Execution failed.");
 
@@ -237,7 +276,7 @@ impl Scheduler {
     let posix_fs = Arc::new(try_future!(PosixFS::new(
       root_path,
       self.core.fs_pool.clone(),
-      vec![]
+      &[]
     )));
     let store = self.core.store.clone();
 
@@ -270,8 +309,31 @@ type Root = Select;
 
 pub type RootResult = Result<Value, Failure>;
 
-impl ContextFactory for Arc<Core> {
-  fn create(&self, entry_id: EntryId) -> Context {
-    Context::new(entry_id, self.clone())
+///
+/// NB: This basic wrapper exists to allow us to implement the `NodeContext` trait (which lives
+/// outside of this crate) for the `Arc` struct (which also lives outside our crate), which is not
+/// possible without the wrapper due to "trait coherence".
+///
+#[derive(Clone)]
+struct RootContext {
+  core: Arc<Core>,
+}
+
+impl NodeContext for RootContext {
+  type Node = NodeKey;
+
+  fn clone_for(&self, entry_id: EntryId) -> Context {
+    Context::new(entry_id, self.core.clone())
+  }
+
+  fn graph(&self) -> &Graph<NodeKey> {
+    &self.core.graph
+  }
+
+  fn spawn<F>(&self, future: F)
+  where
+    F: Future<Item = (), Error = ()> + Send + 'static,
+  {
+    self.core.runtime.get().executor().spawn(future);
   }
 }

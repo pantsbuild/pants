@@ -6,13 +6,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use boxfuture::{BoxFuture, Boxable};
-use futures::Future;
 use futures::future;
+use futures::Future;
 use glob::Pattern;
-use indexmap::{IndexMap, IndexSet, map::Entry::Occupied};
+use indexmap::{map::Entry::Occupied, IndexMap, IndexSet};
 
-use {Dir, GitignoreStyleExcludes, GlobParsedSource, GlobSource, GlobWithSource, Link, PathGlob,
-     PathGlobs, PathStat, Stat, VFS};
+use {
+  Dir, GitignoreStyleExcludes, GlobParsedSource, GlobSource, GlobWithSource, Link, PathGlob,
+  PathGlobs, PathStat, Stat, VFS,
+};
 
 pub trait GlobMatching<E: Send + Sync + 'static>: VFS<E> {
   ///
@@ -245,7 +247,7 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
         // reverse order of expansion (using .rev()), we ensure that we have already visited every
         // "child" glob of the glob we are operating on while iterating. This is a reverse
         // "topological ordering" which preserves the partial order from parent to child globs.
-        let all_globs: Vec<PathGlob> = completed.keys().rev().map(|pg| pg.clone()).collect();
+        let all_globs: Vec<PathGlob> = completed.keys().rev().cloned().collect();
         for cur_glob in all_globs {
           // Note that we talk of "parents" and "childen", but this structure is actually a DAG,
           // because different `DirWildcard`s can potentially expand (transitively) to the same

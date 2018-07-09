@@ -273,12 +273,12 @@ For debugging, append JVM args to turn on the debugger for the appropriate tool 
 
 Note that most tools run under nailgun by default. The easiest way to
 debug them is to disable nailgun by specifying the command line option
-`--no-use-nailgun` or setting `use_nailgun: False` in the specific tool section or in the
-`[DEFAULT]` section of `pants.ini`.
+`--execution-strategy=subprocess` or setting `execution_strategy: subprocess` in the specific tool
+section or in the `[DEFAULT]` section of `pants.ini`.
 
     :::ini
     [DEFAULT]
-    use_nailgun: False
+    execution_strategy: subprocess
 
 ###JVM Tool Development Tips
 

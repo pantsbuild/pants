@@ -209,7 +209,8 @@ Scheduler* scheduler_create(Tasks*,
                             uint64_t,
                             uint64_t,
                             uint64_t,
-                            uint64_t);
+                            uint64_t,
+                            _Bool);
 void scheduler_pre_fork(Scheduler*);
 Value scheduler_metrics(Scheduler*, Session*);
 RawNodes* scheduler_execute(Scheduler*, Session*, ExecutionRequest*);
@@ -223,6 +224,7 @@ void execution_request_destroy(ExecutionRequest*);
 
 uint64_t graph_len(Scheduler*);
 uint64_t graph_invalidate(Scheduler*, BufferBuffer);
+uint64_t graph_invalidate_all_paths(Scheduler*);
 PyResult graph_visualize(Scheduler*, Session*, char*);
 void graph_trace(Scheduler*, ExecutionRequest*, char*);
 
@@ -231,6 +233,8 @@ PyResult  execution_add_root_select(Scheduler*, ExecutionRequest*, Key, TypeCons
 PyResult capture_snapshots(Scheduler*, Value);
 
 PyResult merge_directories(Scheduler*, Value);
+
+PyResult materialize_directories(Scheduler*, Value);
 
 Value validator_run(Scheduler*);
 
@@ -793,6 +797,7 @@ class Native(object):
         execution_options.remote_store_chunk_bytes,
         execution_options.remote_store_chunk_upload_timeout_seconds,
         execution_options.process_execution_parallelism,
+        execution_options.process_execution_cleanup_local_dirs
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)
 

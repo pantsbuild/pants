@@ -9,14 +9,13 @@ import os
 from abc import abstractmethod
 from collections import defaultdict
 
-from pants.backend.native.config.environment import Executable
+from pants.backend.native.config.environment import Executable, Platform
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFetch
 from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.dependency_context import DependencyContext
-from pants.util.contextutil import get_joined_path
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import SubclassesOf, datatype
@@ -219,7 +218,9 @@ class NativeCompile(NativeTask, AbstractClass):
     compiler = compile_request.compiler
     err_flags = ['-Werror'] if compile_request.fatal_warnings else []
 
-    platform_specific_flags = compiler.platform.resolve_platform_specific({
+    platform = Platform.create()
+
+    platform_specific_flags = platform.resolve_platform_specific({
       'linux': lambda: [],
       'darwin': lambda: ['-mmacosx-version-min=10.11'],
     })
@@ -256,6 +257,8 @@ class NativeCompile(NativeTask, AbstractClass):
 
     argv = self._make_compile_argv(compile_request)
 
+    platform = Platform.create()
+
     with self.context.new_workunit(
         name=self.workunit_label, labels=[WorkUnitLabel.COMPILER]) as workunit:
       try:
@@ -264,7 +267,7 @@ class NativeCompile(NativeTask, AbstractClass):
           cwd=output_dir,
           stdout=workunit.output('stdout'),
           stderr=workunit.output('stderr'),
-          env={'PATH': get_joined_path(compiler.path_entries)})
+          env=compiler.get_invocation_environment_dict(platform))
       except OSError as e:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.NativeCompileError(

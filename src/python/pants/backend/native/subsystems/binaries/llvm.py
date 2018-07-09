@@ -7,11 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
+from pants.backend.native.config.environment import (CCompiler, CppCompiler, Linker, LLVMCCompiler,
+                                                     LLVMCppCompiler, Platform)
 from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
+from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_method
 
 
@@ -21,8 +23,8 @@ class LLVMReleaseUrlGenerator(BinaryToolUrlGenerator):
 
   _ARCHIVE_BASE_FMT = 'clang+llvm-{version}-x86_64-{system_id}'
 
-  # TODO(cosmicexplorer): Give a more useful error message than KeyError if the host platform was
-  # not recognized (and make it easy for other BinaryTool subclasses to do this as well).
+  # TODO: Give a more useful error message than KeyError if the host platform was not recognized
+  # (and make it easy for other BinaryTool subclasses to do this as well).
   _SYSTEM_ID = {
     'mac': 'apple-darwin',
     'linux': 'linux-gnu-ubuntu-16.04',
@@ -50,7 +52,7 @@ class LLVM(NativeTool):
     children = os.listdir(unpacked_path)
     if len(children) == 1:
       llvm_base_dir = os.path.join(unpacked_path, children[0])
-      assert(os.path.isdir(llvm_base_dir))
+      assert(is_readable_dir(llvm_base_dir))
       return llvm_base_dir
     return unpacked_path
 
@@ -67,34 +69,37 @@ class LLVM(NativeTool):
       path_entries=self.path_entries(),
       exe_filename=platform.resolve_platform_specific(
         self._PLATFORM_SPECIFIC_LINKER_NAME),
-      platform=platform)
+      library_dirs=[])
 
-  def c_compiler(self, platform):
+  def c_compiler(self):
     return CCompiler(
       path_entries=self.path_entries(),
       exe_filename='clang',
-      platform=platform)
+      library_dirs=[],
+      include_dirs=[])
 
-  def cpp_compiler(self, platform):
+  def cpp_compiler(self):
     return CppCompiler(
       path_entries=self.path_entries(),
       exe_filename='clang++',
-      platform=platform)
+      library_dirs=[],
+      include_dirs=[])
 
 
+# FIXME(#5663): use this over the XCode linker!
 @rule(Linker, [Select(Platform), Select(LLVM)])
 def get_lld(platform, llvm):
   return llvm.linker(platform)
 
 
-@rule(CCompiler, [Select(Platform), Select(LLVM)])
-def get_clang(platform, llvm):
-  return llvm.c_compiler(platform)
+@rule(LLVMCCompiler, [Select(LLVM)])
+def get_clang(llvm):
+  yield LLVMCCompiler(llvm.c_compiler())
 
 
-@rule(CppCompiler, [Select(Platform), Select(LLVM)])
-def get_clang_plusplus(platform, llvm):
-  return llvm.cpp_compiler(platform)
+@rule(LLVMCppCompiler, [Select(LLVM)])
+def get_clang_plusplus(llvm):
+  yield LLVMCppCompiler(llvm.cpp_compiler())
 
 
 def create_llvm_rules():

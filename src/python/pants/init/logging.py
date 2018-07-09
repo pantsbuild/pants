@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import httplib
 import logging
 import os
 import sys
@@ -15,8 +16,30 @@ from logging import FileHandler, Formatter, StreamHandler
 from pants.util.dirutil import safe_mkdir
 
 
+# A custom log level for pants trace logging.
+TRACE = 5
+
+# Although logging supports the WARN level, its not documented and could conceivably be yanked.
+# Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
+# setup a 'WARN' logging level name that maps to 'WARNING'.
+logging.addLevelName(logging.WARNING, 'WARN')
+logging.addLevelName(TRACE, 'TRACE')
+
+
 class LoggingSetupResult(namedtuple('LoggingSetupResult', ['log_filename', 'log_handler'])):
   """A structured result for logging setup."""
+
+
+def _configure_requests_debug_logging():
+  httplib.HTTPConnection.debuglevel = 1
+  requests_logger = logging.getLogger('requests.packages.urllib3')
+  requests_logger.setLevel(TRACE)
+  requests_logger.propagate = True
+
+
+def _maybe_configure_extended_logging(logger):
+  if logger.isEnabledFor(TRACE):
+    _configure_requests_debug_logging()
 
 
 def setup_logging_from_options(bootstrap_options):
@@ -54,6 +77,13 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
   log_filename = None
   file_handler = None
 
+  # A custom log handler for sub-debug trace logging.
+  def trace(self, message, *args, **kwargs):
+    if self.isEnabledFor(TRACE):
+      self._log(TRACE, message, args, **kwargs)
+
+  logging.Logger.trace = trace
+
   logger = logging.getLogger(scope)
   for handler in logger.handlers:
     logger.removeHandler(handler)
@@ -75,7 +105,8 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
         logging.ERROR: 'E',
         logging.WARN: 'W',
         logging.INFO: 'I',
-        logging.DEBUG: 'D'
+        logging.DEBUG: 'D',
+        TRACE: 'T'
       }
 
       def format(self, record):
@@ -99,5 +130,7 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
 
   # This routes warnings through our loggers instead of straight to raw stderr.
   logging.captureWarnings(True)
+
+  _maybe_configure_extended_logging(logger)
 
   return LoggingSetupResult(log_filename, file_handler)

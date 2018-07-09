@@ -1,4 +1,3 @@
-extern crate boxfuture;
 extern crate clap;
 extern crate env_logger;
 extern crate fs;
@@ -11,6 +10,7 @@ use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter::Iterator;
+use std::path::PathBuf;
 use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
@@ -26,6 +26,12 @@ fn main() {
   env_logger::init();
 
   let args = App::new("process_executor")
+    .arg(
+      Arg::with_name("work-dir")
+        .long("work-dir")
+        .takes_value(true)
+        .help("Path to workdir"),
+    )
     .arg(
       Arg::with_name("local-store-path")
         .long("local-store-path")
@@ -86,7 +92,7 @@ fn main() {
   let env: BTreeMap<String, String> = match args.values_of("env") {
     Some(values) => values
       .map(|v| {
-        let mut parts = v.splitn(2, "=");
+        let mut parts = v.splitn(2, '=');
         (
           parts.next().unwrap().to_string(),
           parts.next().unwrap_or_default().to_string(),
@@ -95,6 +101,10 @@ fn main() {
       .collect(),
     None => BTreeMap::new(),
   };
+  let work_dir = args
+    .value_of("work-dir")
+    .map(PathBuf::from)
+    .unwrap_or_else(std::env::temp_dir);
   let local_store_path = args.value_of("local-store-path").unwrap();
   let pool = Arc::new(fs::ResettablePool::new("process-executor-".to_owned()));
   let server_arg = args.value_of("server");
@@ -138,7 +148,9 @@ fn main() {
       1,
       store,
     )),
-    None => Box::new(process_execution::local::CommandRunner::new(store, pool)),
+    None => Box::new(process_execution::local::CommandRunner::new(
+      store, pool, work_dir, true,
+    )),
   };
 
   let result = runner.run(request).wait().expect("Error executing");

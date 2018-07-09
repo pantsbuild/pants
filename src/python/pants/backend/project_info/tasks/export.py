@@ -23,6 +23,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
+from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -37,7 +38,6 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency_utils import M2Coordinate
-from pants.python.python_repos import PythonRepos
 from pants.task.console_task import ConsoleTask
 from pants.util.memo import memoized_property
 
@@ -276,9 +276,9 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
         if hasattr(current_target, 'test_platform'):
           info['test_platform'] = current_target.test_platform.name
 
-      info['roots'] = map(lambda (source_root, package_prefix): {
-        'source_root': source_root,
-        'package_prefix': package_prefix
+      info['roots'] = map(lambda source_root_package_prefix: {
+        'source_root': source_root_package_prefix[0],
+        'package_prefix': source_root_package_prefix[1]
       }, self._source_roots_for_target(current_target))
 
       if classpath_products:

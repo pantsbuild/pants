@@ -70,7 +70,7 @@ pub struct ExecuteProcessRequest {
 /// The result of running a process.
 ///
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ExecuteProcessResult {
+pub struct FallibleExecuteProcessResult {
   pub stdout: Bytes,
   pub stderr: Bytes,
   pub exit_code: i32,
@@ -81,7 +81,7 @@ pub struct ExecuteProcessResult {
 }
 
 pub trait CommandRunner: Send + Sync {
-  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<ExecuteProcessResult, String>;
+  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String>;
 
   fn reset_prefork(&self);
 }
@@ -104,7 +104,7 @@ impl BoundedCommandRunner {
 }
 
 impl CommandRunner for BoundedCommandRunner {
-  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<ExecuteProcessResult, String> {
+  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let inner = self.inner.clone();
     self.sema.with_acquired(move || inner.run(req))
   }

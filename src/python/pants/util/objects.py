@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import sys
 from abc import abstractmethod
+from builtins import map, object, zip
 from collections import OrderedDict, namedtuple
 
 from pants.util.memo import memoized
@@ -50,7 +51,6 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
   if not superclass_name:
     superclass_name = '_anonymous_namedtuple_subclass'
-  superclass_name = str(superclass_name)
 
   namedtuple_cls = namedtuple(superclass_name, field_names, **kwargs)
 
@@ -60,7 +60,15 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       return TypeCheckError(cls.__name__, msg, *args, **kwargs)
 
     def __new__(cls, *args, **kwargs):
-      this_object = super(DataType, cls).__new__(cls, *args, **kwargs)
+      # TODO: Ideally we could execute this exactly once per `cls` but it should be a
+      # relatively cheap check.
+      if not hasattr(cls.__eq__, '_eq_override_canary'):
+        raise cls.make_type_error('Should not override __eq__.')
+
+      try:
+        this_object = super(DataType, cls).__new__(cls, *args, **kwargs)
+      except TypeError as e:
+        raise cls.make_type_error(e)
 
       # TODO(cosmicexplorer): Make this kind of exception pattern (filter for
       # errors then display them all at once) more ergonomic.
@@ -86,6 +94,9 @@ def datatype(field_decls, superclass_name=None, **kwargs):
         return False
       # Explicitly return super.__eq__'s value in case super returns NotImplemented
       return super(DataType, self).__eq__(other)
+    # We define an attribute on the `cls` level definition of `__eq__` that will allow us to detect
+    # that it has been overridden.
+    __eq__._eq_override_canary = None
 
     def __ne__(self, other):
       return not (self == other)
@@ -151,7 +162,10 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
   # Return a new type with the given name, inheriting from the DataType class
   # just defined, with an empty class body.
-  return type(superclass_name, (DataType,), {})
+  try:  # Python3
+    return type(superclass_name, (DataType,), {})
+  except TypeError:  # Python2
+    return type(superclass_name.encode('utf-8'), (DataType,), {})
 
 
 class TypedDatatypeClassConstructionError(Exception):
@@ -165,8 +179,7 @@ class TypedDatatypeClassConstructionError(Exception):
       full_msg, *args, **kwargs)
 
 
-# FIXME: make this subclass TypeError!
-class TypedDatatypeInstanceConstructionError(Exception):
+class TypedDatatypeInstanceConstructionError(TypeError):
 
   def __init__(self, type_name, msg, *args, **kwargs):
     full_msg = "error: in constructor of type {}: {}".format(type_name, msg)

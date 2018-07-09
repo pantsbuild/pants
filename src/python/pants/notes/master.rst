@@ -4,6 +4,69 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.9.0.dev0 (06/25/2018)
+-----------------------
+
+New features
+~~~~~~~~~~~~
+
+* Release Pants as a pex. (#6014)
+  `PR #6014 <https://github.com/pantsbuild/pants/pull/6014>`_
+
+* C/C++ targets which can be compiled/linked and used in python_dist() with ctypes (#5815)
+  `PR #5815 <https://github.com/pantsbuild/pants/pull/5815>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate sources except EagerFilesetWithSpec (#5993)
+  `PR #5993 <https://github.com/pantsbuild/pants/pull/5993>`_
+
+* source attribute is automatically promoted to sources (#5908)
+  `PR #5908 <https://github.com/pantsbuild/pants/pull/5908>`_
+
+Bugfixes
+~~~~~~~~
+
+* Run scalafix before scalafmt (#6011)
+  `PR #6011 <https://github.com/pantsbuild/pants/pull/6011>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add .vscode/ folder to .gitignore (#6020)
+  `PR #6020 <https://github.com/pantsbuild/pants/pull/6020>`_
+
+* [engine] Selecting for ExecuteProcessResult will Throw on non-zero exit (#6000)
+  `PR #6000 <https://github.com/pantsbuild/pants/pull/6000>`_
+
+* Context always has a scheduler in tests (#5997)
+  `PR #5997 <https://github.com/pantsbuild/pants/pull/5997>`_
+
+* Engine looks up default sources when parsing (#5989)
+  `PR #5989 <https://github.com/pantsbuild/pants/pull/5989>`_
+
+* Fix TestSetupPyInterpreter.test_setuptools_version (#5988)
+  `PR #5988 <https://github.com/pantsbuild/pants/pull/5988>`_
+
+* Caching tests are parsed through the engine (#5985)
+  `PR #5985 <https://github.com/pantsbuild/pants/pull/5985>`_
+
+* Override get_sources for pants plugins (#5984)
+  `PR #5984 <https://github.com/pantsbuild/pants/pull/5984>`_
+
+* make_target upgrades sources to EagerFilesetWithSpec (#5974)
+  `PR #5974 <https://github.com/pantsbuild/pants/pull/5974>`_
+
+* Robustify test_namespace_effective PYTHONPATH. (#5976)
+  `PR #5976 <https://github.com/pantsbuild/pants/pull/5976>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* 1.7.0 release notes (#5983)
+  `PR #5983 <https://github.com/pantsbuild/pants/pull/5983>`_
+
 1.8.0rc0 (06/18/2018)
 ---------------------
 

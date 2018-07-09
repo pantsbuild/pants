@@ -400,7 +400,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
   def test_missing_ivy_report(self):
     self.set_options_for_scope(IvySubsystem.options_scope,
                                cache_dir='DOES_NOT_EXIST',
-                               use_nailgun=False)
+                               execution_strategy='subprocess')
 
     with self.assertRaises(IvyUtils.IvyResolveReportError):
       IvyUtils.parse_xml_report('default', IvyUtils.xml_report_path('INVALID_CACHE_DIR',

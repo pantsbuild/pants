@@ -3,7 +3,7 @@
 
 use core::{TypeConstraint, TypeId};
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Get {
   pub product: TypeConstraint,
   pub subject: TypeId,

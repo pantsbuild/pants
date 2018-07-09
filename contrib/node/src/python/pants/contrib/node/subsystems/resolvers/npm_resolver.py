@@ -77,13 +77,13 @@ class NpmResolver(Subsystem, NodeResolverBase):
     else:
       package = {}
 
-    if not package.has_key('name'):
+    if 'name' not in package:
       package['name'] = target.package_name
     elif package['name'] != target.package_name:
       raise TaskError('Package name in the corresponding package.json is not the same '
                       'as the BUILD target name for {}'.format(target.address.reference()))
 
-    if not package.has_key('version'):
+    if 'version' not in package:
       package['version'] = '0.0.0'
 
     # TODO(Chris Pesto): Preserve compatibility with normal package.json files by dropping existing

@@ -40,7 +40,7 @@ pub struct Interns {
 
 impl Interns {
   pub fn new() -> Interns {
-    Default::default()
+    Interns::default()
   }
 
   pub fn insert(&mut self, v: Value) -> Key {
@@ -57,7 +57,7 @@ impl Interns {
       })
       .clone();
     if inserted {
-      self.reverse.insert(key.clone(), v);
+      self.reverse.insert(key, v);
       self.id_generator += 1;
     }
     key

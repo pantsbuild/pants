@@ -27,9 +27,9 @@ class TrailingWhitespace(CheckstylePlugin):
         if token_start[0] == token_end[0]:
           exception_ranges[token_start[0]].append((token_start[1], token_end[1]))
         else:
-          exception_ranges[token_start[0]].append((token_start[1], sys.maxint))
+          exception_ranges[token_start[0]].append((token_start[1], sys.maxsize))
           for line in range(token_start[0] + 1, token_end[0]):
-            exception_ranges[line].append((0, sys.maxint))
+            exception_ranges[line].append((0, sys.maxsize))
           exception_ranges[token_end[0]].append((0, token_end[1]))
     return exception_ranges
 

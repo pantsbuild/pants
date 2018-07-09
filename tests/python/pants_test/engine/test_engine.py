@@ -159,12 +159,11 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
       ''').lstrip()+'\n',
       remove_locations_from_traceback(str(cm.exception)))
 
-  def test_trace_does_not_include_cancellations(self):
-    # Tests that when the computation of `Select(C)` fails, the cancellation of `Select(D)`
-    # is not rendered as a failure.
+  def test_trace_multi(self):
+    # Tests that when multiple distinct failures occur, they are each rendered.
     rules = [
       RootRule(B),
-      TaskRule(D, [Select(B)], D),
+      TaskRule(D, [Select(B)], nested_raise),
       TaskRule(C, [Select(B)], nested_raise),
       TaskRule(A, [Select(C), Select(D)], A),
     ]
@@ -175,6 +174,20 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     self.assert_equal_with_printing(dedent('''
       Received unexpected Throw state(s):
+      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
+        Computing Task(A, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
+          Computing Task(nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =D)
+            Throw(An exception for B)
+              Traceback (most recent call last):
+                File LOCATION-INFO, in call
+                  val = func(*args)
+                File LOCATION-INFO, in nested_raise
+                  fn_raises(x)
+                File LOCATION-INFO, in fn_raises
+                  raise Exception('An exception for {}'.format(type(x).__name__))
+              Exception: An exception for B
+
+
       Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
         Computing Task(A, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
           Computing Task(nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =C)

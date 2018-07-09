@@ -331,6 +331,7 @@ class TestBase(unittest.TestCase):
   def _reset_engine(self):
     if self._scheduler is not None:
       self._build_graph.reset()
+      self._scheduler.invalidate_all_files()
       # Eagerly free file handles, threads, connections, etc, held by the scheduler. In theory,
       # dropping the scheduler is equivalent, but it's easy for references to the scheduler to leak.
       self._scheduler.pre_fork()
@@ -457,6 +458,8 @@ class TestBase(unittest.TestCase):
 
     Subsystem.reset(reset_options=True)
     Subsystem.set_options(fake_options)
+
+    scheduler = scheduler or self.scheduler
 
     context = create_context_from_options(fake_options,
                                           target_roots=target_roots,

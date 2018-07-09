@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import hashlib
 import math
 import unittest
+from builtins import range, str
 
 from pants.base.hash_utils import Sharder, hash_all, hash_file
 from pants.util.contextutil import temporary_file

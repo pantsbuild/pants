@@ -1,11 +1,11 @@
 extern crate futures;
 
-use std::sync::{Arc, Mutex};
 use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 
-use futures::{Async, Poll};
 use futures::future::Future;
 use futures::task::{self, Task};
+use futures::{Async, Poll};
 
 struct Inner {
   waiters: VecDeque<Task>,

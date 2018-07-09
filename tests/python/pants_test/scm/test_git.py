@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import types
 import unittest
 from contextlib import contextmanager
 from textwrap import dedent
@@ -144,7 +143,7 @@ class GitTest(unittest.TestCase):
     self.assertEquals(reader.Symlink, lstat('not-a-dir'))
     self.assertEquals(reader.File, lstat('README'))
     self.assertEquals(reader.Dir, lstat('dir'))
-    self.assertEquals(types.NoneType, lstat('nope-not-here'))
+    self.assertEquals(type(None), lstat('nope-not-here'))
 
   def test_readlink(self):
     reader = self.git.repo_reader(self.initial_rev)

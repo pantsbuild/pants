@@ -11,8 +11,10 @@ import os
 import signal
 import sys
 import traceback
+from builtins import object
 
 import faulthandler
+import six
 
 from pants.util.dirutil import safe_open
 
@@ -71,7 +73,7 @@ class Exiter(object):
     :param out: The file descriptor to emit `msg` to. (Optional)
     """
     if msg:
-      print(msg, file=out or sys.stderr)
+      print(msg.encode('utf-8'), file=out or sys.stderr)
     self._exit(result)
 
   def exit_and_fail(self, msg=None):
@@ -83,14 +85,14 @@ class Exiter(object):
 
   def handle_unhandled_exception(self, exc_class=None, exc=None, tb=None, add_newline=False):
     """Default sys.excepthook implementation for unhandled exceptions."""
-    exc_class = exc_class or sys.exc_type
-    exc = exc or sys.exc_value
-    tb = tb or sys.exc_traceback
+    exc_class = exc_class or sys.exc_info()[0]
+    exc = exc or sys.exc_info()[1]
+    tb = tb or sys.exc_info()[2]
 
     def format_msg(print_backtrace=True):
       msg = 'Exception caught: ({})\n'.format(type(exc))
       msg += '{}\n'.format(''.join(self._format_tb(tb))) if print_backtrace else '\n'
-      msg += 'Exception message: {}\n'.format(exc if str(exc) else 'none')
+      msg += 'Exception message: {}\n'.format(six.text_type(exc) if exc else 'none')
       msg += '\n' if add_newline else ''
       return msg
 
@@ -106,7 +108,7 @@ class Exiter(object):
           exception_log.write('timestamp: {}\n'.format(datetime.datetime.now().isoformat()))
           exception_log.write('args: {}\n'.format(sys.argv))
           exception_log.write('pid: {}\n'.format(os.getpid()))
-          exception_log.write(msg)
+          exception_log.write(msg.encode('utf-8'))
           exception_log.write('\n')
       except Exception as e:
         # This is all error recovery logic so we catch all exceptions from the logic above because

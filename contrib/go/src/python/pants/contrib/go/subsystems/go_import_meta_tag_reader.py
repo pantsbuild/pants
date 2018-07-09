@@ -34,7 +34,7 @@ class GoImportMetaTagReader(Subsystem):
           \s+
           content=['"](?P<root>[^\s]+)\s+(?P<vcs>[^\s]+)\s+(?P<url>[^\s]+)['"]
           \s*
-      >""", flags=re.VERBOSE)
+      /?>""", flags=re.VERBOSE)
 
   @classmethod
   def find_meta_tags(cls, page_html):

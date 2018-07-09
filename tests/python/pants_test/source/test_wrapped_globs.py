@@ -12,7 +12,9 @@ from textwrap import dedent
 from pants.base.payload import Payload
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.files import Files
 from pants.build_graph.target import Target
+from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.source.wrapped_globs import EagerFilesetWithSpec, Globs, LazyFilesetWithSpec, RGlobs
 from pants_test.test_base import TestBase
 
@@ -224,13 +226,17 @@ class FilesetRelPathWrapperTest(TestBase):
 
 class FilesetWithSpecTest(TestBase):
 
+  @classmethod
+  def alias_groups(cls):
+    return BuildFileAliases(targets={'files': Files})
+
   def test_lazy_fileset_with_spec_fails_if_filespec_not_prefixed_by_relroot(self):
     with self.assertRaises(ValueError):
       LazyFilesetWithSpec('foo', {'globs':['notfoo/a.txt']}, lambda: ['foo/a.txt'])
 
   def test_eager_fileset_with_spec_fails_if_filespec_not_prefixed_by_relroot(self):
     with self.assertRaises(ValueError):
-      EagerFilesetWithSpec('foo', {'globs':['notfoo/a.txt']}, files=['files'], files_hash='deadbeef')
+      EagerFilesetWithSpec('foo', {'globs':['notfoo/a.txt']}, EMPTY_SNAPSHOT)
 
   def test_lazy_fileset_with_spec_fails_if_exclude_filespec_not_prefixed_by_relroot(self):
     with self.assertRaises(ValueError):
@@ -242,10 +248,29 @@ class FilesetWithSpecTest(TestBase):
     with self.assertRaises(ValueError):
       EagerFilesetWithSpec('foo',
                            {'globs': [], 'exclude': [{'globs': ['notfoo/a.txt']}]},
-                           files=['files'],
-                           files_hash='deadbeef')
+                           EMPTY_SNAPSHOT)
 
   def test_iter_relative_paths(self):
-    efws = EagerFilesetWithSpec('test_root', {'globs': []}, files=['a', 'b', 'c'], files_hash='deadbeef')
-    result = list(efws.paths_from_buildroot_iter())
-    self.assertEquals(result, ['test_root/a', 'test_root/b', 'test_root/c'])
+    self.create_files('test_root', ['a', 'b', 'c'])
+    efws = self.sources_for(['a', 'b', 'c'], 'test_root')
+    self.assertEquals(
+      efws.files_hash,
+      str('cb11a7f0b5a1e22b93c36783608ba531ea831c2f68a5c9f9498417b211bcfea4'),
+    )
+    self.assertEquals(
+      list(efws.paths_from_buildroot_iter()),
+      ['test_root/a', 'test_root/b', 'test_root/c'],
+    )
+
+  def test_source_snapshot(self):
+    self.create_file('package/dir/foo')
+    self.add_to_build_file('package/dir', 'files(name = "target", sources = ["foo"])')
+    target = self.target('package/dir:target')
+    snapshot = target.sources_snapshot(scheduler=self.scheduler)
+    snapshot_paths = tuple(file.path for file in snapshot.path_stats)
+    self.assertEqual(
+      ('package/dir/foo',),
+      snapshot_paths
+    )
+    self.assertEqual(target.sources_relative_to_target_base().files, ('foo',))
+    self.assertEqual(target.sources_relative_to_buildroot(), ['package/dir/foo'])

@@ -17,6 +17,8 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.engine.fs import DirectoryToMaterialize
+from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import safe_open
 from pants.util.process_handler import subprocess
@@ -27,7 +29,6 @@ _JAVAC_PLUGIN_INFO_FILE = 'META-INF/services/com.sun.source.util.Plugin'
 
 # Well known metadata file to register annotation processors with a java 1.6+ compiler.
 _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
-
 
 logger = logging.getLogger(__name__)
 
@@ -136,12 +137,27 @@ class JavacCompile(JvmCompile):
         settings_args = (a.replace('$JAVA_HOME', distribution.home) for a in settings.args)
       javac_cmd.extend(settings_args)
 
-    javac_cmd.extend([
-      '-d', ctx.classes_dir,
-      # TODO: support -release
-      '-source', str(settings.source_level),
-      '-target', str(settings.target_level),
-    ])
+      javac_cmd.extend([
+        # TODO: support -release
+        '-source', str(settings.source_level),
+        '-target', str(settings.target_level),
+      ])
+
+    if self.execution_strategy() == self.HERMETIC:
+      javac_cmd.extend([
+        # We need to strip the source root from our output files. Outputting to a directory, and
+        # capturing that directory, does the job.
+        # Unfortunately, javac errors if the directory you pass to -d doesn't exist, and we don't
+        # have a convenient way of making a directory in the output tree, so let's just use the
+        # working directory as our output dir.
+        # This also has the benefit of not needing to strip leading directories from the returned
+        # snapshot.
+        '-d', '.',
+      ])
+    else:
+      javac_cmd.extend([
+        '-d', ctx.classes_dir,
+      ])
 
     javac_cmd.extend(self._javac_plugin_args(javac_plugin_map))
 
@@ -155,15 +171,18 @@ class JavacCompile(JvmCompile):
     with argfile.safe_args(ctx.sources, self.get_options()) as batched_sources:
       javac_cmd.extend(batched_sources)
 
-      with self.context.new_workunit(name='javac',
-                                     cmd=' '.join(javac_cmd),
-                                     labels=[WorkUnitLabel.COMPILER]) as workunit:
-        self.context.log.debug('Executing {}'.format(' '.join(javac_cmd)))
-        p = subprocess.Popen(javac_cmd, stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
-        return_code = p.wait()
-        workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
-        if return_code:
-          raise TaskError('javac exited with return code {rc}'.format(rc=return_code))
+      if self.execution_strategy() == self.HERMETIC:
+        self._execute_hermetic_compile(javac_cmd, ctx)
+      else:
+        with self.context.new_workunit(name='javac',
+                                       cmd=' '.join(javac_cmd),
+                                       labels=[WorkUnitLabel.COMPILER]) as workunit:
+          self.context.log.debug('Executing {}'.format(' '.join(javac_cmd)))
+          p = subprocess.Popen(javac_cmd, stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
+          return_code = p.wait()
+          workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
+          if return_code:
+            raise TaskError('javac exited with return code {rc}'.format(rc=return_code))
 
   @classmethod
   def _javac_plugin_args(cls, javac_plugin_map):
@@ -177,3 +196,33 @@ class JavacCompile(JvmCompile):
                           '(arg {} for plugin {})'.format(arg, plugin))
       ret.append('-Xplugin:{} {}'.format(plugin, ' '.join(args)))
     return ret
+
+  def _execute_hermetic_compile(self, cmd, ctx):
+    # For now, executing a compile remotely only works for targets that
+    # do not have any dependencies or inner classes
+
+    input_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
+    output_files = tuple(
+      # Assume no extra .class files to grab. We'll fix up that case soon.
+      # Drop the source_root from the file path.
+      # Assumes `-d .` has been put in the command.
+      os.path.relpath(f.path.replace('.java', '.class'), ctx.target.target_base)
+      for f in input_snapshot.files if f.path.endswith('.java')
+    )
+    exec_process_request = ExecuteProcessRequest.create_from_snapshot(
+      argv=tuple(cmd),
+      snapshot=input_snapshot,
+      output_files=output_files,
+      description='Compiling {} with javac'.format(ctx.target.address.spec),
+    )
+    exec_result = self.context.execute_process_synchronously(
+      exec_process_request,
+      'javac',
+      (WorkUnitLabel.TASK, WorkUnitLabel.JVM),
+    )
+
+    # Dump the output to the .pants.d directory where it's expected by downstream tasks.
+    classes_directory = ctx.classes_dir
+    self.context._scheduler.materialize_directories((
+      DirectoryToMaterialize(str(classes_directory), exec_result.output_directory_digest),
+    ))
