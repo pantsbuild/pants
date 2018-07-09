@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
-from builtins import zip
 from contextlib import contextmanager
 
 from pants.backend.native.config.environment import (GCCCCompiler, GCCCppCompiler, Linker,
@@ -104,7 +103,6 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
       with safe_open(source_file_path, mode='wb') as fp:
         fp.write(contents)
 
-      products, subjects = list(zip(*scheduler_request_specs))
       execution_request = scheduler.execution_request_literal(scheduler_request_specs)
 
       with pushd(tmpdir):
