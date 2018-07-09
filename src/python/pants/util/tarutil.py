@@ -6,13 +6,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import tarfile
+from builtins import str
 
-import six
+import future
+from future.utils import implements_iterator
 
 
-if six.PY2:
+if future.utils.PY2:
+
+  @implements_iterator
   class TarFile(tarfile.TarFile):
-    def next(self):
+
+    def __next__(self):
       """A copy and modification of the next() method in tarfile module.
 
       The copy is from tarfile.py of CPython @102457:95df96aa2f5a
