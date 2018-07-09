@@ -35,7 +35,7 @@ class ScalaFix(RewriteBase):
     cls.register_jvm_tool(register,
                           'scalafix',
                           classpath=[
-                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.11.11', rev='0.5.2'),
+                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.11.12', rev='0.6.0-M11'),
                           ])
 
   @classmethod
