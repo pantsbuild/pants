@@ -14,7 +14,7 @@ import tempfile
 import time
 import uuid
 import zipfile
-from builtins import object, str
+from builtins import object
 from contextlib import closing, contextmanager
 
 from colors import green
