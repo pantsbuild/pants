@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from builtins import next, str
 from textwrap import dedent
 
 from pants.backend.native.register import rules as native_backend_rules
@@ -95,7 +96,7 @@ class TestBuildLocalPythonDistributions(PythonTaskTestBase, SchedulerTestBase):
       self.target_dict[key] = python_dist_tgt
 
   def _all_dist_targets(self):
-    return self.target_dict.values()
+    return list(self.target_dict.values())
 
   def _scheduling_context(self, **kwargs):
     rules = (
@@ -107,7 +108,7 @@ class TestBuildLocalPythonDistributions(PythonTaskTestBase, SchedulerTestBase):
 
   def _retrieve_single_product_at_target_base(self, product_mapping, target):
     product = product_mapping.get(target)
-    base_dirs = product.keys()
+    base_dirs = list(product.keys())
     self.assertEqual(1, len(base_dirs))
     single_base_dir = base_dirs[0]
     all_products = product[single_base_dir]
