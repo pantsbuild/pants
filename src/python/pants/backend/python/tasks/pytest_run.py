@@ -12,6 +12,7 @@ import shutil
 import time
 import traceback
 import uuid
+from builtins import str
 from collections import OrderedDict
 from contextlib import contextmanager
 from textwrap import dedent

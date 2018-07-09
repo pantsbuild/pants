@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from future.utils import string_types
 from pex.pex_info import PexInfo
-from six import string_types
 from twitter.common.collections import maybe_list
 
 from pants.backend.python.targets.python_target import PythonTarget
