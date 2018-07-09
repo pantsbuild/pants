@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import threading
-from builtins import object, str
+from builtins import bytes, object
 
 from six import StringIO
 
@@ -35,8 +35,10 @@ class _RWBuf(object):
       return self._io.read() if size == -1 else self._io.read(size)
 
   def write(self, s):
+    if not isinstance(s, bytes):
+      raise ValueError('Argument not in bytes: {0}'.format(s))
     with self._lock:
-      self.do_write(str(s))
+      self.do_write(s)
       self._io.flush()
 
   def flush(self):
