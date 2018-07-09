@@ -4,7 +4,7 @@
 ## Third party integration testing.
 
 ctypes_compatible_c_library(
-  name='c_library',
+  name='a_c_library',
   sources=['src-subdir/add_three.h', 'src-subdir/add_three.c'],
   ctypes_native_library=native_artifact(lib_name='asdf-c-tp'),
 )
@@ -24,7 +24,7 @@ python_dist(
     'ctypes_python_pkg/ctypes_wrapper.py',
   ],
   dependencies=[
-    ':c_library',
+    ':a_c_library',
     ':cpp_library_with_third_party',
   ],
 )
