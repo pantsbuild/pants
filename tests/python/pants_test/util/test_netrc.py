@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import re
 import unittest
+from builtins import str
 from contextlib import contextmanager
 
 from mock import MagicMock, mock_open, patch

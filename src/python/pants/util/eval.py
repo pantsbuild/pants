@@ -5,9 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from builtins import range, str
 from textwrap import dedent
 
-import six
+import future
 
 
 def parse_expression(val, acceptable_types, name=None, raise_type=ValueError):
@@ -26,7 +27,7 @@ def parse_expression(val, acceptable_types, name=None, raise_type=ValueError):
   def format_type(typ):
     return typ.__name__
 
-  if not isinstance(val, six.string_types):
+  if not isinstance(val, future.utils.string_types):
     raise raise_type('The raw `val` is not a string.  Given {} of type {}.'
                      .format(val, format_type(type(val))))
 
@@ -35,7 +36,7 @@ def parse_expression(val, acceptable_types, name=None, raise_type=ValueError):
 
   def format_raw_value():
     lines = val.splitlines()
-    for line_number in six.moves.range(0, len(lines)):
+    for line_number in range(0, len(lines)):
       lines[line_number] = "{line_number:{width}}: {line}".format(
         line_number=line_number + 1,
         line=lines[line_number],

@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from builtins import next
+
 
 def combined_dict(*dicts):
   """Combine one or more dicts into a new, unified dict (dicts to the right take precedence)."""

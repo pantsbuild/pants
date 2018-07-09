@@ -9,6 +9,7 @@ import errno
 import io
 import select
 import socket
+from builtins import object
 
 
 def teardown_socket(s):
