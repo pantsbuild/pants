@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import sys
+from builtins import range
 
 import markdown
 from docutils.core import publish_parts
@@ -14,7 +15,6 @@ from pygments import highlight
 from pygments.formatters.html import HtmlFormatter
 from pygments.lexers import PythonLexer, TextLexer, guess_lexer_for_filename
 from pygments.util import ClassNotFound
-from six.moves import range
 
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_open

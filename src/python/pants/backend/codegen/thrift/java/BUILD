@@ -3,6 +3,7 @@
 
 python_library(
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/codegen/thrift/lib',
     'src/python/pants/backend/jvm/targets:java',
