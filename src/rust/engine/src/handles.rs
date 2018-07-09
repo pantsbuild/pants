@@ -46,15 +46,6 @@ impl Drop for Handle {
   }
 }
 
-///
-/// Implemented by calling back to python to clone the underlying Handle.
-///
-impl Clone for Handle {
-  fn clone(&self) -> Handle {
-    externs::clone_val(self)
-  }
-}
-
 // By default, a Handle would not be marked Send because of the raw pointer it holds.
 // Because Python objects are threadsafe, we can safely implement Send.
 unsafe impl Send for Handle {}

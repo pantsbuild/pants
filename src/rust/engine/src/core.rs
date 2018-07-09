@@ -5,6 +5,7 @@ use fnv::FnvHasher;
 
 use std::collections::HashMap;
 use std::ops::Deref;
+use std::sync::Arc;
 use std::{fmt, hash};
 
 use externs;
@@ -109,11 +110,11 @@ impl Key {
 /// A wrapper around a handle: soon to contain an Arc.
 ///
 #[derive(Clone, Eq, PartialEq)]
-pub struct Value(Handle);
+pub struct Value(Arc<Handle>);
 
 impl Value {
   pub fn new(handle: Handle) -> Value {
-    Value(handle)
+    Value(Arc::new(handle))
   }
 }
 
@@ -135,11 +136,12 @@ impl fmt::Debug for Value {
 /// Creates a Handle (which represents exclusive access) from a Value (which might be shared),
 /// cloning if necessary.
 ///
-/// TODO: With Arc, this will use `make_mut`.
-///
 impl From<Value> for Handle {
   fn from(value: Value) -> Self {
-    value.0
+    match Arc::try_unwrap(value.0) {
+      Ok(handle) => handle,
+      Err(arc_handle) => externs::clone_val(&arc_handle),
+    }
   }
 }
 
