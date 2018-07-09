@@ -101,8 +101,8 @@ python_library(
 python_library(
   name = 'process_handler',
   sources = ['process_handler.py'],
-  dependencies=[
-    '3rdparty/python:six',
+  dependencies= [
+    '3rdparty/python:future',
     '3rdparty/python:subprocess32',
     ':meta',
   ]
@@ -154,6 +154,7 @@ python_library(
   name = 'tarutil',
   sources = ['tarutil.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:six',
   ],
 )
