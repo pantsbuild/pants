@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
+from builtins import range
 
 from pants.base.build_environment import get_buildroot
 from pants.util.process_handler import subprocess
