@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from abc import abstractmethod
+from builtins import filter
 from collections import defaultdict
 
 from pants.backend.native.config.environment import Executable, Platform
@@ -100,7 +101,7 @@ class NativeCompile(NativeTask, AbstractClass):
     if self._compile_settings.get_subsystem_target_mirrored_field_value('strict_deps', target):
       strict_deps = target.strict_dependencies(DependencyContext())
       if predicate:
-        filtered_deps = filter(predicate, strict_deps)
+        filtered_deps = list(filter(predicate, strict_deps))
       else:
         filtered_deps = strict_deps
       deps = [target] + filtered_deps

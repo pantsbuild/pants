@@ -103,7 +103,6 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
       with safe_open(source_file_path, mode='wb') as fp:
         fp.write(contents)
 
-      products, subjects = zip(*scheduler_request_specs)
       execution_request = scheduler.execution_request_literal(scheduler_request_specs)
 
       with pushd(tmpdir):
