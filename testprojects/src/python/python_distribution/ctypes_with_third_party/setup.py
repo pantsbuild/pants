@@ -13,5 +13,5 @@ setup(
   version='0.0.1',
   packages=find_packages(),
   # Declare two files at the top-level directory (denoted by '').
-  data_files=[('', ['libasdf-c-tp.so', 'libasdf-cpp-tp.so'])],
+  data_files=[('', ['libasdf-cpp-tp.so'])],
 )
