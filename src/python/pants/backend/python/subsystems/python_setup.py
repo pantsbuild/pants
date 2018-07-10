@@ -78,8 +78,9 @@ class PythonSetup(Subsystem):
               'NOTE: this keyword is a temporary fix and will be reverted per: '
               'https://github.com/pantsbuild/pants/issues/5696. The long term '
               'solution is tracked by: https://github.com/pantsbuild/pex/issues/456.')
-    register('--build', advanced=True, type=bool, default=UnsetBool, fingerprint= True,
-             help='Whether to allow building of distributions from source; Default: allow builds')
+    register('--allow-sdist-builds', advanced=True, type=bool, default=True, fingerprint=True,
+             help='Whether to allow building of distributions from source during 3rd party '
+               'resolution; Default: allow builds')
     register('--resolver-use-manylinux', advanced=True, type=bool, default=True, fingerprint=True,
              help='Whether to consider manylinux wheels when resolving requirements for linux '
                   'platforms.')
@@ -133,16 +134,14 @@ class PythonSetup(Subsystem):
     return self.get_options().resolver_blacklist
 
   @property
-  def build(self):
-    return self.get_options().build
+  def allow_sdist_builds(self):
+    return self.get_options().allow_sdist_builds
 
   @property
-  def default_precedence(self):
-    precedence = Sorter.DEFAULT_PACKAGE_PRECEDENCE[:]
-    if self.build is True:
-      allow_builds(precedence)
-    elif self.build is False:
-      no_allow_builds(precedence)
+  def resolver_precedence(self):
+    precedence = Sorter.DEFAULT_PACKAGE_PRECEDENCE
+    if self.allow_sdist_builds is False:
+      precedence = self.disable_sdist_builds(precedence)
 
     return precedence
 
@@ -178,22 +177,11 @@ class PythonSetup(Subsystem):
     except TypeError:
       return Requirement.parse(requirement)
 
-  def _allow_builds(self, precedence):
-    """Enable building SourcePackages
-    :param precedence: An ordered list of allowable :class:`Package` classes
-                       to be used for producing distributions.
-    :return: An ordered list of allowable :class:`Package classes with the SourcePackage
-    """
-    if SourcePackage not in precedence:
-      precedence = precedence + (SourcePackage,)
-    return precedence
-
-
-  def _no_allow_builds(self, precedence):
+  def disable_sdist_builds(self, precedence):
     """Disable building SourcePackages
     :param precedence: An ordered list of allowable :class:`Package` classes
                        to be used for producing distributions.
     :return: An ordered list of allowable :class:`Package classes without the SourcePackage
     """
-    precedence = tuple([precedent for precedent in precedence if precedent is not SourcePackage])
+    precedence = tuple(precedent for precedent in precedence if precedent is not SourcePackage)
     return precedence

@@ -35,7 +35,40 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
     pex_info = PexInfo.from_pex(pex)
     self.assertEquals(getattr(pex_info, attr), value)
 
-  def test_zipsafe_caching(self):
+  # def test_zipsafe_caching(self):
+  #   test_project = 'testprojects/src/python/cache_fields'
+  #   test_build = os.path.join(test_project, 'BUILD')
+  #   test_src = os.path.join(test_project, 'main.py')
+  #   test_pex = 'dist/cache_fields.pex'
+  #   zipsafe_target_tmpl = "python_binary(source='main.py', zip_safe={})"
+
+  #   with self.caching_config() as config, self.mock_buildroot() as buildroot, buildroot.pushd():
+  #     build = functools.partial(
+  #       self.run_pants_with_workdir,
+  #       command=['binary', test_project],
+  #       workdir=os.path.join(buildroot.dir, '.pants.d'),
+  #       config=config,
+  #       build_root=buildroot.dir
+  #     )
+
+  #     buildroot.write_file(test_src, '')
+
+  #     # Create a pex from a simple python_binary target and assert it has zip_safe=True (default).
+  #     buildroot.write_file(test_build, "python_binary(source='main.py')")
+  #     self.assert_success(build())
+  #     self.assert_pex_attribute(test_pex, 'zip_safe', True)
+
+  #     # Simulate a user edit by adding zip_safe=False to the target and check the resulting pex.
+  #     buildroot.write_file(test_build, zipsafe_target_tmpl.format('False'))
+  #     self.assert_success(build())
+  #     self.assert_pex_attribute(test_pex, 'zip_safe', False)
+
+  #     # Simulate a user edit by adding zip_safe=True to the target and check the resulting pex.
+  #     buildroot.write_file(test_build, zipsafe_target_tmpl.format('True'))
+  #     self.assert_success(build())
+  #     self.assert_pex_attribute(test_pex, 'zip_safe', True)
+
+  def test_allow_sdist_builds_fails(self):
     test_project = 'testprojects/src/python/cache_fields'
     test_build = os.path.join(test_project, 'BUILD')
     test_src = os.path.join(test_project, 'main.py')
@@ -58,12 +91,12 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(build())
       self.assert_pex_attribute(test_pex, 'zip_safe', True)
 
-      # Simulate a user edit by adding zip_safe=False to the target and check the resulting pex.
-      buildroot.write_file(test_build, zipsafe_target_tmpl.format('False'))
-      self.assert_success(build())
-      self.assert_pex_attribute(test_pex, 'zip_safe', False)
 
-      # Simulate a user edit by adding zip_safe=True to the target and check the resulting pex.
-      buildroot.write_file(test_build, zipsafe_target_tmpl.format('True'))
-      self.assert_success(build())
-      self.assert_pex_attribute(test_pex, 'zip_safe', True)
+  def test_allow_sdist_builds_succeeds(self):
+    pass
+
+  def test_allow_sdist_builds_multiple_fails(self):
+    pass
+
+  def test_allow_sdist_builds_multiple_succeeds(self):
+    pass

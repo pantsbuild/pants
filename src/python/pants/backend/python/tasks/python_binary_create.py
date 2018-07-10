@@ -72,15 +72,13 @@ class PythonBinaryCreate(Task):
     with self.invalidated(binaries, invalidate_dependents=True) as invalidation_check:
       python_deployable_archive = self.context.products.get('deployable_archives')
       python_pex_product = self.context.products.get('pex_archives')
-      precedence = python_setup.default_precedence[:]
+      precedence = python_setup.resolver_precedence
       for vt in invalidation_check.all_vts:
         pex_path = os.path.join(vt.results_dir, '{}.pex'.format(vt.target.name))
         if not vt.valid:
           self.context.log.debug('cache for {} is invalid, rebuilding'.format(vt.target))
-          if vt.target.build is True:
-            precedence = python_setup._allow_builds(precedence)
-          elif vt.target.build is False:
-            precedence = python_setup._no_allow_builds(precedence)
+          if vt.target.build is False:
+            precedence = python_setup.disable_sdist_builds(precedence)
           self._create_binary(vt.target, vt.results_dir, precedence=precedence)
         else:
           self.context.log.debug('using cache for {}'.format(vt.target))

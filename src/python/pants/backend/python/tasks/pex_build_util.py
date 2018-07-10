@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-
 from pex.fetcher import Fetcher
 from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
@@ -169,7 +168,7 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None, precedenc
   deduped_reqs = OrderedSet(reqs)
   find_links = OrderedSet()
   blacklist = PythonSetup.global_instance().resolver_blacklist
-  precedence = precedence or PythonSetup.global_instance().default_precedence[:]
+  precedence = precedence or PythonSetup.global_instance().resolver_precedence
   for req in deduped_reqs:
     log.debug('  Dumping requirement: {}'.format(req))
     if not (req.key in blacklist and interpreter.identity.matches(blacklist[req.key])):
@@ -224,5 +223,4 @@ def _resolve_multi(interpreter, requirements, platforms, find_links, precedence)
       allow_prereleases=python_setup.resolver_allow_prereleases,
       pkg_blacklist=python_setup.resolver_blacklist,
       use_manylinux=python_setup.use_manylinux)
-
   return distributions
