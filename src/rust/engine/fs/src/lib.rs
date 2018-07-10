@@ -123,6 +123,9 @@ impl PathStat {
   }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub struct DirectoryListing(pub Vec<Stat>);
+
 #[derive(Debug)]
 pub struct GitignoreStyleExcludes {
   patterns: Vec<String>,
@@ -649,23 +652,24 @@ impl PosixFS {
     PosixFS::stat_internal(relative_path, metadata.file_type(), &root, || Ok(metadata))
   }
 
-  pub fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
+  pub fn scandir(&self, dir: &Dir) -> BoxFuture<DirectoryListing, io::Error> {
     let dir = dir.to_owned();
     let root = self.root.0.clone();
     self
       .pool
       .spawn_fn(move || PosixFS::scandir_sync(root, &dir))
+      .map(DirectoryListing)
       .to_boxed()
   }
 }
 
 impl VFS<io::Error> for Arc<PosixFS> {
-  fn read_link(&self, link: Link) -> BoxFuture<PathBuf, io::Error> {
-    PosixFS::read_link(self, &link)
+  fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
+    PosixFS::read_link(self, link)
   }
 
-  fn scandir(&self, dir: Dir) -> BoxFuture<Vec<Stat>, io::Error> {
-    PosixFS::scandir(self, &dir)
+  fn scandir(&self, dir: Dir) -> BoxFuture<Arc<DirectoryListing>, io::Error> {
+    PosixFS::scandir(self, &dir).map(Arc::new).to_boxed()
   }
 
   fn is_ignored(&self, stat: &Stat) -> bool {
@@ -702,7 +706,7 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
             .and_then(move |maybe_stat| {
               match maybe_stat {
                 // Note: This will drop PathStats for symlinks which don't point anywhere.
-                Some(Stat::Link(link)) => fs.canonicalize(link.0.clone(), link),
+                Some(Stat::Link(link)) => fs.canonicalize(link.0.clone(), &link),
                 Some(Stat::Dir(dir)) => {
                   future::ok(Some(PathStat::dir(dir.0.clone(), dir))).to_boxed()
                 }
@@ -722,8 +726,8 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
 /// A context for filesystem operations parameterized on an error type 'E'.
 ///
 pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
-  fn read_link(&self, link: Link) -> BoxFuture<PathBuf, E>;
-  fn scandir(&self, dir: Dir) -> BoxFuture<Vec<Stat>, E>;
+  fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, E>;
+  fn scandir(&self, dir: Dir) -> BoxFuture<Arc<DirectoryListing>, E>;
   fn is_ignored(&self, stat: &Stat) -> bool;
   fn mk_error(msg: &str) -> E;
 }
@@ -782,7 +786,9 @@ mod posixfs_test {
   extern crate tempfile;
   extern crate testutil;
 
-  use super::{Dir, File, Link, PathStat, PathStatGetter, PosixFS, ResettablePool, Stat};
+  use super::{
+    Dir, DirectoryListing, File, Link, PathStat, PathStatGetter, PosixFS, ResettablePool, Stat,
+  };
   use futures::Future;
   use std;
   use std::path::{Path, PathBuf};
@@ -914,7 +920,10 @@ mod posixfs_test {
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("empty_enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
-    assert_eq!(posix_fs.scandir(&Dir(path)).wait().unwrap(), vec![]);
+    assert_eq!(
+      posix_fs.scandir(&Dir(path)).wait().unwrap(),
+      DirectoryListing(vec![])
+    );
   }
 
   #[test]
@@ -948,7 +957,7 @@ mod posixfs_test {
 
     assert_eq!(
       posix_fs.scandir(&Dir(path)).wait().unwrap(),
-      vec![
+      DirectoryListing(vec![
         Stat::File(File {
           path: a_marmoset,
           is_executable: false,
@@ -963,7 +972,7 @@ mod posixfs_test {
           path: sneaky_marmoset,
           is_executable: false,
         }),
-      ]
+      ])
     );
   }
 
@@ -1062,8 +1071,8 @@ mod posixfs_test {
   fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
     let fs = new_posixfs(path);
     let stats = fs.scandir(&Dir(PathBuf::from("."))).wait().unwrap();
-    assert_eq!(stats.len(), 1);
-    match stats.get(0).unwrap() {
+    assert_eq!(stats.0.len(), 1);
+    match stats.0.get(0).unwrap() {
       &super::Stat::File(File {
         is_executable: got, ..
       }) => assert_eq!(want_is_executable, got),

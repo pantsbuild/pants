@@ -33,11 +33,11 @@ NATIVE_ENGINE_MODULE = 'native_engine'
 CFFI_TYPEDEFS = '''
 typedef uint64_t   Id;
 
-// Value is declared as a typedef rather than a wrapper struct because it avoids needing to wrap
+// Handle is declared as a typedef rather than a wrapper struct because it avoids needing to wrap
 // the inner handle/`void*` in a tuple or datatype at the ffi boundary. For most types that
-// overhead would not be worth worrying about, but Value is used often enough that it gives a 6%
+// overhead would not be worth worrying about, but Handle is used often enough that it gives a 6%
 // speedup to avoid the wrapping.
-typedef void*      Value;
+typedef void*      Handle;
 
 typedef struct {
   Id id_;
@@ -59,41 +59,40 @@ typedef struct {
 typedef struct {
   uint8_t*  bytes_ptr;
   uint64_t  bytes_len;
-  Value     handle_;
+  Handle    handle_;
 } Buffer;
 
 typedef struct {
-  Value*     values_ptr;
+  Handle*    values_ptr;
   uint64_t   values_len;
-  Value      handle_;
-} ValueBuffer;
+  Handle     handle_;
+} HandleBuffer;
 
 typedef struct {
   TypeId*     ids_ptr;
   uint64_t    ids_len;
-  Value       handle_;
+  Handle      handle_;
 } TypeIdBuffer;
 
 typedef struct {
   Buffer*     bufs_ptr;
   uint64_t    bufs_len;
-  Value       handle_;
+  Handle      handle_;
 } BufferBuffer;
 
 typedef struct {
   _Bool  is_throw;
-  Value  value;
+  Handle value;
 } PyResult;
 
 typedef struct {
-  uint8_t      tag;
-  ValueBuffer  values;
-  ValueBuffer  constraints;
+  uint8_t       tag;
+  HandleBuffer  values;
+  HandleBuffer  constraints;
 } PyGeneratorResponse;
 
 typedef struct {
   int64_t   hash_;
-  Value     value;
   TypeId    type_id;
 } Ident;
 
@@ -102,22 +101,22 @@ typedef void ExternContext;
 // On the rust side the integration is defined in externs.rs
 typedef void                (*extern_ptr_log)(ExternContext*, uint8_t, uint8_t*, uint64_t);
 typedef uint8_t             extern_log_level;
-typedef Ident               (*extern_ptr_identify)(ExternContext*, Value*);
-typedef _Bool               (*extern_ptr_equals)(ExternContext*, Value*, Value*);
-typedef Value               (*extern_ptr_clone_val)(ExternContext*, Value*);
-typedef void                (*extern_ptr_drop_handles)(ExternContext*, Value*, uint64_t);
+typedef Ident               (*extern_ptr_identify)(ExternContext*, Handle*);
+typedef _Bool               (*extern_ptr_equals)(ExternContext*, Handle*, Handle*);
+typedef Handle              (*extern_ptr_clone_val)(ExternContext*, Handle*);
+typedef void                (*extern_ptr_drop_handles)(ExternContext*, Handle*, uint64_t);
 typedef Buffer              (*extern_ptr_type_to_str)(ExternContext*, TypeId);
-typedef Buffer              (*extern_ptr_val_to_str)(ExternContext*, Value*);
-typedef _Bool               (*extern_ptr_satisfied_by)(ExternContext*, Value*, Value*);
-typedef _Bool               (*extern_ptr_satisfied_by_type)(ExternContext*, Value*, TypeId*);
-typedef Value               (*extern_ptr_store_tuple)(ExternContext*, Value*, uint64_t);
-typedef Value               (*extern_ptr_store_bytes)(ExternContext*, uint8_t*, uint64_t);
-typedef Value               (*extern_ptr_store_i64)(ExternContext*, int64_t);
-typedef ValueBuffer         (*extern_ptr_project_multi)(ExternContext*, Value*, uint8_t*, uint64_t);
-typedef Value               (*extern_ptr_project_ignoring_type)(ExternContext*, Value*, uint8_t*, uint64_t);
-typedef Value               (*extern_ptr_create_exception)(ExternContext*, uint8_t*, uint64_t);
-typedef PyResult            (*extern_ptr_call)(ExternContext*, Value*, Value*, uint64_t);
-typedef PyGeneratorResponse (*extern_ptr_generator_send)(ExternContext*, Value*, Value*);
+typedef Buffer              (*extern_ptr_val_to_str)(ExternContext*, Handle*);
+typedef _Bool               (*extern_ptr_satisfied_by)(ExternContext*, Handle*, Handle*);
+typedef _Bool               (*extern_ptr_satisfied_by_type)(ExternContext*, Handle*, TypeId*);
+typedef Handle              (*extern_ptr_store_tuple)(ExternContext*, Handle**, uint64_t);
+typedef Handle              (*extern_ptr_store_bytes)(ExternContext*, uint8_t*, uint64_t);
+typedef Handle              (*extern_ptr_store_i64)(ExternContext*, int64_t);
+typedef HandleBuffer        (*extern_ptr_project_multi)(ExternContext*, Handle*, uint8_t*, uint64_t);
+typedef Handle              (*extern_ptr_project_ignoring_type)(ExternContext*, Handle*, uint8_t*, uint64_t);
+typedef Handle              (*extern_ptr_create_exception)(ExternContext*, uint8_t*, uint64_t);
+typedef PyResult            (*extern_ptr_call)(ExternContext*, Handle*, Handle**, uint64_t);
+typedef PyGeneratorResponse (*extern_ptr_generator_send)(ExternContext*, Handle*, Handle*);
 typedef PyResult            (*extern_ptr_eval)(ExternContext*, uint8_t*, uint64_t);
 
 typedef void Tasks;
@@ -129,7 +128,7 @@ typedef struct {
   Key             subject;
   TypeConstraint  product;
   uint8_t         state_tag;
-  Value           state_value;
+  Handle          state_value;
 } RawNode;
 
 typedef struct {
@@ -163,8 +162,8 @@ void externs_set(ExternContext*,
                  extern_ptr_create_exception,
                  TypeId);
 
-Key externs_key_for(Value);
-Value externs_val_for(Key);
+Key key_for(Handle);
+Handle val_for(Key);
 
 Tasks* tasks_create(void);
 void tasks_task_begin(Tasks*, Function, TypeConstraint);
@@ -172,7 +171,7 @@ void tasks_add_get(Tasks*, TypeConstraint, TypeId);
 void tasks_add_select(Tasks*, TypeConstraint);
 void tasks_add_select_variant(Tasks*, TypeConstraint, Buffer);
 void tasks_task_end(Tasks*);
-void tasks_singleton_add(Tasks*, Value, TypeConstraint);
+void tasks_singleton_add(Tasks*, Handle, TypeConstraint);
 void tasks_destroy(Tasks*);
 
 Scheduler* scheduler_create(Tasks*,
@@ -212,7 +211,7 @@ Scheduler* scheduler_create(Tasks*,
                             uint64_t,
                             _Bool);
 void scheduler_pre_fork(Scheduler*);
-Value scheduler_metrics(Scheduler*, Session*);
+Handle scheduler_metrics(Scheduler*, Session*);
 RawNodes* scheduler_execute(Scheduler*, Session*, ExecutionRequest*);
 void scheduler_destroy(Scheduler*);
 
@@ -230,13 +229,13 @@ void graph_trace(Scheduler*, ExecutionRequest*, char*);
 
 PyResult  execution_add_root_select(Scheduler*, ExecutionRequest*, Key, TypeConstraint);
 
-PyResult capture_snapshots(Scheduler*, Value);
+PyResult capture_snapshots(Scheduler*, Handle);
 
-PyResult merge_directories(Scheduler*, Value);
+PyResult merge_directories(Scheduler*, Handle);
 
-PyResult materialize_directories(Scheduler*, Value);
+PyResult materialize_directories(Scheduler*, Handle);
 
-Value validator_run(Scheduler*);
+PyResult validator_run(Scheduler*);
 
 void rule_graph_visualize(Scheduler*, TypeIdBuffer, char*);
 void rule_subgraph_visualize(Scheduler*, TypeId, TypeConstraint, char*);
@@ -253,23 +252,23 @@ void garbage_collect_store(Scheduler*);
 CFFI_EXTERNS = '''
 extern "Python" {
   void                extern_log(ExternContext*, uint8_t, uint8_t*, uint64_t);
-  PyResult            extern_call(ExternContext*, Value*, Value*, uint64_t);
-  PyGeneratorResponse extern_generator_send(ExternContext*, Value*, Value*);
+  PyResult            extern_call(ExternContext*, Handle*, Handle**, uint64_t);
+  PyGeneratorResponse extern_generator_send(ExternContext*, Handle*, Handle*);
   PyResult            extern_eval(ExternContext*, uint8_t*, uint64_t);
-  Ident               extern_identify(ExternContext*, Value*);
-  _Bool               extern_equals(ExternContext*, Value*, Value*);
-  Value               extern_clone_val(ExternContext*, Value*);
-  void                extern_drop_handles(ExternContext*, Value*, uint64_t);
+  Ident               extern_identify(ExternContext*, Handle*);
+  _Bool               extern_equals(ExternContext*, Handle*, Handle*);
+  Handle              extern_clone_val(ExternContext*, Handle*);
+  void                extern_drop_handles(ExternContext*, Handle*, uint64_t);
   Buffer              extern_type_to_str(ExternContext*, TypeId);
-  Buffer              extern_val_to_str(ExternContext*, Value*);
-  _Bool               extern_satisfied_by(ExternContext*, Value*, Value*);
-  _Bool               extern_satisfied_by_type(ExternContext*, Value*, TypeId*);
-  Value               extern_store_tuple(ExternContext*, Value*, uint64_t);
-  Value               extern_store_bytes(ExternContext*, uint8_t*, uint64_t);
-  Value               extern_store_i64(ExternContext*, int64_t);
-  Value               extern_project_ignoring_type(ExternContext*, Value*, uint8_t*, uint64_t);
-  ValueBuffer         extern_project_multi(ExternContext*, Value*, uint8_t*, uint64_t);
-  Value               extern_create_exception(ExternContext*, uint8_t*, uint64_t);
+  Buffer              extern_val_to_str(ExternContext*, Handle*);
+  _Bool               extern_satisfied_by(ExternContext*, Handle*, Handle*);
+  _Bool               extern_satisfied_by_type(ExternContext*, Handle*, TypeId*);
+  Handle              extern_store_tuple(ExternContext*, Handle**, uint64_t);
+  Handle              extern_store_bytes(ExternContext*, uint8_t*, uint64_t);
+  Handle              extern_store_i64(ExternContext*, int64_t);
+  Handle              extern_project_ignoring_type(ExternContext*, Handle*, uint8_t*, uint64_t);
+  HandleBuffer        extern_project_multi(ExternContext*, Handle*, uint8_t*, uint64_t);
+  Handle              extern_create_exception(ExternContext*, uint8_t*, uint64_t);
 }
 '''
 
@@ -364,28 +363,27 @@ def _initialize_externs(ffi):
 
   @ffi.def_extern()
   def extern_identify(context_handle, val):
-    """Return an Ident containing a clone of the Value with its __hash__ and TypeId."""
+    """Return an Ident containing the __hash__ and TypeId for the given Handle."""
     c = ffi.from_handle(context_handle)
     obj = ffi.from_handle(val[0])
     hash_ = hash(obj)
-    cloned = c.to_value(obj)
     type_id = c.to_id(type(obj))
-    return (hash_, cloned, TypeId(type_id))
+    return (hash_, TypeId(type_id))
 
   @ffi.def_extern()
   def extern_equals(context_handle, val1, val2):
-    """Return true if the given Values are __eq__."""
+    """Return true if the given Handles are __eq__."""
     return ffi.from_handle(val1[0]) == ffi.from_handle(val2[0])
 
   @ffi.def_extern()
   def extern_clone_val(context_handle, val):
-    """Clone the given Value."""
+    """Clone the given Handle."""
     c = ffi.from_handle(context_handle)
     return c.to_value(ffi.from_handle(val[0]))
 
   @ffi.def_extern()
   def extern_drop_handles(context_handle, handles_ptr, handles_len):
-    """Drop the given Values."""
+    """Drop the given Handles."""
     c = ffi.from_handle(context_handle)
     handles = ffi.unpack(handles_ptr, handles_len)
     c.drop_handles(handles)
@@ -398,13 +396,13 @@ def _initialize_externs(ffi):
 
   @ffi.def_extern()
   def extern_val_to_str(context_handle, val):
-    """Given a Value for `obj`, write str(obj) and return it."""
+    """Given a Handle for `obj`, write str(obj) and return it."""
     c = ffi.from_handle(context_handle)
     return c.utf8_buf(six.text_type(c.from_value(val[0])))
 
   @ffi.def_extern()
   def extern_satisfied_by(context_handle, constraint_val, val):
-    """Given a TypeConstraint and a Value return constraint.satisfied_by(value)."""
+    """Given a TypeConstraint and a Handle return constraint.satisfied_by(value)."""
     constraint = ffi.from_handle(constraint_val[0])
     return constraint.satisfied_by(ffi.from_handle(val[0]))
 
@@ -417,25 +415,25 @@ def _initialize_externs(ffi):
 
   @ffi.def_extern()
   def extern_store_tuple(context_handle, vals_ptr, vals_len):
-    """Given storage and an array of Values, return a new Value to represent the list."""
+    """Given storage and an array of Handles, return a new Handle to represent the list."""
     c = ffi.from_handle(context_handle)
-    return c.to_value(tuple(c.from_value(val) for val in ffi.unpack(vals_ptr, vals_len)))
+    return c.to_value(tuple(c.from_value(val[0]) for val in ffi.unpack(vals_ptr, vals_len)))
 
   @ffi.def_extern()
   def extern_store_bytes(context_handle, bytes_ptr, bytes_len):
-    """Given a context and raw bytes, return a new Value to represent the content."""
+    """Given a context and raw bytes, return a new Handle to represent the content."""
     c = ffi.from_handle(context_handle)
     return c.to_value(bytes(ffi.buffer(bytes_ptr, bytes_len)))
 
   @ffi.def_extern()
   def extern_store_i64(context_handle, i64):
-    """Given a context and int32_t, return a new Value to represent the int32_t."""
+    """Given a context and int32_t, return a new Handle to represent the int32_t."""
     c = ffi.from_handle(context_handle)
     return c.to_value(i64)
 
   @ffi.def_extern()
   def extern_project_ignoring_type(context_handle, val, field_str_ptr, field_str_len):
-    """Given a Value for `obj`, and a field name, project the field as a new Value."""
+    """Given a Handle for `obj`, and a field name, project the field as a new Handle."""
     c = ffi.from_handle(context_handle)
     obj = c.from_value(val[0])
     field_name = to_py_str(field_str_ptr, field_str_len)
@@ -499,12 +497,12 @@ def _initialize_externs(ffi):
     """Given a callable, call it."""
     c = ffi.from_handle(context_handle)
     runnable = c.from_value(func[0])
-    args = tuple(c.from_value(arg) for arg in ffi.unpack(args_ptr, args_len))
+    args = tuple(c.from_value(arg[0]) for arg in ffi.unpack(args_ptr, args_len))
     return call(c, runnable, args)
 
   @ffi.def_extern()
   def extern_eval(context_handle, python_code_str_ptr, python_code_str_len):
-    """Given an evalable string, eval it and return a Value for its result."""
+    """Given an evalable string, eval it and return a Handle for its result."""
     c = ffi.from_handle(context_handle)
     return call(c, eval, [to_py_str(python_code_str_ptr, python_code_str_len)])
 
@@ -533,7 +531,7 @@ class ExternContext(object):
   """A wrapper around python objects used in static extern functions in this module.
 
   See comments in `src/rust/engine/src/interning.rs` for more information on the relationship
-  between `Key`s and `Value`s.
+  between `Key`s and `Handle`s.
   """
 
   def __init__(self, ffi, lib):
@@ -566,7 +564,7 @@ class ExternContext(object):
     return (buf_buf, len(bufs), self.to_value(buf_buf))
 
   def vals_buf(self, vals):
-    buf = self._ffi.new('Value[]', vals)
+    buf = self._ffi.new('Handle[]', vals)
     return (buf, len(vals), self.to_value(buf))
 
   def type_ids_buf(self, types):
@@ -581,6 +579,15 @@ class ExternContext(object):
   def from_value(self, val):
     return self._ffi.from_handle(val)
 
+  def raise_or_return(self, pyresult):
+    """Consumes the given PyResult to raise/return the exception/value it represents."""
+    value = self.from_value(pyresult.value)
+    self._handles.remove(pyresult.value)
+    if pyresult.is_throw:
+      raise value
+    else:
+      return value
+
   def drop_handles(self, handles):
     self._handles -= set(handles)
 
@@ -593,11 +600,11 @@ class ExternContext(object):
     return self._types[type_id]
 
   def to_key(self, obj):
-    cdata = self._lib.externs_key_for(self.to_value(obj))
+    cdata = self._lib.key_for(self.to_value(obj))
     return Key(cdata.id_, TypeId(cdata.type_id.id_))
 
   def from_key(self, key):
-    return self._lib.externs_val_for(key)
+    return self._lib.val_for(key)
 
 
 class Native(object):
@@ -662,7 +669,7 @@ class Native(object):
   @memoized_property
   def context(self):
     # We statically initialize a ExternContext to correspond to the queue of dropped
-    # Values that the native code maintains.
+    # Handles that the native code maintains.
     def init_externs():
       context = ExternContext(self.ffi, self.lib)
       self.lib.externs_set(context._handle,
