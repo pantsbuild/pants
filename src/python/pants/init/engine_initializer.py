@@ -39,7 +39,6 @@ from pants.option.global_options import (DEFAULT_EXECUTION_OPTIONS, ExecutionOpt
                                          GlobMatchErrorBehavior)
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.rules.core.register import create_core_rules
-from pants.util.collections import combined_dict
 from pants.util.objects import datatype
 
 
@@ -224,21 +223,24 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'goal_ma
     return graph, address_mapper
 
 
-def _make_goal_map_from_rules(rules):
-  goal_map = {}
-  goal_to_rule = [(rule.goal, rule) for rule in rules if getattr(rule, 'goal', None) is not None]
-  for goal, rule in goal_to_rule:
-    if goal in goal_map:
-      raise GoalMappingError(
-        'could not map goal `{}` to rule `{}`: already claimed by product `{}`'
-        .format(goal, rule, goal_map[goal])
-      )
-    goal_map[goal] = rule.output_type
-  return goal_map
-
-
 class EngineInitializer(object):
   """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
+
+  class GoalMappingError(Exception):
+    """Raised when a goal cannot be mapped to an @rule."""
+
+  @staticmethod
+  def _make_goal_map_from_rules(rules):
+    goal_map = {}
+    goal_to_rule = [(rule.goal, rule) for rule in rules if getattr(rule, 'goal', None) is not None]
+    for goal, rule in goal_to_rule:
+      if goal in goal_map:
+        raise EngineInitializer.GoalMappingError(
+          'could not map goal `{}` to rule `{}`: already claimed by product `{}`'
+          .format(goal, rule, goal_map[goal])
+        )
+      goal_map[goal] = rule.output_type
+    return goal_map
 
   @staticmethod
   def setup_legacy_graph(native, bootstrap_options, build_configuration):
@@ -344,7 +346,7 @@ class EngineInitializer(object):
       rules
     )
 
-    goal_map = _make_goal_map_from_rules(rules)
+    goal_map = EngineInitializer._make_goal_map_from_rules(rules)
 
     scheduler = Scheduler(
       native,

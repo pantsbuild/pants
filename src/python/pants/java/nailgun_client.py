@@ -221,12 +221,7 @@ class NailgunClient(object):
         traceback=sys.exc_info()[2]
       )
     except NailgunProtocol.ProtocolError as e:
-      # If we get to a `ProtocolError` and we don't yet have a pid, then
-      # the daemon has not yet achieved a successful fork - so we can
-      # treat that as a separate, retryable error (usually indicating that
-      # the daemon is in a bad state).
-      exc_type = self.NailgunExecutionError if self.pid is None else self.NailgunError
-      raise exc_type(
+      raise self.NailgunError(
         address=self._address_string,
         pid=self.pid,
         wrapped_exc=e,

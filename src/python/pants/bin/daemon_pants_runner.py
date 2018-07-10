@@ -14,13 +14,12 @@ from contextlib import contextmanager
 
 from setproctitle import setproctitle as set_process_title
 
+from pants.base.build_environment import get_buildroot
 from pants.base.exiter import Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
-from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.process_manager import ProcessManager
 from pants.util.contextutil import HardSystemExit, hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
@@ -75,23 +74,25 @@ class DaemonPantsRunner(ProcessManager):
   """
 
   @classmethod
-  def _parse_options(self, args, env):
-    options_bootstrapper = OptionsBootstrapper(args=args, env=env)
-    build_config = BuildConfigInitializer.get(options_bootstrapper)
-    options = OptionsInitializer.create(options_bootstrapper, build_config)
-    return build_config, options
-
-  @classmethod
   def create(cls, sock, args, env, fork_lock, scheduler_service):
-    deferred_exc = None
-    graph_helper = None
-    target_roots = None
     try:
-      with cls.nailgunned_stdio(sock, env):
-        build_config, options = cls._parse_options(args, env)
+      # N.B. This will temporarily redirect stdio in the daemon's pre-fork context
+      # to the nailgun session. We'll later do this a second time post-fork, because
+      # threads.
+      with cls.nailgunned_stdio(sock, env, handle_stdin=False):
+        options, build_config, options_bootstrapper = LocalPantsRunner.parse_options(args, env)
+        subprocess_dir = options.for_global_scope().pants_subprocessdir
         graph_helper, target_roots = scheduler_service.prefork(options, build_config)
+        deferred_exc = None
     except Exception:
       deferred_exc = sys.exc_info()
+      graph_helper = None
+      target_roots = None
+      options_bootstrapper = None
+      # N.B. This will be overridden with the correct value if options
+      # parsing is successful - otherwise it permits us to run just far
+      # enough to raise the deferred exception.
+      subprocess_dir = os.path.join(get_buildroot(), '.pids')
 
     return cls(
       sock,
@@ -100,12 +101,13 @@ class DaemonPantsRunner(ProcessManager):
       fork_lock,
       graph_helper,
       target_roots,
-      options.for_global_scope().pants_subprocessdir,
+      subprocess_dir,
+      options_bootstrapper,
       deferred_exc
     )
 
   def __init__(self, socket, args, env, fork_lock, graph_helper, target_roots,
-               metadata_base_dir, deferred_exc=None):
+               metadata_base_dir, options_bootstrapper, deferred_exc):
     """
     :param socket socket: A connected socket capable of speaking the nailgun protocol.
     :param list args: The arguments (i.e. sys.argv) for this run.
@@ -116,6 +118,7 @@ class DaemonPantsRunner(ProcessManager):
                                             None.
     :param TargetRoots target_roots: The `TargetRoots` for this run.
     :param str metadata_base_dir: The ProcessManager metadata_base_dir from options.
+    :param OptionsBootstrapper options_bootstrapper: An OptionsBootstrapper to reuse.
     :param Exception deferred_exception: A deferred exception from the daemon's pre-fork context.
                                          If present, this will be re-raised in the client context.
     """
@@ -129,6 +132,7 @@ class DaemonPantsRunner(ProcessManager):
     self._fork_lock = fork_lock
     self._graph_helper = graph_helper
     self._target_roots = target_roots
+    self._options_bootstrapper = options_bootstrapper
     self._deferred_exception = deferred_exc
 
     self._exiter = DaemonExiter(socket)
@@ -164,14 +168,27 @@ class DaemonPantsRunner(ProcessManager):
 
   @classmethod
   @contextmanager
-  def _pipe_stdio(cls, sock, stdin_isatty, stdout_isatty, stderr_isatty):
+  def _pipe_stdio(cls, sock, stdin_isatty, stdout_isatty, stderr_isatty, handle_stdin):
     """Handles stdio redirection in the case of pipes and/or mixed pipes and ttys."""
     stdio_writers = (
       (ChunkType.STDOUT, stdout_isatty),
       (ChunkType.STDERR, stderr_isatty)
     )
     types, ttys = zip(*(stdio_writers))
-    with NailgunStreamStdinReader.open(sock, stdin_isatty) as stdin_fd,\
+
+    @contextmanager
+    def maybe_handle_stdin(want):
+      if want:
+        # TODO: Launching this thread pre-fork to handle @rule input currently results
+        # in an unhandled SIGILL in `src/python/pants/engine/scheduler.py, line 313 in pre_fork`.
+        # More work to be done here in https://github.com/pantsbuild/pants/issues/6005
+        with NailgunStreamStdinReader.open(sock, stdin_isatty) as fd:
+          yield fd
+      else:
+        with open('/dev/null', 'rb') as fh:
+          yield fh.fileno()
+
+    with maybe_handle_stdin(handle_stdin) as stdin_fd,\
          NailgunStreamWriter.open_multi(sock, types, ttys) as ((stdout_fd, stderr_fd), writer),\
          stdio_as(stdout_fd=stdout_fd, stderr_fd=stderr_fd, stdin_fd=stdin_fd):
       # N.B. This will be passed to and called by the `DaemonExiter` prior to sending an
@@ -191,16 +208,23 @@ class DaemonPantsRunner(ProcessManager):
 
   @classmethod
   @contextmanager
-  def nailgunned_stdio(cls, sock, env):
+  def nailgunned_stdio(cls, sock, env, handle_stdin=True):
     """Redirects stdio to the connected socket speaking the nailgun protocol."""
     # Determine output tty capabilities from the environment.
     stdin_isatty, stdout_isatty, stderr_isatty = NailgunProtocol.isatty_from_env(env)
+    is_tty_capable = all((stdin_isatty, stdout_isatty, stderr_isatty))
 
-    if all((stdin_isatty, stdout_isatty, stderr_isatty)):
+    if is_tty_capable:
       with cls._tty_stdio(env) as finalizer:
         yield finalizer
     else:
-      with cls._pipe_stdio(sock, stdin_isatty, stdout_isatty, stderr_isatty) as finalizer:
+      with cls._pipe_stdio(
+        sock,
+        stdin_isatty,
+        stdout_isatty,
+        stderr_isatty,
+        handle_stdin
+      ) as finalizer:
         yield finalizer
 
   def _setup_sigint_handler(self):
@@ -277,12 +301,13 @@ class DaemonPantsRunner(ProcessManager):
         self._raise_deferred_exc()
 
         # Otherwise, conduct a normal run.
-        runner = LocalPantsRunner(
+        runner = LocalPantsRunner.create(
           self._exiter,
           self._args,
           self._env,
-          target_roots=self._target_roots,
-          daemon_build_graph=self._graph_helper
+          self._target_roots,
+          self._graph_helper,
+          self._options_bootstrapper
         )
         runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
         runner.run()

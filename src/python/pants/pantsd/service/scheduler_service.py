@@ -41,6 +41,7 @@ class SchedulerService(PantsService):
     :param str build_root: The current build root.
     :param list invalidation_globs: A list of `globs` that when encountered in filesystem event
                                     subscriptions will tear down the daemon.
+    :param string pantsd_pidfile: The path to the pantsd pidfile for fs event monitoring.
     """
     super(SchedulerService, self).__init__()
     self._fs_event_service = fs_event_service

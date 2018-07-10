@@ -6,8 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import select
-import sys
-import traceback
 from contextlib import contextmanager
 
 from pants.pantsd.pailgun_server import PailgunServer
