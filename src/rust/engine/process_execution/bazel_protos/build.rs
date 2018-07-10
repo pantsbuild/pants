@@ -23,7 +23,7 @@ fn main() {
 
   protoc_grpcio::compile_grpc_protos(
     &[
-      "google/devtools/remoteexecution/v1test/remote_execution.proto",
+      "build/bazel/remote/execution/v2/remote_execution.proto",
       "google/bytestream/bytestream.proto",
       "google/rpc/code.proto",
       "google/rpc/error_details.proto",
@@ -32,6 +32,7 @@ fn main() {
       "google/protobuf/empty.proto",
     ],
     &[
+      thirdpartyprotobuf.join("bazelbuild_remote-apis"),
       thirdpartyprotobuf.join("googleapis"),
       thirdpartyprotobuf.join("standard"),
       thirdpartyprotobuf.join("rust-protobuf"),

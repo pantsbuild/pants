@@ -8,6 +8,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 use bazel_protos;
+use futures::{Future, Sink};
 use grpcio;
 use protobuf;
 
@@ -155,7 +156,7 @@ impl MockResponder {
       .concat()
   }
 
-  fn send_next_operation(
+  fn send_next_operation_unary(
     &self,
     sink: grpcio::UnarySink<super::bazel_protos::operations::Operation>,
   ) {
@@ -180,26 +181,77 @@ impl MockResponder {
       }
     }
   }
+
+  fn send_next_operation_stream(
+    &self,
+    ctx: grpcio::RpcContext,
+    sink: grpcio::ServerStreamingSink<super::bazel_protos::operations::Operation>,
+  ) {
+    match self
+      .mock_execution
+      .operation_responses
+      .lock()
+      .unwrap()
+      .pop_front()
+    {
+      Some((op, duration)) => {
+        if let Some(d) = duration {
+          sleep(d);
+        }
+        ctx.spawn(
+          sink
+            .send((op.clone(), grpcio::WriteFlags::default()))
+            .map(|mut stream| stream.close())
+            .map(|_| ())
+            .map_err(|_| ()),
+        )
+      }
+      None => ctx.spawn(
+        sink
+          .fail(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::InvalidArgument,
+            Some("Did not expect further requests from client.".to_string()),
+          ))
+          .map(|_| ())
+          .map_err(|_| ()),
+      ),
+    }
+  }
 }
 
 impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
+  // We currently only support the one-shot "stream and disconnect" client behavior.
+  // If we start supporting the "stream updates" variant, we will need to do so here.
   fn execute(
     &self,
-    _: grpcio::RpcContext,
+    ctx: grpcio::RpcContext,
     req: bazel_protos::remote_execution::ExecuteRequest,
-    sink: grpcio::UnarySink<super::bazel_protos::operations::Operation>,
+    sink: grpcio::ServerStreamingSink<bazel_protos::operations::Operation>,
   ) {
     self.log(req.clone());
 
     if self.mock_execution.execute_request != req {
-      sink.fail(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::InvalidArgument,
-        Some("Did not expect this request".to_string()),
-      ));
+      ctx.spawn(
+        sink
+          .fail(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::InvalidArgument,
+            Some("Did not expect this request".to_string()),
+          ))
+          .map_err(|_| ()),
+      );
       return;
     }
 
-    self.send_next_operation(sink);
+    self.send_next_operation_stream(ctx, sink);
+  }
+
+  fn wait_execution(
+    &self,
+    _ctx: grpcio::RpcContext,
+    _req: bazel_protos::remote_execution::WaitExecutionRequest,
+    _sink: grpcio::ServerStreamingSink<bazel_protos::operations::Operation>,
+  ) {
+    unimplemented!()
   }
 }
 
@@ -212,7 +264,7 @@ impl bazel_protos::operations_grpc::Operations for MockResponder {
   ) {
     self.log(req.clone());
 
-    self.send_next_operation(sink)
+    self.send_next_operation_unary(sink)
   }
 
   fn list_operations(
