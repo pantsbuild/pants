@@ -58,3 +58,9 @@ int mangled_function(int x) {
 }
 
 extern "C" int multiply_by_three(int x) { return mangled_function(x * 3); }
+
+extern "C"
+{
+void *__dso_handle = NULL;
+}
+
