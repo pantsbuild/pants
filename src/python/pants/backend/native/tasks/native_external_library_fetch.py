@@ -52,7 +52,6 @@ class ConanRequirement(datatype(['pkg_spec'])):
 class NativeExternalLibraryFetch(Task):
   options_scope = 'native-external-library-fetch'
   native_library_constraint = Exactly(ExternalNativeLibrary)
-  any_library_filename_regex = re.compile(r"^lib\.(a|so|dylib)$")
 
   class NativeExternalLibraryFetchError(TaskError):
     pass
@@ -77,7 +76,7 @@ class NativeExternalLibraryFetch(Task):
 
   @classmethod
   def _parse_lib_name_from_library_filename(cls, filename):
-    match_group = re.match(cls.any_library_filename_regex, filename)
+    match_group = re.match(r"^lib(.*)\.(a|so|dylib)$", filename)
     if match_group:
       return match_group.group(1)
     return None
