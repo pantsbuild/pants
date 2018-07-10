@@ -10,7 +10,6 @@ import os
 from zipfile import ZipFile
 
 from pants.backend.native.config.environment import Platform
-from pants.base.build_environment import get_buildroot
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import is_executable

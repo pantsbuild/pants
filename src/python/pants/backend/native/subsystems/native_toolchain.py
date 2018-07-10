@@ -77,6 +77,7 @@ def select_linker(platform, native_toolchain):
   # its own set of C++-specific files for the linker if necessary. Using e.g. 'g++' as the linker
   # appears to produce byte-identical output when linking even C-only object files, and also
   # happens to work when C++ is used.
+  # Currently, OSX links through the clang++ frontend, and Linux links through the g++ frontend.
   if platform.normalized_os_name == 'darwin':
     # TODO(#5663): turn this into LLVM when lld works.
     linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)

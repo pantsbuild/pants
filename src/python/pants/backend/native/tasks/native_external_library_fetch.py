@@ -18,8 +18,7 @@ from pants.task.task import Task
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
-from pants.util.objects import datatype, Exactly
-from pants.util.osutil import get_normalized_os_name
+from pants.util.objects import Exactly, datatype
 from pants.util.process_handler import subprocess
 
 
@@ -76,9 +75,9 @@ class NativeExternalLibraryFetch(Task):
         lib_args.append(lib_dir_arg)
       return lib_args
 
-  @staticmethod
-  def _parse_lib_name_from_library_filename(filename):
-    match_group = re.match(any_library_filename_regex, filename)
+  @classmethod
+  def _parse_lib_name_from_library_filename(cls, filename):
+    match_group = re.match(cls.any_library_filename_regex, filename)
     if match_group:
       return match_group.group(1)
     return None

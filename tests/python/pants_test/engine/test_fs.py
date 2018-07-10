@@ -12,8 +12,8 @@ import unittest
 from contextlib import contextmanager
 
 from pants.base.project_tree import Dir, Link
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, DirectoryToMaterialize, FilesContent, PathGlobs,
-                             PathGlobsAndRoot, Snapshot, create_fs_rules)
+from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, DirectoryToMaterialize,
+                             FilesContent, PathGlobs, PathGlobsAndRoot, Snapshot, create_fs_rules)
 from pants.util.contextutil import temporary_dir
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
