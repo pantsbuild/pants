@@ -6,10 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import range
 from contextlib import contextmanager
 from textwrap import dedent
 
-from six.moves import range
 from twitter.common.collections import maybe_list
 
 from pants.backend.jvm.targets.java_agent import JavaAgent

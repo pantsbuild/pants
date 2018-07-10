@@ -65,9 +65,10 @@ python_tests(
 )
 
 python_tests(
-  name='java_compile_settings_partitioning',
-  sources=['test_java_compile_settings_partitioning.py'],
-  dependencies=[
+  name = 'java_compile_settings_partitioning',
+  sources = ['test_java_compile_settings_partitioning.py'],
+  dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'src/python/pants/fs',
     'src/python/pants/subsystem',
@@ -80,9 +81,10 @@ python_tests(
 )
 
 python_library(
-  name='jvm_platform_integration_mixin',
-  sources=['jvm_platform_integration_mixin.py'],
-  dependencies=[
+  name = 'jvm_platform_integration_mixin',
+  sources = ['jvm_platform_integration_mixin.py'],
+  dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

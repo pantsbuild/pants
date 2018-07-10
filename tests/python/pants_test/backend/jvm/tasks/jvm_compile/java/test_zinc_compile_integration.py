@@ -164,7 +164,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
       classpath_file_by_target_id[target_id] = '{}.txt'.format(target_id)
 
     with self.do_test_compile(target_rel_spec,
-      expected_files=classpath_file_by_target_id.values(),
+      expected_files = list(classpath_file_by_target_id.values()),
       extra_args=['--compile-zinc-capture-classpath']) as found:
       for target_id, filename in classpath_file_by_target_id.items():
         found_classpath_file = self.get_only(found, filename)
