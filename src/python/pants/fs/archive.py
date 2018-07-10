@@ -217,7 +217,7 @@ _ARCHIVER_BY_TYPE = OrderedDict(
   zip=ZIP)
 
 archive_extensions = {
-  name:archiver.extension for name, archiver in _ARCHIVER_BY_TYPE.items()
+  name: archiver.extension for name, archiver in _ARCHIVER_BY_TYPE.items()
 }
 
 TYPE_NAMES = frozenset(_ARCHIVER_BY_TYPE.keys())
