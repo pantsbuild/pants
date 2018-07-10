@@ -5,8 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import itertools
 import os
+from builtins import filter, object
 from collections import OrderedDict
 
 from twitter.common.collections import OrderedSet
@@ -86,7 +86,7 @@ class ClasspathUtil(object):
     :rtype: OrderedDict
     """
     classpath_target_tuples = classpath_products.get_product_target_mappings_for_targets(targets)
-    filtered_items_iter = itertools.ifilter(cls._accept_conf_filter(confs, lambda x: x[0][0]),
+    filtered_items_iter = filter(cls._accept_conf_filter(confs, lambda x: x[0][0]),
                                             classpath_target_tuples)
 
     # group (classpath_entry, target) tuples by targets
@@ -110,7 +110,7 @@ class ClasspathUtil(object):
   @classmethod
   def _filtered_classpath_by_confs_iter(cls, classpath_tuples, confs):
     filter_func = cls._accept_conf_filter(confs, unpack_func=lambda x: x[0])
-    return itertools.ifilter(filter_func, classpath_tuples)
+    return filter(filter_func, classpath_tuples)
 
   @classmethod
   def _entries_iter(cls, classpath):

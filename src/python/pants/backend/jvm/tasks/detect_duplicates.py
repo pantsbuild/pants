@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
+from builtins import filter, str
 from collections import defaultdict
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil

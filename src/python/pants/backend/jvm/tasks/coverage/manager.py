@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
+from builtins import object
 
 from pants.backend.jvm.tasks.coverage.cobertura import Cobertura
 from pants.backend.jvm.tasks.coverage.engine import NoCoverage

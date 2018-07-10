@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import six
+import future
 from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import TargetDefinitionException
@@ -99,7 +99,7 @@ class JarLibrary(Target):
     """
     jar_deps = OrderedSet()
     for spec in jar_library_specs:
-      if not isinstance(spec, six.string_types):
+      if not isinstance(spec, future.utils.string_types):
         raise JarLibrary.ExpectedAddressError(
           "{address}: expected imports to contain string addresses, got {found_class}."
           .format(address=relative_to.spec,

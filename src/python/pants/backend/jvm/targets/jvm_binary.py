@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import re
 from hashlib import sha1
 
-from six import string_types
+from future.utils import string_types
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException

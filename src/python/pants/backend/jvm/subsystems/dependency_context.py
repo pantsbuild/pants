@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import hashlib
+from builtins import str
 
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform

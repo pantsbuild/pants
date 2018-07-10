@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import functools
 import os
+from builtins import object, str
 from multiprocessing import cpu_count
 
 from twitter.common.collections import OrderedSet

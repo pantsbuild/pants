@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import re
+from builtins import next, object, str
 from collections import OrderedDict
 
 import six

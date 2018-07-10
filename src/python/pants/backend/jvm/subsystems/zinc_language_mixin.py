@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from builtins import object
+
 
 class ZincLanguageMixin(object):
   """A mixin for subsystems for languages compiled with Zinc."""

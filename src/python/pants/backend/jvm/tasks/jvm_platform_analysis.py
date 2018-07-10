@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import re
+from builtins import filter, map, object, str
 from collections import defaultdict, namedtuple
 from hashlib import sha1
 
@@ -230,7 +231,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
       for target, deps in invalids:
         for dep in deps:
           dependency_to_dependees[dep].add(target)
-      invalids = dependency_to_dependees.items()
+      invalids = list(dependency_to_dependees.items())
 
     invalids = sorted(invalids)
     individual_errors = '\n'.join(self._create_individual_error_message(target, deps)
@@ -328,7 +329,7 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
     min_allowed_version = {}
 
     def get_versions(targets):
-      return map(self.jvm_version, targets)
+      return list(map(self.jvm_version, targets))
 
     for target in self.jvm_targets:
       if target_dependencies[target]:

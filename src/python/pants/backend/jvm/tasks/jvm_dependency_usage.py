@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 import os
 import sys
+from builtins import next, object
 from collections import defaultdict, namedtuple
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -213,7 +214,7 @@ class JvmDependencyUsage(Task):
         nodes[concrete_target] = node
 
     # Prune any Nodes with 0 products.
-    for concrete_target, node in nodes.items()[:]:
+    for concrete_target, node in list(nodes.items()):  # copy because mutation
       if node.products_total == 0:
         nodes.pop(concrete_target)
 

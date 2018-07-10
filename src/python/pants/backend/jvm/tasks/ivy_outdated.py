@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
+from builtins import str
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.subsystems.shader import Shader

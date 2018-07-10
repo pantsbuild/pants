@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from six import string_types
+from future.utils import string_types
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TargetDefinitionException

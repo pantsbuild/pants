@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+from builtins import map, next, object
 from collections import defaultdict
 from textwrap import dedent
 
@@ -255,7 +256,7 @@ class PinnedJarArtifactSet(object):
   def __len__(self):
     return len(self._artifacts_to_versions)
 
-  def __nonzero__(self):
+  def __bool__(self):
     return len(self) > 0
 
   def __contains__(self, artifact):

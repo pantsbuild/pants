@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import six
+import future
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -53,7 +53,7 @@ class ImportJarsMixin(Target):
         for item in target_representation.get(fields_tuple[field_pos], ()):
           # For better error handling, this simply skips over non-strings, but we catch them
           # with a WrongTargetType in JarLibrary.to_jar_dependencies.
-          if not isinstance(item, six.string_types):
+          if not isinstance(item, future.utils.string_types):
             raise JarLibrary.ExpectedAddressError(
               'expected imports to contain string addresses, got {found_class} instead.'
               .format(found_class=type(item).__name__)
