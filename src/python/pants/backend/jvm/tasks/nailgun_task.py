@@ -93,12 +93,15 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
       return SubprocessExecutor(dist)
 
   def runjava(self, classpath, main, jvm_options=None, args=None, workunit_name=None,
-              workunit_labels=None, workunit_log_config=None, dist=None):
+              workunit_labels=None, workunit_log_config=None, dist=None, return_workunit=False):
     """Runs the java main using the given classpath and args.
 
     If --no-use-nailgun is specified then the java main is run in a freshly spawned subprocess,
     otherwise a persistent nailgun server dedicated to this Task subclass is used to speed up
     amortized run times.
+
+    If return_workunit is True, a tuple of (exit_code, WorkUnit) will be returned. Otherwise, just
+    the exit_code will be returned.
 
     :API: public
     """
@@ -119,7 +122,8 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
                                workunit_labels=workunit_labels,
                                workunit_log_config=workunit_log_config,
                                create_synthetic_jar=create_synthetic_jar,
-                               synthetic_jar_dir=self._executor_workdir)
+                               synthetic_jar_dir=self._executor_workdir,
+                               return_workunit=return_workunit)
     except executor.Error as e:
       raise TaskError(e)
 

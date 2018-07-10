@@ -41,7 +41,8 @@ def _get_runner(classpath, main, jvm_options, args, executor,
 def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
                  workunit_factory=None, workunit_name=None, workunit_labels=None,
                  cwd=None, workunit_log_config=None, distribution=None,
-                 create_synthetic_jar=True, synthetic_jar_dir=None, stdin=None):
+                 create_synthetic_jar=True, synthetic_jar_dir=None, stdin=None,
+                 return_workunit=False):
   """Executes the java program defined by the classpath and main.
 
   If `workunit_factory` is supplied, does so in the context of a workunit.
@@ -63,6 +64,8 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
     a temporary directory will be provided and cleaned up upon process exit.
   :param file stdin: The stdin handle to use: by default None, meaning that stdin will
     not be propagated into the process.
+  :param return_workunit: If True, a tuple of (exit_code, WorkUnit) will be returned. Otherwise,
+    just the exit_code will be returned.
 
   Returns the exit code of the java program.
   Raises `pants.java.Executor.Error` if there was a problem launching java itself.
@@ -77,7 +80,8 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
                         workunit_name=workunit_name,
                         workunit_labels=workunit_labels,
                         workunit_log_config=workunit_log_config,
-                        stdin=stdin)
+                        stdin=stdin,
+                        return_workunit=return_workunit)
 
 
 def execute_java_async(classpath, main, jvm_options=None, args=None, executor=None,
@@ -121,7 +125,7 @@ def execute_java_async(classpath, main, jvm_options=None, args=None, executor=No
 
 
 def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_labels=None,
-                   workunit_log_config=None, stdin=None):
+                   workunit_log_config=None, stdin=None, return_workunit=False):
   """Executes the given java runner.
 
   If `workunit_factory` is supplied, does so in the context of a workunit.
@@ -133,6 +137,8 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
   :param WorkUnit.LogConfig workunit_log_config: an optional tuple of task options affecting reporting
   :param file stdin: The stdin handle to use: by default None, meaning that stdin will
     not be propagated into the process.
+  :param return_workunit: If true, a tuple of (exit_code, WorkUnit) will be returned, else just the
+    exit_code.
 
   Returns the exit code of the java runner.
   Raises `pants.java.Executor.Error` if there was a problem launching java itself.
@@ -155,6 +161,8 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
                        stderr=workunit.output('stderr'),
                        stdin=stdin)
       workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
+      if return_workunit:
+        return ret, workunit
       return ret
 
 
