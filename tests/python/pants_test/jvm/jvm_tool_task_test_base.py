@@ -75,13 +75,17 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
 
     Bootstrapper.reset_instance()
 
-  def context(self, for_task_types=None, **kwargs):
+  def context(self, for_task_types=None, workunit_output_dir=None, **kwargs):
     """
     :API: public
     """
     # Add in the bootstrapper task type, so its options get registered and set.
     for_task_types = [self.bootstrap_task_type] + (for_task_types or [])
-    return super(JvmToolTaskTestBase, self).context(for_task_types=for_task_types, **kwargs)
+    return super(JvmToolTaskTestBase, self).context(
+      for_task_types=for_task_types,
+      workunit_output_dir=workunit_output_dir,
+      **kwargs
+    )
 
   def prepare_execute(self, context):
     """Prepares a jvm tool-using task for execution, first bootstrapping any required jvm tools.

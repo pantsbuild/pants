@@ -70,7 +70,12 @@ class TestContext(Context):
       return super(TestContext.TestLogger, self).makeRecord(
         name, lvl, fn, lno, msg, args, exc_info, func, extra)
 
-  def __init__(self, *args, **kwargs):
+  def __init__(self, workunit_output_dir=None, *args, **kwargs):
+    """
+    :param workunit_output_dir: If None, a dummy WorkUnit which always writes to stderr will be
+      returned any time new_workunit is called. Otherwise, a real WorkUnit will be returned, which
+      writes output to workunit_output_dir.
+    """
     super(TestContext, self).__init__(*args, **kwargs)
     logger_cls = logging.getLoggerClass()
     try:
@@ -78,14 +83,25 @@ class TestContext(Context):
       self._logger = logging.getLogger('test')
     finally:
       logging.setLoggerClass(logger_cls)
+    self._workunit_output_dir = workunit_output_dir
 
   @contextmanager
   def new_workunit(self, name, labels=None, cmd='', log_config=None):
     """
     :API: public
     """
-    sys.stderr.write('\nStarting workunit {}\n'.format(name))
-    yield TestContext.DummyWorkUnit()
+    if self._workunit_output_dir is None:
+      sys.stderr.write('\nStarting workunit {}\n'.format(name))
+      yield TestContext.DummyWorkUnit()
+    else:
+      yield WorkUnit(
+        run_info_dir=self._workunit_output_dir,
+        parent='',
+        name=name,
+        labels=labels,
+        cmd=cmd,
+        log_config=log_config,
+      )
 
   @property
   def log(self):
@@ -113,7 +129,7 @@ class TestContext(Context):
 
 def create_context_from_options(options, target_roots=None, build_graph=None,
                                 build_file_parser=None, address_mapper=None, console_outstream=None,
-                                workspace=None, scheduler=None):
+                                workspace=None, scheduler=None, workunit_output_dir=None):
   """Creates a ``Context`` with the given options and no targets by default.
 
   :param options: An :class:`pants.option.options.Option`-alike object that supports read methods.
@@ -125,4 +141,5 @@ def create_context_from_options(options, target_roots=None, build_graph=None,
   return TestContext(options=options, run_tracker=run_tracker, target_roots=target_roots,
                      build_graph=build_graph, build_file_parser=build_file_parser,
                      address_mapper=address_mapper, console_outstream=console_outstream,
-                     workspace=workspace, scheduler=scheduler)
+                     workspace=workspace, scheduler=scheduler,
+                     workunit_output_dir=workunit_output_dir)
