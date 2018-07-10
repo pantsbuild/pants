@@ -469,7 +469,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
             result += abs(subprocess_result)
 
         tests_info = self.parse_test_info(batch_output_dir, parse_error_handler, ['classname'])
-        for test_name, test_info in list(tests_info.items()):
+        for test_name, test_info in tests_info.items():
           test_item = Test(test_info['classname'], test_name)
           test_target = test_registry.get_owning_target(test_item)
           self.report_all_info_for_single_test(self.options_scope, test_target,
