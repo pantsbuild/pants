@@ -687,8 +687,8 @@ class JvmCompile(NailgunTaskBase):
 
         dep_context = DependencyContext.global_instance()
         tgt, = vts.targets
-        fatal_warnings = dep_context.defaulted_property(tgt, lambda x: x.fatal_warnings)
         compiler_option_sets = dep_context.defaulted_property(tgt, lambda x: x.compiler_option_sets)
+        fatal_warnings = 'fatal_warnings' in compiler_option_sets
         zinc_file_manager = dep_context.defaulted_property(tgt, lambda x: x.zinc_file_manager)
         with Timer() as timer:
           self._compile_vts(vts,
