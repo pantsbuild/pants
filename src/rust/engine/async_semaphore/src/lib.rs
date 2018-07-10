@@ -30,24 +30,20 @@ impl AsyncSemaphore {
   ///
   /// Runs the given Future-creating function (and the Future it returns) under the semaphore.
   ///
-  pub fn with_acquired<F, B, T, E>(&self, f: F) -> Box<Future<Item = T, Error = E> + Send>
+  pub fn with_acquired<F, B, T, E>(&self, f: F) -> impl Future<Item = T, Error = E> + Send
   where
     F: FnOnce() -> B + Send + 'static,
     B: Future<Item = T, Error = E> + Send + 'static,
   {
-    let permit = PermitFuture {
+    PermitFuture {
       inner: Some(self.inner.clone()),
-    };
-    Box::new(
-      permit
-        .map_err(|()| panic!("Acquisition is infalliable."))
-        .and_then(|permit| {
-          f().map(move |t| {
-            drop(permit);
-            t
-          })
-        }),
-    )
+    }.map_err(|()| panic!("Acquisition is infalliable."))
+      .and_then(|permit| {
+        f().map(move |t| {
+          drop(permit);
+          t
+        })
+      })
   }
 }
 

@@ -10,7 +10,7 @@ use tokio::runtime::Runtime;
 
 use futures::Future;
 
-use boxfuture::{BoxFuture, Boxable};
+use boxfuture::IFuture;
 use core::{Failure, TypeId};
 use externs;
 use fs::{safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
@@ -146,7 +146,7 @@ impl Context {
   ///
   /// Get the future value for the given Node implementation.
   ///
-  pub fn get<N: WrappedNode>(&self, node: N) -> BoxFuture<N::Item, Failure> {
+  pub fn get<N: WrappedNode>(&self, node: N) -> impl IFuture<N::Item, Failure> {
     // TODO: Odd place for this... could do it periodically in the background?
     if let Some(handles) = maybe_drain_handles() {
       externs::drop_handles(&handles);
@@ -160,7 +160,6 @@ impl Context {
           .try_into()
           .unwrap_or_else(|_| panic!("A Node implementation was ambiguous."))
       })
-      .to_boxed()
   }
 }
 

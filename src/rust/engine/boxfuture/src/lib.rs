@@ -39,3 +39,11 @@ macro_rules! try_future {
     }
   }};
 }
+
+///
+/// A trait alias specifically for _avoiding_ `BoxFuture` via `impl IFuture`.
+///
+#[cfg_attr(rustfmt, rustfmt_skip)]
+pub trait IFuture<T, E>: Future<Item=T, Error=E> {}
+#[cfg_attr(rustfmt, rustfmt_skip)]
+impl<T, E, I> IFuture<T, E> for I where I: Future<Item=T, Error=E> {}

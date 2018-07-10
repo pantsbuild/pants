@@ -53,7 +53,7 @@ use futures::future::{self, Future};
 use glob::Pattern;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 
-use boxfuture::{BoxFuture, Boxable};
+use boxfuture::{BoxFuture, Boxable, IFuture};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Stat {
@@ -543,49 +543,43 @@ impl PosixFS {
     self.ignore.is_ignored(stat)
   }
 
-  pub fn read_file(&self, file: &File) -> BoxFuture<FileContent, io::Error> {
+  pub fn read_file(&self, file: &File) -> impl IFuture<FileContent, io::Error> {
     let path = file.path.clone();
     let path_abs = self.root.0.join(&file.path);
-    self
-      .pool
-      .spawn_fn(move || {
-        std::fs::File::open(&path_abs).and_then(|mut f| {
-          let mut content = Vec::new();
-          f.read_to_end(&mut content)?;
-          Ok(FileContent {
-            path: path,
-            content: Bytes::from(content),
-          })
+    self.pool.spawn_fn(move || {
+      std::fs::File::open(&path_abs).and_then(|mut f| {
+        let mut content = Vec::new();
+        f.read_to_end(&mut content)?;
+        Ok(FileContent {
+          path: path,
+          content: Bytes::from(content),
         })
       })
-      .to_boxed()
+    })
   }
 
-  pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
+  pub fn read_link(&self, link: &Link) -> impl IFuture<PathBuf, io::Error> {
     let link_parent = link.0.parent().map(|p| p.to_owned());
     let link_abs = self.root.0.join(link.0.as_path()).to_owned();
-    self
-      .pool
-      .spawn_fn(move || {
-        link_abs.read_link().and_then(|path_buf| {
-          if path_buf.is_absolute() {
-            Err(io::Error::new(
-              io::ErrorKind::InvalidData,
-              format!("Absolute symlink: {:?}", link_abs),
-            ))
-          } else {
-            link_parent
-              .map(|parent| parent.join(path_buf))
-              .ok_or_else(|| {
-                io::Error::new(
-                  io::ErrorKind::InvalidData,
-                  format!("Symlink without a parent?: {:?}", link_abs),
-                )
-              })
-          }
-        })
+    self.pool.spawn_fn(move || {
+      link_abs.read_link().and_then(|path_buf| {
+        if path_buf.is_absolute() {
+          Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Absolute symlink: {:?}", link_abs),
+          ))
+        } else {
+          link_parent
+            .map(|parent| parent.join(path_buf))
+            .ok_or_else(|| {
+              io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Symlink without a parent?: {:?}", link_abs),
+              )
+            })
+        }
       })
-      .to_boxed()
+    })
   }
 
   ///
@@ -649,23 +643,22 @@ impl PosixFS {
     PosixFS::stat_internal(relative_path, metadata.file_type(), &root, || Ok(metadata))
   }
 
-  pub fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
+  pub fn scandir(&self, dir: &Dir) -> impl IFuture<Vec<Stat>, io::Error> {
     let dir = dir.to_owned();
     let root = self.root.0.clone();
     self
       .pool
       .spawn_fn(move || PosixFS::scandir_sync(root, &dir))
-      .to_boxed()
   }
 }
 
 impl VFS<io::Error> for Arc<PosixFS> {
   fn read_link(&self, link: Link) -> BoxFuture<PathBuf, io::Error> {
-    PosixFS::read_link(self, &link)
+    PosixFS::read_link(self, &link).to_boxed()
   }
 
   fn scandir(&self, dir: Dir) -> BoxFuture<Vec<Stat>, io::Error> {
-    PosixFS::scandir(self, &dir)
+    PosixFS::scandir(self, &dir).to_boxed()
   }
 
   fn is_ignored(&self, stat: &Stat) -> bool {

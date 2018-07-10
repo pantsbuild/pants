@@ -22,7 +22,7 @@ extern crate tempfile;
 extern crate testutil;
 extern crate tokio_process;
 
-use boxfuture::BoxFuture;
+use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -106,7 +106,7 @@ impl BoundedCommandRunner {
 impl CommandRunner for BoundedCommandRunner {
   fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let inner = self.inner.clone();
-    self.sema.with_acquired(move || inner.run(req))
+    self.sema.with_acquired(move || inner.run(req)).to_boxed()
   }
 
   fn reset_prefork(&self) {
