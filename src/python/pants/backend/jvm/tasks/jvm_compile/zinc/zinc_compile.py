@@ -274,7 +274,7 @@ class BaseZincCompile(JvmCompile):
     return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
 
   def compile(self, ctx, args, classpath, upstream_analysis,
-              settings, fatal_warnings, compiler_option_sets, zinc_file_manager,
+              settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     self._verify_zinc_classpath(classpath)
     self._verify_zinc_classpath(upstream_analysis.keys())

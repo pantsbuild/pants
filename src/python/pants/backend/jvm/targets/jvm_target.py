@@ -104,8 +104,15 @@ class JvmTarget(Target, Jarable):
       entity_description='fatal_warnings',
       hint_message="fatal_warnings should be defined as part of the target compiler_option_sets"
     )
-    if fatal_warnings and 'fatal_warnings' not in compiler_option_sets:
-      compiler_option_sets.append('fatal_warnings')
+    if fatal_warnings is not None:
+      compiler_option_sets = [] if compiler_option_sets is None else compiler_option_sets
+      if fatal_warnings:
+        compiler_option_sets.append('fatal_warnings')
+      else:
+        try:
+          compiler_option_sets.remove('fatal_warnings')
+        except ValueError:
+          pass
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'provides': provides,
@@ -113,7 +120,6 @@ class JvmTarget(Target, Jarable):
       'platform': PrimitiveField(platform),
       'strict_deps': PrimitiveField(strict_deps),
       'exports': PrimitivesSetField(exports or []),
-      'fatal_warnings': PrimitiveField(fatal_warnings),
       'compiler_option_sets': PrimitivesSetField(compiler_option_sets),
       'zinc_file_manager': PrimitiveField(zinc_file_manager),
       'javac_plugins': PrimitivesSetField(javac_plugins or []),
