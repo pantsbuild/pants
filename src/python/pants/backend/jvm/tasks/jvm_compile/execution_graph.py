@@ -4,11 +4,13 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import Queue as queue
+import queue
 import threading
 import traceback
-from collections import defaultdict, deque
+from builtins import map, object, str
 from heapq import heappop, heappush
+
+from future.moves.collections import defaultdict, deque
 
 from pants.base.worker_pool import Work
 

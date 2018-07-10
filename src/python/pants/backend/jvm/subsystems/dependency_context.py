@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
+from builtins import str
 
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform

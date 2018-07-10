@@ -72,6 +72,9 @@ resources(
 python_library(
   name='repository',
   sources=['repository.py'],
+  dependencies = [
+    '3rdparty/python:future',
+  ]
 )
 
 python_library(
@@ -88,7 +91,7 @@ python_library(
   name='ossrh_publication_metadata',
   sources=['ossrh_publication_metadata.py'],
   dependencies=[
-    '3rdparty/python:six',
+    '3rdparty/python:future',
     ':artifact',
     'src/python/pants/base:validation',
   ],

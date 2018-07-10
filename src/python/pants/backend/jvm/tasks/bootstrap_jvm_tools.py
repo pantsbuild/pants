@@ -9,6 +9,7 @@ import os
 import shutil
 import textwrap
 import threading
+from builtins import map
 from collections import defaultdict
 from textwrap import dedent
 

@@ -11,6 +11,7 @@ import logging
 import os
 import xml.etree.ElementTree as ET
 from abc import abstractmethod
+from builtins import map, next, object
 from functools import total_ordering
 
 from pants.base.mustache import MustacheRenderer
@@ -141,7 +142,7 @@ class ReportTestSuite(object):
                                                 self.skipped)
     d['icon_class'] = ReportTestSuite.icon_class(self.tests, self.errors, self.failures,
                                                  self.skipped)
-    d['testcases'] = map(lambda tc: tc.as_dict(), self.testcases)
+    d['testcases'] = [tc.as_dict() for tc in self.testcases]
     return d
 
 
@@ -293,7 +294,7 @@ class JUnitHtmlReport(JUnitHtmlReportInterface):
                                                               values['total_errors'],
                                                               values['total_failures'],
                                                               values['total_skipped'])
-    values['testsuites'] = map(lambda ts: ts.as_dict(), testsuites)
+    values['testsuites'] = [ts.as_dict() for ts in testsuites]
 
     package_name, _, _ = __name__.rpartition('.')
     renderer = MustacheRenderer(package_name=package_name)

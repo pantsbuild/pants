@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import object, str
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
@@ -81,11 +82,10 @@ class Scalastyle(LintTaskMixin, NailgunTask):
 
   @classmethod
   def get_non_synthetic_scala_targets(cls, targets):
-    return filter(
-      lambda target: isinstance(target, Target)
-                     and target.has_sources(cls._SCALA_SOURCE_EXTENSION)
-                     and (not target.is_synthetic),
-      targets)
+    return [target for target in targets
+            if isinstance(target, Target)
+            and target.has_sources(cls._SCALA_SOURCE_EXTENSION)
+            and not target.is_synthetic]
 
   @classmethod
   def get_non_excluded_scala_sources(cls, scalastyle_excluder, scala_targets):
@@ -95,12 +95,10 @@ class Scalastyle(LintTaskMixin, NailgunTask):
       scala_sources.extend(target.sources_relative_to_buildroot())
 
     # make sure only the sources with the .scala extension stay.
-    scala_sources = filter(
-      lambda filename: filename.endswith(cls._SCALA_SOURCE_EXTENSION),
-      scala_sources)
+    scala_sources = [filename for filename in scala_sources if filename.endswith(cls._SCALA_SOURCE_EXTENSION)]
 
     # filter out all sources matching exclude patterns, if specified in config.
-    scala_sources = filter(scalastyle_excluder.should_include, scala_sources)
+    scala_sources = [source for source in scala_sources if scalastyle_excluder.should_include(source)]
 
     return scala_sources
 

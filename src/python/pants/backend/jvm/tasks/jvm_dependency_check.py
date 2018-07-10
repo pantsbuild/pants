@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import filter, next
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -97,7 +98,7 @@ class JvmDependencyCheck(Task):
     fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
         classpath_product)
 
-    targets = self.context.products.get_data('zinc_analysis').keys()
+    targets = list(self.context.products.get_data('zinc_analysis').keys())
 
     with self.invalidated(targets,
                           fingerprint_strategy=fingerprint_strategy,
@@ -217,7 +218,7 @@ class JvmDependencyCheck(Task):
                 (src, actual_dep))
 
     return (list(missing_file_deps),
-            missing_direct_tgt_deps_map.items())
+            list(missing_direct_tgt_deps_map.items()))
 
   def _do_check_unnecessary_deps(self, target, actual_deps, log_fn):
     replacement_deps = self._compute_unnecessary_deps(target, actual_deps)
@@ -235,7 +236,7 @@ class JvmDependencyCheck(Task):
         'unnecessary BUILD dependencies:\n  {}\n{}'
         '(If you\'re seeing this message in error, you might need to '
         'change the `scope` of the dependencies.)'.format(
-          joined_dep_msg(replacement_deps.keys()),
+          joined_dep_msg(list(replacement_deps.keys())),
           replacements_msg,
         )
       )
