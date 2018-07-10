@@ -229,7 +229,7 @@ int main() {
 #include <iostream>
 
 int main() {
-  std::cout << "I C the world, ++ more!" << std::endl;
+  std::cout << "I C Clang the world, ++ more!" << std::endl;
 }
 """, scheduler_request_specs=scheduler_request_specs) as products:
 
@@ -245,4 +245,4 @@ int main() {
       )
 
       self._do_compile_link(clangpp, linker_with_clangpp_workaround, 'hello.cpp', 'hello_clangpp',
-                            "I C the world, ++ more!")
+                            "I C Clang the world, ++ more!")
