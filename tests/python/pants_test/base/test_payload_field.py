@@ -143,6 +143,10 @@ class PayloadTest(TestBase):
       sopf(None),
       sopf(['one']),
     )
+    self.assertNotEqual(
+      sopf(None),
+      sopf([]),
+    )
 
   def test_unimplemented_fingerprinted_field(self):
     class TestUnimplementedValue(FingerprintedMixin):
