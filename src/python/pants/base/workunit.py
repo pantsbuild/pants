@@ -9,9 +9,8 @@ import os
 import re
 import time
 import uuid
+from builtins import object, range
 from collections import namedtuple
-
-from six.moves import range
 
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_method
@@ -36,6 +35,7 @@ class WorkUnitLabel(object):
   TOOL = 'TOOL'           # Single invocations of a tool.
   MULTITOOL = 'MULTITOOL' # Multiple consecutive invocations of the same tool.
   COMPILER = 'COMPILER'   # Invocation of a compiler.
+  LINKER = 'LINKER'       # Invocation of a linker.
 
   TEST = 'TEST'           # Running a test.
   JVM = 'JVM'             # Running a tool via the JVM.

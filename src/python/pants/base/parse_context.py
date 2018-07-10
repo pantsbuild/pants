@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import functools
 import threading
+from builtins import object
 
 
 class Storage(threading.local):

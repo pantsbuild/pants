@@ -39,6 +39,8 @@ class AntlrJavaGen(SimpleCodegenTask, NailgunTask):
   """Generate .java source code from ANTLR grammar files."""
   gentarget_type = JavaAntlrLibrary
 
+  sources_globs = ('**/*.java',)
+
   class AmbiguousPackageError(TaskError):
     """Raised when a java package cannot be unambiguously determined for a JavaAntlrLibrary."""
 

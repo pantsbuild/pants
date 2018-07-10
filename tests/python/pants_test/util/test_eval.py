@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-import six
+import future
 
 from pants.util.eval import parse_expression
 
@@ -15,7 +15,7 @@ from pants.util.eval import parse_expression
 class ParseLiteralTest(unittest.TestCase):
 
   def test_success_simple(self):
-    literal = parse_expression("'42'", acceptable_types=six.string_types)
+    literal = parse_expression("'42'", acceptable_types=future.utils.string_types)
     self.assertEqual('42', literal)
 
   def test_success_mixed(self):

@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import logging
 import multiprocessing
 import os
 import sys
@@ -67,6 +66,7 @@ class ExecutionOptions(datatype([
   'remote_store_chunk_bytes',
   'remote_store_chunk_upload_timeout_seconds',
   'process_execution_parallelism',
+  'process_execution_cleanup_local_dirs',
 ])):
   """A collection of all options related to (remote) execution of processes.
 
@@ -76,13 +76,14 @@ class ExecutionOptions(datatype([
 
   @classmethod
   def from_bootstrap_options(cls, bootstrap_options):
-    cls(
+    return cls(
       remote_store_server=bootstrap_options.remote_store_server,
       remote_execution_server=bootstrap_options.remote_execution_server,
       remote_store_thread_count=bootstrap_options.remote_store_thread_count,
       remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
       remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
       process_execution_parallelism=bootstrap_options.process_execution_parallelism,
+      process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
     )
 
 
@@ -93,6 +94,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_chunk_bytes=1024*1024,
     remote_store_chunk_upload_timeout_seconds=60,
     process_execution_parallelism=multiprocessing.cpu_count()*2,
+    process_execution_cleanup_local_dirs=True,
   )
 
 
@@ -119,12 +121,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     default_distdir = os.path.join(buildroot, default_distdir_name)
     default_rel_distdir = '/{}/'.format(default_distdir_name)
 
-    # Although logging supports the WARN level, its not documented and could conceivably be yanked.
-    # Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
-    # setup a 'WARN' logging level name that maps to 'WARNING'.
-    logging.addLevelName(logging.WARNING, 'WARN')
-    register('-l', '--level', choices=['debug', 'info', 'warn'], default='info', recursive=True,
-             help='Set the logging level.')
+    register('-l', '--level', choices=['trace', 'debug', 'info', 'warn'], default='info',
+             recursive=True, help='Set the logging level.')
     register('-q', '--quiet', type=bool, recursive=True, daemon=False,
              help='Squelches most console output. NOTE: Some tasks default to behaving quietly: '
                   'inverting this option supports making them noisier than they would be otherwise.')
@@ -222,7 +220,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
              help='Paths that correspond with build roots for any subproject that this '
                   'project depends on.')
-    register('--owner-of', type=list, default=[], fromfile=True, metavar='<path>',
+    register('--owner-of', type=list, default=[], daemon=False, fromfile=True, metavar='<path>',
              help='Select the targets that own these files. '
                   'This is the third target calculation strategy along with the --changed '
                   'options and specifying the targets directly. These three types of target '
@@ -315,6 +313,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--process-execution-parallelism', type=int, default=multiprocessing.cpu_count(),
              advanced=True,
              help='Number of concurrent processes that may be executed either locally and remotely.')
+    register('--process-execution-cleanup-local-dirs', type=bool, default=True,
+             help='Whether or not to cleanup directories used for local process execution '
+                  '(primarily useful for e.g. debugging).')
 
   @classmethod
   def register_options(cls, register):

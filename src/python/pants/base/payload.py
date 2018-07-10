@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from builtins import object
 from hashlib import sha1
 
 
@@ -30,7 +31,7 @@ class Payload(object):
 
   @property
   def fields(self):
-    return self._fields.items()
+    return list(self._fields.items())
 
   def as_dict(self):
     """Return the Payload object as a dict."""

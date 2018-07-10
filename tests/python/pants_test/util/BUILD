@@ -15,6 +15,7 @@ python_tests(
   sources = ['test_collections.py'],
   coverage = ['pants.util.collections'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:collections',
   ]
 )
@@ -24,6 +25,7 @@ python_tests(
   sources = ['test_contextutil.py'],
   coverage = ['pants.util.contextutil'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:mock',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
@@ -35,8 +37,8 @@ python_tests(
   sources = ['test_dirutil.py'],
   coverage = ['pants.util.dirutil'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:mock',
-    '3rdparty/python:six',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:objects',
@@ -47,7 +49,7 @@ python_tests(
   name = 'eval',
   sources = ['test_eval.py'],
   dependencies = [
-    '3rdparty/python:six',
+    '3rdparty/python:future',
     'src/python/pants/util:eval',
   ]
 )
@@ -73,6 +75,7 @@ python_tests(
   name = 'memo',
   sources = ['test_memo.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ]
@@ -82,6 +85,7 @@ python_tests(
   name = 'meta',
   sources = ['test_meta.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:meta',
     'tests/python/pants_test:test_base',
   ]
@@ -91,6 +95,7 @@ python_tests(
   name = 'netrc',
   sources = ['test_netrc.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:mock',
     'src/python/pants/util:netrc',
   ]
@@ -101,6 +106,7 @@ python_tests(
   sources = ['test_objects.py'],
   coverage = ['pants.util.objects'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:objects',
     'tests/python/pants_test:base_test',
   ]
@@ -110,6 +116,7 @@ python_tests(
   name = 'osutil',
   sources = ['test_osutil.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:osutil',
     'tests/python/pants_test:test_base',
   ]
@@ -146,6 +153,7 @@ python_tests(
   name = 'strutil',
   sources = ['test_strutil.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:strutil',
   ]
 )

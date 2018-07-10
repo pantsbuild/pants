@@ -34,6 +34,10 @@ class SafeFilenameTest(unittest.TestCase):
     self.assertEqual('**.jill',
                      safe_filename('jack', '.jill', digest=self.FixedDigest(2), max_length=8))
 
+  def test_shorten_readable(self):
+    self.assertEqual('j.**.e.jill',
+                     safe_filename('jackalope', '.jill', digest=self.FixedDigest(2), max_length=11))
+
   def test_shorten_fail(self):
     with self.assertRaises(ValueError):
       safe_filename('jack', '.beanstalk', digest=self.FixedDigest(3), max_length=12)

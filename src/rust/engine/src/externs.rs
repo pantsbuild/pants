@@ -40,7 +40,7 @@ pub fn clone_val(val: &Value) -> Value {
   with_externs(|e| (e.clone_val)(e.context, val))
 }
 
-pub fn drop_handles(handles: Vec<Handle>) {
+pub fn drop_handles(handles: &[Handle]) {
   with_externs(|e| (e.drop_handles)(e.context, handles.as_ptr(), handles.len() as u64))
 }
 
@@ -49,9 +49,9 @@ pub fn satisfied_by(constraint: &TypeConstraint, obj: &Value) -> bool {
   with_externs(|e| (e.satisfied_by)(e.context, interns.get(&constraint.0), obj))
 }
 
-pub fn satisfied_by_type(constraint: &TypeConstraint, cls: &TypeId) -> bool {
+pub fn satisfied_by_type(constraint: &TypeConstraint, cls: TypeId) -> bool {
   let interns = INTERNS.read().unwrap();
-  with_externs(|e| (e.satisfied_by_type)(e.context, interns.get(&constraint.0), cls))
+  with_externs(|e| (e.satisfied_by_type)(e.context, interns.get(&constraint.0), &cls))
 }
 
 pub fn store_tuple(values: &[Value]) -> Value {
@@ -66,6 +66,9 @@ pub fn store_i64(val: i64) -> Value {
   with_externs(|e| (e.store_i64)(e.context, val))
 }
 
+///
+/// Pulls out the value specified by the field name from a given Value
+///
 pub fn project_ignoring_type(value: &Value, field: &str) -> Value {
   with_externs(|e| (e.project_ignoring_type)(e.context, value, field.as_ptr(), field.len() as u64))
 }
@@ -442,7 +445,7 @@ impl BufferBuffer {
     self
       .to_bytes_vecs()
       .into_iter()
-      .map(|v| OsString::from_vec(v))
+      .map(OsString::from_vec)
       .collect()
   }
 
@@ -450,7 +453,7 @@ impl BufferBuffer {
     self
       .to_bytes_vecs()
       .into_iter()
-      .map(|v| String::from_utf8(v))
+      .map(String::from_utf8)
       .collect()
   }
 }

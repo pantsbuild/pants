@@ -38,6 +38,8 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     'compiler_args'
   ])
 
+  sources_globs = ('**/*',)
+
   @classmethod
   def register_options(cls, register):
     super(ScroogeGen, cls).register_options(register)

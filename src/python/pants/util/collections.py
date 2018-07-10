@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from builtins import next
+
 
 def combined_dict(*dicts):
   """Combine one or more dicts into a new, unified dict (dicts to the right take precedence)."""
@@ -19,3 +21,20 @@ def recursively_update(d, d2):
         recursively_update(d[k], v)
         continue
     d[k] = v
+
+
+def assert_single_element(iterable):
+  """Get the single element of `iterable`, or raise an error.
+
+  :raise: :class:`StopIteration` if there is no element.
+  :raise: :class:`ValueError` if there is more than one element.
+  """
+  it = iter(iterable)
+  first_item = next(it)
+
+  try:
+    next(it)
+  except StopIteration:
+    return first_item
+
+  raise ValueError("iterable {!r} has more than one element.".format(iterable))

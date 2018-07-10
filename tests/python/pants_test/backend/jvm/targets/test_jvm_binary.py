@@ -11,8 +11,8 @@ from pants.backend.jvm.register import build_file_aliases
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, ManifestEntries, Skip
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload_field import FingerprintedField
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.target import Target
 from pants.java.jar.exclude import Exclude
 from pants_test.test_base import TestBase
 
@@ -120,21 +120,26 @@ class JvmBinaryTest(TestBase):
     self.assertEquals(Duplicate.FAIL, jar_rules.default_dup_action)
 
   def test_bad_source_declaration(self):
+    self.create_file('foo/foo.py')
     self.add_to_build_file(
       '',
       'jvm_binary(name = "foo", main = "com.example.Foo", source = ["foo.py"])',
     )
-    with self.assertRaisesRegexp(TargetDefinitionException,
-                                 r'Invalid target JvmBinary.*foo.*source must be a single'):
+    with self.assertRaisesRegexp(AddressLookupError,
+                                 r'Invalid target.*foo.*source must be a string'):
       self.target(':foo')
 
   def test_bad_sources_declaration(self):
+    self.create_file('foo/foo.py')
+    self.create_file('foo/bar.py')
     self.add_to_build_file(
       'foo',
-      'jvm_binary(name = "foo", main = "com.example.Foo", sources = ["foo.py"])',
+      'jvm_binary(name = "foo", main = "com.example.Foo", sources = ["foo.py", "bar.py"])',
     )
-    with self.assertRaisesRegexp(Target.IllegalArgument,
-                                 r'jvm_binary only supports a single "source" argument'):
+    with self.assertRaisesRegexp(
+      AddressLookupError,
+      r'Invalid target.*foo.*jvm_binary must have exactly 0 or 1 sources'
+    ):
       self.target('foo:foo')
 
   def test_bad_main_declaration(self):

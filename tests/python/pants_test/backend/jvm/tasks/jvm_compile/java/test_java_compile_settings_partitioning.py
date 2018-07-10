@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import defaultdict
 from contextlib import contextmanager
+from functools import reduce
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatformSettings
 from pants.backend.jvm.targets.java_library import JavaLibrary

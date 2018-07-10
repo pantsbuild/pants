@@ -21,6 +21,7 @@ python_tests(
   name = 'integration',
   sources = globs('*_integration.py'),
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
   ],

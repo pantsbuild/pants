@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import copy
 import pickle
 from abc import abstractmethod
+from builtins import object, str
 
 from pants.util.objects import (Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
                                 TypedDatatypeInstanceConstructionError, datatype)
@@ -262,6 +263,14 @@ class DatatypeTest(BaseTest):
     with self.assertRaises(ValueError):
       datatype(['0isntanallowedfirstchar'])
 
+  def test_override_eq_disallowed(self):
+    class OverridesEq(datatype(['myval'])):
+      def __eq__(self, other):
+        return other.myval == self.myval
+    with self.assertRaises(TypeCheckError) as tce:
+      OverridesEq(1)
+    self.assertIn('Should not override __eq__.', str(tce.exception))
+
   def test_subclass_pickleable(self):
     before = ExportedDatatype(1)
     dumps = pickle.dumps(before, protocol=2)
@@ -312,10 +321,15 @@ class TypedDatatypeTest(BaseTest):
 
     with self.assertRaises(ValueError) as cm:
       class JustTypeField(datatype([str])): pass
-    expected_msg = (
-      "Type names and field names can only contain alphanumeric characters "
-      "and underscores: \"<type 'str'>\"")
-    self.assertEqual(str(cm.exception), expected_msg)
+    def compare_string_rep(string_type):
+      expected_message = (
+        "Type names and field names can only contain alphanumeric characters "
+        "and underscores: \"<{0}>\"").format(string_type)
+      self.assertEqual(str(cm.exception), expected_message)
+    if 'newstr' in str(cm.exception):  # Python2
+      compare_string_rep("class 'future.types.newstr.newstr'")
+    else:  # Python3
+      compare_string_rep("type 'str'")
 
     with self.assertRaises(ValueError) as cm:
       class NonStringField(datatype([3])): pass
@@ -364,9 +378,13 @@ class TypedDatatypeTest(BaseTest):
     self.assertEqual(some_object.an_int, 45)
     self.assertEqual(repr(some_object),
                      "WithExplicitTypeConstraint(a_string='asdf', an_int=45)")
-    self.assertEqual(
-      str(some_object),
-      "WithExplicitTypeConstraint(a_string<=str>=asdf, an_int<=int>=45)")
+    def compare_string_rep(string_type):
+      expected_message = "WithExplicitTypeConstraint(a_string<={0}>=asdf, an_int<=int>=45)".format(string_type)
+      self.assertEqual(str(some_object), expected_message)
+    if 'newstr' in str(some_object):  # Python2
+      compare_string_rep('newstr')
+    else:  # Python3
+      compare_string_rep('str')
 
     some_nonneg_int = NonNegativeInt(an_int=3)
     self.assertEqual(3, some_nonneg_int.an_int)
@@ -387,8 +405,13 @@ class TypedDatatypeTest(BaseTest):
     self.assertEqual(3, mixed_type_obj.value)
     self.assertEqual(repr(mixed_type_obj),
                      "MixedTyping(value=3, name='asdf')")
-    self.assertEqual(str(mixed_type_obj),
-                     "MixedTyping(value=3, name<=str>=asdf)")
+    def compare_string_rep(string_type):
+      expected_message = "MixedTyping(value=3, name<={0}>=asdf)".format(string_type)
+      self.assertEqual(str(mixed_type_obj), expected_message)
+    if 'newstr' in str(mixed_type_obj):  # Python2
+      compare_string_rep('newstr')
+    else:  # Python3
+      compare_string_rep('str')
 
     subclass_constraint_obj = WithSubclassTypeConstraint(SomeDatatypeClass())
     self.assertEqual('asdf', subclass_constraint_obj.some_value.something())
@@ -401,27 +424,32 @@ class TypedDatatypeTest(BaseTest):
   def test_mixin_type_construction(self):
     obj_with_mixin = TypedWithMixin(str(' asdf '))
     self.assertEqual(repr(obj_with_mixin), "TypedWithMixin(val=' asdf ')")
-    self.assertEqual(str(obj_with_mixin),
-                     "TypedWithMixin(val<=str>= asdf )")
+    def compare_string_rep(string_type):
+      expected_message = "TypedWithMixin(val<={0}>= asdf )".format(string_type)
+      self.assertEqual(str(obj_with_mixin), expected_message)
+    if 'newstr' in str(obj_with_mixin):  # Python2
+      compare_string_rep('newstr')
+    else:  # Python3
+      compare_string_rep('str')
     self.assertEqual(obj_with_mixin.as_str(), ' asdf ')
     self.assertEqual(obj_with_mixin.stripped(), 'asdf')
 
   def test_instance_construction_errors(self):
     with self.assertRaises(TypeError) as cm:
       SomeTypedDatatype(something=3)
-    expected_msg = "__new__() got an unexpected keyword argument 'something'"
+    expected_msg = "error: in constructor of type SomeTypedDatatype: type check error:\n__new__() got an unexpected keyword argument 'something'"
     self.assertEqual(str(cm.exception), expected_msg)
 
     # not providing all the fields
     with self.assertRaises(TypeError) as cm:
       SomeTypedDatatype()
-    expected_msg = "__new__() takes exactly 2 arguments (1 given)"
+    expected_msg = "error: in constructor of type SomeTypedDatatype: type check error:\n__new__() takes exactly 2 arguments (1 given)"
     self.assertEqual(str(cm.exception), expected_msg)
 
     # unrecognized fields
     with self.assertRaises(TypeError) as cm:
       SomeTypedDatatype(3, 4)
-    expected_msg = "__new__() takes exactly 2 arguments (3 given)"
+    expected_msg = "error: in constructor of type SomeTypedDatatype: type check error:\n__new__() takes exactly 2 arguments (3 given)"
     self.assertEqual(str(cm.exception), expected_msg)
 
     with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
@@ -434,7 +462,7 @@ field 'nonneg_int' was invalid: value 3 (with type 'int') must satisfy this type
     # test that kwargs with keywords that aren't field names fail the same way
     with self.assertRaises(TypeError) as cm:
       CamelCaseWrapper(4, a=3)
-    expected_msg = "__new__() got an unexpected keyword argument 'a'"
+    expected_msg = "error: in constructor of type CamelCaseWrapper: type check error:\n__new__() got an unexpected keyword argument 'a'"
     self.assertEqual(str(cm.exception), expected_msg)
 
   def test_type_check_errors(self):
@@ -449,26 +477,44 @@ field 'val' was invalid: value [] (with type 'list') must satisfy this type cons
     # type checking failure with multiple arguments (one is correct)
     with self.assertRaises(TypeCheckError) as cm:
       AnotherTypedDatatype(str('correct'), str('should be list'))
-    expected_msg = (
-      """error: in constructor of type AnotherTypedDatatype: type check error:
-field 'elements' was invalid: value 'should be list' (with type 'str') must satisfy this type constraint: Exactly(list).""")
-    self.assertEqual(str(cm.exception), expected_msg)
+    def compare_string_rep(string_type):
+      expected_message = (
+        """error: in constructor of type AnotherTypedDatatype: type check error:
+field 'elements' was invalid: value 'should be list' (with type '{0}') must satisfy this type constraint: Exactly(list)."""
+      .format(string_type))
+      self.assertEqual(str(cm.exception), expected_message)
+    if 'newstr' in str(cm.exception):  # Python2
+      compare_string_rep('newstr')
+    else:  # Python3
+      compare_string_rep('str')
 
     # type checking failure on both arguments
     with self.assertRaises(TypeCheckError) as cm:
       AnotherTypedDatatype(3, str('should be list'))
-    expected_msg = (
-      """error: in constructor of type AnotherTypedDatatype: type check error:
-field 'string' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly(str).
-field 'elements' was invalid: value 'should be list' (with type 'str') must satisfy this type constraint: Exactly(list).""")
-    self.assertEqual(str(cm.exception), expected_msg)
+    def compare_string_rep(string_type):
+      expected_message = (
+        """error: in constructor of type AnotherTypedDatatype: type check error:
+field 'string' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly({0}).
+field 'elements' was invalid: value 'should be list' (with type '{0}') must satisfy this type constraint: Exactly(list)."""
+          .format(string_type))
+      self.assertEqual(str(cm.exception), expected_message)
+    if 'newstr' in str(cm.exception):  # Python2
+      compare_string_rep('newstr')
+    else:  # Python3
+      compare_string_rep('str')
 
     with self.assertRaises(TypeCheckError) as cm:
       NonNegativeInt(str('asdf'))
-    expected_msg = (
-      """error: in constructor of type NonNegativeInt: type check error:
-field 'an_int' was invalid: value 'asdf' (with type 'str') must satisfy this type constraint: Exactly(int).""")
-    self.assertEqual(str(cm.exception), expected_msg)
+    def compare_string_rep(string_type):
+      expected_message = (
+        """error: in constructor of type NonNegativeInt: type check error:
+field 'an_int' was invalid: value 'asdf' (with type '{0}') must satisfy this type constraint: Exactly(int)."""
+          .format(string_type))
+      self.assertEqual(str(cm.exception), expected_message)
+    if 'newstr' in str(cm.exception):  # Python2
+      compare_string_rep('newstr')
+    else:  # Python3
+      compare_string_rep('str')
 
     with self.assertRaises(TypeCheckError) as cm:
       NonNegativeInt(-3)

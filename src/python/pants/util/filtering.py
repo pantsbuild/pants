@@ -49,9 +49,9 @@ def create_filter(predicate_param, predicate_factory):
   # NOTE: Do not inline this into create_filters above. A separate function is necessary
   # in order to capture the different closure on each invocation.
   modifier, param = _extract_modifier(predicate_param)
-  predicates = map(predicate_factory, param.split(','))
+  predicates = [predicate_factory(p) for p in param.split(',')]
   def filt(x):
-    return modifier(any(map(lambda pred: pred(x), predicates)))
+    return modifier(any(pred(x) for pred in predicates))
   return filt
 
 

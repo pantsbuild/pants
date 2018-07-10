@@ -6,12 +6,36 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from builtins import map
 from textwrap import dedent
 
+from pants.backend.python.pex_util import get_local_platform
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.build_graph.address import Address
 from pants_test.backend.python.tasks.interpreter_cache_test_mixin import InterpreterCacheTestMixin
 from pants_test.task_test_base import TaskTestBase
+
+
+def normalize_platform_tag(platform_tag):
+  return platform_tag.replace('-', '_')
+
+
+def name_and_platform(whl):
+  # The wheel filename is of the format
+  # {distribution}-{version}(-{build tag})?-{python tag}-{abi tag}-{platform tag}.whl
+  # See https://www.python.org/dev/peps/pep-0425/.
+  # We don't care about the python or abi versions (they depend on what we're currently
+  # running on), we just want to make sure we have all the platforms we expect.
+  parts = os.path.splitext(whl)[0].split('-')
+  dist = parts[0]
+  version = parts[1]
+  platform_tag = parts[-1]
+  return dist, version, normalize_platform_tag(platform_tag)
+
+
+def check_wheel_platform_matches_host(wheel_dist):
+  _, _, wheel_platform = name_and_platform(wheel_dist)
+  return wheel_platform == normalize_platform_tag(get_local_platform())
 
 
 class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
@@ -31,7 +55,7 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
     """
     :API: public
     """
-    sources = None if source_contents_map is None else ['__init__.py'] + source_contents_map.keys()
+    sources = None if source_contents_map is None else ['__init__.py'] + list(source_contents_map.keys())
     sources_strs = ["'{0}'".format(s) for s in sources] if sources else None
     self.add_to_build_file(relpath=relpath, target=dedent("""
     python_library(

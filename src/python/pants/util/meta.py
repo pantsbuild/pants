@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from abc import ABCMeta
+from builtins import object
 
 
 class SingletonMetaclass(type):
@@ -95,8 +96,14 @@ def staticproperty(func):
 
 
 # Extend Singleton and your class becomes a singleton, each construction returns the same instance.
-Singleton = SingletonMetaclass(str('Singleton'), (object,), {})
+try:  # Python3
+  Singleton = SingletonMetaclass(u'Singleton', (object,), {})
+except TypeError:  # Python2
+  Singleton = SingletonMetaclass(b'Singleton', (object,), {})
 
 
 # Abstract base classes w/o __metaclass__ or meta =, just extend AbstractClass.
-AbstractClass = ABCMeta(str('AbstractClass'), (object,), {})
+try:  # Python3
+  AbstractClass = ABCMeta(u'AbstractClass', (object,), {})
+except TypeError:  # Python2
+  AbstractClass = ABCMeta(b'AbstractClass', (object,), {})

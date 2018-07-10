@@ -8,7 +8,6 @@ extern crate sha2;
 use digest::{Digest as DigestTrait, FixedOutput};
 use sha2::Sha256;
 
-use std::error::Error;
 use std::fmt;
 use std::io::{self, Write};
 
@@ -33,8 +32,8 @@ impl Fingerprint {
 
   pub fn from_hex_string(hex_string: &str) -> Result<Fingerprint, String> {
     <[u8; FINGERPRINT_SIZE] as hex::FromHex>::from_hex(hex_string)
-      .map(|v| Fingerprint(v))
-      .map_err(|e| e.description().to_string())
+      .map(Fingerprint)
+      .map_err(|e| format!("{:?}", e))
   }
 
   pub fn as_bytes(&self) -> &[u8; FINGERPRINT_SIZE] {
@@ -43,7 +42,7 @@ impl Fingerprint {
 
   pub fn to_hex(&self) -> String {
     let mut s = String::new();
-    for &byte in self.0.iter() {
+    for &byte in &self.0 {
       fmt::Write::write_fmt(&mut s, format_args!("{:02x}", byte)).unwrap();
     }
     s

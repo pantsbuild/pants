@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
+from functools import reduce
 
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ def get_normalized_os_name():
 
 
 def all_normalized_os_names():
-  return OS_ALIASES.keys()
+  return list(OS_ALIASES.keys())
 
 
 def known_os_names():

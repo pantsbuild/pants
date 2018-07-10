@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from builtins import str
+
 from pex.interpreter import PythonIdentity
 from twitter.common.collections import maybe_list
 
@@ -66,7 +68,7 @@ class PythonDistribution(Target):
 
   @property
   def has_native_sources(self):
-    return self.has_sources(extension=('.c', '.cpp', '.cc'))
+    return self.has_sources(extension=tuple(self.native_source_extensions))
 
   @property
   def platforms(self):

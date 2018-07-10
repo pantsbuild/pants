@@ -183,7 +183,6 @@ class PantsPlugin(PythonLibrary):
 
     super(PantsPlugin, self).__init__(address,
                                       payload,
-                                      sources=['register.py'],
                                       provides=setup_py,
                                       **kwargs)
 

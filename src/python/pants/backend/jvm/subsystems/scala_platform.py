@@ -41,9 +41,6 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
   """
   options_scope = 'scala'
 
-  deprecated_options_scope = 'scala-platform'
-  deprecated_options_scope_removal_version = '1.9.0.dev0'
-
   @classmethod
   def _create_jardep(cls, name, version):
     return JarDependency(org='org.scala-lang',

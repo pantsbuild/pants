@@ -16,6 +16,7 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
 from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.backend.python.tasks.setup_py import SetupPy
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -43,7 +44,9 @@ class SetupPyTestBase(PythonTaskTestBase):
   @contextmanager
   def run_execute(self, target, recursive=False):
     self.set_options(recursive=recursive)
-    context = self.context(target_roots=[target])
+    si_task_type = self.synthesize_task_subtype(SelectInterpreter, 'si_scope')
+    context = self.context(for_task_types=[si_task_type], target_roots=[target])
+    si_task_type(context, os.path.join(self.pants_workdir, 'si')).execute()
     setup_py = self.create_task(context)
     setup_py.execute()
     yield context.products.get_data(SetupPy.PYTHON_DISTS_PRODUCT)
@@ -181,7 +184,7 @@ class TestSetupPy(SetupPyTestBase):
     dep_map = OrderedDict(foo=['bar'], bar=['baz'], baz=[])
     target_map = self.create_dependencies(dep_map)
     with self.run_execute(target_map['foo'], recursive=False) as created:
-      self.assertEqual([target_map['foo']], created.keys())
+      self.assertEqual([target_map['foo']], list(created.keys()))
     with self.run_execute(target_map['foo'], recursive=True) as created:
       self.assertEqual({target_map['baz'], target_map['bar'], target_map['foo']},
                        set(created.keys()))
@@ -247,10 +250,10 @@ class TestSetupPy(SetupPyTestBase):
     self.assertEqual(entry_points, {'foo_binary': 'foo.bin:foo'})
 
     with self.run_execute(foo, recursive=False) as created:
-      self.assertEqual([foo], created.keys())
+      self.assertEqual([foo], list(created.keys()))
 
     with self.run_execute(foo, recursive=True) as created:
-      self.assertEqual([foo], created.keys())
+      self.assertEqual([foo], list(created.keys()))
 
   def test_binary_target_injected_into_reduced_dependencies_with_provider(self):
     bar_bin_dep = self.create_python_library(
@@ -293,7 +296,7 @@ class TestSetupPy(SetupPyTestBase):
     self.assertEqual(entry_points, {'bar_binary': 'bar.bin:bar'})
 
     with self.run_execute(bar, recursive=False) as created:
-      self.assertEqual([bar], created.keys())
+      self.assertEqual([bar], list(created.keys()))
 
     with self.run_execute(bar, recursive=True) as created:
       self.assertEqual({bar_bin_dep, bar}, set(created.keys()))
@@ -476,7 +479,7 @@ class TestSetupPy(SetupPyTestBase):
     conway = self.target('src/python/monster:conway')
 
     with self.run_execute(conway) as created:
-      self.assertEqual([conway], created.keys())
+      self.assertEqual([conway], list(created.keys()))
       sdist = created[conway]
 
       with self.extracted_sdist(sdist=sdist,
@@ -522,7 +525,7 @@ class TestSetupPy(SetupPyTestBase):
     conway = self.target('src/python/monster:conway')
 
     with self.run_execute(conway) as created:
-      self.assertEqual([conway], created.keys())
+      self.assertEqual([conway], list(created.keys()))
 
       # Now that we've created the sdist tarball, delete the symlink destination to ensure the
       # unpacked sdist can't get away with unpacking a symlink that happens to have local
@@ -593,7 +596,7 @@ class TestSetupPy(SetupPyTestBase):
       ]
     )
     with self.run_execute(pants) as created:
-      self.assertEqual([pants], created.keys())
+      self.assertEqual([pants], list(created.keys()))
 
 
 def test_detect_namespace_packages():

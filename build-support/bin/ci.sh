@@ -18,7 +18,7 @@ Usage: $0 (-h|-fxbkmsrjlpuyncia)
  -f           skip python code formatting checks
  -x           skip bootstrap clean-all (assume bootstrapping from a
               fresh clone)
- -b           skip bootstraping pants from local sources
+ -b           skip bootstrapping pants from local sources
  -k           skip bootstrapped pants self compile check
  -m           skip sanity checks of bootstrapped pants and repo BUILD
               files
@@ -223,8 +223,8 @@ if [[ "${skip_rust_tests:-false}" == "false" ]]; then
       test_threads_flag="--test-threads=1"
     fi
 
-    RUST_BACKTRACE=1 "${REPO_ROOT}/build-support/bin/native/cargo" test --all \
-      --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" -- "${test_threads_flag}"
+    RUST_BACKTRACE=all "${REPO_ROOT}/build-support/bin/native/cargo" test --all \
+      --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" -- "${test_threads_flag}" --nocapture
   ) || die "Pants rust test failure"
   end_travis_section
 fi

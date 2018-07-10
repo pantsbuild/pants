@@ -11,7 +11,9 @@ import unittest
 
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, FileContent, FilesContent,
                              PathGlobs, Snapshot, create_fs_rules)
-from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
+from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
+                                           FallibleExecuteProcessResult, ProcessExecutionFailure,
+                                           create_process_rules)
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
 from pants.util.objects import TypeCheckError, datatype
@@ -69,9 +71,8 @@ def cat_files_process_result_concatted(cat_exe_req):
   cat_files_snapshot = yield Get(Snapshot, PathGlobs, cat_exe_req.path_globs)
   process_request = ExecuteProcessRequest.create_from_snapshot(
     argv=cat_bin.argv_from_snapshot(cat_files_snapshot),
-    env=dict(),
     snapshot=cat_files_snapshot,
-    output_files=(),
+    description='cat some files',
   )
   cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
   yield Concatted(str(cat_process_result.stdout))
@@ -86,6 +87,8 @@ def create_cat_stdout_rules():
 
 class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)])):
 
+  description = 'obtaining javac version'
+
   @property
   def bin_path(self):
     return self.binary_location.bin_path
@@ -98,36 +101,11 @@ class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)
 def process_request_from_javac_version(javac_version_exe_req):
   yield ExecuteProcessRequest.create_with_empty_snapshot(
     argv=javac_version_exe_req.gen_argv(),
-    env=dict(),
-    output_files=())
+    description=javac_version_exe_req.description,
+  )
 
 
 class JavacVersionOutput(datatype([('value', str)])): pass
-
-
-class ProcessExecutionFailure(Exception):
-  """Used to denote that a process exited, but was unsuccessful in some way.
-
-  For example, exiting with a non-zero code.
-  """
-
-  MSG_FMT = """process '{desc}' failed with code {code}.
-stdout:
-{stdout}
-stderr:
-{stderr}
-"""
-
-  def __init__(self, exit_code, stdout, stderr, process_description):
-    # These are intentionally "public" members.
-    self.exit_code = exit_code
-    self.stdout = stdout
-    self.stderr = stderr
-
-    msg = self.MSG_FMT.format(
-      desc=process_description, code=exit_code, stdout=stdout, stderr=stderr)
-
-    super(ProcessExecutionFailure, self).__init__(msg)
 
 
 @rule(JavacVersionOutput, [Select(JavacVersionExecutionRequest)])
@@ -136,15 +114,6 @@ def get_javac_version_output(javac_version_command):
     ExecuteProcessRequest, JavacVersionExecutionRequest, javac_version_command)
   javac_version_proc_result = yield Get(
     ExecuteProcessResult, ExecuteProcessRequest, javac_version_proc_req)
-
-  exit_code = javac_version_proc_result.exit_code
-  if exit_code != 0:
-    stdout = javac_version_proc_result.stdout
-    stderr = javac_version_proc_result.stderr
-    # TODO(cosmicexplorer): We should probably make this automatic for most
-    # process invocations (see #5719).
-    raise ProcessExecutionFailure(
-      exit_code, stdout, stderr, 'obtaining javac version')
 
   yield JavacVersionOutput(str(javac_version_proc_result.stderr))
 
@@ -198,18 +167,14 @@ def javac_compile_process_result(javac_compile_req):
   output_dirs = tuple({os.path.dirname(java_file) for java_file in java_files})
   process_request = ExecuteProcessRequest.create_from_snapshot(
     argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
-    env=dict(),
     snapshot=sources_snapshot,
     output_directories=output_dirs,
+    description='javac compilation'
   )
   javac_proc_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
 
-  exit_code = javac_proc_result.exit_code
   stdout = javac_proc_result.stdout
   stderr = javac_proc_result.stderr
-  if exit_code != 0:
-    raise ProcessExecutionFailure(
-      exit_code, stdout, stderr, 'javac compilation')
 
   yield JavacCompileResult(
     stdout,
@@ -230,6 +195,7 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
     env = env or dict()
     return ExecuteProcessRequest.create_with_empty_snapshot(
       argv=argv,
+      description='',
       env=env,
       output_files=(),
     )
@@ -328,9 +294,9 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs(())
 
     request = ExecuteProcessRequest.create_with_empty_snapshot(
-      ("/bin/bash", "-c", "echo -n 'European Burmese' > roland"),
-      dict(),
-      ("roland",)
+      argv=("/bin/bash", "-c", "echo -n 'European Burmese' > roland"),
+      description="echo roland",
+      output_files=("roland",)
     )
 
     execute_process_result = self.execute_expecting_one_result(scheduler, ExecuteProcessResult, request).value
@@ -361,9 +327,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs(())
 
     request = ExecuteProcessRequest.create_with_empty_snapshot(
-      ("/bin/bash", "-c", "/bin/sleep 1; echo -n 'European Burmese'"),
-      dict(),
-      tuple(),
+      argv=("/bin/bash", "-c", "/bin/sleep 1; echo -n 'European Burmese'"),
       timeout_seconds=0.1,
       description='sleepy-cat',
     )
@@ -403,7 +367,32 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       self.execute_raising_throw(scheduler, JavacCompileResult, request)
     e = cm.exception
     self.assertEqual(1, e.exit_code)
+    self.assertIn('javac compilation', str(e))
     self.assertIn("NOT VALID JAVA", e.stderr)
+
+  def test_fallible_failing_command_returns_exited_result(self):
+    scheduler = self.mk_scheduler_in_example_fs(())
+
+    request = ExecuteProcessRequest.create_with_empty_snapshot(
+      argv=("/bin/bash", "-c", "exit 1"),
+      description='one-cat',
+    )
+
+    result = self.execute_expecting_one_result(scheduler, FallibleExecuteProcessResult, request).value
+
+    self.assertEquals(result.exit_code, 1)
+
+  def test_non_fallible_failing_command_raises(self):
+    scheduler = self.mk_scheduler_in_example_fs(())
+
+    request = ExecuteProcessRequest.create_with_empty_snapshot(
+      argv=("/bin/bash", "-c", "exit 1"),
+      description='one-cat',
+    )
+
+    with self.assertRaises(ProcessExecutionFailure) as cm:
+      self.execute_raising_throw(scheduler, ExecuteProcessResult, request)
+    self.assertIn("process 'one-cat' failed with exit code 1.", str(cm.exception))
 
   def mk_example_fs_tree(self):
     fs_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
@@ -413,5 +402,5 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     return fs_tree
 
   def mk_scheduler_in_example_fs(self, rules):
-    rules = list(rules) + create_fs_rules() + [RootRule(ExecuteProcessRequest)]
+    rules = list(rules) + create_fs_rules() + create_process_rules()
     return self.mk_scheduler(rules=rules, project_tree=self.mk_example_fs_tree())

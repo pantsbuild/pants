@@ -13,6 +13,7 @@ from six import string_types
 from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
@@ -23,8 +24,9 @@ from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
+from pants.fs.fs import safe_filename
 from pants.source.payload_fields import SourcesField
-from pants.source.wrapped_globs import Files, FilesetWithSpec, Globs
+from pants.source.wrapped_globs import EagerFilesetWithSpec, Files, FilesetWithSpec, Globs
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -99,18 +101,39 @@ class Target(AbstractTarget):
                     'in BUILD files that are not yet available in the current version of pants.')
 
     @classmethod
-    def check(cls, target, kwargs):
+    def check(cls, target, kwargs, payload):
       """
       :API: public
       """
-      cls.global_instance().check_unknown(target, kwargs)
+      cls.global_instance().check_unknown(target, kwargs, payload)
 
-    def check_unknown(self, target, kwargs):
+    def check_unknown(self, target, kwargs, payload):
       """
       :API: public
       """
       ignore_params = set((self.get_options().ignored or {}).get(target.type_alias, ()))
       unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
+      if 'source' in unknown_args:
+        if 'sources' in payload.as_dict():
+          deprecated_conditional(
+            lambda: True,
+            '1.10.0.dev0',
+            ('The source argument in targets is deprecated - it gets automatically promoted to '
+            'sources. Target {} should just use a sources argument. No BUILD files need changing. '
+            'The source argument will stop being populated -').format(target.type_alias),
+          )
+          unknown_args.pop('source')
+      if 'sources' in unknown_args:
+        if 'sources' in payload.as_dict():
+          deprecated_conditional(
+            lambda: True,
+            '1.10.0.dev0',
+            ('The source argument is deprecated - it gets automatically promoted to sources.'
+             'Target {} should just use a sources argument. No BUILD files need changing. '
+             'The source argument will stop being populated -').format(target.type_alias),
+          )
+          unknown_args.pop('sources')
+          kwargs.pop('sources')
       ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
       if ignored_args:
         logger.debug('{target} ignoring the unimplemented arguments: {args}'
@@ -173,11 +196,7 @@ class Target(AbstractTarget):
   @classmethod
   def compute_target_id(cls, address):
     """Computes a target id from the given address."""
-    id_candidate = address.path_safe_spec
-    if len(id_candidate) >= 200:
-      # two dots + 79 char head + 79 char tail + 40 char sha1
-      return '{}.{}.{}'.format(id_candidate[:79], sha1(id_candidate).hexdigest(), id_candidate[-79:])
-    return id_candidate
+    return safe_filename(address.path_safe_spec)
 
   @staticmethod
   def combine_ids(ids):
@@ -311,7 +330,7 @@ class Target(AbstractTarget):
     self._cached_exports_addresses = None
     self._no_cache = no_cache
     if kwargs:
-      self.Arguments.check(self, kwargs)
+      self.Arguments.check(self, kwargs, self.payload)
 
   @property
   def scope(self):
@@ -530,6 +549,14 @@ class Target(AbstractTarget):
     """Returns the count of source files owned by the target."""
     return len(self._sources_field.sources.files)
 
+  def sources_snapshot(self, scheduler=None):
+    """
+    Get a Snapshot of the sources attribute of this target.
+
+    This API is experimental, and is subject to change.
+    """
+    return self._sources_field.snapshot(scheduler=scheduler)
+
   @property
   def derived_from(self):
     """Returns the target this target was derived from.
@@ -660,8 +687,11 @@ class Target(AbstractTarget):
     """
     strict_deps = self._cached_strict_dependencies_map.get(dep_context, None)
     if strict_deps is None:
-      default_predicate = self._closure_dep_predicate({self},
-                                                      **dep_context.target_closure_kwargs)
+      default_predicate = self._closure_dep_predicate({self}, **dep_context.target_closure_kwargs)
+      # FIXME(#5977): this branch needs testing!
+      if not default_predicate:
+        def default_predicate(*args, **kwargs):
+          return True
 
       def dep_predicate(source, dependency):
         if not default_predicate(source, dependency):
@@ -688,7 +718,7 @@ class Target(AbstractTarget):
       for declared in result:
         if type(declared) in dep_context.alias_types:
           continue
-        if isinstance(declared, dep_context.compiler_plugin_types):
+        if isinstance(declared, dep_context.types_with_closure):
           strict_deps.update(declared.closure(
             bfs=True,
             **dep_context.target_closure_kwargs))
@@ -829,6 +859,8 @@ class Target(AbstractTarget):
                                             exclude=exclude)
     return None
 
+  # TODO: Inline this as SourcesField(sources=sources) when all callers are guaranteed to pass an
+  # EagerFilesetWithSpec.
   def create_sources_field(self, sources, sources_rel_path, key_arg=None):
     """Factory method to create a SourcesField appropriate for the type of the sources object.
 
@@ -847,15 +879,39 @@ class Target(AbstractTarget):
       # This is so that tests don't need to set up the subsystem when creating targets that
       # legitimately do not require sources.
       if (key_arg is None or key_arg == 'sources') and self.supports_default_sources():
+        deprecated_conditional(
+          lambda: True,
+          '1.10.0.dev0',
+          'Default sources should always be parsed through the engine not by create_sources_field. '
+          'This code should be unreachable, and this message should never be displayed. '
+          'If you see this message, please contact pants-dev. '
+          'Class which caused this message: {}'.format(self.__class__.__name__)
+        )
         sources = self.default_sources(sources_rel_path)
       else:
         sources = FilesetWithSpec.empty(sources_rel_path)
     elif isinstance(sources, (set, list, tuple)):
       # Received a literal sources list: convert to a FilesetWithSpec via Files.
+      deprecated_conditional(
+        lambda: True,
+        '1.10.0.dev0',
+        ('Passing collections as the value of the sources argument to create_sources_field is '
+         'deprecated, and now takes a slow path. Instead, class {} should have its sources '
+         'argument populated by the engine, either by using the standard parsing pipeline, or by '
+         'requesting a SourcesField product from the v2 engine.').format(self.__class__.__name__)
+      )
       sources = Files.create_fileset_with_spec(sources_rel_path, *sources)
     elif not isinstance(sources, FilesetWithSpec):
       key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
       raise TargetDefinitionException(self, "Expected {}a glob, an address or a list, but was {}"
                                             .format(key_arg_section, type(sources)))
+    elif not isinstance(sources, EagerFilesetWithSpec):
+      deprecated_conditional(
+        lambda: True,
+        '1.10.0.dev0',
+        ('FilesetWithSpec sources values are deprecated except for EagerFilesetWithSpec values. '
+         'Saw value of type {}').format(type(sources))
+      )
+
 
     return SourcesField(sources=sources)

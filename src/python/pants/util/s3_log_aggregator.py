@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import sys
+from builtins import object
 from collections import defaultdict
 
 from s3logparse.s3logparse import parse_log_lines

@@ -14,10 +14,11 @@ import tempfile
 import time
 import uuid
 import zipfile
+from builtins import object
 from contextlib import closing, contextmanager
 
 from colors import green
-from six import string_types
+from future.utils import string_types
 
 from pants.util.dirutil import safe_delete
 from pants.util.tarutil import TarFile
@@ -27,25 +28,14 @@ class InvalidZipPath(ValueError):
   """Indicates a bad zip file path."""
 
 
-def get_joined_path(new_entries, env=None, env_var='PATH', delimiter=':', prepend=False):
-  """Join path entries, combining with an environment variable if specified."""
-  if env is None:
-    env = {}
+def _os_encode(u, enc=sys.getfilesystemencoding()):
+  """Turns a `unicode` into `bytes` via encoding."""
+  return u.encode(enc, 'strict')
 
-  prev_path = env.get(env_var, None)
-  if prev_path is None:
-    path_dirs = list()
-  else:
-    path_dirs = list(prev_path.split(delimiter))
 
-  new_entries_list = list(new_entries)
-
-  if prepend:
-    path_dirs = new_entries_list + path_dirs
-  else:
-    path_dirs += new_entries_list
-
-  return delimiter.join(path_dirs)
+def _os_decode(b, enc=sys.getfilesystemencoding()):
+  """Turns a `bytes` into `unicode` via decoding."""
+  return b.decode(enc, 'strict')
 
 
 @contextmanager
@@ -61,7 +51,7 @@ def environment_as(**kwargs):
 
   def setenv(key, val):
     if val is not None:
-      os.environ[key] = val
+      os.environ[key] = _os_encode(val)
     else:
       if key in os.environ:
         del os.environ[key]
@@ -76,6 +66,10 @@ def environment_as(**kwargs):
       setenv(key, val)
 
 
+def _copy_and_decode_env(env):
+  return {k: _os_decode(v) for k, v in env.items()}
+
+
 def _purge_env():
   # N.B. Without the use of `del` here (which calls `os.unsetenv` under the hood), subprocess32
   # invokes or other things that may access the environment at the C level may not see the
@@ -87,13 +81,13 @@ def _purge_env():
 
 def _restore_env(env):
   for k, v in env.items():
-    os.environ[k] = v
+    os.environ[k] = _os_encode(v)
 
 
 @contextmanager
 def hermetic_environment_as(**kwargs):
   """Set the environment to the supplied values from an empty state."""
-  old_environment = os.environ.copy()
+  old_environment = _copy_and_decode_env(os.environ)
   _purge_env()
   try:
     with environment_as(**kwargs):
@@ -162,7 +156,7 @@ def signal_handler_as(sig, handler):
 
 
 @contextmanager
-def temporary_dir(root_dir=None, cleanup=True, suffix=str(), permissions=None, prefix=tempfile.template):
+def temporary_dir(root_dir=None, cleanup=True, suffix=b'', permissions=None, prefix=tempfile.template):
   """
     A with-context that creates a temporary directory.
 
@@ -298,7 +292,8 @@ def open_tar(path_or_file, *args, **kwargs):
     If path_or_file is a file, caller must close it separately.
   """
   (path, fileobj) = ((path_or_file, None) if isinstance(path_or_file, string_types)
-                     else (None, path_or_file))
+                     else (None, path_or_file))  # TODO(python3port): stop using six.string_types
+                                                 # This should only accept python3 `str`, not byte strings.
   with closing(TarFile.open(path, *args, fileobj=fileobj, **kwargs)) as tar:
     yield tar
 

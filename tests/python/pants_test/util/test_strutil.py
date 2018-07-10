@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import unittest
+from builtins import bytes
 
 from pants.util.strutil import camelcase, ensure_binary, ensure_text, pluralize, strip_prefix
 

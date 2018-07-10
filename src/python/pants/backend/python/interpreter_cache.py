@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
+from builtins import map, object, str
 
 from pex.interpreter import PythonInterpreter
 from pex.package import EggPackage, Package, SourcePackage
@@ -161,7 +162,7 @@ class PythonInterpreterCache(object):
         ':'.join(filters), ':'.join(setup_paths)))
 
     def unsatisfied_filters(interpreters):
-      return filter(lambda f: len(list(self._matching(interpreters, [f]))) == 0, filters)
+      return [f for f in filters if len(list(self._matching(interpreters, [f]))) == 0]
 
     interpreters = []
     with OwnerPrintingInterProcessFileLock(path=os.path.join(self._cache_dir, '.file_lock')):

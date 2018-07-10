@@ -49,7 +49,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
     products = context.products.get('deployable_archives')
     self.assertIsNotNone(products)
     product_data = products.get(binary)
-    product_basedir = product_data.keys()[0]
+    product_basedir = list(product_data.keys())[0]
     self.assertEquals(product_data[product_basedir], [pex_name])
 
     # Check pex copy.

@@ -1,7 +1,6 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use bazel_protos;
@@ -9,15 +8,15 @@ use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
 use fs::{self, File, PathStat, Store};
-use futures::{future, Future};
+use futures::{future, Future, Stream};
 use futures_timer::Delay;
-use hashing::{Digest, Fingerprint};
 use grpcio;
+use hashing::{Digest, Fingerprint};
 use protobuf::{self, Message, ProtobufEnum};
 use resettable::Resettable;
 use sha2::Sha256;
 
-use super::{ExecuteProcessRequest, ExecuteProcessResult};
+use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
 use std::cmp::min;
 
 #[derive(Clone)]
@@ -39,6 +38,42 @@ enum ExecutionError {
   NotFinished(String),
 }
 
+impl CommandRunner {
+  // The Execute API used to be unary, and became streaming. The contract of the streaming API is
+  // that if the client closes the stream after one request, it should continue to function exactly
+  // like the unary API.
+  // For maximal compatibility with servers, we fall back to this unary-like behavior, and control
+  // our own polling rates.
+  // In the future, we may want to remove this behavior if servers reliably support the full stream
+  // behavior.
+  fn oneshot_execute(
+    &self,
+    execute_request: Arc<bazel_protos::remote_execution::ExecuteRequest>,
+  ) -> BoxFuture<bazel_protos::operations::Operation, String> {
+    let stream = try_future!(
+      self
+        .execution_client
+        .get()
+        .execute(&execute_request)
+        .map_err(rpcerror_to_string)
+    );
+    stream
+        .take(1)
+        .into_future()
+        // If there was an error, drop the _stream to disconnect so that the server doesn't keep the
+        // connection alive and continue sending on it.
+        .map_err(|(error, _stream)| rpcerror_to_string(error))
+        .and_then(|(maybe_operation, _stream)| {
+          // If there was a response, drop the _stream to disconnect so that the server doesn't keep
+          // the connection alive and continue sending on it.
+          maybe_operation.ok_or_else(|| {
+            "Didn't get proper stream response from server during remote execution".to_owned()
+          })
+        })
+        .to_boxed()
+  }
+}
+
 impl super::CommandRunner for CommandRunner {
   ///
   /// Runs a command via a gRPC service implementing the Bazel Remote Execution API
@@ -57,45 +92,47 @@ impl super::CommandRunner for CommandRunner {
   /// Loops until the server gives a response, either successful or error. Does not have any
   /// timeout: polls in a tight loop.
   ///
-  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<ExecuteProcessResult, String> {
-    let execution_client = self.execution_client.clone();
-    let execution_client2 = execution_client.clone();
+  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let operations_client = self.operations_client.clone();
 
     let store = self.store.clone();
     let execute_request_result = make_execute_request(&req);
 
-    let req_description = req.description;
-    let req_timeout = req.timeout;
+    let ExecuteProcessRequest {
+      description,
+      timeout,
+      ..
+    } = req;
 
     match execute_request_result {
-      Ok((command, execute_request)) => {
+      Ok((action, command, execute_request)) => {
         let command_runner = self.clone();
-        let command_digest = try_future!(execute_request.get_action().get_command_digest().into());
+        let command_runner2 = self.clone();
+        let execute_request = Arc::new(execute_request);
+        let execute_request2 = execute_request.clone();
         self
-          .upload_command(&command, command_digest)
+          .upload_proto(&command)
+          .join(self.upload_proto(&action))
           .and_then(move |_| {
             debug!(
               "Executing remotely request: {:?} (command: {:?})",
               execute_request, command
             );
-
-            map_grpc_result(execution_client.get().execute(&execute_request))
-              .map(|result| (Arc::new(execute_request), result))
+            command_runner.oneshot_execute(execute_request)
           })
-          .and_then(move |(execute_request, operation)| {
+          .and_then(move |operation| {
             let start_time = Instant::now();
 
             future::loop_fn((operation, 0), move |(operation, iter_num)| {
-              let req_description = req_description.clone();
+              let description = description.clone();
 
-              let execute_request = execute_request.clone();
-              let execution_client2 = execution_client2.clone();
+              let execute_request2 = execute_request2.clone();
               let store = store.clone();
               let operations_client = operations_client.clone();
-              command_runner
+              let command_runner2 = command_runner2.clone();
+              command_runner2
                 .extract_execute_response(operation)
-                .map(|value| future::Loop::Break(value))
+                .map(future::Loop::Break)
                 .or_else(move |value| {
                   match value {
                     ExecutionError::Fatal(err) => future::err(err).to_boxed(),
@@ -104,15 +141,10 @@ impl super::CommandRunner for CommandRunner {
                         "Server reported missing digests; trying to upload: {:?}",
                         missing_digests
                       );
-                      let execute_request = execute_request.clone();
-                      let execution_client2 = execution_client2.clone();
+                      let execute_request = execute_request2.clone();
                       store.ensure_remote_has_recursive(missing_digests)
                               .and_then(move |()| {
-                                map_grpc_result(
-                                  execution_client2.get().execute(
-                                    &execute_request.clone()
-                                  )
-                                )
+                                command_runner2.oneshot_execute(execute_request)
                               })
                               // Reset `iter_num` on `MissingDigests`
                               .map(|operation| future::Loop::Continue((operation, 0)))
@@ -131,10 +163,10 @@ impl super::CommandRunner for CommandRunner {
                       // take the grpc result and cancel the op if too much time has passed.
                       let elapsed = start_time.elapsed();
 
-                      if elapsed > req_timeout {
+                      if elapsed > timeout {
                         future::err(format!(
                           "Exceeded time out of {:?} with {:?} for operation {}, {}",
-                          req_timeout, elapsed, operation_name, req_description
+                          timeout, elapsed, operation_name, description
                         )).to_boxed()
                       } else {
                         // maybe the delay here should be the min of remaining time and the backoff period
@@ -142,13 +174,16 @@ impl super::CommandRunner for CommandRunner {
                           .map_err(move |e| {
                             format!(
                               "Future-Delay errored at operation result polling for {}, {}: {}",
-                              operation_name, req_description, e
+                              operation_name, description, e
                             )
                           })
                           .and_then(move |_| {
-                            future::done(map_grpc_result(
-                              operations_client.get().get_operation(&operation_request),
-                            )).map(move |operation| {
+                            future::done(
+                              operations_client
+                                .get()
+                                .get_operation(&operation_request)
+                                .map_err(rpcerror_to_string),
+                            ).map(move |operation| {
                               future::Loop::Continue((operation, iter_num + 1))
                             })
                               .to_boxed()
@@ -205,24 +240,20 @@ impl CommandRunner {
     }
   }
 
-  fn upload_command(
-    &self,
-    command: &bazel_protos::remote_execution::Command,
-    command_digest: Digest,
-  ) -> BoxFuture<(), String> {
+  fn upload_proto<P: protobuf::Message>(&self, proto: &P) -> BoxFuture<(), String> {
     let store = self.store.clone();
     let store2 = store.clone();
     future::done(
-      command
+      proto
         .write_to_bytes()
-        .map_err(|e| format!("Error serializing command {:?}", e)),
+        .map_err(|e| format!("Error serializing proto {:?}", e)),
     ).and_then(move |command_bytes| store.store_file_bytes(Bytes::from(command_bytes), true))
       .map_err(|e| format!("Error saving digest to local store: {:?}", e))
-      .and_then(move |_| {
-        // TODO: Tune when we upload the command.
+      .and_then(move |digest| {
+        // TODO: Tune when we upload the proto.
         store2
-          .ensure_remote_has_recursive(vec![command_digest])
-          .map_err(|e| format!("Error uploading command {:?}", e))
+          .ensure_remote_has_recursive(vec![digest])
+          .map_err(|e| format!("Error uploading proto {:?}", e))
           .map(|_| ())
       })
       .to_boxed()
@@ -231,7 +262,7 @@ impl CommandRunner {
   fn extract_execute_response(
     &self,
     mut operation: bazel_protos::operations::Operation,
-  ) -> BoxFuture<ExecuteProcessResult, ExecutionError> {
+  ) -> BoxFuture<FallibleExecuteProcessResult, ExecutionError> {
     // TODO: Log less verbosely
     debug!("Got operation response: {:?}", operation);
     if !operation.get_done() {
@@ -260,7 +291,7 @@ impl CommandRunner {
       .join(self.extract_output_files(&execute_response))
       .and_then(move |((stdout, stderr), output_directory)| {
         match grpcio::RpcStatusCode::from(execute_response.get_status().get_code()) {
-          grpcio::RpcStatusCode::Ok => future::ok(ExecuteProcessResult {
+          grpcio::RpcStatusCode::Ok => future::ok(FallibleExecuteProcessResult {
             stdout: stdout,
             stderr: stderr,
             exit_code: execute_response.get_result().get_exit_code(),
@@ -290,10 +321,12 @@ impl CommandRunner {
             try_future!(
               precondition_failure
                 .merge_from_bytes(details.get_value())
-                .map_err(|e| ExecutionError::Fatal(format!(
-                  "Error deserializing FailedPrecondition proto: {:?}",
-                  e
-                )))
+                .map_err(|e| {
+                  ExecutionError::Fatal(format!(
+                    "Error deserializing FailedPrecondition proto: {:?}",
+                    e
+                  ))
+                })
             );
 
             let mut missing_digests =
@@ -306,39 +339,31 @@ impl CommandRunner {
                   violation
                 ))).to_boxed();
               }
-              let parts: Vec<_> = violation.get_subject().split("/").collect();
-              if parts.len() != 3 || parts.get(0).unwrap() != &"blobs" {
+              let parts: Vec<_> = violation.get_subject().split('/').collect();
+              if parts.len() != 3 || parts[0] != "blobs" {
                 return future::err(ExecutionError::Fatal(format!(
                   "Received FailedPrecondition MISSING but didn't recognize subject {}",
                   violation.get_subject()
                 ))).to_boxed();
               }
               let digest = Digest(
+                try_future!(Fingerprint::from_hex_string(parts[1]).map_err(|e| {
+                  ExecutionError::Fatal(format!("Bad digest in missing blob: {}: {}", parts[1], e))
+                })),
                 try_future!(
-                  Fingerprint::from_hex_string(parts.get(1).unwrap()).map_err(|e| {
-                    ExecutionError::Fatal(format!(
-                      "Bad digest in missing blob: {}: {}",
-                      parts.get(1).unwrap(),
-                      e
-                    ))
+                  parts[2].parse::<usize>().map_err(|e| {
+                    ExecutionError::Fatal(format!("Missing blob had bad size: {}: {}", parts[2], e))
                   })
                 ),
-                try_future!(parts.get(2).unwrap().parse::<usize>().map_err(|e| {
-                  ExecutionError::Fatal(format!(
-                    "Missing blob had bad size: {}: {}",
-                    parts.get(2).unwrap(),
-                    e
-                  ))
-                })),
               );
               missing_digests.push(digest);
             }
-            if missing_digests.len() == 0 {
+            if missing_digests.is_empty() {
               return future::err(ExecutionError::Fatal(
                 "Error from remote execution: FailedPrecondition, but no details".to_owned(),
               )).to_boxed();
             }
-            return future::err(ExecutionError::MissingDigests(missing_digests)).to_boxed();
+            future::err(ExecutionError::MissingDigests(missing_digests)).to_boxed()
           }
           code => future::err(ExecutionError::Fatal(format!(
             "Error from remote execution: {:?}: {:?}",
@@ -354,7 +379,7 @@ impl CommandRunner {
     &self,
     execute_response: &bazel_protos::remote_execution::ExecuteResponse,
   ) -> BoxFuture<Bytes, ExecutionError> {
-    let stdout = if execute_response.get_result().has_stdout_digest() {
+    if execute_response.get_result().has_stdout_digest() {
       let stdout_digest_result: Result<Digest, String> =
         execute_response.get_result().get_stdout_digest().into();
       let stdout_digest = try_future!(
@@ -370,14 +395,13 @@ impl CommandRunner {
             stdout_digest, error
           ))
         })
-        .and_then(move |maybe_value| match maybe_value {
-          Some(value) => return Ok(value),
-          None => {
-            return Err(ExecutionError::Fatal(format!(
+        .and_then(move |maybe_value| {
+          maybe_value.ok_or_else(|| {
+            ExecutionError::Fatal(format!(
               "Couldn't find stdout digest ({:?}), when fetching.",
               stdout_digest
-            )))
-          }
+            ))
+          })
         })
         .to_boxed()
     } else {
@@ -391,15 +415,14 @@ impl CommandRunner {
         })
         .map(|_| stdout_copy)
         .to_boxed()
-    };
-    return stdout;
+    }
   }
 
   fn extract_stderr(
     &self,
     execute_response: &bazel_protos::remote_execution::ExecuteResponse,
   ) -> BoxFuture<Bytes, ExecutionError> {
-    let stderr = if execute_response.get_result().has_stderr_digest() {
+    if execute_response.get_result().has_stderr_digest() {
       let stderr_digest_result: Result<Digest, String> =
         execute_response.get_result().get_stderr_digest().into();
       let stderr_digest = try_future!(
@@ -415,14 +438,13 @@ impl CommandRunner {
             stderr_digest, error
           ))
         })
-        .and_then(move |maybe_value| match maybe_value {
-          Some(value) => return Ok(value),
-          None => {
-            return Err(ExecutionError::Fatal(format!(
+        .and_then(move |maybe_value| {
+          maybe_value.ok_or_else(|| {
+            ExecutionError::Fatal(format!(
               "Couldn't find stderr digest ({:?}), when fetching.",
               stderr_digest
-            )))
-          }
+            ))
+          })
         })
         .to_boxed()
     } else {
@@ -436,59 +458,33 @@ impl CommandRunner {
         })
         .map(|_| stderr_copy)
         .to_boxed()
-    };
-    return stderr;
+    }
   }
 
   fn extract_output_files(
     &self,
     execute_response: &bazel_protos::remote_execution::ExecuteResponse,
   ) -> BoxFuture<Digest, ExecutionError> {
-    let mut futures = vec![];
-    let path_map = Arc::new(Mutex::new(HashMap::new()));
-    let path_map_2 = path_map.clone();
+    let mut path_map = HashMap::new();
     let path_stats_result: Result<Vec<PathStat>, String> = execute_response
       .get_result()
       .get_output_files()
       .into_iter()
       .map(|output_file| {
         let output_file_path_buf = PathBuf::from(output_file.get_path());
-        if output_file.has_digest() {
-          let digest: Result<Digest, String> = output_file.get_digest().into();
-          let mut underlying_path_map = path_map.lock().unwrap();
-          underlying_path_map.insert(output_file_path_buf.clone(), digest?);
-        } else {
-          let raw_content = output_file.content.clone();
-          let path_map_3 = path_map.clone();
-          let output_file_path_buf_2 = output_file_path_buf.clone();
-          let output_file_path_buf_3 = output_file_path_buf_2.clone();
-          futures.push(
-            self
-              .store
-              .store_file_bytes(raw_content, false)
-              .map_err(move |error| {
-                ExecutionError::Fatal(format!(
-                  "Error storing raw content for output file {:?}: {:?}",
-                  output_file_path_buf_3, error
-                ))
-              })
-              .map(move |digest| {
-                let mut underlying_path_map = path_map_3.lock().unwrap();
-                underlying_path_map.insert(output_file_path_buf_2, digest);
-              }),
-          );
-        }
+        let digest: Result<Digest, String> = output_file.get_digest().into();
+        path_map.insert(output_file_path_buf.clone(), digest?);
         Ok(PathStat::file(
           output_file_path_buf.clone(),
           File {
-            path: output_file_path_buf.clone(),
+            path: output_file_path_buf,
             is_executable: output_file.get_is_executable(),
           },
         ))
       })
       .collect();
 
-    let path_stats = try_future!(path_stats_result.map_err(|err| ExecutionError::Fatal(err)));
+    let path_stats = try_future!(path_stats_result.map_err(ExecutionError::Fatal));
 
     #[derive(Clone)]
     struct StoreOneOffRemoteDigest {
@@ -496,7 +492,7 @@ impl CommandRunner {
     }
 
     impl StoreOneOffRemoteDigest {
-      pub fn new(map: HashMap<PathBuf, Digest>) -> StoreOneOffRemoteDigest {
+      fn new(map: HashMap<PathBuf, Digest>) -> StoreOneOffRemoteDigest {
         StoreOneOffRemoteDigest {
           map_of_paths_to_digests: map,
         }
@@ -515,23 +511,16 @@ impl CommandRunner {
       }
     }
 
-    let store = self.store.clone();
-    future::join_all(futures)
-      .and_then(|_| {
-        // The unwrap() below is safe because we have joined any futures that had references to the Arc
-        let path_wrap_mutex = Arc::try_unwrap(path_map_2).unwrap();
-        let underlying_path_map = path_wrap_mutex.into_inner().unwrap();
-        fs::Snapshot::digest_from_path_stats(
-          store,
-          StoreOneOffRemoteDigest::new(underlying_path_map),
-          path_stats,
-        ).map_err(move |error| {
-          ExecutionError::Fatal(format!(
-            "Error when storing the output file directory info in the remote CAS: {:?}",
-            error
-          ))
-        })
-      })
+    fs::Snapshot::digest_from_path_stats(
+      self.store.clone(),
+      StoreOneOffRemoteDigest::new(path_map),
+      &path_stats,
+    ).map_err(move |error| {
+      ExecutionError::Fatal(format!(
+        "Error when storing the output file directory info in the remote CAS: {:?}",
+        error
+      ))
+    })
       .to_boxed()
   }
 }
@@ -540,6 +529,7 @@ fn make_execute_request(
   req: &ExecuteProcessRequest,
 ) -> Result<
   (
+    bazel_protos::remote_execution::Action,
     bazel_protos::remote_execution::Command,
     bazel_protos::remote_execution::ExecuteRequest,
   ),
@@ -547,16 +537,12 @@ fn make_execute_request(
 > {
   let mut command = bazel_protos::remote_execution::Command::new();
   command.set_arguments(protobuf::RepeatedField::from_vec(req.argv.clone()));
-  for (ref name, ref value) in req.env.iter() {
+  for (ref name, ref value) in &req.env {
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env.set_name(name.to_string());
     env.set_value(value.to_string());
     command.mut_environment_variables().push(env);
   }
-
-  let mut action = bazel_protos::remote_execution::Action::new();
-  action.set_command_digest(digest(&command)?);
-  action.set_input_root_digest((&req.input_files).into());
   let mut output_files = req
     .output_files
     .iter()
@@ -567,12 +553,16 @@ fn make_execute_request(
     })
     .collect::<Result<Vec<String>, String>>()?;
   output_files.sort();
-  action.set_output_files(protobuf::repeated::RepeatedField::from_vec(output_files));
+  command.set_output_files(protobuf::repeated::RepeatedField::from_vec(output_files));
+
+  let mut action = bazel_protos::remote_execution::Action::new();
+  action.set_command_digest(digest(&command)?);
+  action.set_input_root_digest((&req.input_files).into());
 
   let mut execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
-  execute_request.set_action(action);
+  execute_request.set_action_digest(digest(&action)?);
 
-  Ok((command, execute_request))
+  Ok((action, command, execute_request))
 }
 
 fn format_error(error: &bazel_protos::status::Status) -> String {
@@ -584,23 +574,19 @@ fn format_error(error: &bazel_protos::status::Status) -> String {
   format!("{}: {}", error_code, error.get_message())
 }
 
-fn map_grpc_result<T>(result: grpcio::Result<T>) -> Result<T, String> {
-  match result {
-    Ok(value) => Ok(value),
-    Err(grpcio::Error::RpcFailure(status)) => Err(format!(
+fn rpcerror_to_string(error: grpcio::Error) -> String {
+  match error {
+    grpcio::Error::RpcFailure(status) => format!(
       "{:?}: {:?}",
       status.status,
-      status.details.unwrap_or("[no message]".to_string())
-    )),
-    Err(err) => Err(err.description().to_string()),
+      status.details.unwrap_or_else(|| "[no message]".to_string())
+    ),
+    err => format!("{:?}", err),
   }
 }
 
-fn digest(message: &protobuf::Message) -> Result<bazel_protos::remote_execution::Digest, String> {
-  let bytes = match message.write_to_bytes() {
-    Ok(b) => b,
-    Err(e) => return Err(e.description().to_string()),
-  };
+fn digest(message: &Message) -> Result<bazel_protos::remote_execution::Digest, String> {
+  let bytes = message.write_to_bytes().map_err(|e| format!("{:?}", e))?;
 
   let mut hasher = Sha256::default();
   hasher.input(&bytes);
@@ -609,7 +595,7 @@ fn digest(message: &protobuf::Message) -> Result<bazel_protos::remote_execution:
   digest.set_size_bytes(bytes.len() as i64);
   digest.set_hash(format!("{:x}", hasher.fixed_result()));
 
-  return Ok(digest);
+  Ok(digest)
 }
 
 #[cfg(test)]
@@ -620,20 +606,20 @@ mod tests {
   use futures::Future;
   use grpcio;
   use hashing::{Digest, Fingerprint};
-  use protobuf::{self, Message, ProtobufEnum};
   use mock;
+  use protobuf::{self, Message, ProtobufEnum};
   use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
   use testutil::{as_bytes, owned_string_vec};
 
-  use super::{CommandRunner, ExecuteProcessRequest, ExecuteProcessResult, ExecutionError};
   use super::super::CommandRunner as CommandRunnerTrait;
+  use super::{CommandRunner, ExecuteProcessRequest, ExecutionError, FallibleExecuteProcessResult};
   use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
+  use std::ops::Sub;
   use std::path::PathBuf;
   use std::sync::Arc;
   use std::time::Duration;
-  use std::ops::Sub;
 
   #[derive(Debug, PartialEq)]
   enum StdoutType {
@@ -676,24 +662,38 @@ mod tests {
       env.set_value("value".to_owned());
       env
     });
-    let mut want_execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
-    want_execute_request.set_action({
-      let mut action = bazel_protos::remote_execution::Action::new();
-      action.set_command_digest(
-        (&Digest(
-          Fingerprint::from_hex_string(
-            "7e487b414ca637093673c010eaacc56c6ffd573035133338ca282e952158d0f4",
-          ).unwrap(),
-          30,
-        )).into(),
-      );
-      action.set_input_root_digest((&input_directory.digest()).into());
-      action.mut_output_files().push("other/file".to_owned());
-      action.mut_output_files().push("path/to/file".to_owned());
-      action
-    });
+    want_command
+      .mut_output_files()
+      .push("other/file".to_owned());
+    want_command
+      .mut_output_files()
+      .push("path/to/file".to_owned());
 
-    assert_eq!(result, Ok((want_command, want_execute_request)));
+    let mut want_action = bazel_protos::remote_execution::Action::new();
+    want_action.set_command_digest(
+      (&Digest(
+        Fingerprint::from_hex_string(
+          "fb09aa134e9d84aed9c35a9dadb128ab6924285fbcb7e4bec0f65b5c08988a5f",
+        ).unwrap(),
+        56,
+      )).into(),
+    );
+    want_action.set_input_root_digest((&input_directory.digest()).into());
+
+    let mut want_execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
+    want_execute_request.set_action_digest(
+      (&Digest(
+        Fingerprint::from_hex_string(
+          "736c7aca28d63a5b09c4549e0e70bf8cb1645070a038a51abd7283f611cbd6c6",
+        ).unwrap(),
+        140,
+      )).into(),
+    );
+
+    assert_eq!(
+      result,
+      Ok((want_action, want_command, want_execute_request))
+    );
   }
 
   #[test]
@@ -712,7 +712,7 @@ mod tests {
           timeout: Duration::from_millis(1000),
           description: "wrong command".to_string(),
         }).unwrap()
-          .1,
+          .2,
         vec![],
       ))
     };
@@ -733,7 +733,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().1,
+        super::make_execute_request(&execute_request).unwrap().2,
         vec![
           make_incomplete_operation(&op_name),
           make_successful_operation(
@@ -750,7 +750,7 @@ mod tests {
 
     assert_eq!(
       result,
-      ExecuteProcessResult {
+      FallibleExecuteProcessResult {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
@@ -773,7 +773,7 @@ mod tests {
           0,
         ).0
       ),
-      Ok(ExecuteProcessResult {
+      Ok(FallibleExecuteProcessResult {
         stdout: testdata.bytes(),
         stderr: testdata_empty.bytes(),
         exit_code: 0,
@@ -796,7 +796,7 @@ mod tests {
           0,
         ).0
       ),
-      Ok(ExecuteProcessResult {
+      Ok(FallibleExecuteProcessResult {
         stdout: testdata_empty.bytes(),
         stderr: testdata.bytes(),
         exit_code: 0,
@@ -817,15 +817,13 @@ mod tests {
         op_name.clone(),
         super::make_execute_request(&echo_roland_request())
           .unwrap()
-          .1,
-        vec![
-          make_successful_operation(
-            &op_name.clone(),
-            StdoutType::Raw(test_stdout.string()),
-            StderrType::Raw(test_stderr.string()),
-            0,
-          ),
-        ],
+          .2,
+        vec![make_successful_operation(
+          &op_name.clone(),
+          StdoutType::Raw(test_stdout.string()),
+          StderrType::Raw(test_stderr.string()),
+          0,
+        )],
       ))
     };
 
@@ -846,7 +844,7 @@ mod tests {
     let result = cmd_runner.run(echo_roland_request()).wait();
     assert_eq!(
       result,
-      Ok(ExecuteProcessResult {
+      Ok(FallibleExecuteProcessResult {
         stdout: test_stdout.bytes(),
         stderr: test_stderr.bytes(),
         exit_code: 0,
@@ -885,7 +883,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().1,
+        super::make_execute_request(&execute_request).unwrap().2,
         Vec::from_iter(
           iter::repeat(make_incomplete_operation(&op_name))
             .take(4)
@@ -903,7 +901,7 @@ mod tests {
 
     assert_eq!(
       result,
-      ExecuteProcessResult {
+      FallibleExecuteProcessResult {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
@@ -932,7 +930,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().1,
+        super::make_execute_request(&execute_request).unwrap().2,
         vec![
           make_incomplete_operation(&op_name),
           make_delayed_incomplete_operation(&op_name, delayed_operation_time),
@@ -955,27 +953,24 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().1,
-        vec![
-          make_incomplete_operation(&op_name),
-          {
-            let mut op = bazel_protos::operations::Operation::new();
-            op.set_name(op_name.clone());
-            op.set_done(true);
-            op.set_response({
-              let mut response_wrapper = protobuf::well_known_types::Any::new();
-              response_wrapper.set_type_url(format!(
-                "type.googleapis.com/{}",
-                bazel_protos::remote_execution::ExecuteResponse::new()
-                  .descriptor()
-                  .full_name()
-              ));
-              response_wrapper.set_value(vec![0x00, 0x00, 0x00]);
-              response_wrapper
-            });
-            (op, None)
-          },
-        ],
+        super::make_execute_request(&execute_request).unwrap().2,
+        vec![make_incomplete_operation(&op_name), {
+          let mut op = bazel_protos::operations::Operation::new();
+          op.set_name(op_name.clone());
+          op.set_done(true);
+          op.set_response({
+            let mut response_wrapper = protobuf::well_known_types::Any::new();
+            response_wrapper.set_type_url(format!(
+              "type.googleapis.com/{}",
+              bazel_protos::remote_execution::ExecuteResponse::new()
+                .descriptor()
+                .full_name()
+            ));
+            response_wrapper.set_value(vec![0x00, 0x00, 0x00]);
+            response_wrapper
+          });
+          (op, None)
+        }],
       ))
     };
 
@@ -991,21 +986,19 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().1,
-        vec![
-          {
-            let mut op = bazel_protos::operations::Operation::new();
-            op.set_name(op_name.to_string());
-            op.set_done(true);
-            op.set_error({
-              let mut error = bazel_protos::status::Status::new();
-              error.set_code(bazel_protos::code::Code::INTERNAL.value());
-              error.set_message("Something went wrong".to_string());
-              error
-            });
-            (op, None)
-          },
-        ],
+        super::make_execute_request(&execute_request).unwrap().2,
+        vec![{
+          let mut op = bazel_protos::operations::Operation::new();
+          op.set_name(op_name.to_string());
+          op.set_done(true);
+          op.set_error({
+            let mut error = bazel_protos::status::Status::new();
+            error.set_code(bazel_protos::code::Code::INTERNAL.value());
+            error.set_message("Something went wrong".to_string());
+            error
+          });
+          (op, None)
+        }],
       ))
     };
 
@@ -1023,22 +1016,19 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().1,
-        vec![
-          make_incomplete_operation(&op_name),
-          {
-            let mut op = bazel_protos::operations::Operation::new();
-            op.set_name(op_name.to_string());
-            op.set_done(true);
-            op.set_error({
-              let mut error = bazel_protos::status::Status::new();
-              error.set_code(bazel_protos::code::Code::INTERNAL.value());
-              error.set_message("Something went wrong".to_string());
-              error
-            });
-            (op, None)
-          },
-        ],
+        super::make_execute_request(&execute_request).unwrap().2,
+        vec![make_incomplete_operation(&op_name), {
+          let mut op = bazel_protos::operations::Operation::new();
+          op.set_name(op_name.to_string());
+          op.set_done(true);
+          op.set_error({
+            let mut error = bazel_protos::status::Status::new();
+            error.set_code(bazel_protos::code::Code::INTERNAL.value());
+            error.set_message("Something went wrong".to_string());
+            error
+          });
+          (op, None)
+        }],
       ))
     };
 
@@ -1056,15 +1046,13 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().1,
-        vec![
-          {
-            let mut op = bazel_protos::operations::Operation::new();
-            op.set_name(op_name.to_string());
-            op.set_done(true);
-            (op, None)
-          },
-        ],
+        super::make_execute_request(&execute_request).unwrap().2,
+        vec![{
+          let mut op = bazel_protos::operations::Operation::new();
+          op.set_name(op_name.to_string());
+          op.set_done(true);
+          (op, None)
+        }],
       ))
     };
 
@@ -1082,16 +1070,13 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().1,
-        vec![
-          make_incomplete_operation(&op_name),
-          {
-            let mut op = bazel_protos::operations::Operation::new();
-            op.set_name(op_name.to_string());
-            op.set_done(true);
-            (op, None)
-          },
-        ],
+        super::make_execute_request(&execute_request).unwrap().2,
+        vec![make_incomplete_operation(&op_name), {
+          let mut op = bazel_protos::operations::Operation::new();
+          op.set_name(op_name.to_string());
+          op.set_done(true);
+          (op, None)
+        }],
       ))
     };
 
@@ -1111,12 +1096,12 @@ mod tests {
         op_name.clone(),
         super::make_execute_request(&cat_roland_request())
           .unwrap()
-          .1,
+          .2,
         vec![
           make_incomplete_operation(&op_name),
-          make_precondition_failure_operation(vec![
-            missing_preconditionfailure_violation(&roland.digest()),
-          ]),
+          make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
+            &roland.digest()
+          )]),
           make_successful_operation(
             "cat2",
             StdoutType::Raw(roland.string()),
@@ -1147,7 +1132,7 @@ mod tests {
       .wait();
     assert_eq!(
       result,
-      Ok(ExecuteProcessResult {
+      Ok(FallibleExecuteProcessResult {
         stdout: roland.bytes(),
         stderr: Bytes::from(""),
         exit_code: 0,
@@ -1171,12 +1156,12 @@ mod tests {
         op_name.clone(),
         super::make_execute_request(&cat_roland_request())
           .unwrap()
-          .1,
+          .2,
         vec![
           make_incomplete_operation(&op_name),
-          make_precondition_failure_operation(vec![
-            missing_preconditionfailure_violation(&missing_digest),
-          ]),
+          make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
+            &missing_digest,
+          )]),
         ],
       ))
     };
@@ -1223,7 +1208,7 @@ mod tests {
 
   #[test]
   fn extract_execute_response_success() {
-    let want_result = ExecuteProcessResult {
+    let want_result = FallibleExecuteProcessResult {
       stdout: as_bytes("roland"),
       stderr: Bytes::from("simba"),
       exit_code: 17,
@@ -1311,13 +1296,11 @@ mod tests {
 
   #[test]
   fn extract_execute_response_other_failed_precondition() {
-    let missing = vec![
-      {
-        let mut violation = bazel_protos::error_details::PreconditionFailure_Violation::new();
-        violation.set_field_type("OUT_OF_CAPACITY".to_owned());
-        violation
-      },
-    ];
+    let missing = vec![{
+      let mut violation = bazel_protos::error_details::PreconditionFailure_Violation::new();
+      violation.set_field_type("OUT_OF_CAPACITY".to_owned());
+      violation
+    }];
 
     let (operation, _duration) = make_precondition_failure_operation(missing);
 
@@ -1394,7 +1377,7 @@ mod tests {
         let op_name = "gimme-foo".to_string();
         mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request).unwrap().1,
+          super::make_execute_request(&execute_request).unwrap().2,
           vec![
             make_incomplete_operation(&op_name),
             make_successful_operation(
@@ -1425,7 +1408,7 @@ mod tests {
         let op_name = "gimme-foo".to_string();
         mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request).unwrap().1,
+          super::make_execute_request(&execute_request).unwrap().2,
           vec![
             make_incomplete_operation(&op_name),
             make_incomplete_operation(&op_name),
@@ -1645,7 +1628,7 @@ mod tests {
   fn run_command_remote(
     address: String,
     request: ExecuteProcessRequest,
-  ) -> Result<ExecuteProcessResult, String> {
+  ) -> Result<FallibleExecuteProcessResult, String> {
     let cas = mock::StubCAS::with_roland_and_directory(1024);
     let command_runner = create_command_runner(address, &cas);
     command_runner.run(request).wait()
@@ -1667,7 +1650,7 @@ mod tests {
 
   fn extract_execute_response(
     operation: bazel_protos::operations::Operation,
-  ) -> Result<ExecuteProcessResult, ExecutionError> {
+  ) -> Result<FallibleExecuteProcessResult, ExecutionError> {
     let cas = mock::StubCAS::with_roland_and_directory(1024);
     let command_runner = create_command_runner("".to_owned(), &cas);
     command_runner.extract_execute_response(operation).wait()
@@ -1683,7 +1666,7 @@ mod tests {
       .wait()
   }
 
-  fn make_any_proto(message: &protobuf::Message) -> protobuf::well_known_types::Any {
+  fn make_any_proto(message: &Message) -> protobuf::well_known_types::Any {
     let mut any = protobuf::well_known_types::Any::new();
     any.set_type_url(format!(
       "type.googleapis.com/{}",

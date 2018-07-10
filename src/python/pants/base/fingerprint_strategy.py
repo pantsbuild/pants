@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 from abc import abstractmethod
+from builtins import object
 
 from pants.util.meta import AbstractClass
 

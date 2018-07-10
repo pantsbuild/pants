@@ -36,6 +36,7 @@ python_tests(
   name = 'exclude_target_regexp_integration',
   sources = [ 'test_exclude_target_regexp_integration.py' ],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
   ],
@@ -58,6 +59,7 @@ python_library(
   name = 'context_utils',
   sources = ['context_utils.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
@@ -70,6 +72,7 @@ python_tests(
   name = 'deprecated',
   sources = ['test_deprecated.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/base:deprecated',
     'src/python/pants:version',
   ]
@@ -109,6 +112,7 @@ python_tests(
   name = 'hash_utils',
   sources = ['test_hash_utils.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/base:hash_utils',
     'src/python/pants/util:contextutil',
   ]
@@ -185,6 +189,7 @@ python_tests(
   name = 'worker_pool',
   sources = ['test_worker_pool.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/base:worker_pool',
     'src/python/pants/util:contextutil',
   ]
@@ -206,4 +211,14 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/option:testing',
   ],
+)
+
+python_tests(
+  name = 'exiter_integration',
+  sources = [ 'test_exiter_integration.py' ],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+  timeout = 120,
 )

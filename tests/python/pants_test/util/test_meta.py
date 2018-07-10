@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from abc import abstractmethod, abstractproperty
+from builtins import object
 
 from pants.util.meta import AbstractClass, Singleton, classproperty, staticproperty
 from pants_test.test_base import TestBase

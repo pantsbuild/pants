@@ -4,6 +4,9 @@
 python_library(
   name='interpreter_cache_test_mixin',
   sources=['interpreter_cache_test_mixin.py'],
+  dependencies = [
+    '3rdparty/python:future',
+  ]
 )
 
 python_library(
@@ -11,6 +14,7 @@ python_library(
   sources=['python_task_test_base.py'],
   dependencies=[
     ':interpreter_cache_test_mixin',
+    '3rdparty/python:future',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/build_graph',
     'tests/python/pants_test:task_test_base'
@@ -29,6 +33,7 @@ python_tests(
   sources=python_native_code_test_files,
   dependencies=[
     ':python_task_test_base',
+    '3rdparty/python:future',
     'src/python/pants/backend/native',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/backend/python/targets',
@@ -48,6 +53,7 @@ python_tests(
     ':python_task_test_base',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    '3rdparty/python:future',
     '3rdparty/python:coverage',
     '3rdparty/python:mock',
     '3rdparty/python:pex',
@@ -64,7 +70,6 @@ python_tests(
     'src/python/pants/base:run_info',
     'src/python/pants/build_graph',
     'src/python/pants/fs',
-    'src/python/pants/python',
     'src/python/pants/source',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -90,6 +95,20 @@ python_tests(
   ],
   tags={'integration'},
   timeout=2400
+)
+
+python_tests(
+  name='ctypes_integration',
+  sources=['test_ctypes_integration.py', 'test_python_distribution_integration.py'],
+  dependencies=[
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:process_handler',
+    'tests/python/pants_test:int-test',
+    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
+  ],
+  tags={'integration'},
+  timeout=2400,
 )
 
 python_tests(

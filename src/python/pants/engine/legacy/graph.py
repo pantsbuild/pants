@@ -26,7 +26,6 @@ from pants.engine.rules import TaskRule, rule
 from pants.engine.selectors import Get, Select
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
-from pants.util.dirutil import fast_relpath
 from pants.util.objects import Collection, datatype
 
 
@@ -281,14 +280,6 @@ class HydratedTarget(datatype(['address', 'adaptor', 'dependencies'])):
   def addresses(self):
     return self.dependencies
 
-  def __eq__(self, other):
-    if type(self) != type(other):
-      return False
-    return self.address == other.address
-
-  def __ne__(self, other):
-    return not (self == other)
-
   def __hash__(self):
     return hash(self.address)
 
@@ -364,20 +355,17 @@ def hydrate_target(target_adaptor):
 
 
 def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
-  fds = snapshot.path_stats if include_dirs else snapshot.files
-  files = tuple(fast_relpath(fd.path, spec_path) for fd in fds)
-
   rel_include_globs = filespec['globs']
 
   relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(rel_include_globs, spec_path)
-  if filespec.has_key('exclude'):
+  if 'exclude' in filespec:
     relpath_adjusted_filespec['exclude'] = [FilesetRelPathWrapper.to_filespec(e['globs'], spec_path)
                                             for e in filespec['exclude']]
 
   return EagerFilesetWithSpec(spec_path,
                               relpath_adjusted_filespec,
-                              files=files,
-                              files_hash=snapshot.directory_digest.fingerprint)
+                              snapshot,
+                              include_dirs=include_dirs)
 
 
 @rule(HydratedField, [Select(SourcesField), Select(GlobMatchErrorBehavior)])
@@ -392,6 +380,7 @@ def hydrate_sources(sources_field, glob_match_error_behavior):
     sources_field.address.spec_path,
     sources_field.filespecs,
     snapshot)
+  sources_field.validate_fn(fileset_with_spec)
   yield HydratedField(sources_field.arg, fileset_with_spec)
 
 

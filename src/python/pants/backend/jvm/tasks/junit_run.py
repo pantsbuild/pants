@@ -138,7 +138,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   def implementation_version(cls):
     return super(JUnitRun, cls).implementation_version() + [('JUnitRun', 3)]
 
-  _BATCH_ALL = sys.maxint
+  _BATCH_ALL = sys.maxsize
 
   @classmethod
   def register_options(cls, register):

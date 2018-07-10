@@ -28,11 +28,11 @@ python_tests(
   name = 'interpreter_cache',
   sources = ['test_interpreter_cache.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:mock',
     '3rdparty/python:pex',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python/subsystems',
-    'src/python/pants/python',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test:int-test',

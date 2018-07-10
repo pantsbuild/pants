@@ -208,7 +208,7 @@ impl Store {
       .load_bytes_with(entry_type, digest.0, f_local)
       .and_then(
         move |maybe_local_value| match (maybe_local_value, maybe_remote) {
-          (Some(value_result), _) => future::done(value_result.map(|v| Some(v))).to_boxed(),
+          (Some(value_result), _) => future::done(value_result.map(Some)).to_boxed(),
           (None, None) => future::ok(None).to_boxed(),
           (None, Some(remote)) => remote
             .load_bytes_with(entry_type, digest, move |bytes: Bytes| bytes)
@@ -247,14 +247,14 @@ impl Store {
     let remote = match self.remote {
       Some(ref remote) => remote,
       None => {
-        return future::err(format!("Cannot ensure remote has blobs without a remote")).to_boxed()
+        return future::err("Cannot ensure remote has blobs without a remote".to_owned()).to_boxed()
       }
     };
 
     let mut expanding_futures = Vec::new();
 
     let mut expanded_digests = HashMap::new();
-    for digest in digests.into_iter() {
+    for digest in digests {
       match self.local.entry_type(&digest.0) {
         Ok(Some(EntryType::File)) => {
           expanded_digests.insert(digest, EntryType::File);
@@ -296,7 +296,7 @@ impl Store {
           filtered_digests
             .into_iter()
             .map(move |digest| {
-              let entry_type = digest_entry_types.get(&digest).unwrap();
+              let entry_type = digest_entry_types[&digest];
               let remote = remote2.clone();
               local
                 .load_bytes_with(entry_type.clone(), digest.0, move |bytes| {
@@ -310,7 +310,7 @@ impl Store {
             .collect::<Vec<_>>(),
         )
       })
-      .and_then(move |futures| future::join_all(futures))
+      .and_then(future::join_all)
       .map(|_| ())
       .to_boxed()
   }
@@ -382,7 +382,7 @@ impl Store {
           {
             let mut accumulator = accumulator.lock().unwrap();
             accumulator.insert(digest, EntryType::Directory);
-            for file in directory.get_files().into_iter() {
+            for file in directory.get_files() {
               accumulator.insert(try_future!(file.get_digest().into()), EntryType::File);
             }
           }
@@ -400,9 +400,7 @@ impl Store {
           ).map(|_| ())
             .to_boxed()
         }
-        None => {
-          return future::err(format!("Could not expand unknown directory: {:?}", digest)).to_boxed()
-        }
+        None => future::err(format!("Could not expand unknown directory: {:?}", digest)).to_boxed(),
       })
       .to_boxed()
   }
@@ -466,10 +464,9 @@ impl Store {
           .and_then(|mut f| f.write_all(&bytes))
           .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
       })
-      .map_err(|e| e.into())
       .and_then(move |write_result| match write_result {
         Some(Ok(())) => Ok(()),
-        Some(Err(e)) => Err(e.into()),
+        Some(Err(e)) => Err(e),
         None => Err(format!("File with digest {:?} not found", digest)),
       })
       .to_boxed()
@@ -478,7 +475,7 @@ impl Store {
   // Returns files sorted by their path.
   pub fn contents_for_directory(
     &self,
-    directory: bazel_protos::remote_execution::Directory,
+    directory: &bazel_protos::remote_execution::Directory,
   ) -> BoxFuture<Vec<FileContent>, String> {
     let accumulator = Arc::new(Mutex::new(HashMap::new()));
     self
@@ -498,7 +495,7 @@ impl Store {
   // Assumes that all fingerprints it encounters are valid.
   fn contents_for_directory_helper(
     &self,
-    directory: bazel_protos::remote_execution::Directory,
+    directory: &bazel_protos::remote_execution::Directory,
     path_so_far: PathBuf,
     contents_wrapped: Arc<Mutex<HashMap<PathBuf, Bytes>>>,
   ) -> BoxFuture<(), String> {
@@ -542,7 +539,7 @@ impl Store {
               maybe_dir
                 .ok_or_else(|| format!("Could not find sub-directory with digest {:?}", digest))
             })
-            .and_then(move |dir| store.contents_for_directory_helper(dir, path, contents_wrapped))
+            .and_then(move |dir| store.contents_for_directory_helper(&dir, path, contents_wrapped))
             .to_boxed()
         })
         .collect::<Vec<_>>(),
@@ -567,9 +564,11 @@ mod local {
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::future;
   use hashing::{Digest, Fingerprint};
-  use lmdb::{self, Cursor, Database, DatabaseFlags, Environment, RwTransaction, Transaction,
-             WriteFlags, NO_OVERWRITE, NO_SYNC, NO_TLS};
   use lmdb::Error::{KeyExist, NotFound};
+  use lmdb::{
+    self, Cursor, Database, DatabaseFlags, Environment, RwTransaction, Transaction, WriteFlags,
+    NO_OVERWRITE, NO_SYNC, NO_TLS,
+  };
   use resettable::Resettable;
   use sha2::Sha256;
   use std::collections::{BinaryHeap, HashMap};
@@ -578,9 +577,9 @@ mod local {
   use std::sync::Arc;
   use std::time;
 
-  use pool::ResettablePool;
-  use super::MAX_LOCAL_STORE_SIZE_BYTES;
   use super::super::EMPTY_FINGERPRINT;
+  use super::MAX_LOCAL_STORE_SIZE_BYTES;
+  use pool::ResettablePool;
 
   #[derive(Clone)]
   pub struct ByteStore {
@@ -604,10 +603,8 @@ mod local {
       Ok(ByteStore {
         inner: Arc::new(InnerStore {
           pool: pool,
-          file_dbs: Resettable::new(move || ShardedLmdb::new(&files_root).map(|db| Arc::new(db))),
-          directory_dbs: Resettable::new(move || {
-            ShardedLmdb::new(&directories_root).map(|db| Arc::new(db))
-          }),
+          file_dbs: Resettable::new(move || ShardedLmdb::new(&files_root).map(Arc::new)),
+          directory_dbs: Resettable::new(move || ShardedLmdb::new(&directories_root).map(Arc::new)),
         }),
       })
     }
@@ -649,7 +646,7 @@ mod local {
           ))
         }
       };
-      return Ok(None);
+      Ok(None)
     }
 
     pub fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(
@@ -755,7 +752,7 @@ mod local {
         EntryType::Directory => self.inner.directory_dbs.clone(),
       };
 
-      for &(ref env, ref database, ref lease_database) in database.get()?.all_lmdbs().iter() {
+      for &(ref env, ref database, ref lease_database) in &database.get()?.all_lmdbs() {
         let txn = env
           .begin_ro_txn()
           .map_err(|err| format!("Error beginning transaction to garbage collect: {}", err))?;
@@ -976,30 +973,30 @@ mod local {
 
     // First Database is content, second is leases.
     pub fn get(&self, fingerprint: &Fingerprint) -> (Arc<Environment>, Database, Database) {
-      self.lmdbs.get(&(fingerprint.0[0] & 0xF0)).unwrap().clone()
+      self.lmdbs[&(fingerprint.0[0] & 0xF0)].clone()
     }
 
     pub fn all_lmdbs(&self) -> Vec<(Arc<Environment>, Database, Database)> {
-      self.lmdbs.values().map(|v| v.clone()).collect()
+      self.lmdbs.values().cloned().collect()
     }
   }
 
   #[derive(Eq, PartialEq, Ord, PartialOrd)]
   struct AgedFingerprint {
     // expired_seconds_ago must be the first field for the Ord implementation.
-    pub expired_seconds_ago: u64,
-    pub fingerprint: Fingerprint,
-    pub size_bytes: usize,
-    pub entry_type: EntryType,
+    expired_seconds_ago: u64,
+    fingerprint: Fingerprint,
+    size_bytes: usize,
+    entry_type: EntryType,
   }
 
   #[cfg(test)]
   pub mod tests {
+    use super::super::super::safe_create_dir_all;
+    use super::{ByteStore, EntryType, ResettablePool};
     use bytes::Bytes;
     use futures::Future;
     use hashing::{Digest, Fingerprint};
-    use super::{ByteStore, EntryType, ResettablePool};
-    use super::super::super::safe_create_dir_all;
     use lmdb::{DatabaseFlags, Environment, Transaction, WriteFlags};
     use std::path::Path;
     use std::sync::Arc;
@@ -1523,8 +1520,8 @@ mod remote {
   use bytes::{Bytes, BytesMut};
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::{self, future, Future, Sink, Stream};
-  use hashing::{Digest, Fingerprint};
   use grpcio;
+  use hashing::{Digest, Fingerprint};
   use resettable::Resettable;
   use sha2::Sha256;
   use std::cmp::min;
@@ -1608,7 +1605,7 @@ mod remote {
           let chunk_size_bytes = self.chunk_size_bytes;
           let stream =
             futures::stream::unfold::<_, _, futures::future::FutureResult<_, grpcio::Error>, _>(
-              (0 as usize, false),
+              (0, false),
               move |(offset, has_sent_any)| {
                 if offset >= bytes.len() && has_sent_any {
                   None
@@ -1694,7 +1691,7 @@ mod remote {
                 e
               )),
             })
-            .map(move |maybe_bytes| maybe_bytes.map(|bytes| f(bytes)))
+            .map(move |maybe_bytes| maybe_bytes.map(f))
             .to_boxed()
         }
         Err(err) => future::err(format!(
@@ -1734,11 +1731,8 @@ mod remote {
 
   #[cfg(test)]
   mod tests {
-
-    extern crate tempfile;
-
-    use super::ByteStore;
     use super::super::EntryType;
+    use super::ByteStore;
     use bytes::Bytes;
     use futures::Future;
     use hashing::Digest;
@@ -2316,12 +2310,10 @@ mod tests {
 
     let cas = StubCAS::with_unverified_content(
       1024,
-      vec![
-        (
-          non_canonical_directory_fingerprint.clone(),
-          non_canonical_directory_bytes,
-        ),
-      ].into_iter()
+      vec![(
+        non_canonical_directory_fingerprint.clone(),
+        non_canonical_directory_bytes,
+      )].into_iter()
         .collect(),
     );
     new_store(dir.path(), cas.address())
@@ -2346,12 +2338,10 @@ mod tests {
 
     let cas = StubCAS::with_unverified_content(
       1024,
-      vec![
-        (
-          testdata.fingerprint(),
-          TestDirectory::containing_roland().bytes(),
-        ),
-      ].into_iter()
+      vec![(
+        testdata.fingerprint(),
+        TestDirectory::containing_roland().bytes(),
+      )].into_iter()
         .collect(),
     );
     load_file_bytes(&new_store(dir.path(), cas.address()), testdata.digest())
@@ -2371,12 +2361,10 @@ mod tests {
 
     let cas = StubCAS::with_unverified_content(
       1024,
-      vec![
-        (
-          testdir.fingerprint(),
-          TestDirectory::containing_roland().bytes(),
-        ),
-      ].into_iter()
+      vec![(
+        testdir.fingerprint(),
+        TestDirectory::containing_roland().bytes(),
+      )].into_iter()
         .collect(),
     );
     load_file_bytes(&new_store(dir.path(), cas.address()), testdir.digest())
@@ -2927,7 +2915,7 @@ mod tests {
     let store = new_local_store(store_dir.path());
 
     let file_contents = store
-      .contents_for_directory(TestDirectory::empty().directory())
+      .contents_for_directory(&TestDirectory::empty().directory())
       .wait()
       .expect("Getting FileContents");
 
@@ -2961,7 +2949,7 @@ mod tests {
       .expect("Error saving catnip file bytes");
 
     let file_contents = store
-      .contents_for_directory(recursive_testdir.directory())
+      .contents_for_directory(&recursive_testdir.directory())
       .wait()
       .expect("Getting FileContents");
 

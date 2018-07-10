@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import sys
+from builtins import str
 
 from pants.base.build_root import BuildRoot
 from pants.scm.scm import Scm

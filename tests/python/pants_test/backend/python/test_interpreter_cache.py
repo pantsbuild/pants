@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from builtins import str
 from contextlib import contextmanager
 
 import mock
@@ -13,8 +14,8 @@ from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import Unsatisfiable, resolve
 
 from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInterpreterCache
+from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.test_base import TestBase

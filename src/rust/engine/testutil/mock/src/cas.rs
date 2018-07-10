@@ -28,10 +28,10 @@ impl StubCAS {
     directories: Vec<TestDirectory>,
   ) -> StubCAS {
     let mut blobs = HashMap::new();
-    for file in files.into_iter() {
+    for file in files {
       blobs.insert(file.fingerprint(), file.bytes());
     }
-    for directory in directories.into_iter() {
+    for directory in directories {
       blobs.insert(directory.fingerprint(), directory.bytes());
     }
     StubCAS::with_unverified_content(chunk_size_bytes, blobs)
@@ -123,9 +123,9 @@ impl StubCASResponder {
 
   fn read_internal(
     &self,
-    req: bazel_protos::bytestream::ReadRequest,
+    req: &bazel_protos::bytestream::ReadRequest,
   ) -> Result<Vec<bazel_protos::bytestream::ReadResponse>, grpcio::RpcStatus> {
-    let parts: Vec<_> = req.get_resource_name().splitn(4, "/").collect();
+    let parts: Vec<_> = req.get_resource_name().splitn(4, '/').collect();
     if parts.len() != 4 || parts.get(0) != Some(&"") || parts.get(1) != Some(&"blobs") {
       return Err(grpcio::RpcStatus::new(
         grpcio::RpcStatusCode::InvalidArgument,
@@ -135,7 +135,7 @@ impl StubCASResponder {
         )),
       ));
     }
-    let digest = parts.get(2).unwrap();
+    let digest = parts[2];
     let fingerprint = Fingerprint::from_hex_string(digest).map_err(|e| {
       grpcio::RpcStatus::new(
         grpcio::RpcStatusCode::InvalidArgument,
@@ -173,12 +173,12 @@ impl StubCASResponder {
   ///
   fn send<Item, S>(
     &self,
-    ctx: grpcio::RpcContext,
+    ctx: &grpcio::RpcContext,
     sink: grpcio::ServerStreamingSink<Item>,
     stream: S,
   ) where
     Item: Send + 'static,
-    S: futures::Stream<Item = (Item, grpcio::WriteFlags), Error = grpcio::Error> + Send + 'static,
+    S: Stream<Item = (Item, grpcio::WriteFlags), Error = grpcio::Error> + Send + 'static,
   {
     ctx.spawn(stream.forward(sink).map(|_| ()).map_err(|_| ()));
   }
@@ -195,9 +195,9 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
       let mut request_count = self.read_request_count.lock().unwrap();
       *request_count = *request_count + 1;
     }
-    match self.read_internal(req) {
+    match self.read_internal(&req) {
       Ok(response) => self.send(
-        ctx,
+        &ctx,
         sink,
         futures::stream::iter_ok(
           response
@@ -271,11 +271,12 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
           move |(maybe_resource_name, bytes)| match maybe_resource_name {
             None => Err(grpcio::RpcStatus::new(
               grpcio::RpcStatusCode::InvalidArgument,
-              Some(format!("Stream saw no messages")),
+              Some("Stream saw no messages".to_owned()),
             )),
             Some(resource_name) => {
-              let parts: Vec<_> = resource_name.splitn(6, "/").collect();
-              if parts.len() != 6 || parts.get(1) != Some(&"uploads")
+              let parts: Vec<_> = resource_name.splitn(6, '/').collect();
+              if parts.len() != 6
+                || parts.get(1) != Some(&"uploads")
                 || parts.get(3) != Some(&"blobs")
               {
                 return Err(grpcio::RpcStatus::new(
@@ -283,29 +284,24 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
                   Some(format!("Bad resource name: {}", resource_name)),
                 ));
               }
-              let fingerprint = match Fingerprint::from_hex_string(parts.get(4).unwrap()) {
+              let fingerprint = match Fingerprint::from_hex_string(parts[4]) {
                 Ok(f) => f,
                 Err(err) => {
                   return Err(grpcio::RpcStatus::new(
                     grpcio::RpcStatusCode::InvalidArgument,
                     Some(format!(
                       "Bad fingerprint in resource name: {}: {}",
-                      parts.get(4).unwrap(),
-                      err
+                      parts[4], err
                     )),
                   ))
                 }
               };
-              let size = match parts.get(5).unwrap().parse::<usize>() {
+              let size = match parts[5].parse::<usize>() {
                 Ok(s) => s,
                 Err(err) => {
                   return Err(grpcio::RpcStatus::new(
                     grpcio::RpcStatusCode::InvalidArgument,
-                    Some(format!(
-                      "Bad size in resource name: {}: {}",
-                      parts.get(5).unwrap(),
-                      err
-                    )),
+                    Some(format!("Bad size in resource name: {}: {}", parts[5], err)),
                   ))
                 }
               };
@@ -396,16 +392,14 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
       None,
     ));
   }
-
   fn get_tree(
     &self,
     _ctx: grpcio::RpcContext,
     _req: bazel_protos::remote_execution::GetTreeRequest,
-    sink: grpcio::UnarySink<bazel_protos::remote_execution::GetTreeResponse>,
+    _sink: grpcio::ServerStreamingSink<bazel_protos::remote_execution::GetTreeResponse>,
   ) {
-    sink.fail(grpcio::RpcStatus::new(
-      grpcio::RpcStatusCode::Unimplemented,
-      None,
-    ));
+    // Our client doesn't currently use get_tree, so we don't bother implementing it.
+    // We will need to if the client starts wanting to use it.
+    unimplemented!()
   }
 }

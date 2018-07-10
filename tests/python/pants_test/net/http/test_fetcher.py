@@ -11,6 +11,7 @@ import os
 import SocketServer
 import unittest
 from contextlib import closing, contextmanager
+from functools import reduce
 from threading import Thread
 
 import mock

@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import codecs
 import os
 import re
+from builtins import str
 
 from pkg_resources import resource_string
 from pygments.formatters.html import HtmlFormatter

@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from builtins import str
+
 from pex.interpreter import PythonIdentity
 from twitter.common.collections import maybe_list
 
@@ -39,7 +41,7 @@ class PythonTarget(Target):
     :type dependencies: list of strings
     :param sources: Files to "include". Paths are relative to the
       BUILD file's directory.
-    :type sources: ``Fileset`` or list of strings
+    :type sources: ``EagerFilesetWithSpec``
     :param provides:
       The `setup_py <#setup_py>`_ to publish that represents this
       target outside the repo.
