@@ -11,6 +11,7 @@ from hashlib import sha1
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.deprecated import deprecated
 from pants.base.hash_utils import stable_json_hash
 from pants.util.meta import AbstractClass
 
@@ -164,6 +165,27 @@ class PrimitiveField(PayloadField):
     return stable_json_hash(self._underlying)
 
 
+class PrimitivesSetField(PayloadField):
+  """A general field for order-insensitive sets of primitive, ordered types.
+
+  As long as the underlying elements are JSON representable and have a consistent sort order,
+  their hash can be stably inferred. An underlying value of `None` is preserved to allow for
+  "unset" fields: to default to an empty list/set instead, pass one to the constructor.
+
+  :API: public
+  """
+
+  def __init__(self, underlying=None):
+    self._underlying = tuple(sorted(set(underlying))) if underlying is not None else None
+
+  @property
+  def value(self):
+    return self._underlying
+
+  def _compute_fingerprint(self):
+    return stable_json_hash(self._underlying)
+
+
 class SetOfPrimitivesField(PayloadField):
   """A general field for order-insensitive sets of primitive, ordered types.
 
@@ -173,6 +195,8 @@ class SetOfPrimitivesField(PayloadField):
   :API: public
   """
 
+  @deprecated(removal_version='1.11.0.dev0',
+              hint_message='Use PrimitivesSetField, which preserves `None`/unset fields.')
   def __init__(self, underlying=None):
     self._underlying = tuple(sorted(set(underlying or [])))
 
