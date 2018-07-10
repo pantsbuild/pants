@@ -398,6 +398,8 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
     _req: bazel_protos::remote_execution::GetTreeRequest,
     _sink: grpcio::ServerStreamingSink<bazel_protos::remote_execution::GetTreeResponse>,
   ) {
+    // Our client doesn't currently use get_tree, so we don't bother implementing it.
+    // We will need to if the client starts wanting to use it.
     unimplemented!()
   }
 }

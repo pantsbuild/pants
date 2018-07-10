@@ -40,10 +40,12 @@ enum ExecutionError {
 
 impl CommandRunner {
   // The Execute API used to be unary, and became streaming. The contract of the streaming API is
-  // that if the client disconnects after one request, it should continue to function exactly like
-  // the unary API.
+  // that if the client closes the stream after one request, it should continue to function exactly
+  // like the unary API.
   // For maximal compatibility with servers, we fall back to this unary-like behavior, and control
   // our own polling rates.
+  // In the future, we may want to remove this behavior if servers reliably support the full stream
+  // behavior.
   fn oneshot_execute(
     &self,
     execute_request: Arc<bazel_protos::remote_execution::ExecuteRequest>,
@@ -58,12 +60,12 @@ impl CommandRunner {
     stream
         .take(1)
         .into_future()
-        // Drop the _stream to disconnect so that the server doesn't keep the connection alive and
-        // continue sending on it.
+        // If there was an error, drop the _stream to disconnect so that the server doesn't keep the
+        // connection alive and continue sending on it.
         .map_err(|(error, _stream)| rpcerror_to_string(error))
         .and_then(|(maybe_operation, _stream)| {
-          // Drop the _stream to disconnect so that the server doesn't keep the connection alive and
-          // continue sending on it.
+          // If there was a response, drop the _stream to disconnect so that the server doesn't keep
+          // the connection alive and continue sending on it.
           maybe_operation.ok_or_else(|| {
             "Didn't get proper stream response from server during remote execution".to_owned()
           })
