@@ -9,7 +9,8 @@ from hashlib import sha1
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.payload_field import (ExcludesField, FingerprintedField, FingerprintedMixin,
-                                      JarsField, PrimitiveField, PythonRequirementsField)
+                                      JarsField, PrimitiveField, PrimitivesSetField,
+                                      PythonRequirementsField)
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants_test.test_base import TestBase
@@ -119,6 +120,33 @@ class PayloadTest(TestBase):
     fingerprinted_field2 = FingerprintedField(field2)
     self.assertEquals(fingerprinted_field1.fingerprint(), fingerprinted_field1_same.fingerprint())
     self.assertNotEquals(fingerprinted_field1.fingerprint(), fingerprinted_field2.fingerprint())
+
+  def test_set_of_primitives_field(self):
+    # Should preserve `None` values.
+    self.assertEqual(PrimitivesSetField(None).value, None)
+
+    def sopf(underlying):
+      return PrimitivesSetField(underlying).fingerprint()
+    self.assertEqual(
+      sopf({'one', 'two'}),
+      sopf({'two', 'one'}),
+    )
+    self.assertEqual(
+      sopf(['one', 'two']),
+      sopf(['two', 'one']),
+    )
+    self.assertEqual(
+      sopf(None),
+      sopf(None),
+    )
+    self.assertNotEqual(
+      sopf(None),
+      sopf(['one']),
+    )
+    self.assertNotEqual(
+      sopf(None),
+      sopf([]),
+    )
 
   def test_unimplemented_fingerprinted_field(self):
     class TestUnimplementedValue(FingerprintedMixin):
