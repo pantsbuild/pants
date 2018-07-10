@@ -26,7 +26,7 @@ def invoke_pex_for_output(pex_file_to_run):
 class CTypesIntegrationTest(PantsRunIntegrationTest):
 
   _binary_target = 'testprojects/src/python/python_distribution/ctypes:bin'
-  _binary_target_with_header_only_third_party = (
+  _binary_target_with_third_party = (
     'testprojects/src/python//python_distribution/ctypes_with_third_party:bin_with_third_party'
   )
 
@@ -74,19 +74,14 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       binary_run_output = invoke_pex_for_output(pex)
       self.assertEqual('x=3, f(x)=17\n', binary_run_output)
 
-  def test_header_only_third_party_integration(self):
+  def test_ctypes_third_party_integration(self):
     with temporary_dir() as tmp_dir:
-      cereal_outfile = os.path.join(get_buildroot(), 'out.cereal')
-      try:
-        pants_run = self.run_pants(
-            command=['clean-all', 'run', self._binary_target_with_header_only_third_party],
-            config={
-              GLOBAL_SCOPE_CONFIG_SECTION: {
-                'pants_distdir': tmp_dir,
-              }
+      pants_run = self.run_pants(
+          command=['clean-all', 'run', self._binary_target_with_third_party],
+          config={
+            GLOBAL_SCOPE_CONFIG_SECTION: {
+              'pants_distdir': tmp_dir,
             }
-        )
-        self.assert_success(pants_run)
-      finally:
-        if os.path.exists(cereal_outfile):
-          os.remove(cereal_outfile)
+          }
+          )
+      self.assert_success(pants_run)

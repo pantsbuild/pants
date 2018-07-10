@@ -72,23 +72,26 @@ def select_linker(platform, native_toolchain):
   #   'darwin': lambda: Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools),
   #   'linux': lambda: Get(Linker, Binutils, native_toolchain._binutils),
   # })
-  if platform.normalized_os_name == 'darwin':
-    # TODO(#5663): turn this into LLVM when lld works.
-    linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
-    libc_dirs = []
-  else:
-    linker = yield Get(Linker, Binutils, native_toolchain._binutils)
-    libc_dirs = [native_toolchain._libc_dev.host_libc.get_lib_dir()]
-
   # NB: We need to link through a provided compiler's frontend, and we need to know where all the
   # compiler's libraries/etc are, so we set the executable name to the C++ compiler, which can find
   # its own set of C++-specific files for the linker if necessary. Using e.g. 'g++' as the linker
   # appears to produce byte-identical output when linking even C-only object files, and also
   # happens to work when C++ is used.
-  gcc_c_compiler = yield Get(GCCCCompiler, NativeToolchain, native_toolchain)
-  c_compiler = gcc_c_compiler.c_compiler
-  gcc_cpp_compiler = yield Get(GCCCppCompiler, NativeToolchain, native_toolchain)
-  cpp_compiler = gcc_cpp_compiler.cpp_compiler
+  if platform.normalized_os_name == 'darwin':
+    # TODO(#5663): turn this into LLVM when lld works.
+    linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    libc_dirs = []
+    llvm_c_compiler = yield Get(LLVMCCompiler, NativeToolchain, native_toolchain)
+    c_compiler = llvm_c_compiler.c_compiler
+    llvm_cpp_compiler = yield Get(LLVMCppCompiler, NativeToolchain, native_toolchain)
+    cpp_compiler = llvm_cpp_compiler.cpp_compiler
+  else:
+    linker = yield Get(Linker, Binutils, native_toolchain._binutils)
+    libc_dirs = [native_toolchain._libc_dev.host_libc.get_lib_dir()]
+    gcc_c_compiler = yield Get(GCCCCompiler, NativeToolchain, native_toolchain)
+    c_compiler = gcc_c_compiler.c_compiler
+    gcc_cpp_compiler = yield Get(GCCCppCompiler, NativeToolchain, native_toolchain)
+    cpp_compiler = gcc_cpp_compiler.cpp_compiler
 
   # NB: If needing to create an environment for process invocation that could use either a compiler
   # or a linker (e.g. when we compile native code from `python_dist()`s), use the environment from
@@ -97,14 +100,14 @@ def select_linker(platform, native_toolchain):
   # FIXME(#5951): we need a way to compose executables more hygienically.
   linker = Linker(
     path_entries=(
-      c_compiler.path_entries +
       cpp_compiler.path_entries +
+      c_compiler.path_entries +
       linker.path_entries),
     exe_filename=cpp_compiler.exe_filename,
     library_dirs=(
       libc_dirs +
-      c_compiler.library_dirs +
       cpp_compiler.library_dirs +
+      c_compiler.library_dirs +
       linker.library_dirs))
 
   yield linker

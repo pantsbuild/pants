@@ -84,11 +84,14 @@ class LinkSharedLibraries(NativeTask):
 
     all_shared_libs_by_name = {}
 
+    # FIXME: convert this to a v2 engine dependency injection.
+    platform = Platform.create()
+
     with self.invalidated(targets_providing_artifacts,
                           invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
         if vt.valid:
-          shared_library = self._retrieve_shared_lib_from_cache(vt)
+          shared_library = self._retrieve_shared_lib_from_cache(vt, platform)
         else:
           link_request = self._make_link_request(
             vt, compiled_objects_product, native_target_deps_product, external_libs_product)
@@ -107,10 +110,10 @@ class LinkSharedLibraries(NativeTask):
 
         shared_libs_product.add(vt.target, vt.target.target_base).append(shared_library)
 
-  def _retrieve_shared_lib_from_cache(self, vt):
+  def _retrieve_shared_lib_from_cache(self, vt, platform):
     native_artifact = vt.target.ctypes_native_library
     path_to_cached_lib = os.path.join(
-      vt.results_dir, native_artifact.as_shared_lib(self.linker.platform))
+      vt.results_dir, native_artifact.as_shared_lib(platform))
     if not os.path.isfile(path_to_cached_lib):
       raise self.LinkSharedLibrariesError("The shared library at {} does not exist!"
                                           .format(path_to_cached_lib))
