@@ -172,7 +172,9 @@ class NativeExternalLibraryFetch(Task):
     :param conan_binary: The conan client pex to use for manipulating registry.txt.
     """
 
-    # Delete the conan-center remote from conan's registry.
+    # Conan will prepend the conan-center remote to the remote registry when
+    # bootstrapped for the first time, so we want to delete it from the registry
+    # and replace it with Pants-controlled remotes.
     remove_conan_center_remote_cmdline = self._remove_conan_center_remote_cmdline(conan_binary)
     try:
       stdout = subprocess.check_output(remove_conan_center_remote_cmdline.split())

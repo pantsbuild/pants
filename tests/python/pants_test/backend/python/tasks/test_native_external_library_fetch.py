@@ -8,12 +8,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import textwrap
 import unittest
 
+from pants.backend.native.config.environment import Platform
 from pants.backend.native.tasks.native_external_library_fetch import (ConanRequirement,
                                                                       NativeExternalLibraryFetch)
-from pants.util.osutil import get_normalized_os_name
 
 
 class TestConanRequirement(unittest.TestCase):
+
+  CONAN_OS_NAME = {
+    'darwin': lambda: 'Macos',
+    'linux': lambda: 'Linux',
+  }
 
   def test_parse_conan_stdout_for_pkg_hash(self):
     tc_1 = textwrap.dedent("""
@@ -44,13 +49,9 @@ class TestConanRequirement(unittest.TestCase):
   def test_build_conan_cmdline_args(self):
     pkg_spec = 'test/1.0.0@conan/stable'
     cr = ConanRequirement(pkg_spec=pkg_spec)
-    os_name = get_normalized_os_name()
-    if os_name == 'linux':
-      expected = ['install', 'test/1.0.0@conan/stable', '-s', 'os=Linux']
-    elif os_name == 'darwin':
-      expected = ['install', 'test/1.0.0@conan/stable', '-s', 'os=Macos']
-    else:
-      expected = 'Unsupported platform'
+    platform = Platform.create()
+    conan_os_name = platform.resolve_platform_specific(self.CONAN_OS_NAME)
+    expected = ['install', 'test/1.0.0@conan/stable', '-s', 'os={}'.format(conan_os_name)]
     self.assertEqual(cr.fetch_cmdline_args, expected)
 
 
