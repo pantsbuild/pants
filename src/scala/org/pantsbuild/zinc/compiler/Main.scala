@@ -121,6 +121,9 @@ object Main {
       }
 
       log.info("Compile success " + Util.timing(startTime))
+
+      // if compile successful, jar the contents of classesDirectory and copy to outputJar
+
     } catch {
       case e: CompileFailed =>
         log.error("Compile failed " + Util.timing(startTime))

@@ -38,6 +38,7 @@ case class Settings(
   _sources: Seq[File]               = Seq.empty,
   classpath: Seq[File]              = Seq.empty,
   _classesDirectory: Option[File]   = None,
+  outputJar: Option[File]           = None,
   scala: ScalaLocation              = ScalaLocation(),
   scalacOptions: Seq[String]        = Seq.empty,
   javaHome: Option[File]            = None,
@@ -57,10 +58,15 @@ case class Settings(
 
   lazy val sources: Seq[File] = _sources map normalise
 
+  if _classesDirectory.isEmpty && outputJar.isEmpty {
+    throw new RuntimeException(
+      s"Either ${Settings.DestinationOpt} or ${Settings.JarDestinationOpt} option is required.")
+  }
+
   lazy val classesDirectory: File =
     normalise(
       _classesDirectory.getOrElse {
-        throw new RuntimeException(s"The ${Settings.ZincCacheDirOpt} option is required.")
+        throw new RuntimeException(s"The ${Settings.DestinationOpt}  option is required.")
       }
     )
 
@@ -214,6 +220,7 @@ case class IncOptions(
 
 object Settings extends OptionSet[Settings] {
   val DestinationOpt = "-d"
+  val JarDestinationOpt = "-jar"
   val ZincCacheDirOpt = "-zinc-cache-dir"
   val CompilerBridgeOpt = "-compiler-bridge"
   val CompilerInterfaceOpt = "-compiler-interface"
@@ -243,6 +250,7 @@ object Settings extends OptionSet[Settings] {
     header("Compile options:"),
     path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
     file(     DestinationOpt, "directory",     "Destination for compiled classes",           (s: Settings, f: File) => s.copy(_classesDirectory = Some(f))),
+    file(     JarDestinationOpt, "directory",     "Jar destination for compiled classes",           (s: Settings, f: File) => s.copy(outputJar = Some(f))),
 
     header("Scala options:"),
     file(      "-scala-home", "directory",     "Scala home directory (for locating jars)",   (s: Settings, f: File) => s.copy(scala = s.scala.copy(home = Some(f)))),
