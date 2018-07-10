@@ -213,8 +213,6 @@ int main() {
   def test_hello_cpp_clangpp(self):
 
     scheduler_request_specs = [
-      # We need GCC to provide libstdc++.so.6, which clang needs to run on Linux.
-      (self.toolchain, GCCCppCompiler),
       (self.toolchain, LLVMCppCompiler),
       (self.toolchain, Linker),
     ]
@@ -227,16 +225,8 @@ int main() {
 }
 """, scheduler_request_specs=scheduler_request_specs) as products:
 
-      gpp_wrapper, clangpp_wrapper, linker = products
-      gpp = gpp_wrapper.cpp_compiler
+      clangpp_wrapper, linker = products
       clangpp = clangpp_wrapper.cpp_compiler
 
-      # FIXME(#5951): we should be matching the linker to the compiler here, instead of trying to
-      # use the same linker for everything. This is a temporary workaround.
-      linker_with_clangpp_workaround = Linker(
-        path_entries=(clangpp.path_entries + linker.path_entries),
-        exe_filename=clangpp.exe_filename,
-        library_dirs=(gpp.library_dirs + linker.library_dirs + clangpp.library_dirs))
-
-      self._do_compile_link(clangpp, linker_with_clangpp_workaround, 'hello.cpp', 'hello_clangpp',
+      self._do_compile_link(clangpp, linker, 'hello.cpp', 'hello_clangpp',
                             "I C the world, ++ more!")
