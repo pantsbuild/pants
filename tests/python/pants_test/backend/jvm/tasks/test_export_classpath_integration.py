@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import time
+from builtins import range
 
 from pants.java.jar.manifest import Manifest
 from pants.util.contextutil import open_zip

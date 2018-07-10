@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 import xml.etree.ElementTree as ET
+from builtins import object
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot

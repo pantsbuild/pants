@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import unittest
+from builtins import object, str
 
 from mock import Mock
 
@@ -76,7 +77,7 @@ class JarPublishTest(TaskTestBase):
       provides="""artifact(org='com.example', name='horse', repo=internal)""",
       dependencies=c_deps)
 
-    return targets.values()
+    return list(targets.values())
 
   def _prepare_targets_with_duplicates(self):
     targets = list(self._prepare_for_publishing())

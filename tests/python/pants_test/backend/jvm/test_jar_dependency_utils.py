@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import unittest
+from builtins import chr, object, str
 
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 
