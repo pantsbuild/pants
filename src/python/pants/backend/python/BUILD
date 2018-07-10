@@ -39,6 +39,7 @@ python_library(
   name = 'interpreter_cache',
   sources = ['interpreter_cache.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:pex',
     ':pex_util',
     'src/python/pants/backend/python/targets',
@@ -53,6 +54,7 @@ python_library(
   name = 'pants_requirement',
   sources = ['pants_requirement.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',
@@ -70,11 +72,17 @@ python_library(
 python_library(
   name = 'python_requirement',
   sources = ['python_requirement.py'],
+  dependencies = [
+    '3rdparty/python:future',
+  ]
 )
 
 python_library(
   name = 'python_requirements',
   sources = ['python_requirements.py'],
+  dependencies = [
+    '3rdparty/python:future',
+  ]
 )
 
 python_library(

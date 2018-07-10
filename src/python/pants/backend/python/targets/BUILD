@@ -12,6 +12,7 @@ python_library(
     'python_tests.py',
   ],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
     '3rdparty/python:six',

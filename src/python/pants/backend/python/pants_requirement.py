@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from builtins import object
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.build_environment import pants_version
