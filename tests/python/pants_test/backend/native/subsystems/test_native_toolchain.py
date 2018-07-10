@@ -236,5 +236,13 @@ int main() {
       clangpp_wrapper, linker = products
       clangpp = clangpp_wrapper.cpp_compiler
 
-      self._do_compile_link(clangpp, linker, 'hello.cpp', 'hello_clangpp',
+      # FIXME(#5951): we should be matching the linker to the compiler here, instead of trying to
+      # use the same linker for everything. This is a temporary workaround.
+      linker_with_clangpp_workaround = Linker(
+        path_entries=(clangpp.path_entries + linker.path_entries),
+        exe_filename=clangpp.exe_filename,
+        library_dirs=(clangpp.library_dirs + linker.library_dirs),
+      )
+
+      self._do_compile_link(clangpp, linker_with_clangpp_workaround, 'hello.cpp', 'hello_clangpp',
                             "I C the world, ++ more!")
