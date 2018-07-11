@@ -17,8 +17,8 @@ from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTest
 
 class PythonIsortTest(PythonTaskTestBase):
   BAD_IMPORT_ORDER = dedent("""
-                          unicode_literals)
-
+  from __future__ import division, absolute_import, unicode_literals, print_function
+  
   """)
 
   CONFIG_A = dedent("""
@@ -29,7 +29,7 @@ class PythonIsortTest(PythonTaskTestBase):
   """)
 
   RESULT_A = dedent("""
-from __future__ import absolute_import, division, print_function, unicode_literals
+    from __future__ import absolute_import, division, print_function, unicode_literals
   """)
 
   CONFIG_B = dedent("""
@@ -40,12 +40,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
   """)
 
   RESULT_B = dedent("""
-from __future__ import absolute_import, division, print_function, unicode_literals
-                            division,
-                            generators,
-                            nested_scopes,
-                            print_function,
-                            unicode_literals,
+    from __future__ import (absolute_import, 
+                            division, 
+                            print_function, 
+                            unicode_literals)
   """)
 
   @classmethod

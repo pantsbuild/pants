@@ -43,7 +43,7 @@ class SelectInterpreterTest(TaskTestBase):
       with open(binary, 'w') as fp:
         fp.write(dedent("""
         #!{}
-from __future__ import absolute_import, division, print_function, unicode_literals
+        from __future__ import print_function
 
         print({!r})
         """.format(PythonInterpreter.get().binary, id_str)).strip())
