@@ -9,6 +9,8 @@ import pickle
 from abc import abstractmethod
 from builtins import object, str
 
+from future.utils import PY2, native, text_type
+
 from pants.util.objects import (Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
                                 TypedDatatypeInstanceConstructionError, datatype)
 from pants_test.base_test import BaseTest
@@ -135,20 +137,20 @@ class SomeMixin(object):
     return self.as_str().strip()
 
 
-class TypedWithMixin(datatype([('val', str)]), SomeMixin):
+class TypedWithMixin(datatype([('val', text_type)]), SomeMixin):
   """Example of using `datatype()` with a mixin."""
 
   def as_str(self):
     return self.val
 
 
-class AnotherTypedDatatype(datatype([('string', str), ('elements', list)])): pass
+class AnotherTypedDatatype(datatype([('string', text_type), ('elements', list)])): pass
 
 
-class WithExplicitTypeConstraint(datatype([('a_string', str), ('an_int', Exactly(int))])): pass
+class WithExplicitTypeConstraint(datatype([('a_string', text_type), ('an_int', Exactly(int))])): pass
 
 
-class MixedTyping(datatype(['value', ('name', str)])): pass
+class MixedTyping(datatype(['value', ('name', text_type)])): pass
 
 
 class SomeBaseClass(object):
@@ -319,16 +321,16 @@ class TypedDatatypeTest(BaseTest):
     self.assertEqual(str(cm.exception), expected_msg)
 
     with self.assertRaises(ValueError) as cm:
-      class JustTypeField(datatype([str])): pass
-    def compare_string_rep(string_type):
+      class JustTypeField(datatype([text_type])): pass
+    def compare_str(unicode_type_name):
       expected_message = (
         "Type names and field names can only contain alphanumeric characters "
-        "and underscores: \"<{0}>\"").format(string_type)
+        "and underscores: \"<type '{}'>\"").format(unicode_type_name)
       self.assertEqual(str(cm.exception), expected_message)
-    if 'newstr' in str(cm.exception):  # Python2
-      compare_string_rep("class 'future.types.newstr.newstr'")
-    else:  # Python3
-      compare_string_rep("type 'str'")
+    if PY2:
+      compare_str('unicode')
+    else:
+      compare_str('str')
 
     with self.assertRaises(ValueError) as cm:
       class NonStringField(datatype([3])): pass
@@ -372,18 +374,22 @@ class TypedDatatypeTest(BaseTest):
     self.assertEqual(repr(some_val), "SomeTypedDatatype(val=3)")
     self.assertEqual(str(some_val), "SomeTypedDatatype(val<=int>=3)")
 
-    some_object = WithExplicitTypeConstraint(str('asdf'), 45)
+    some_object = WithExplicitTypeConstraint(native(str('asdf')), 45)
     self.assertEqual(some_object.a_string, 'asdf')
     self.assertEqual(some_object.an_int, 45)
-    self.assertEqual(repr(some_object),
-                     "WithExplicitTypeConstraint(a_string='asdf', an_int=45)")
-    def compare_string_rep(string_type):
-      expected_message = "WithExplicitTypeConstraint(a_string<={0}>=asdf, an_int<=int>=45)".format(string_type)
+    def compare_repr(include_unicode = False):
+      expected_message = "WithExplicitTypeConstraint(a_string={unicode_literal}'asdf', an_int=45)"\
+        .format(unicode_literal='u' if include_unicode else '')
+      self.assertEqual(repr(some_object), expected_message)
+    def compare_str(unicode_type_name):
+      expected_message = "WithExplicitTypeConstraint(a_string<={}>=asdf, an_int<=int>=45)".format(unicode_type_name)
       self.assertEqual(str(some_object), expected_message)
-    if 'newstr' in str(some_object):  # Python2
-      compare_string_rep('newstr')
-    else:  # Python3
-      compare_string_rep('str')
+    if PY2:
+      compare_str('unicode')
+      compare_repr(include_unicode=True)
+    else:
+      compare_str('str')
+      compare_repr()
 
     some_nonneg_int = NonNegativeInt(an_int=3)
     self.assertEqual(3, some_nonneg_int.an_int)
@@ -400,17 +406,21 @@ class TypedDatatypeTest(BaseTest):
       str(wrapped_nonneg_int),
       "CamelCaseWrapper(nonneg_int<=NonNegativeInt>=NonNegativeInt(an_int<=int>=45))")
 
-    mixed_type_obj = MixedTyping(value=3, name=str('asdf'))
+    mixed_type_obj = MixedTyping(value=3, name=native(str('asdf')))
     self.assertEqual(3, mixed_type_obj.value)
-    self.assertEqual(repr(mixed_type_obj),
-                     "MixedTyping(value=3, name='asdf')")
-    def compare_string_rep(string_type):
-      expected_message = "MixedTyping(value=3, name<={0}>=asdf)".format(string_type)
+    def compare_repr(include_unicode = False):
+      expected_message = "MixedTyping(value=3, name={unicode_literal}'asdf')" \
+        .format(unicode_literal='u' if include_unicode else '')
+      self.assertEqual(repr(mixed_type_obj), expected_message)
+    def compare_str(unicode_type_name):
+      expected_message = "MixedTyping(value=3, name<={}>=asdf)".format(unicode_type_name)
       self.assertEqual(str(mixed_type_obj), expected_message)
-    if 'newstr' in str(mixed_type_obj):  # Python2
-      compare_string_rep('newstr')
-    else:  # Python3
-      compare_string_rep('str')
+    if PY2:
+      compare_str('unicode')
+      compare_repr(include_unicode=True)
+    else:
+      compare_str('str')
+      compare_repr()
 
     subclass_constraint_obj = WithSubclassTypeConstraint(SomeDatatypeClass())
     self.assertEqual('asdf', subclass_constraint_obj.some_value.something())
@@ -421,15 +431,20 @@ class TypedDatatypeTest(BaseTest):
       "WithSubclassTypeConstraint(some_value<+SomeBaseClass>=SomeDatatypeClass())")
 
   def test_mixin_type_construction(self):
-    obj_with_mixin = TypedWithMixin(str(' asdf '))
-    self.assertEqual(repr(obj_with_mixin), "TypedWithMixin(val=' asdf ')")
-    def compare_string_rep(string_type):
-      expected_message = "TypedWithMixin(val<={0}>= asdf )".format(string_type)
+    obj_with_mixin = TypedWithMixin(native(str(' asdf ')))
+    def compare_repr(include_unicode = False):
+      expected_message = "TypedWithMixin(val={unicode_literal}' asdf ')" \
+        .format(unicode_literal='u' if include_unicode else '')
+      self.assertEqual(repr(obj_with_mixin), expected_message)
+    def compare_str(unicode_type_name):
+      expected_message = "TypedWithMixin(val<={}>= asdf )".format(unicode_type_name)
       self.assertEqual(str(obj_with_mixin), expected_message)
-    if 'newstr' in str(obj_with_mixin):  # Python2
-      compare_string_rep('newstr')
-    else:  # Python3
-      compare_string_rep('str')
+    if PY2:
+      compare_str('unicode')
+      compare_repr(include_unicode=True)
+    else:
+      compare_str('str')
+      compare_repr()
     self.assertEqual(obj_with_mixin.as_str(), ' asdf ')
     self.assertEqual(obj_with_mixin.stripped(), 'asdf')
 
@@ -475,45 +490,45 @@ field 'val' was invalid: value [] (with type 'list') must satisfy this type cons
 
     # type checking failure with multiple arguments (one is correct)
     with self.assertRaises(TypeCheckError) as cm:
-      AnotherTypedDatatype(str('correct'), str('should be list'))
-    def compare_string_rep(string_type):
+      AnotherTypedDatatype(native(str('correct')), native(str('should be list')))
+    def compare_str(unicode_type_name, include_unicode=False):
       expected_message = (
         """error: in constructor of type AnotherTypedDatatype: type check error:
-field 'elements' was invalid: value 'should be list' (with type '{0}') must satisfy this type constraint: Exactly(list)."""
-      .format(string_type))
+field 'elements' was invalid: value {unicode_literal}'should be list' (with type '{type_name}') must satisfy this type constraint: Exactly(list)."""
+      .format(type_name=unicode_type_name, unicode_literal='u' if include_unicode else ''))
       self.assertEqual(str(cm.exception), expected_message)
-    if 'newstr' in str(cm.exception):  # Python2
-      compare_string_rep('newstr')
-    else:  # Python3
-      compare_string_rep('str')
+    if PY2:
+      compare_str('unicode', include_unicode=True)
+    else:
+      compare_str('str')
 
     # type checking failure on both arguments
     with self.assertRaises(TypeCheckError) as cm:
-      AnotherTypedDatatype(3, str('should be list'))
-    def compare_string_rep(string_type):
+      AnotherTypedDatatype(3, native(str('should be list')))
+    def compare_str(unicode_type_name, include_unicode=False):
       expected_message = (
         """error: in constructor of type AnotherTypedDatatype: type check error:
-field 'string' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly({0}).
-field 'elements' was invalid: value 'should be list' (with type '{0}') must satisfy this type constraint: Exactly(list)."""
-          .format(string_type))
+field 'string' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly({type_name}).
+field 'elements' was invalid: value {unicode_literal}'should be list' (with type '{type_name}') must satisfy this type constraint: Exactly(list)."""
+          .format(type_name=unicode_type_name, unicode_literal='u' if include_unicode else ''))
       self.assertEqual(str(cm.exception), expected_message)
-    if 'newstr' in str(cm.exception):  # Python2
-      compare_string_rep('newstr')
-    else:  # Python3
-      compare_string_rep('str')
+    if PY2:
+      compare_str('unicode', include_unicode=True)
+    else:
+      compare_str('str')
 
     with self.assertRaises(TypeCheckError) as cm:
-      NonNegativeInt(str('asdf'))
-    def compare_string_rep(string_type):
+      NonNegativeInt(native(str('asdf')))
+    def compare_str(unicode_type_name, include_unicode=False):
       expected_message = (
         """error: in constructor of type NonNegativeInt: type check error:
-field 'an_int' was invalid: value 'asdf' (with type '{0}') must satisfy this type constraint: Exactly(int)."""
-          .format(string_type))
+field 'an_int' was invalid: value {unicode_literal}'asdf' (with type '{type_name}') must satisfy this type constraint: Exactly(int)."""
+          .format(type_name=unicode_type_name, unicode_literal='u' if include_unicode else ''))
       self.assertEqual(str(cm.exception), expected_message)
-    if 'newstr' in str(cm.exception):  # Python2
-      compare_string_rep('newstr')
-    else:  # Python3
-      compare_string_rep('str')
+    if PY2:
+      compare_str('unicode', include_unicode=True)
+    else:
+      compare_str('str')
 
     with self.assertRaises(TypeCheckError) as cm:
       NonNegativeInt(-3)
