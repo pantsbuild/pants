@@ -179,11 +179,12 @@ object InputUtils {
 
       val jarPath = Paths.get(classesDirectory.toString, settings.outputJar.toString)
       val target = new JarOutputStream(Files.newOutputStream(jarPath))
-      val entryTime = System.currentTimeMillis()
 
       override def visitFile(source: Path, attrs: BasicFileAttributes): FileVisitResult = {
         val jarEntry = new JarEntry(source.toString)
-        jarEntry.setTime(entryTime)
+        // setting jarEntry time to a fixed value for all entries within the jar for determinism
+        // and so that jarfiles are byte-for-byte reproducible.
+        jarEntry.setTime(settings.creationTime)
 
         log.debug("Creating jar entry " + jarEntry + " for the file " + source)
 

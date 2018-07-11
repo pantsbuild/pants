@@ -48,7 +48,8 @@ case class Settings(
   compileOrder: CompileOrder        = CompileOrder.Mixed,
   sbt: SbtJars                      = SbtJars(),
   _incOptions: IncOptions           = IncOptions(),
-  analysis: AnalysisOptions         = AnalysisOptions()
+  analysis: AnalysisOptions         = AnalysisOptions(),
+  creationTime: Long                = System.currentTimeMillis()
 ) {
   import Settings._
 
@@ -60,7 +61,7 @@ case class Settings(
 
   if (_classesDirectory.isEmpty && outputJar.isEmpty) {
     throw new RuntimeException(
-      s"Either ${Settings.DestinationOpt} or ${Settings.JarDestinationOpt} option is required.")
+      s"At least one of ${Settings.DestinationOpt} or ${Settings.JarDestinationOpt} option is required.")
   }
 
   lazy val classesDirectory: File =
@@ -247,6 +248,7 @@ object Settings extends OptionSet[Settings] {
     path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
     file(     DestinationOpt, "directory",     "Destination for compiled classes",           (s: Settings, f: File) => s.copy(_classesDirectory = Some(f))),
     file(     JarDestinationOpt, "directory",     "Jar destination for compiled classes",           (s: Settings, f: File) => s.copy(outputJar = Some(f))),
+    long(     "-jar-creation-time", "Creation time for compiled jars, default is current time",           (s: Settings, l: Long) => s.copy(creationTime = l)),
 
     header("Scala options:"),
     file(      "-scala-home", "directory",     "Scala home directory (for locating jars)",   (s: Settings, f: File) => s.copy(scala = s.scala.copy(home = Some(f)))),
