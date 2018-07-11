@@ -903,7 +903,7 @@ impl NodeVisualizer<NodeKey> for Visualizer {
         let viz_colors_len = self.viz_colors.len();
         self
           .viz_colors
-          .entry(entry.on_node(NodeKey::product_str))
+          .entry(entry.node().product_str())
           .or_insert_with(|| format!("{}", viz_colors_len % max_colors + 1))
           .clone()
       }

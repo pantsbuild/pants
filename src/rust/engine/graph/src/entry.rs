@@ -124,12 +124,9 @@ pub struct Entry<N: Node> {
   // TODO: This is a clone of the Node, which is also kept in the `nodes` map. It would be
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
-  inner: Arc<Mutex<InnerEntry<N>>>,
-}
-
-struct InnerEntry<N: Node> {
   node: EntryKey<N>,
-  state: EntryState<N>,
+
+  state: Arc<Mutex<EntryState<N>>>,
 }
 
 impl<N: Node> Entry<N> {
@@ -140,29 +137,29 @@ impl<N: Node> Entry<N> {
   ///
   pub(crate) fn new(node: EntryKey<N>) -> Entry<N> {
     Entry {
-      inner: Arc::new(Mutex::new(InnerEntry {
-        node: node,
-        state: EntryState::initial(),
-      })),
+      node: node,
+      state: Arc::new(Mutex::new(EntryState::initial())),
     }
+  }
+
+  pub fn node(&self) -> &N {
+    self.node.content()
   }
 
   ///
   /// If the Future for this Node has already completed, returns a clone of its result.
   ///
-  /// Note that this takes out its own lock on inner; if you already have a lock on inner, you
-  /// should call its peek function.
-  ///
   pub fn peek(&self) -> Option<Result<N::Item, N::Error>> {
-    self.inner.lock().unwrap().peek()
-  }
-
-  ///
-  /// Execute's a function on this Entry's node, returning its result.
-  ///
-  pub fn on_node<T, F: FnOnce(&N) -> T>(&self, f: F) -> T {
-    let inner = self.inner.lock().unwrap();
-    f(inner.node.content())
+    let state = self.state.lock().unwrap();
+    match *state {
+      EntryState::Completed {
+        ref result, dirty, ..
+      } if !dirty =>
+      {
+        Some(result.clone())
+      }
+      _ => None,
+    }
   }
 
   ///
@@ -275,11 +272,11 @@ impl<N: Node> Entry<N> {
     C: NodeContext<Node = N>,
   {
     {
-      let mut inner = self.inner.lock().unwrap();
+      let mut state = self.state.lock().unwrap();
 
       // First check whether the Node is already complete, or is currently running: in both of these
       // cases we don't swap the state of the Node.
-      match &mut inner.state {
+      match &mut *state {
         &mut EntryState::Running {
           ref mut waiters, ..
         } => {
@@ -307,14 +304,14 @@ impl<N: Node> Entry<N> {
       };
 
       // Otherwise, we'll need to swap the state of the Node, so take it by value.
-      let next_state = match mem::replace(&mut inner.state, EntryState::initial()) {
+      let next_state = match mem::replace(&mut *state, EntryState::initial()) {
         EntryState::NotStarted {
           run_token,
           generation,
           previous_result,
         } => Self::run(
           context,
-          &inner.node,
+          &self.node,
           entry_id,
           run_token,
           generation,
@@ -338,7 +335,7 @@ impl<N: Node> Entry<N> {
           // cause it to re-run if the dep_generations mismatch).
           Self::run(
             context,
-            &inner.node,
+            &self.node,
             entry_id,
             run_token,
             generation,
@@ -352,7 +349,7 @@ impl<N: Node> Entry<N> {
       };
 
       // Swap in the new state and then recurse.
-      inner.state = next_state;
+      *state = next_state;
     }
     self.get(context, entry_id)
   }
@@ -374,12 +371,12 @@ impl<N: Node> Entry<N> {
   ) where
     C: NodeContext<Node = N>,
   {
-    let mut inner = self.inner.lock().unwrap();
+    let mut state = self.state.lock().unwrap();
 
     // We care about exactly one case: a Running state with the same run_token. All other states
     // represent various (legal) race conditions. See `RunToken`'s docs for more information.
-    match &inner.state {
-      &EntryState::Running { run_token, .. } if result_run_token == run_token => {}
+    match *state {
+      EntryState::Running { run_token, .. } if result_run_token == run_token => {}
       _ => {
         // We care about exactly one case: a Running state with the same run_token. All other states
         // represent various (legal) race conditions.
@@ -387,7 +384,7 @@ impl<N: Node> Entry<N> {
       }
     }
 
-    inner.state = match mem::replace(&mut inner.state, EntryState::initial()) {
+    *state = match mem::replace(&mut *state, EntryState::initial()) {
       EntryState::Running {
         waiters,
         run_token,
@@ -401,7 +398,7 @@ impl<N: Node> Entry<N> {
           // be trusted and were never published. We continue to use the previous result.
           Self::run(
             context,
-            &inner.node,
+            &self.node,
             entry_id,
             run_token,
             generation,
@@ -452,10 +449,10 @@ impl<N: Node> Entry<N> {
   /// we want the per-Entry locking strategy to be.
   ///
   pub(crate) fn generation(&self) -> Generation {
-    match &self.inner.lock().unwrap().state {
-      &EntryState::NotStarted { generation, .. }
-      | &EntryState::Running { generation, .. }
-      | &EntryState::Completed { generation, .. } => generation,
+    match *self.state.lock().unwrap() {
+      EntryState::NotStarted { generation, .. }
+      | EntryState::Running { generation, .. }
+      | EntryState::Completed { generation, .. } => generation,
     }
   }
 
@@ -466,10 +463,10 @@ impl<N: Node> Entry<N> {
   /// we want the per-Entry locking strategy to be.
   ///
   pub(crate) fn run_token(&self) -> RunToken {
-    match &self.inner.lock().unwrap().state {
-      &EntryState::NotStarted { run_token, .. }
-      | &EntryState::Running { run_token, .. }
-      | &EntryState::Completed { run_token, .. } => run_token,
+    match *self.state.lock().unwrap() {
+      EntryState::NotStarted { run_token, .. }
+      | EntryState::Running { run_token, .. }
+      | EntryState::Completed { run_token, .. } => run_token,
     }
   }
 
@@ -477,8 +474,8 @@ impl<N: Node> Entry<N> {
   /// If the Node has started and has not yet completed, returns its runtime.
   ///
   pub(crate) fn current_running_duration(&self, now: &Instant) -> Option<Duration> {
-    match &self.inner.lock().unwrap().state {
-      &EntryState::Running { start_time, .. } => Some(now.duration_since(start_time)),
+    match *self.state.lock().unwrap() {
+      EntryState::Running { start_time, .. } => Some(now.duration_since(start_time)),
       _ => None,
     }
   }
@@ -487,10 +484,10 @@ impl<N: Node> Entry<N> {
   /// Clears the state of this Node, forcing it to be recomputed.
   ///
   pub(crate) fn clear(&mut self) {
-    let mut inner = self.inner.lock().unwrap();
+    let mut state = self.state.lock().unwrap();
 
     let (run_token, generation, previous_result) =
-      match mem::replace(&mut inner.state, EntryState::initial()) {
+      match mem::replace(&mut *state, EntryState::initial()) {
         EntryState::NotStarted {
           run_token,
           generation,
@@ -511,7 +508,7 @@ impl<N: Node> Entry<N> {
       };
 
     // Swap in a state with a new RunToken value, which invalidates any outstanding work.
-    inner.state = EntryState::NotStarted {
+    *state = EntryState::NotStarted {
       run_token: run_token.next(),
       generation,
       previous_result,
@@ -523,7 +520,7 @@ impl<N: Node> Entry<N> {
   /// requested, and re-run if any of them have changed generations.
   ///
   pub(crate) fn dirty(&mut self) {
-    match &mut self.inner.lock().unwrap().state {
+    match &mut *self.state.lock().unwrap() {
       &mut EntryState::Running { ref mut dirty, .. }
       | &mut EntryState::Completed { ref mut dirty, .. } => {
         // Mark dirty.
@@ -534,29 +531,11 @@ impl<N: Node> Entry<N> {
   }
 
   pub(crate) fn format(&self) -> String {
-    let inner = self.inner.lock().unwrap();
-    let state = match inner.peek() {
+    let state = match self.peek() {
       Some(Ok(ref nr)) => format!("{:?}", nr),
       Some(Err(ref x)) => format!("{:?}", x),
       None => "<None>".to_string(),
     };
-    format!("{} == {}", inner.node.content().format(), state).replace("\"", "\\\"")
-  }
-}
-
-impl<N: Node> InnerEntry<N> {
-  ///
-  /// If the Future for this Node has already completed, returns a clone of its result.
-  ///
-  fn peek(&self) -> Option<Result<N::Item, N::Error>> {
-    match &self.state {
-      &EntryState::Completed {
-        ref result, dirty, ..
-      } if !dirty =>
-      {
-        Some(result.clone())
-      }
-      _ => None,
-    }
+    format!("{} == {}", self.node.content().format(), state).replace("\"", "\\\"")
   }
 }

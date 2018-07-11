@@ -334,7 +334,7 @@ impl<N: Node> InnerGraph<N> {
     let _format = |eid: EntryId, depth: usize, is_last: bool| -> String {
       let entry = self.unsafe_entry_for_id(eid);
       let indent = "  ".repeat(depth);
-      let output = format!("{}Computing {}", indent, entry.on_node(Node::format));
+      let output = format!("{}Computing {}", indent, entry.node().format());
       if is_last {
         format!(
           "{}\n{}  {}",
@@ -398,7 +398,7 @@ impl<N: Node> InnerGraph<N> {
 
       if deps.peek().is_none() {
         // If the entry has no running deps, it is a leaf. Emit it.
-        res.push((self.unsafe_entry_for_id(id).on_node(Node::format), duration));
+        res.push((self.unsafe_entry_for_id(id).node().format(), duration));
         if res.len() >= k {
           break;
         }
