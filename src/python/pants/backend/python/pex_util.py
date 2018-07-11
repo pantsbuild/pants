@@ -32,3 +32,13 @@ def get_local_platform():
   # is fixed.
   current_platform = Platform.current()
   return current_platform.platform
+
+
+def get_extended_local_platform():
+  """Returns the extended form of the local platform; eg: 'linux_x86_64-cp-27-cp27mu'.
+
+  :returns: The local extended platform name.
+  :rtype: str
+  """
+  current_platform = Platform.current()
+  return str(current_platform)
