@@ -113,14 +113,6 @@ class Target(AbstractTarget):
       """
       ignore_params = set((self.get_options().ignored or {}).get(target.type_alias, ()))
       unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
-      if 'source' in kwargs and 'source' not in unknown_args and 'source' not in ignore_params:
-        deprecated_conditional(
-          lambda: True,
-          '1.10.0.dev0',
-          ('The source argument in targets is deprecated - it gets automatically promoted to '
-           'sources. Target {} should just use a sources argument. No BUILD files need changing. '
-           'The source argument will stop being populated -').format(target.type_alias),
-        )
       if 'source' in unknown_args and 'sources' in payload.as_dict():
         unknown_args.pop('source')
       if 'sources' in unknown_args:
