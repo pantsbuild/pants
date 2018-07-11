@@ -474,25 +474,28 @@ impl<N: Node> Graph<N> {
   where
     C: NodeContext<Node = N>,
   {
-    // Get or create the destination, and then insert the dep and return its state.
-    let mut inner = self.inner.lock().unwrap();
-    let dst_id = {
-      // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
-      // without a much more complicated algorithm.
-      let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
-      if inner.detect_cycle(src_id, potential_dst_id) {
-        // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
-        inner.ensure_entry(EntryKey::Cyclic(dst_node))
-      } else {
-        // Valid dependency.
-        potential_dst_id
-      }
+    let (maybe_entry, entry_id) = {
+      // Get or create the destination, and then insert the dep and return its state.
+      let mut inner = self.inner.lock().unwrap();
+      let dst_id = {
+        // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
+        // without a much more complicated algorithm.
+        let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
+        if inner.detect_cycle(src_id, potential_dst_id) {
+          // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
+          inner.ensure_entry(EntryKey::Cyclic(dst_node))
+        } else {
+          // Valid dependency.
+          potential_dst_id
+        }
+      };
+      inner.pg.add_edge(src_id, dst_id, ());
+      (inner.entry_for_id(dst_id).cloned(), dst_id)
     };
 
     // Declare the dep, and return the state of the destination.
-    inner.pg.add_edge(src_id, dst_id, ());
-    if let Some(entry) = inner.entry_for_id_mut(dst_id) {
-      entry.get(context, dst_id).map(|(res, _)| res).to_boxed()
+    if let Some(mut entry) = maybe_entry {
+      entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
     } else {
       future::err(N::Error::invalidated()).to_boxed()
     }
@@ -505,10 +508,13 @@ impl<N: Node> Graph<N> {
   where
     C: NodeContext<Node = N>,
   {
-    let mut inner = self.inner.lock().unwrap();
-    let id = inner.ensure_entry(EntryKey::Valid(node));
-    if let Some(entry) = inner.entry_for_id_mut(id) {
-      entry.get(context, id).map(|(res, _)| res).to_boxed()
+    let (maybe_entry, entry_id) = {
+      let mut inner = self.inner.lock().unwrap();
+      let id = inner.ensure_entry(EntryKey::Valid(node));
+      (inner.entry_for_id(id).cloned(), id)
+    };
+    if let Some(mut entry) = maybe_entry {
+      entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
     } else {
       future::err(N::Error::invalidated()).to_boxed()
     }
@@ -591,16 +597,19 @@ impl<N: Node> Graph<N> {
   ) where
     C: NodeContext<Node = N>,
   {
-    let mut inner = self.inner.lock().unwrap();
-    // Get the Generations of all dependencies of the Node. We can trust that these have not changed
-    // since we began executing, as long as we are not currently marked dirty (see the method doc).
-    let dep_generations = inner
-      .pg
-      .neighbors_directed(entry_id, Direction::Outgoing)
-      .filter_map(|dep_id| inner.entry_for_id(dep_id))
-      .map(|entry| entry.generation())
-      .collect();
-    if let Some(entry) = inner.entry_for_id_mut(entry_id) {
+    let (entry, entry_id, dep_generations) = {
+      let mut inner = self.inner.lock().unwrap();
+      // Get the Generations of all dependencies of the Node. We can trust that these have not changed
+      // since we began executing, as long as we are not currently marked dirty (see the method doc).
+      let dep_generations = inner
+          .pg
+          .neighbors_directed(entry_id, Direction::Outgoing)
+          .filter_map(|dep_id| inner.entry_for_id(dep_id))
+          .map(|entry| entry.generation())
+          .collect();
+      (inner.entry_for_id(entry_id).cloned(), entry_id, dep_generations)
+    };
+    if let Some(mut entry) = entry {
       entry.complete(context, entry_id, run_token, dep_generations, result);
     }
   }

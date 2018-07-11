@@ -120,6 +120,7 @@ impl<N: Node> EntryKey<N> {
 ///
 /// An Entry and its adjacencies.
 ///
+#[derive(Clone)]
 pub struct Entry<N: Node> {
   // TODO: This is a clone of the Node, which is also kept in the `nodes` map. It would be
   // nice to avoid keeping two copies of each Node, but tracking references between the two
