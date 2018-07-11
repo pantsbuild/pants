@@ -113,16 +113,16 @@ class Target(AbstractTarget):
       """
       ignore_params = set((self.get_options().ignored or {}).get(target.type_alias, ()))
       unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
-      if 'source' in unknown_args:
-        if 'sources' in payload.as_dict():
-          deprecated_conditional(
-            lambda: True,
-            '1.10.0.dev0',
-            ('The source argument in targets is deprecated - it gets automatically promoted to '
-            'sources. Target {} should just use a sources argument. No BUILD files need changing. '
-            'The source argument will stop being populated -').format(target.type_alias),
-          )
-          unknown_args.pop('source')
+      if 'source' in kwargs and 'source' not in unknown_args and 'source' not in ignore_params:
+        deprecated_conditional(
+          lambda: True,
+          '1.10.0.dev0',
+          ('The source argument in targets is deprecated - it gets automatically promoted to '
+           'sources. Target {} should just use a sources argument. No BUILD files need changing. '
+           'The source argument will stop being populated -').format(target.type_alias),
+        )
+      if 'source' in unknown_args and 'sources' in payload.as_dict():
+        unknown_args.pop('source')
       if 'sources' in unknown_args:
         if 'sources' in payload.as_dict():
           deprecated_conditional(
@@ -891,16 +891,19 @@ class Target(AbstractTarget):
       else:
         sources = FilesetWithSpec.empty(sources_rel_path)
     elif isinstance(sources, (set, list, tuple)):
-      # Received a literal sources list: convert to a FilesetWithSpec via Files.
-      deprecated_conditional(
-        lambda: True,
-        '1.10.0.dev0',
-        ('Passing collections as the value of the sources argument to create_sources_field is '
-         'deprecated, and now takes a slow path. Instead, class {} should have its sources '
-         'argument populated by the engine, either by using the standard parsing pipeline, or by '
-         'requesting a SourcesField product from the v2 engine.').format(self.__class__.__name__)
-      )
-      sources = Files.create_fileset_with_spec(sources_rel_path, *sources)
+      if sources:
+        # Received a literal sources list: convert to a FilesetWithSpec via Files.
+        deprecated_conditional(
+          lambda: True,
+          '1.10.0.dev0',
+          ('Passing collections as the value of the sources argument to create_sources_field is '
+           'deprecated, and now takes a slow path. Instead, class {} should have its sources '
+           'argument populated by the engine, either by using the standard parsing pipeline, or by '
+           'requesting a SourcesField product from the v2 engine.').format(self.__class__.__name__)
+        )
+        sources = Files.create_fileset_with_spec(sources_rel_path, *sources)
+      else:
+        sources = FilesetWithSpec.empty(sources_rel_path)
     elif not isinstance(sources, FilesetWithSpec):
       key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
       raise TargetDefinitionException(self, "Expected {}a glob, an address or a list, but was {}"
