@@ -16,7 +16,7 @@ use std::hash::BuildHasherDefault;
 use std::io::{self, BufWriter, Write};
 use std::mem;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use fnv::FnvHasher;
@@ -149,8 +149,29 @@ pub struct Entry<N: Node> {
   // TODO: This is a clone of the Node, which is also kept in the `nodes` map. It would be
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
+  inner: Arc<Mutex<InnerEntry<N>>>,
+}
+
+pub struct InnerEntry<N: Node> {
   node: EntryKey<N>,
   state: EntryState<N>,
+}
+
+impl<N: Node> InnerEntry<N> {
+  ///
+  /// If the Future for this Node has already completed, returns a clone of its result.
+  ///
+  fn peek(&self) -> Option<Result<N::Item, N::Error>> {
+    match &self.state {
+      &EntryState::Completed {
+        ref result, dirty, ..
+      } if !dirty =>
+        {
+          Some(result.clone())
+        }
+      _ => None,
+    }
+  }
 }
 
 impl<N: Node> Entry<N> {
@@ -161,8 +182,10 @@ impl<N: Node> Entry<N> {
   ///
   fn new(node: EntryKey<N>) -> Entry<N> {
     Entry {
-      node: node,
-      state: EntryState::initial(),
+      inner: Arc::new(Mutex::new(InnerEntry {
+        node: node,
+        state: EntryState::initial(),
+      })),
     }
   }
 
@@ -271,98 +294,87 @@ impl<N: Node> Entry<N> {
   where
     C: NodeContext<Node = N>,
   {
-    // First check whether the Node is already complete, or is currently running: in both of these
-    // cases we don't swap the state of the Node.
-    match &mut self.state {
-      &mut EntryState::Running {
-        ref mut waiters, ..
-      } => {
-        let (send, recv) = oneshot::channel();
-        waiters.push(send);
-        return recv
-          .map_err(|_| N::Error::invalidated())
-          .flatten()
-          .to_boxed();
-      }
-      &mut EntryState::Completed {
-        ref result,
-        generation,
-        dirty,
-        ..
-      } if !dirty =>
-      {
-        return future::result(result.clone())
-          .map(move |res| (res, generation))
-          .to_boxed();
-      }
-      _ => {
-        // Fall through to the second match.
-      }
-    };
+    {
+      let mut inner = self.inner.lock().unwrap();
 
-    // Otherwise, we'll need to swap the state of the Node, so take it by value.
-    let next_state = match mem::replace(&mut self.state, EntryState::initial()) {
-      EntryState::NotStarted {
-        run_token,
-        generation,
-        previous_result,
-      } => Self::run(
-        context,
-        &self.node,
-        entry_id,
-        run_token,
-        generation,
-        None,
-        previous_result,
-      ),
-      EntryState::Completed {
-        run_token,
-        generation,
-        result,
-        dep_generations,
-        dirty,
-      } => {
-        assert!(
+      // First check whether the Node is already complete, or is currently running: in both of these
+      // cases we don't swap the state of the Node.
+      match &mut inner.state {
+        &mut EntryState::Running {
+          ref mut waiters, ..
+        } => {
+          let (send, recv) = oneshot::channel();
+          waiters.push(send);
+          return recv
+              .map_err(|_| N::Error::invalidated())
+              .flatten()
+              .to_boxed();
+        }
+        &mut EntryState::Completed {
+          ref result,
+          generation,
           dirty,
-          "A clean Node should not reach this point: {:?}",
-          result
-        );
-        // The Node has already completed but is now marked dirty. This indicates that we are the
-        // first caller to request it since it was marked dirty. We attempt to clean it (which will
-        // cause it to re-run if the dep_generations mismatch).
-        Self::run(
+          ..
+        } if !dirty =>
+          {
+            return future::result(result.clone())
+                .map(move |res| (res, generation))
+                .to_boxed();
+          }
+        _ => {
+          // Fall through to the second match.
+        }
+      };
+
+      // Otherwise, we'll need to swap the state of the Node, so take it by value.
+      let next_state = match mem::replace(&mut inner.state, EntryState::initial()) {
+        EntryState::NotStarted {
+          run_token,
+          generation,
+          previous_result,
+        } => Self::run(
           context,
-          &self.node,
+          &inner.node,
           entry_id,
           run_token,
           generation,
-          Some(dep_generations),
-          Some(result),
-        )
-      }
-      EntryState::Running { .. } => {
-        panic!("A Running Node should not reach this point.");
-      }
-    };
+          None,
+          previous_result,
+        ),
+        EntryState::Completed {
+          run_token,
+          generation,
+          result,
+          dep_generations,
+          dirty,
+        } => {
+          assert!(
+            dirty,
+            "A clean Node should not reach this point: {:?}",
+            result
+          );
+          // The Node has already completed but is now marked dirty. This indicates that we are the
+          // first caller to request it since it was marked dirty. We attempt to clean it (which will
+          // cause it to re-run if the dep_generations mismatch).
+          Self::run(
+            context,
+            &inner.node,
+            entry_id,
+            run_token,
+            generation,
+            Some(dep_generations),
+            Some(result),
+          )
+        }
+        EntryState::Running { .. } => {
+          panic!("A Running Node should not reach this point.");
+        }
+      };
 
-    // Swap in the new state and then recurse.
-    self.state = next_state;
-    self.get(context, entry_id)
-  }
-
-  ///
-  /// If the Future for this Node has already completed, returns a clone of its result.
-  ///
-  fn peek(&self) -> Option<Result<N::Item, N::Error>> {
-    match &self.state {
-      &EntryState::Completed {
-        ref result, dirty, ..
-      } if !dirty =>
-      {
-        Some(result.clone())
-      }
-      _ => None,
+      // Swap in the new state and then recurse.
+      inner.state = next_state;
     }
+    self.get(context, entry_id)
   }
 
   ///
@@ -382,9 +394,11 @@ impl<N: Node> Entry<N> {
   ) where
     C: NodeContext<Node = N>,
   {
+    let mut inner = self.inner.lock().unwrap();
+
     // We care about exactly one case: a Running state with the same run_token. All other states
     // represent various (legal) race conditions. See `RunToken`'s docs for more information.
-    match &self.state {
+    match &inner.state {
       &EntryState::Running { run_token, .. } if result_run_token == run_token => {}
       _ => {
         // We care about exactly one case: a Running state with the same run_token. All other states
@@ -393,7 +407,7 @@ impl<N: Node> Entry<N> {
       }
     }
 
-    self.state = match mem::replace(&mut self.state, EntryState::initial()) {
+    inner.state = match mem::replace(&mut inner.state, EntryState::initial()) {
       EntryState::Running {
         waiters,
         run_token,
@@ -407,7 +421,7 @@ impl<N: Node> Entry<N> {
           // be trusted and were never published. We continue to use the previous result.
           Self::run(
             context,
-            &self.node,
+            &inner.node,
             entry_id,
             run_token,
             generation,
@@ -458,7 +472,7 @@ impl<N: Node> Entry<N> {
   /// we want the per-Entry locking strategy to be.
   ///
   fn generation(&self) -> Generation {
-    match &self.state {
+    match &self.inner.lock().unwrap().state {
       &EntryState::NotStarted { generation, .. }
       | &EntryState::Running { generation, .. }
       | &EntryState::Completed { generation, .. } => generation,
@@ -472,7 +486,7 @@ impl<N: Node> Entry<N> {
   /// we want the per-Entry locking strategy to be.
   ///
   fn run_token(&self) -> RunToken {
-    match &self.state {
+    match &self.inner.lock().unwrap().state {
       &EntryState::NotStarted { run_token, .. }
       | &EntryState::Running { run_token, .. }
       | &EntryState::Completed { run_token, .. } => run_token,
@@ -483,7 +497,7 @@ impl<N: Node> Entry<N> {
   /// If the Node has started and has not yet completed, returns its runtime.
   ///
   fn current_running_duration(&self, now: &Instant) -> Option<Duration> {
-    match &self.state {
+    match &self.inner.lock().unwrap().state {
       &EntryState::Running { start_time, .. } => Some(now.duration_since(start_time)),
       _ => None,
     }
@@ -493,8 +507,10 @@ impl<N: Node> Entry<N> {
   /// Clears the state of this Node, forcing it to be recomputed.
   ///
   fn clear(&mut self) {
+    let mut inner = self.inner.lock().unwrap();
+
     let (run_token, generation, previous_result) =
-      match mem::replace(&mut self.state, EntryState::initial()) {
+      match mem::replace(&mut inner.state, EntryState::initial()) {
         EntryState::NotStarted {
           run_token,
           generation,
@@ -515,7 +531,7 @@ impl<N: Node> Entry<N> {
       };
 
     // Swap in a state with a new RunToken value, which invalidates any outstanding work.
-    self.state = EntryState::NotStarted {
+    inner.state = EntryState::NotStarted {
       run_token: run_token.next(),
       generation,
       previous_result,
@@ -527,7 +543,7 @@ impl<N: Node> Entry<N> {
   /// requested, and re-run if any of them have changed generations.
   ///
   fn dirty(&mut self) {
-    match &mut self.state {
+    match &mut self.inner.lock().unwrap().state {
       &mut EntryState::Running { ref mut dirty, .. }
       | &mut EntryState::Completed { ref mut dirty, .. } => {
         // Mark dirty.
@@ -538,12 +554,13 @@ impl<N: Node> Entry<N> {
   }
 
   fn format(&self) -> String {
-    let state = match self.peek() {
+    let inner = self.inner.lock().unwrap();
+    let state = match inner.peek() {
       Some(Ok(ref nr)) => format!("{:?}", nr),
       Some(Err(ref x)) => format!("{:?}", x),
       None => "<None>".to_string(),
     };
-    format!("{} == {}", self.node.content().format(), state).replace("\"", "\\\"")
+    format!("{} == {}", inner.node.content().format(), state).replace("\"", "\\\"")
   }
 }
 
@@ -711,7 +728,10 @@ impl<N: Node> InnerGraph<N> {
     try!(f.write_all(b"  concentrate=true;\n"));
     try!(f.write_all(b"  rankdir=TB;\n"));
 
-    let mut format_color = |entry: &Entry<N>| visualizer.color(entry.node.content(), entry.peek());
+    let mut format_color = |entry: &Entry<N>| {
+      let inner = entry.inner.lock().unwrap();
+      visualizer.color(inner.node.content(), inner.peek())
+    };
 
     let root_entries = roots
       .iter()
@@ -764,7 +784,7 @@ impl<N: Node> InnerGraph<N> {
         let mut non_bottom_deps = self
           .pg
           .neighbors_directed(id, Direction::Outgoing)
-          .filter(|dep_id| !T::is_bottom(self.unsafe_entry_for_id(*dep_id).peek()))
+          .filter(|dep_id| !T::is_bottom(self.unsafe_entry_for_id(*dep_id).inner.lock().unwrap().peek()))
           .peekable();
 
         if non_bottom_deps.peek().is_none() {
@@ -845,13 +865,14 @@ impl<N: Node> InnerGraph<N> {
     let _format = |eid: EntryId, depth: usize, is_last: bool| -> String {
       let entry = self.unsafe_entry_for_id(eid);
       let indent = "  ".repeat(depth);
-      let output = format!("{}Computing {}", indent, entry.node.content().format());
+      let inner = entry.inner.lock().unwrap();
+      let output = format!("{}Computing {}", indent, inner.node.content().format());
       if is_last {
         format!(
           "{}\n{}  {}",
           output,
           indent,
-          T::state_str(&indent, entry.peek())
+          T::state_str(&indent, inner.peek())
         )
       } else {
         output
@@ -910,7 +931,7 @@ impl<N: Node> InnerGraph<N> {
       if deps.peek().is_none() {
         // If the entry has no running deps, it is a leaf. Emit it.
         res.push((
-          self.unsafe_entry_for_id(id).node.content().format(),
+          self.unsafe_entry_for_id(id).inner.lock().unwrap().node.content().format(),
           duration,
         ));
         if res.len() >= k {
@@ -950,7 +971,7 @@ impl<N: Node> InnerGraph<N> {
     entryids
       .into_iter()
       .filter_map(move |eid| self.entry_for_id(eid))
-      .filter_map(|entry| match entry.peek() {
+      .filter_map(|entry| match entry.inner.lock().unwrap().peek() {
         Some(Ok(item)) => N::digest(item),
         _ => None,
       })
