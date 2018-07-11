@@ -154,7 +154,10 @@ class JvmTarget(Target, Jarable):
     :return: See constructor.
     :rtype: bool or None
     """
-    return 'fatal_warnings' in self.payload.compiler_option_sets
+    if self.payload.compiler_option_sets is not None:
+      return 'fatal_warnings' in self.payload.compiler_option_sets
+    else:
+      return False
 
   @memoized_property
   def compiler_option_sets(self):
