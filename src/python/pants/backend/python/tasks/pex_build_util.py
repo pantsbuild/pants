@@ -83,7 +83,8 @@ def dump_sources(builder, tgt, log):
                     'Depend on resources() targets instead.'.format(tgt.address.spec))
 
 
-def dump_requirement_libs(builder, interpreter, req_libs, log, platforms=None, precedence=None):
+def dump_requirement_libs(builder, interpreter, req_libs, log, platforms=None, precedence=None,
+                          cache_distribution=True):
   """Multi-platform dependency resolution for PEX files.
 
   :param builder: Dump the requirements into this builder.
@@ -92,12 +93,15 @@ def dump_requirement_libs(builder, interpreter, req_libs, log, platforms=None, p
   :param log: Use this logger.
   :param platforms: A list of :class:`Platform`s to resolve requirements for.
                     Defaults to the platforms specified by PythonSetup.
+  :param cache_distribution: Cache distributions locally
   """
   reqs = [req for req_lib in req_libs for req in req_lib.requirements]
-  dump_requirements(builder, interpreter, reqs, log, platforms=platforms, precedence=precedence)
+  dump_requirements(builder, interpreter, reqs, log, platforms=platforms, precedence=precedence,
+                    cache_distribution=cache_distribution)
 
 
-def dump_requirements(builder, interpreter, reqs, log, platforms=None, precedence=None):
+def dump_requirements(builder, interpreter, reqs, log, platforms=None, precedence=None,
+                      cache_distribution=True):
   """Multi-platform dependency resolution for PEX files.
 
   :param builder: Dump the requirements into this builder.
@@ -108,6 +112,7 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None, precedenc
                     Defaults to the platforms specified by PythonSetup.
   :param precedence: An ordered list of allowable :class:`Package` classes
                      to be used for producing distributions.
+  :param cache_distribution: Cache distributions locally
   """
   deduped_reqs = OrderedSet(reqs)
   find_links = OrderedSet()
@@ -120,7 +125,8 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None, precedenc
     if req.repository:
       find_links.add(req.repository)
   # Resolve the requirements into distributions.
-  distributions = resolve_multi(interpreter, deduped_reqs, platforms, find_links, precedence)
+  distributions = resolve_multi(interpreter, deduped_reqs, platforms, find_links, precedence,
+                                cache_distribution=cache_distribution)
   locations = set()
   for platform, dists in distributions.items():
     for dist in dists:
@@ -130,7 +136,8 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None, precedenc
       locations.add(dist.location)
 
 
-def resolve_multi(interpreter, requirements, platforms, find_links, precedence):
+def resolve_multi(interpreter, requirements, platforms, find_links, precedence,
+                  cache_distribution=None):
   """Multi-platform dependency resolution for PEX files.
 
   Returns a list of distributions that must be included in order to satisfy a set of requirements.
@@ -142,6 +149,7 @@ def resolve_multi(interpreter, requirements, platforms, find_links, precedence):
   :param find_links: Additional paths to search for source packages during resolution.
   :param precedence: An ordered list of allowable :class:`Package` classes
                      to be used for producing distributions.
+  :param cache_distribution: Cache distributions locally
   :return: Map of platform name -> list of :class:`pkg_resources.Distribution` instances needed
            to satisfy the requirements on that platform.
   """
@@ -162,7 +170,7 @@ def resolve_multi(interpreter, requirements, platforms, find_links, precedence):
       platform=get_local_platform() if platform == 'current' else platform,
       context=python_repos.get_network_context(),
       precedence=precedence,
-      cache=requirements_cache_dir,
+      cache=requirements_cache_dir if cache_distribution else None,
       cache_ttl=python_setup.resolver_cache_ttl,
       allow_prereleases=python_setup.resolver_allow_prereleases,
       pkg_blacklist=python_setup.resolver_blacklist,
