@@ -50,6 +50,7 @@ use externs::{
   TypeToStrExtern, ValToStrExtern,
 };
 use futures::Future;
+use handles::Handle;
 use hashing::Digest;
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
@@ -68,9 +69,9 @@ enum RawStateTag {
 pub struct RawNode {
   subject: Key,
   product: TypeConstraint,
-  // The Value represents a union tagged with RawStateTag.
+  // The Handle represents a union tagged with RawStateTag.
   state_tag: u8,
-  state_value: Value,
+  state_handle: Handle,
 }
 
 impl RawNode {
@@ -92,7 +93,7 @@ impl RawNode {
       subject: subject.clone(),
       product: product.clone(),
       state_tag: state_tag,
-      state_value: state_value,
+      state_handle: state_value.into(),
     }
   }
 }
@@ -172,13 +173,13 @@ pub extern "C" fn externs_set(
 }
 
 #[no_mangle]
-pub extern "C" fn externs_key_for(value: Value) -> Key {
-  externs::key_for(value)
+pub extern "C" fn key_for(value: Handle) -> Key {
+  externs::key_for(value.into())
 }
 
 #[no_mangle]
-pub extern "C" fn externs_val_for(key: Key) -> Value {
-  externs::val_for(&key)
+pub extern "C" fn val_for(key: Key) -> Handle {
+  externs::val_for(&key).into()
 }
 
 ///
@@ -291,13 +292,13 @@ pub extern "C" fn scheduler_create(
 }
 
 ///
-/// Returns a Value representing a tuple of tuples of metric name string and metric value int.
+/// Returns a Handle representing a tuple of tuples of metric name string and metric value int.
 ///
 #[no_mangle]
 pub extern "C" fn scheduler_metrics(
   scheduler_ptr: *mut Scheduler,
   session_ptr: *mut Session,
-) -> Value {
+) -> Handle {
   with_scheduler(scheduler_ptr, |scheduler| {
     with_session(session_ptr, |session| {
       let values = scheduler
@@ -310,7 +311,7 @@ pub extern "C" fn scheduler_metrics(
           ])
         })
         .collect::<Vec<_>>();
-      externs::store_tuple(&values)
+      externs::store_tuple(&values).into()
     })
   })
 }
@@ -371,11 +372,11 @@ pub extern "C" fn tasks_create() -> *const Tasks {
 #[no_mangle]
 pub extern "C" fn tasks_singleton_add(
   tasks_ptr: *mut Tasks,
-  value: Value,
+  handle: Handle,
   output_constraint: TypeConstraint,
 ) {
   with_tasks(tasks_ptr, |tasks| {
-    tasks.singleton_add(value, output_constraint);
+    tasks.singleton_add(handle.into(), output_constraint);
   })
 }
 
@@ -519,12 +520,9 @@ pub extern "C" fn execution_request_destroy(ptr: *mut ExecutionRequest) {
 }
 
 #[no_mangle]
-pub extern "C" fn validator_run(scheduler_ptr: *mut Scheduler) -> Value {
+pub extern "C" fn validator_run(scheduler_ptr: *mut Scheduler) -> PyResult {
   with_scheduler(scheduler_ptr, |scheduler| {
-    match scheduler.core.rule_graph.validate() {
-      Ok(_) => externs::store_tuple(&[]),
-      Err(msg) => externs::create_exception(&msg),
-    }
+    scheduler.core.rule_graph.validate().into()
   })
 }
 
@@ -607,9 +605,9 @@ pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler) {
 #[no_mangle]
 pub extern "C" fn capture_snapshots(
   scheduler_ptr: *mut Scheduler,
-  path_globs_and_root_tuple_wrapper: Value,
+  path_globs_and_root_tuple_wrapper: Handle,
 ) -> PyResult {
-  let values = externs::project_multi(&path_globs_and_root_tuple_wrapper, "dependencies");
+  let values = externs::project_multi(&path_globs_and_root_tuple_wrapper.into(), "dependencies");
   let path_globs_and_roots_result: Result<Vec<(fs::PathGlobs, PathBuf)>, String> = values
     .iter()
     .map(|value| {
@@ -649,10 +647,10 @@ pub extern "C" fn capture_snapshots(
 #[no_mangle]
 pub extern "C" fn merge_directories(
   scheduler_ptr: *mut Scheduler,
-  directories_value: Value,
+  directories_value: Handle,
 ) -> PyResult {
   let digests_result: Result<Vec<hashing::Digest>, String> =
-    externs::project_multi(&directories_value, "dependencies")
+    externs::project_multi(&directories_value.into(), "dependencies")
       .iter()
       .map(|v| nodes::lift_digest(v))
       .collect();
@@ -675,9 +673,9 @@ pub extern "C" fn merge_directories(
 #[no_mangle]
 pub extern "C" fn materialize_directories(
   scheduler_ptr: *mut Scheduler,
-  directories_paths_and_digests_value: Value,
+  directories_paths_and_digests_value: Handle,
 ) -> PyResult {
-  let values = externs::project_multi(&directories_paths_and_digests_value, "dependencies");
+  let values = externs::project_multi(&directories_paths_and_digests_value.into(), "dependencies");
   let directories_paths_and_digests_results: Result<Vec<(PathBuf, Digest)>, String> = values
     .iter()
     .map(|value| {
