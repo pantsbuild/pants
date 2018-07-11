@@ -122,8 +122,10 @@ object Main {
 
       log.info("Compile success " + Util.timing(startTime))
 
-      // if compile successful, jar the contents of classesDirectory and copy to outputJar
-
+      // TODO(ity): if compile successful, jar the contents of classesDirectory and copy to outputJar
+      if (settings.outputJar.isDefined) {
+        InputUtils.createClassesJar(settings, log)
+      }
     } catch {
       case e: CompileFailed =>
         log.error("Compile failed " + Util.timing(startTime))

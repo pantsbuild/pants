@@ -6,7 +6,10 @@ package org.pantsbuild.zinc.compiler
 
 import java.io.{File, IOException}
 import java.lang.{ Boolean => JBoolean }
+import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.{FileVisitResult, Files, Path, Paths, SimpleFileVisitor}
 import java.util.function.{ Function => JFunction }
+import java.util.jar.{Attributes, JarEntry, JarFile, JarInputStream, JarOutputStream, Manifest}
 import java.util.{ List => JList, Map => JMap }
 
 import scala.collection.JavaConverters._
@@ -159,6 +162,40 @@ object InputUtils {
     val (compiler, other) = filtered partition (_.getName matches ScalaCompiler.pattern)
     val (library, extra) = other partition (_.getName matches ScalaLibrary.pattern)
     if (compiler.nonEmpty && library.nonEmpty) Some(ScalaJars(compiler(0), library(0), extra)) else None
+  }
+
+  /**
+   * Jar the contents of output classes (settings.classesDirectory) and copy to settings.outputJar
+   */
+  def createClassesJar(settings: Settings, log: Logger) = {
+    val classesDirectory = settings.classesDirectory
+    object FileVisitor extends SimpleFileVisitor[Path]() {
+      def done(): Path = {
+        target.close()
+        log.debug("Output jar generated at: " + jarPath)
+        // TODO(ity): Delete the temp classesDirectory, if one was created
+        jarPath
+      }
+
+      val jarPath = Paths.get(classesDirectory.toString, settings.outputJar.toString)
+      val target = new JarOutputStream(Files.newOutputStream(jarPath))
+      val entryTime = System.currentTimeMillis()
+
+      override def visitFile(source: Path, attrs: BasicFileAttributes): FileVisitResult = {
+        val jarEntry = new JarEntry(source.toString)
+        jarEntry.setTime(entryTime)
+
+        log.debug("Creating jar entry " + jarEntry + " for the file " + source)
+
+        target.putNextEntry(jarEntry)
+        Files.copy(source, target)
+        target.closeEntry()
+        FileVisitResult.CONTINUE
+      }
+
+      Files.walkFileTree(classesDirectory.toPath, FileVisitor)
+      FileVisitor.done()
+    }
   }
 
   //

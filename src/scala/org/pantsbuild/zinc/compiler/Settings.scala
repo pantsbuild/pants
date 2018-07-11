@@ -5,7 +5,7 @@
 package org.pantsbuild.zinc.compiler
 
 import java.io.File
-import java.nio.file.Path
+import java.nio.file.{Files, Path}
 import java.lang.{ Boolean => JBoolean }
 import java.util.function.{ Function => JFunction }
 import java.util.{ List => JList, logging => jlogging }
@@ -58,17 +58,13 @@ case class Settings(
 
   lazy val sources: Seq[File] = _sources map normalise
 
-  if _classesDirectory.isEmpty && outputJar.isEmpty {
+  if (_classesDirectory.isEmpty && outputJar.isEmpty) {
     throw new RuntimeException(
       s"Either ${Settings.DestinationOpt} or ${Settings.JarDestinationOpt} option is required.")
   }
 
   lazy val classesDirectory: File =
-    normalise(
-      _classesDirectory.getOrElse {
-        throw new RuntimeException(s"The ${Settings.DestinationOpt}  option is required.")
-      }
-    )
+    normalise(_classesDirectory.getOrElse(defaultClassesDirectory()))
 
   lazy val incOptions: IncOptions = {
     _incOptions.copy(
@@ -94,15 +90,15 @@ case class ConsoleOptions(
 ) {
   def javaLogLevel: jlogging.Level = logLevel match {
     case Level.Info =>
-      jlogging.Level.INFO   
+      jlogging.Level.INFO
     case Level.Warn =>
       jlogging.Level.WARNING
     case Level.Error =>
-      jlogging.Level.SEVERE 
+      jlogging.Level.SEVERE
     case Level.Debug =>
       jlogging.Level.FINE
     case x =>
-      sys.error(s"Unsupported log level: $x")    
+      sys.error(s"Unsupported log level: $x")
   }
 
   /**
@@ -321,5 +317,13 @@ object Settings extends OptionSet[Settings] {
    */
   def defaultBackupLocation(classesDir: File) = {
     classesDir.getParentFile / "backup" / classesDir.getName
+  }
+
+  /**
+   * If a settings.classesDirectory option isnt specified, create a temporary directory for output
+   * classes to be written to.
+   */
+  def defaultClassesDirectory(): File = {
+    Files.createTempDirectory("temp-zinc-classes").toFile
   }
 }
