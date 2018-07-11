@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from textwrap import dedent
@@ -18,7 +17,6 @@ from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTest
 
 class PythonIsortTest(PythonTaskTestBase):
   BAD_IMPORT_ORDER = dedent("""
-  from __future__ import (with_statement, division, absolute_import, generators, nested_scopes, print_function,
                           unicode_literals)
 
   """)
@@ -31,8 +29,7 @@ class PythonIsortTest(PythonTaskTestBase):
   """)
 
   RESULT_A = dedent("""
-    from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                            unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
   """)
 
   CONFIG_B = dedent("""
@@ -43,13 +40,12 @@ class PythonIsortTest(PythonTaskTestBase):
   """)
 
   RESULT_B = dedent("""
-    from __future__ import (absolute_import,
+from __future__ import absolute_import, division, print_function, unicode_literals
                             division,
                             generators,
                             nested_scopes,
                             print_function,
                             unicode_literals,
-                            with_statement)
   """)
 
   @classmethod
