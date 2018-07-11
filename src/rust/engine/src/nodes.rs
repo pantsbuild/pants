@@ -23,7 +23,7 @@ use rule_graph;
 use selectors;
 use tasks::{self, Intrinsic, IntrinsicKind};
 
-use graph::{Node, NodeError, NodeTracer, NodeVisualizer};
+use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -893,9 +893,9 @@ impl NodeVisualizer<NodeKey> for Visualizer {
     "set312"
   }
 
-  fn color(&mut self, node: &NodeKey, result: Option<Result<NodeResult, Failure>>) -> String {
+  fn color(&mut self, entry: &Entry<NodeKey>) -> String {
     let max_colors = 12;
-    match result {
+    match entry.peek() {
       None | Some(Err(Failure::Noop(_))) => "white".to_string(),
       Some(Err(Failure::Throw(..))) => "4".to_string(),
       Some(Err(Failure::Invalidated)) => "12".to_string(),
@@ -903,7 +903,7 @@ impl NodeVisualizer<NodeKey> for Visualizer {
         let viz_colors_len = self.viz_colors.len();
         self
           .viz_colors
-          .entry(node.product_str())
+          .entry(entry.on_node(NodeKey::product_str))
           .or_insert_with(|| format!("{}", viz_colors_len % max_colors + 1))
           .clone()
       }
