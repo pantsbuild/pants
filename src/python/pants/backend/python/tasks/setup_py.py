@@ -8,6 +8,7 @@ import ast
 import itertools
 import os
 import pprint
+import re
 import shutil
 from abc import abstractmethod
 from builtins import map, object, str, zip
