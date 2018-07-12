@@ -2,6 +2,7 @@
 version = "0.0.1"
 name = "process_execution"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
 
 [dependencies]
 async_semaphore = { path = "../async_semaphore" }

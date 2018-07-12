@@ -3,6 +3,7 @@ version = "0.0.1"
 name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 build = "src/cffi_build.rs"
+publish = false
 
 [profile.release]
 # Enable debug symbols in the `release` profile: doesn't add a noticeable overhead in size/speed,
