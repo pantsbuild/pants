@@ -8,6 +8,8 @@ import logging
 import os
 from builtins import str
 
+from future.utils import native
+
 from pants.backend.jvm import argfile
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -224,5 +226,5 @@ class JavacCompile(JvmCompile):
     # Dump the output to the .pants.d directory where it's expected by downstream tasks.
     classes_directory = ctx.classes_dir
     self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(str(classes_directory), exec_result.output_directory_digest),
+      DirectoryToMaterialize(native(str(classes_directory)), exec_result.output_directory_digest),
     ))

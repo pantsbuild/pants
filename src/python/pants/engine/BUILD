@@ -47,6 +47,7 @@ python_library(
   sources=['fs.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:future',
     ':rules',
     ':selectors',
     'src/python/pants/base:project_tree',
