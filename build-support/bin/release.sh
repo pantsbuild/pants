@@ -7,7 +7,7 @@ set -e
 ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 source ${ROOT}/build-support/common.sh
 
-PY=$(which python2.7)
+PY=$(which python2.7 || exit 0)
 [[ -n "${PY}" ]] || die "You must have python2.7 installed and on the path to release."
 export PY
 

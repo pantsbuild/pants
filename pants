@@ -47,8 +47,6 @@ source ${HERE}/build-support/bin/native/bootstrap_code.sh
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
 
-PY=${PY:-$(which python2.7)}
-
 if [[ ! -z "${WRAPPER_REQUIREMENTS}" ]]; then
   REQUIREMENTS=(
     $(echo ${WRAPPER_REQUIREMENTS} | tr : ' ')
