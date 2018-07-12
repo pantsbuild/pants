@@ -5,9 +5,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
+from builtins import chr, range
 from collections import defaultdict
-
-import six
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address, parse_spec
@@ -191,7 +190,7 @@ class BuildGraphTest(TestBase):
     bfs_closure = BuildGraph.closure([self.build_graph.get_target(root)], bfs=True)
     self.assertEquals(
         [t.address.target_name for t in bfs_closure],
-        [str(six.unichr(x)) for x in six.moves.xrange(ord('a'), ord('o') + 1)],
+        [chr(x) for x in range(ord('a'), ord('o') + 1)],
     )
 
   def test_transitive_subgraph_of_addresses_bfs(self):
@@ -208,7 +207,7 @@ class BuildGraphTest(TestBase):
 
     self.assertEquals(
         [t.address.target_name for t in self.build_graph.transitive_subgraph_of_addresses_bfs([root])],
-        [str(six.unichr(x)) for x in six.moves.xrange(ord('a'), ord('o') + 1)],
+        [chr(x) for x in range(ord('a'), ord('o') + 1)],
     )
 
   def test_transitive_subgraph_of_addresses_bfs_predicate(self):
