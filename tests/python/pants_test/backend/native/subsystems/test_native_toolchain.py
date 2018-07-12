@@ -192,6 +192,7 @@ int main() {
 
     scheduler_request_specs = [
       (self.toolchain, GCCCppCompiler),
+      (self.toolchain, LLVMCppCompiler),
       (self.toolchain, Linker),
     ]
 
@@ -203,10 +204,18 @@ int main() {
 }
 """, scheduler_request_specs=scheduler_request_specs) as products:
 
-      gpp_wrapper, linker = products
+      gpp_wrapper, clangpp_wrapper, linker = products
       gpp = gpp_wrapper.cpp_compiler
+      clangpp = clangpp_wrapper.cpp_compiler
 
-      self._do_compile_link(gpp, linker, 'hello.cpp', 'hello_gpp', "I C the world, ++ more!")
+      # FIXME(#5951): we should be matching the linker to the compiler here, instead of trying to
+      # use the same linker for everything. This is a temporary workaround.
+      linker_with_gpp_workaround = Linker(
+        path_entries=(gpp.path_entries + linker.path_entries),
+        exe_filename=gpp.exe_filename,
+        library_dirs=(gpp.library_dirs + linker.library_dirs + clangpp.library_dirs))
+
+      self._do_compile_link(gpp, linker_with_gpp_workaround, 'hello.cpp', 'hello_gpp', "I C the world, ++ more!")
 
   def test_hello_cpp_clangpp(self):
 
