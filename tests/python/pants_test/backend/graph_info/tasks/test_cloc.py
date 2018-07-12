@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import filter
+
 from pants.backend.graph_info.tasks.cloc import CountLinesOfCode
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -68,4 +70,4 @@ class ClocTest(ConsoleTaskTestBase, SchedulerTestBase):
     )
     self.assertEquals(['Ignored the following files:',
                        'src/py/foo/empty.py: zero sized file'],
-                      filter(None, res)[-2:])
+                      list(filter(None, res))[-2:])
