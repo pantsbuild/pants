@@ -143,7 +143,7 @@ class AddressFamily(datatype(['namespace', 'objects_by_name'])):
 
   def __repr__(self):
     return 'AddressFamily(namespace={!r}, objects_by_name={!r})'.format(
-        self.namespace, self.objects_by_name.keys())
+        self.namespace, list(self.objects_by_name.keys()))
 
 
 class ResolveError(MappingError):
