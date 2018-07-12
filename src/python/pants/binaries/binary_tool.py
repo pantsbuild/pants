@@ -6,6 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import os
+from builtins import str
+
+from future.utils import native
 
 from pants.binaries.binary_util import BinaryRequest, BinaryUtil
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
@@ -198,7 +201,7 @@ class Script(BinaryToolBase):
     snapshot = context._scheduler.capture_snapshots((
       PathGlobsAndRoot(
         PathGlobs((script_relpath,)),
-        str(bootstrapdir),
+        native(str(bootstrapdir)),
       ),
     ))[0]
     return (script_relpath, snapshot)

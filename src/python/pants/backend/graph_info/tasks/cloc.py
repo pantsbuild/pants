@@ -5,6 +5,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import str
+
+from future.utils import native
 
 from pants.backend.graph_info.subsystems.cloc_binary import ClocBinary
 from pants.base.workunit import WorkUnitLabel
@@ -49,7 +52,7 @@ class CountLinesOfCode(ConsoleTask):
       list_file_snapshot = self.context._scheduler.capture_snapshots((
         PathGlobsAndRoot(
           PathGlobs(('input_files_list',)),
-          str(tmpdir),
+          native(str(tmpdir)),
         ),
       ))[0]
 
