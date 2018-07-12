@@ -138,20 +138,13 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
                 out=e.output),
         e)
 
-  def _do_compile_link(self, compiler, linker, source_file, outfile, output,
-                       extra_compile_args=None, extra_link_args=None):
-    if not extra_compile_args:
-      extra_compile_args = []
-    if not extra_link_args:
-      extra_link_args = []
+  def _do_compile_link(self, compiler, linker, source_file, outfile, output):
 
     intermediate_obj_file_name = '{}.o'.format(outfile)
-    compile_argv = ['-c', source_file, '-o', intermediate_obj_file_name] + extra_compile_args
-    self._invoke_compiler(compiler, compile_argv)
+    self._invoke_compiler(compiler, ['-c', source_file, '-o', intermediate_obj_file_name])
     self.assertTrue(os.path.isfile(intermediate_obj_file_name))
 
-    link_argv = [intermediate_obj_file_name, '-o', outfile] + extra_link_args
-    self._invoke_linker(linker, link_argv)
+    self._invoke_linker(linker, [intermediate_obj_file_name, '-o', outfile])
     self.assertTrue(is_executable(outfile))
     program_out = self._invoke_capturing_output([os.path.abspath(outfile)])
     self.assertEqual((output + '\n'), program_out)
@@ -213,19 +206,12 @@ int main() {
       gpp_wrapper, linker = products
       gpp = gpp_wrapper.cpp_compiler
 
-      # FIXME(#5951): we should be matching the linker to the compiler here, instead of trying to
-      # use the same linker for everything. This is a temporary workaround.
-      linker_with_gpp_workaround = Linker(
-        path_entries=(gpp.path_entries + linker.path_entries),
-        exe_filename=gpp.exe_filename,
-        library_dirs=(gpp.library_dirs + linker.library_dirs))
-
-      self._do_compile_link(gpp, linker_with_gpp_workaround, 'hello.cpp', 'hello_gpp',
-                            "I C the world, ++ more!")
+      self._do_compile_link(gpp, linker, 'hello.cpp', 'hello_gpp', "I C the world, ++ more!")
 
   def test_hello_cpp_clangpp(self):
 
     scheduler_request_specs = [
+      # We need GCC to provide libstdc++.so.6, which clang needs to run on Linux.
       (self.toolchain, GCCCppCompiler),
       (self.toolchain, LLVMCppCompiler),
       (self.toolchain, Linker),
@@ -235,7 +221,7 @@ int main() {
 #include <iostream>
 
 int main() {
-  std::cout << "I C Clang the world, ++ more!" << std::endl;
+  std::cout << "I C the world, ++ more!" << std::endl;
 }
 """, scheduler_request_specs=scheduler_request_specs) as products:
 
@@ -248,17 +234,7 @@ int main() {
       linker_with_clangpp_workaround = Linker(
         path_entries=(clangpp.path_entries + linker.path_entries),
         exe_filename=clangpp.exe_filename,
-        library_dirs=(clangpp.library_dirs + linker.library_dirs),
-      )
+        library_dirs=(gpp.library_dirs + linker.library_dirs + clangpp.library_dirs))
 
-      linker_with_gpp_workaround = Linker(
-        path_entries=(gpp.path_entries + linker.path_entries),
-        exe_filename=gpp.exe_filename,
-        library_dirs=(gpp.library_dirs + linker.library_dirs))
-
-      self._do_compile_link(
-        clangpp, linker_with_gpp_workaround, 'hello.cpp', 'hello_clangpp',
-        "I C Clang the world, ++ more!",
-        extra_compile_args=['-nobuiltininc', '-nostdinc++', '-fno-lto'],
-        extra_link_args=['-v', '-H', '-fno-lto'],
-      )
+      self._do_compile_link(clangpp, linker_with_clangpp_workaround, 'hello.cpp', 'hello_clangpp',
+                            "I C the world, ++ more!")
