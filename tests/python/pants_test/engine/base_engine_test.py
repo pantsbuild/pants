@@ -28,7 +28,7 @@ class EngineTestBase(TestBase):
 
     :API: public
     """
-    return map(cls.as_goal, goal_names)
+    return [cls.as_goal(goal_name) for goal_name in goal_names]
 
   @classmethod
   def install_task(cls, name, action=None, dependencies=None, goal=None):

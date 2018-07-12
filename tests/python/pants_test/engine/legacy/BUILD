@@ -5,6 +5,7 @@ python_tests(
   name = 'address_mapper',
   sources = ['test_address_mapper.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:mock',
     'src/python/pants/base:specs',
     'src/python/pants/bin',
@@ -41,6 +42,7 @@ python_tests(
   name = 'changed_integration',
   sources = ['test_changed_integration.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -107,6 +109,7 @@ python_tests(
   name = 'graph',
   sources = ['test_graph.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:mock',
     '3rdparty/python:requirements_files',
     'src/python/pants/bin',
@@ -186,6 +189,7 @@ python_tests(
   name = 'structs',
   sources = ['test_structs.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/engine/legacy:structs',
   ]
 )

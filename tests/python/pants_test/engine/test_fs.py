@@ -8,7 +8,7 @@ import logging
 import os
 import tarfile
 import unittest
-from builtins import str
+from builtins import object, str
 from contextlib import contextmanager
 
 from future.utils import text_type

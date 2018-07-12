@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import functools
 import unittest
+from builtins import range
 
 from pants.engine.nodes import Return
 
