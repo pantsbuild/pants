@@ -236,16 +236,28 @@ def select_gcc_cpp_compiler(platform, native_toolchain):
   yield final_gcc_cpp_compiler
 
 
-@rule(CCompiler, [Select(NativeToolchain)])
-def select_c_compiler(native_toolchain):
-  llvm_c_compiler = yield Get(LLVMCCompiler, NativeToolchain, native_toolchain)
-  yield llvm_c_compiler.c_compiler
+@rule(CCompiler, [Select(NativeToolchain), Select(Platform)])
+def select_c_compiler(native_toolchain, platform):
+  if platform.normalized_os_name == 'darwin':
+    llvm_c_compiler = yield Get(LLVMCCompiler, NativeToolchain, native_toolchain)
+    c_compiler = llvm_c_compiler.c_compiler
+  else:
+    gcc_c_compiler = yield Get(GCCCCompiler, NativeToolchain, native_toolchain)
+    c_compiler = gcc_c_compiler.c_compiler
+
+  yield c_compiler
 
 
-@rule(CppCompiler, [Select(NativeToolchain)])
-def select_cpp_compiler(native_toolchain):
-  llvm_cpp_compiler = yield Get(LLVMCppCompiler, NativeToolchain, native_toolchain)
-  yield llvm_cpp_compiler.cpp_compiler
+@rule(CppCompiler, [Select(NativeToolchain), Select(Platform)])
+def select_cpp_compiler(native_toolchain, platform):
+  if platform.normalized_os_name == 'darwin':
+    llvm_cpp_compiler = yield Get(LLVMCppCompiler, NativeToolchain, native_toolchain)
+    cpp_compiler = llvm_cpp_compiler.cpp_compiler
+  else:
+    gcc_cpp_compiler = yield Get(GCCCppCompiler, NativeToolchain, native_toolchain)
+    cpp_compiler = gcc_cpp_compiler.cpp_compiler
+
+  yield cpp_compiler
 
 
 def create_native_toolchain_rules():

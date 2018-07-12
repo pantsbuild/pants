@@ -59,6 +59,13 @@ class LLVM(NativeTool):
   def path_entries(self):
     return [os.path.join(self.select(), 'bin')]
 
+  @property
+  def _common_lib_dirs(self):
+    return [
+      os.path.join(self.select(), 'lib'),
+      os.path.join(self.select(), 'lib/clang/6.0.0'),
+    ]
+
   _PLATFORM_SPECIFIC_LINKER_NAME = {
     'darwin': lambda: 'ld64.lld',
     'linux': lambda: 'lld',
@@ -69,7 +76,7 @@ class LLVM(NativeTool):
       path_entries=self.path_entries(),
       exe_filename=platform.resolve_platform_specific(
         self._PLATFORM_SPECIFIC_LINKER_NAME),
-      library_dirs=[])
+      library_dirs=self._common_lib_dirs)
 
   @property
   def _common_include_dir(self):
@@ -79,7 +86,7 @@ class LLVM(NativeTool):
     return CCompiler(
       path_entries=self.path_entries(),
       exe_filename='clang',
-      library_dirs=[],
+      library_dirs=self._common_lib_dirs,
       include_dirs=[self._common_include_dir])
 
   @property
@@ -90,7 +97,7 @@ class LLVM(NativeTool):
     return CppCompiler(
       path_entries=self.path_entries(),
       exe_filename='clang++',
-      library_dirs=[],
+      library_dirs=self._common_lib_dirs,
       include_dirs=[
         self._cpp_include_dir,
         self._common_include_dir,
