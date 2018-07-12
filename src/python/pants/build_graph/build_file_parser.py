@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import warnings
+from builtins import object
 
 import six
 
