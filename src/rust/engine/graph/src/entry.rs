@@ -362,6 +362,12 @@ impl<N: Node> Entry<N> {
   /// result should be used. This special case exists to avoid 1) cloning the result to call this
   /// method, and 2) comparing the current/previous results unnecessarily.
   ///
+  /// Takes a &mut InnerGraph to ensure that completing nodes doesn't race with dirtying them.
+  /// The important relationship being guaranteed here is that if the Graph is calling
+  /// invalidate_from_roots, it may mark us, or our dependencies, as dirty. We don't want to
+  /// complete _while_ a batch of nodes are being marked as dirty, and this exclusive access ensures
+  /// that can't happen.
+  ///
   pub(crate) fn complete<C>(
     &mut self,
     context: &C,
@@ -369,6 +375,7 @@ impl<N: Node> Entry<N> {
     result_run_token: RunToken,
     dep_generations: Vec<Generation>,
     result: Option<Result<N::Item, N::Error>>,
+    _graph: &mut super::InnerGraph<N>,
   ) where
     C: NodeContext<Node = N>,
   {
@@ -520,7 +527,9 @@ impl<N: Node> Entry<N> {
   /// Dirties this Node, which will cause it to examine its dependencies the next time it is
   /// requested, and re-run if any of them have changed generations.
   ///
-  pub(crate) fn dirty(&mut self) {
+  /// See comment on complete for information about _graph argument.
+  ///
+  pub(crate) fn dirty(&mut self, _graph: &mut super::InnerGraph<N>) {
     match &mut *self.state.lock().unwrap() {
       &mut EntryState::Running { ref mut dirty, .. }
       | &mut EntryState::Completed { ref mut dirty, .. } => {

@@ -177,7 +177,9 @@ impl<N: Node> InnerGraph<N> {
     // outbound edges until we decide whether we can clean an entry: if we can, all edges are
     // preserved; if we can't, they are cleared in `Graph::clear_deps`.
     for id in &transitive_ids {
-      self.pg.node_weight_mut(*id).map(|entry| entry.dirty());
+      if let Some(mut entry) = self.pg.node_weight_mut(*id).cloned() {
+        entry.dirty(self);
+      }
     }
 
     invalidation_result
@@ -586,7 +588,10 @@ impl<N: Node> Graph<N> {
   /// change while we're running. In order for a dependency to "change" it must have been cleared
   /// or been marked dirty. But if our dependencies have been cleared or marked dirty, then we will
   /// have been as well. We can thus use the dirty bit as a signal that the generation values of
-  /// our dependencies are still accurate.
+  /// our dependencies are still accurate. The dirty bit is safae to rely on as it is only ever
+  /// mutated, and dependencies' dirty bits are only read, under the InnerGraph lock - this is only
+  /// reliably the case because Entry happens to require a &mut InnerGraph reference; it would be
+  /// great not to violate that in the future.
   ///
   fn complete<C>(
     &self,
@@ -610,7 +615,8 @@ impl<N: Node> Graph<N> {
       (inner.entry_for_id(entry_id).cloned(), entry_id, dep_generations)
     };
     if let Some(mut entry) = entry {
-      entry.complete(context, entry_id, run_token, dep_generations, result);
+      let mut inner = self.inner.lock().unwrap();
+      entry.complete(context, entry_id, run_token, dep_generations, result, &mut inner);
     }
   }
 
