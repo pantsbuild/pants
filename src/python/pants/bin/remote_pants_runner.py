@@ -8,6 +8,7 @@ import logging
 import signal
 import sys
 import time
+from builtins import object, str
 from contextlib import contextmanager
 
 from pants.console.stty_utils import STTYSettings

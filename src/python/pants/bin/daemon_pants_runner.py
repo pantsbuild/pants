@@ -10,6 +10,7 @@ import signal
 import sys
 import termios
 import time
+from builtins import bytes, str, zip
 from contextlib import contextmanager
 
 from setproctitle import setproctitle as set_process_title
@@ -222,7 +223,7 @@ class DaemonPantsRunner(ProcessManager):
 
     # Broadcast our process group ID (in PID form - i.e. negated) to the remote client so
     # they can send signals (e.g. SIGINT) to all processes in the runners process group.
-    NailgunProtocol.send_pid(self._socket, bytes(os.getpgrp() * -1))
+    NailgunProtocol.send_pid(self._socket, bytes(str(os.getpgrp() * -1), 'ascii'))
 
     # Invoke a Pants run with stdio redirected and a proxied environment.
     with self._nailgunned_stdio(self._socket) as finalizer, hermetic_environment_as(**self._env):
