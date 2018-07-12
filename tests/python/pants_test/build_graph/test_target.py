@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os.path
 from hashlib import sha1
@@ -13,7 +12,7 @@ import mock
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.payload import Payload
-from pants.base.payload_field import SetOfPrimitivesField
+from pants.base.payload_field import PrimitivesSetField
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
@@ -37,7 +36,7 @@ class SourcesTarget(Target):
     payload.add_field('sources', self.create_sources_field(sources,
                                                            sources_rel_path=address.spec_path,
                                                            key_arg='sources'))
-    payload.add_field('exports', SetOfPrimitivesField(exports))
+    payload.add_field('exports', PrimitivesSetField(exports or []))
     super(SourcesTarget, self).__init__(address=address, payload=payload, **kwargs)
 
   @property

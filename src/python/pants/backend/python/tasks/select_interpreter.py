@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import os
@@ -61,7 +60,7 @@ class SelectInterpreter(Task):
     )
     if not python_tgts_and_reqs:
       return
-    python_tgts = filter(lambda tgt: isinstance(tgt, PythonTarget), python_tgts_and_reqs)
+    python_tgts = [tgt for tgt in python_tgts_and_reqs if isinstance(tgt, PythonTarget)]
     fs = PythonInterpreterFingerprintStrategy()
     with self.invalidated(python_tgts, fingerprint_strategy=fs) as invalidation_check:
       if (PythonSetup.global_instance().interpreter_search_paths

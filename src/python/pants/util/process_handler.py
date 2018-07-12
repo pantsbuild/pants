@@ -2,16 +2,15 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+import io
 import multiprocessing
 import os
-import StringIO
 import sys
 from abc import abstractmethod
 
-import six
+import future
 
 from pants.util.meta import AbstractClass
 
@@ -20,7 +19,7 @@ from pants.util.meta import AbstractClass
 # NB: As recommended here: https://github.com/google/python-subprocess32/blob/master/README.md
 # which accounts for non-posix, ie: Windows. Although we don't support Windows yet, this sets the
 # pattern up in anticipation.
-if os.name == 'posix' and six.PY2:
+if os.name == 'posix' and future.utils.PY2:
   import subprocess32 as subprocess3
 else:
   import subprocess as subprocess3
@@ -106,7 +105,7 @@ class SubprocessProcessHandler(ProcessHandler):
 
 
 def _tee(infile, outfile, return_function):
-  accumulator = StringIO.StringIO()
+  accumulator = io.BytesIO()
   for line in iter(infile.readline, ""):
     accumulator.write(line)
     outfile.write(line)

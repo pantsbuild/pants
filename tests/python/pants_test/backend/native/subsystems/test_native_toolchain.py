@@ -2,8 +2,7 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
@@ -103,7 +102,6 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
       with safe_open(source_file_path, mode='wb') as fp:
         fp.write(contents)
 
-      products, subjects = zip(*scheduler_request_specs)
       execution_request = scheduler.execution_request_literal(scheduler_request_specs)
 
       with pushd(tmpdir):

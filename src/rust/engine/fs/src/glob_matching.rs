@@ -25,7 +25,7 @@ pub trait GlobMatching<E: Send + Sync + 'static>: VFS<E> {
   ///
   /// TODO: Should handle symlink loops (which would exhibit as an infinite loop in expand).
   ///
-  fn canonicalize(&self, symbolic_path: PathBuf, link: Link) -> BoxFuture<Option<PathStat>, E> {
+  fn canonicalize(&self, symbolic_path: PathBuf, link: &Link) -> BoxFuture<Option<PathStat>, E> {
     GlobMatchingImplementation::canonicalize(self, symbolic_path, link)
   }
 
@@ -94,7 +94,8 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
         // Match any relevant Stats, and join them into PathStats.
         future::join_all(
           dir_listing
-            .into_iter()
+            .0
+            .iter()
             .filter(|stat| {
               // Match relevant filenames.
               stat
@@ -121,12 +122,14 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
               } else {
                 match stat {
                   Stat::Link(l) => context.canonicalize(stat_symbolic_path, l),
-                  Stat::Dir(d) => {
-                    future::ok(Some(PathStat::dir(stat_symbolic_path.to_owned(), d))).to_boxed()
-                  }
-                  Stat::File(f) => {
-                    future::ok(Some(PathStat::file(stat_symbolic_path.to_owned(), f))).to_boxed()
-                  }
+                  Stat::Dir(d) => future::ok(Some(PathStat::dir(
+                    stat_symbolic_path.to_owned(),
+                    d.clone(),
+                  ))).to_boxed(),
+                  Stat::File(f) => future::ok(Some(PathStat::file(
+                    stat_symbolic_path.to_owned(),
+                    f.clone(),
+                  ))).to_boxed(),
                 }
               }
             })
@@ -134,7 +137,7 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
         )
       })
       .map(|path_stats| {
-        // See the TODO above.
+        // See the note above.
         path_stats.into_iter().filter_map(|pso| pso).collect()
       })
       .to_boxed()
@@ -369,7 +372,7 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
     }
   }
 
-  fn canonicalize(&self, symbolic_path: PathBuf, link: Link) -> BoxFuture<Option<PathStat>, E> {
+  fn canonicalize(&self, symbolic_path: PathBuf, link: &Link) -> BoxFuture<Option<PathStat>, E> {
     // Read the link, which may result in PathGlob(s) that match 0 or 1 Path.
     let context = self.clone();
     self

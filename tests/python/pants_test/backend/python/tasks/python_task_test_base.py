@@ -2,10 +2,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import map
 from textwrap import dedent
 
 from pants.backend.python.pex_util import get_local_platform
@@ -54,7 +54,7 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
     """
     :API: public
     """
-    sources = None if source_contents_map is None else ['__init__.py'] + source_contents_map.keys()
+    sources = None if source_contents_map is None else ['__init__.py'] + list(source_contents_map.keys())
     sources_strs = ["'{0}'".format(s) for s in sources] if sources else None
     self.add_to_build_file(relpath=relpath, target=dedent("""
     python_library(

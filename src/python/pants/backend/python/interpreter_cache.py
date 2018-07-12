@@ -2,11 +2,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import shutil
+from builtins import map, object, str
 
 from pex.interpreter import PythonInterpreter
 from pex.package import EggPackage, Package, SourcePackage
@@ -161,7 +161,7 @@ class PythonInterpreterCache(object):
         ':'.join(filters), ':'.join(setup_paths)))
 
     def unsatisfied_filters(interpreters):
-      return filter(lambda f: len(list(self._matching(interpreters, [f]))) == 0, filters)
+      return [f for f in filters if len(list(self._matching(interpreters, [f]))) == 0]
 
     interpreters = []
     with OwnerPrintingInterProcessFileLock(path=os.path.join(self._cache_dir, '.file_lock')):

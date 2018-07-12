@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
@@ -163,11 +162,7 @@ class Scheduler(object):
           yield line.rstrip()
 
   def _assert_ruleset_valid(self):
-    raw_value = self._native.lib.validator_run(self._scheduler)
-    value = self._from_value(raw_value)
-
-    if isinstance(value, Exception):
-      raise ValueError(str(value))
+    self._raise_or_return(self._native.lib.validator_run(self._scheduler))
 
   def _to_value(self, obj):
     return self._native.context.to_value(obj)
@@ -176,11 +171,7 @@ class Scheduler(object):
     return self._native.context.from_value(val)
 
   def _raise_or_return(self, pyresult):
-    value = self._from_value(pyresult.value)
-    if pyresult.is_throw:
-      raise value
-    else:
-      return value
+    return self._native.context.raise_or_return(pyresult)
 
   def _to_id(self, typ):
     return self._native.context.to_id(typ)

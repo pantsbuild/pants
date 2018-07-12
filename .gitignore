@@ -30,7 +30,6 @@
 .python
 .pydevproject
 .pytest_cache/
-build/
 codegen/classes/
 htmlcov/
 out/

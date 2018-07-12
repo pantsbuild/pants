@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from twitter.common.collections import OrderedSet
 
@@ -12,7 +11,7 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.base.payload import Payload
-from pants.base.payload_field import ExcludesField, PrimitiveField, SetOfPrimitivesField
+from pants.base.payload_field import ExcludesField, PrimitiveField, PrimitivesSetField
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.java.jar.exclude import Exclude
@@ -102,12 +101,12 @@ class JvmTarget(Target, Jarable):
       'excludes': excludes,
       'platform': PrimitiveField(platform),
       'strict_deps': PrimitiveField(strict_deps),
-      'exports': SetOfPrimitivesField(exports),
+      'exports': PrimitivesSetField(exports or []),
       'fatal_warnings': PrimitiveField(fatal_warnings),
       'zinc_file_manager': PrimitiveField(zinc_file_manager),
-      'javac_plugins': SetOfPrimitivesField(javac_plugins),
+      'javac_plugins': PrimitivesSetField(javac_plugins or []),
       'javac_plugin_args': PrimitiveField(javac_plugin_args),
-      'scalac_plugins': SetOfPrimitivesField(scalac_plugins),
+      'scalac_plugins': PrimitivesSetField(scalac_plugins or []),
       'scalac_plugin_args': PrimitiveField(scalac_plugin_args),
     })
 

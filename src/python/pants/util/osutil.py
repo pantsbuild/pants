@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
@@ -46,7 +45,7 @@ def get_normalized_os_name():
 
 
 def all_normalized_os_names():
-  return OS_ALIASES.keys()
+  return list(OS_ALIASES.keys())
 
 
 def known_os_names():

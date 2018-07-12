@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from textwrap import dedent
@@ -49,7 +48,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
     products = context.products.get('deployable_archives')
     self.assertIsNotNone(products)
     product_data = products.get(binary)
-    product_basedir = product_data.keys()[0]
+    product_basedir = list(product_data.keys())[0]
     self.assertEquals(product_data[product_basedir], [pex_name])
 
     # Check pex copy.

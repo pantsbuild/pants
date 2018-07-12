@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from collections import OrderedDict
@@ -184,7 +183,7 @@ class TestSetupPy(SetupPyTestBase):
     dep_map = OrderedDict(foo=['bar'], bar=['baz'], baz=[])
     target_map = self.create_dependencies(dep_map)
     with self.run_execute(target_map['foo'], recursive=False) as created:
-      self.assertEqual([target_map['foo']], created.keys())
+      self.assertEqual([target_map['foo']], list(created.keys()))
     with self.run_execute(target_map['foo'], recursive=True) as created:
       self.assertEqual({target_map['baz'], target_map['bar'], target_map['foo']},
                        set(created.keys()))
@@ -250,10 +249,10 @@ class TestSetupPy(SetupPyTestBase):
     self.assertEqual(entry_points, {'foo_binary': 'foo.bin:foo'})
 
     with self.run_execute(foo, recursive=False) as created:
-      self.assertEqual([foo], created.keys())
+      self.assertEqual([foo], list(created.keys()))
 
     with self.run_execute(foo, recursive=True) as created:
-      self.assertEqual([foo], created.keys())
+      self.assertEqual([foo], list(created.keys()))
 
   def test_binary_target_injected_into_reduced_dependencies_with_provider(self):
     bar_bin_dep = self.create_python_library(
@@ -296,7 +295,7 @@ class TestSetupPy(SetupPyTestBase):
     self.assertEqual(entry_points, {'bar_binary': 'bar.bin:bar'})
 
     with self.run_execute(bar, recursive=False) as created:
-      self.assertEqual([bar], created.keys())
+      self.assertEqual([bar], list(created.keys()))
 
     with self.run_execute(bar, recursive=True) as created:
       self.assertEqual({bar_bin_dep, bar}, set(created.keys()))
@@ -479,7 +478,7 @@ class TestSetupPy(SetupPyTestBase):
     conway = self.target('src/python/monster:conway')
 
     with self.run_execute(conway) as created:
-      self.assertEqual([conway], created.keys())
+      self.assertEqual([conway], list(created.keys()))
       sdist = created[conway]
 
       with self.extracted_sdist(sdist=sdist,
@@ -525,7 +524,7 @@ class TestSetupPy(SetupPyTestBase):
     conway = self.target('src/python/monster:conway')
 
     with self.run_execute(conway) as created:
-      self.assertEqual([conway], created.keys())
+      self.assertEqual([conway], list(created.keys()))
 
       # Now that we've created the sdist tarball, delete the symlink destination to ensure the
       # unpacked sdist can't get away with unpacking a symlink that happens to have local
@@ -596,7 +595,7 @@ class TestSetupPy(SetupPyTestBase):
       ]
     )
     with self.run_execute(pants) as created:
-      self.assertEqual([pants], created.keys())
+      self.assertEqual([pants], list(created.keys()))
 
 
 def test_detect_namespace_packages():

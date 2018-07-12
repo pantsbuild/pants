@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
 import itertools
@@ -11,6 +10,7 @@ import os
 import pprint
 import shutil
 from abc import abstractmethod
+from builtins import map, object, str, zip
 from collections import OrderedDict, defaultdict
 
 from pex.compatibility import string, to_bytes
@@ -527,10 +527,10 @@ class SetupPy(Task):
   def nearest_subpackage(cls, package, all_packages):
     """Given a package, find its nearest parent in all_packages."""
     def shared_prefix(candidate):
-      zipped = itertools.izip(package.split('.'), candidate.split('.'))
+      zipped = zip(package.split('.'), candidate.split('.'))
       matching = itertools.takewhile(lambda pair: pair[0] == pair[1], zipped)
       return [pair[0] for pair in matching]
-    shared_packages = list(filter(None, map(shared_prefix, all_packages)))
+    shared_packages = [_f for _f in map(shared_prefix, all_packages) if _f]
     return '.'.join(max(shared_packages, key=len)) if shared_packages else package
 
   @classmethod
@@ -761,7 +761,7 @@ class SetupPy(Task):
 
     interpreter = self.context.products.get_data(PythonInterpreter)
     python_dists = self.context.products.register_data(self.PYTHON_DISTS_PRODUCT, {})
-    for exported_python_target in reversed(sort_targets(created.keys())):
+    for exported_python_target in reversed(sort_targets(list(created.keys()))):
       setup_dir = created.get(exported_python_target)
       if setup_dir:
         if not self._run:

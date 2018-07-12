@@ -2,9 +2,9 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import str
 from collections import defaultdict
 
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
@@ -111,9 +111,10 @@ class PythonNativeCode(Subsystem):
     if not self._any_targets_have_native_sources(targets):
       return False
 
-    targets_with_platforms = filter(self._PYTHON_PLATFORM_TARGETS_CONSTRAINT.satisfied_by, targets)
+    targets_with_platforms = [target for target in targets
+                              if self._PYTHON_PLATFORM_TARGETS_CONSTRAINT.satisfied_by(target)]
     platforms_with_sources = self.get_targets_by_declared_platform(targets_with_platforms)
-    platform_names = platforms_with_sources.keys()
+    platform_names = list(platforms_with_sources.keys())
 
     if len(platform_names) < 1:
       raise self.PythonNativeCodeError(

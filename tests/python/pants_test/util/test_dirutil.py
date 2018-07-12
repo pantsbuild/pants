@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import errno
 import os
@@ -11,8 +10,8 @@ import time
 import unittest
 from contextlib import contextmanager
 
+import future
 import mock
-import six
 
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
@@ -121,10 +120,10 @@ class DirutilTest(unittest.TestCase):
     # unicode constructor.
     with temporary_dir() as tmpdir:
       safe_mkdir(os.path.join(tmpdir, '中文'))
-      if isinstance(tmpdir, six.text_type):
+      if isinstance(tmpdir, future.utils.text_type):
         tmpdir = tmpdir.encode('utf-8')
       for _, dirs, _ in dirutil.safe_walk(tmpdir):
-        self.assertTrue(all(isinstance(dirname, six.text_type) for dirname in dirs))
+        self.assertTrue(all(isinstance(dirname, future.utils.text_type) for dirname in dirs))
 
   @contextmanager
   def tree(self):
