@@ -13,6 +13,7 @@ from abc import abstractmethod
 from builtins import map, object, str, zip
 from collections import OrderedDict, defaultdict
 
+from pex import pep425tags
 from pex.compatibility import string, to_bytes
 from pex.installer import InstallerBase, Packager
 from pex.interpreter import PythonInterpreter
@@ -21,7 +22,6 @@ from twitter.common.dirutil.chroot import Chroot
 from wheel.install import WheelFile
 
 from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
-from pants.backend.python.pex_util import get_local_platform
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -63,9 +63,7 @@ class SetupPyRunner(InstallerBase):
   def for_bdist_wheel(cls, source_dir, is_platform_specific, **kw):
     cmd = ['bdist_wheel']
     if is_platform_specific:
-      cmd.extend(['--plat-name', get_local_platform()])
-    else:
-      cmd.append('--universal')
+      cmd.extend(['--plat-name', pep425tags.get_platform()])
     cmd.extend(['--dist-dir', cls.DIST_DIR])
     return cls(source_dir, cmd, **kw)
 

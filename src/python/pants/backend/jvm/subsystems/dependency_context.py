@@ -61,11 +61,11 @@ class DependencyContext(Subsystem, DependencyContextBase):
     if target_property_selected is not None:
       return target_property_selected
 
-    prop = False
+    prop = None
     if target.has_sources('.java'):
-      prop |= selector(Java.global_instance())
+      prop = prop or selector(Java.global_instance())
     if target.has_sources('.scala'):
-      prop |= selector(ScalaPlatform.global_instance())
+      prop = prop or selector(ScalaPlatform.global_instance())
     return prop
 
 
