@@ -73,13 +73,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       self.assertEqual('x=3, f(x)=17\n', binary_run_output)
 
   def test_ctypes_third_party_integration(self):
-    with temporary_dir() as tmp_dir:
-      pants_run = self.run_pants(
-          command=['clean-all', 'run', self._binary_target_with_third_party],
-          config={
-            GLOBAL_SCOPE_CONFIG_SECTION: {
-              'pants_distdir': tmp_dir,
-            }
-          }
-          )
-      self.assert_success(pants_run)
+    pants_run = self.run_pants(
+      command=['clean-all', 'run', self._binary_target_with_third_party]
+    )
+    self.assert_success(pants_run)
