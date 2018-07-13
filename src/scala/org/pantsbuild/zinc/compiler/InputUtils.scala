@@ -164,41 +164,6 @@ object InputUtils {
     if (compiler.nonEmpty && library.nonEmpty) Some(ScalaJars(compiler(0), library(0), extra)) else None
   }
 
-  /**
-   * Jar the contents of output classes (settings.classesDirectory) and copy to settings.outputJar
-   */
-  def createClassesJar(settings: Settings, log: Logger) = {
-    val classesDirectory = settings.classesDirectory
-    object FileVisitor extends SimpleFileVisitor[Path]() {
-      def done(): Path = {
-        target.close()
-        log.debug("Output jar generated at: " + jarPath)
-        // TODO(ity): Delete the temp classesDirectory, if one was created
-        jarPath
-      }
-
-      val jarPath = Paths.get(classesDirectory.toString, settings.outputJar.toString)
-      val target = new JarOutputStream(Files.newOutputStream(jarPath))
-
-      override def visitFile(source: Path, attrs: BasicFileAttributes): FileVisitResult = {
-        val jarEntry = new JarEntry(source.toString)
-        // setting jarEntry time to a fixed value for all entries within the jar for determinism
-        // and so that jarfiles are byte-for-byte reproducible.
-        jarEntry.setTime(settings.creationTime)
-
-        log.debug("Creating jar entry " + jarEntry + " for the file " + source)
-
-        target.putNextEntry(jarEntry)
-        Files.copy(source, target)
-        target.closeEntry()
-        FileVisitResult.CONTINUE
-      }
-
-      Files.walkFileTree(classesDirectory.toPath, FileVisitor)
-      FileVisitor.done()
-    }
-  }
-
   //
   // Default setup
   //
