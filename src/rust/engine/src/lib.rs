@@ -46,8 +46,8 @@ use externs::{
   Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
   EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, IdentifyExtern, LogExtern,
   ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult, SatisfiedByExtern,
-  SatisfiedByTypeExtern, StoreBytesExtern, StoreI64Extern, StoreTupleExtern, TypeIdBuffer,
-  TypeToStrExtern, ValToStrExtern,
+  SatisfiedByTypeExtern, StoreBytesExtern, StoreI64Extern, StoreTupleExtern, StoreUtf8Extern,
+  TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
 use futures::Future;
 use handles::Handle;
@@ -141,6 +141,7 @@ pub extern "C" fn externs_set(
   satisfied_by_type: SatisfiedByTypeExtern,
   store_tuple: StoreTupleExtern,
   store_bytes: StoreBytesExtern,
+  store_utf8: StoreUtf8Extern,
   store_i64: StoreI64Extern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
@@ -164,6 +165,7 @@ pub extern "C" fn externs_set(
     satisfied_by_type,
     store_tuple,
     store_bytes,
+    store_utf8,
     store_i64,
     project_ignoring_type,
     project_multi,

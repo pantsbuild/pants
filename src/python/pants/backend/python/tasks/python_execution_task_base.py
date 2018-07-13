@@ -119,4 +119,4 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
             extra_file.add_to(builder)
           builder.freeze()
 
-    return WrappedPEX(PEX(path, interpreter), interpreter)
+    return WrappedPEX(PEX(path, interpreter))
