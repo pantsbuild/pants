@@ -8,7 +8,7 @@ import logging
 import os
 from builtins import str
 
-from future.utils import native
+from future.utils import text_type
 
 from pants.binaries.binary_util import BinaryRequest, BinaryUtil
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
@@ -201,7 +201,7 @@ class Script(BinaryToolBase):
     snapshot = context._scheduler.capture_snapshots((
       PathGlobsAndRoot(
         PathGlobs((script_relpath,)),
-        native(str(bootstrapdir)),
+        text_type(bootstrapdir),
       ),
     ))[0]
     return (script_relpath, snapshot)
