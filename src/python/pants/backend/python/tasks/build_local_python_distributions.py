@@ -205,10 +205,8 @@ class BuildLocalPythonDistributions(Task):
                              'Installing setup requirements: {}\n\n'
                              .format([req.key for req in setup_reqs_to_resolve]))
 
-    cur_platforms = ['current'] if is_platform_specific else None
-
     setup_requires_site_dir = ensure_setup_requires_site_dir(
-      setup_reqs_to_resolve, interpreter, setup_requires_dir, platforms=cur_platforms)
+      setup_reqs_to_resolve, interpreter, setup_requires_dir, platforms=['current'])
     if setup_requires_site_dir:
       self.context.log.debug('Setting PYTHONPATH with setup_requires site directory: {}'
                              .format(setup_requires_site_dir))
@@ -226,8 +224,9 @@ class BuildLocalPythonDistributions(Task):
     self._copy_sources(dist_tgt, dist_target_dir)
 
     setup_runner = SetupPyRunner.for_bdist_wheel(
-      dist_target_dir,
-      is_platform_specific=is_platform_specific)
+      source_dir=dist_target_dir,
+      is_platform_specific=is_platform_specific,
+      interpreter=interpreter)
 
     with environment_as(**setup_py_execution_environment.as_environment()):
       # Build a whl using SetupPyRunner and return its absolute path.

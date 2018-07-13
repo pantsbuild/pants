@@ -8,7 +8,8 @@ import os
 from builtins import map
 from textwrap import dedent
 
-from pants.backend.python.pex_util import get_local_platform
+from pex import pep425tags
+
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.build_graph.address import Address
 from pants_test.backend.python.tasks.interpreter_cache_test_mixin import InterpreterCacheTestMixin
@@ -34,7 +35,7 @@ def name_and_platform(whl):
 
 def check_wheel_platform_matches_host(wheel_dist):
   _, _, wheel_platform = name_and_platform(wheel_dist)
-  return wheel_platform == normalize_platform_tag(get_local_platform())
+  return wheel_platform == normalize_platform_tag(pep425tags.get_platform())
 
 
 class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
