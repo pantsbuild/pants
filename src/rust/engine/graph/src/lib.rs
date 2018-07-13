@@ -588,7 +588,7 @@ impl<N: Node> Graph<N> {
   /// change while we're running. In order for a dependency to "change" it must have been cleared
   /// or been marked dirty. But if our dependencies have been cleared or marked dirty, then we will
   /// have been as well. We can thus use the dirty bit as a signal that the generation values of
-  /// our dependencies are still accurate. The dirty bit is safae to rely on as it is only ever
+  /// our dependencies are still accurate. The dirty bit is safe to rely on as it is only ever
   /// mutated, and dependencies' dirty bits are only read, under the InnerGraph lock - this is only
   /// reliably the case because Entry happens to require a &mut InnerGraph reference; it would be
   /// great not to violate that in the future.
