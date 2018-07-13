@@ -10,11 +10,13 @@ import os
 import sys
 import sysconfig
 import traceback
+from builtins import str
 from contextlib import closing
 
 import cffi
 import pkg_resources
 import six
+from future.utils import native
 
 from pants.engine.selectors import Get, constraint_for
 from pants.util.contextutil import temporary_dir
@@ -110,6 +112,7 @@ typedef _Bool               (*extern_ptr_satisfied_by)(ExternContext*, Handle*, 
 typedef _Bool               (*extern_ptr_satisfied_by_type)(ExternContext*, Handle*, TypeId*);
 typedef Handle              (*extern_ptr_store_tuple)(ExternContext*, Handle**, uint64_t);
 typedef Handle              (*extern_ptr_store_bytes)(ExternContext*, uint8_t*, uint64_t);
+typedef Handle              (*extern_ptr_store_utf8)(ExternContext*, uint8_t*, uint64_t);
 typedef Handle              (*extern_ptr_store_i64)(ExternContext*, int64_t);
 typedef HandleBuffer        (*extern_ptr_project_multi)(ExternContext*, Handle*, uint8_t*, uint64_t);
 typedef Handle              (*extern_ptr_project_ignoring_type)(ExternContext*, Handle*, uint8_t*, uint64_t);
@@ -155,6 +158,7 @@ void externs_set(ExternContext*,
                  extern_ptr_satisfied_by_type,
                  extern_ptr_store_tuple,
                  extern_ptr_store_bytes,
+                 extern_ptr_store_utf8,
                  extern_ptr_store_i64,
                  extern_ptr_project_ignoring_type,
                  extern_ptr_project_multi,
@@ -264,6 +268,7 @@ extern "Python" {
   _Bool               extern_satisfied_by_type(ExternContext*, Handle*, TypeId*);
   Handle              extern_store_tuple(ExternContext*, Handle**, uint64_t);
   Handle              extern_store_bytes(ExternContext*, uint8_t*, uint64_t);
+  Handle              extern_store_utf8(ExternContext*, uint8_t*, uint64_t);
   Handle              extern_store_i64(ExternContext*, int64_t);
   Handle              extern_project_ignoring_type(ExternContext*, Handle*, uint8_t*, uint64_t);
   HandleBuffer        extern_project_multi(ExternContext*, Handle*, uint8_t*, uint64_t);
@@ -423,6 +428,12 @@ def _initialize_externs(ffi):
     """Given a context and raw bytes, return a new Handle to represent the content."""
     c = ffi.from_handle(context_handle)
     return c.to_value(bytes(ffi.buffer(bytes_ptr, bytes_len)))
+
+  @ffi.def_extern()
+  def extern_store_utf8(context_handle, utf8_ptr, utf8_len):
+    """Given a context and UTF8 bytes, return a new Handle to represent the content."""
+    c = ffi.from_handle(context_handle)
+    return c.to_value(native(str(ffi.buffer(utf8_ptr, utf8_len))))
 
   @ffi.def_extern()
   def extern_store_i64(context_handle, i64):
@@ -687,6 +698,7 @@ class Native(object):
                            self.ffi_lib.extern_satisfied_by_type,
                            self.ffi_lib.extern_store_tuple,
                            self.ffi_lib.extern_store_bytes,
+                           self.ffi_lib.extern_store_utf8,
                            self.ffi_lib.extern_store_i64,
                            self.ffi_lib.extern_project_ignoring_type,
                            self.ffi_lib.extern_project_multi,

@@ -4,9 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import bytes
-
-from future.utils import binary_type, native, text_type
+from future.utils import native, text_type
 
 from pants.base.project_tree import Dir, File
 from pants.engine.rules import RootRule
@@ -69,7 +67,7 @@ class PathGlobsAndRoot(datatype([('path_globs', PathGlobs), ('root', text_type)]
   pass
 
 
-class DirectoryDigest(datatype([('fingerprint', binary_type), ('serialized_bytes_length', int)])):
+class DirectoryDigest(datatype([('fingerprint', text_type), ('serialized_bytes_length', int)])):
   """A DirectoryDigest is an opaque handle to a set of files known about by the engine.
 
   The contents of files can be inspected by requesting a FilesContent for it.
@@ -131,7 +129,7 @@ _EMPTY_FINGERPRINT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b78
 
 
 EMPTY_DIRECTORY_DIGEST = DirectoryDigest(
-  fingerprint=native(bytes(_EMPTY_FINGERPRINT, 'ascii')),
+  fingerprint=native(_EMPTY_FINGERPRINT),
   serialized_bytes_length=0
 )
 

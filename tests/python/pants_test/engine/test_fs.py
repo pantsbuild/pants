@@ -277,7 +277,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       globs = PathGlobs(("*",), ())
       snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, native(str(temp_dir))),))[0]
       self.assert_snapshot_equals(snapshot, ["roland"], DirectoryDigest(
-        native(b"63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        native("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))
 
@@ -295,11 +295,11 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       ))
       self.assertEquals(3, len(snapshots))
       self.assert_snapshot_equals(snapshots[0], ["roland"], DirectoryDigest(
-        native(b"63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        native("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))
       self.assert_snapshot_equals(snapshots[1], ["susannah"], DirectoryDigest(
-        native(b"d3539cfc21eb4bab328ca9173144a8e932c515b1b9e26695454eeedbc5a95f6f"),
+        native("d3539cfc21eb4bab328ca9173144a8e932c515b1b9e26695454eeedbc5a95f6f"),
         82
       ))
       self.assert_snapshot_equals(snapshots[2], [], EMPTY_DIRECTORY_DIGEST)
@@ -367,7 +367,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
     with temporary_dir() as temp_dir:
       dir_path = os.path.join(temp_dir, "containing_roland")
       digest = DirectoryDigest(
-        native(b"63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        native("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       )
       scheduler = self.mk_scheduler(rules=create_fs_rules())
@@ -431,6 +431,6 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       globs = PathGlobs(("*",), ())
       snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, native(str(temp_dir))),))[0]
       self.assert_snapshot_equals(snapshot, ["roland"], DirectoryDigest(
-        native(b"63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        native("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))
