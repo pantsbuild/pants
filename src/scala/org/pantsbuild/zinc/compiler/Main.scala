@@ -122,7 +122,7 @@ object Main {
 
       log.info("Compile success " + Util.timing(startTime))
 
-      // TODO(ity): if compile successful, jar the contents of classesDirectory and copy to outputJar
+      // if compile is successful, jar the contents of classesDirectory and copy to outputJar
       if (settings.outputJar.isDefined) {
         OutputUtils.createClassesJar(settings, log)
       }

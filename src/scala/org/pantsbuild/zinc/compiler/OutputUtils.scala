@@ -29,7 +29,8 @@ object OutputUtils {
         FileVisitResult.CONTINUE
       }
     }
-    // Sort the contents of the classesDirectory in lexicographic order
+    // Sort the contents of the classesDirectory in lexicographic order for
+    // deterministic jar creation
     Files.walkFileTree(classesDirectory.toPath, fileSortVisitor)
 
     val jarPath = Paths.get(classesDirectory.toString, settings.outputJar.toString)
@@ -37,8 +38,8 @@ object OutputUtils {
 
     def createJar(source: Path): FileVisitResult = {
       val jarEntry = new JarEntry(source.toString)
-      // setting jarEntry time to a fixed value for all entries within the jar for determinism
-      // and so that jar are byte-for-byte reproducible.
+      // setting jarEntry time to a fixed value for all entries within the jar so that jars are
+      // byte-for-byte reproducible.
       jarEntry.setTime(settings.creationTime)
 
       log.debug("Creating jar entry " + jarEntry + " for the file " + source)
