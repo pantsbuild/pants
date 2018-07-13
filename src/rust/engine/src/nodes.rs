@@ -681,7 +681,7 @@ impl Snapshot {
     externs::unsafe_call(
       &core.types.construct_directory_digest,
       &[
-        externs::store_bytes(item.0.to_hex().as_bytes()),
+        externs::store_utf8(&item.0.to_hex()),
         externs::store_i64(item.1 as i64),
       ],
     )

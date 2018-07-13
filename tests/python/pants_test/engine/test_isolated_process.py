@@ -305,7 +305,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertEquals(
       execute_process_result.output_directory_digest,
       DirectoryDigest(
-        fingerprint=native(b"63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        fingerprint=native("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         serialized_bytes_length=80,
       )
     )
