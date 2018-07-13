@@ -97,7 +97,7 @@ class MypyTask(ResolveRequirementsTaskBase):
     path = os.path.realpath(os.path.join(self.workdir, str(py3_interpreter.identity), mypy_version))
     if not os.path.isdir(path):
       self.merge_pexes(path, pex_info, py3_interpreter, [mypy_requirement_pex])
-    pex = WrappedPEX(PEX(path, py3_interpreter), py3_interpreter)
+    pex = WrappedPEX(PEX(path, py3_interpreter))
     return pex.run(mypy_args, **kwargs)
 
   def execute(self):
