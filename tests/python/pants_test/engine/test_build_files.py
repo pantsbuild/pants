@@ -34,7 +34,7 @@ class ParseAddressFamilyTest(unittest.TestCase):
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
     address_mapper = AddressMapper(JsonParser(TestTable()))
     af = run_rule(parse_address_family, address_mapper, Dir('/dev/null'), {
-        (Snapshot, PathGlobs): lambda _: Snapshot(DirectoryDigest(native(b"abc"), 10), (File('/dev/null/BUILD'),)),
+        (Snapshot, PathGlobs): lambda _: Snapshot(DirectoryDigest(native("abc"), 10), (File('/dev/null/BUILD'),)),
         (FilesContent, DirectoryDigest): lambda _: FilesContent([FileContent('/dev/null/BUILD', '')]),
       })
     self.assertEquals(len(af.objects_by_name), 0)
@@ -45,7 +45,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     """Test that matching the same Spec twice succeeds."""
     address = SingleAddress('a', 'a')
     address_mapper = AddressMapper(JsonParser(TestTable()))
-    snapshot = Snapshot(DirectoryDigest(native(b'xx'), 2), (Path('a/BUILD', File('a/BUILD')),))
+    snapshot = Snapshot(DirectoryDigest(native('xx'), 2), (Path('a/BUILD', File('a/BUILD')),))
     address_family = AddressFamily('a', {'a': ('a/BUILD', 'this is an object!')})
 
     bfas = run_rule(addresses_from_address_families, address_mapper, Specs([address, address]), {
@@ -60,7 +60,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     """Test that targets are filtered based on `tags`."""
     spec = SiblingAddresses('root')
     address_mapper = AddressMapper(JsonParser(TestTable()))
-    snapshot = Snapshot(DirectoryDigest(native(b'xx'), 2), (Path('root/BUILD', File('root/BUILD')),))
+    snapshot = Snapshot(DirectoryDigest(native('xx'), 2), (Path('root/BUILD', File('root/BUILD')),))
     address_family = AddressFamily('root',
       {'a': ('root/BUILD', TargetAdaptor()),
        'b': ('root/BUILD', TargetAdaptor(tags={'integration'})),
@@ -81,7 +81,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     """Test that targets are filtered based on exclude patterns."""
     spec = SiblingAddresses('root')
     address_mapper = AddressMapper(JsonParser(TestTable()))
-    snapshot = Snapshot(DirectoryDigest(native(b'xx'), 2), (Path('root/BUILD', File('root/BUILD')),))
+    snapshot = Snapshot(DirectoryDigest(native('xx'), 2), (Path('root/BUILD', File('root/BUILD')),))
     address_family = AddressFamily('root',
       {'exclude_me': ('root/BUILD', TargetAdaptor()),
        'not_me': ('root/BUILD', TargetAdaptor()),
