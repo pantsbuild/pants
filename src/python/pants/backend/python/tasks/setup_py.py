@@ -64,8 +64,6 @@ class SetupPyRunner(InstallerBase):
     cmd = ['bdist_wheel']
     if is_platform_specific:
       cmd.extend(['--plat-name', pep425tags.get_platform()])
-    else:
-      cmd.append('--universal')
     cmd.extend(['--dist-dir', cls.DIST_DIR])
     return cls(source_dir, cmd, **kw)
 
