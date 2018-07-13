@@ -27,7 +27,7 @@ class ZincLanguageMixin(object):
 
     register('--compiler-option-sets', advanced=True, default=[], type=list,
              fingerprint=True,
-             help='The default for the "compiler_option_sets" argument'
+             help='The default for the "compiler_option_sets" argument '
                   'for targets of this language.')
 
     register('--zinc-file-manager', advanced=True, default=True, type=bool,
