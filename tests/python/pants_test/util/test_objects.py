@@ -9,7 +9,7 @@ import pickle
 from abc import abstractmethod
 from builtins import object, str
 
-from future.utils import PY2, native, text_type
+from future.utils import PY2, text_type
 
 from pants.util.objects import (Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
                                 TypedDatatypeInstanceConstructionError, datatype)
@@ -374,7 +374,7 @@ class TypedDatatypeTest(BaseTest):
     self.assertEqual(repr(some_val), "SomeTypedDatatype(val=3)")
     self.assertEqual(str(some_val), "SomeTypedDatatype(val<=int>=3)")
 
-    some_object = WithExplicitTypeConstraint(native(str('asdf')), 45)
+    some_object = WithExplicitTypeConstraint(text_type('asdf'), 45)
     self.assertEqual(some_object.a_string, 'asdf')
     self.assertEqual(some_object.an_int, 45)
     def compare_repr(include_unicode = False):
@@ -406,7 +406,7 @@ class TypedDatatypeTest(BaseTest):
       str(wrapped_nonneg_int),
       "CamelCaseWrapper(nonneg_int<=NonNegativeInt>=NonNegativeInt(an_int<=int>=45))")
 
-    mixed_type_obj = MixedTyping(value=3, name=native(str('asdf')))
+    mixed_type_obj = MixedTyping(value=3, name=text_type('asdf'))
     self.assertEqual(3, mixed_type_obj.value)
     def compare_repr(include_unicode = False):
       expected_message = "MixedTyping(value=3, name={unicode_literal}'asdf')" \
@@ -431,7 +431,7 @@ class TypedDatatypeTest(BaseTest):
       "WithSubclassTypeConstraint(some_value<+SomeBaseClass>=SomeDatatypeClass())")
 
   def test_mixin_type_construction(self):
-    obj_with_mixin = TypedWithMixin(native(str(' asdf ')))
+    obj_with_mixin = TypedWithMixin(text_type(' asdf '))
     def compare_repr(include_unicode = False):
       expected_message = "TypedWithMixin(val={unicode_literal}' asdf ')" \
         .format(unicode_literal='u' if include_unicode else '')
@@ -490,7 +490,7 @@ field 'val' was invalid: value [] (with type 'list') must satisfy this type cons
 
     # type checking failure with multiple arguments (one is correct)
     with self.assertRaises(TypeCheckError) as cm:
-      AnotherTypedDatatype(native(str('correct')), native(str('should be list')))
+      AnotherTypedDatatype(text_type('correct'), text_type('should be list'))
     def compare_str(unicode_type_name, include_unicode=False):
       expected_message = (
         """error: in constructor of type AnotherTypedDatatype: type check error:
@@ -504,7 +504,7 @@ field 'elements' was invalid: value {unicode_literal}'should be list' (with type
 
     # type checking failure on both arguments
     with self.assertRaises(TypeCheckError) as cm:
-      AnotherTypedDatatype(3, native(str('should be list')))
+      AnotherTypedDatatype(3, text_type('should be list'))
     def compare_str(unicode_type_name, include_unicode=False):
       expected_message = (
         """error: in constructor of type AnotherTypedDatatype: type check error:
@@ -518,7 +518,7 @@ field 'elements' was invalid: value {unicode_literal}'should be list' (with type
       compare_str('str')
 
     with self.assertRaises(TypeCheckError) as cm:
-      NonNegativeInt(native(str('asdf')))
+      NonNegativeInt(text_type('asdf'))
     def compare_str(unicode_type_name, include_unicode=False):
       expected_message = (
         """error: in constructor of type NonNegativeInt: type check error:
