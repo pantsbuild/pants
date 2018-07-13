@@ -248,7 +248,7 @@ object Settings extends OptionSet[Settings] {
     path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
     file(     DestinationOpt, "directory",     "Destination for compiled classes",           (s: Settings, f: File) => s.copy(_classesDirectory = Some(f))),
     file(     JarDestinationOpt, "directory",     "Jar destination for compiled classes",           (s: Settings, f: File) => s.copy(outputJar = Some(f))),
-    long("-jar-creation-time", "n",        "Creation time for compiled jars, default is current time", (s: Settings, l: Long) => s.copy(creationTime = l)),
+    long("-jar-creation-time", "n",        "Creation timestamp for compiled jars, default is current time", (s: Settings, l: Long) => s.copy(creationTime = l)),
 
     header("Scala options:"),
     file(      "-scala-home", "directory",     "Scala home directory (for locating jars)",   (s: Settings, f: File) => s.copy(scala = s.scala.copy(home = Some(f)))),
