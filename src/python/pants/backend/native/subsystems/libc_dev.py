@@ -37,7 +37,7 @@ class LibcDev(Subsystem):
   def register_options(cls, register):
     super(LibcDev, cls).register_options(register)
 
-    register('--libc-dir', type=dir_option, default='/usr/lib', fingerprint=True, advanced=True,
+    register('--libc-dir', type=dir_option, default=None, fingerprint=True, advanced=True,
              help='A directory containing a host-specific crti.o from libc.')
     register('--host-compiler', type=str, default='gcc', fingerprint=True, advanced=True,
              help='The host compiler to invoke with -print-search-dirs to find the host libc.')
@@ -77,9 +77,13 @@ class LibcDev(Subsystem):
   def host_libc(self):
     """Use the --libc-dir option if provided, otherwise invoke a host compiler to find libc dev."""
     libc_dir_option = self.get_options().libc_dir
-    maybe_libc_crti = os.path.join(libc_dir_option, self._LIBC_INIT_OBJECT_FILE)
-    if os.path.isfile(maybe_libc_crti):
-      return HostLibcDev(crti_object=maybe_libc_crti,
-                         fingerprint=hash_file(maybe_libc_crti))
+    if libc_dir_option:
+      maybe_libc_crti = os.path.join(libc_dir_option, self._LIBC_INIT_OBJECT_FILE)
+      if os.path.isfile(maybe_libc_crti):
+        return HostLibcDev(crti_object=maybe_libc_crti,
+                           fingerprint=hash_file(maybe_libc_crti))
+      raise self.HostLibcDevResolutionError(
+        "Could not locate {} in directory {} provided by the --libc-dir option."
+        .format(self._LIBC_INIT_OBJECT_FILE, libc_dir_option))
 
     return self._get_host_libc_from_host_compiler()

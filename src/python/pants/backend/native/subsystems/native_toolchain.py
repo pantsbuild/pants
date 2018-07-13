@@ -33,7 +33,7 @@ class NativeToolchain(Subsystem):
   options_scope = 'native-toolchain'
 
   @classmethod
-  def register_options(register):
+  def register_options(cls, register):
     super(NativeToolchain, cls).register_options(register)
 
     register('--enable-libc-search', type=bool, default=False, fingerprint=True, advanced=True,
