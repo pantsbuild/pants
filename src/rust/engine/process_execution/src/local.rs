@@ -5,6 +5,7 @@ use boxfuture::{BoxFuture, Boxable};
 use fs::{self, GlobMatching, PathGlobs, PathStatGetter, Snapshot, StrictGlobMatching};
 use futures::{future, Future, Stream};
 use std::collections::BTreeSet;
+use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
@@ -40,21 +41,23 @@ impl CommandRunner {
 
   fn outputs_stream_for_child(
     mut child: Child,
-  ) -> Box<Stream<Item = ChildOutput, Error = String> + Send> {
+  ) -> impl Stream<Item = ChildOutput, Error = String> + Send {
     // TODO: This assumes that the Child was launched with stdout/stderr `Stdio::piped`.
     let stdout_stream = FramedRead::new(child.stdout().take().unwrap(), IdentityDecoder)
       .map(|bytes| ChildOutput::Stdout(bytes.into()));
     let stderr_stream = FramedRead::new(child.stderr().take().unwrap(), IdentityDecoder)
       .map(|bytes| ChildOutput::Stderr(bytes.into()));
-    let exit_stream = child
-      .into_stream()
-      .map(|exit_status| ChildOutput::Exit(exit_status.code()));
-    Box::new(
-      stdout_stream
-        .select(stderr_stream)
-        .chain(exit_stream)
-        .map_err(|e| format!("Failed to consume process outputs: {:?}", e)),
-    )
+    let exit_stream = child.into_stream().map(|exit_status| {
+      ChildOutput::Exit(
+        exit_status
+          .code()
+          .or_else(|| exit_status.signal().map(|signal| -signal)),
+      )
+    });
+    stdout_stream
+      .select(stderr_stream)
+      .chain(exit_stream)
+      .map_err(|e| format!("Failed to consume process outputs: {:?}", e))
   }
 
   fn construct_output_snapshot(
@@ -322,6 +325,31 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes("bar"),
         exit_code: 1,
+        output_directory: fs::EMPTY_DIGEST,
+      }
+    )
+  }
+
+  #[test]
+  #[cfg(unix)]
+  fn capture_exit_code_signal() {
+    // Launch a process that kills itself with a signal.
+    let result = run_command_locally(ExecuteProcessRequest {
+      argv: owned_string_vec(&["/bin/bash", "-c", "kill $$"]),
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
+      timeout: Duration::from_millis(1000),
+      description: "kill self".to_string(),
+    });
+
+    assert_eq!(
+      result.unwrap(),
+      FallibleExecuteProcessResult {
+        stdout: as_bytes(""),
+        stderr: as_bytes(""),
+        exit_code: -15,
         output_directory: fs::EMPTY_DIGEST,
       }
     )
