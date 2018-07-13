@@ -14,3 +14,12 @@ python_tests(
   ],
   tags={'platform_specific_behavior'},
 )
+
+python_tests(
+  name='integration',
+  dependencies=[
+    'tests/python/pants_test:int-test',
+    'tests/python/pants_test/backend/native/utils',
+  ]
+  tags={'integration', 'platform_specific_behavior'},
+)
