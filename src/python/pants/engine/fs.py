@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from future.utils import native, text_type
+from future.utils import text_type
 
 from pants.base.project_tree import Dir, File
 from pants.engine.rules import RootRule
@@ -129,7 +129,7 @@ _EMPTY_FINGERPRINT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b78
 
 
 EMPTY_DIRECTORY_DIGEST = DirectoryDigest(
-  fingerprint=native(_EMPTY_FINGERPRINT),
+  fingerprint=text_type(_EMPTY_FINGERPRINT),
   serialized_bytes_length=0
 )
 
