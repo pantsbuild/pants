@@ -50,7 +50,7 @@ impl Interns {
     let id_generator = self.id_generator;
     let key = self
       .forward
-      .entry(InternKey(ident.hash, ident.value))
+      .entry(InternKey(ident.hash, v.clone()))
       .or_insert_with(|| {
         inserted = true;
         Key::new(id_generator, type_id)

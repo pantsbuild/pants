@@ -10,7 +10,7 @@ use std::sync::RwLock;
 
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use enum_primitive::FromPrimitive;
-use handles::Handle;
+use handles::{DroppingHandle, Handle};
 use interning::Interns;
 use log;
 
@@ -19,11 +19,11 @@ pub fn eval(python: &str) -> Result<Value, Failure> {
 }
 
 pub fn identify(val: &Value) -> Ident {
-  with_externs(|e| (e.identify)(e.context, val))
+  with_externs(|e| (e.identify)(e.context, val as &Handle))
 }
 
-pub fn equals(val1: &Value, val2: &Value) -> bool {
-  with_externs(|e| (e.equals)(e.context, val1, val2))
+pub fn equals(h1: &Handle, h2: &Handle) -> bool {
+  with_externs(|e| (e.equals)(e.context, h1, h2))
 }
 
 pub fn key_for(val: Value) -> Key {
@@ -36,45 +36,69 @@ pub fn val_for(key: &Key) -> Value {
   interns.get(key).clone()
 }
 
-pub fn clone_val(val: &Value) -> Value {
-  with_externs(|e| (e.clone_val)(e.context, val))
+pub fn clone_val(handle: &Handle) -> Handle {
+  with_externs(|e| (e.clone_val)(e.context, handle))
 }
 
-pub fn drop_handles(handles: &[Handle]) {
+pub fn drop_handles(handles: &[DroppingHandle]) {
   with_externs(|e| (e.drop_handles)(e.context, handles.as_ptr(), handles.len() as u64))
 }
 
 pub fn satisfied_by(constraint: &TypeConstraint, obj: &Value) -> bool {
   let interns = INTERNS.read().unwrap();
-  with_externs(|e| (e.satisfied_by)(e.context, interns.get(&constraint.0), obj))
+  with_externs(|e| {
+    (e.satisfied_by)(
+      e.context,
+      interns.get(&constraint.0) as &Handle,
+      obj as &Handle,
+    )
+  })
 }
 
 pub fn satisfied_by_type(constraint: &TypeConstraint, cls: TypeId) -> bool {
   let interns = INTERNS.read().unwrap();
-  with_externs(|e| (e.satisfied_by_type)(e.context, interns.get(&constraint.0), &cls))
+  with_externs(|e| (e.satisfied_by_type)(e.context, interns.get(&constraint.0) as &Handle, &cls))
 }
 
 pub fn store_tuple(values: &[Value]) -> Value {
-  with_externs(|e| (e.store_tuple)(e.context, values.as_ptr(), values.len() as u64))
+  let handles: Vec<_> = values
+    .iter()
+    .map(|v| v as &Handle as *const Handle)
+    .collect();
+  with_externs(|e| (e.store_tuple)(e.context, handles.as_ptr(), handles.len() as u64).into())
 }
 
 pub fn store_bytes(bytes: &[u8]) -> Value {
-  with_externs(|e| (e.store_bytes)(e.context, bytes.as_ptr(), bytes.len() as u64))
+  with_externs(|e| (e.store_bytes)(e.context, bytes.as_ptr(), bytes.len() as u64).into())
 }
 
 pub fn store_i64(val: i64) -> Value {
-  with_externs(|e| (e.store_i64)(e.context, val))
+  with_externs(|e| (e.store_i64)(e.context, val).into())
 }
 
 ///
 /// Pulls out the value specified by the field name from a given Value
 ///
 pub fn project_ignoring_type(value: &Value, field: &str) -> Value {
-  with_externs(|e| (e.project_ignoring_type)(e.context, value, field.as_ptr(), field.len() as u64))
+  with_externs(|e| {
+    (e.project_ignoring_type)(
+      e.context,
+      value as &Handle,
+      field.as_ptr(),
+      field.len() as u64,
+    ).into()
+  })
 }
 
 pub fn project_multi(value: &Value, field: &str) -> Vec<Value> {
-  with_externs(|e| (e.project_multi)(e.context, value, field.as_ptr(), field.len() as u64).to_vec())
+  with_externs(|e| {
+    (e.project_multi)(
+      e.context,
+      value as &Handle,
+      field.as_ptr(),
+      field.len() as u64,
+    ).to_vec()
+  })
 }
 
 pub fn project_multi_strs(item: &Value, field: &str) -> Vec<String> {
@@ -86,7 +110,12 @@ pub fn project_multi_strs(item: &Value, field: &str) -> Vec<String> {
 
 pub fn project_str(value: &Value, field: &str) -> String {
   let name_val = with_externs(|e| {
-    (e.project_ignoring_type)(e.context, value, field.as_ptr(), field.len() as u64)
+    (e.project_ignoring_type)(
+      e.context,
+      value as &Handle,
+      field.as_ptr(),
+      field.len() as u64,
+    ).into()
   });
   val_to_str(&name_val)
 }
@@ -105,14 +134,14 @@ pub fn type_to_str(type_id: TypeId) -> String {
 
 pub fn val_to_str(val: &Value) -> String {
   with_externs(|e| {
-    (e.val_to_str)(e.context, val)
+    (e.val_to_str)(e.context, val as &Handle)
       .to_string()
       .unwrap_or_else(|e| format!("<failed to decode unicode for {:?}: {}>", val, e))
   })
 }
 
 pub fn create_exception(msg: &str) -> Value {
-  with_externs(|e| (e.create_exception)(e.context, msg.as_ptr(), msg.len() as u64))
+  with_externs(|e| (e.create_exception)(e.context, msg.as_ptr(), msg.len() as u64).into())
 }
 
 pub fn call_method(value: &Value, method: &str, args: &[Value]) -> Result<Value, Failure> {
@@ -120,11 +149,20 @@ pub fn call_method(value: &Value, method: &str, args: &[Value]) -> Result<Value,
 }
 
 pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
-  with_externs(|e| (e.call)(e.context, func, args.as_ptr(), args.len() as u64)).into()
+  let arg_handles: Vec<_> = args.iter().map(|v| v as &Handle as *const Handle).collect();
+  with_externs(|e| {
+    (e.call)(
+      e.context,
+      func as &Handle,
+      arg_handles.as_ptr(),
+      args.len() as u64,
+    )
+  }).into()
 }
 
 pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {
-  let response = with_externs(|e| (e.generator_send)(e.context, generator, arg));
+  let response =
+    with_externs(|e| (e.generator_send)(e.context, generator as &Handle, arg as &Handle));
   match response.res_type {
     PyGeneratorResponseType::Break => Ok(GeneratorResponse::Break(response.values.unwrap_one())),
     PyGeneratorResponseType::Throw => Err(PyResult::failure_from(response.values.unwrap_one())),
@@ -241,30 +279,34 @@ unsafe impl Send for Externs {}
 pub type LogExtern = extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
 
 pub type SatisfiedByExtern =
-  extern "C" fn(*const ExternContext, *const Value, *const Value) -> bool;
+  extern "C" fn(*const ExternContext, *const Handle, *const Handle) -> bool;
 
 pub type SatisfiedByTypeExtern =
-  extern "C" fn(*const ExternContext, *const Value, *const TypeId) -> bool;
+  extern "C" fn(*const ExternContext, *const Handle, *const TypeId) -> bool;
 
-pub type IdentifyExtern = extern "C" fn(*const ExternContext, *const Value) -> Ident;
+pub type IdentifyExtern = extern "C" fn(*const ExternContext, *const Handle) -> Ident;
 
-pub type EqualsExtern = extern "C" fn(*const ExternContext, *const Value, *const Value) -> bool;
+pub type EqualsExtern = extern "C" fn(*const ExternContext, *const Handle, *const Handle) -> bool;
 
-pub type CloneValExtern = extern "C" fn(*const ExternContext, *const Value) -> Value;
+pub type CloneValExtern = extern "C" fn(*const ExternContext, *const Handle) -> Handle;
 
-pub type DropHandlesExtern = extern "C" fn(*const ExternContext, *const Handle, u64);
+pub type DropHandlesExtern = extern "C" fn(*const ExternContext, *const DroppingHandle, u64);
 
-pub type StoreTupleExtern = extern "C" fn(*const ExternContext, *const Value, u64) -> Value;
+pub type StoreTupleExtern =
+  extern "C" fn(*const ExternContext, *const *const Handle, u64) -> Handle;
 
-pub type StoreBytesExtern = extern "C" fn(*const ExternContext, *const u8, u64) -> Value;
+pub type StoreBytesExtern = extern "C" fn(*const ExternContext, *const u8, u64) -> Handle;
 
-pub type StoreI64Extern = extern "C" fn(*const ExternContext, i64) -> Value;
+pub type StoreI64Extern = extern "C" fn(*const ExternContext, i64) -> Handle;
 
+///
+/// NB: When a PyResult is handed from Python to Rust, the Rust side destroys the handle. But when
+/// it is passed from Rust to Python, Python must destroy the handle.
+///
 #[repr(C)]
-#[derive(Debug)]
 pub struct PyResult {
   is_throw: bool,
-  value: Value,
+  handle: Handle,
 }
 
 impl PyResult {
@@ -276,10 +318,11 @@ impl PyResult {
 
 impl From<PyResult> for Result<Value, Failure> {
   fn from(result: PyResult) -> Self {
+    let value = result.handle.into();
     if result.is_throw {
-      Err(PyResult::failure_from(result.value))
+      Err(PyResult::failure_from(value))
     } else {
-      Ok(result.value)
+      Ok(value)
     }
   }
 }
@@ -289,11 +332,11 @@ impl From<Result<Value, String>> for PyResult {
     match res {
       Ok(v) => PyResult {
         is_throw: false,
-        value: v,
+        handle: v.into(),
       },
       Err(msg) => PyResult {
         is_throw: true,
-        value: create_exception(&msg),
+        handle: create_exception(&msg).into(),
       },
     }
   }
@@ -318,8 +361,8 @@ pub enum PyGeneratorResponseType {
 #[repr(C)]
 pub struct PyGeneratorResponse {
   res_type: PyGeneratorResponseType,
-  values: ValueBuffer,
-  constraints: ValueBuffer,
+  values: HandleBuffer,
+  constraints: HandleBuffer,
 }
 
 #[derive(Debug)]
@@ -331,11 +374,12 @@ pub enum GeneratorResponse {
   GetMulti(Vec<Get>),
 }
 
-// The result of an `identify` call, including the __hash__ of a Value and its TypeId.
+///
+/// The result of an `identify` call, including the __hash__ of a Handle and its TypeId.
+///
 #[repr(C)]
 pub struct Ident {
   pub hash: i64,
-  pub value: Value,
   pub type_id: TypeId,
 }
 
@@ -343,49 +387,47 @@ pub struct Ident {
 /// Points to an array containing a series of values allocated by Python.
 ///
 /// TODO: An interesting optimization might be possible where we avoid actually
-/// allocating the values array for values_len == 1, and instead store the Value in
+/// allocating the values array for values_len == 1, and instead store the Handle in
 /// the `handle_` field.
 ///
 #[repr(C)]
-pub struct ValueBuffer {
-  values_ptr: *mut Value,
-  values_len: u64,
-  // A Value handle to hold the underlying buffer alive.
-  handle_: Value,
+pub struct HandleBuffer {
+  handles_ptr: *mut Handle,
+  handles_len: u64,
+  // A Handle to hold the underlying buffer alive.
+  handle_: Handle,
 }
 
-impl ValueBuffer {
+impl HandleBuffer {
   pub fn to_vec(&self) -> Vec<Value> {
-    with_vec(
-      self.values_ptr,
-      self.values_len as usize,
-      |value_vec| unsafe { value_vec.iter().map(|v| v.clone_without_handle()).collect() },
-    )
+    with_vec(self.handles_ptr, self.handles_len as usize, |handle_vec| {
+      handle_vec
+        .iter()
+        .map(|h| Value::new(unsafe { h.clone_shallow() }))
+        .collect()
+    })
   }
 
-  /// Asserts that the ValueBuffer contains one value, and returns it.
+  /// Asserts that the HandleBuffer contains one value, and returns it.
   pub fn unwrap_one(&self) -> Value {
     assert!(
-      self.values_len == 1,
-      "ValueBuffer contained more than one value: {}",
-      self.values_len
+      self.handles_len == 1,
+      "HandleBuffer contained more than one value: {}",
+      self.handles_len
     );
-    with_vec(
-      self.values_ptr,
-      self.values_len as usize,
-      |value_vec| unsafe { value_vec.iter().next().unwrap().clone_without_handle() },
-    )
+    with_vec(self.handles_ptr, self.handles_len as usize, |handle_vec| {
+      Value::new(unsafe { handle_vec.iter().next().unwrap().clone_shallow() })
+    })
   }
 }
 
 // Points to an array of TypeIds.
 #[repr(C)]
-#[derive(Debug)]
 pub struct TypeIdBuffer {
   ids_ptr: *mut TypeId,
   ids_len: u64,
-  // handle to hold the underlying array alive
-  handle_: Value,
+  // A Handle to hold the underlying array alive.
+  handle_: Handle,
 }
 
 impl TypeIdBuffer {
@@ -394,21 +436,26 @@ impl TypeIdBuffer {
   }
 }
 
-pub type ProjectIgnoringTypeExtern =
-  extern "C" fn(*const ExternContext, *const Value, field_name_ptr: *const u8, field_name_len: u64)
-    -> Value;
+pub type ProjectIgnoringTypeExtern = extern "C" fn(
+  *const ExternContext,
+  *const Handle,
+  field_name_ptr: *const u8,
+  field_name_len: u64,
+) -> Handle;
 
-pub type ProjectMultiExtern =
-  extern "C" fn(*const ExternContext, *const Value, field_name_ptr: *const u8, field_name_len: u64)
-    -> ValueBuffer;
+pub type ProjectMultiExtern = extern "C" fn(
+  *const ExternContext,
+  *const Handle,
+  field_name_ptr: *const u8,
+  field_name_len: u64,
+) -> HandleBuffer;
 
 #[repr(C)]
-#[derive(Debug)]
 pub struct Buffer {
   bytes_ptr: *mut u8,
   bytes_len: u64,
-  // A Value handle to hold the underlying array alive.
-  handle_: Value,
+  // A Handle to hold the underlying array alive.
+  handle_: Handle,
 }
 
 impl Buffer {
@@ -425,13 +472,18 @@ impl Buffer {
   }
 }
 
-// Points to an array of (byte) Buffers.
+///
+/// Points to an array of (byte) Buffers.
+///
+/// TODO: Because this is only ever passed from Python to Rust, it could just use
+/// `project_multi_strs`.
+///
 #[repr(C)]
 pub struct BufferBuffer {
   bufs_ptr: *mut Buffer,
   bufs_len: u64,
-  // handle to hold the underlying array alive
-  handle_: Value,
+  // A Handle to hold the underlying array alive.
+  handle_: Handle,
 }
 
 impl BufferBuffer {
@@ -460,16 +512,16 @@ impl BufferBuffer {
 
 pub type TypeToStrExtern = extern "C" fn(*const ExternContext, TypeId) -> Buffer;
 
-pub type ValToStrExtern = extern "C" fn(*const ExternContext, *const Value) -> Buffer;
+pub type ValToStrExtern = extern "C" fn(*const ExternContext, *const Handle) -> Buffer;
 
 pub type CreateExceptionExtern =
-  extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Value;
+  extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Handle;
 
 pub type CallExtern =
-  extern "C" fn(*const ExternContext, *const Value, *const Value, u64) -> PyResult;
+  extern "C" fn(*const ExternContext, *const Handle, *const *const Handle, u64) -> PyResult;
 
 pub type GeneratorSendExtern =
-  extern "C" fn(*const ExternContext, *const Value, *const Value) -> PyGeneratorResponse;
+  extern "C" fn(*const ExternContext, *const Handle, *const Handle) -> PyGeneratorResponse;
 
 pub type EvalExtern =
   extern "C" fn(*const ExternContext, python_ptr: *const u8, python_len: u64) -> PyResult;

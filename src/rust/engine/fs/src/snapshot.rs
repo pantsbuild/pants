@@ -21,7 +21,7 @@ pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
 ]);
 pub const EMPTY_DIGEST: Digest = Digest(EMPTY_FINGERPRINT, 0);
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Eq, Hash, PartialEq)]
 pub struct Snapshot {
   pub digest: Digest,
   pub path_stats: Vec<PathStat>,
@@ -614,10 +614,14 @@ mod tests {
     );
 
     let merged_res = {
-      let snapshot = Snapshot::from_path_stats(store.clone(), digester.clone(), vec![file])
+      let snapshot1 =
+        Snapshot::from_path_stats(store.clone(), digester.clone(), vec![file.clone()])
+          .wait()
+          .unwrap();
+      let snapshot2 = Snapshot::from_path_stats(store.clone(), digester.clone(), vec![file])
         .wait()
         .unwrap();
-      Snapshot::merge(store.clone(), &[snapshot.clone(), snapshot]).wait()
+      Snapshot::merge(store.clone(), &[snapshot1, snapshot2]).wait()
     };
 
     match merged_res {

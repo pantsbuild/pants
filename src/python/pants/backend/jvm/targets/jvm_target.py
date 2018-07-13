@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from twitter.common.collections import OrderedSet
 
@@ -11,6 +10,7 @@ from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
+from pants.base.deprecated import deprecated_conditional
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, PrimitiveField, PrimitivesSetField
 from pants.build_graph.resources import Resources
@@ -40,6 +40,7 @@ class JvmTarget(Target, Jarable):
                strict_deps=None,
                exports=None,
                fatal_warnings=None,
+               compiler_option_sets=None,
                zinc_file_manager=None,
                # Some subclasses can have both .java and .scala sources
                # (e.g., JUnitTests, JvmBinary, even ScalaLibrary), so it's convenient
@@ -83,7 +84,7 @@ class JvmTarget(Target, Jarable):
                          if A exports B, and B exports C, then any targets that depends on A will
                          have access to both B and C.
     :param bool fatal_warnings: Whether to turn warnings into errors for this target.  If present,
-                                takes priority over the language's fatal-warnings option.
+                                takes priority over the language's fatal-warnings option. Deprecated.
     :param bool zinc_file_manager: Whether to use zinc provided file manager that allows
                                    transactional rollbacks, but in certain cases may conflict with
                                    user libraries.
@@ -96,6 +97,21 @@ class JvmTarget(Target, Jarable):
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     payload = payload or Payload()
     excludes = ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg='excludes'))
+    deprecated_conditional(
+      lambda: fatal_warnings is not None,
+      removal_version='1.11.0dev0',
+      entity_description='fatal_warnings',
+      hint_message="fatal_warnings should be defined as part of the target compiler_option_sets"
+    )
+    if fatal_warnings is not None:
+      compiler_option_sets = [] if compiler_option_sets is None else compiler_option_sets
+      if fatal_warnings:
+        compiler_option_sets.append('fatal_warnings')
+      else:
+        try:
+          compiler_option_sets.remove('fatal_warnings')
+        except ValueError:
+          pass
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'provides': provides,
@@ -103,7 +119,7 @@ class JvmTarget(Target, Jarable):
       'platform': PrimitiveField(platform),
       'strict_deps': PrimitiveField(strict_deps),
       'exports': PrimitivesSetField(exports or []),
-      'fatal_warnings': PrimitiveField(fatal_warnings),
+      'compiler_option_sets': PrimitivesSetField(compiler_option_sets),
       'zinc_file_manager': PrimitiveField(zinc_file_manager),
       'javac_plugins': PrimitivesSetField(javac_plugins or []),
       'javac_plugin_args': PrimitiveField(javac_plugin_args),
@@ -137,7 +153,19 @@ class JvmTarget(Target, Jarable):
     :return: See constructor.
     :rtype: bool or None
     """
-    return self.payload.fatal_warnings
+    if self.payload.compiler_option_sets is not None:
+      return 'fatal_warnings' in self.payload.compiler_option_sets
+    else:
+      return False
+
+  @memoized_property
+  def compiler_option_sets(self):
+    """For every element in this list, enable the corresponding flags on compilation
+    of targets.
+    :return: See constructor.
+    :rtype: list
+    """
+    return self.payload.compiler_option_sets
 
   @property
   def zinc_file_manager(self):
