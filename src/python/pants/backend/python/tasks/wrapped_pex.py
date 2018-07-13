@@ -57,7 +57,7 @@ class WrappedPEX(object):
     env = copy(kwargs.pop('env', {}))
 
     # Hack around bug in PEX where custom interpreters are not forwarded to PEXEnvironments.
-    # TODO(John Sirois): Remove when XXX is fixed.
+    # TODO(John Sirois): Remove when https://github.com/pantsbuild/pex/issues/522 is fixed.
     env[self._PEX_PYTHON_PATH_ENV_VAR_NAME] = self._pex._interpreter.binary
 
     pex_path = self._pex_path()

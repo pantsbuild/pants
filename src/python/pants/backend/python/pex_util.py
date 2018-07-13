@@ -48,6 +48,7 @@ def expand_and_maybe_adjust_platform(interpreter, platform):
   :returns: The `platform`, potentially adjusted.
   :rtype: :class:`pex.platforms.Platform`
   """
+  # TODO(John Sirois): Kill all usages when https://github.com/pantsbuild/pex/issues/511 is fixed.
   cur_plat = Platform.current()
 
   if cur_plat.platform != Platform.create(platform).platform:
@@ -70,7 +71,7 @@ def expand_and_maybe_adjust_platform(interpreter, platform):
 
   logger.debug("""
 Modifying given platform of {given_platform!r}:
-Resolves as {current_platform!r}
+Using the current platform of {current_platform!r}
 Under current interpreter {current_interpreter!r}
         
 To match given interpreter {given_interpreter!r}.
