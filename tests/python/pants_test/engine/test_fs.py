@@ -309,7 +309,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       globs = PathGlobs(("*",), ())
       with self.assertRaises(Exception) as cm:
-        scheduler.capture_snapshots((PathGlobsAndRoot(globs, str(os.path.join(temp_dir, "doesnotexist"))),))
+        scheduler.capture_snapshots((PathGlobsAndRoot(globs, native(str(os.path.join(temp_dir, "doesnotexist")))),))
       self.assertIn("doesnotexist", str(cm.exception))
 
   def assert_snapshot_equals(self, snapshot, files, directory_digest):
