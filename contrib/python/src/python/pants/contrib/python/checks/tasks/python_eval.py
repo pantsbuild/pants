@@ -157,7 +157,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
 
       exec_pex = PEX(exec_pex_path, interpreter)
       extra_pex_paths = [pex.path() for pex in filter(None, [reqs_pex, srcs_pex])]
-      pex = WrappedPEX(exec_pex, interpreter, extra_pex_paths)
+      pex = WrappedPEX(exec_pex, extra_pex_paths)
 
       with self.context.new_workunit(name='eval',
                                      labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.RUN,

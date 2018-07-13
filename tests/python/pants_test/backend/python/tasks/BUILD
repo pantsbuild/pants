@@ -88,10 +88,12 @@ python_tests(
   sources=globs('*_integration.py', exclude=python_native_code_test_files),
   dependencies=[
     '3rdparty/python:pex',
+    'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
-    'tests/python/pants_test/backend/python:pants_requirement_integration_test_base',
     'tests/python/pants_test:int-test',
+    'tests/python/pants_test/backend/python:pants_requirement_integration_test_base',
+    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
   ],
   tags={'integration'},
   timeout=2400
