@@ -2,8 +2,9 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+from pants.base.deprecated import deprecated
 
 
 class ZincLanguageMixin(object):
@@ -20,7 +21,13 @@ class ZincLanguageMixin(object):
 
     register('--fatal-warnings', advanced=True, type=bool,
              fingerprint=True,
+             removal_version='1.11.0.dev0',
+             removal_hint='Use --compiler-option-sets=fatal_warnings instead of fatal_warnings',
              help='The default for the "fatal_warnings" argument for targets of this language.')
+
+    register('--compiler-option-sets', advanced=True, default=[], type=list,
+             fingerprint=True,
+             help='The option sets to be enabled for the compilation of this target.')
 
     register('--zinc-file-manager', advanced=True, default=True, type=bool,
              fingerprint=True,
@@ -34,11 +41,23 @@ class ZincLanguageMixin(object):
     return self.get_options().strict_deps
 
   @property
+  @deprecated('1.11.0.dev0', 'Consume fatal_warnings from compiler_option_sets instead.')
   def fatal_warnings(self):
     """If true, make warnings fatal for targets that do not specify fatal_warnings.
     :rtype: bool
     """
     return self.get_options().fatal_warnings
+
+  @property
+  def compiler_option_sets(self):
+    """For every element in this list, enable the corresponding flags on compilation
+    of targets.
+    :rtype: list
+    """
+    option_sets = self.get_options().compiler_option_sets
+    if 'fatal_warnings' not in option_sets and self.fatal_warnings:
+      option_sets.append('fatal_warnings')
+    return option_sets
 
   @property
   def zinc_file_manager(self):

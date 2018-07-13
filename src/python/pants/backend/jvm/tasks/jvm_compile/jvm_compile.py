@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import os
@@ -82,6 +81,14 @@ class JvmCompile(NailgunTaskBase):
     register('--fatal-warnings-disabled-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_fatal_warnings_disabled_args_default()),
              help='Extra compiler args to use when fatal warnings are disabled.')
+
+    register('--compiler-option-sets-enabled-args', advanced=True, type=dict, fingerprint=True,
+             default={'fatal_warnings': list(cls.get_fatal_warnings_enabled_args_default())},
+             help='Extra compiler args to use for each enabled option set.')
+
+    register('--compiler-option-sets-disabled-args', advanced=True, type=dict, fingerprint=True,
+             default={'fatal_warnings': list(cls.get_fatal_warnings_disabled_args_default())},
+             help='Extra compiler args to use for each disabled option set.')
 
     register('--debug-symbols', type=bool, fingerprint=True,
              help='Compile with debug symbol enabled.')
@@ -227,7 +234,7 @@ class JvmCompile(NailgunTaskBase):
     raise NotImplementedError()
 
   def compile(self, ctx, args, classpath, upstream_analysis,
-              settings, fatal_warnings, zinc_file_manager,
+              settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     """Invoke the compiler.
 
@@ -449,8 +456,8 @@ class JvmCompile(NailgunTaskBase):
       with open(path, 'w') as f:
         f.write(text.encode('utf-8'))
 
-  def _compile_vts(self, vts, ctx, upstream_analysis, classpath, progress_message, settings, fatal_warnings,
-                   zinc_file_manager, counter):
+  def _compile_vts(self, vts, ctx, upstream_analysis, classpath, progress_message, settings, 
+                   compiler_option_sets, zinc_file_manager, counter):
     """Compiles sources for the given vts into the given output dir.
 
     :param vts: VersionedTargetSet with one entry for the target.
@@ -489,7 +496,7 @@ class JvmCompile(NailgunTaskBase):
             classpath,
             upstream_analysis,
             settings,
-            fatal_warnings,
+            compiler_option_sets,
             zinc_file_manager,
             self._get_plugin_map('javac', Java.global_instance(), ctx.target),
             self._get_plugin_map('scalac', ScalaPlatform.global_instance(), ctx.target),
@@ -678,7 +685,7 @@ class JvmCompile(NailgunTaskBase):
 
         dep_context = DependencyContext.global_instance()
         tgt, = vts.targets
-        fatal_warnings = dep_context.defaulted_property(tgt, lambda x: x.fatal_warnings)
+        compiler_option_sets = dep_context.defaulted_property(tgt, lambda x: x.compiler_option_sets)
         zinc_file_manager = dep_context.defaulted_property(tgt, lambda x: x.zinc_file_manager)
         with Timer() as timer:
           self._compile_vts(vts,
@@ -687,7 +694,7 @@ class JvmCompile(NailgunTaskBase):
                             cp_entries,
                             progress_message,
                             tgt.platform,
-                            fatal_warnings,
+                            compiler_option_sets,
                             zinc_file_manager,
                             counter)
         self._record_target_stats(tgt,

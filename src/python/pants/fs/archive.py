@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import sys
@@ -217,7 +216,7 @@ _ARCHIVER_BY_TYPE = OrderedDict(
   zip=ZIP)
 
 archive_extensions = {
-  name:archiver.extension for name, archiver in _ARCHIVER_BY_TYPE.items()
+  name: archiver.extension for name, archiver in _ARCHIVER_BY_TYPE.items()
 }
 
 TYPE_NAMES = frozenset(_ARCHIVER_BY_TYPE.keys())

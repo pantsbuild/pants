@@ -14,8 +14,8 @@ use context::{Context, Core};
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
 use fs::{
-  self, Dir, File, FileContent, GlobMatching, Link, PathGlobs, PathStat, StoreFileByDigest,
-  StrictGlobMatching, VFS,
+  self, Dir, DirectoryListing, File, FileContent, GlobMatching, Link, PathGlobs, PathStat,
+  StoreFileByDigest, StrictGlobMatching, VFS,
 };
 use hashing;
 use process_execution::{self, CommandRunner};
@@ -47,12 +47,12 @@ fn was_required(failure: Failure) -> Failure {
 }
 
 impl VFS<Failure> for Context {
-  fn read_link(&self, link: Link) -> NodeFuture<PathBuf> {
-    self.get(ReadLink(link)).map(|res| res.0).to_boxed()
+  fn read_link(&self, link: &Link) -> NodeFuture<PathBuf> {
+    self.get(ReadLink(link.clone())).map(|res| res.0).to_boxed()
   }
 
-  fn scandir(&self, dir: Dir) -> NodeFuture<Vec<fs::Stat>> {
-    self.get(Scandir(dir)).map(|res| res.0).to_boxed()
+  fn scandir(&self, dir: Dir) -> NodeFuture<Arc<DirectoryListing>> {
+    self.get(Scandir(dir))
   }
 
   fn is_ignored(&self, stat: &fs::Stat) -> bool {
@@ -257,8 +257,12 @@ impl Select {
     }
   }
 
-  fn snapshot(&self, context: &Context, entry: &rule_graph::Entry) -> NodeFuture<fs::Snapshot> {
-    let edges = &context
+  fn snapshot(
+    &self,
+    context: &Context,
+    entry: &rule_graph::Entry,
+  ) -> NodeFuture<Arc<fs::Snapshot>> {
+    let edges = context
       .core
       .rule_graph
       .edges_for_inner(entry)
@@ -269,7 +273,7 @@ impl Select {
       context.core.types.path_globs.clone(),
       self.subject,
       self.variants.clone(),
-      edges,
+      &edges,
     ).run(context.clone())
       .and_then(move |path_globs_val| context.get(Snapshot(externs::key_for(path_globs_val))))
       .to_boxed()
@@ -613,20 +617,17 @@ impl From<DigestFile> for NodeKey {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Scandir(Dir);
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DirectoryListing(Vec<fs::Stat>);
-
 impl WrappedNode for Scandir {
-  type Item = DirectoryListing;
+  type Item = Arc<DirectoryListing>;
 
-  fn run(self, context: Context) -> NodeFuture<DirectoryListing> {
+  fn run(self, context: Context) -> NodeFuture<Arc<DirectoryListing>> {
     let dir = self.0.clone();
     context
       .core
       .vfs
       .scandir(&self.0)
       .then(move |listing_res| match listing_res {
-        Ok(listing) => Ok(DirectoryListing(listing)),
+        Ok(listing) => Ok(Arc::new(listing)),
         Err(e) => Err(throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
       })
       .to_boxed()
@@ -750,13 +751,14 @@ impl Snapshot {
 }
 
 impl WrappedNode for Snapshot {
-  type Item = fs::Snapshot;
+  type Item = Arc<fs::Snapshot>;
 
-  fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
+  fn run(self, context: Context) -> NodeFuture<Arc<fs::Snapshot>> {
     let lifted_path_globs = Self::lift_path_globs(&externs::val_for(&self.0));
     future::result(lifted_path_globs)
       .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))
       .and_then(move |path_globs| Self::create(context, path_globs))
+      .map(Arc::new)
       .to_boxed()
   }
 }
@@ -1063,10 +1065,10 @@ impl NodeError for Failure {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NodeResult {
   Digest(hashing::Digest),
-  DirectoryListing(DirectoryListing),
+  DirectoryListing(Arc<DirectoryListing>),
   LinkDest(LinkDest),
   ProcessResult(ProcessResult),
-  Snapshot(fs::Snapshot),
+  Snapshot(Arc<fs::Snapshot>),
   Value(Value),
 }
 
@@ -1076,8 +1078,8 @@ impl From<Value> for NodeResult {
   }
 }
 
-impl From<fs::Snapshot> for NodeResult {
-  fn from(v: fs::Snapshot) -> Self {
+impl From<Arc<fs::Snapshot>> for NodeResult {
+  fn from(v: Arc<fs::Snapshot>) -> Self {
     NodeResult::Snapshot(v)
   }
 }
@@ -1100,8 +1102,8 @@ impl From<LinkDest> for NodeResult {
   }
 }
 
-impl From<DirectoryListing> for NodeResult {
-  fn from(v: DirectoryListing) -> Self {
+impl From<Arc<DirectoryListing>> for NodeResult {
+  fn from(v: Arc<DirectoryListing>) -> Self {
     NodeResult::DirectoryListing(v)
   }
 }
@@ -1148,7 +1150,7 @@ impl TryFrom<NodeResult> for Value {
   }
 }
 
-impl TryFrom<NodeResult> for fs::Snapshot {
+impl TryFrom<NodeResult> for Arc<fs::Snapshot> {
   type Err = ();
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
@@ -1192,7 +1194,7 @@ impl TryFrom<NodeResult> for LinkDest {
   }
 }
 
-impl TryFrom<NodeResult> for DirectoryListing {
+impl TryFrom<NodeResult> for Arc<DirectoryListing> {
   type Err = ();
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
