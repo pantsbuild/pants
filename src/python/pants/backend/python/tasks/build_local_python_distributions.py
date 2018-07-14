@@ -232,6 +232,7 @@ class BuildLocalPythonDistributions(Task):
 
     setup_runner = SetupPyRunner.for_snapshot_bdist_wheel(
       source_dir=dist_target_dir,
+      snapshot_fingerprint=snapshot_version,
       is_platform_specific=is_platform_specific,
       interpreter=interpreter)
 
