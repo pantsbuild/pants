@@ -33,7 +33,7 @@ class MetaRenameTest(TaskTestBase):
     self.set_options(**{ 'from': '{}:a'.format(self.spec_path),
                          'to': '{}:{}'.format(self.spec_path, self.new_name) })
     self.meta_rename = self.create_task(
-      self.context(target_roots=prepare_dependencies(self).values()))
+      self.context(target_roots=list(prepare_dependencies(self).values())))
 
   def test_update_original_build_name(self):
     self.meta_rename.execute()
