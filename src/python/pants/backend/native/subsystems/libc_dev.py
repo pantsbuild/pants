@@ -37,6 +37,10 @@ class LibcDev(Subsystem):
   def register_options(cls, register):
     super(LibcDev, cls).register_options(register)
 
+    register('--enable-libc-search', type=bool, default=False, fingerprint=True, advanced=True,
+             help="Whether to search for the host's libc installation. Set to False if the host "
+                  "does not have a libc install with crti.o -- this file is necessary to create "
+                  "executables on Linux hosts.")
     register('--libc-dir', type=dir_option, default=None, fingerprint=True, advanced=True,
              help='A directory containing a host-specific crti.o from libc.')
     register('--host-compiler', type=str, default='gcc', fingerprint=True, advanced=True,
@@ -74,7 +78,7 @@ class LibcDev(Subsystem):
                        fingerprint=hash_file(libc_crti_object_file))
 
   @memoized_property
-  def host_libc(self):
+  def _host_libc(self):
     """Use the --libc-dir option if provided, otherwise invoke a host compiler to find libc dev."""
     libc_dir_option = self.get_options().libc_dir
     if libc_dir_option:
@@ -87,3 +91,9 @@ class LibcDev(Subsystem):
         .format(self._LIBC_INIT_OBJECT_FILE, libc_dir_option))
 
     return self._get_host_libc_from_host_compiler()
+
+  def get_libc_dirs(self, platform):
+    return platform.resolve_platform_specific({
+      'darwin': [],
+      'linux': [self._host_libc.get_lib_dir()],
+    })

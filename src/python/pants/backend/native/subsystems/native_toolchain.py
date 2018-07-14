@@ -33,15 +33,6 @@ class NativeToolchain(Subsystem):
   options_scope = 'native-toolchain'
 
   @classmethod
-  def register_options(cls, register):
-    super(NativeToolchain, cls).register_options(register)
-
-    register('--enable-libc-search', type=bool, default=False, fingerprint=True, advanced=True,
-             help="Whether to search for the host's libc installation. Set to False if the host "
-                  "does not have a libc install with crti.o -- this file is necessary to create "
-                  "executables on Linux hosts.")
-
-  @classmethod
   def subsystem_dependencies(cls):
     return super(NativeToolchain, cls).subsystem_dependencies() + (
       Binutils.scoped(cls),
@@ -71,15 +62,6 @@ class NativeToolchain(Subsystem):
   def _libc_dev(self):
     return LibcDev.scoped_instance(self)
 
-  def _libc_dirs(self, platform):
-    if not self.get_options().enable_libc_search:
-      return []
-
-    return platform.resolve_platform_specific({
-      'darwin': lambda: [],
-      'linux': lambda: [self._libc_dev.host_libc.get_lib_dir()]
-    })
-
 
 @rule(Linker, [Select(Platform), Select(NativeToolchain)])
 def select_linker(platform, native_toolchain):
@@ -95,7 +77,7 @@ def select_linker(platform, native_toolchain):
   else:
     linker = yield Get(Linker, Binutils, native_toolchain._binutils)
 
-  libc_dirs = native_toolchain._libc_dirs(platform)
+  libc_dirs = native_toolchain._libc_dev.get_libc_dirs(platform)
 
   # NB: We need to link through a provided compiler's frontend, and we need to know where all the
   # compiler's libraries/etc are, so we set the executable name to the C++ compiler, which can find
