@@ -154,7 +154,8 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'goal_ma
 
     def __init__(self, invalid_goals):
       super(LegacyGraphSession.InvalidGoals, self).__init__(
-        'could not satisfy the following v2 goals: {}'.format(', '.join(invalid_goals))
+        'could not satisfy the following goals with @console_rules: {}'
+        .format(', '.join(invalid_goals))
       )
       self.invalid_goals = invalid_goals
 

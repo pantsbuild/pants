@@ -182,6 +182,11 @@ class LocalPantsRunner(object):
     if self._is_daemon or not self._global_options.v2:
       return 0
 
+    # If we're a pure --v2 run, validate goals - otherwise some goals specified
+    # may be provided by the --v1 task paths.
+    if not self._global_options.v1:
+      self._graph_session.validate_goals(self._options.goals)
+
     try:
       self._graph_session.run_console_rules(
         self._options.goals,
