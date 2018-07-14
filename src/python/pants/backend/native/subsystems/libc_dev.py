@@ -100,6 +100,9 @@ class LibcDev(Subsystem):
     return self._get_host_libc_from_host_compiler()
 
   def get_libc_dirs(self, platform):
+    if not self.get_options().enable_libc_search:
+      return []
+
     return platform.resolve_platform_specific({
       'darwin': lambda: [],
       'linux': lambda: [self._host_libc.get_lib_dir()],
