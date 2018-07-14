@@ -17,8 +17,15 @@ from pants.util.memo import memoized_property
 class LibcDev(Subsystem):
   """Subsystem to detect and provide the host's installed version of a libc "dev" package.
 
-  This subsystem exists to give a useful error message if the package isn't
-  installed, and to allow a nonstandard install location.
+  A libc "dev" package is provided on most Linux systems by default, but may not be located at any
+  standardized path. We define a libc dev package as one which provides crti.o, an object file which
+  is part of any libc implementation and is required to create executables (more information
+  available at https://wiki.osdev.org/Creating_a_C_Library).
+
+  NB: This is currently unused except in CI, because we have no plans to support creating native
+  executables from C or C++ sources yet (PRs welcome!). It is used to provide an "end-to-end" test
+  of the compilation and linking toolchain in CI by creating and invoking a "hello world"
+  executable.
   """
 
   options_scope = 'libc'
