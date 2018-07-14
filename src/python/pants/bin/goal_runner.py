@@ -88,8 +88,6 @@ class GoalRunnerFactory(object):
 
   def _setup_context(self):
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
-      self._maybe_handle_help(self._options.help_request)
-
       build_file_parser = BuildFileParser(self._build_config, self._root_dir)
       build_graph, address_mapper = self._graph_session.create_build_graph(
         self._target_roots,
@@ -122,6 +120,7 @@ class GoalRunnerFactory(object):
       return goals, context
 
   def create(self):
+    self._maybe_handle_help(self._options.help_request)
     goals, context = self._setup_context()
     return GoalRunner(context=context,
                       goals=goals,
