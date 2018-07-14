@@ -185,7 +185,9 @@ class SchedulerService(PantsService):
         session.warm_product_graph(target_roots)
 
       if global_options.v2:
-        session.validate_goals(options.goals)
+        if not global_options.v1:
+          session.validate_goals(options.goals)
+
         # N.B. @console_rules run pre-fork in order to cache the products they request during execution.
         session.run_console_rules(options.goals, target_roots)
 

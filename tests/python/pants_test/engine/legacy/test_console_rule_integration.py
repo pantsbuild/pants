@@ -39,3 +39,13 @@ class TestConsoleRuleIntegration(PantsRunIntegrationTest):
       'could not satisfy the following goals with @console_rules: lint',
       result.stderr_data
     )
+
+  @ensure_daemon
+  def test_v2_goal_validation_both(self):
+    self.do_command(
+      '--v1',
+      '--v2',
+      'filedeps',
+      ':',
+      success=True
+    )
