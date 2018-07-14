@@ -9,6 +9,7 @@ import os
 from abc import abstractmethod
 from collections import OrderedDict
 
+from future.utils import text_type
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
@@ -293,7 +294,7 @@ class SimpleCodegenTask(Task):
       to_capture.append(
         PathGlobsAndRoot(
           PathGlobs(buildroot_relative_globs, buildroot_relative_excludes),
-          str(get_buildroot()),
+          text_type(get_buildroot()),
         )
       )
       results_dirs.append(results_dir_relpath)

@@ -65,6 +65,7 @@ python_tests(
   sources=['test_fs.py'],
   dependencies=[
     ':scheduler_test_base',
+    '3rdparty/python:future',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:nodes',
     'tests/python/pants_test:test_base',
@@ -87,6 +88,7 @@ python_tests(
   name='isolated_process',
   sources=['test_isolated_process.py'],
   dependencies=[
+    '3rdparty/python:future',
     ':scheduler_test_base',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:isolated_process',
@@ -136,6 +138,7 @@ python_tests(
   name='build_files',
   sources=['test_build_files.py'],
   dependencies=[
+    '3rdparty/python:future',
     ':scheduler_test_base',
     'src/python/pants/build_graph',
     'src/python/pants/engine:build_files',
