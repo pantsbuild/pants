@@ -19,6 +19,7 @@ resettable = { path = "../resettable" }
 sha2 = "0.6.0"
 tempfile = "3"
 futures-timer = "0.1"
+tokio-codec = "0.1"
 tokio-process = "0.2.1"
 
 [dev-dependencies]
