@@ -74,10 +74,10 @@ def select_linker(platform, native_toolchain):
   if platform.normalized_os_name == 'darwin':
     # TODO(#5663): turn this into LLVM when lld works.
     linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
-    libc_dirs = []
   else:
     linker = yield Get(Linker, Binutils, native_toolchain._binutils)
-    libc_dirs = [native_toolchain._libc_dev.host_libc.get_lib_dir()]
+
+  libc_dirs = native_toolchain._libc_dev.get_libc_dirs(platform)
 
   # NB: We need to link through a provided compiler's frontend, and we need to know where all the
   # compiler's libraries/etc are, so we set the executable name to the C++ compiler, which can find
