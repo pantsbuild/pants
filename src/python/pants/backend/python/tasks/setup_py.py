@@ -13,7 +13,6 @@ from abc import abstractmethod
 from builtins import map, object, str, zip
 from collections import OrderedDict, defaultdict
 
-from pex import pep425tags
 from pex.compatibility import string, to_bytes
 from pex.installer import InstallerBase, Packager
 from pex.interpreter import PythonInterpreter
@@ -56,24 +55,6 @@ setup(**
 
 class SetupPyRunner(InstallerBase):
   _EXTRAS = ('setuptools', 'wheel')
-
-  DIST_DIR = 'dist'
-
-  # NB: "snapshot" refers to a "snapshot release", not a Snapshot.
-  @classmethod
-  def for_snapshot_bdist_wheel(cls, source_dir, snapshot_fingerprint, is_platform_specific, **kw):
-    # NB: adds a '+' before the fingerprint to the build tag!
-    egg_info_snapshot_tag_args = ['egg_info', '--tag-build=+{}'.format(snapshot_fingerprint)]
-    bdist_whl_args = ['bdist_wheel']
-    if is_platform_specific:
-      platform_args = ['--plat-name', pep425tags.get_platform()]
-    else:
-      platform_args = []
-    dist_dir_args = ['--dist-dir', cls.DIST_DIR]
-
-    setup_py_command = (
-      egg_info_snapshot_tag_args + bdist_whl_args + platform_args + dist_dir_args)
-    return cls(source_dir, setup_py_command, **kw)
 
   def __init__(self, source_dir, setup_command, **kw):
     self.__setup_command = setup_command
