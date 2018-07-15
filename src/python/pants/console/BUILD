@@ -5,6 +5,7 @@ python_library(
   name = 'stty_utils',
   sources = ['stty_utils.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:process_handler',
   ]
 )
