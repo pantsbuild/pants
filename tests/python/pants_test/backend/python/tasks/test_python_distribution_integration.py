@@ -4,9 +4,11 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import functools
 import glob
 import os
 import re
+from contextlib import contextmanager
 
 from pants.backend.native.config.environment import Platform
 from pants.base.build_environment import get_buildroot
@@ -22,6 +24,20 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
   fasthello_tests = 'examples/tests/python/example/python_distribution/hello/test_fasthello'
   fasthello_install_requires_dir = 'testprojects/src/python/python_distribution/fasthello_with_install_requires'
   hello_setup_requires = 'examples/src/python/example/python_distribution/hello/setup_requires'
+
+  @staticmethod
+  @contextmanager
+  def caching_config():
+    """Creates a temporary directory and returns a pants configuration for passing to pants_run."""
+    with temporary_dir() as tmp_dir:
+      yield {
+        'cache': {
+          'read': True,
+          'write': True,
+          'read_from': [tmp_dir],
+          'write_to': [tmp_dir]
+        }
+      }
 
   def _assert_native_greeting(self, output):
     self.assertIn('Hello from C!', output)
@@ -61,14 +77,30 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     return re.sub('"Hello from C!"', '"Hello from C?"', orig_content)
 
   def test_invalidation(self):
-    run_command = ['run', '{}:main_with_no_conflict'.format(self.fasthello_install_requires_dir)]
-    unmodified_pants_run = self.run_pants(command=run_command)
-    self.assert_success(unmodified_pants_run)
-    self.assertIn('Hello from C!\n', unmodified_pants_run.stdout_data)
+    fasthello_run = '{}:main_with_no_conflict'.format(self.fasthello_install_requires_dir)
 
-    c_source_file = '{}/c_greet.c'.format(self.fasthello_install_requires_dir)
-    with self.rewrite_file_content(c_source_file, self.rewrite_hello_c_source):
-      modified_pants_run = self.run_pants(command=run_command)
+    with self.caching_config() as config, self.mock_buildroot(
+        dirs_to_copy=[self.fasthello_install_requires_dir]) as buildroot, buildroot.pushd():
+      run_target = functools.partial(
+        self.run_pants_with_workdir,
+        command=['run', fasthello_run],
+        workdir=os.path.join(buildroot.dir, '.pants.d'),
+        config=config,
+        build_root=buildroot.dir,
+      )
+
+      unmodified_pants_run = run_target()
+      self.assert_success(unmodified_pants_run)
+      self.assertIn('Hello from C!\n', unmodified_pants_run.stdout_data)
+
+      c_source_file = os.path.join(self.fasthello_install_requires_dir, 'c_greet.c')
+      with open(c_source_file, 'r') as f:
+        orig_contents = f.read()
+      modified_contents = re.sub('"Hello from C!"', '"Hello from C?"', orig_contents)
+      with open(c_source_file, 'w') as f:
+        f.write(modified_contents)
+
+      modified_pants_run = run_target()
       self.assert_success(modified_pants_run)
       self.assertIn('Hello from C?\n', modified_pants_run.stdout_data)
 
