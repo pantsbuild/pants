@@ -65,8 +65,8 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       run_target = functools.partial(
         self.run_pants_with_workdir,
         command=['run', fasthello_run],
-        workdir=os.path.join(buildroot.dir, '.pants.d'),
-        build_root=buildroot.dir,
+        workdir=os.path.join(buildroot.new_buildroot, '.pants.d'),
+        build_root=buildroot.new_buildroot,
       )
 
       unmodified_pants_run = run_target()

@@ -45,9 +45,9 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       build = functools.partial(
         self.run_pants_with_workdir,
         command=['binary', test_project],
-        workdir=os.path.join(buildroot.dir, '.pants.d'),
+        workdir=os.path.join(buildroot.new_buildroot, '.pants.d'),
         config=config,
-        build_root=buildroot.dir
+        build_root=buildroot.new_buildroot
       )
 
       buildroot.write_file(test_src, '')
