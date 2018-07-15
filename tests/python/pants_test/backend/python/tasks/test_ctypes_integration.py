@@ -50,7 +50,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
       # The + is because we append the target's fingerprint to the version. We test this version
       # string in test_build_local_python_distributions.py.
-      wheel_glob = os.path.join(tmp_dir, 'ctypes_test-1.0.0+*.whl')
+      wheel_glob = os.path.join(tmp_dir, 'ctypes_test-0.0.1+*.whl')
       wheel_dist_with_path = assert_single_element(glob.glob(wheel_glob))
       wheel_dist = re.sub('^{}{}'.format(re.escape(tmp_dir), os.path.sep), '', wheel_dist_with_path)
 
