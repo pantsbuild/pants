@@ -16,7 +16,7 @@ from contextlib import closing
 import cffi
 import pkg_resources
 import six
-from future.utils import native
+from future.utils import text_type
 
 from pants.engine.selectors import Get, constraint_for
 from pants.util.contextutil import temporary_dir
@@ -433,7 +433,7 @@ def _initialize_externs(ffi):
   def extern_store_utf8(context_handle, utf8_ptr, utf8_len):
     """Given a context and UTF8 bytes, return a new Handle to represent the content."""
     c = ffi.from_handle(context_handle)
-    return c.to_value(native(str(ffi.buffer(utf8_ptr, utf8_len))))
+    return c.to_value(text_type(ffi.buffer(utf8_ptr, utf8_len)))
 
   @ffi.def_extern()
   def extern_store_i64(context_handle, i64):
@@ -820,7 +820,7 @@ class Native(object):
     return self.gc(scheduler, self.lib.scheduler_destroy)
 
   def set_panic_handler(self):
-    if os.getenv("RUST_BACKTRACE", "0") != "1":
+    if os.getenv("RUST_BACKTRACE", "0") == "0":
       # The panic handler hides a lot of rust tracing which may be useful.
       # Don't activate it when the user explicitly asks for rust backtraces.
       self.lib.set_panic_handler()

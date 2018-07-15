@@ -20,6 +20,7 @@ extern crate sha2;
 extern crate tempfile;
 #[cfg(test)]
 extern crate testutil;
+extern crate tokio_codec;
 extern crate tokio_process;
 
 use boxfuture::BoxFuture;

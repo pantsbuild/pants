@@ -11,7 +11,7 @@ import unittest
 from builtins import str
 from contextlib import contextmanager
 
-from future.utils import native
+from future.utils import text_type
 
 from pants.base.project_tree import Dir, Link
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, DirectoryToMaterialize,
@@ -275,9 +275,9 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         f.write("European Burmese")
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       globs = PathGlobs(("*",), ())
-      snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, native(str(temp_dir))),))[0]
+      snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(temp_dir)),))[0]
       self.assert_snapshot_equals(snapshot, ["roland"], DirectoryDigest(
-        native("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))
 
@@ -289,17 +289,17 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         f.write("I don't know")
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       snapshots = scheduler.capture_snapshots((
-        PathGlobsAndRoot(PathGlobs(("roland",), ()), native(str(temp_dir))),
-        PathGlobsAndRoot(PathGlobs(("susannah",), ()), native(str(temp_dir))),
-        PathGlobsAndRoot(PathGlobs(("doesnotexist",), ()), native(str(temp_dir))),
+        PathGlobsAndRoot(PathGlobs(("roland",), ()), text_type(temp_dir)),
+        PathGlobsAndRoot(PathGlobs(("susannah",), ()), text_type(temp_dir)),
+        PathGlobsAndRoot(PathGlobs(("doesnotexist",), ()), text_type(temp_dir)),
       ))
       self.assertEquals(3, len(snapshots))
       self.assert_snapshot_equals(snapshots[0], ["roland"], DirectoryDigest(
-        native("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))
       self.assert_snapshot_equals(snapshots[1], ["susannah"], DirectoryDigest(
-        native("d3539cfc21eb4bab328ca9173144a8e932c515b1b9e26695454eeedbc5a95f6f"),
+        text_type("d3539cfc21eb4bab328ca9173144a8e932c515b1b9e26695454eeedbc5a95f6f"),
         82
       ))
       self.assert_snapshot_equals(snapshots[2], [], EMPTY_DIRECTORY_DIGEST)
@@ -309,7 +309,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       globs = PathGlobs(("*",), ())
       with self.assertRaises(Exception) as cm:
-        scheduler.capture_snapshots((PathGlobsAndRoot(globs, str(os.path.join(temp_dir, "doesnotexist"))),))
+        scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(os.path.join(temp_dir, "doesnotexist"))),))
       self.assertIn("doesnotexist", str(cm.exception))
 
   def assert_snapshot_equals(self, snapshot, files, directory_digest):
@@ -330,10 +330,10 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       (empty_snapshot, roland_snapshot, susannah_snapshot, both_snapshot) = (
           scheduler.capture_snapshots((
-            PathGlobsAndRoot(PathGlobs(("doesnotmatch",), ()), native(str(temp_dir))),
-            PathGlobsAndRoot(PathGlobs(("roland",), ()), native(str(temp_dir))),
-            PathGlobsAndRoot(PathGlobs(("susannah",), ()), native(str(temp_dir))),
-            PathGlobsAndRoot(PathGlobs(("*",), ()), native(str(temp_dir))),
+            PathGlobsAndRoot(PathGlobs(("doesnotmatch",), ()), text_type(temp_dir)),
+            PathGlobsAndRoot(PathGlobs(("roland",), ()), text_type(temp_dir)),
+            PathGlobsAndRoot(PathGlobs(("susannah",), ()), text_type(temp_dir)),
+            PathGlobsAndRoot(PathGlobs(("*",), ()), text_type(temp_dir)),
         ))
       )
 
@@ -367,11 +367,11 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
     with temporary_dir() as temp_dir:
       dir_path = os.path.join(temp_dir, "containing_roland")
       digest = DirectoryDigest(
-        native("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       )
       scheduler = self.mk_scheduler(rules=create_fs_rules())
-      scheduler.materialize_directories((DirectoryToMaterialize(native(str(dir_path)), digest),))
+      scheduler.materialize_directories((DirectoryToMaterialize(text_type(dir_path), digest),))
 
       created_file = os.path.join(dir_path, "roland")
       with open(created_file) as f:
@@ -429,8 +429,8 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         f.write("European Burmese")
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       globs = PathGlobs(("*",), ())
-      snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, native(str(temp_dir))),))[0]
+      snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(temp_dir)),))[0]
       self.assert_snapshot_equals(snapshot, ["roland"], DirectoryDigest(
-        native("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))
