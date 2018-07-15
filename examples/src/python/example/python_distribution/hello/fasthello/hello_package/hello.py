@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import c_greet
 import cpp_greet
 
-
 def hello():
   return '\n'.join([
     c_greet.c_greet(),

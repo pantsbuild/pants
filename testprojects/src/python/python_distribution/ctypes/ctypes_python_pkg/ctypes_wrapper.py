@@ -23,7 +23,6 @@ asdf_cpp_lib_path = get_generated_shared_lib('asdf-cpp')
 asdf_c_lib = ctypes.CDLL(asdf_c_lib_path)
 asdf_cpp_lib = ctypes.CDLL(asdf_cpp_lib_path)
 
-
 def f(x):
   added = asdf_c_lib.add_three(x)
   multiplied = asdf_cpp_lib.multiply_by_three(added)

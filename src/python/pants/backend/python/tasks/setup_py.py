@@ -8,7 +8,6 @@ import ast
 import itertools
 import os
 import pprint
-import re
 import shutil
 from abc import abstractmethod
 from builtins import map, object, str, zip
@@ -167,12 +166,6 @@ class SetupPyExecutionEnvironment(datatype([
     ],
     'linux': lambda: ['-shared'],
   }
-
-  # A "local" extension to a version string, as per
-  # https://www.python.org/dev/peps/pep-0440/#local-version-identifiers
-  PEP_0440_DISALLOWED_LOCAL = re.compile(r'[^a-zA-Z0-9\.]')
-  # Replace all the disallowed characters with dots.
-  _local_version_replacer_char = '.'
 
   def as_environment(self):
     ret = {}

@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import c_greet
 import cpp_greet
 
-
 def hello():
   print(c_greet.c_greet())
   print(cpp_greet.cpp_greet())
