@@ -109,6 +109,12 @@ class PantsRunIntegrationTest(unittest.TestCase):
     return [
         # Used in the wrapper script to locate a rust install.
         'HOME',
+
+        # Used in the wrapper script to locate a python 2.7 binary via `which`; also used in
+        # pants.pex for the same purpose via a pex header shebang of `#!/usr/bin/env python2.7`.
+        'PATH',
+
+        # Allow profiling of integration tests,
         'PANTS_PROFILE',
       ]
 
