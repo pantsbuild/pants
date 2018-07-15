@@ -10,7 +10,6 @@ import unittest
 from builtins import str
 
 from future.utils import text_type
-from future.utils import native, text_type
 
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, FileContent, FilesContent,
                              PathGlobs, Snapshot, create_fs_rules)
@@ -78,7 +77,7 @@ def cat_files_process_result_concatted(cat_exe_req):
     description='cat some files',
   )
   cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
-  yield Concatted(native(str(cat_process_result.stdout)))
+  yield Concatted(text_type(cat_process_result.stdout))
 
 
 def create_cat_stdout_rules():
@@ -118,7 +117,7 @@ def get_javac_version_output(javac_version_command):
   javac_version_proc_result = yield Get(
     ExecuteProcessResult, ExecuteProcessRequest, javac_version_proc_req)
 
-  yield JavacVersionOutput(native(str(javac_version_proc_result.stderr)))
+  yield JavacVersionOutput(text_type(javac_version_proc_result.stderr))
 
 
 class JavacSources(datatype([('java_files', tuple)])):
@@ -180,8 +179,8 @@ def javac_compile_process_result(javac_compile_req):
   stderr = javac_proc_result.stderr
 
   yield JavacCompileResult(
-    native(str(stdout)),
-    native(str(stderr)),
+    text_type(stdout),
+    text_type(stderr),
     javac_proc_result.output_directory_digest,
   )
 
@@ -273,7 +272,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     results = self.execute(scheduler, Concatted, cat_exe_req)
     self.assertEqual(1, len(results))
     concatted = results[0]
-    self.assertEqual(Concatted(native('one\ntwo\n')), concatted)
+    self.assertEqual(Concatted(text_type('one\ntwo\n')), concatted)
 
   def test_javac_version_example(self):
     scheduler = self.mk_scheduler_in_example_fs([
