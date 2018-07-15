@@ -58,6 +58,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       self._assert_native_greeting(pants_run.stdout_data)
 
   def test_invalidation(self):
+    """Test that the current version of a python_dist() is resolved after modifying its sources."""
     fasthello_run = '{}:main_with_no_conflict'.format(self.fasthello_install_requires_dir)
 
     with self.mock_buildroot(
