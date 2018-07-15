@@ -134,7 +134,7 @@ Refactoring, Improvements, and Tooling
   `PR #6052 <https://github.com/pantsbuild/pants/pull/6052>`_
 
 * Port backend/python to Python 3 (#6086)
-  `Issue #6062 <https://github.com/pantsbuild/pants/issues/6062>`_
+  `Issue #6062 <https://github.com/pantsbuild/pants/issues/6062>`_
   `PR #6086 <https://github.com/pantsbuild/pants/pull/6086>`_
 
 * Port backend/native to Python 3 (#6084)
@@ -164,8 +164,8 @@ Refactoring, Improvements, and Tooling
   `PR #6067 <https://github.com/pantsbuild/pants/pull/6067>`_
 
 * Run `futurize --stage1` to make safe changes for python 3 compatibility. (#6063)
-  `Issue #6062) <https://github.com/pantsbuild/pants/issues/6062)>`_
   `PR #6063 <https://github.com/pantsbuild/pants/pull/6063>`_
+  `Issue #6062 <https://github.com/pantsbuild/pants/issues/6062>`_
 
 * Switch to a per-entry state machine in Graph (#6013)
   `PR #6013 <https://github.com/pantsbuild/pants/pull/6013>`_
