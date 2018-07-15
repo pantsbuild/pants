@@ -8,8 +8,6 @@ from builtins import object
 
 from pants.base.deprecated import deprecated
 
-from builtins import object
-
 
 class ZincLanguageMixin(object):
   """A mixin for subsystems for languages compiled with Zinc."""
