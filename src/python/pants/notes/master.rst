@@ -4,6 +4,202 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.9.0.dev1 (07/14/2018)
+-----------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add support for reusing Graph node values if their inputs haven't changed (#6059)
+  `PR #6059 <https://github.com/pantsbuild/pants/pull/6059>`_
+
+* Compile a VERY simple java source remotely (no dependencies or inner classes) (#5999)
+  `PR #5999 <https://github.com/pantsbuild/pants/pull/5999>`_
+
+* Expose materialize_directory as an intrinsic function on the scheduler (#6028)
+  `PR #6028 <https://github.com/pantsbuild/pants/pull/6028>`_
+
+* Targets always have a Snapshot (#5994)
+  `PR #5994 <https://github.com/pantsbuild/pants/pull/5994>`_
+
+* Add an execution strategy flag (#5981)
+  `PR #5981 <https://github.com/pantsbuild/pants/pull/5981>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Enable passing option sets to the compiler and deprecate fatal_warnings (#6065)
+  `PR #6065 <https://github.com/pantsbuild/pants/pull/6065>`_
+
+* Upgrade to v2 of bazel protobuf (#6027)
+  `PR #6027 <https://github.com/pantsbuild/pants/pull/6027>`_
+
+* Add PrimitivesSetField and deprecate SetOfPrimitivesField (#6087)
+  `PR #6087 <https://github.com/pantsbuild/pants/pull/6087>`_
+
+* Update to rust 1.27, implicitly requiring OSX 10.11 (#6035)
+  `PR #6035 <https://github.com/pantsbuild/pants/pull/6035>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix local execution of hermetic integration tests (#6101)
+  `PR #6101 <https://github.com/pantsbuild/pants/pull/6101>`_
+
+* Use PrimitivesSetField in ScalaJs target and minor help text fixup (#6113)
+  `PR #6113 <https://github.com/pantsbuild/pants/pull/6113>`_
+
+* Fix 'current' platform handling. (#6104)
+  `PR #6104 <https://github.com/pantsbuild/pants/pull/6104>`_
+
+* Make RUST_BACKTRACE sniffing less specific (#6107)
+  `PR #6107 <https://github.com/pantsbuild/pants/pull/6107>`_
+
+* Improve source field deprecations (#6097)
+  `PR #6097 <https://github.com/pantsbuild/pants/pull/6097>`_
+
+* Remove and prevent inaccurate __eq__ implementations on datatype (#6061)
+  `PR #6061 <https://github.com/pantsbuild/pants/pull/6061>`_
+
+* Ensure correct toolchain per clone. (#6054)
+  `PR #6054 <https://github.com/pantsbuild/pants/pull/6054>`_
+
+* Have pantsbuild-ci-bot do deploys. (#6053)
+  `PR #6053 <https://github.com/pantsbuild/pants/pull/6053>`_
+
+* Fix go-import meta tag ends with /> #6036 (#6037)
+  `PR #6037 <https://github.com/pantsbuild/pants/pull/6037>`_
+
+* Fix bad exclusion introduced during rushed change. (#6034)
+  `PR #6034 <https://github.com/pantsbuild/pants/pull/6034>`_
+
+* Fix unicode handling in Exiters (#6032)
+  `PR #6032 <https://github.com/pantsbuild/pants/pull/6032>`_
+
+* [pantsd] Improve environment unicode handling. (#6031)
+  `PR #6031 <https://github.com/pantsbuild/pants/pull/6031>`_
+
+* Actually return execution options (#6019)
+  `PR #6019 <https://github.com/pantsbuild/pants/pull/6019>`_
+
+* Ignore the `logs/` dir. (#6021)
+  `PR #6021 <https://github.com/pantsbuild/pants/pull/6021>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Port errorprone to py3 (#6118)
+  `PR #6118 <https://github.com/pantsbuild/pants/pull/6118>`_
+
+* Port console to Python 3 (#6121)
+  `PR #6121 <https://github.com/pantsbuild/pants/pull/6121>`_
+
+* Port buildgen to py3 (#6110)
+  `PR #6110 <https://github.com/pantsbuild/pants/pull/6110>`_
+
+* Add release metadata to boxfuture (#6106)
+  `PR #6106 <https://github.com/pantsbuild/pants/pull/6106>`_
+
+* Port engine/fs.py datatype() instances (#6103)
+  `PR #6103 <https://github.com/pantsbuild/pants/pull/6103>`_
+  `PR #6098 <https://github.com/pantsbuild/pants/pull/6098>`_
+  `PR #6092 <https://github.com/pantsbuild/pants/pull/6092>`_
+
+* Port findbugs to py3. (#6120)
+  `PR #6120 <https://github.com/pantsbuild/pants/pull/6120>`_
+
+* Port codeanalysis to py3. (#6111)
+  `PR #6111 <https://github.com/pantsbuild/pants/pull/6111>`_
+
+* Port buildrefactor to py3. (#6109)
+  `PR #6109 <https://github.com/pantsbuild/pants/pull/6109>`_
+
+* Switch from output_async to spawn_async, and buffer output. (#6105)
+  `PR #6105 <https://github.com/pantsbuild/pants/pull/6105>`_
+
+* Allow Rust to store `unicode` as well as `bytes` (#6108)
+  `PR #6108 <https://github.com/pantsbuild/pants/pull/6108>`_
+  `PR #6103 <https://github.com/pantsbuild/pants/pull/6103>`_
+
+* Remove unnecessary __future__ imports  (#6096)
+  `PR #6096 <https://github.com/pantsbuild/pants/pull/6096>`_
+
+* Port fs to python 3 compatibility (#6091)
+  `PR #6091 <https://github.com/pantsbuild/pants/pull/6091>`_
+
+* Nodes output cheaply-cloneable values (#6078)
+  `PR #6078 <https://github.com/pantsbuild/pants/pull/6078>`_
+
+* execution_strategy is a memoized_property (#6052)
+  `PR #6052 <https://github.com/pantsbuild/pants/pull/6052>`_
+
+* Port backend/python to Python 3 (#6086)
+  `Issue #6062 <https://github.com/pantsbuild/pants/issues/6062>`_
+  `PR #6086 <https://github.com/pantsbuild/pants/pull/6086>`_
+
+* Port backend/native to Python 3 (#6084)
+  `Issue #6062 <https://github.com/pantsbuild/pants/issues/6062>`_
+  `PR #6084 <https://github.com/pantsbuild/pants/pull/6084>`_
+
+* Port majority of pants/util to Python 3 (#6073)
+  `Issue #6062 <https://github.com/pantsbuild/pants/issues/6062>`_
+  `PR #6073 <https://github.com/pantsbuild/pants/pull/6073>`_
+
+* Port backend/codegen and backend/docgen to Python 3 (#6083)
+  `PR #6083 <https://github.com/pantsbuild/pants/pull/6083>`_
+
+* Port util/process_handler.py and util/tarutil.py to Python 3 (#6082)
+  `PR #6082 <https://github.com/pantsbuild/pants/pull/6082>`_
+  `PR #6073 <https://github.com/pantsbuild/pants/pull/6073>`_
+
+* Add `-ltrace` and requests debug logging. (#6070)
+  `PR #6070 <https://github.com/pantsbuild/pants/pull/6070>`_
+
+* Port util metaprogramming files to Python3 (#6072)
+  `Issue #6062 <https://github.com/pantsbuild/pants/issues/6062>`_
+  `PR #6072 <https://github.com/pantsbuild/pants/pull/6072>`_
+
+* Add future lib and port src/base to Python3 (#6067)
+  `Issue #6062), <https://github.com/pantsbuild/pants/issues/6062),>`_
+  `PR #6067 <https://github.com/pantsbuild/pants/pull/6067>`_
+
+* Run `futurize --stage1` to make safe changes for python 3 compatibility. (#6063)
+  `Issue #6062) <https://github.com/pantsbuild/pants/issues/6062)>`_
+  `PR #6063 <https://github.com/pantsbuild/pants/pull/6063>`_
+
+* Switch to a per-entry state machine in Graph (#6013)
+  `PR #6013 <https://github.com/pantsbuild/pants/pull/6013>`_
+
+* Log more in rust tests (#6060)
+  `PR #6060 <https://github.com/pantsbuild/pants/pull/6060>`_
+
+* Introduce libc subsystem to find crti.o on linux hosts and unskip the native backend subsystem tests (#5943)
+  `PR #5943 <https://github.com/pantsbuild/pants/pull/5943>`_
+
+* Clean up process execution python API (#6051)
+  `PR #6051 <https://github.com/pantsbuild/pants/pull/6051>`_
+
+* Skip pyprep and pytest-prep if there are no python targest (#6039)
+  `PR #6039 <https://github.com/pantsbuild/pants/pull/6039>`_
+
+* Simplify rust code (#6043)
+  `PR #6043 <https://github.com/pantsbuild/pants/pull/6043>`_
+
+* [remoting] Move local process execution tempdirs into the workdir, add option to not delete them (#6023)
+  `PR #6023 <https://github.com/pantsbuild/pants/pull/6023>`_
+
+* Many rust lints (#5982)
+  `PR #5982 <https://github.com/pantsbuild/pants/pull/5982>`_
+
+* Include type name in TypedDataType construction errors (#6015)
+  `PR #6015 <https://github.com/pantsbuild/pants/pull/6015>`_
+
+* Consolidate `src/python/pants/python` -> `src/python/pants/backend/python` (#6025)
+  `PR #6025 <https://github.com/pantsbuild/pants/pull/6025>`_
+
+* Extract and genericize Graph for easier testing (#6010)
+  `PR #6010 <https://github.com/pantsbuild/pants/pull/6010>`_
+
 1.9.0.dev0 (06/25/2018)
 -----------------------
 
