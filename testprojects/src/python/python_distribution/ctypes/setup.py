@@ -7,9 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from setuptools import setup, find_packages
 
+
 setup(
   name='ctypes_test',
-  version='1.0.0',
+  version='0.0.1',
   packages=find_packages(),
   # Declare two files at the top-level directory (denoted by '').
   data_files=[('', ['libasdf-c.so', 'libasdf-cpp.so'])],
