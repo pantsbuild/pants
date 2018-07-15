@@ -8,9 +8,8 @@ import queue
 import threading
 import traceback
 from builtins import map, object, str
+from collections import defaultdict, deque
 from heapq import heappop, heappush
-
-from future.moves.collections import defaultdict, deque
 
 from pants.base.worker_pool import Work
 
