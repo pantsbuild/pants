@@ -74,6 +74,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(unmodified_pants_run)
       self.assertIn('Hello from C!\n', unmodified_pants_run.stdout_data)
 
+      # Modify one of the source files for this target so that the output is different.
       c_source_file = os.path.join(self.fasthello_install_requires_dir, 'c_greet.c')
       with open(c_source_file, 'r') as f:
         orig_contents = f.read()
