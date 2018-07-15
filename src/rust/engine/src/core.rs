@@ -165,29 +165,8 @@ pub enum Failure {
   /// A Node failed because a filesystem change invalidated it or its inputs.
   /// A root requestor should usually immediately retry their request.
   Invalidated,
-  /// There was no valid combination of rules to satisfy a request.
-  Noop(Noop),
   /// A rule raised an exception.
   Throw(Value, String),
-}
-
-// NB: enum members are listed in ascending priority order based on how likely they are
-// to be useful to users.
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
-pub enum Noop {
-  NoTask,
-  NoVariant,
-  Cycle,
-}
-
-impl fmt::Debug for Noop {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    f.write_str(match self {
-      &Noop::Cycle => "Dep graph contained a cycle.",
-      &Noop::NoTask => "No task was available to compute the value.",
-      &Noop::NoVariant => "A matching variant key was not configured in variants.",
-    })
-  }
 }
 
 pub fn throw(msg: &str) -> Failure {
@@ -196,6 +175,6 @@ pub fn throw(msg: &str) -> Failure {
     format!(
       "Traceback (no traceback):\n  <pants native internals>\nException: {}",
       msg
-    ).to_string(),
+    ),
   )
 }

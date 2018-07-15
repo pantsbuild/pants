@@ -38,8 +38,8 @@ pub struct Tasks {
 ///   2. add_*() - zero or more times per task to add input clauses
 ///   3. task_end() - once per task
 ///
-/// Also has a one-shot method for adding a singleton (which has no Selects):
-///   1. singleton_add()
+/// Also has a one-shot method for adding Singletons (which have no Selects):
+///   * singleton_add()
 ///
 /// (This protocol was original defined in a Builder, but that complicated the C lifecycle.)
 ///
@@ -112,7 +112,7 @@ impl Tasks {
   pub fn singleton_add(&mut self, value: Value, product: TypeConstraint) {
     if let Some(&(_, ref existing_value)) = self.singletons.get(&product) {
       panic!(
-        "More than one singleton rule was installed for the product {:?}: {:?} vs {:?}",
+        "More than one Singleton rule was installed for the product {:?}: {:?} vs {:?}",
         product, existing_value, value,
       );
     }

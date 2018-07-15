@@ -230,8 +230,8 @@ class Scheduler(object):
 
   def _register_task(self, output_constraint, rule):
     """Register the given TaskRule with the native scheduler."""
-    func = rule.func
-    self._native.lib.tasks_task_begin(self._tasks, Function(self._to_key(func)), output_constraint)
+    func = Function(self._to_key(rule.func))
+    self._native.lib.tasks_task_begin(self._tasks, func, output_constraint)
     for selector in rule.input_selectors:
       selector_type = type(selector)
       product_constraint = self._to_constraint(selector.product)
@@ -325,7 +325,7 @@ class Scheduler(object):
       for raw_root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
         if raw_root.state_tag is 1:
           state = Return(self._from_value(raw_root.state_value))
-        elif raw_root.state_tag in (2, 3, 4):
+        elif raw_root.state_tag in (2, 3):
           state = Throw(self._from_value(raw_root.state_value))
         else:
           raise ValueError(

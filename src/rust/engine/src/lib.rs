@@ -44,6 +44,7 @@ extern crate fs;
 extern crate futures;
 extern crate graph;
 extern crate hashing;
+extern crate itertools;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
@@ -82,8 +83,7 @@ use types::Types;
 enum RawStateTag {
   Return = 1,
   Throw = 2,
-  Noop = 3,
-  Invalidated = 4,
+  Invalidated = 3,
 }
 
 #[repr(C)]
@@ -100,10 +100,6 @@ impl RawNode {
     let (state_tag, state_value) = match state {
       Ok(v) => (RawStateTag::Return as u8, v),
       Err(Failure::Throw(exc, _)) => (RawStateTag::Throw as u8, exc),
-      Err(Failure::Noop(noop)) => (
-        RawStateTag::Noop as u8,
-        externs::create_exception(&format!("{:?}", noop)),
-      ),
       Err(Failure::Invalidated) => (
         RawStateTag::Invalidated as u8,
         externs::create_exception("Exhausted retries due to changed files."),
