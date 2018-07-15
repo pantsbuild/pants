@@ -25,11 +25,11 @@ New features
 * Add an execution strategy flag (#5981)
   `PR #5981 <https://github.com/pantsbuild/pants/pull/5981>`_
 
-API Changes
-~~~~~~~~~~~
-
 * Enable passing option sets to the compiler and deprecate fatal_warnings (#6065)
   `PR #6065 <https://github.com/pantsbuild/pants/pull/6065>`_
+
+API Changes
+~~~~~~~~~~~
 
 * Upgrade to v2 of bazel protobuf (#6027)
   `PR #6027 <https://github.com/pantsbuild/pants/pull/6027>`_
@@ -84,6 +84,9 @@ Bugfixes
 
 * Ignore the `logs/` dir. (#6021)
   `PR #6021 <https://github.com/pantsbuild/pants/pull/6021>`_
+
+* Fix edge removal in Graph that could make invalidation inaccurate (#6123)
+  `PR #6123 <https://github.com/pantsbuild/pants/pull/6123>`_
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -199,6 +202,13 @@ Refactoring, Improvements, and Tooling
 
 * Extract and genericize Graph for easier testing (#6010)
   `PR #6010 <https://github.com/pantsbuild/pants/pull/6010>`_
+
+* Add libc search noop option (#6122)
+  `PR #6122 <https://github.com/pantsbuild/pants/pull/6122>`_
+
+* Fix test_objects handling of dataclass() py2-py3 compatibility (#6098)
+  `PR #6098 <https://github.com/pantsbuild/pants/pull/6098>`_
+  `Issue #6062 <https://github.com/pantsbuild/pants/issues/6062>`_
 
 1.9.0.dev0 (06/25/2018)
 -----------------------
