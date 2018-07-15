@@ -1075,12 +1075,13 @@ impl<N: Node> Graph<N> {
     }
 
     // Otherwise, clear the deps.
-    let dep_edges: Vec<_> = inner
+    // NB: Because `remove_edge` changes EdgeIndex values, we remove edges one at a time.
+    while let Some(dep_edge) = inner
       .pg
       .edges_directed(entry_id, Direction::Outgoing)
+      .next()
       .map(|edge| edge.id())
-      .collect();
-    for dep_edge in dep_edges {
+    {
       inner.pg.remove_edge(dep_edge);
     }
   }
