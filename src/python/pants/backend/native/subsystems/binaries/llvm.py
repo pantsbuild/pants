@@ -13,7 +13,7 @@ from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
 from pants.util.dirutil import is_readable_dir
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_method, memoized_property
 
 
 class LLVMReleaseUrlGenerator(BinaryToolUrlGenerator):
@@ -70,19 +70,29 @@ class LLVM(NativeTool):
         self._PLATFORM_SPECIFIC_LINKER_NAME),
       library_dirs=[])
 
+  # FIXME: use ParseSearchDirs for this and other include directories -- we shouldn't be trying to
+  # guess the path here.
+  @memoized_property
+  def _common_include_dirs(self):
+    return [os.path.join(self.select(), 'lib/clang', self.version(), 'include')]
+
   def c_compiler(self):
     return CCompiler(
       path_entries=self.path_entries(),
       exe_filename='clang',
       library_dirs=[],
-      include_dirs=[])
+      include_dirs=self._common_include_dirs)
+
+  @memoized_property
+  def _cpp_include_dirs(self):
+    return [os.path.join(self.select(), 'include/c++/v1')]
 
   def cpp_compiler(self):
     return CppCompiler(
       path_entries=self.path_entries(),
       exe_filename='clang++',
       library_dirs=[],
-      include_dirs=[])
+      include_dirs=(self._cpp_include_dirs + self._common_include_dirs))
 
 
 # FIXME(#5663): use this over the XCode linker!
