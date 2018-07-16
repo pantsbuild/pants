@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import inspect
 import re
 import textwrap
+from builtins import object, range
 from collections import OrderedDict, namedtuple
 
 from pants.base.exceptions import TaskError

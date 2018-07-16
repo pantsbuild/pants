@@ -6,6 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import unittest
 
+from future.utils import PY2
+
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.option.config import Config
 from pants.option.global_options import GlobalOptionsRegistrar
@@ -30,13 +32,15 @@ class HelpInfoExtracterTest(unittest.TestCase):
     do_test(['-f', '--foo'], {'type': bool }, ['-f', '--[no-]foo'],
             ['-f', '--foo', '--no-foo'])
 
-    do_test(['--foo'], {}, ['--foo=<str>'], ['--foo'])
+    str_repr = 'newstr' if PY2 else 'str'
+
+    do_test(['--foo'], {}, ['--foo=<{}>'.format(str_repr)], ['--foo'])
     do_test(['--foo'], {'metavar': 'xx'}, ['--foo=xx'], ['--foo'])
     do_test(['--foo'], {'type': int}, ['--foo=<int>'], ['--foo'])
     do_test(['--foo'], {'type': list}, [
-      '--foo=<str> (--foo=<str>) ...',
-      '--foo="[<str>, <str>, ...]"',
-      '--foo="+[<str>, <str>, ...]"'
+      '--foo=<{0}> (--foo=<{0}>) ...'.format(str_repr),
+      '--foo="[<{0}>, <{0}>, ...]"'.format(str_repr),
+      '--foo="+[<{0}>, <{0}>, ...]"'.format(str_repr)
     ], ['--foo'])
     do_test(['--foo'], {'type': list, 'member_type': int},[
       '--foo=<int> (--foo=<int>) ...',
@@ -54,7 +58,7 @@ class HelpInfoExtracterTest(unittest.TestCase):
     do_test(['--foo'], {'type': dict}, ['--foo="{\'key1\':val1,\'key2\':val2,...}"'],
                                             ['--foo'])
 
-    do_test(['--foo', '--bar'], {}, ['--foo=<str>', '--bar=<str>'], ['--foo', '--bar'])
+    do_test(['--foo', '--bar'], {}, ['--foo=<{}>'.format(str_repr), '--bar=<{}>'.format(str_repr)], ['--foo', '--bar'])
 
   def test_non_global_scope(self):
     def do_test(args, kwargs, expected_display_args, expected_scoped_cmd_line_args,
