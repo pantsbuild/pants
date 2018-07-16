@@ -106,7 +106,7 @@ class FindBugs(NailgunTask):
     if self.get_options().transitive:
       targets = self.context.targets(self._is_findbugs_target)
     else:
-      targets = [t for t in self.context.target_roots if self._is_findbugs_target(t)]
+      targets = filter(self._is_findbugs_target, self.context.target_roots)
 
     targets = list(set(targets))
 
