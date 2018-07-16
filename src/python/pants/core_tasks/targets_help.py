@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import next
+
 from colors import blue, cyan, green
 
 from pants.help.build_dictionary_info_extracter import BuildDictionaryInfoExtracter
