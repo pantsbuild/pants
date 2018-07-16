@@ -8,7 +8,7 @@ import copy
 import os
 import re
 import traceback
-from builtins import map, next, object
+from builtins import next, object
 from collections import defaultdict
 
 import six
