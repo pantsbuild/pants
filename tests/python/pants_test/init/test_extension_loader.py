@@ -8,6 +8,7 @@ import sys
 import types
 import unittest
 import uuid
+from builtins import object
 from contextlib import contextmanager
 
 from pkg_resources import (Distribution, EmptyProvider, VersionConflict, WorkingSet, working_set,
