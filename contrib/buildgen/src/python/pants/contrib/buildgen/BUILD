@@ -21,6 +21,7 @@ python_library(
   name = 'build_file_manipulator',
   sources = ['build_file_manipulator.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/build_graph',
   ]
 )

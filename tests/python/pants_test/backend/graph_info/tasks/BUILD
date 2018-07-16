@@ -7,6 +7,7 @@ python_tests(
   sources=['test_cloc.py'],
   coverage=['pants.backend.graph_info.tasks.cloc'],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/python/targets:python',
@@ -20,6 +21,7 @@ python_tests(
   name='cloc_integration',
   sources=['test_cloc_integration.py'],
   dependencies=[
+    '3rdparty/python:future',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
@@ -69,6 +71,7 @@ python_tests(
   name = 'listtargets',
   sources = ['test_listtargets.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/backend/jvm:artifact',
     'src/python/pants/backend/jvm/targets:java',
@@ -107,6 +110,7 @@ python_tests(
   name='paths',
   sources=['test_paths.py'],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/base:exceptions',
     'tests/python/pants_test:task_test_base',

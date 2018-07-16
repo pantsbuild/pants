@@ -3,6 +3,7 @@
 
 python_library(
   dependencies=[
+    '3rdparty/python:future',
     '3rdparty/python:ansicolors',
     '3rdparty/python:packaging',
     '3rdparty/python:setuptools',
