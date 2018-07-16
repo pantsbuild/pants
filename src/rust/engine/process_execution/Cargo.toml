@@ -2,6 +2,7 @@
 version = "0.0.1"
 name = "process_execution"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
 
 [dependencies]
 async_semaphore = { path = "../async_semaphore" }
@@ -19,6 +20,7 @@ resettable = { path = "../resettable" }
 sha2 = "0.6.0"
 tempfile = "3"
 futures-timer = "0.1"
+tokio-codec = "0.1"
 tokio-process = "0.2.1"
 
 [dev-dependencies]

@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -13,13 +13,14 @@ from pants.backend.native.config.environment import (GCCCCompiler, GCCCppCompile
 from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
+from pants.backend.native.subsystems.libc_dev import LibcDev
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import is_executable, safe_open
 from pants.util.process_handler import subprocess
 from pants.util.strutil import safe_shlex_join
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
+from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystems
 from pants_test.test_base import TestBase
 
 
@@ -27,6 +28,12 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
 
   def setUp(self):
     super(TestNativeToolchain, self).setUp()
+
+    init_subsystems([LibcDev, NativeToolchain], options={
+      'libc': {
+        'enable_libc_search': True,
+      },
+    })
 
     self.platform = Platform.create()
     self.toolchain = global_subsystem_instance(NativeToolchain)

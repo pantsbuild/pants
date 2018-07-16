@@ -2,6 +2,7 @@
 name = "fs_util"
 version = "0.0.1"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
 
 [dependencies]
 bytes = "0.4.5"

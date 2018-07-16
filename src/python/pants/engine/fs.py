@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from future.utils import text_type
+
 from pants.base.project_tree import Dir, File
 from pants.engine.rules import RootRule
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -61,11 +63,11 @@ class PathGlobs(datatype([
       glob_match_error_behavior=glob_match_error_behavior)
 
 
-class PathGlobsAndRoot(datatype([('path_globs', PathGlobs), ('root', str)])):
+class PathGlobsAndRoot(datatype([('path_globs', PathGlobs), ('root', text_type)])):
   pass
 
 
-class DirectoryDigest(datatype([('fingerprint', str), ('serialized_bytes_length', int)])):
+class DirectoryDigest(datatype([('fingerprint', text_type), ('serialized_bytes_length', int)])):
   """A DirectoryDigest is an opaque handle to a set of files known about by the engine.
 
   The contents of files can be inspected by requesting a FilesContent for it.
@@ -114,7 +116,7 @@ class Snapshot(datatype([('directory_digest', DirectoryDigest), ('path_stats', t
     return [p.stat for p in self.files]
 
 
-class DirectoryToMaterialize(datatype([('path', str), ('directory_digest', DirectoryDigest)])):
+class DirectoryToMaterialize(datatype([('path', text_type), ('directory_digest', DirectoryDigest)])):
   """A request to materialize the contents of a directory digest at the provided path."""
   pass
 
@@ -127,7 +129,7 @@ _EMPTY_FINGERPRINT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b78
 
 
 EMPTY_DIRECTORY_DIGEST = DirectoryDigest(
-  fingerprint=str(_EMPTY_FINGERPRINT),
+  fingerprint=text_type(_EMPTY_FINGERPRINT),
   serialized_bytes_length=0
 )
 

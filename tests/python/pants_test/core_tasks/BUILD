@@ -50,7 +50,7 @@ python_tests(
   name = 'run_prep_command',
   sources = ['test_run_prep_command.py'],
   dependencies = [
-    '3rdparty/python:six',
+    '3rdparty/python:future',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/core_tasks',

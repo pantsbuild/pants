@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import next
 
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin

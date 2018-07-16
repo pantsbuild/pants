@@ -310,7 +310,6 @@ pub type StoreBytesExtern = extern "C" fn(*const ExternContext, *const u8, u64) 
 
 pub type StoreUtf8Extern = extern "C" fn(*const ExternContext, *const u8, u64) -> Handle;
 
-
 pub type StoreI64Extern = extern "C" fn(*const ExternContext, i64) -> Handle;
 
 ///
