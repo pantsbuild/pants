@@ -71,6 +71,7 @@ def select_linker(platform, native_toolchain):
   #   'darwin': lambda: Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools),
   #   'linux': lambda: Get(Linker, Binutils, native_toolchain._binutils),
   # })
+  #
   # NB: We need to link through a provided compiler's frontend, and we need to know where all the
   # compiler's libraries/etc are, so we set the executable name to the C++ compiler, which can find
   # its own set of C++-specific files for the linker if necessary. Using e.g. 'g++' as the linker
