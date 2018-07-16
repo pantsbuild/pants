@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import functools
 import glob
 import os
 import re
@@ -63,11 +62,11 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
 
     with self.mock_buildroot(
         dirs_to_copy=[self.fasthello_install_requires_dir]) as buildroot, buildroot.pushd():
-      run_target = functools.partial(
-        self.run_pants_with_workdir,
-        command=['run', fasthello_run],
+      run_target = lambda: self.run_pants_with_workdir(
+        command=['-ldebug', 'run', fasthello_run],
         workdir=os.path.join(buildroot.new_buildroot, '.pants.d'),
         build_root=buildroot.new_buildroot,
+        extra_env={'PEX_VERBOSE': '9'},
       )
 
       unmodified_pants_run = run_target()
