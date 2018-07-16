@@ -4,10 +4,12 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-
 # TODO(John Sirois): UnionProducts? That seems broken though for ranged version constraints,
 # which npm has and are widely used in the community.  For now stay dumb simple (and slow) and
 # resolve each node_module individually.
+from builtins import object
+
+
 class NodePaths(object):
   """Maps NpmPackage targets to their resolved NODE_PATH chroot."""
 
@@ -38,4 +40,4 @@ class NodePaths(object):
 
     :rtype list string
     """
-    return self._paths_by_target.values()
+    return list(self._paths_by_target.values())
