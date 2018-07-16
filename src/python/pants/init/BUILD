@@ -3,6 +3,7 @@
 
 python_library(
   dependencies=[
+    '3rdparty/python:future',
     ':plugins',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
