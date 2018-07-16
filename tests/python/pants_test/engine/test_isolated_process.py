@@ -8,6 +8,8 @@ import os
 import tarfile
 import unittest
 
+from future.utils import text_type
+
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, FileContent, FilesContent,
                              PathGlobs, Snapshot, create_fs_rules)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
@@ -303,7 +305,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertEquals(
       execute_process_result.output_directory_digest,
       DirectoryDigest(
-        fingerprint=str("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        fingerprint=text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         serialized_bytes_length=80,
       )
     )

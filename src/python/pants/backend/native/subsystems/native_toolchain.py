@@ -80,18 +80,18 @@ def select_linker(platform, native_toolchain):
   if platform.normalized_os_name == 'darwin':
     # TODO(#5663): turn this into LLVM when lld works.
     linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
-    libc_dirs = []
     llvm_c_compiler = yield Get(LLVMCCompiler, NativeToolchain, native_toolchain)
     c_compiler = llvm_c_compiler.c_compiler
     llvm_cpp_compiler = yield Get(LLVMCppCompiler, NativeToolchain, native_toolchain)
     cpp_compiler = llvm_cpp_compiler.cpp_compiler
   else:
     linker = yield Get(Linker, Binutils, native_toolchain._binutils)
-    libc_dirs = [native_toolchain._libc_dev.host_libc.get_lib_dir()]
     gcc_c_compiler = yield Get(GCCCCompiler, NativeToolchain, native_toolchain)
     c_compiler = gcc_c_compiler.c_compiler
     gcc_cpp_compiler = yield Get(GCCCppCompiler, NativeToolchain, native_toolchain)
     cpp_compiler = gcc_cpp_compiler.cpp_compiler
+
+  libc_dirs = native_toolchain._libc_dev.get_libc_dirs(platform)
 
   # NB: If needing to create an environment for process invocation that could use either a compiler
   # or a linker (e.g. when we compile native code from `python_dist()`s), use the environment from

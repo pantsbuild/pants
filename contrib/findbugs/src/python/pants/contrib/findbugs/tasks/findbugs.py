@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import str
 
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -105,7 +106,7 @@ class FindBugs(NailgunTask):
     if self.get_options().transitive:
       targets = self.context.targets(self._is_findbugs_target)
     else:
-      targets = filter(self._is_findbugs_target, self.context.target_roots)
+      targets = [t for t in self.context.target_roots if self._is_findbugs_target(t)]
 
     targets = list(set(targets))
 

@@ -10,6 +10,7 @@ use hashing::Digest;
 use futures::future::Future;
 use petgraph::stable_graph;
 
+use entry::Entry;
 use Graph;
 
 // 2^32 Nodes ought to be more than enough for anyone!
@@ -17,6 +18,8 @@ pub type EntryId = stable_graph::NodeIndex<u32>;
 
 ///
 /// Defines executing a cacheable/memoizable step within the given NodeContext.
+///
+/// Note that it is assumed that Nodes are very cheap to clone.
 ///
 pub trait Node: Clone + Debug + Eq + Hash + Send + 'static {
   type Context: NodeContext<Node = Self>;
@@ -58,9 +61,9 @@ pub trait NodeVisualizer<N: Node> {
   fn color_scheme(&self) -> &str;
 
   ///
-  /// Returns a GraphViz color name/id within Self::color_scheme for the given Node/result.
+  /// Returns a GraphViz color name/id within Self::color_scheme for the given Entry.
   ///
-  fn color(&mut self, node: &N, result: Option<Result<N::Item, N::Error>>) -> String;
+  fn color(&mut self, entry: &Entry<N>) -> String;
 }
 
 ///

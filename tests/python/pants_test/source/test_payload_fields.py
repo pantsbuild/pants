@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from future.utils import text_type
+
 from pants.base.project_tree import File
 from pants.engine.fs import DirectoryDigest, Path, Snapshot
 from pants.source.payload_fields import SourcesField
@@ -80,9 +82,9 @@ class PayloadTest(TestBase):
     self.assertEqual(['foo/a.txt'], list(sf.source_paths))
     self.assertEqual(['foo/foo/a.txt'], list(sf.relative_to_buildroot()))
 
-    digest = str('56001a7e48555f156420099a99da60a7a83acc90853046709341bf9f00a6f944')
+    digest = '56001a7e48555f156420099a99da60a7a83acc90853046709341bf9f00a6f944'
     want_snapshot = Snapshot(
-      DirectoryDigest(digest, 77),
+      DirectoryDigest(text_type(digest), 77),
       (Path('foo/foo/a.txt', stat=File('foo/foo/a.txt')),)
     )
 

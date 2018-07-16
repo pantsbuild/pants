@@ -3,17 +3,19 @@ extern crate tempfile;
 
 use boxfuture::{BoxFuture, Boxable};
 use fs::{self, GlobMatching, PathGlobs, PathStatGetter, Snapshot, StrictGlobMatching};
-use futures::{future, Future};
+use futures::{future, Future, Stream};
 use std::collections::BTreeSet;
+use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 
-use tokio_process::CommandExt;
+use tokio_codec::{Decoder, FramedRead};
+use tokio_process::{Child, CommandExt};
 
 use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 
 pub struct CommandRunner {
   store: fs::Store,
@@ -35,6 +37,27 @@ impl CommandRunner {
       work_dir,
       cleanup_local_dirs,
     }
+  }
+
+  fn outputs_stream_for_child(
+    mut child: Child,
+  ) -> impl Stream<Item = ChildOutput, Error = String> + Send {
+    // TODO: This assumes that the Child was launched with stdout/stderr `Stdio::piped`.
+    let stdout_stream = FramedRead::new(child.stdout().take().unwrap(), IdentityDecoder)
+      .map(|bytes| ChildOutput::Stdout(bytes.into()));
+    let stderr_stream = FramedRead::new(child.stderr().take().unwrap(), IdentityDecoder)
+      .map(|bytes| ChildOutput::Stderr(bytes.into()));
+    let exit_stream = child.into_stream().map(|exit_status| {
+      ChildOutput::Exit(
+        exit_status
+          .code()
+          .or_else(|| exit_status.signal().map(|signal| -signal)),
+      )
+    });
+    stdout_stream
+      .select(stderr_stream)
+      .chain(exit_stream)
+      .map_err(|e| format!("Failed to consume process outputs: {:?}", e))
   }
 
   fn construct_output_snapshot(
@@ -120,11 +143,35 @@ impl super::CommandRunner for CommandRunner {
                   // to stop automatic PATH searching.
                   .env("PATH", "")
                   .envs(env)
-                  .output_async()
-                  .map_err(|e| format!("Error executing process: {:?}", e))
-                  .map(|output| (output, workdir))
+                  .stdin(Stdio::null())
+                  .stdout(Stdio::piped())
+                  .stderr(Stdio::piped())
+                  .spawn_async()
+                  .map_err(|e| format!("Error launching process: {:?}", e))
+                  .map(|child| (child, workdir))
       })
-      .and_then(move |(output, workdir)| {
+      .and_then(|(child, workdir)| {
+        // Consume the stream of ChildOutputs incrementally.
+        let init = (
+          BytesMut::with_capacity(8192),
+          BytesMut::with_capacity(8192),
+          None,
+        );
+        Self::outputs_stream_for_child(child)
+          .fold(
+            init,
+            |(mut stdout, mut stderr, mut exit_code), child_output| {
+              match child_output {
+                ChildOutput::Stdout(bytes) => stdout.extend_from_slice(&bytes),
+                ChildOutput::Stderr(bytes) => stderr.extend_from_slice(&bytes),
+                ChildOutput::Exit(code) => exit_code = code,
+              };
+              Ok((stdout, stderr, exit_code)) as Result<_, String>
+            },
+          )
+          .map(|output| (output, workdir))
+      })
+      .and_then(move |((stdout, stderr, exit_code), workdir)| {
         let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
           future::ok(fs::Snapshot::empty()).to_boxed()
         } else {
@@ -170,10 +217,10 @@ impl super::CommandRunner for CommandRunner {
         };
 
         output_snapshot
-          .map(|snapshot| FallibleExecuteProcessResult {
-            stdout: Bytes::from(output.stdout),
-            stderr: Bytes::from(output.stderr),
-            exit_code: output.status.code().unwrap(),
+          .map(move |snapshot| FallibleExecuteProcessResult {
+            stdout: stdout.freeze(),
+            stderr: stderr.freeze(),
+            exit_code: exit_code.unwrap_or(-1),
             output_directory: snapshot.digest,
           })
           .to_boxed()
@@ -185,6 +232,34 @@ impl super::CommandRunner for CommandRunner {
     self.store.reset_prefork();
     self.fs_pool.reset();
   }
+}
+
+///
+/// A Decoder that emits bytes immediately for any non-empty buffer.
+///
+struct IdentityDecoder;
+
+impl Decoder for IdentityDecoder {
+  type Item = Bytes;
+  type Error = ::std::io::Error;
+
+  fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+    if buf.len() == 0 {
+      Ok(None)
+    } else {
+      Ok(Some(buf.take().freeze()))
+    }
+  }
+}
+
+///
+/// An enum of the possible outputs from a child process.
+///
+#[derive(Debug)]
+enum ChildOutput {
+  Stdout(Bytes),
+  Stderr(Bytes),
+  Exit(Option<i32>),
 }
 
 #[cfg(test)]
@@ -250,6 +325,31 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes("bar"),
         exit_code: 1,
+        output_directory: fs::EMPTY_DIGEST,
+      }
+    )
+  }
+
+  #[test]
+  #[cfg(unix)]
+  fn capture_exit_code_signal() {
+    // Launch a process that kills itself with a signal.
+    let result = run_command_locally(ExecuteProcessRequest {
+      argv: owned_string_vec(&["/bin/bash", "-c", "kill $$"]),
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
+      timeout: Duration::from_millis(1000),
+      description: "kill self".to_string(),
+    });
+
+    assert_eq!(
+      result.unwrap(),
+      FallibleExecuteProcessResult {
+        stdout: as_bytes(""),
+        stderr: as_bytes(""),
+        exit_code: -15,
         output_directory: fs::EMPTY_DIGEST,
       }
     )

@@ -67,6 +67,6 @@ Alyssa Pohahau
 FIXED_LIST
 ) | grep -v -E "^[[:space:]]*#" | \
     grep -v -E "^[[:space:]]*$" | \
-    sort -u | \
+    LC_ALL=C sort -u | \
     sed -E -e "s|^|+ |" >> CONTRIBUTORS.md
 fi

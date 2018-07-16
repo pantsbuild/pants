@@ -2,6 +2,7 @@
 version = "0.0.1"
 name = "async_semaphore"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
 
 [dependencies]
 futures = "^0.1.16"
