@@ -629,12 +629,6 @@ impl RuleGraph {
   }
 
   pub fn visualize(&self, f: &mut io::Write) -> io::Result<()> {
-    if self.rule_dependency_edges.is_empty() {
-      writeln!(f, "digraph {{")?;
-      writeln!(f, "  // empty graph")?;
-      writeln!(f, "}}")?;
-    }
-
     let mut root_subject_type_strs = self
       .root_param_types
       .iter()
