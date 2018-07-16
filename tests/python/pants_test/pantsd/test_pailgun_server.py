@@ -7,8 +7,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import socket
 import threading
 import unittest
+from builtins import bytes
 from contextlib import contextmanager
-from SocketServer import TCPServer
+from socketserver import TCPServer
 
 import mock
 
