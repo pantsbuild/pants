@@ -7,12 +7,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import getpass
 import logging
 import mimetypes
-import urllib.parse
 from builtins import object, str
 from os.path import basename
 
-from future import standard_library
-standard_library.install_aliases()
+from future.moves.urllib.parse import quote_plus
 
 
 log = logging.getLogger(__name__)
@@ -24,9 +22,9 @@ log = logging.getLogger(__name__)
 """Code to ease publishing text to Confluence wikis."""
 
 try:
-  from xmlrpclib import ServerProxy, Error as XMLRPCError, Binary
-except ImportError:
   from xmlrpc.client import ServerProxy, Error as XMLRPCError, Binary
+except ImportError:
+  from xmlrpclib import ServerProxy, Error as XMLRPCError, Binary
 
 mimetypes.init()
 
@@ -80,7 +78,7 @@ class Confluence(object):
   def get_url(server_url, wiki_space, page_title):
     """ return the url for a confluence page in a given space and with a given
     title. """
-    return '%s/display/%s/%s' % (server_url, wiki_space, urllib.parse.quote_plus(page_title))
+    return '%s/display/%s/%s' % (server_url, wiki_space, quote_plus(page_title))
 
   def logout(self):
     """Terminates the session and connection to the server.
