@@ -456,7 +456,7 @@ class ProcessManager(ProcessMetadataManager):
     differ in their permissions without good reason - in this case, we want to inherit the umask.
     """
     self.purge_metadata()
-    self.pre_fork(**pre_fork_opts or {})
+    self.pre_fork(**(pre_fork_opts or {}))
     logger.debug('forking %s', self)
     pid = os.fork()
     if pid == 0:
@@ -465,7 +465,7 @@ class ProcessManager(ProcessMetadataManager):
       if second_pid == 0:
         try:
           os.chdir(self._buildroot)
-          self.post_fork_child(**post_fork_child_opts or {})
+          self.post_fork_child(**(post_fork_child_opts or {}))
         except Exception:
           logger.critical(traceback.format_exc())
         finally:
@@ -473,7 +473,7 @@ class ProcessManager(ProcessMetadataManager):
       else:
         try:
           if write_pid: self.write_pid(second_pid)
-          self.post_fork_parent(**post_fork_parent_opts or {})
+          self.post_fork_parent(**(post_fork_parent_opts or {}))
         except Exception:
           logger.critical(traceback.format_exc())
         finally:
@@ -491,20 +491,20 @@ class ProcessManager(ProcessMetadataManager):
     to the caller to allow for library-agnostic flexibility in subprocess execution.
     """
     self.purge_metadata()
-    self.pre_fork(**pre_fork_opts or {})
+    self.pre_fork(**(pre_fork_opts or {}))
     pid = os.fork()
     if pid == 0:
       try:
         os.setsid()
         os.chdir(self._buildroot)
-        self.post_fork_child(**post_fork_child_opts or {})
+        self.post_fork_child(**(post_fork_child_opts or {}))
       except Exception:
         logger.critical(traceback.format_exc())
       finally:
         os._exit(0)
     else:
       try:
-        self.post_fork_parent(**post_fork_parent_opts or {})
+        self.post_fork_parent(**(post_fork_parent_opts or {}))
       except Exception:
         logger.critical(traceback.format_exc())
 
