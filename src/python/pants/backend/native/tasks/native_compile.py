@@ -266,7 +266,7 @@ class NativeCompile(NativeTask, AbstractClass):
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.NativeCompileError(
           "Error in '{section_name}' with command {cmd} for request {req}. Exit code was: {rc}."
-          .format(section_name=self.workunit_name, cmd=argv, req=compile_request, rc=rc))
+          .format(section_name=self.workunit_label, cmd=argv, req=compile_request, rc=rc))
 
   def collect_cached_objects(self, versioned_target):
     """Scan `versioned_target`'s results directory and return the output files from that directory.

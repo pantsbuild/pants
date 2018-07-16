@@ -67,7 +67,7 @@ class Conan(Subsystem):
     conan_pex_path = os.path.join(conan_bootstrap_dir, 'conan_binary')
     interpreter = PythonInterpreter.get()
     if os.path.exists(conan_pex_path):
-      conan_binary = WrappedPEX(PEX(conan_pex_path, interpreter), interpreter)
+      conan_binary = WrappedPEX(PEX(conan_pex_path, interpreter))
       return self.ConanBinary(pex=conan_binary)
     else:  
       with safe_concurrent_creation(conan_pex_path) as safe_path:
@@ -75,5 +75,5 @@ class Conan(Subsystem):
         reqs = [PythonRequirement(req) for req in self.get_options().conan_requirements]
         dump_requirements(builder, interpreter, reqs, logger)
         builder.freeze()
-      conan_binary = WrappedPEX(PEX(conan_pex_path, interpreter), interpreter)
+      conan_binary = WrappedPEX(PEX(conan_pex_path, interpreter))
       return self.ConanBinary(pex=conan_binary)
