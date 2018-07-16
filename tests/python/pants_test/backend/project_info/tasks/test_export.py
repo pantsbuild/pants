@@ -429,7 +429,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     result = self.execute_export_json('src/python/has_reqs')
     interpreters = result['python_setup']['interpreters']
     self.assertEquals(1, len(interpreters))
-    chroot = interpreters.values()[0]['chroot']
+    chroot = list(interpreters.values())[0]['chroot']
     deps = os.listdir(os.path.join(chroot, '.deps'))
     self.assertEquals(1, len(deps))
     six_whl = deps[0]
