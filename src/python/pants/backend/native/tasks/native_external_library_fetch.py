@@ -2,8 +2,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
@@ -176,7 +175,6 @@ class NativeExternalLibraryFetch(Task):
     # and replace it with Pants-controlled remotes.
     remove_conan_center_remote_cmdline = self._remove_conan_center_remote_cmdline(conan_binary)
     try:
-      import pdb;pdb.set_trace()
       stdout = subprocess.check_output(remove_conan_center_remote_cmdline.split()[1:])
       self.context.log.debug(stdout)
     except subprocess.CalledProcessError as e:
