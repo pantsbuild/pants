@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
+from builtins import str
 
 from pants.backend.graph_info.tasks.target_filter_task_mixin import TargetFilterTaskMixin
 from pants.base.build_environment import get_buildroot
@@ -92,7 +93,7 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
         regex = re.compile(tag_regex)
       except re.error as e:
         raise TaskError("Invalid regular expression: {}: {}".format(tag_regex, e))
-      return lambda target: any(map(regex.search, map(str, target.tags)))
+      return lambda target: any(regex.search(str(tag)) for tag in target.tags)
     self._filters.extend(create_filters(self.get_options().tag_regex, filter_for_tag_regex))
 
   def console_output(self, _):
