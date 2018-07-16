@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import unittest
+from builtins import str
 
 from pants.util.contextutil import environment_as
 from pants.util.process_handler import subprocess

@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import types
+from builtins import object
 from textwrap import dedent
 
 from pants.build_graph.target import Target
