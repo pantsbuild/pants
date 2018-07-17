@@ -39,6 +39,18 @@ class ConanRequirement(datatype(['pkg_spec'])):
 
   @memoized_property
   def directory_path(self):
+    """
+    A helper method for converting Conan to package specifications to the data directory
+    path that Conan creates for each package.
+
+    Example package specification:
+      "my_library/1.0.0@pants/stable"
+    Example of the direcory path that Conan downloads pacakge data for this package to:
+      "my_library/1.0.0/pants/stable"
+
+    For more info on Conan package specifications, see:
+      https://docs.conan.io/en/latest/introduction.html
+    """
     return self.pkg_spec.replace('@', '/')
 
   @memoized_property
@@ -120,7 +132,7 @@ class NativeExternalLibraryFetch(Task):
 
   def _prepare_vts_results_dir(self, vts):
     """
-    Given a `VergetTargetSet`, prepare its results dir.
+    Given a `VersionedTargetSet`, prepare its results dir.
     """
     vt_set_results_dir = os.path.join(self.workdir, vts.cache_key.hash)
     safe_mkdir(vt_set_results_dir)
@@ -233,6 +245,7 @@ class NativeExternalLibraryFetch(Task):
     # This will initially live under the workdir to provide easy debugging on the initial
     # iteration of this system (a 'clean-all' will nuke the conan dir). In the future,
     # it would be good to migrate this under ~/.cache/pants/conan for persistence.
+    # Fix this per: https://github.com/pantsbuild/pants/issues/6169
     with environment_as(CONAN_USER_HOME=self.workdir):
       for pkg_spec in vt.target.packages:
 

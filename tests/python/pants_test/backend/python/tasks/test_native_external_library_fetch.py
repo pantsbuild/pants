@@ -21,21 +21,41 @@ class TestConanRequirement(unittest.TestCase):
 
   def test_parse_conan_stdout_for_pkg_hash(self):
     tc_1 = textwrap.dedent("""
-      rang/3.1.0@rang/stable: Installing package\n
-      Requirements\n    rang/3.1.0@rang/stable from 'pants-conan-remote'
-      \nPackages\n    rang/3.1.0@rang/stable:5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9\n\n
-      rang/3.1.0@rang/stable: Already installed!\n"
+      rang/3.1.0@rang/stable: Installing package
+
+      Requirements
+          rang/3.1.0@rang/stable from 'pants-conan-remote'
+      Packages
+          rang/3.1.0@rang/stable:5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9
+
+      rang/3.1.0@rang/stable: Already installed!
+
     """
     )
-    tc_2 = textwrap.dedent(
-      "rang/3.1.0@rang/stable: Not found, retrieving from server 'pants-conan-remote' \n"
-      "rang/3.1.0@rang/stable: Trying with 'pants-conan-remote'...\nDownloading conanmanifest.txt\n"
-      "\nDownloading conanfile.py\n\nrang/3.1.0@rang/stable: Installing package\nRequirements\n    "
-      "rang/3.1.0@rang/stable from 'pants-conan-remote'\nPackages\n    "
-      "rang/3.1.0@rang/stable:5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9\n\nrang/3.1.0@rang/stable: "
-      "Retrieving package 5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9 from remote 'pants-conan-remote' \n"
-      "Downloading conanmanifest.txt\n\nDownloading conaninfo.txt\n\nDownloading conan_package.tgz\n\n"
-      "rang/3.1.0@rang/stable: Package installed 5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9\n"
+    tc_2 = textwrap.dedent("""
+      rang/3.1.0@rang/stable: Not found, retrieving from server 'pants-conan-remote'
+      rang/3.1.0@rang/stable: Trying with 'pants-conan-remote'...
+      Downloading conanmanifest.txt
+
+      Downloading conanfile.py
+
+      rang/3.1.0@rang/stable: Installing package
+      Requirements
+          rang/3.1.0@rang/stable from 'pants-conan-remote'
+      Packages
+          rang/3.1.0@rang/stable:5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9
+
+      rang/3.1.0@rang/stable: Retrieving package 5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9 from remote 'pants-conan-remote'
+
+      Downloading conanmanifest.txt
+
+      Downloading conaninfo.txt
+
+      Downloading conan_package.tgz
+
+      rang/3.1.0@rang/stable: Package installed 5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9
+
+    """
     )
     pkg_spec = 'rang/3.1.0@rang/stable'
     expected_sha = '5ab84d6acfe1f23c4fae0ab88f26e3a396351ac9'

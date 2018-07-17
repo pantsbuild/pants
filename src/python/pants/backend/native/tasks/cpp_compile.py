@@ -43,6 +43,7 @@ class CppCompile(NativeCompile):
 
   def _make_compile_argv(self, compile_request):
     # FIXME: this is a temporary fix, do not do any of this kind of introspection.
+    # https://github.com/pantsbuild/pants/issues/5951
     prev_argv = super(CppCompile, self)._make_compile_argv(compile_request)
 
     if compile_request.compiler.exe_filename == 'clang++':
