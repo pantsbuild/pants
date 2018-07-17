@@ -42,3 +42,7 @@ class TestOptionsQuietIntegration(PantsRunIntegrationTest):
       json.loads(json_string)
       # Make sure json string does not appear in stdout.
       self.assertNotIn(json_string, pants_run.stdout_data)
+
+  # TODO: test that -q used recursively still spits out a deprecation warning! It appears that
+  # setting -q recursively also silences the deprecation warning, while e.g. --no-quiet will display
+  # the correct warning.

@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
+import re
 import sys
 from builtins import object, open, str
 
@@ -53,7 +54,7 @@ class DeprecatedFlagMatcher(datatype([('scope_flags_fun', CallableWrapper)])):
         raise self.make_type_error("scope_flags_fun must return a dict, or None (was: {!r})"
                                    .format(maybe_deprecation_warning_kwargs))
 
-      warn_or_error(**maybe_deprecation_warning_kwargs)
+      warn_or_error(stacklevel=4, **maybe_deprecation_warning_kwargs)
 
 
 class Options(object):
@@ -347,18 +348,34 @@ class Options(object):
           deprecated_entity_description='scope {}'.format(deprecated_scope),
           hint='Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys)))
 
+  _quiet_flag_regex = re.compile(r'\A(\-q|\-\-([^=]+\-)?quiet(=.*)?)\Z')
+
+  def _match_recursive_quiet_flag(self, scope, flags):
+    if scope == GLOBAL_SCOPE:
+      found_flag = None
+      for f in flags:
+        if self._quiet_flag_regex.match(f):
+          found_flag = f
+          break
+
+      if found_flag:
+        return dict(
+          removal_version='1.13.0.dev.0',
+          deprecated_entity_description="Using the -q or --quiet option recursively "
+                                        "(after a goal name on the command line)",
+          hint="The -q or --quiet flags can be specified globally by providing them on the "
+          "command line before any other goals. This will silence all pants logging "
+          "for all tasks and only produce the output from e.g. ./pants run.\nThe flag provided "
+          "was '{}' in scope '{}'."
+          .format(found_flag, scope))
+
   @memoized_property
   def flag_matchers(self):
     return [
-      DeprecatedFlagMatcher(lambda scope, _, values: self._check_deprecated_scope(scope, values)),
-      DeprecatedFlagMatcher.for_static_kwargs(
-        lambda scope, flags, _: scope != GLOBAL_SCOPE and set(['-q', '--quiet']) & set(flags),
-        removal_version='1.11.0.dev.0',
-        deprecated_entity_description="Using the -q or --quiet option recursively "
-        "(after a goal name on the command line).",
-        hint="The -q or --quiet flags can be specified globally by providing them on the "
-        "command line before any other goals. This will silence all pants logging "
-        "for all tasks and only produce the output from e.g. ./pants run."),
+      DeprecatedFlagMatcher(
+        lambda scope, _, values: self._check_deprecated_scope(scope, values)),
+      DeprecatedFlagMatcher(
+        lambda scope, flags, _: self._match_recursive_quiet_flag(scope, flags)),
     ]
 
   def _check_deprecations(self, scope, flags, values):
