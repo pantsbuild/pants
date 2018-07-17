@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
-from builtins import map, object
+from builtins import object
 
 from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
@@ -30,11 +30,17 @@ class FileExcluder(object):
               'The pep8 check has been renamed to pycodestyle. '
               'Please update your suppression file: "{}". The pep8 option'.format(excludes_path)
             )
-            list(map(lambda p:p if p != 'pep8' else 'pycodestyle', plugins))
+
+            style_plugins = []
+            for p in plugins:
+              if p == 'pep8':
+                style_plugins.append(p)
+              else:
+                style_plugins.append('pycodestyle')
 
             self.excludes[pattern] = {
               'regex': re.compile(pattern),
-              'plugins': plugins
+              'plugins': style_plugins
             }
             log.debug('Exclude pattern: {pattern}'.format(pattern=pattern))
     else:
