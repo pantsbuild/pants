@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import ast
 import textwrap
 import unittest
+from builtins import range, str
 
 from pants_test.option.util.fakes import create_options
 

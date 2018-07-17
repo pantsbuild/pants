@@ -5,6 +5,7 @@ python_library(
   name='all',
   sources=rglobs('*.py'),
   dependencies=[
+    '3rdparty/python:future',
     '3rdparty/python:pycodestyle',
     '3rdparty/python:pyflakes',
     '3rdparty/python:pex',
