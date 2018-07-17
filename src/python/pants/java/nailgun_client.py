@@ -10,6 +10,7 @@ import os
 import signal
 import socket
 import sys
+from builtins import object, str
 
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
