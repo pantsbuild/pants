@@ -34,11 +34,14 @@ class CallableWrapper(datatype(['callable_object'])):
 
 
 class DeprecatedFlagMatcher(datatype([('scope_flags_fun', CallableWrapper)])):
+
+  # FIXME: this is currently unused!
   @classmethod
   def for_static_kwargs(cls, predicate, **kw):
     callable_predicate = CallableWrapper(predicate)
     def generated_callable(*args, **kwargs):
       if callable_predicate(*args, **kwargs):
+        # FIXME: remove these print statements!
         print("args: {}, kwargs: {}".format(args, kwargs), file=sys.stderr)
         print("kw: {}".format(kw), file=sys.stderr)
         return kw
