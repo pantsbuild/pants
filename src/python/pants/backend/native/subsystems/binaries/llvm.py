@@ -77,11 +77,15 @@ class LLVM(NativeTool):
   def _common_include_dirs(self):
     return [os.path.join(self.select(), 'lib/clang', self.version(), 'include')]
 
+  @memoized_property
+  def _common_lib_dirs(self):
+    return [os.path.join(self.select(), 'lib')]
+
   def c_compiler(self):
     return CCompiler(
       path_entries=self.path_entries(),
       exe_filename='clang',
-      library_dirs=[],
+      library_dirs=self._common_lib_dirs,
       include_dirs=self._common_include_dirs)
 
   @memoized_property
@@ -92,7 +96,7 @@ class LLVM(NativeTool):
     return CppCompiler(
       path_entries=self.path_entries(),
       exe_filename='clang++',
-      library_dirs=[],
+      library_dirs=self._common_lib_dirs,
       include_dirs=(self._cpp_include_dirs + self._common_include_dirs))
 
 
