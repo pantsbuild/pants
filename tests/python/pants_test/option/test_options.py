@@ -26,7 +26,7 @@ from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, Im
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.optionable import Optionable
-from pants.option.options import Options
+from pants.option.options import DeprecatedFlagMatcher, Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
 from pants.option.ranked_value import RankedValue
@@ -171,14 +171,15 @@ class OptionsTest(unittest.TestCase):
       self._write_config_to_file(fp, config)
     return Config.load(config_paths=[fp.name])
 
-  def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None):
+  def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None, options_cls=None):
     args = shlex.split(str(args_str))
-    options = Options.create(env=env or {},
-                             config=self._create_config(config or {}),
-                             known_scope_infos=OptionsTest._known_scope_infos,
-                             args=args,
-                             bootstrap_option_values=bootstrap_option_values,
-                             option_tracker=OptionTracker())
+    options_type = options_cls or Options
+    options = options_type.create(env=env or {},
+                                  config=self._create_config(config or {}),
+                                  known_scope_infos=OptionsTest._known_scope_infos,
+                                  args=args,
+                                  bootstrap_option_values=bootstrap_option_values,
+                                  option_tracker=OptionTracker())
     self._register(options)
     return options
 
@@ -792,6 +793,8 @@ class OptionsTest(unittest.TestCase):
 
   def test_deprecated_option_past_removal(self):
     """Ensure that expired options raise CodeRemovedError on attempted use."""
+    # NB: these exceptions are triggered by the `Parser#parse_args()` method, not
+    # `Options#for_scope()`!
     # Test option past removal from flag
     with self.assertRaises(CodeRemovedError):
       self._parse('./pants --global-crufty-expired=way2crufty').for_global_scope()
@@ -817,6 +820,20 @@ class OptionsTest(unittest.TestCase):
     self.assertIn("will be removed in version",
                   warning_message)
     self.assertIn(option_string, warning_message)
+
+  def test_arbitrary_deprecation_matcher(self):
+    class OptionsWithDeprecation(Options):
+      flag_matchers = [
+        DeprecatedFlagMatcher.for_static_kwargs(
+          lambda _scope, flags, _values: any(f.startswith('--int-choices') for f in flags),
+          removal_version='9999.9.9.dev0',
+          deprecated_entity_description='int choices test option'),
+      ]
+
+    with self.warnings_catcher() as w:
+      options = self._parse('./pants --int-choices=42', options_cls=OptionsWithDeprecation)
+      self.assertEqual(options.for_global_scope().int_choices, [42])
+      self.assertWarning(w, 'int choices')
 
   def test_deprecated_options_flag(self):
     with self.warnings_catcher() as w:

@@ -15,6 +15,44 @@ from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
 from pants.option.scope import ScopeInfo
+from pants.util.memo import memoized_property
+from pants.util.objects import datatype
+
+
+class CallableWrapper(datatype(['callable_object'])):
+  def __call__(self, *args, **kwargs):
+    return self.callable_object(*args, **kwargs)
+
+  def __new__(cls, callable_object):
+    if isinstance(callable_object, cls):
+      return callable_object
+    if not callable(callable_object):
+      cls.make_type_error("{!r} must be callable".format(callable_object))
+    return super(CallableWrapper, cls).__new__(cls, callable_object)
+
+
+class DeprecatedFlagMatcher(datatype([('scope_flags_fun', CallableWrapper)])):
+  @classmethod
+  def for_static_kwargs(cls, predicate, **kw):
+    callable_predicate = CallableWrapper(predicate)
+    def generated_callable(*args, **kwargs):
+      if callable_predicate(*args, **kwargs):
+        print("args: {}, kwargs: {}".format(args, kwargs), file=sys.stderr)
+        print("kw: {}".format(kw), file=sys.stderr)
+        return kw
+    return cls(CallableWrapper(generated_callable))
+
+  def __new__(cls, scope_flags_fun):
+    return super(DeprecatedFlagMatcher, cls).__new__(cls, CallableWrapper(scope_flags_fun))
+
+  def evaluate(self, scope, flags, values):
+    maybe_deprecation_warning_kwargs = self.scope_flags_fun(scope, flags, values)
+    if maybe_deprecation_warning_kwargs is not None:
+      if not isinstance(maybe_deprecation_warning_kwargs, dict):
+        raise self.make_type_error("scope_flags_fun must return a dict, or None (was: {!r})"
+                                   .format(maybe_deprecation_warning_kwargs))
+
+      warn_or_error(**maybe_deprecation_warning_kwargs)
 
 
 class Options(object):
@@ -285,6 +323,39 @@ class Options(object):
     self._assert_not_frozen()
     self._parser_hierarchy.walk(callback)
 
+  def _check_deprecated_scope(self, scope, values):
+    # If we're the new name of a deprecated scope, also get values from that scope.
+    deprecated_scope = self.known_scope_to_info[scope].deprecated_scope
+    # Note that deprecated_scope and scope share the same Optionable class, so deprecated_scope's
+    # Optionable has a deprecated_options_scope equal to deprecated_scope. Therefore we must
+    # check that scope != deprecated_scope to prevent infinite recursion.
+    if deprecated_scope is not None and scope != deprecated_scope:
+      # Do the deprecation check only on keys that were explicitly set on the deprecated scope
+      # (and not on its enclosing scopes).
+      explicit_keys = self.for_scope(deprecated_scope,
+                                     inherit_from_enclosing_scope=False).get_explicit_keys()
+      if explicit_keys:
+        # Update our values with those of the deprecated scope (now including values inherited
+        # from its enclosing scope).
+        # Note that a deprecated val will take precedence over a val of equal rank.
+        # This makes the code a bit neater.
+        values.update(self.for_scope(deprecated_scope))
+
+        return dict(
+          removal_version=self.known_scope_to_info[scope].deprecated_scope_removal_version,
+          deprecated_entity_description='scope {}'.format(deprecated_scope),
+          hint='Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys)))
+
+  @memoized_property
+  def flag_matchers(self):
+    return [
+      DeprecatedFlagMatcher(lambda scope, _, values: self._check_deprecated_scope(scope, values)),
+    ]
+
+  def _check_deprecations(self, scope, flags, values):
+    for flag_matcher in self.flag_matchers:
+      flag_matcher.evaluate(scope, flags, values)
+
   # TODO: Eagerly precompute backing data for this?
   def for_scope(self, scope, inherit_from_enclosing_scope=True):
     """Return the option values for the given scope.
@@ -308,25 +379,8 @@ class Options(object):
     flags_in_scope = self._scope_to_flags.get(scope, [])
     self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
 
-    # If we're the new name of a deprecated scope, also get values from that scope.
-    deprecated_scope = self.known_scope_to_info[scope].deprecated_scope
-    # Note that deprecated_scope and scope share the same Optionable class, so deprecated_scope's
-    # Optionable has a deprecated_options_scope equal to deprecated_scope. Therefore we must
-    # check that scope != deprecated_scope to prevent infinite recursion.
-    if deprecated_scope is not None and scope != deprecated_scope:
-      # Do the deprecation check only on keys that were explicitly set on the deprecated scope
-      # (and not on its enclosing scopes).
-      explicit_keys = self.for_scope(deprecated_scope,
-                                     inherit_from_enclosing_scope=False).get_explicit_keys()
-      if explicit_keys:
-        warn_or_error(self.known_scope_to_info[scope].deprecated_scope_removal_version,
-                      'scope {}'.format(deprecated_scope),
-                      'Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys)))
-        # Update our values with those of the deprecated scope (now including values inherited
-        # from its enclosing scope).
-        # Note that a deprecated val will take precedence over a val of equal rank.
-        # This makes the code a bit neater.
-        values.update(self.for_scope(deprecated_scope))
+    # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
+    self._check_deprecations(scope, flags_in_scope, values)
 
     # Cache the values.
     self._values_by_scope[scope] = values
