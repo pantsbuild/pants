@@ -104,7 +104,10 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
             'received unexpected chunk {} -> {}'.format(chunk_type, payload)
           )
     finally:
-      self._write_handle.close()
+      try:
+        self._write_handle.close()
+      except (OSError, IOError):
+        pass
 
 
 class NailgunStreamWriter(_StoppableDaemonThread):

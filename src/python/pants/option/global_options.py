@@ -236,6 +236,12 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--enable-pantsd', advanced=True, type=bool, default=False,
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
+    # Toggles v1/v2 `Task` vs `@rule` pipelines on/off.
+    register('--v1', advanced=True, type=bool, default=True,
+             help='Enables execution of v1 Tasks.')
+    register('--v2', advanced=True, type=bool, default=False,
+             help='Enables execution of v2 @rules.')
+
     # These facilitate configuring the native engine.
     register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option, daemon=False,
              help='A directory to write execution and rule graphs to as `dot` files. The contents '

@@ -36,12 +36,10 @@ class SplitArgs(namedtuple('SplitArgs',
   passthru: Any remaining args specified after a -- separator.
   passthru_owner: The scope specified last on the command line, if any. None otherwise.
   """
-  pass
 
 
 class HelpRequest(AbstractClass):
   """Represents an implicit or explicit request for help by the user."""
-  pass
 
 
 class OptionsHelp(HelpRequest):
@@ -58,7 +56,6 @@ class OptionsHelp(HelpRequest):
 
 class VersionHelp(HelpRequest):
   """The user asked for the version of this instance of pants."""
-  pass
 
 
 class UnknownGoalHelp(HelpRequest):
@@ -71,7 +68,6 @@ class UnknownGoalHelp(HelpRequest):
 
 class NoGoalHelp(HelpRequest):
   """The user specified no goals."""
-  pass
 
 
 class ArgSplitter(object):

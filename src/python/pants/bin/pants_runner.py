@@ -42,7 +42,7 @@ class PantsRunner(object):
     # N.B. Inlining this import speeds up the python thin client run by about 100ms.
     from pants.bin.local_pants_runner import LocalPantsRunner
 
-    runner = LocalPantsRunner(
+    runner = LocalPantsRunner.create(
         self._exiter,
         self._args,
         self._env,
