@@ -444,7 +444,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
   @contextmanager
   def mock_buildroot(self, dirs_to_copy=None):
     """Construct a mock buildroot and return a helper object for interacting with it."""
-    Manager = namedtuple('Manager', 'write_file pushd dir')
+    Manager = namedtuple('Manager', 'write_file pushd new_buildroot')
     # N.B. BUILD.tools, contrib, 3rdparty needs to be copied vs symlinked to avoid
     # symlink prefix check error in v1 and v2 engine.
     files_to_copy = ('BUILD.tools',)
