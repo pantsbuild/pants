@@ -26,6 +26,7 @@ class CallableWrapper(datatype(['callable_object'])):
   def __new__(cls, callable_object):
     if isinstance(callable_object, cls):
       return callable_object
+    # `callable()` was deprecated in Python 3.0, then undeprecated in 3.2.
     if not callable(callable_object):
       cls.make_type_error("{!r} must be callable".format(callable_object))
     return super(CallableWrapper, cls).__new__(cls, callable_object)
