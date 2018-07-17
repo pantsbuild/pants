@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import sys
+from builtins import object
 from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
@@ -106,7 +107,7 @@ class ArgSplitter(object):
     # cmd line, as an alternative to ... scope --flag-name.
 
     # We check for prefixes in reverse order, so we match the longest prefix first.
-    sorted_scope_infos = sorted(filter(lambda si: si.scope, self._known_scope_infos),
+    sorted_scope_infos = sorted([si for si in self._known_scope_infos if si.scope],
                                 key=lambda si: si.scope, reverse=True)
 
     # List of pairs (prefix, ScopeInfo).

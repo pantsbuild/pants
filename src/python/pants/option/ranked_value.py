@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import object
+
 
 class RankedValue(object):
   """An option value, together with a rank inferred from its source.

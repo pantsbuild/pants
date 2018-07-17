@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import object
 from collections import defaultdict
 
 from pants.option.global_options import GlobalOptionsRegistrar
@@ -110,7 +111,7 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
       return passthru_args or []
 
     def items(self):
-      return options.items()
+      return list(options.items())
 
     @property
     def scope_to_flags(self):

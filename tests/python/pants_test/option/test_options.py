@@ -10,6 +10,7 @@ import shlex
 import tempfile
 import unittest
 import warnings
+from builtins import str
 from contextlib import contextmanager
 from textwrap import dedent
 
