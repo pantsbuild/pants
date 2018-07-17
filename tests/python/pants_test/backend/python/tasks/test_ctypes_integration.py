@@ -25,7 +25,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
   _binary_target = 'testprojects/src/python/python_distribution/ctypes:bin'
   _binary_target_with_third_party = (
-    'testprojects/src/python//python_distribution/ctypes_with_third_party:bin_with_third_party'
+    'testprojects/src/python/python_distribution/ctypes_with_third_party:bin_with_third_party'
   )
 
   def test_run(self):
@@ -70,10 +70,23 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
       # Execute the binary and ensure its output is correct.
       binary_run_output = invoke_pex_for_output(pex)
-      self.assertEqual('x=3, f(x)=17\n', binary_run_output)
+      self.assertIn('x=3, f(x)=17', binary_run_output)
 
   def test_ctypes_third_party_integration(self):
+    pants_binary = self.run_pants(
+      command=['clean-all', 'binary', self._binary_target_with_third_party]
+    )
+    self.assert_success(pants_binary)
+
     pants_run = self.run_pants(
       command=['clean-all', 'run', self._binary_target_with_third_party]
     )
     self.assert_success(pants_run)
+    self.assertIn('Test worked!', pants_run.stdout_data)
+
+    # Test cached run.
+    pants_run = self.run_pants(
+      command=['run', self._binary_target_with_third_party]
+    )
+    self.assert_success(pants_run)
+    self.assertIn('Test worked!', pants_run.stdout_data)

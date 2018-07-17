@@ -54,6 +54,10 @@ int mangled_function(int x) {
 	MyRecord myRecord;
 	SomeData myData;
 
+  std::cout << "Testing 3rdparty C++..."
+       << rang::style::bold << "Test worked!"
+       << rang::style::reset << std::endl;
+
 	return x ^ 3;
 }
 
