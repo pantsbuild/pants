@@ -350,6 +350,14 @@ class Options(object):
   def flag_matchers(self):
     return [
       DeprecatedFlagMatcher(lambda scope, _, values: self._check_deprecated_scope(scope, values)),
+      DeprecatedFlagMatcher.for_static_kwargs(
+        lambda scope, flags, _: scope != GLOBAL_SCOPE and set(['-q', '--quiet']) & set(flags),
+        removal_version='1.11.0.dev.0',
+        deprecated_entity_description="Using the -q or --quiet option recursively "
+        "(after a goal name on the command line).",
+        hint="The -q or --quiet flags can be specified globally by providing them on the "
+        "command line before any other goals. This will silence all pants logging "
+        "for all tasks and only produce the output from e.g. ./pants run."),
     ]
 
   def _check_deprecations(self, scope, flags, values):
