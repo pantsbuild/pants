@@ -9,7 +9,7 @@ from pants.binaries.binary_tool import Script
 
 class Isort(Script):
   options_scope = 'isort'
-  default_version = '4.2.5'
+  default_version = '4.3.4'
   suffix = '.pex'
 
   replaces_scope = 'fmt.isort'
