@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import struct
+from builtins import bytes, object, zip
 
 import six
 
