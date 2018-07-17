@@ -5,6 +5,7 @@
 package org.pantsbuild.zinc.compiler
 
 import java.io.File
+import sbt.internal.util.{ ConsoleLogger, ConsoleOut }
 import java.nio.file.{Files, Path}
 import java.lang.{ Boolean => JBoolean }
 import java.util.function.{ Function => JFunction }
@@ -58,7 +59,6 @@ case class Settings(
   }
 
   lazy val sources: Seq[File] = _sources map normalise
-
   if (_classesDirectory.isEmpty && outputJar.isEmpty) {
     throw new RuntimeException(
       s"Either ${Settings.DestinationOpt} or ${Settings.JarDestinationOpt} option is required.")

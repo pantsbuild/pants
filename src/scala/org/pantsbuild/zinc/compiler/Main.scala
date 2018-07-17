@@ -124,7 +124,10 @@ object Main {
 
       // if compile is successful, jar the contents of classesDirectory and copy to outputJar
       if (settings.outputJar.isDefined) {
-        OutputUtils.createClassesJar(settings, log)
+        val outputJarPath = settings.outputJar.get.toPath
+        val classesDirectory = settings.classesDirectory
+        log.debug("Creating JAR at %s, for files at %s" format (outputJarPath, classesDirectory))
+        OutputUtils.createClassesJar(classesDirectory, outputJarPath, settings.creationTime)
       }
     } catch {
       case e: CompileFailed =>
