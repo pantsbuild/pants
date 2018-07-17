@@ -705,7 +705,8 @@ impl<'t> GraphMaker<'t> {
     };
 
     match &entry {
-      &Entry::WithDeps(ref e) => e.params()
+      &Entry::WithDeps(ref e) => e
+        .params()
         .iter()
         .filter(|&type_id| Some(type_id) != provided_param)
         .cloned()

@@ -15,15 +15,7 @@ from pants.engine.rules import RootRule, RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import Get, Select
 from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import JsonParser
-from pants_test.engine.examples.planners import Goal
 from pants_test.engine.util import TargetTable, assert_equal_with_printing, create_scheduler
-
-
-class AGoal(Goal):
-
-  @classmethod
-  def products(cls):
-    return [A]
 
 
 class A(object):

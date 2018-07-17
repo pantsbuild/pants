@@ -413,6 +413,9 @@ class SchedulerSession(object):
     self._session = session
     self._run_count = 0
 
+  def assert_ruleset_valid(self):
+    self._scheduler._assert_ruleset_valid()
+
   def graph_len(self):
     return self._scheduler.graph_len()
 
