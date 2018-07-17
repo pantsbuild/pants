@@ -30,7 +30,8 @@ class ConanRequirement(datatype(['pkg_spec'])):
   }
 
   def parse_conan_stdout_for_pkg_sha(self, stdout):
-    # TODO(cmlivingston): regex this
+    # FIXME: properly regex this method.
+    # https://github.com/pantsbuild/pants/issues/6168
     pkg_line = stdout.split('Packages')[1]
     collected_matches = [line for line in pkg_line.split() if self.pkg_spec in line]
     pkg_sha = collected_matches[0].split(':')[1]
@@ -175,6 +176,8 @@ class NativeExternalLibraryFetch(Task):
     # and replace it with Pants-controlled remotes.
     remove_conan_center_remote_cmdline = self._remove_conan_center_remote_cmdline(conan_binary)
     try:
+      # Slice the command line because subprocess errors when the first element in the
+      # list of command strings is the setting of an environment variable.
       stdout = subprocess.check_output(remove_conan_center_remote_cmdline.split()[1:])
       self.context.log.debug(stdout)
     except subprocess.CalledProcessError as e:
