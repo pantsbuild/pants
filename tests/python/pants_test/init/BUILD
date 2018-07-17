@@ -5,6 +5,7 @@
 python_tests(
   sources=rglobs('*.py'),
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:mock',
     '3rdparty/python:parameterized',
     '3rdparty/python:pex',

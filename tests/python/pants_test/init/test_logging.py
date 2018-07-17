@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import unittest
 import uuid
+from builtins import str
 from contextlib import closing, contextmanager
 
 import six
