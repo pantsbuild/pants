@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import re
 import tempfile
+from builtins import next
 from collections import defaultdict, namedtuple
 
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
@@ -114,7 +115,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     if language not in self._registered_language_aliases():
       raise TargetDefinitionException(
         target,
-        'language {} not supported: expected one of {}.'.format(language, self._registered_language_aliases().keys()))
+        'language {} not supported: expected one of {}.'.format(language, list(self._registered_language_aliases().keys())))
     return language
 
   @memoized_method
