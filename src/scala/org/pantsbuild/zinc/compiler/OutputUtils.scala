@@ -43,7 +43,7 @@ object OutputUtils {
    * Create a JAR of of filePaths provided.
    *
    * @param filePaths set of all paths to be added to the JAR
-   * @param outputJarPath Path to the output JAR to be created
+   * @param outputJarPath Absolute Path to the output JAR being created
    * @param jarEntryTime time to be set for each JAR entry
    */
   def createJar(filePaths: mutable.TreeSet[Path], outputJarPath: Path, jarEntryTime: Long) {
@@ -86,16 +86,25 @@ object OutputUtils {
    * @return
    */
   def existsClass(jarPath: Path, clazz: String): Boolean = {
-    val jis = new JarInputStream(Files.newInputStream(jarPath))
-    @tailrec
-    def findClass(entry: JarEntry): Boolean = entry match {
-      case null =>
-        false
-      case entry if entry.getName == clazz =>
-        true
-      case _ =>
-        findClass(jis.getNextJarEntry)
+    var jis: JarInputStream = null
+    var found = false
+    try {
+      jis = new JarInputStream(Files.newInputStream(jarPath))
+
+      @tailrec
+      def findClass(entry: JarEntry): Boolean = entry match {
+        case null =>
+          false
+        case entry if entry.getName == clazz =>
+          true
+        case _ =>
+          findClass(jis.getNextJarEntry)
+      }
+
+      found = findClass(jis.getNextJarEntry)
+    } finally {
+      jis.close()
     }
-    findClass(jis.getNextJarEntry)
+    found
   }
 }
