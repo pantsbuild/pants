@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import datetime
+import faulthandler
 import logging
 import os
 import signal
@@ -12,7 +13,6 @@ import sys
 import traceback
 from builtins import object
 
-import faulthandler
 import six
 
 from pants.util.dirutil import safe_open
