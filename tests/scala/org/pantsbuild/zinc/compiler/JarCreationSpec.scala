@@ -21,7 +21,7 @@ class JarCreationSpec extends WordSpec with MustMatchers {
         IO.withTemporaryDirectory { tempOutputDir =>
           val jarOutputPath = Paths.get(tempOutputDir.toString, "spec-empty-output.jar")
 
-          OutputUtils.createJar(filePaths, jarOutputPath, System.currentTimeMillis())
+          OutputUtils.createJar(tempInputDir.toString, filePaths, jarOutputPath, System.currentTimeMillis())
           OutputUtils.existsClass(jarOutputPath, "NonExistent.class") must be(false)
         }
       }
@@ -30,14 +30,15 @@ class JarCreationSpec extends WordSpec with MustMatchers {
   "JarCreationWithClasses" should {
     "succeed when input classes are provided" in {
       IO.withTemporaryDirectory { tempInputDir =>
-        val tempFile = File.createTempFile(tempInputDir.toString, "Clazz.class")
+        val tempFile = File.createTempFile("Temp", ".class", tempInputDir)
         val filePaths = mutable.TreeSet(tempFile.toPath)
 
         IO.withTemporaryDirectory { tempOutputDir =>
           val jarOutputPath = Paths.get(tempOutputDir.toString, "spec-valid-output.jar")
 
-          OutputUtils.createJar(filePaths, jarOutputPath, System.currentTimeMillis())
-          OutputUtils.existsClass(jarOutputPath, tempFile.toString) must be(true)
+          OutputUtils.createJar(tempInputDir.toString, filePaths, jarOutputPath, System.currentTimeMillis())
+          OutputUtils.existsClass(jarOutputPath, tempFile.toString) must be(false)
+          OutputUtils.existsClass(jarOutputPath, tempFile.getName) must be(true)
         }
       }
     }

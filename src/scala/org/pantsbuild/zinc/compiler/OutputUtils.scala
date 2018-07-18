@@ -10,7 +10,6 @@ import java.nio.file.{FileVisitResult, Files, Path, Paths, SimpleFileVisitor}
 import java.util.jar.{JarEntry, JarInputStream, JarOutputStream}
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.util.Try
 
 object OutputUtils {
 
@@ -39,6 +38,10 @@ object OutputUtils {
     sorted
   }
 
+  def relativize(base: String, path: Path): String = {
+    new File(base).toURI().relativize(new File(path.toString).toURI()).getPath()
+  }
+
   /**
    * Create a JAR of of filePaths provided.
    *
@@ -46,12 +49,13 @@ object OutputUtils {
    * @param outputJarPath Absolute Path to the output JAR being created
    * @param jarEntryTime time to be set for each JAR entry
    */
-  def createJar(filePaths: mutable.TreeSet[Path], outputJarPath: Path, jarEntryTime: Long) {
+  def createJar(
+    base: String, filePaths: mutable.TreeSet[Path], outputJarPath: Path, jarEntryTime: Long) {
 
     val target = new JarOutputStream(Files.newOutputStream(outputJarPath))
 
-    def addToJar(source: Path): FileVisitResult = {
-      val jarEntry = new JarEntry(source.toString)
+    def addToJar(source: Path, entryName: String): FileVisitResult = {
+      val jarEntry = new JarEntry(entryName)
       // setting jarEntry time to a fixed value for all entries within the jar so that jars are
       // byte-for-byte reproducible.
       jarEntry.setTime(jarEntryTime)
@@ -62,7 +66,8 @@ object OutputUtils {
       FileVisitResult.CONTINUE
     }
 
-    filePaths.map(addToJar(_))
+    val pathToName = filePaths.zipWithIndex.map{case(k, v) => (k, relativize(base, k))}.toMap
+    pathToName.map(e => addToJar(e._1, e._2))
     target.close()
   }
 
@@ -75,7 +80,7 @@ object OutputUtils {
     // Sort the contents of the classesDirectory for deterministic jar creation
     val sortedClasses = sort(classesDirectory)
 
-    createJar(sortedClasses, outputJarPath, jarCreationTime)
+    createJar(classesDirectory.toString, sortedClasses, outputJarPath, jarCreationTime)
   }
 
   /**
