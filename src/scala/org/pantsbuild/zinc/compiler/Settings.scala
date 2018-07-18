@@ -50,7 +50,7 @@ case class Settings(
   sbt: SbtJars                      = SbtJars(),
   _incOptions: IncOptions           = IncOptions(),
   analysis: AnalysisOptions         = AnalysisOptions(),
-  creationTime: Long                = System.currentTimeMillis()
+  creationTime: Long                = 0
 ) {
   import Settings._
 
@@ -59,10 +59,6 @@ case class Settings(
   }
 
   lazy val sources: Seq[File] = _sources map normalise
-  if (_classesDirectory.isEmpty && outputJar.isEmpty) {
-    throw new RuntimeException(
-      s"Either ${Settings.DestinationOpt} or ${Settings.JarDestinationOpt} option is required.")
-  }
 
   lazy val classesDirectory: File =
     normalise(_classesDirectory.getOrElse(defaultClassesDirectory()))
@@ -317,7 +313,7 @@ object Settings extends OptionSet[Settings] {
   /**
    * By default the backup location is relative to the classes directory (for example, target/classes/../backup/classes).
    */
-  def defaultBackupLocation(classesDir: File) = {
+  def defaultBackupLocation(classesDir: File): File = {
     classesDir.getParentFile / "backup" / classesDir.getName
   }
 

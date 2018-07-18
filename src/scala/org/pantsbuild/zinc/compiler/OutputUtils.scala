@@ -19,17 +19,21 @@ object OutputUtils {
    * @param dir File handle containing the contents to sort
    * @return sorted set of all paths within the `dir`
    */
-  def sort(dir:File): mutable.TreeSet[(Path, Boolean)] = {
-    val sorted = new mutable.TreeSet[(Path, Boolean)]()
+  def sort(dir:File): mutable.TreeSet[Path] = {
+    val sorted = new mutable.TreeSet[Path]()
 
     val fileSortVisitor = new SimpleFileVisitor[Path]() {
       override def preVisitDirectory(path: Path, attrs: BasicFileAttributes): FileVisitResult = {
-        sorted.add(path, false)
+        if (!path.endsWith("/")) {
+          sorted.add(Paths.get(path.toString, "/"))
+        } else {
+          sorted.add(path)
+        }
         FileVisitResult.CONTINUE
       }
 
       override def visitFile(path: Path, attrs: BasicFileAttributes): FileVisitResult = {
-        sorted.add(path, true)
+        sorted.add(path)
         FileVisitResult.CONTINUE
       }
     }
@@ -50,25 +54,30 @@ object OutputUtils {
    * @param jarEntryTime time to be set for each JAR entry
    */
   def createJar(
-    base: String, filePaths: mutable.TreeSet[(Path, Boolean)], outputJarPath: Path, jarEntryTime: Long) {
+    base: String, filePaths: mutable.TreeSet[Path], outputJarPath: Path, jarEntryTime: Long) {
 
     val target = new JarOutputStream(Files.newOutputStream(outputJarPath))
 
-    def addToJar(source: (Path, Boolean), entryName: String): FileVisitResult = {
-      val jarEntry = new JarEntry(entryName)
+    def jarEntry(name: String): JarEntry = {
+      val jarEntry = new JarEntry(name)
       // setting jarEntry time to a fixed value for all entries within the jar so that jars are
       // byte-for-byte reproducible.
       jarEntry.setTime(jarEntryTime)
+      jarEntry
+    }
 
-      target.putNextEntry(jarEntry)
-      if (source._2) {
-        Files.copy(source._1, target)
+    def addToJar(source: Path, entryName: String): FileVisitResult = {
+      if (source.toFile.isDirectory) {
+        target.putNextEntry(jarEntry(entryName))
+      } else {
+        target.putNextEntry(jarEntry(entryName))
+        Files.copy(source, target)
       }
       target.closeEntry()
       FileVisitResult.CONTINUE
     }
 
-    val pathToName = filePaths.zipWithIndex.map{case(k, v) => (k, relativize(base, k._1))}.toMap
+    val pathToName = filePaths.zipWithIndex.map{case(k, v) => (k, relativize(base, k))}.toMap
     pathToName.map(e => addToJar(e._1, e._2))
     target.close()
   }
