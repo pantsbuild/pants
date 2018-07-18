@@ -3,70 +3,56 @@
 
 This document describes releases leading up to the ``1.9.x`` ``stable`` series.
 
-1.9.0rc0 (07/17/2018)
+1.9.0rc0 (07/17/2018) @ HEAD
 ---------------------
 
 New features
 ~~~~~~~~~~~~
 
-
 Bugfixes
 ~~~~~~~~
 
-* Shorten safe filenames further, and combine codepaths to make them readable. (#5971)
-  `PR #5971 <https://github.com/pantsbuild/pants/pull/5971>`_
-
-* Whitelist the --owner-of option to not restart the daemon. (#5979)
-  `PR #5979 <https://github.com/pantsbuild/pants/pull/5979>`_
-
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* Remove DeprecatedPythonTaskTestBase (#5973)
-  `Issue #5870 <https://github.com/pantsbuild/pants/issues/5870>`_
-  `PR #5973 <https://github.com/pantsbuild/pants/pull/5973>`_
-
-* Mark a few options that should not show up in `./pants help`. (#5968)
-  `PR #5968 <https://github.com/pantsbuild/pants/pull/5968>`_
 
 Documentation Updates
 ~~~~~~~~~~~~~~~~~~~~~
 
-* adding more documentation for python_app (#5965)
-  `PR #5965 <https://github.com/pantsbuild/pants/pull/5965>`_
+New features
+~~~~~~~~~~~~
+
+1.9.0.dev1 (7/15/18) @ 476104ade52e924f9b6c4a7b2be7368f9416d777
+~~~~~~~~~~~~~~~~~~~~
 
 New features
 ~~~~~~~~~~~~
 
-* Allow manylinux wheels when resolving plugins. (#5959)
-  `PR #5959 <https://github.com/pantsbuild/pants/pull/5959>`_
-
-* Separate the resolution cache and repository cache in Ivy (#5844)
-  `PR #5844 <https://github.com/pantsbuild/pants/pull/5844>`_
-
-* Allow pants to select targets by file(s) (#5930)
-  `PR #5930 <https://github.com/pantsbuild/pants/pull/5930>`_
-
 Bugfixes
 ~~~~~~~~
-
-* Cobertura coverage: Include the full target closure's classpath entries for instrumentation (#5879)
-  `PR #5879 <https://github.com/pantsbuild/pants/pull/5879>`_
-
-* `exclude-patterns` and `tag` should apply only to roots (#5786)
-  `PR #5786 <https://github.com/pantsbuild/pants/pull/5786>`_
-
-* Fixup macosx platform version. (#5938)
-  `PR #5938 <https://github.com/pantsbuild/pants/pull/5938>`_
-
-* Ban bad `readonly` shell pattern (#5924)
-  `PR #5924 <https://github.com/pantsbuild/pants/pull/5924>`_
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* Record start times per graph node and expose a method to summarize them. (#5964)
-  `PR #5964 <https://github.com/pantsbuild/pants/pull/5964>`_
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
 
-* Remove value wrapper on the python side of ffi. (#5961)
-  `PR #5961 <https://github.com/pantsbuild/pants/pull/5961>`_
+New features
+~~~~~~~~~~~~
+
+1.9.0.dev0 (6/25/18) @ aad4b7be46109302090d8966748ef2807cba1a6b
+~~~~~~~~~~~~~~~~~~~
+
+New features
+~~~~~~~~~~~~
+
+Bugfixes
+~~~~~~~~
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+New features
+~~~~~~~~~~~~
