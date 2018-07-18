@@ -34,9 +34,9 @@ class FileExcluder(object):
             style_plugins = []
             for p in plugins:
               if p == 'pep8':
-                style_plugins.append(p)
-              else:
                 style_plugins.append('pycodestyle')
+              else:
+                style_plugins.append(p)
 
             self.excludes[pattern] = {
               'regex': re.compile(pattern),
