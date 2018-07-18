@@ -92,6 +92,9 @@ class LinkSharedLibraries(NativeTask):
         if vt.valid:
           shared_library = self._retrieve_shared_lib_from_cache(vt, platform)
         else:
+          # FIXME: We need to partition links based on proper dependency edges and not
+          # perform a link to every native_external_library for all targets in the closure.
+          # https://github.com/pantsbuild/pants/issues/6178
           link_request = self._make_link_request(
             vt, compiled_objects_product, native_target_deps_product, external_libs_product)
           shared_library = self._execute_link_request(link_request)
