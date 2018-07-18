@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import unittest
+from builtins import object
 
 from pants.java.junit.junit_xml_parser import Test as JUnitTest
 # NB: The Test -> JUnitTest import re-name above is needed to work around conflicts with pytest test

@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import sys
+from builtins import object
 
 from pants.base.build_environment import pants_release, pants_version
 from pants.help.help_formatter import HelpFormatter
@@ -55,10 +56,10 @@ class HelpPrinter(object):
     """
     show_all_help = self._help_request.all_scopes
     if show_all_help:
-      help_scopes = self._options.known_scope_to_info.keys()
+      help_scopes = list(self._options.known_scope_to_info.keys())
     else:
       # The scopes explicitly mentioned by the user on the cmd line.
-      help_scopes = set(self._options.scope_to_flags.keys()) - set([GLOBAL_SCOPE])
+      help_scopes = set(self._options.scope_to_flags.keys()) - {GLOBAL_SCOPE}
 
     scope_infos = list(ScopeInfoIterator(self._options.known_scope_to_info).iterate(help_scopes))
     if scope_infos:

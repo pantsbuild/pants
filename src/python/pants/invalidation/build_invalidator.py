@@ -8,6 +8,7 @@ import errno
 import hashlib
 import os
 from abc import abstractmethod
+from builtins import object
 from collections import namedtuple
 
 from pants.base.hash_utils import hash_all

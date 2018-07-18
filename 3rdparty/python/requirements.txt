@@ -9,7 +9,6 @@ fasteners==0.14.1
 faulthandler==2.6
 future==0.16.0
 futures==3.0.5
-isort==4.2.5
 Markdown==2.1.1
 mock==2.0.0
 packaging==16.8

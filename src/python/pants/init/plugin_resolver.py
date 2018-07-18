@@ -8,6 +8,7 @@ import hashlib
 import logging
 import os
 import site
+from builtins import object
 
 from pex import resolver
 from pex.base import requirement_is_exact

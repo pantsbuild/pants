@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import os
+from builtins import str
 
 from pants.base.build_file import BuildFile
 from pants.base.specs import DescendantAddresses, SiblingAddresses, Specs

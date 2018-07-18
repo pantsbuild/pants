@@ -10,13 +10,12 @@ import os
 import sys
 import sysconfig
 import traceback
-from builtins import str
+from builtins import bytes, object, str
 from contextlib import closing
 
 import cffi
 import pkg_resources
-import six
-from future.utils import text_type
+from future.utils import binary_type, text_type
 
 from pants.engine.selectors import Get, constraint_for
 from pants.util.contextutil import temporary_dir
@@ -303,7 +302,7 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
     ffibuilder.cdef(CFFI_HEADERS)
     ffibuilder.cdef(CFFI_EXTERNS)
     ffibuilder.set_source(module_name, CFFI_TYPEDEFS + CFFI_HEADERS)
-    ffibuilder.emit_c_code(six.binary_type(temp_c_file))
+    ffibuilder.emit_c_code(binary_type(temp_c_file))
 
     # Work around https://github.com/rust-lang/rust/issues/36342 by renaming initnative_engine to
     # wrapped_initnative_engine so that the rust code can define the symbol initnative_engine.
@@ -396,13 +395,13 @@ def _initialize_externs(ffi):
   def extern_type_to_str(context_handle, type_id):
     """Given a TypeId, write type.__name__ and return it."""
     c = ffi.from_handle(context_handle)
-    return c.utf8_buf(six.text_type(c.from_id(type_id.id_).__name__))
+    return c.utf8_buf(text_type(c.from_id(type_id.id_).__name__))
 
   @ffi.def_extern()
   def extern_val_to_str(context_handle, val):
     """Given a Handle for `obj`, write str(obj) and return it."""
     c = ffi.from_handle(context_handle)
-    return c.utf8_buf(six.text_type(c.from_value(val[0])))
+    return c.utf8_buf(text_type(c.from_value(val[0])))
 
   @ffi.def_extern()
   def extern_satisfied_by(context_handle, constraint_val, val):
@@ -427,7 +426,7 @@ def _initialize_externs(ffi):
   def extern_store_bytes(context_handle, bytes_ptr, bytes_len):
     """Given a context and raw bytes, return a new Handle to represent the content."""
     c = ffi.from_handle(context_handle)
-    return c.to_value(bytes(ffi.buffer(bytes_ptr, bytes_len)))
+    return c.to_value(binary_type(ffi.buffer(bytes_ptr, bytes_len)))
 
   @ffi.def_extern()
   def extern_store_utf8(context_handle, utf8_ptr, utf8_len):
@@ -800,8 +799,8 @@ class Native(object):
         tc(constraint_process_result),
         tc(constraint_generator),
         # Types.
-        TypeId(self.context.to_id(six.text_type)),
-        TypeId(self.context.to_id(six.binary_type)),
+        TypeId(self.context.to_id(text_type)),
+        TypeId(self.context.to_id(binary_type)),
         # Project tree.
         self.context.utf8_buf(build_root),
         self.context.utf8_buf(work_dir),

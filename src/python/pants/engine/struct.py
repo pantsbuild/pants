@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from abc import abstractproperty
 from collections import MutableMapping, MutableSequence
 
-import six
+import future
 
 from pants.engine.addressable import addressable, addressable_list
 from pants.engine.objects import Serializable, SerializableFactory, Validatable, ValidationError
@@ -17,10 +17,10 @@ from pants.util.objects import SubclassesOf, SuperclassesOf
 
 def _normalize_utf8_keys(kwargs):
   """When kwargs are passed literally in a source file, their keys are ascii: normalize."""
-  if any(type(key) is six.binary_type for key in kwargs.keys()):
+  if any(type(key) is future.utils.binary_type for key in kwargs.keys()):
     # This is to preserve the original dict type for kwargs.
     dict_type = type(kwargs)
-    return dict_type([(six.text_type(k), v) for k, v in kwargs.items()])
+    return dict_type([(future.utils.text_type(k), v) for k, v in kwargs.items()])
   return kwargs
 
 
