@@ -153,7 +153,7 @@ to this directory.",
               .takes_value(true)
               .long("chunk-bytes")
               .required(false)
-              .default_value(&format!("3 * 1024 * 1024"))
+              .default_value(&format!("{}", 3 * 1024 * 1024))
         )
       .get_matches(),
   ) {
