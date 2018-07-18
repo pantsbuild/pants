@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
+from builtins import str
 
 from pants.build_graph.address import Address
 from pants.engine.objects import ValidationError

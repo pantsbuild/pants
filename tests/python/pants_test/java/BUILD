@@ -5,6 +5,7 @@ python_tests(
   name = 'executor',
   sources = ['test_executor.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/java/distribution:distribution',
     'src/python/pants/java:executor',
     'src/python/pants/util:contextutil',
@@ -18,6 +19,7 @@ python_tests(
   sources = ['test_nailgun_client.py'],
   coverage = ['pants.java.nailgun_client'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:mock',
     'src/python/pants/java:nailgun_client',
   ]

@@ -8,6 +8,7 @@ import copy
 import os
 import re
 import traceback
+from builtins import next, object
 from collections import defaultdict
 
 import six
@@ -568,13 +569,15 @@ class Parser(object):
           [rv.value for rv in ranked_vals if rv.value is not None]).val
       merged_val = [self._convert_member_type(kwargs.get('member_type', str), x)
                     for x in merged_val]
-      map(check, merged_val)
+      for val in merged_val:
+        check(val)
       ret = RankedValue(merged_rank, merged_val)
     elif is_dict_option(kwargs):
       merged_rank = ranked_vals[-1].rank
       merged_val = DictValueComponent.merge(
           [rv.value for rv in ranked_vals if rv.value is not None]).val
-      map(check, merged_val)
+      for val in merged_val:
+        check(val)
       ret = RankedValue(merged_rank, merged_val)
     else:
       ret = ranked_vals[-1]

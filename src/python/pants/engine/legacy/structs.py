@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os.path
 from abc import abstractproperty
+from builtins import object, str
 
 from six import string_types
 

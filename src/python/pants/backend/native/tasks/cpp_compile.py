@@ -41,6 +41,17 @@ class CppCompile(NativeCompile):
   def get_compiler(self):
     return self._request_single(CppCompiler, self._toolchain)
 
+  def _make_compile_argv(self, compile_request):
+    # FIXME: this is a temporary fix, do not do any of this kind of introspection.
+    # https://github.com/pantsbuild/pants/issues/5951
+    prev_argv = super(CppCompile, self)._make_compile_argv(compile_request)
+
+    if compile_request.compiler.exe_filename == 'clang++':
+      new_argv = [prev_argv[0], '-nobuiltininc', '-nostdinc++'] + prev_argv[1:]
+    else:
+      new_argv = prev_argv
+    return new_argv
+
   # FIXME(#5951): don't have any command-line args in the task or in the subsystem -- rather,
   # subsystem options should be used to populate an `Executable` which produces its own arguments.
   def extra_compile_args(self):

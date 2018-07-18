@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import str
+
 from pants.backend.graph_info.tasks.paths import Path, Paths
 from pants.base.exceptions import TaskError
 from pants_test.task_test_base import ConsoleTaskTestBase

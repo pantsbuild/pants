@@ -87,7 +87,7 @@ class ProductsTest(TestBase):
         with safe_open(os.path.join(outdir, product), mode='w') as fp:
           fp.write(product)
         return product
-      product_mapping.add(target, outdir, map(create_product, products))
+      product_mapping.add(target, outdir, [create_product(product) for product in products])
       yield temporary_dir
 
   def test_non_empty_products(self):
@@ -110,7 +110,7 @@ class ProductsTest(TestBase):
         with safe_open(abspath, mode='w') as fp:
           fp.write(product)
         return abspath
-      data_by_target[target].add_abs_paths(outdir, map(create_product, products))
+      data_by_target[target].add_abs_paths(outdir, [create_product(product) for product in products])
       yield temporary_dir
 
   def test_non_empty_data(self):

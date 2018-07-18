@@ -52,7 +52,7 @@ class HelpInfoExtracterTest(unittest.TestCase):
              '{\'key1\':val1,\'key2\':val2,...}, ...]"'],
             ['--foo'])
     do_test(['--foo'], {'type': dict}, ['--foo="{\'key1\':val1,\'key2\':val2,...}"'],
-                                            ['--foo'])
+            ['--foo'])
 
     do_test(['--foo', '--bar'], {}, ['--foo=<str>', '--bar=<str>'], ['--foo', '--bar'])
 

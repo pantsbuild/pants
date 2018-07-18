@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import time
+from builtins import bytes, object, str, zip
 from collections import defaultdict
 from types import GeneratorType
 
@@ -156,7 +157,7 @@ class Scheduler(object):
 
   def graph_trace(self, execution_request):
     with temporary_file_path() as path:
-      self._native.lib.graph_trace(self._scheduler, execution_request, bytes(path))
+      self._native.lib.graph_trace(self._scheduler, execution_request, bytes(path, 'utf-8'))
       with open(path) as fd:
         for line in fd.readlines():
           yield line.rstrip()
@@ -247,14 +248,14 @@ class Scheduler(object):
     self._native.lib.tasks_task_end(self._tasks)
 
   def visualize_graph_to_file(self, session, filename):
-    res = self._native.lib.graph_visualize(self._scheduler, session, bytes(filename))
+    res = self._native.lib.graph_visualize(self._scheduler, session, bytes(filename, 'utf-8'))
     self._raise_or_return(res)
 
   def visualize_rule_graph_to_file(self, filename):
     self._native.lib.rule_graph_visualize(
       self._scheduler,
       self._root_type_ids(),
-      bytes(filename))
+      bytes(filename, 'utf-8'))
 
   def rule_graph_visualization(self):
     with temporary_file_path() as path:
@@ -272,7 +273,7 @@ class Scheduler(object):
         self._scheduler,
         root_type_id,
         product_type_id,
-        bytes(path))
+        bytes(path, 'utf-8'))
       with open(path) as fd:
         for line in fd.readlines():
           yield line.rstrip()
@@ -484,8 +485,8 @@ class SchedulerSession(object):
     scheduling thread.
     """
     start_time = time.time()
-    roots = zip(execution_request.roots,
-                self._scheduler._run_and_return_roots(self._session, execution_request.native))
+    roots = list(zip(execution_request.roots,
+                     self._scheduler._run_and_return_roots(self._session, execution_request.native)))
 
     self._maybe_visualize()
 

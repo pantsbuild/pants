@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
+from builtins import object
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config

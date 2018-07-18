@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import textwrap
 import unittest
+from builtins import object
 from contextlib import contextmanager
 
 from twitter.common.collections import maybe_list

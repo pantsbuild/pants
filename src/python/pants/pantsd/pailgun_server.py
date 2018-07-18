@@ -53,8 +53,7 @@ class PailgunHandler(PailgunHandlerBase):
 
   def _run_pants(self, sock, arguments, environment):
     """Execute a given run with a pants runner."""
-    runner = self.server.runner_factory(sock, arguments, environment)
-    runner.run()
+    self.server.runner_factory(sock, arguments, environment).run()
 
   def handle(self):
     """Request handler for a single Pailgun request."""

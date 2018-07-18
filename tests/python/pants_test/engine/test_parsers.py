@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import json
 import unittest
+from builtins import object, str
 from textwrap import dedent
 
 from pants.engine import parser

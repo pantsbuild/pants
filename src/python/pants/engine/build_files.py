@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import collections
 import functools
 import logging
+from builtins import next, str
 from os.path import dirname, join
 
 import six
@@ -124,7 +125,9 @@ def resolve_unhydrated_struct(address_mapper, address):
   collect_dependencies(struct)
 
   yield UnhydratedStruct(
-    filter(lambda build_address: build_address == address, addresses)[0], struct, dependencies)
+    next(build_address for build_address in addresses if build_address == address),
+    struct,
+    dependencies)
 
 
 def hydrate_struct(symbol_table_constraint, address_mapper, unhydrated_struct):
@@ -227,7 +230,7 @@ def addresses_from_address_families(address_mapper, specs):
     return False
 
   def filter_for_tag(tag):
-    return lambda t: tag in map(str, t.kwargs().get("tags", []))
+    return lambda t: tag in [str(t_tag) for t_tag in t.kwargs().get("tags", [])]
 
   include_target = wrap_filters(create_filters(specs.tags if specs.tags else '', filter_for_tag))
 

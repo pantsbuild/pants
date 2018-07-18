@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 
+from pex import pep425tags
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.native.targets.native_library import NativeLibrary
@@ -33,6 +34,16 @@ class BuildLocalPythonDistributions(Task):
   """Create python distributions (.whl) from python_dist targets."""
 
   options_scope = 'python-create-distributions'
+
+  # NB: these are all the immediate subdirectories of the target's results directory.
+  # This contains any modules from a setup_requires().
+  _SETUP_REQUIRES_SITE_SUBDIR = 'setup_requires_site'
+  # This will contain the sources used to build the python_dist().
+  _DIST_SOURCE_SUBDIR = 'python_dist_subdir'
+
+  # This defines the output directory when building the dist, so we know where the output wheel is
+  # located. It is a subdirectory of `_DIST_SOURCE_SUBDIR`.
+  _DIST_OUTPUT_DIR = 'dist'
 
   @classmethod
   def product_types(cls):
@@ -92,19 +103,13 @@ class BuildLocalPythonDistributions(Task):
 
     return reqs_to_resolve
 
-  # NB: these are all the immediate subdirectories of the target's results directory.
-  # This contains any modules from a setup_requires().
-  setup_requires_site_subdir = 'setup_requires_site'
-  # This will contain the sources used to build the python_dist().
-  dist_subdir = 'python_dist_subdir'
-
   @classmethod
   def _get_output_dir(cls, results_dir):
-    return os.path.join(results_dir, cls.dist_subdir)
+    return os.path.join(results_dir, cls._DIST_SOURCE_SUBDIR)
 
   @classmethod
   def _get_dist_dir(cls, results_dir):
-    return os.path.join(cls._get_output_dir(results_dir), SetupPyRunner.DIST_DIR)
+    return os.path.join(cls._get_output_dir(results_dir), cls._DIST_OUTPUT_DIR)
 
   def execute(self):
     dist_targets = self.context.targets(is_local_python_dist)
@@ -198,7 +203,7 @@ class BuildLocalPythonDistributions(Task):
       # We are including a platform-specific shared lib in this dist, so mark it as such.
       is_platform_specific = True
 
-    setup_requires_dir = os.path.join(results_dir, self.setup_requires_site_subdir)
+    setup_requires_dir = os.path.join(results_dir, self._SETUP_REQUIRES_SITE_SUBDIR)
     setup_reqs_to_resolve = self._get_setup_requires_to_resolve(dist_target)
     if setup_reqs_to_resolve:
       self.context.log.debug('python_dist target(s) with setup_requires detected. '
@@ -215,17 +220,50 @@ class BuildLocalPythonDistributions(Task):
       setup_requires_site_dir=setup_requires_site_dir,
       setup_py_native_tools=native_tools)
 
-    self._create_dist(dist_target, dist_output_dir, interpreter,
-                      setup_py_execution_environment, is_platform_specific)
+    versioned_target_fingerprint = versioned_target.cache_key.hash
+
+    self._create_dist(
+      dist_target,
+      dist_output_dir,
+      interpreter,
+      setup_py_execution_environment,
+      versioned_target_fingerprint,
+      is_platform_specific)
+
+  # NB: "snapshot" refers to a "snapshot release", not a Snapshot.
+  def _generate_snapshot_bdist_wheel_argv(self, snapshot_fingerprint, is_platform_specific):
+    """Create a command line to pass to :class:`SetupPyRunner`.
+
+    Note that distutils will convert `snapshot_fingerprint` into a string suitable for a version
+    tag. Currently for versioned target fingerprints, this seems to convert all punctuation into
+    '.' and downcase all ASCII chars. See https://www.python.org/dev/peps/pep-0440/ for further
+    information on allowed version names.
+
+    NB: adds a '+' before the fingerprint to the build tag!
+    """
+    egg_info_snapshot_tag_args = ['egg_info', '--tag-build=+{}'.format(snapshot_fingerprint)]
+    bdist_whl_args = ['bdist_wheel']
+    if is_platform_specific:
+      platform_args = ['--plat-name', pep425tags.get_platform()]
+    else:
+      platform_args = []
+
+    dist_dir_args = ['--dist-dir', self._DIST_OUTPUT_DIR]
+
+    setup_py_command = egg_info_snapshot_tag_args + bdist_whl_args + platform_args + dist_dir_args
+    return setup_py_command
 
   def _create_dist(self, dist_tgt, dist_target_dir, interpreter,
-                   setup_py_execution_environment, is_platform_specific):
+                   setup_py_execution_environment, snapshot_fingerprint, is_platform_specific):
     """Create a .whl file for the specified python_distribution target."""
     self._copy_sources(dist_tgt, dist_target_dir)
 
-    setup_runner = SetupPyRunner.for_bdist_wheel(
+    setup_py_snapshot_version_argv = self._generate_snapshot_bdist_wheel_argv(
+      snapshot_fingerprint, is_platform_specific)
+
+    setup_runner = SetupPyRunner(
       source_dir=dist_target_dir,
-      is_platform_specific=is_platform_specific,
+      setup_command=setup_py_snapshot_version_argv,
       interpreter=interpreter)
 
     with environment_as(**setup_py_execution_environment.as_environment()):

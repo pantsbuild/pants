@@ -8,11 +8,12 @@ import hashlib
 import logging
 import os
 import site
+from builtins import object
 
 from pex import resolver
 from pex.base import requirement_is_exact
-from pkg_resources import working_set as global_working_set
 from pkg_resources import Requirement
+from pkg_resources import working_set as global_working_set
 from wheel.install import WheelFile
 
 from pants.backend.python.subsystems.python_repos import PythonRepos

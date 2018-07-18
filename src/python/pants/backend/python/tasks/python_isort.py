@@ -22,12 +22,6 @@ from pants.util.process_handler import subprocess
 class IsortPythonTask(FmtTaskMixin, Task):
   """Autoformats Python source files with isort.
 
-  isort binary is built at contrib/python/src/python/pants/contrib/python/isort,
-  then uploaded to
-  https://github.com/pantsbuild/binaries/tree/gh-pages/build-support/scripts
-
-  TODO: Explain why we don't invoke isort directly.
-
   Behavior:
   ./pants fmt.isort <targets> -- <args, e.g. "--recursive ."> will sort the files only related
     to specified targets, but the way of finding the config(s) is vanilla. If no target is
@@ -58,6 +52,8 @@ class IsortPythonTask(FmtTaskMixin, Task):
     cmd = [isort_script] + self.get_passthru_args() + sources
     logging.debug(' '.join(cmd))
 
+    # NB: We execute isort out of process to avoid unwanted side-effects from importing it:
+    #   https://github.com/timothycrosley/isort/issues/456
     try:
       subprocess.check_call(cmd, cwd=get_buildroot(),
                             stderr=test_output_file, stdout=test_output_file)

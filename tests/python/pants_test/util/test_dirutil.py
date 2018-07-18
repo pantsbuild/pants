@@ -16,10 +16,11 @@ import mock
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import (ExistingDirError, ExistingFileError, _mkdtemp_unregister_cleaner,
-                                absolute_symlink, check_no_overlapping_paths, fast_relpath, get_basedir,
-                                longest_dir_prefix, mergetree, read_file, relative_symlink, relativize_paths,
-                                rm_rf, safe_concurrent_creation, safe_file_dump, safe_mkdir, safe_mkdtemp,
-                                safe_open, safe_rm_oldest_items_in_dir, safe_rmtree, touch)
+                                absolute_symlink, check_no_overlapping_paths, fast_relpath,
+                                get_basedir, longest_dir_prefix, mergetree, read_file,
+                                relative_symlink, relativize_paths, rm_rf, safe_concurrent_creation,
+                                safe_file_dump, safe_mkdir, safe_mkdtemp, safe_open,
+                                safe_rm_oldest_items_in_dir, safe_rmtree, touch)
 from pants.util.objects import datatype
 
 

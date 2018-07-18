@@ -349,6 +349,7 @@ dependencies = [
 name = "fs_util"
 version = "0.0.1"
 dependencies = [
+ "boxfuture 0.0.1",
  "bytes 0.4.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.31.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.5.10 (registry+https://github.com/rust-lang/crates.io-index)",
