@@ -9,7 +9,7 @@ import os
 from pants.backend.native.config.environment import CCompiler, CppCompiler, Platform
 from pants.backend.native.subsystems.utils.archive_file_mapper import ArchiveFileMapper
 from pants.binaries.binary_tool import NativeTool
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import rule
 from pants.engine.selectors import Select
 from pants.util.memo import memoized_method, memoized_property
 
@@ -108,5 +108,4 @@ def create_gcc_rules():
   return [
     get_gcc,
     get_gplusplus,
-    RootRule(GCC),
   ]

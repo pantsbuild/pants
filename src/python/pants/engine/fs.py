@@ -144,5 +144,4 @@ def create_fs_rules():
   return [
     RootRule(DirectoryDigest),
     RootRule(PathGlobs),
-    RootRule(Snapshot),
   ]
