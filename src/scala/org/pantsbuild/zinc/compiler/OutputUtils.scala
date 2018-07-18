@@ -19,17 +19,17 @@ object OutputUtils {
    * @param dir File handle containing the contents to sort
    * @return sorted set of all paths within the `dir`
    */
-  def sort(dir:File): mutable.TreeSet[Path] = {
-    val sorted = new mutable.TreeSet[Path]()
+  def sort(dir:File): mutable.TreeSet[(Path, Boolean)] = {
+    val sorted = new mutable.TreeSet[(Path, Boolean)]()
 
     val fileSortVisitor = new SimpleFileVisitor[Path]() {
       override def preVisitDirectory(path: Path, attrs: BasicFileAttributes): FileVisitResult = {
-        sorted.add(path)
+        sorted.add(path, false)
         FileVisitResult.CONTINUE
       }
 
       override def visitFile(path: Path, attrs: BasicFileAttributes): FileVisitResult = {
-        sorted.add(path)
+        sorted.add(path, true)
         FileVisitResult.CONTINUE
       }
     }
@@ -39,7 +39,7 @@ object OutputUtils {
   }
 
   def relativize(base: String, path: Path): String = {
-    new File(base).toURI().relativize(new File(path.toString).toURI()).getPath()
+    new File(base.toString).toURI().relativize(new File(path.toString).toURI()).getPath()
   }
 
   /**
@@ -50,23 +50,25 @@ object OutputUtils {
    * @param jarEntryTime time to be set for each JAR entry
    */
   def createJar(
-    base: String, filePaths: mutable.TreeSet[Path], outputJarPath: Path, jarEntryTime: Long) {
+    base: String, filePaths: mutable.TreeSet[(Path, Boolean)], outputJarPath: Path, jarEntryTime: Long) {
 
     val target = new JarOutputStream(Files.newOutputStream(outputJarPath))
 
-    def addToJar(source: Path, entryName: String): FileVisitResult = {
+    def addToJar(source: (Path, Boolean), entryName: String): FileVisitResult = {
       val jarEntry = new JarEntry(entryName)
       // setting jarEntry time to a fixed value for all entries within the jar so that jars are
       // byte-for-byte reproducible.
       jarEntry.setTime(jarEntryTime)
 
       target.putNextEntry(jarEntry)
-      Files.copy(source, target)
+      if (source._2) {
+        Files.copy(source._1, target)
+      }
       target.closeEntry()
       FileVisitResult.CONTINUE
     }
 
-    val pathToName = filePaths.zipWithIndex.map{case(k, v) => (k, relativize(base, k))}.toMap
+    val pathToName = filePaths.zipWithIndex.map{case(k, v) => (k, relativize(base, k._1))}.toMap
     pathToName.map(e => addToJar(e._1, e._2))
     target.close()
   }
@@ -84,13 +86,13 @@ object OutputUtils {
   }
 
   /**
-   * Determines if a Class exists in a JAR provided.
+   * Determines if a file exists in a JAR provided.
    *
    * @param jarPath Absolute Path to the JAR being inspected
-   * @param clazz Name of the Class, the existence of which is to be inspected
+   * @param fileName Name of the file, the existence of which is to be inspected
    * @return
    */
-  def existsClass(jarPath: Path, clazz: String): Boolean = {
+  def existsClass(jarPath: Path, fileName: String): Boolean = {
     var jis: JarInputStream = null
     var found = false
     try {
@@ -100,7 +102,7 @@ object OutputUtils {
       def findClass(entry: JarEntry): Boolean = entry match {
         case null =>
           false
-        case entry if entry.getName == clazz =>
+        case entry if entry.getName == fileName =>
           true
         case _ =>
           findClass(jis.getNextJarEntry)
