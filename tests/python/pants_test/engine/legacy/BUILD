@@ -63,6 +63,16 @@ python_tests(
 )
 
 python_tests(
+  name = 'console_rule_integration',
+  sources = [ 'test_console_rule_integration.py' ],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+  timeout = 300,
+)
+
+python_tests(
   name = 'dependees_integration',
   sources = ['test_dependees_integration.py'],
   dependencies = [

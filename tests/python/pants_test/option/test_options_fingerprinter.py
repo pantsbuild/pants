@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import range, zip
 
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField

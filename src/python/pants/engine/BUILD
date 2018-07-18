@@ -186,6 +186,12 @@ python_library(
   ],
 )
 
+
+python_library(
+  name='console',
+  sources=['console.py']
+)
+
 resources(
   name='native_engine_shared_library',
   sources=['native_engine.so']

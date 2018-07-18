@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import json
 import os
+from builtins import object, str
 from collections import defaultdict
 
 import six
@@ -275,10 +276,10 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
         if hasattr(current_target, 'test_platform'):
           info['test_platform'] = current_target.test_platform.name
 
-      info['roots'] = map(lambda source_root_package_prefix: {
+      info['roots'] = [{
         'source_root': source_root_package_prefix[0],
         'package_prefix': source_root_package_prefix[1]
-      }, self._source_roots_for_target(current_target))
+      } for source_root_package_prefix in self._source_roots_for_target(current_target)]
 
       if classpath_products:
         info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
@@ -341,7 +342,8 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
 
       interpreters_info = {}
       for interpreter, targets in six.iteritems(python_interpreter_targets_mapping):
-        req_libs = filter(has_python_requirements, Target.closure_for_targets(targets))
+        req_libs = [target for target in Target.closure_for_targets(targets)
+                    if has_python_requirements(target)]
         chroot = self.resolve_requirements(interpreter, req_libs)
         interpreters_info[str(interpreter.identity)] = {
           'binary': interpreter.binary,
@@ -397,7 +399,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
     def root_package_prefix(source_file):
       source = os.path.dirname(source_file)
       return os.path.join(get_buildroot(), target.target_base, source), source.replace(os.sep, '.')
-    return set(map(root_package_prefix, target.sources_relative_to_source_root()))
+    return set(root_package_prefix(source) for source in target.sources_relative_to_source_root())
 
 
 class Export(ExportTask, ConsoleTask):

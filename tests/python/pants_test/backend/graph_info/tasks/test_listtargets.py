@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import object
 from textwrap import dedent
 
 from pants.backend.graph_info.tasks.listtargets import ListTargets

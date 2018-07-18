@@ -166,8 +166,8 @@ class IdeaPluginGen(ConsoleTask):
   def execute(self):
     # Heuristics to guess whether user tries to load a python project,
     # in which case intellij project sdk has to be set up manually.
-    jvm_target_num = len(filter(lambda x: isinstance(x, JvmTarget), self.context.target_roots))
-    python_target_num = len(filter(lambda x: isinstance(x, PythonTarget), self.context.target_roots))
+    jvm_target_num = len([x for x in self.context.target_roots if isinstance(x, JvmTarget)])
+    python_target_num = len([x for x in self.context.target_roots if isinstance(x, PythonTarget)])
     if python_target_num > jvm_target_num:
       logging.warn('This is likely a python project. Please make sure to '
                    'select the proper python interpreter as Project SDK in IntelliJ.')

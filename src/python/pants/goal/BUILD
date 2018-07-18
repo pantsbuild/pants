@@ -5,6 +5,7 @@ python_library(
   name = 'task_registrar',
   sources = ['task_registrar.py'],
   dependencies = [
+    '3rdparty/python:future',
     ':goal',
   ],
 )
@@ -13,6 +14,7 @@ python_library(
   name = 'aggregated_timings',
   sources = ['aggregated_timings.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:dirutil',
   ]
 )
@@ -22,6 +24,7 @@ python_library(
   name = 'artifact_cache_stats',
   sources = ['artifact_cache_stats.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/cache',
     'src/python/pants/util:dirutil',
   ]
@@ -31,6 +34,7 @@ python_library(
   name = 'context',
   sources = ['context.py'],
   dependencies = [
+    '3rdparty/python:future',
     ':products',
     ':workspace',
     'src/python/pants/base:build_environment',
@@ -56,6 +60,7 @@ python_library(
 python_library(
   sources = ['goal.py'],
   dependencies = [
+    '3rdparty/python:future',
     ':error',
     'src/python/pants/option',
     'src/python/pants/util:memo',
@@ -65,12 +70,16 @@ python_library(
 python_library(
   name = 'pantsd_stats',
   sources = ['pantsd_stats.py'],
+  dependencies = [
+    '3rdparty/python:future',
+  ],
 )
 
 python_library(
   name = 'products',
   sources = ['products.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/util:dirutil',
   ],
