@@ -4,6 +4,73 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.9.0rc0 (07/17/2018)
+---------------------
+
+New features
+~~~~~~~~~~~~
+
+* Early support for @console_rule. (#6088)
+  `PR #6088 <https://github.com/pantsbuild/pants/pull/6088>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Eliminate obsolete PANTS_ARGS from ci. (#6141)
+  `PR #6141 <https://github.com/pantsbuild/pants/pull/6141>`_
+
+Bugfixes
+~~~~~~~~
+
+* add the target fingerprint to the version of each local dist so that we don't use the first cached one (#6022)
+  `PR #6022 <https://github.com/pantsbuild/pants/pull/6022>`_
+
+* Preserve output directories if process execution failed (#6152)
+  `PR #6152 <https://github.com/pantsbuild/pants/pull/6152>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Move each EntryState in the graph under its own Mutex (#6095)
+  `PR #6095 <https://github.com/pantsbuild/pants/pull/6095>`_
+
+Python 3 porting (#6062)
+------------------------
+
+* Add missing future dependency to BUILD (#6135)
+  `PR #6135 <https://github.com/pantsbuild/pants/pull/6135>`_
+
+* Port binaries package to Python 3 (#6127)
+  `PR #6127 <https://github.com/pantsbuild/pants/pull/6127>`_
+
+* Port option package to python3 (#6117)
+  `PR #6117 <https://github.com/pantsbuild/pants/pull/6117>`_
+
+* Port to mypy to py3 (#6140)
+  `PR #6140 <https://github.com/pantsbuild/pants/pull/6140>`_
+
+* Port goal package to Python 3 (#6138)
+  `Issue #6062 <https://github.com/pantsbuild/pants/issues/6062>`_
+  `PR #6138 <https://github.com/pantsbuild/pants/pull/6138>`_
+
+* Port findbugs to py3 (#6137)
+  `PR #6137 <https://github.com/pantsbuild/pants/pull/6137>`_
+
+* Port backend project info to Python 3 (#6132)
+  `PR #6132 <https://github.com/pantsbuild/pants/pull/6132>`_
+
+* Port backend graph info to Python 3 (#6131)
+  `PR #6131 <https://github.com/pantsbuild/pants/pull/6131>`_
+
+* Port core tasks to Python 3 (#6130)
+  `PR #6130 <https://github.com/pantsbuild/pants/pull/6130>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Impose a consistent sort on CONTRIBUTORS.md. (#6125)
+  `PR #6125 <https://github.com/pantsbuild/pants/pull/6125>`_
+
 1.9.0.dev1 (07/14/2018)
 -----------------------
 
