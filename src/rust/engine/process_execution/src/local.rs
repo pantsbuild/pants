@@ -157,47 +157,40 @@ impl super::CommandRunner for CommandRunner {
           BytesMut::with_capacity(8192),
           None,
         );
-        Self::outputs_stream_for_child(child)
-          .fold(
-            init,
-            |(mut stdout, mut stderr, mut exit_code), child_output| {
-              match child_output {
-                ChildOutput::Stdout(bytes) => stdout.extend_from_slice(&bytes),
-                ChildOutput::Stderr(bytes) => stderr.extend_from_slice(&bytes),
-                ChildOutput::Exit(code) => exit_code = code,
-              };
-              Ok((stdout, stderr, exit_code)) as Result<_, String>
-            },
-          )
+        Self::outputs_stream_for_child(child).fold(
+          init,
+          |(mut stdout, mut stderr, mut exit_code), child_output| {
+            match child_output {
+              ChildOutput::Stdout(bytes) => stdout.extend_from_slice(&bytes),
+              ChildOutput::Stderr(bytes) => stderr.extend_from_slice(&bytes),
+              ChildOutput::Exit(code) => exit_code = code,
+            };
+            Ok((stdout, stderr, exit_code)) as Result<_, String>
+          },
+        )
       })
       .and_then(move |(stdout, stderr, exit_code)| {
         let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
           future::ok(fs::Snapshot::empty()).to_boxed()
         } else {
           // Use no ignore patterns, because we are looking for explicitly listed paths.
-          future::done(
-            fs::PosixFS::new(
-              workdir_path2,
-              fs_pool,
-              &[],
-            )
-          )
-          .map_err(|err| {
-            format!(
-              "Error making posix_fs to fetch local process execution output files: {}",
-              err
-            )
-          })
-          .map(Arc::new)
-          .and_then(|posix_fs| {
-            CommandRunner::construct_output_snapshot(
-              store,
-              posix_fs,
-              output_file_paths,
-              output_dir_paths
-            )
-          })
-          .to_boxed()
+          future::done(fs::PosixFS::new(workdir_path2, fs_pool, &[]))
+            .map_err(|err| {
+              format!(
+                "Error making posix_fs to fetch local process execution output files: {}",
+                err
+              )
+            })
+            .map(Arc::new)
+            .and_then(|posix_fs| {
+              CommandRunner::construct_output_snapshot(
+                store,
+                posix_fs,
+                output_file_paths,
+                output_dir_paths,
+              )
+            })
+            .to_boxed()
         };
 
         output_snapshot
@@ -208,7 +201,8 @@ impl super::CommandRunner for CommandRunner {
             output_directory: snapshot.digest,
           })
           .to_boxed()
-      }).then(move |result| {
+      })
+      .then(move |result| {
         // Force workdir not to get dropped until after we've ingested the outputs
         if !cleanup_local_dirs {
           // This consumes the `TempDir` without deleting directory on the filesystem, meaning
@@ -216,8 +210,7 @@ impl super::CommandRunner for CommandRunner {
           let preserved_path = workdir.into_path();
           info!(
             "preserved local process execution dir `{:?}` for {:?}",
-            preserved_path,
-            req_description
+            preserved_path, req_description
           );
         } // Else, workdir gets dropped here
         result

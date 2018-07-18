@@ -608,16 +608,27 @@ impl<N: Node> Graph<N> {
       // Get the Generations of all dependencies of the Node. We can trust that these have not changed
       // since we began executing, as long as we are not currently marked dirty (see the method doc).
       let dep_generations = inner
-          .pg
-          .neighbors_directed(entry_id, Direction::Outgoing)
-          .filter_map(|dep_id| inner.entry_for_id(dep_id))
-          .map(|entry| entry.generation())
-          .collect();
-      (inner.entry_for_id(entry_id).cloned(), entry_id, dep_generations)
+        .pg
+        .neighbors_directed(entry_id, Direction::Outgoing)
+        .filter_map(|dep_id| inner.entry_for_id(dep_id))
+        .map(|entry| entry.generation())
+        .collect();
+      (
+        inner.entry_for_id(entry_id).cloned(),
+        entry_id,
+        dep_generations,
+      )
     };
     if let Some(mut entry) = entry {
       let mut inner = self.inner.lock().unwrap();
-      entry.complete(context, entry_id, run_token, dep_generations, result, &mut inner);
+      entry.complete(
+        context,
+        entry_id,
+        run_token,
+        dep_generations,
+        result,
+        &mut inner,
+      );
     }
   }
 

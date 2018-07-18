@@ -15,7 +15,7 @@ function usage() {
   fi
 }
 
-write_mode=diff
+write_mode=check
 
 while getopts "hf" opt; do
   case ${opt} in
@@ -54,24 +54,21 @@ bad_files=(
     exit ${PIPESTATUS[0]}
   )
 )
-case $? in
-  4)
+exit_code=$?
+
+if [[ ${exit_code} -ne 0 ]]; then
+  if [[ "${write_mode}" == "check" ]]; then
     echo >&2 "The following rust files were incorrectly formatted, run \`$0 -f\` to reformat them:"
     for bad_file in ${bad_files[*]}; do
       echo >&2 ${bad_file}
     done
-    exit 1
-    ;;
-  0)
-    exit 0
-    ;;
-  *)
+  else
     cat << EOF >&2
 An error occurred while checking the formatting of rust files.
-Try running \`(cd "${NATIVE_ROOT}" && ${cmd[*]} --write-mode=diff)\` to investigate.
+Try running \`(cd "${NATIVE_ROOT}" && ${cmd[*]} --write-mode=${write_mode})\` to investigate.
 Its error is:
 EOF
-    cd "${NATIVE_ROOT}" && ${cmd[*]} --write-mode=diff >/dev/null
-    exit 1
-    ;;
-esac
+    cd "${NATIVE_ROOT}" && ${cmd[*]} --write-mode=${write_mode} >/dev/null
+  fi
+  exit 1
+fi
