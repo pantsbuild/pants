@@ -400,11 +400,11 @@ fn expand_files_helper(
     .load_directory(digest)
     .and_then(|maybe_dir| match maybe_dir {
       Some(dir) => {
-        for file in dir.get_files() {
-          files
-            .lock()
-            .unwrap()
-            .push(format!("{}{}", prefix, file.name));
+        {
+          let mut files_unlocked = files.lock().unwrap();
+          for file in dir.get_files() {
+            files_unlocked.push(format!("{}{}", prefix, file.name));
+          }
         }
         futures::future::join_all(
           dir
