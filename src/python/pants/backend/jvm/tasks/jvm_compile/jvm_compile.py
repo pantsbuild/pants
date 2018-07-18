@@ -17,6 +17,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
+from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
   CLASS_NOT_FOUND_ERROR_PATTERNS
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
@@ -381,8 +382,10 @@ class JvmCompile(NailgunTaskBase):
                           for vt in invalidation_check.all_vts}
       for ccs in compile_contexts.values():
         cc = self.select_runtime_context(ccs)
-        classpath_product.add_for_target(cc.target, [(conf, classpath_for_context(cc))
-                                                     for conf in self._confs])
+        classpath_product.add_for_target(
+          cc.target,
+          # TODO: Add snapshot
+          [(conf, classpath_for_context(cc), None) for conf in self._confs])
 
       # Register products for valid targets.
       valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
@@ -401,8 +404,10 @@ class JvmCompile(NailgunTaskBase):
         for ccs in compile_contexts.values():
           cc = self.select_runtime_context(ccs)
           for conf in self._confs:
-            classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
-            classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
+            # TODO: Add snapshot
+            classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir, None)])
+            # TODO: Add snapshot
+            classpath_product.add_for_target(cc.target, [(conf, cc.jar_file, None)])
 
   def create_runtime_classpath(self):
     compile_classpath = self.context.products.get_data('compile_classpath')
@@ -448,7 +453,7 @@ class JvmCompile(NailgunTaskBase):
       raise TaskError("Compilation failure: {}".format(e))
 
   def _record_compile_classpath(self, classpath, targets, outdir):
-    relative_classpaths = [fast_relpath(path, self.get_options().pants_workdir) for path in classpath]
+    relative_classpaths = [fast_relpath(entry.path2, self.get_options().pants_workdir) for entry in classpath]
     text = '\n'.join(relative_classpaths)
     for target in targets:
       path = os.path.join(outdir, 'compile_classpath', '{}.txt'.format(target.id))
@@ -624,8 +629,8 @@ class JvmCompile(NailgunTaskBase):
       compile_contexts_by_directory[compile_context.classes_dir] = compile_context
     # If we have a compile context for the target, include it.
     for entry in classpath_entries:
-      if not entry.endswith('.jar'):
-        compile_context = compile_contexts_by_directory.get(entry)
+      if not entry.path2.endswith('.jar'):
+        compile_context = compile_contexts_by_directory.get(entry.path2)
         if not compile_context:
           self.context.log.debug('Missing upstream analysis for {}'.format(entry))
         else:
@@ -757,7 +762,7 @@ class JvmCompile(NailgunTaskBase):
     return os.path.exists(ctx.analysis_file)
 
   def _cp_entries_for_ctx(self, ctx, classpath_product_key):
-    cp_entries = [ctx.classes_dir]
+    cp_entries = [ClasspathEntry(ctx.classes_dir, None)]
     cp_entries.extend(self._zinc.compile_classpath(classpath_product_key,
       ctx.target,
       extra_cp_entries=self._extra_compile_time_classpath))

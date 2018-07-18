@@ -25,11 +25,12 @@ class ClasspathEntry(object):
   :API: public
   """
 
-  def __init__(self, path):
+  def __init__(self, path, directory_digest):
     self._path = path
+    self._directory_digest = directory_digest
 
   @property
-  def path(self):
+  def path2(self):
     """Returns the pants internal path of this classpath entry.
 
     Suitable for use in constructing classpaths for pants executions and pants generated artifacts.
@@ -39,6 +40,10 @@ class ClasspathEntry(object):
     :rtype: string
     """
     return self._path
+
+  @property
+  def directory_digest(self):
+    return self._directory_digest
 
   def is_excluded_by(self, excludes):
     """Returns `True` if this classpath entry should be excluded given the `excludes` in play.
@@ -50,16 +55,16 @@ class ClasspathEntry(object):
     return False
 
   def __hash__(self):
-    return hash(self.path)
+    return hash(self.path2)
 
   def __eq__(self, other):
-    return isinstance(other, ClasspathEntry) and self.path == other.path
+    return isinstance(other, ClasspathEntry) and self.path2 == other.path2 and self.directory_digest == other.directory_digest
 
   def __ne__(self, other):
     return not self == other
 
   def __repr__(self):
-    return 'ClasspathEntry(path={!r})'.format(self.path)
+    return 'ClasspathEntry(path={!r}, directory_digest={!r})'.format(self.path2, self.directory_digest)
 
   @classmethod
   def is_artifact_classpath_entry(cls, classpath_entry):
@@ -82,8 +87,8 @@ class ArtifactClasspathEntry(ClasspathEntry):
   :API: public
   """
 
-  def __init__(self, path, coordinate, cache_path):
-    super(ArtifactClasspathEntry, self).__init__(path)
+  def __init__(self, path, coordinate, cache_path, directory_digest=None):
+    super(ArtifactClasspathEntry, self).__init__(path, directory_digest)
     self._coordinate = coordinate
     self._cache_path = cache_path
 
@@ -115,20 +120,21 @@ class ArtifactClasspathEntry(ClasspathEntry):
     return any(_matches_exclude(self.coordinate, exclude) for exclude in excludes)
 
   def __hash__(self):
-    return hash((self.path, self.coordinate, self.cache_path))
+    return hash((self.path2, self.coordinate, self.cache_path))
 
   def __eq__(self, other):
     return (isinstance(other, ArtifactClasspathEntry) and
-            self.path == other.path and
+            self.path2 == other.path2 and
             self.coordinate == other.coordinate and
-            self.cache_path == other.cache_path)
+            self.cache_path == other.cache_path and
+            self.directory_digest == other.directory_digest)
 
   def __ne__(self, other):
     return not self == other
 
   def __repr__(self):
-    return ('ArtifactClasspathEntry(path={!r}, coordinate={!r}, cache_path={!r})'
-            .format(self.path, self.coordinate, self.cache_path))
+    return ('ArtifactClasspathEntry(path={!r}, coordinate={!r}, cache_path={!r}, directory_digest={!r})'
+            .format(self.path2, self.coordinate, self.cache_path, self.directory_digest))
 
 
 def _matches_exclude(coordinate, exclude):
@@ -355,7 +361,7 @@ class ClasspathProducts(object):
     :rtype: list of (string, string)
     """
     cp_entries = self.get_classpath_entries_for_targets(targets)
-    return [(conf, cp_entry.path) for conf, cp_entry in cp_entries]
+    return [(conf, cp_entry) for conf, cp_entry in cp_entries]
 
   def get_classpath_entries_for_targets(self, targets, respect_excludes=True):
     """Gets the classpath products for the given targets.
@@ -443,7 +449,7 @@ class ClasspathProducts(object):
       self._excludes.add_for_target(target, target.excludes)
 
   def _wrap_path_elements(self, classpath_elements):
-    return [(element[0], ClasspathEntry(element[1])) for element in classpath_elements]
+    return [(element[0], ClasspathEntry(element[1], element[2])) for element in classpath_elements]
 
   def _add_elements_for_target(self, target, elements):
     self._validate_classpath_tuples(elements, target)
@@ -459,7 +465,7 @@ class ClasspathProducts(object):
     """
     for classpath_tuple in classpath:
       conf, classpath_entry = classpath_tuple
-      path = classpath_entry.path
+      path = classpath_entry.path2
       if os.path.relpath(path, self._pants_workdir).startswith(os.pardir):
         raise TaskError(
           'Classpath entry {} for target {} is located outside the working directory "{}".'

@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import Queue as queue
+import sys
 import threading
 import traceback
 from collections import defaultdict, deque
@@ -263,8 +264,12 @@ class ExecutionGraph(object):
         try:
           work()
           result = (worker_key, SUCCESSFUL, None)
-        except Exception as e:
-          result = (worker_key, FAILED, e)
+        except Exception:
+          _, exc_value, exc_traceback = sys.exc_info()
+          # TODO: Make this an if show backtraces
+          if True:
+            traceback.print_tb(exc_traceback)
+          result = (worker_key, FAILED, exc_value)
         finished_queue.put(result)
         jobs_in_flight.decrement()
 

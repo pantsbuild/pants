@@ -69,5 +69,5 @@ class JvmTask(Task):
 
     classpath_for_targets = ClasspathUtil.classpath(closure, classpath_product, self.confs)
     classpath = list(classpath_prefix or ())
-    classpath.extend(classpath_for_targets)
+    classpath.extend((ce.path2 for ce in classpath_for_targets))
     return classpath

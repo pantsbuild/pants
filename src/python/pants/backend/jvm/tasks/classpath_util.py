@@ -72,7 +72,7 @@ class ClasspathUtil(object):
     """
     classpath_tuples = classpath_products.get_internal_classpath_entries_for_targets(targets)
     filtered_tuples_iter = cls._filtered_classpath_by_confs_iter(classpath_tuples, confs)
-    return [entry.path for entry in cls._entries_iter(filtered_tuples_iter)]
+    return [entry.path2 for entry in cls._entries_iter(filtered_tuples_iter)]
 
   @classmethod
   def classpath_by_targets(cls, targets, classpath_products, confs=('default',)):

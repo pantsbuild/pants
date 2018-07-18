@@ -275,7 +275,7 @@ class BaseZincCompile(JvmCompile):
   def compile(self, ctx, args, classpath, upstream_analysis,
               settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
-    self._verify_zinc_classpath(classpath)
+    self._verify_zinc_classpath(ce.path2 for ce in classpath)
     self._verify_zinc_classpath(upstream_analysis.keys())
 
     zinc_args = []
@@ -283,7 +283,7 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend([
       '-log-level', self.get_options().level,
       '-analysis-cache', ctx.analysis_file,
-      '-classpath', ':'.join(classpath),
+      '-classpath', ':'.join(ce.path2 for ce in classpath),
       '-d', ctx.classes_dir
     ])
     if not self.get_options().colors:

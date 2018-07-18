@@ -55,7 +55,8 @@ class ResourcesTask(Task):
       for vt in invalidation.all_vts:
         # Register the target's chroot in the products.
         for conf in self.get_options().confs:
-          runtime_classpath.add_for_target(vt.target, [(conf, vt.results_dir)])
+          # TODO: Add a snapshot
+          runtime_classpath.add_for_target(vt.target, [(conf, vt.results_dir, None)])
         # And if it was invalid, generate the resources to the chroot.
         if not vt.valid:
           self.prepare_resources(vt.target, vt.results_dir)
