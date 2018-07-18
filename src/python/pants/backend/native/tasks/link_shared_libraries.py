@@ -10,6 +10,7 @@ from pants.backend.native.config.environment import Linker, Platform
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_compile import NativeTargetDependencies, ObjectFiles
+from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFetch
 from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -27,6 +28,7 @@ class LinkSharedLibraryRequest(datatype([
     'object_files',
     'native_artifact',
     'output_dir',
+    'external_libs_info'
 ])): pass
 
 
@@ -40,6 +42,7 @@ class LinkSharedLibraries(NativeTask):
   def prepare(cls, options, round_manager):
     round_manager.require(NativeTargetDependencies)
     round_manager.require(ObjectFiles)
+    round_manager.require(NativeExternalLibraryFetch.NativeExternalLibraryFiles)
 
   @property
   def cache_target_dirs(self):
@@ -76,17 +79,24 @@ class LinkSharedLibraries(NativeTask):
     native_target_deps_product = self.context.products.get(NativeTargetDependencies)
     compiled_objects_product = self.context.products.get(ObjectFiles)
     shared_libs_product = self.context.products.get(SharedLibrary)
+    external_libs_product = self.context.products.get_data(NativeExternalLibraryFetch.NativeExternalLibraryFiles)
 
     all_shared_libs_by_name = {}
+
+    # FIXME: convert this to a v2 engine dependency injection.
+    platform = Platform.create()
 
     with self.invalidated(targets_providing_artifacts,
                           invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
         if vt.valid:
-          shared_library = self._retrieve_shared_lib_from_cache(vt)
+          shared_library = self._retrieve_shared_lib_from_cache(vt, platform)
         else:
+          # FIXME: We need to partition links based on proper dependency edges and not
+          # perform a link to every native_external_library for all targets in the closure.
+          # https://github.com/pantsbuild/pants/issues/6178
           link_request = self._make_link_request(
-            vt, compiled_objects_product, native_target_deps_product)
+            vt, compiled_objects_product, native_target_deps_product, external_libs_product)
           shared_library = self._execute_link_request(link_request)
 
         same_name_shared_lib = all_shared_libs_by_name.get(shared_library.name, None)
@@ -102,16 +112,20 @@ class LinkSharedLibraries(NativeTask):
 
         shared_libs_product.add(vt.target, vt.target.target_base).append(shared_library)
 
-  def _retrieve_shared_lib_from_cache(self, vt):
+  def _retrieve_shared_lib_from_cache(self, vt, platform):
     native_artifact = vt.target.ctypes_native_library
     path_to_cached_lib = os.path.join(
-      vt.results_dir, native_artifact.as_shared_lib(self.linker.platform))
+      vt.results_dir, native_artifact.as_shared_lib(platform))
     if not os.path.isfile(path_to_cached_lib):
       raise self.LinkSharedLibrariesError("The shared library at {} does not exist!"
                                           .format(path_to_cached_lib))
     return SharedLibrary(name=native_artifact.lib_name, path=path_to_cached_lib)
 
-  def _make_link_request(self, vt, compiled_objects_product, native_target_deps_product):
+  def _make_link_request(self,
+                         vt,
+                         compiled_objects_product,
+                         native_target_deps_product,
+                         external_libs_product):
     self.context.log.debug("link target: {}".format(vt.target))
 
     deps = self._retrieve_single_product_at_target_base(native_target_deps_product, vt.target)
@@ -130,7 +144,8 @@ class LinkSharedLibraries(NativeTask):
       linker=self.linker,
       object_files=all_compiled_object_files,
       native_artifact=vt.target.ctypes_native_library,
-      output_dir=vt.results_dir)
+      output_dir=vt.results_dir,
+      external_libs_info=external_libs_product)
 
   _SHARED_CMDLINE_ARGS = {
     'darwin': lambda: ['-mmacosx-version-min=10.11', '-Wl,-dylib'],
@@ -155,6 +170,7 @@ class LinkSharedLibraries(NativeTask):
     # We are executing in the results_dir, so get absolute paths for everything.
     cmd = ([linker.exe_filename] +
            self._get_shared_lib_cmdline_args(platform) +
+           link_request.external_libs_info.get_third_party_lib_args() +
            ['-o', os.path.abspath(resulting_shared_lib_path)] +
            [os.path.abspath(obj) for obj in object_files])
 
