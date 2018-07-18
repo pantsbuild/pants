@@ -10,14 +10,11 @@ import sys
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.build_file_parser import BuildFileParser
-from pants.engine.native import Native
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
-from pants.init.engine_initializer import EngineInitializer
-from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.option.ranked_value import RankedValue
 from pants.task.task import QuietTaskMixin
@@ -27,17 +24,16 @@ logger = logging.getLogger(__name__)
 
 
 class GoalRunnerFactory(object):
-  def __init__(self, root_dir, options, build_config, run_tracker, reporting,
-               target_roots=None, daemon_graph_helper=None, exiter=sys.exit):
+  def __init__(self, root_dir, options, build_config, run_tracker, reporting, graph_session,
+               target_roots, exiter=sys.exit):
     """
     :param str root_dir: The root directory of the pants workspace (aka the "build root").
     :param Options options: The global, pre-initialized Options instance.
     :param BuildConfiguration build_config: A pre-initialized BuildConfiguration instance.
     :param Runtracker run_tracker: The global, pre-initialized/running RunTracker instance.
     :param Reporting reporting: The global, pre-initialized Reporting instance.
+    :param LegacyGraphSession graph_session: The graph session for this run.
     :param TargetRoots target_roots: A pre-existing `TargetRoots` object, if available.
-    :param LegacyGraphSession daemon_graph_helper: A LegacyGraphSession instance for graph
-                                                   reuse. (Optional)
     :param func exiter: A function that accepts an exit code value and exits. (for tests, Optional)
     """
     self._root_dir = root_dir
@@ -45,78 +41,41 @@ class GoalRunnerFactory(object):
     self._build_config = build_config
     self._run_tracker = run_tracker
     self._reporting = reporting
+    self._graph_session = graph_session
     self._target_roots = target_roots
-    self._daemon_graph_helper = daemon_graph_helper
     self._exiter = exiter
 
-    self._requested_goals = self._options.goals
-    self._help_request = self._options.help_request
-    self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
-    self._build_graph = None
-    self._address_mapper = None
-
     self._global_options = options.for_global_scope()
-    self._tag = self._global_options.tag
     self._fail_fast = self._global_options.fail_fast
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
-  def _handle_help(self, help_request):
+  def _maybe_handle_help(self, help_request):
     """Handle requests for `help` information."""
     if help_request:
       help_printer = HelpPrinter(self._options)
       result = help_printer.print_help()
       self._exiter(result)
 
-  def _init_graph(self, target_roots, graph_helper, exclude_target_regexps, tags):
-    """Determine the BuildGraph, AddressMapper and spec_roots for a given run.
-
-    :param TargetRoots target_roots: The existing `TargetRoots` object, if any.
-    :param LegacyGraphSession graph_helper: A LegacyGraphSession to use for graph construction,
-                                            if available. This would usually come from the daemon.
-    :returns: A tuple of (BuildGraph, AddressMapper, SchedulerSession, TargetRoots).
-    """
-    # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
-    if not graph_helper:
-      native = Native.create(self._global_options)
-      native.set_panic_handler()
-      graph_scheduler_helper = EngineInitializer.setup_legacy_graph(native,
-                                                                    self._global_options,
-                                                                    self._build_config)
-      graph_helper = graph_scheduler_helper.new_session()
-    target_roots = target_roots or TargetRootsCalculator.create(
-      options=self._options,
-      session=graph_helper.scheduler_session,
-      build_root=self._root_dir,
-      symbol_table=graph_helper.symbol_table,
-      exclude_patterns=tuple(exclude_target_regexps),
-      tags=tuple(tags)
-    )
-    graph, address_mapper = graph_helper.create_build_graph(target_roots,
-                                                            self._root_dir)
-    return graph, address_mapper, graph_helper.scheduler_session, target_roots
-
-  def _determine_goals(self, requested_goals):
+  def _determine_goals(self, address_mapper, requested_goals):
     """Check and populate the requested goals for a given run."""
-
     spec_parser = CmdLineSpecParser(self._root_dir)
+
     for goal in requested_goals:
-      if self._address_mapper.is_valid_single_address(spec_parser.parse_spec(goal)):
+      if address_mapper.is_valid_single_address(spec_parser.parse_spec(goal)):
         logger.warning("Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 
-    goals = [Goal.by_name(goal) for goal in requested_goals]
-    return goals
+    return [Goal.by_name(goal) for goal in requested_goals]
 
-  def _roots_to_targets(self, target_roots):
+  def _roots_to_targets(self, build_graph, target_roots):
     """Populate the BuildGraph and target list from a set of input TargetRoots."""
     with self._run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
-
-      def generate_targets():
-        for address in self._build_graph.inject_roots_closure(target_roots, self._fail_fast):
-          yield self._build_graph.get_target(address)
-
-      return list(generate_targets())
+      return [
+        build_graph.get_target(address)
+        for address
+        in build_graph.inject_roots_closure(target_roots, self._fail_fast)
+      ]
 
   def _should_be_quiet(self, goals):
     if self._explain:
@@ -129,17 +88,16 @@ class GoalRunnerFactory(object):
 
   def _setup_context(self):
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
-      self._build_graph, self._address_mapper, scheduler, target_roots = self._init_graph(
+      build_file_parser = BuildFileParser(self._build_config, self._root_dir)
+      build_graph, address_mapper = self._graph_session.create_build_graph(
         self._target_roots,
-        self._daemon_graph_helper,
-        self._global_options.exclude_target_regexp,
-        self._global_options.tag
+        self._root_dir
       )
 
-      goals = self._determine_goals(self._requested_goals)
+      goals = self._determine_goals(address_mapper, self._options.goals)
       is_quiet = self._should_be_quiet(goals)
 
-      target_root_instances = self._roots_to_targets(target_roots)
+      target_root_instances = self._roots_to_targets(build_graph, self._target_roots)
 
       # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
       self._run_tracker.run_info.add_scm_info()
@@ -152,22 +110,22 @@ class GoalRunnerFactory(object):
       context = Context(options=self._options,
                         run_tracker=self._run_tracker,
                         target_roots=target_root_instances,
-                        requested_goals=self._requested_goals,
-                        build_graph=self._build_graph,
-                        build_file_parser=self._build_file_parser,
-                        address_mapper=self._address_mapper,
+                        requested_goals=self._options.goals,
+                        build_graph=build_graph,
+                        build_file_parser=build_file_parser,
+                        address_mapper=address_mapper,
                         invalidation_report=invalidation_report,
-                        scheduler=scheduler)
+                        scheduler=self._graph_session.scheduler_session)
+
       return goals, context
 
-  def setup(self):
-    self._handle_help(self._help_request)
+  def create(self):
+    self._maybe_handle_help(self._options.help_request)
     goals, context = self._setup_context()
     return GoalRunner(context=context,
                       goals=goals,
                       run_tracker=self._run_tracker,
-                      kill_nailguns=self._kill_nailguns,
-                      exiter=self._exiter)
+                      kill_nailguns=self._kill_nailguns)
 
 
 class GoalRunner(object):
@@ -175,37 +133,32 @@ class GoalRunner(object):
 
   Factory = GoalRunnerFactory
 
-  def __init__(self, context, goals, run_tracker, kill_nailguns, exiter=sys.exit):
+  def __init__(self, context, goals, run_tracker, kill_nailguns):
     """
     :param Context context: The global, pre-initialized Context as created by GoalRunnerFactory.
     :param list[Goal] goals: The list of goals to act on.
     :param Runtracker run_tracker: The global, pre-initialized/running RunTracker instance.
     :param bool kill_nailguns: Whether or not to kill nailguns after the run.
-    :param func exiter: A function that accepts an exit code value and exits (for tests, Optional).
     """
     self._context = context
     self._goals = goals
     self._run_tracker = run_tracker
     self._kill_nailguns = kill_nailguns
-    self._exiter = exiter
+
+  def _is_valid_workdir(self, workdir):
+    if workdir.endswith('.pants.d'):
+      return True
+
+    self._context.log.error(
+      'Pants working directory should end with \'.pants.d\', currently it is {}\n'
+      .format(workdir)
+    )
+    return False
 
   def _execute_engine(self):
-    workdir = self._context.options.for_global_scope().pants_workdir
-    if not workdir.endswith('.pants.d'):
-      self._context.log.error('Pants working directory should end with \'.pants.d\', currently it is {}\n'
-                              .format(workdir))
-      return 1
-
-    unknown_goals = [goal.name for goal in self._goals if not goal.ordered_task_names()]
-    if unknown_goals:
-      self._context.log.error('Unknown goal(s): {}\n'.format(' '.join(unknown_goals)))
-      return 1
-
     engine = RoundEngine()
-
     sorted_goal_infos = engine.sort_goals(self._context, self._goals)
     RunTracker.global_instance().set_sorted_goal_infos(sorted_goal_infos)
-
     result = engine.execute(self._context, self._goals)
 
     if self._context.invalidation_report:
@@ -213,7 +166,7 @@ class GoalRunner(object):
 
     return result
 
-  def run(self):
+  def _run_goals(self):
     should_kill_nailguns = self._kill_nailguns
 
     try:
@@ -240,3 +193,11 @@ class GoalRunner(object):
         NailgunProcessGroup().killall()
 
     return result
+
+  def run(self):
+    global_options = self._context.options.for_global_scope()
+
+    if not self._is_valid_workdir(global_options.pants_workdir):
+      return 1
+
+    return self._run_goals()

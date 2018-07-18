@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import object
+
 from pants.goal.error import GoalError
 from pants.option.optionable import Optionable
 from pants.util.memo import memoized
@@ -244,7 +246,7 @@ class _Goal(object):
 
   def task_types(self):
     """Returns the task types in this goal, unordered."""
-    return self._task_type_by_name.values()
+    return list(self._task_type_by_name.values())
 
   def task_items(self):
     for name, task_type in self._task_type_by_name.items():

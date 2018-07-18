@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import sys
+from builtins import object
 from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
@@ -35,12 +36,10 @@ class SplitArgs(namedtuple('SplitArgs',
   passthru: Any remaining args specified after a -- separator.
   passthru_owner: The scope specified last on the command line, if any. None otherwise.
   """
-  pass
 
 
 class HelpRequest(AbstractClass):
   """Represents an implicit or explicit request for help by the user."""
-  pass
 
 
 class OptionsHelp(HelpRequest):
@@ -57,7 +56,6 @@ class OptionsHelp(HelpRequest):
 
 class VersionHelp(HelpRequest):
   """The user asked for the version of this instance of pants."""
-  pass
 
 
 class UnknownGoalHelp(HelpRequest):
@@ -70,7 +68,6 @@ class UnknownGoalHelp(HelpRequest):
 
 class NoGoalHelp(HelpRequest):
   """The user specified no goals."""
-  pass
 
 
 class ArgSplitter(object):
@@ -106,7 +103,7 @@ class ArgSplitter(object):
     # cmd line, as an alternative to ... scope --flag-name.
 
     # We check for prefixes in reverse order, so we match the longest prefix first.
-    sorted_scope_infos = sorted(filter(lambda si: si.scope, self._known_scope_infos),
+    sorted_scope_infos = sorted([si for si in self._known_scope_infos if si.scope],
                                 key=lambda si: si.scope, reverse=True)
 
     # List of pairs (prefix, ScopeInfo).

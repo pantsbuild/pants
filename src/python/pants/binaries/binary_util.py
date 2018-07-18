@@ -9,6 +9,7 @@ import os
 import posixpath
 import shutil
 from abc import abstractmethod
+from builtins import object
 from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet

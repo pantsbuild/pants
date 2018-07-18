@@ -8,6 +8,7 @@ import itertools
 import logging
 import os
 import sys
+from builtins import filter, next, object
 
 from pants.base.build_environment import get_default_pants_config_file
 from pants.engine.fs import FileContent
@@ -100,7 +101,7 @@ class OptionsBootstrapper(object):
     # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
     # Stop before '--' since args after that are pass-through and may have duplicate names to our
     # bootstrap options.
-    bargs = filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != '--', self._args))
+    bargs = list(filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != '--', self._args)))
 
     config_file_paths = self.get_config_file_paths(env=self._env, args=self._args)
     config_files_products = yield config_file_paths
@@ -130,7 +131,7 @@ class OptionsBootstrapper(object):
     full_configpaths = pre_bootstrap_config.sources()
     if bootstrap_option_values.pantsrc:
       rcfiles = [os.path.expanduser(rcfile) for rcfile in bootstrap_option_values.pantsrc_files]
-      existing_rcfiles = filter(os.path.exists, rcfiles)
+      existing_rcfiles = list(filter(os.path.exists, rcfiles))
       full_configpaths.extend(existing_rcfiles)
 
     full_config_files_products = yield full_configpaths
