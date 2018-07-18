@@ -465,6 +465,40 @@ impl CommandRunner {
     &self,
     execute_response: &bazel_protos::remote_execution::ExecuteResponse,
   ) -> BoxFuture<Digest, ExecutionError> {
+    // Get Digests of output Directories.
+    // Then we'll make a Directory for the output files, and merge them.
+    let mut directory_digests =
+      Vec::with_capacity(execute_response.get_result().get_output_directories().len() + 1);
+    // TODO: Maybe take rather than clone
+    let output_directories = execute_response
+      .get_result()
+      .get_output_directories()
+      .to_owned();
+    for dir in output_directories {
+      let digest_result: Result<Digest, String> = dir.get_tree_digest().into();
+      let mut digest = future::done(digest_result).to_boxed();
+      for component in dir.get_path().rsplit('/') {
+        let component = component.to_owned();
+        let store = self.store.clone();
+        digest = digest
+          .and_then(move |digest| {
+            let mut directory = bazel_protos::remote_execution::Directory::new();
+            directory.mut_directories().push({
+              let mut node = bazel_protos::remote_execution::DirectoryNode::new();
+              node.set_name(component);
+              node.set_digest((&digest).into());
+              node
+            });
+            store.record_directory(&directory, true)
+          })
+          .to_boxed();
+      }
+      directory_digests.push(digest.map_err(|err| {
+        ExecutionError::Fatal(format!("Error saving remote output directory: {}", err))
+      }));
+    }
+
+    // Make a directory for the files
     let mut path_map = HashMap::new();
     let path_stats_result: Result<Vec<PathStat>, String> = execute_response
       .get_result()
@@ -511,6 +545,7 @@ impl CommandRunner {
       }
     }
 
+    let store = self.store.clone();
     fs::Snapshot::digest_from_path_stats(
       self.store.clone(),
       StoreOneOffRemoteDigest::new(path_map),
@@ -521,6 +556,16 @@ impl CommandRunner {
         error
       ))
     })
+      .join(future::join_all(directory_digests))
+      .and_then(|(files_digest, mut directory_digests)| {
+        directory_digests.push(files_digest);
+        fs::Snapshot::merge_directories(store, directory_digests).map_err(|err| {
+          ExecutionError::Fatal(format!(
+            "Error when merging output files and directories: {}",
+            err
+          ))
+        })
+      })
       .to_boxed()
   }
 }
@@ -554,6 +599,20 @@ fn make_execute_request(
     .collect::<Result<Vec<String>, String>>()?;
   output_files.sort();
   command.set_output_files(protobuf::repeated::RepeatedField::from_vec(output_files));
+
+  let mut output_directories = req
+    .output_directories
+    .iter()
+    .map(|p| {
+      p.to_str()
+        .map(|s| s.to_owned())
+        .ok_or_else(|| format!("Non-UTF8 output directory path: {:?}", p))
+    })
+    .collect::<Result<Vec<String>, String>>()?;
+  output_directories.sort();
+  command.set_output_directories(protobuf::repeated::RepeatedField::from_vec(
+    output_directories,
+  ));
 
   let mut action = bazel_protos::remote_execution::Action::new();
   action.set_command_digest(digest(&command)?);
@@ -645,9 +704,12 @@ mod tests {
       // Intentionally poorly sorted:
       output_files: vec!["path/to/file", "other/file"]
         .into_iter()
-        .map(|p| PathBuf::from(p))
+        .map(PathBuf::from)
         .collect(),
-      output_directories: BTreeSet::new(),
+      output_directories: vec!["directory/name"]
+        .into_iter()
+        .map(PathBuf::from)
+        .collect(),
       timeout: Duration::from_millis(1000),
       description: "some description".to_owned(),
     };
@@ -668,14 +730,17 @@ mod tests {
     want_command
       .mut_output_files()
       .push("path/to/file".to_owned());
+    want_command
+      .mut_output_directories()
+      .push("directory/name".to_owned());
 
     let mut want_action = bazel_protos::remote_execution::Action::new();
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "fb09aa134e9d84aed9c35a9dadb128ab6924285fbcb7e4bec0f65b5c08988a5f",
+          "cc4ddd3085aaffbe0abce22f53b30edbb59896bb4a4f0d76219e48070cd0afe1",
         ).unwrap(),
-        56,
+        72,
       )).into(),
     );
     want_action.set_input_root_digest((&input_directory.digest()).into());
@@ -684,7 +749,7 @@ mod tests {
     want_execute_request.set_action_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "736c7aca28d63a5b09c4549e0e70bf8cb1645070a038a51abd7283f611cbd6c6",
+          "844c929423444f3392e0dcc89ebf1febbfdf3a2e2fcab7567cc474705a5385e4",
         ).unwrap(),
         140,
       )).into(),
@@ -1516,6 +1581,77 @@ mod tests {
     assert_eq!(
       extract_output_files_from_response(&execute_response),
       Ok(TestDirectory::recursive().digest())
+    )
+  }
+
+  #[test]
+  fn extract_output_files_from_response_just_directory() {
+    let mut output_directory = bazel_protos::remote_execution::OutputDirectory::new();
+    output_directory.set_path("cats".into());
+    output_directory.set_tree_digest((&TestDirectory::containing_roland().digest()).into());
+    let mut output_directories = protobuf::RepeatedField::new();
+    output_directories.push(output_directory);
+
+    let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
+    execute_response.set_result({
+      let mut result = bazel_protos::remote_execution::ActionResult::new();
+      result.set_exit_code(0);
+      result.set_output_directories(output_directories);
+      result
+    });
+
+    assert_eq!(
+      extract_output_files_from_response(&execute_response),
+      Ok(TestDirectory::nested().digest())
+    )
+  }
+
+  #[test]
+  fn extract_output_files_from_response_directories_and_files() {
+    // /catnip
+    // /pets/cats/roland
+    // /pets/dogs/robin
+
+    let mut output_directories = protobuf::RepeatedField::new();
+    output_directories.push({
+      let mut output_directory = bazel_protos::remote_execution::OutputDirectory::new();
+      output_directory.set_path("pets/cats".into());
+      output_directory.set_tree_digest((&TestDirectory::containing_roland().digest()).into());
+      output_directory
+    });
+    output_directories.push({
+      let mut output_directory = bazel_protos::remote_execution::OutputDirectory::new();
+      output_directory.set_path("pets/dogs".into());
+      output_directory.set_tree_digest((&TestDirectory::containing_robin().digest()).into());
+      output_directory
+    });
+
+    let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
+    execute_response.set_result({
+      let mut result = bazel_protos::remote_execution::ActionResult::new();
+      result.set_exit_code(0);
+      result.set_output_directories(output_directories);
+      result.set_output_files({
+        let mut output_files = protobuf::RepeatedField::new();
+        output_files.push({
+          let mut output_file = bazel_protos::remote_execution::OutputFile::new();
+          output_file.set_path("treats".into());
+          output_file.set_digest((&TestData::catnip().digest()).into());
+          output_file
+        });
+        output_files
+      });
+      result
+    });
+
+    assert_eq!(
+      extract_output_files_from_response(&execute_response),
+      Ok(Digest(
+        Fingerprint::from_hex_string(
+          "639b4b84bb58a9353d49df8122e7987baf038efe54ed035e67910846c865b1e2"
+        ).unwrap(),
+        159
+      ))
     )
   }
 
