@@ -245,7 +245,7 @@ class NailgunProtocol(object):
     def gen_env_vars():
       for fd_id, fd in zip(STDIO_DESCRIPTORS, (stdin, stdout, stderr)):
         is_atty = fd.isatty()
-        yield (cls.TTY_ENV_TMPL.format(fd_id), bytes(int(is_atty)))
+        yield (cls.TTY_ENV_TMPL.format(fd_id), bytes([int(is_atty)]))
         if is_atty:
           yield (cls.TTY_PATH_ENV.format(fd_id), os.ttyname(fd.fileno()) or '')
     return dict(gen_env_vars())
