@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
+import http.server
 import os
 import socketserver
 import unittest
@@ -14,7 +15,6 @@ from functools import reduce
 from io import StringIO
 from threading import Thread
 
-import http.server
 import mock
 import requests
 
