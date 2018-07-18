@@ -9,20 +9,27 @@ This document describes releases leading up to the ``1.9.x`` ``stable`` series.
 New features
 ~~~~~~~~~~~~
 
+* Conan (third party) support for ctypes native libraries (#5998)
+  `PR #5998 <https://github.com/pantsbuild/pants/pull/5998>`_
+  `PR #5815 <https://github.com/pantsbuild/pants/pull/5815>`_
+
 * Early support for @console_rule. (#6088)
   `PR #6088 <https://github.com/pantsbuild/pants/pull/6088>`_
-
-API Changes
-~~~~~~~~~~~
-
-* Eliminate obsolete PANTS_ARGS from ci. (#6141)
-  `PR #6141 <https://github.com/pantsbuild/pants/pull/6141>`_
 
 Bugfixes
 ~~~~~~~~
 
+* rustfmt check more reliably works (#6172)
+  `PR #6172 <https://github.com/pantsbuild/pants/pull/6172>`_
+
+* Fix isort issues (#6174)
+  `PR #6174 <https://github.com/pantsbuild/pants/pull/6174>`_
+
 * add the target fingerprint to the version of each local dist so that we don't use the first cached one (#6022)
   `PR #6022 <https://github.com/pantsbuild/pants/pull/6022>`_
+
+* Eliminate obsolete PANTS_ARGS from ci. (#6141)
+  `PR #6141 <https://github.com/pantsbuild/pants/pull/6141>`_
 
 * Preserve output directories if process execution failed (#6152)
   `PR #6152 <https://github.com/pantsbuild/pants/pull/6152>`_
@@ -30,11 +37,56 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Upgrade to isort 4.3.4. (#6166)
+  `PR #6166 <https://github.com/pantsbuild/pants/pull/6166>`_
+
+* fs_util can list the recursive files in a Directory (#6153)
+  `PR #6153 <https://github.com/pantsbuild/pants/pull/6153>`_
+
+* Support output directory saving in remote execution (#6167)
+  `PR #6167 <https://github.com/pantsbuild/pants/pull/6167>`_
+
 * Move each EntryState in the graph under its own Mutex (#6095)
   `PR #6095 <https://github.com/pantsbuild/pants/pull/6095>`_
 
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Impose a consistent sort on CONTRIBUTORS.md. (#6125)
+  `PR #6125 <https://github.com/pantsbuild/pants/pull/6125>`_
+
 Python 3 porting (#6062)
 ~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Port engine to Python 3 (#6133)
+  `PR #6133 <https://github.com/pantsbuild/pants/pull/6133>`_
+
+* Port go to py3 (#6139)
+  `PR #6139 <https://github.com/pantsbuild/pants/pull/6139>`_
+
+* Port init package to Python 3 (#6145)
+  `PR #6145 <https://github.com/pantsbuild/pants/pull/6145>`_
+
+* Port help package to Python 3 (#6144)
+  `PR #6144 <https://github.com/pantsbuild/pants/pull/6144>`_
+
+* Port invalidation to Python 3 (#6147)
+  `PR #6147 <https://github.com/pantsbuild/pants/pull/6147>`_
+
+* port cpp to py3 (#6116)
+  `PR #6116 <https://github.com/pantsbuild/pants/pull/6116>`_
+
+* Port ivy to Python 3 (#6154)
+  `PR #6154 <https://github.com/pantsbuild/pants/pull/6154>`_
+
+* Port java to Python 3 (#6159)
+  `PR #6159 <https://github.com/pantsbuild/pants/pull/6159>`_
+
+* Port contrib/scalajs to py3 (#6164)
+  `PR #6164 <https://github.com/pantsbuild/pants/pull/6164>`_
+
+* port scrooge to py3 (#6165)
+  `PR #6165 <https://github.com/pantsbuild/pants/pull/6165>`_
 
 * Add missing future dependency to BUILD (#6135)
   `PR #6135 <https://github.com/pantsbuild/pants/pull/6135>`_
@@ -63,12 +115,6 @@ Python 3 porting (#6062)
 
 * Port core tasks to Python 3 (#6130)
   `PR #6130 <https://github.com/pantsbuild/pants/pull/6130>`_
-
-Documentation Updates
-~~~~~~~~~~~~~~~~~~~~~
-
-* Impose a consistent sort on CONTRIBUTORS.md. (#6125)
-  `PR #6125 <https://github.com/pantsbuild/pants/pull/6125>`_
 
 1.9.0.dev1 (07/14/2018)
 -----------------------
