@@ -254,7 +254,6 @@ class EngineInitializer(object):
       build_configuration,
       native=native,
       glob_match_error_behavior=bootstrap_options.glob_expansion_failure,
-      rules=build_configuration.rules(),
       build_ignore_patterns=bootstrap_options.build_ignore,
       exclude_target_regexps=bootstrap_options.exclude_target_regexp,
       subproject_roots=bootstrap_options.subproject_roots,
@@ -271,7 +270,6 @@ class EngineInitializer(object):
     build_root=None,
     native=None,
     glob_match_error_behavior=None,
-    rules=None,
     build_ignore_patterns=None,
     exclude_target_regexps=None,
     subproject_roots=None,
@@ -308,7 +306,7 @@ class EngineInitializer(object):
     build_root = build_root or get_buildroot()
     build_configuration = build_configuration or BuildConfigInitializer.get(OptionsBootstrapper())
     build_file_aliases = build_configuration.registered_aliases()
-    rules = rules or build_configuration.rules() or []
+    rules = build_configuration.rules()
     console = Console()
 
     symbol_table = LegacySymbolTable(build_file_aliases)
