@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import functools
 import re
 from abc import abstractmethod
+from builtins import str
 from os import sep as os_sep
 from os.path import join as os_path_join
 

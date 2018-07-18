@@ -8,6 +8,7 @@ import logging
 import os
 import sys
 from abc import abstractmethod, abstractproperty
+from builtins import object
 from contextlib import contextmanager
 
 from six import string_types

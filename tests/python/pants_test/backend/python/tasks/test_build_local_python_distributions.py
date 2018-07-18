@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import re
 from builtins import next, str
 from textwrap import dedent
 
@@ -12,6 +13,7 @@ from pants.backend.python.register import rules as python_backend_rules
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
+from pants.util.collections import assert_single_element
 from pants_test.backend.python.tasks.python_task_test_base import (PythonTaskTestBase,
                                                                    check_wheel_platform_matches_host,
                                                                    name_and_platform)
@@ -115,6 +117,27 @@ class TestBuildLocalPythonDistributions(PythonTaskTestBase, SchedulerTestBase):
     single_product = all_products[0]
     return single_product
 
+  def _get_dist_snapshot_version(self, task, python_dist_target):
+    """Get the target's fingerprint, and guess the resulting version string of the built dist.
+
+    Local python_dist() builds are tagged with the versioned target's fingerprint using the
+    --tag-build option in the egg_info command. This fingerprint string is slightly modified by
+    distutils to ensure a valid version string, and this method finds what that modified version
+    string is so we can verify that the produced local dist is being tagged with the correct
+    snapshot version.
+
+    The argument we pass to that option begins with a +, which is unchanged. See
+    https://www.python.org/dev/peps/pep-0440/ for further information.
+    """
+    with task.invalidated([python_dist_target], invalidate_dependents=True) as invalidation_check:
+      versioned_dist_target = assert_single_element(invalidation_check.all_vts)
+
+    versioned_target_fingerprint = versioned_dist_target.cache_key.hash
+
+    # This performs the normalization that distutils performs to the version string passed to the
+    # --tag-build option.
+    return re.sub(r'[^a-zA-Z0-9]', '.', versioned_target_fingerprint.lower())
+
   def _create_distribution_synthetic_target(self, python_dist_target):
     context = self._scheduling_context(
       target_roots=[python_dist_target],
@@ -126,12 +149,16 @@ class TestBuildLocalPythonDistributions(PythonTaskTestBase, SchedulerTestBase):
     self.assertEquals(1, len(synthetic_tgts))
     synthetic_target = next(iter(synthetic_tgts))
 
-    return context, synthetic_target
+    snapshot_version = self._get_dist_snapshot_version(
+      python_create_distributions_task, python_dist_target)
+
+    return context, synthetic_target, snapshot_version
 
   def test_python_create_universal_distribution(self):
     universal_dist = self.target_dict['universal']
-    context, synthetic_target = self._create_distribution_synthetic_target(universal_dist)
-    self.assertEquals(['universal_dist==0.0.0'],
+    context, synthetic_target, snapshot_version = self._create_distribution_synthetic_target(
+      universal_dist)
+    self.assertEquals(['universal_dist==0.0.0+{}'.format(snapshot_version)],
                       [str(x.requirement) for x in synthetic_target.requirements.value])
 
     local_wheel_products = context.products.get('local_wheels')
@@ -141,8 +168,9 @@ class TestBuildLocalPythonDistributions(PythonTaskTestBase, SchedulerTestBase):
 
   def test_python_create_platform_specific_distribution(self):
     platform_specific_dist = self.target_dict['platform_specific']
-    context, synthetic_target = self._create_distribution_synthetic_target(platform_specific_dist)
-    self.assertEquals(['platform_specific_dist==0.0.0'],
+    context, synthetic_target, snapshot_version = self._create_distribution_synthetic_target(
+      platform_specific_dist)
+    self.assertEquals(['platform_specific_dist==0.0.0+{}'.format(snapshot_version)],
                       [str(x.requirement) for x in synthetic_target.requirements.value])
 
     local_wheel_products = context.products.get('local_wheels')

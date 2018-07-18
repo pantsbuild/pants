@@ -10,6 +10,7 @@ import os
 import pkgutil
 import plistlib
 from abc import abstractproperty
+from builtins import object, str
 from collections import namedtuple
 from contextlib import contextmanager
 

@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import shutil
+from builtins import object
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.nodes import Return, Throw

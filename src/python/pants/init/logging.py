@@ -4,13 +4,14 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import httplib
 import logging
 import os
 import sys
 import time
 from collections import namedtuple
 from logging import FileHandler, Formatter, StreamHandler
+
+from future.moves.http import client
 
 from pants.util.dirutil import safe_mkdir
 
@@ -30,7 +31,7 @@ class LoggingSetupResult(namedtuple('LoggingSetupResult', ['log_filename', 'log_
 
 
 def _configure_requests_debug_logging():
-  httplib.HTTPConnection.debuglevel = 1
+  client.HTTPConnection.debuglevel = 1
   requests_logger = logging.getLogger('requests.packages.urllib3')
   requests_logger.setLevel(TRACE)
   requests_logger.propagate = True
