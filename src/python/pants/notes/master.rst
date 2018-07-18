@@ -35,7 +35,7 @@ Refactoring, Improvements, and Tooling
   `PR #6095 <https://github.com/pantsbuild/pants/pull/6095>`_
 
 Python 3 porting (#6062)
-------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 * Add missing future dependency to BUILD (#6135)
   `PR #6135 <https://github.com/pantsbuild/pants/pull/6135>`_
