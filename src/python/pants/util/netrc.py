@@ -7,8 +7,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import collections
 import os
 from builtins import object
-from netrc import netrc as NetrcDb
 from netrc import NetrcParseError
+from netrc import netrc as NetrcDb
 
 
 class Netrc(object):
