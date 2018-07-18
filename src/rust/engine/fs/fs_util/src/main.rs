@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate boxfuture;
 extern crate bytes;
+#[macro_use(value_t)]
 extern crate clap;
 extern crate env_logger;
 extern crate fs;
@@ -146,6 +147,14 @@ to this directory.",
               .long("server-address")
               .required(false)
         )
+        .arg(
+          Arg::with_name("chunk-bytes")
+              .help("Number of bytes to include per-chunk when uploading bytes. grpc imposes a hard message-size limit of around 4MB.")
+              .takes_value(true)
+              .long("chunk-bytes")
+              .required(false)
+              .default_value(&format!("3 * 1024 * 1024"))
+        )
       .get_matches(),
   ) {
     Ok(_) => {}
@@ -161,17 +170,21 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
   let pool = Arc::new(ResettablePool::new("fsutil-pool-".to_string()));
   let (store, store_has_remote) = {
     let (store_result, store_has_remote) = match top_match.value_of("server-address") {
-      Some(cas_address) => (
-        Store::with_remote(
-          store_dir,
-          pool.clone(),
-          cas_address.to_owned(),
-          1,
-          10 * 1024 * 1024,
-          Duration::from_secs(30),
-        ),
-        true,
-      ),
+      Some(cas_address) => {
+        let chunk_size =
+          value_t!(top_match.value_of("chunk-bytes"), usize).expect("Bad chunk-bytes flag");
+        (
+          Store::with_remote(
+            store_dir,
+            pool.clone(),
+            cas_address.to_owned(),
+            1,
+            chunk_size,
+            Duration::from_secs(30),
+          ),
+          true,
+        )
+      }
       None => (Store::local_only(store_dir, pool.clone()), false),
     };
     let store = store_result.map_err(|e| {
