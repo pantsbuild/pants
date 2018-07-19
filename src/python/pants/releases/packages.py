@@ -7,10 +7,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 import os
 import sys
-import urllib2
-from ConfigParser import ConfigParser
+from builtins import object
+from configparser import ConfigParser
+from functools import total_ordering
 
 from bs4 import BeautifulSoup
+from future.moves.urllib.error import HTTPError
+from future.moves.urllib.request import Request, urlopen
 
 from pants.util.process_handler import subprocess
 
@@ -23,29 +26,34 @@ def banner(message):
   print("{}[=== {} ===]{}".format(COLOR_BLUE, message, COLOR_RESET))
 
 
+@total_ordering
 class Package(object):
+
   def __init__(self, name):
     self.name = name
 
-  def __cmp__(self, other):
-    return cmp(self.name, other.name)
+  def __lt__(self, other):
+    return self.name < other.name
+
+  def __eq__(self, other):
+    return self.name == other.name
 
   def __str__(self):
     return self.name
 
   def exists(self):
-    req = urllib2.Request("https://pypi.python.org/pypi/{}".format(self.name))
+    req = Request("https://pypi.python.org/pypi/{}".format(self.name))
     req.get_method = lambda: "HEAD"
     try:
-      urllib2.urlopen(req)
+      urlopen(req)
       return True
-    except urllib2.HTTPError as e:
+    except HTTPError as e:
       if e.code == 404:
         return False
       raise
 
   def latest_version(self):
-    f = urllib2.urlopen("https://pypi.python.org/pypi/{}/json".format(self.name))
+    f = urlopen("https://pypi.python.org/pypi/{}/json".format(self.name))
     j = json.load(f)
     return j["info"]["version"]
 
@@ -54,7 +62,7 @@ class Package(object):
              html_node_class='sidebar-section__user-gravatar',
              html_node_attr='aria-label'):
     url = "https://pypi.python.org/pypi/{}/{}".format(self.name, self.latest_version())
-    url_content = urllib2.urlopen(url).read()
+    url_content = urlopen(url).read()
     parser = BeautifulSoup(url_content, 'html.parser')
     owners = [
       item.attrs[html_node_attr]
@@ -64,10 +72,10 @@ class Package(object):
     return set(owner.lower() for owner in owners)
 
 
-core_packages = set([
+core_packages = {
   Package("pantsbuild.pants"),
   Package("pantsbuild.pants.testinfra"),
-])
+}
 
 
 def contrib_packages():
@@ -136,6 +144,6 @@ elif sys.argv[1:] == ["list-owners"]:
       print("{}".format(owner))
 elif sys.argv[1:] == ["check-my-ownership"]:
   me = get_pypi_config('server-login', 'username')
-  check_ownership(set([me]))
+  check_ownership({me})
 else:
   raise Exception("Didn't recognise arguments {}".format(sys.argv[1:]))
