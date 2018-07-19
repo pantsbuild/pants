@@ -4,29 +4,24 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import functools
 import logging
 import os
 
-from pants.backend.python.subsystems.isort import Isort
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
+from pants.backend.python.tasks.isort_prep import IsortPrep
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnitLabel
 from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.task import Task
-from pants.util.process_handler import subprocess
+from pants.util.contextutil import pushd
 
 
-# TODO: Should be named IsortRun, for consistency.
-class IsortPythonTask(FmtTaskMixin, Task):
+class IsortRun(FmtTaskMixin, Task):
   """Autoformats Python source files with isort.
-
-  isort binary is built at contrib/python/src/python/pants/contrib/python/isort,
-  then uploaded to
-  https://github.com/pantsbuild/binaries/tree/gh-pages/build-support/scripts
-
-  TODO: Explain why we don't invoke isort directly.
 
   Behavior:
   ./pants fmt.isort <targets> -- <args, e.g. "--recursive ."> will sort the files only related
@@ -39,30 +34,36 @@ class IsortPythonTask(FmtTaskMixin, Task):
   _PYTHON_SOURCE_EXTENSION = '.py'
 
   @classmethod
-  def subsystem_dependencies(cls):
-    return super(IsortPythonTask, cls).subsystem_dependencies() + (Isort, )
+  def prepare(cls, options, round_manager):
+    super(IsortRun, cls).prepare(options, round_manager)
+    round_manager.require_data(IsortPrep.Isort)
 
-  def __init__(self, *args, **kwargs):
-    super(IsortPythonTask, self).__init__(*args, **kwargs)
-    self.options = self.get_options()
+  def execute(self):
+    targets = self.get_targets(self.is_non_synthetic_python_target)
+    with self.invalidated(targets=targets) as invalidation_check:
+      if not invalidation_check.invalid_vts:
+        logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
+        return
 
-  def execute(self, test_output_file=None):
-    sources = self._calculate_isortable_python_sources(
-      self.get_targets(self.is_non_synthetic_python_target))
+      invalid_tgts = [vt.target for vt in invalidation_check.invalid_vts]
+      sources = self._calculate_isortable_python_sources(invalid_tgts)
+      if not sources:
+        logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
+        return
 
-    if not sources:
-      logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
-      return
+      isort = self.context.products.get_data(IsortPrep.Isort)
+      args = self.get_passthru_args() + sources
 
-    isort_script = Isort.global_instance().select(context=self.context)
-    cmd = [isort_script] + self.get_passthru_args() + sources
-    logging.debug(' '.join(cmd))
-
-    try:
-      subprocess.check_call(cmd, cwd=get_buildroot(),
-                            stderr=test_output_file, stdout=test_output_file)
-    except subprocess.CalledProcessError as e:
-      raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), e.returncode))
+      # NB: We execute isort out of process to avoid unwanted side-effects from importing it:
+      #   https://github.com/timothycrosley/isort/issues/456
+      with pushd(get_buildroot()):
+        workunit_factory = functools.partial(self.context.new_workunit,
+                                             name='run-isort',
+                                             labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT])
+        cmdline, exit_code = isort.run(workunit_factory, args)
+        if exit_code != 0:
+          raise TaskError('{} ... exited non-zero ({}).'.format(cmdline, exit_code),
+                          exit_code=exit_code)
 
   def _calculate_isortable_python_sources(self, targets):
     """Generate a set of source files from the given targets."""

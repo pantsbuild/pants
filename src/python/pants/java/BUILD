@@ -5,6 +5,7 @@ python_library(
   name = 'executor',
   sources = ['executor.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
     'src/python/pants/base:build_environment',
@@ -19,6 +20,7 @@ python_library(
   name = 'nailgun_client',
   sources = ['nailgun_client.py'],
   dependencies = [
+    '3rdparty/python:future',
     ':nailgun_io',
     ':nailgun_protocol',
     'src/python/pants/util:socket'
@@ -29,6 +31,7 @@ python_library(
   name = 'nailgun_io',
   sources = ['nailgun_io.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:contextlib2',
     ':nailgun_protocol'
   ]
@@ -38,6 +41,7 @@ python_library(
   name = 'nailgun_protocol',
   sources = ['nailgun_protocol.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:six',
   ]
 )
@@ -60,6 +64,7 @@ python_library(
   name = 'util',
   sources = ['util.py'],
   dependencies = [
+    '3rdparty/python:future',
     ':executor',
     ':nailgun_executor',
     'src/python/pants/base:workunit',

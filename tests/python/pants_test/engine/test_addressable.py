@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import object
+
 from pants.engine.addressable import (MutationError, NotSerializableError, addressable,
                                       addressable_dict, addressable_list)
 from pants.engine.objects import Resolvable, Serializable

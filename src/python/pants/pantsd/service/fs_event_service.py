@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import traceback
-
 from concurrent.futures import ThreadPoolExecutor
 
 from pants.pantsd.service.pants_service import PantsService

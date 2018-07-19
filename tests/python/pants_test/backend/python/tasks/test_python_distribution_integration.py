@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import glob
 import os
+import re
 
 from pants.backend.native.config.environment import Platform
 from pants.base.build_environment import get_buildroot
@@ -19,7 +20,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
   # whl by setup.py) and an associated test to be consumed by the pants goals tested below.
   fasthello_project = 'examples/src/python/example/python_distribution/hello/fasthello'
   fasthello_tests = 'examples/tests/python/example/python_distribution/hello/test_fasthello'
-  fasthello_install_requires = 'testprojects/src/python/python_distribution/fasthello_with_install_requires'
+  fasthello_install_requires_dir = 'testprojects/src/python/python_distribution/fasthello_with_install_requires'
   hello_setup_requires = 'examples/src/python/example/python_distribution/hello/setup_requires'
 
   def _assert_native_greeting(self, output):
@@ -29,7 +30,9 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
   def test_pants_binary(self):
     with temporary_dir() as tmp_dir:
       pex = os.path.join(tmp_dir, 'main.pex')
-      wheel_glob = os.path.join(tmp_dir, 'fasthello-1.0.0-*.whl')
+      # The + is because we append the target's fingerprint to the version. We test this version
+      # string in test_build_local_python_distributions.py.
+      wheel_glob = os.path.join(tmp_dir, 'fasthello-1.0.0+*.whl')
       command=[
         '--pants-distdir={}'.format(tmp_dir), 'binary', '{}:main'.format(self.fasthello_project)]
       pants_run = self.run_pants(command=command)
@@ -53,9 +56,38 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       # Check that text was properly printed to stdout.
       self._assert_native_greeting(pants_run.stdout_data)
 
+  def test_invalidation(self):
+    """Test that the current version of a python_dist() is resolved after modifying its sources."""
+    fasthello_run = '{}:main_with_no_conflict'.format(self.fasthello_install_requires_dir)
+
+    with self.mock_buildroot(
+        dirs_to_copy=[self.fasthello_install_requires_dir]) as buildroot, buildroot.pushd():
+      run_target = lambda: self.run_pants_with_workdir(
+        command=['-ldebug', 'run', fasthello_run],
+        workdir=os.path.join(buildroot.new_buildroot, '.pants.d'),
+        build_root=buildroot.new_buildroot,
+        extra_env={'PEX_VERBOSE': '9'},
+      )
+
+      unmodified_pants_run = run_target()
+      self.assert_success(unmodified_pants_run)
+      self.assertIn('Hello from C!\n', unmodified_pants_run.stdout_data)
+
+      # Modify one of the source files for this target so that the output is different.
+      c_source_file = os.path.join(self.fasthello_install_requires_dir, 'c_greet.c')
+      with open(c_source_file, 'r') as f:
+        orig_contents = f.read()
+      modified_contents = re.sub('"Hello from C!"', '"Hello from C?"', orig_contents)
+      with open(c_source_file, 'w') as f:
+        f.write(modified_contents)
+
+      modified_pants_run = run_target()
+      self.assert_success(modified_pants_run)
+      self.assertIn('Hello from C?\n', modified_pants_run.stdout_data)
+
   def test_pants_test(self):
     with temporary_dir() as tmp_dir:
-      wheel_glob = os.path.join(tmp_dir, 'fasthello-1.0.0-*.whl')
+      wheel_glob = os.path.join(tmp_dir, '*.whl')
       command=[
         '--pants-distdir={}'.format(tmp_dir),
         'test',
@@ -71,23 +103,23 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       command=[
         '--pants-distdir={}'.format(tmp_dir),
         'run',
-        '{}:main_with_no_conflict'.format(self.fasthello_install_requires)]
+        '{}:main_with_no_conflict'.format(self.fasthello_install_requires_dir)]
       pants_run = self.run_pants(command=command)
       self.assert_success(pants_run)
       self.assertIn('United States', pants_run.stdout_data)
-      command=['binary', '{}:main_with_no_conflict'.format(self.fasthello_install_requires)]
+      command=['binary', '{}:main_with_no_conflict'.format(self.fasthello_install_requires_dir)]
       pants_run = self.run_pants(command=command)
       self.assert_success(pants_run)
       output = subprocess.check_output(pex)
       self.assertIn('United States', output)
 
   def test_with_conflicting_transitive_deps(self):
-    command=['run', '{}:main_with_conflicting_dep'.format(self.fasthello_install_requires)]
+    command=['run', '{}:main_with_conflicting_dep'.format(self.fasthello_install_requires_dir)]
     pants_run = self.run_pants(command=command)
     self.assert_failure(pants_run)
     self.assertIn('pycountry', pants_run.stderr_data)
     self.assertIn('fasthello', pants_run.stderr_data)
-    command=['binary', '{}:main_with_conflicting_dep'.format(self.fasthello_install_requires)]
+    command=['binary', '{}:main_with_conflicting_dep'.format(self.fasthello_install_requires_dir)]
     pants_run = self.run_pants(command=command)
     self.assert_failure(pants_run)
     self.assertIn('pycountry', pants_run.stderr_data)
@@ -100,8 +132,8 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       command=[
         '--pants-distdir={}'.format(tmp_dir),
         'binary',
-        '{}:main_with_no_conflict'.format(self.fasthello_install_requires),
-        '{}:main_with_no_pycountry'.format(self.fasthello_install_requires)]
+        '{}:main_with_no_conflict'.format(self.fasthello_install_requires_dir),
+        '{}:main_with_no_pycountry'.format(self.fasthello_install_requires_dir)]
       pants_run = self.run_pants(command=command)
       self.assert_success(pants_run)
       # Check that the pex was built.

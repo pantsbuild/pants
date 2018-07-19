@@ -57,10 +57,34 @@ stages:
   - name: Deploy Pants Pex
     if: tag IS present AND tag =~ ^release_.*$
 
-# NB: There is much repetition in include elements, but there is no known current way to factor
-# this duplication up.
+default_test_config: &default_test_config
+  os: linux
+  dist: trusty
+  sudo: required
+  addons:
+    apt:
+      packages:
+        - lib32stdc++6
+        - lib32z1
+        - lib32z1-dev
+        - gcc-multilib
+        - python-dev
+        - openssl
+        - libssl-dev
+  stage: Test Pants
+  language: python
+  python: "2.7.13"
+  before_install:
+    # Remove bad openjdk6 from trusty image, so
+    # Pants will pick up oraclejdk6 from `packages` above.
+    - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+    - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+    - jdk_switcher use oraclejdk8
+
 matrix:
   include:
+
+    # Build macOS engine
     - os: osx
       # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
       # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
@@ -74,6 +98,7 @@ matrix:
       script:
         - ./pants --version && ./build-support/bin/release.sh -n
 
+    # Build Linux engine
     - os: linux
       stage: Test Pants
       language: generic
@@ -100,6 +125,7 @@ matrix:
       after_failure:
         - build-support/bin/ci-failure.sh
 
+    # Deploy Pex
     - os: linux
       language: python
       stage: Deploy Pants Pex
@@ -121,331 +147,79 @@ matrix:
           tags: true
           repo: pantsbuild/pants
 
-    - os: linux
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
-            - gcc-multilib
-            - python-dev
-            - openssl
-            - libssl-dev
-      stage: Test Pants
-      language: python
-      python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
+    - <<: *default_test_config
       env:
         - SHARD="Various pants self checks and lint"
       script:
         - ./build-support/bin/ci.sh -x -cejlpn 'Various pants self checks and lint'
 
-    - os: linux
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
-            - gcc-multilib
-            - python-dev
-            - openssl
-            - libssl-dev
-      stage: Test Pants
-      language: python
-      python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
+    - <<: *default_test_config
       env:
         - SHARD="Unit tests for pants and pants-plugins - shard 1"
       script:
         - ./build-support/bin/ci.sh -x -efkmrcnt -u 0/2 "${SHARD}"
 
-    - os: linux
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
-            - gcc-multilib
-            - python-dev
-            - openssl
-            - libssl-dev
-      stage: Test Pants
-      language: python
-      python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
+    - <<: *default_test_config
       env:
         - SHARD="Unit tests for pants and pants-plugins - shard 2"
       script:
         - ./build-support/bin/ci.sh -x -efkmrcnt -u 1/2 "${SHARD}"
 
-    - os: linux
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
-            - gcc-multilib
-            - python-dev
-            - openssl
-            - libssl-dev
-      stage: Test Pants
-      language: python
-      python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
+    - <<: *default_test_config
       env:
         - SHARD="Python contrib tests - shard 1"
       script:
         - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 0/2 "${SHARD}"
 
-    - os: linux
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
-            - gcc-multilib
-            - python-dev
-            - openssl
-            - libssl-dev
-      stage: Test Pants
-      language: python
-      python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
+    - <<: *default_test_config
       env:
         - SHARD="Python contrib tests - shard 2"
       script:
         - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 1/2 "${SHARD}"
 
-    - os: linux
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
-            - gcc-multilib
-            - python-dev
-            - openssl
-            - libssl-dev
-      stage: Test Pants
-      language: python
-      python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
+    - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 1"
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 0/7 "${SHARD}"
 
-    - os: linux
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
-            - gcc-multilib
-            - python-dev
-            - openssl
-            - libssl-dev
-      stage: Test Pants
-      language: python
-      python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
+    - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 2"
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 1/7 "${SHARD}"
 
-    - os: linux
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
-            - gcc-multilib
-            - python-dev
-            - openssl
-            - libssl-dev
-      stage: Test Pants
-      language: python
-      python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
+    - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 3"
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 2/7 "${SHARD}"
 
-    - os: linux
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
-            - gcc-multilib
-            - python-dev
-            - openssl
-            - libssl-dev
-      stage: Test Pants
-      language: python
-      python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
+    - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 4"
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 3/7 "${SHARD}"
 
-    - os: linux
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
-            - gcc-multilib
-            - python-dev
-            - openssl
-            - libssl-dev
-      stage: Test Pants
-      language: python
-      python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
+    - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 5"
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 4/7 "${SHARD}"
 
-    - os: linux
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
-            - gcc-multilib
-            - python-dev
-            - openssl
-            - libssl-dev
-      stage: Test Pants
-      language: python
-      python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
+    - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 6"
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 5/7 "${SHARD}"
 
-    - os: linux
-      dist: trusty
-      sudo: required
-      addons:
-        apt:
-          packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
-            - gcc-multilib
-            - python-dev
-            - openssl
-            - libssl-dev
-      stage: Test Pants
-      language: python
-      python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
+    - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 7"
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 6/7 "${SHARD}"
 
-    # Rust tests
+    # Rust on linux
     - os: linux
       dist: trusty
       sudo: required
@@ -469,6 +243,7 @@ matrix:
       script:
         - ./build-support/bin/ci.sh -bcfjklmnprtx
 
+    # Rust on macOS
     - os: osx
       # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.3

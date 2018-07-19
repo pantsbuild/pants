@@ -11,6 +11,7 @@ from collections import defaultdict
 
 from pants.backend.native.config.environment import Executable, Platform
 from pants.backend.native.targets.native_library import NativeLibrary
+from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFetch
 from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -117,13 +118,16 @@ class NativeCompile(NativeTask, AbstractClass):
   def execute(self):
     object_files_product = self.context.products.get(ObjectFiles)
     native_deps_product = self.context.products.get(NativeTargetDependencies)
+    external_libs_product = self.context.products.get_data(
+      NativeExternalLibraryFetch.NativeExternalLibraryFiles
+    )
     source_targets = self.context.targets(self.source_target_constraint.satisfied_by)
 
     with self.invalidated(source_targets, invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.invalid_vts:
         deps = self.native_deps(vt.target)
         self._add_product_at_target_base(native_deps_product, vt.target, deps)
-        compile_request = self._make_compile_request(vt, deps)
+        compile_request = self._make_compile_request(vt, deps, external_libs_product)
         self.context.log.debug("compile_request: {}".format(compile_request))
         self._compile(compile_request)
 
@@ -184,10 +188,18 @@ class NativeCompile(NativeTask, AbstractClass):
   def _compiler(self):
     return self.get_compiler()
 
-  def _make_compile_request(self, versioned_target, dependencies):
+  def _get_third_party_include_dirs(self, external_libs_product):
+    directory = external_libs_product.include_dir
+    return [directory] if directory else []
+
+  def _make_compile_request(self, versioned_target, dependencies, external_libs_product):
     target = versioned_target.target
+
     include_dirs = [self._include_dirs_for_target(dep_tgt) for dep_tgt in dependencies]
+    include_dirs.extend(self._get_third_party_include_dirs(external_libs_product))
+
     sources_and_headers = self.get_sources_headers_for_target(target)
+
     return NativeCompileRequest(
       compiler=self._compiler,
       include_dirs=include_dirs,
@@ -266,7 +278,7 @@ class NativeCompile(NativeTask, AbstractClass):
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.NativeCompileError(
           "Error in '{section_name}' with command {cmd} for request {req}. Exit code was: {rc}."
-          .format(section_name=self.workunit_name, cmd=argv, req=compile_request, rc=rc))
+          .format(section_name=self.workunit_label, cmd=argv, req=compile_request, rc=rc))
 
   def collect_cached_objects(self, versioned_target):
     """Scan `versioned_target`'s results directory and return the output files from that directory.

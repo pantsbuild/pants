@@ -122,7 +122,8 @@ impl super::CommandRunner for CommandRunner {
           )
         })
     );
-
+    let workdir_path = workdir.path().to_owned();
+    let workdir_path2 = workdir_path.clone();
     let store = self.store.clone();
     let fs_pool = self.fs_pool.clone();
     let env = req.env;
@@ -133,11 +134,11 @@ impl super::CommandRunner for CommandRunner {
     let req_description = req.description;
     self
       .store
-      .materialize_directory(workdir.path().to_owned(), req.input_files)
+      .materialize_directory(workdir_path.clone(), req.input_files)
       .and_then(move |()| {
         Command::new(&argv[0])
                   .args(&argv[1..])
-                  .current_dir(workdir.path())
+                  .current_dir(&workdir_path)
                   .env_clear()
                   // It would be really nice not to have to manually set PATH but this is sadly the only way
                   // to stop automatic PATH searching.
@@ -148,72 +149,48 @@ impl super::CommandRunner for CommandRunner {
                   .stderr(Stdio::piped())
                   .spawn_async()
                   .map_err(|e| format!("Error launching process: {:?}", e))
-                  .map(|child| (child, workdir))
       })
-      .and_then(|(child, workdir)| {
+      .and_then(|child| {
         // Consume the stream of ChildOutputs incrementally.
         let init = (
           BytesMut::with_capacity(8192),
           BytesMut::with_capacity(8192),
           None,
         );
-        Self::outputs_stream_for_child(child)
-          .fold(
-            init,
-            |(mut stdout, mut stderr, mut exit_code), child_output| {
-              match child_output {
-                ChildOutput::Stdout(bytes) => stdout.extend_from_slice(&bytes),
-                ChildOutput::Stderr(bytes) => stderr.extend_from_slice(&bytes),
-                ChildOutput::Exit(code) => exit_code = code,
-              };
-              Ok((stdout, stderr, exit_code)) as Result<_, String>
-            },
-          )
-          .map(|output| (output, workdir))
+        Self::outputs_stream_for_child(child).fold(
+          init,
+          |(mut stdout, mut stderr, mut exit_code), child_output| {
+            match child_output {
+              ChildOutput::Stdout(bytes) => stdout.extend_from_slice(&bytes),
+              ChildOutput::Stderr(bytes) => stderr.extend_from_slice(&bytes),
+              ChildOutput::Exit(code) => exit_code = code,
+            };
+            Ok((stdout, stderr, exit_code)) as Result<_, String>
+          },
+        )
       })
-      .and_then(move |((stdout, stderr, exit_code), workdir)| {
+      .and_then(move |(stdout, stderr, exit_code)| {
         let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
           future::ok(fs::Snapshot::empty()).to_boxed()
         } else {
           // Use no ignore patterns, because we are looking for explicitly listed paths.
-          future::done(
-            fs::PosixFS::new(
-              workdir.path(),
-              fs_pool,
-              &[],
-            )
-          )
-          .map_err(|err| {
-            format!(
-              "Error making posix_fs to fetch local process execution output files: {}",
-              err
-            )
-          })
-          .map(Arc::new)
-          .and_then(|posix_fs| {
-            CommandRunner::construct_output_snapshot(
-              store,
-              posix_fs,
-              output_file_paths,
-              output_dir_paths
-            )
-          })
-          // Force workdir not to get dropped until after we've ingested the outputs
-          .map(move |result| (result, workdir) )
-          .map(move |(result, workdir)| {
-            if !cleanup_local_dirs {
-              // This consumes the `TempDir` without deleting directory on the filesystem, meaning
-              // that the temporary directory will no longer be automatically deleted when dropped.
-              let preserved_path = workdir.into_path();
-              info!(
-                "preserved local process execution dir `{:?}` for {:?}",
-                preserved_path,
-                req_description
-              );
-            }
-            result
-          })
-          .to_boxed()
+          future::done(fs::PosixFS::new(workdir_path2, fs_pool, &[]))
+            .map_err(|err| {
+              format!(
+                "Error making posix_fs to fetch local process execution output files: {}",
+                err
+              )
+            })
+            .map(Arc::new)
+            .and_then(|posix_fs| {
+              CommandRunner::construct_output_snapshot(
+                store,
+                posix_fs,
+                output_file_paths,
+                output_dir_paths,
+              )
+            })
+            .to_boxed()
         };
 
         output_snapshot
@@ -224,6 +201,19 @@ impl super::CommandRunner for CommandRunner {
             output_directory: snapshot.digest,
           })
           .to_boxed()
+      })
+      .then(move |result| {
+        // Force workdir not to get dropped until after we've ingested the outputs
+        if !cleanup_local_dirs {
+          // This consumes the `TempDir` without deleting directory on the filesystem, meaning
+          // that the temporary directory will no longer be automatically deleted when dropped.
+          let preserved_path = workdir.into_path();
+          info!(
+            "preserved local process execution dir `{:?}` for {:?}",
+            preserved_path, req_description
+          );
+        } // Else, workdir gets dropped here
+        result
       })
       .to_boxed()
   }
@@ -629,7 +619,7 @@ mod tests {
     );
     result.unwrap();
 
-    assert_eq!(preserved_work_root.exists(), true);
+    assert!(preserved_work_root.exists());
 
     // Collect all of the top level sub-dirs under our test workdir.
     let subdirs = testutil::file::list_dir(&preserved_work_root);
@@ -637,7 +627,34 @@ mod tests {
 
     // Then look for a file like e.g. `/tmp/abc1234/process-execution7zt4pH/roland`
     let rolands_path = preserved_work_root.join(&subdirs[0]).join("roland");
-    assert_eq!(rolands_path.exists(), true);
+    assert!(rolands_path.exists());
+  }
+
+  #[test]
+  fn test_directory_preservation_error() {
+    let preserved_work_tmpdir = TempDir::new().unwrap();
+    let preserved_work_root = preserved_work_tmpdir.path().to_owned();
+
+    assert!(preserved_work_root.exists());
+    assert_eq!(testutil::file::list_dir(&preserved_work_root).len(), 0);
+
+    run_command_locally_in_dir(
+      ExecuteProcessRequest {
+        argv: vec!["doesnotexist".to_owned()],
+        env: BTreeMap::new(),
+        input_files: fs::EMPTY_DIGEST,
+        output_files: BTreeSet::new(),
+        output_directories: BTreeSet::new(),
+        timeout: Duration::from_millis(1000),
+        description: "failing execution".to_string(),
+      },
+      preserved_work_root.clone(),
+      false,
+    ).expect_err("Want process to fail");
+
+    assert!(preserved_work_root.exists());
+    // Collect all of the top level sub-dirs under our test workdir.
+    assert_eq!(testutil::file::list_dir(&preserved_work_root).len(), 1);
   }
 
   fn run_command_locally(

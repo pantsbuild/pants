@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import fnmatch
 import os
+from builtins import object
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet

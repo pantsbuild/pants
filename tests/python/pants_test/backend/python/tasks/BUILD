@@ -22,10 +22,9 @@ python_library(
 )
 
 python_native_code_test_files = [
-  # TODO: This test does not have any platform-specific testing right now, but that will be
-  # changed when #5815 is merged.
   'test_build_local_python_distributions.py',
   'test_python_distribution_integration.py',
+  'test_ctypes_integration.py',
 ]
 
 python_tests(
@@ -43,7 +42,7 @@ python_tests(
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/engine:scheduler_test_base',
   ],
-  tags={'platform_specific_behavior'},
+  tags={'platform_specific_behavior', 'integration'},
   timeout=2400,
 )
 
@@ -100,22 +99,8 @@ python_tests(
 )
 
 python_tests(
-  name='ctypes_integration',
-  sources=['test_ctypes_integration.py', 'test_python_distribution_integration.py'],
-  dependencies=[
-    'src/python/pants/base:build_environment',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
-    'tests/python/pants_test:int-test',
-    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
-  ],
-  tags={'integration'},
-  timeout=2400,
-)
-
-python_tests(
-  name='python_isort_integration',
-  sources=['test_python_isort_integration.py'],
+  name='isort_run_integration',
+  sources=['test_isort_run_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',
@@ -124,8 +109,8 @@ python_tests(
 )
 
 python_tests(
-  name='python_isort',
-  sources=['test_python_isort.py'],
+  name='isort_run',
+  sources=['test_isort_run.py'],
   dependencies=[
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',

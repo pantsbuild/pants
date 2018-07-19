@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import object
+
 from pants.binaries.binary_util import BinaryUtil
 from pants.goal.run_tracker import RunTracker
 from pants.init.repro import Reproducer

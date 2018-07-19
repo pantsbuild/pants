@@ -4,10 +4,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import http.server
 import json
 import threading
 
-import http.server
 from future.moves.urllib.parse import parse_qs
 
 from pants.goal.run_tracker import RunTracker

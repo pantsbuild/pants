@@ -6,8 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import struct
+from builtins import object, str, zip
 
 import six
+from future.utils import binary_type
 
 
 STDIO_DESCRIPTORS = (0, 1, 2)
@@ -244,7 +246,7 @@ class NailgunProtocol(object):
     def gen_env_vars():
       for fd_id, fd in zip(STDIO_DESCRIPTORS, (stdin, stdout, stderr)):
         is_atty = fd.isatty()
-        yield (cls.TTY_ENV_TMPL.format(fd_id), bytes(int(is_atty)))
+        yield (cls.TTY_ENV_TMPL.format(fd_id), binary_type(str(int(is_atty))))
         if is_atty:
           yield (cls.TTY_PATH_ENV.format(fd_id), os.ttyname(fd.fileno()) or '')
     return dict(gen_env_vars())

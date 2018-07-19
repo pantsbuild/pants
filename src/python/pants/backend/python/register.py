@@ -17,13 +17,14 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
 from pants.backend.python.tasks.gather_sources import GatherSources
+from pants.backend.python.tasks.isort_prep import IsortPrep
+from pants.backend.python.tasks.isort_run import IsortRun
 from pants.backend.python.tasks.local_python_distribution_artifact import \
   LocalPythonDistributionArtifact
 from pants.backend.python.tasks.pytest_prep import PytestPrep
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks.python_bundle import PythonBundle
-from pants.backend.python.tasks.python_isort import IsortPythonTask
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
@@ -69,7 +70,8 @@ def register_goals():
   task(name='setup-py', action=SetupPy).install()
   task(name='py', action=PythonBinaryCreate).install('binary')
   task(name='py-wheels', action=LocalPythonDistributionArtifact).install('binary')
-  task(name='isort', action=IsortPythonTask).install('fmt')
+  task(name='isort-prep', action=IsortPrep).install('fmt')
+  task(name='isort', action=IsortRun).install('fmt')
   task(name='py', action=PythonBundle).install('bundle')
 
 

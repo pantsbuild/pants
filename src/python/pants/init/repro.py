@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import sys
+from builtins import object
 
 from pants.base.build_environment import get_buildroot
 from pants.subsystem.subsystem import Subsystem

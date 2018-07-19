@@ -8,6 +8,7 @@ import io
 import os
 import select
 import threading
+from builtins import zip
 from contextlib import contextmanager
 
 from contextlib2 import ExitStack
@@ -163,10 +164,10 @@ class NailgunStreamWriter(_StoppableDaemonThread):
 
     # N.B. This is purely to permit safe handling of a dynamic number of contextmanagers.
     with ExitStack() as stack:
-      read_fds, write_fds = zip(
+      read_fds, write_fds = list(zip(
         # Allocate one pipe pair per chunk type provided.
         *(stack.enter_context(_pipe(isatty)) for isatty in isattys)
-      )
+      ))
       writer = NailgunStreamWriter(
         read_fds,
         sock,
