@@ -99,8 +99,8 @@ python_tests(
 )
 
 python_tests(
-  name='python_isort_integration',
-  sources=['test_python_isort_integration.py'],
+  name='isort_run_integration',
+  sources=['test_isort_run_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',
@@ -109,8 +109,8 @@ python_tests(
 )
 
 python_tests(
-  name='python_isort',
-  sources=['test_python_isort.py'],
+  name='isort_run',
+  sources=['test_isort_run.py'],
   dependencies=[
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',

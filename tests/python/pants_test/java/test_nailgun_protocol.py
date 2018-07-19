@@ -205,6 +205,45 @@ class TestNailgunProtocol(unittest.TestCase):
       (False, True, False)
     )
 
+  def _make_mock_stream(self, isatty, fileno):
+    mock_stream = mock.Mock()
+    mock_stream.isatty.return_value = isatty
+    mock_stream.fileno.return_value = fileno
+    return mock_stream
+
+  _fake_ttyname = '/this/is/not/a/real/tty'
+
+  @mock.patch('os.ttyname', autospec=True, spec_set=True)
+  def test_isatty_to_env_with_mock_tty(self, mock_ttyname):
+    mock_ttyname.return_value = self._fake_ttyname
+    mock_stdin = self._make_mock_stream(True, 0)
+    mock_stdout = self._make_mock_stream(True, 1)
+    mock_stderr = self._make_mock_stream(True, 2)
+
+    self.assertEquals(
+      NailgunProtocol.isatty_to_env(mock_stdin, mock_stdout, mock_stderr),
+      {
+        'NAILGUN_TTY_0': b'1',
+        'NAILGUN_TTY_1': b'1',
+        'NAILGUN_TTY_2': b'1',
+        'NAILGUN_TTY_PATH_0': self._fake_ttyname,
+        'NAILGUN_TTY_PATH_1': self._fake_ttyname,
+        'NAILGUN_TTY_PATH_2': self._fake_ttyname,
+      })
+
+  def test_isatty_to_env_without_tty(self):
+    mock_stdin = self._make_mock_stream(False, 0)
+    mock_stdout = self._make_mock_stream(False, 1)
+    mock_stderr = self._make_mock_stream(False, 2)
+
+    self.assertEquals(
+      NailgunProtocol.isatty_to_env(mock_stdin, mock_stdout, mock_stderr),
+      {
+        'NAILGUN_TTY_0': b'0',
+        'NAILGUN_TTY_1': b'0',
+        'NAILGUN_TTY_2': b'0',
+      })
+
   def test_construct_chunk(self):
     with self.assertRaises(TypeError):
       NailgunProtocol.construct_chunk(ChunkType.STDOUT, 1111)
