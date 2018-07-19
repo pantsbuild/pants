@@ -19,6 +19,9 @@ New features
 Bugfixes
 ~~~~~~~~
 
+* Fix incorrect use of bytes() when invoking the daemon in a tty (#6181)
+  `PR #6181 <https://github.com/pantsbuild/pants/pull/6181>`_
+
 * rustfmt check more reliably works (#6172)
   `PR #6172 <https://github.com/pantsbuild/pants/pull/6172>`_
 
