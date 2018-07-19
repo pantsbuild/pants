@@ -42,6 +42,7 @@ class IsortRun(FmtTaskMixin, Task):
     targets = self.get_targets(self.is_non_synthetic_python_target)
     with self.invalidated(targets=targets) as invalidation_check:
       if not invalidation_check.invalid_vts:
+        logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
         return
 
       invalid_tgts = [vt.target for vt in invalidation_check.invalid_vts]

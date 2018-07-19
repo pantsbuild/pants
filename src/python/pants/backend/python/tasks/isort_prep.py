@@ -18,6 +18,8 @@ from pants.backend.python.tasks.pex_build_util import dump_requirement_libs
 from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
+from pants.option.custom_types import list_option
+from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
 from pants.util.dirutil import fast_relpath, safe_concurrent_creation
 
@@ -25,8 +27,43 @@ from pants.util.dirutil import fast_relpath, safe_concurrent_creation
 class IsortPrep(Task):
 
   class Isort(object):
-    def __init__(self, pex):
-      self._pex = pex
+    class Factory(Subsystem):
+      options_scope = 'isort'
+
+      @classmethod
+      def register_options(cls, register):
+        super(IsortPrep.Isort.Factory, cls).register_options(register)
+        register('--version', default='4.3.4', advanced=True, fingerprint=True,
+                 help='The version of isort to use.')
+        register('--additional-requirements', default=['setuptools'], type=list_option,
+                 advanced=True, fingerprint=True,
+                 help='Additional undeclared dependencies of the requested isort version.')
+
+      @classmethod
+      def create_requirements(cls, context, workdir):
+        options = cls.global_instance().get_options()
+        address = Address(spec_path=fast_relpath(workdir, get_buildroot()), target_name='isort')
+        requirements = ['isort=={}'.format(options.version)] + options.additional_requirements
+        context.build_graph.inject_synthetic_target(
+          address=address,
+          target_type=PythonRequirementLibrary,
+          requirements=[PythonRequirement(r) for r in requirements]
+        )
+        return context.build_graph.get_target(address=address)
+
+      @classmethod
+      def build_isort_pex(cls, context, interpreter, pex_path, requirements_lib):
+        with safe_concurrent_creation(pex_path) as chroot:
+          builder = PEXBuilder(path=chroot, interpreter=interpreter)
+          dump_requirement_libs(builder=builder,
+                                interpreter=interpreter,
+                                req_libs=[requirements_lib],
+                                log=context.log)
+          builder.set_script('isort')
+          builder.freeze()
+
+    def __init__(self, pex_path, interpreter=None):
+      self._pex = PEX(pex_path, interpreter=interpreter)
 
     def run(self, workunit_factory, args, **kwargs):
       cmdline = ' '.join(self._pex.cmdline(args))
@@ -41,14 +78,12 @@ class IsortPrep(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    # PythonSetup, PythonRepos are required by dump_requirement_libs.
-    return super(IsortPrep, cls).subsystem_dependencies() + (PythonSetup, PythonRepos)
-
-  @classmethod
-  def register_options(cls, register):
-    super(IsortPrep, cls).register_options(register)
-    register('--version', advanced=True, fingerprint=True, default='4.3.4',
-             help='The version of isort to use.')
+    return super(IsortPrep, cls).subsystem_dependencies() + (
+      cls.Isort.Factory,
+      # PythonSetup, PythonRepos are required by dump_requirement_libs.
+      PythonSetup,
+      PythonRepos
+    )
 
   @classmethod
   def product_types(cls):
@@ -59,16 +94,9 @@ class IsortPrep(Task):
     return True
 
   def execute(self):
-    address = Address(spec_path=fast_relpath(self.workdir, get_buildroot()), target_name='isort')
-    self.context.build_graph.inject_synthetic_target(
-      address=address,
-      target_type=PythonRequirementLibrary,
-      requirements=[PythonRequirement(r)
-                    for r in 'isort=={}'.format(self.get_options().version), 'setuptools']
-    )
-    isort_requirements = self.context.build_graph.get_target(address=address)
+    isort_requirement_lib = self.Isort.Factory.create_requirements(self.context, self.workdir)
 
-    with self.invalidated(targets=[isort_requirements]) as invalidation_check:
+    with self.invalidated(targets=[isort_requirement_lib]) as invalidation_check:
       interpreter = PythonInterpreter.get()
 
       assert len(invalidation_check.all_vts) == 1, (
@@ -80,14 +108,10 @@ class IsortPrep(Task):
 
       if invalidation_check.invalid_vts:
         with self.context.new_workunit(name='create-isort-pex', labels=[WorkUnitLabel.PREP]):
-          with safe_concurrent_creation(pex_path) as chroot:
-            builder = PEXBuilder(path=chroot, interpreter=interpreter)
-            dump_requirement_libs(builder=builder,
-                                  interpreter=interpreter,
-                                  req_libs=[vt.target],
-                                  log=self.context.log)
-            builder.set_script('isort')
-            builder.freeze()
+          self.Isort.Factory.build_isort_pex(context=self.context,
+                                             interpreter=interpreter,
+                                             pex_path=pex_path,
+                                             requirements_lib=isort_requirement_lib)
 
-      isort = PEX(pex_path, interpreter=interpreter)
-      self.context.products.register_data(self.Isort, self.Isort(isort))
+      isort = self.Isort(pex_path, interpreter=interpreter)
+      self.context.products.register_data(self.Isort, isort)
