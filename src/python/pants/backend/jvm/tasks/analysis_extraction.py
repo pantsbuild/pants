@@ -108,7 +108,7 @@ class AnalysisExtraction(NailgunTask):
     args = [
         '-summary-json', summary_json_file,
         '-analysis-cache', analysis_file,
-        '-classpath', ':'.join(target_classpath),
+        '-classpath', ':'.join(ce.path2 for ce in target_classpath),
         '-analysis-map', ','.join('{}:{}'.format(k, v) for k, v in upstream_analysis),
       ]
     args.extend(self._zinc.rebase_map_args)

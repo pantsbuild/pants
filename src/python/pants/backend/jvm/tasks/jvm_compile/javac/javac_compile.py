@@ -128,7 +128,7 @@ class JavacCompile(JvmCompile):
     javac_cmd = ['{}/bin/javac'.format(distribution.real_home)]
 
     javac_cmd.extend([
-      '-classpath', ':'.join(classpath),
+      '-classpath', ':'.join(ce.path2 for ce in classpath),
     ])
 
     if settings.args:

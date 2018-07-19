@@ -78,7 +78,7 @@ class RunJvmPrepCommandBase(Task):
         mainclass = target.payload.get_field_value('mainclass')
         args = target.payload.get_field_value('args', [])
         target_jvm_options = target.payload.get_field_value('jvm_options', [])
-        cp = list(ClasspathUtil.classpath(target.closure(), classpath_products))
+        cp = list(ce.path2 for ce in ClasspathUtil.classpath(target.closure(), classpath_products))
         if not cp:
           raise TaskError('target {} has no classpath. (Add dependencies= parameter?'
                           .format(target.address.spec))

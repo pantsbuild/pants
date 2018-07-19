@@ -64,7 +64,7 @@ class JvmBinaryTask(JarBuilderTask):
                        respect_intransitive=True))
     external_jars = OrderedSet(jar_entry for conf, jar_entry in classpath_entries
                                if conf == 'default')
-    return [(entry.path, entry.coordinate) for entry in external_jars
+    return [(entry.path2, entry.coordinate) for entry in external_jars
             if not entry.is_excluded_by(binary.deploy_excludes)]
 
   @contextmanager

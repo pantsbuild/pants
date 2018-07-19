@@ -60,7 +60,7 @@ class ConsolidateClasspath(JvmBinaryTask):
       for vt in invalidation.all_vts:
         entries = entries_map.get(vt.target, [])
         for index, (conf, entry) in enumerate(entries):
-          if ClasspathUtil.is_dir(entry.path):
+          if ClasspathUtil.is_dir(entry.path2):
             jarpath = os.path.join(vt.results_dir, 'output-{}.jar'.format(index))
 
             # Regenerate artifact for invalid vts.

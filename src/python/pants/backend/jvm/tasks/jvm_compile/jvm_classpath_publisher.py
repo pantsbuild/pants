@@ -36,7 +36,7 @@ class RuntimeClasspathPublisher(Task):
     if self.get_options().manifest_jar_only:
       classpath = ClasspathUtil.classpath(targets, runtime_classpath)
       # Safely create e.g. dist/export-classpath/manifest.jar
-      safe_classpath(classpath, basedir, "manifest.jar")
+      safe_classpath((ce.path2 for ce in classpath), basedir, "manifest.jar")
     else:
       ClasspathProducts.create_canonical_classpath(runtime_classpath,
                                                    targets,

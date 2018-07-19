@@ -446,7 +446,8 @@ class BaseZincCompile(JvmCompile):
 
     cp_product = self.context.products.get_data('runtime_classpath')
     for classpath_element in classpath:
-      name = self._maybe_get_plugin_name(classpath_element)
+      classpath_element_path = classpath_element.path2
+      name = self._maybe_get_plugin_name(classpath_element_path)
       if name in plugin_names:
         plugin_target_closure = self._plugin_targets('scalac').get(name, [])
         # It's important to use relative paths, as the compiler flags get embedded in the zinc
@@ -456,11 +457,11 @@ class BaseZincCompile(JvmCompile):
           ClasspathUtil.internal_classpath(plugin_target_closure, cp_product, self._confs)]
         # If the plugin is external then rel_classpath_elements will be empty, so we take
         # just the external jar itself.
-        rel_classpath_elements = rel_classpath_elements or [classpath_element]
+        rel_classpath_elements = rel_classpath_elements or [classpath_element_path]
         # Some classpath elements may be repeated, so we allow for that here.
         if active_plugins.get(name, rel_classpath_elements) != rel_classpath_elements:
           raise TaskError('Plugin {} defined in {} and in {}'.format(name, active_plugins[name],
-                                                                     classpath_element))
+                                                                     classpath_element_path))
         active_plugins[name] = rel_classpath_elements
         if len(active_plugins) == len(plugin_names):
           # We've found all the plugins, so return now to spare us from processing

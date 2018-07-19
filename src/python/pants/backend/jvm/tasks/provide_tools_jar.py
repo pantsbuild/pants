@@ -48,8 +48,9 @@ class ProvideToolsJar(JvmToolTaskMixin):
         tools_classpath = self._tools_classpath_pairs(vt.results_dir)
         if not vt.valid:
           self._symlink_tools_classpath(tools_classpath)
+        # TODO: Include DirectoryDigest
         compile_classpath.add_for_target(vt.target,
-                                         [('default', entry) for _, entry in tools_classpath])
+                                         [('default', entry, None) for _, entry in tools_classpath])
 
   def _tools_classpath_pairs(self, dest_dir):
     """Given a destination directory, returns a list of tuples of (src, dst) symlink pairs."""

@@ -163,7 +163,7 @@ class ErrorProne(NailgunTask):
     errorprone_classpath_file = os.path.join(self.workdir, '{}.classpath'.format(os.path.basename(output_dir)))
     with open(errorprone_classpath_file, 'w') as f:
       f.write('-classpath ')
-      f.write(':'.join(runtime_classpath))
+      f.write(':'.join(ce.path2 for ce in runtime_classpath))
     args.append('@{}'.format(errorprone_classpath_file))
 
     for opt in self.get_options().command_line_options:
