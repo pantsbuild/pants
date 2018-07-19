@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import str
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
