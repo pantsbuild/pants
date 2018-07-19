@@ -4,10 +4,11 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import io
 import logging
 import os
-import StringIO
 import traceback
+from builtins import object
 from contextlib import contextmanager
 
 from pants.scm.scm import Scm
@@ -447,7 +448,7 @@ class GitRepositoryReader(object):
       return os.listdir(path)
 
     tree = self._read_tree(path[:-1])
-    return tree.keys()
+    return list(tree.keys())
 
   @contextmanager
   def open(self, relpath):
@@ -470,7 +471,7 @@ class GitRepositoryReader(object):
     if object_type == 'tree':
       raise self.IsDirException(self.rev, relpath)
     assert object_type == 'blob'
-    yield StringIO.StringIO(data)
+    yield io.BytesIO(data)
 
   @memoized_method
   def _realpath(self, relpath):
