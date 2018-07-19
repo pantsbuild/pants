@@ -22,6 +22,7 @@ from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
+from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.build_environment import get_buildroot
@@ -304,9 +305,12 @@ class BaseZincCompile(JvmCompile):
     #   classes_dir doesn't have scalac-plugin.xml yet, and we don't want that fact to get
     #   memoized (which in practice will only happen if this plugin uses some other plugin, thus
     #   triggering the plugin search mechanism, which does the memoizing).
-    scalac_plugin_search_classpath = (
-      (set(classpath) | set(self.scalac_plugin_classpath_elements())) -
-      {ctx.classes_dir, ctx.jar_file}
+    scalac_plugin_search_classpath = set(
+      ce
+      # TODO: Add digest
+      for ce in (set(classpath) | set(ClasspathEntry(path, None) for path in self.scalac_plugin_classpath_elements()))
+      # TODO: Just don't add self to classpath in the first place
+      if ce.path2 != ctx.classes_dir and ce.path2 != ctx.jar_file
     )
     zinc_args.extend(self._scalac_plugin_args(scalac_plugin_map, scalac_plugin_search_classpath))
     if upstream_analysis:

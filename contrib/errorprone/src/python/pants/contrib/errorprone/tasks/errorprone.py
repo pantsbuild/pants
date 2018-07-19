@@ -127,7 +127,7 @@ class ErrorProne(NailgunTask):
 
   def errorprone(self, target):
     runtime_classpaths = self.context.products.get_data('runtime_classpath')
-    runtime_classpath = [jar for conf, jar in runtime_classpaths.get_for_targets(target.closure(bfs=True))]
+    runtime_classpath = [ce.path2 for conf, ce in runtime_classpaths.get_for_targets(target.closure(bfs=True))]
 
     output_dir = os.path.join(self.workdir, target.id)
     safe_mkdir(output_dir)
@@ -163,7 +163,7 @@ class ErrorProne(NailgunTask):
     errorprone_classpath_file = os.path.join(self.workdir, '{}.classpath'.format(os.path.basename(output_dir)))
     with open(errorprone_classpath_file, 'w') as f:
       f.write('-classpath ')
-      f.write(':'.join(ce.path2 for ce in runtime_classpath))
+      f.write(':'.join(runtime_classpath))
     args.append('@{}'.format(errorprone_classpath_file))
 
     for opt in self.get_options().command_line_options:
