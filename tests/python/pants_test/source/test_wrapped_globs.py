@@ -254,7 +254,7 @@ class FilesetWithSpecTest(TestBase):
     efws = self.sources_for(['a', 'b', 'c'], 'test_root')
     self.assertEquals(
       efws.files_hash,
-      str('cb11a7f0b5a1e22b93c36783608ba531ea831c2f68a5c9f9498417b211bcfea4'),
+      'cb11a7f0b5a1e22b93c36783608ba531ea831c2f68a5c9f9498417b211bcfea4',
     )
     self.assertEquals(
       list(efws.paths_from_buildroot_iter()),
