@@ -15,7 +15,8 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_sources,
                                                        has_python_requirements, has_python_sources,
-                                                       has_resources, is_python_target)
+                                                       has_resources, is_python_target,
+                                                       subsystems_used)
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
@@ -31,7 +32,7 @@ class PythonBinaryCreate(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PythonBinaryCreate, cls).subsystem_dependencies() + (PythonNativeCode.scoped(cls),)
+    return super(PythonBinaryCreate, cls).subsystem_dependencies() + (PythonNativeCode.scoped(cls),) + subsystems_used()
 
   @memoized_property
   def _python_native_code_settings(self):

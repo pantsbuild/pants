@@ -127,6 +127,15 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None):
       locations.add(dist.location)
 
 
+def subsystems_used():
+  """The subsystems used by the utility functions.
+
+  This function is provided so that consuming tasks can call it in their
+  subsystem_dependencies implementations.
+  """
+  return (PythonRepos, PythonSetup)
+
+
 def resolve_multi(interpreter, requirements, platforms, find_links):
   """Multi-platform dependency resolution for PEX files.
 

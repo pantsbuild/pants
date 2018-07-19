@@ -7,6 +7,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import functools
 import os
 from contextlib import contextmanager
+from textwrap import dedent
+from zipfile import ZipFile
 
 from pex.pex_info import PexInfo
 
@@ -66,3 +68,74 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       buildroot.write_file(test_build, zipsafe_target_tmpl.format('True'))
       self.assert_success(build())
       self.assert_pex_attribute(test_pex, 'zip_safe', True)
+
+  def test_platforms(self):
+    test_project = 'testprojects/src/python/cache_fields'
+    test_build = os.path.join(test_project, 'BUILD')
+    test_src = os.path.join(test_project, 'main.py')
+    test_pex = 'dist/cache_fields.pex'
+    numpy_manylinux_dep = '.deps/numpy-1.14.5-cp27-cp27m-manylinux1_x86_64.whl/numpy/__init__.py'
+    numpy_macos_dep = '.deps/numpy-1.14.5-cp27-cp27m-macosx_10_6_intel.macosx_10_9_intel.macosx_10_9_x86_64.macosx_10_10_intel.macosx_10_10_x86_64.whl/numpy/__init__.py'
+
+    with self.caching_config() as config, self.mock_buildroot() as buildroot, buildroot.pushd():
+      config['python-setup'] = {
+        'platforms': None
+      }
+      build = functools.partial(
+        self.run_pants_with_workdir,
+        command=['binary', test_project],
+        workdir=os.path.join(buildroot.new_buildroot, '.pants.d'),
+        config=config,
+        build_root=buildroot.new_buildroot
+      )
+
+      buildroot.write_file(test_src, '')
+
+      buildroot.write_file(test_build,
+        dedent("""
+        python_binary(source='main.py', dependencies=[':numpy'])
+        python_requirement_library(
+          name='numpy',
+          requirements=[
+            python_requirement('numpy==1.14.5')
+          ]
+        )
+
+        """)
+      )
+      # When only the linux platform is requested,
+      # only linux wheels should end up in the pex.
+      config['python-setup']['platforms'] = ['linux-x86_64']
+      build()
+
+      with self._open_zip(test_pex) as z:
+        namelist = z.namelist()
+        self.assertIn(
+          numpy_manylinux_dep,
+          namelist)
+        self.assertNotIn(
+          numpy_manylinux_dep,
+          namelist)
+
+      # When both linux and macosx platforms are requested,
+      # wheels for both should end up in the pex.
+      config['python-setup']['platforms'] = [
+        'linux-x86_64',
+        'macosx-10.13-x86_64']
+      build()
+
+      with self._open_zip(test_pex) as z:
+        namelist = z.namelist()
+        self.assertIn(
+          numpy_manylinux_dep,
+          namelist)
+        self.assertIn(
+          numpy_macos_dep,
+          namelist)
+
+  def _open_zip(self, path):
+    try:
+      z = ZipFile(path)
+      yield z
+    finally:
+      z.close()
