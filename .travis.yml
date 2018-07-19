@@ -147,84 +147,72 @@ matrix:
           tags: true
           repo: pantsbuild/pants
 
-    # Linter
     - <<: *default_test_config
       env:
         - SHARD="Various pants self checks and lint"
       script:
         - ./build-support/bin/ci.sh -x -cejlpn 'Various pants self checks and lint'
 
-    # Unit tests - shard 1
     - <<: *default_test_config
       env:
         - SHARD="Unit tests for pants and pants-plugins - shard 1"
       script:
         - ./build-support/bin/ci.sh -x -efkmrcnt -u 0/2 "${SHARD}"
 
-    # Unit tests - shard 2
     - <<: *default_test_config
       env:
         - SHARD="Unit tests for pants and pants-plugins - shard 2"
       script:
         - ./build-support/bin/ci.sh -x -efkmrcnt -u 1/2 "${SHARD}"
 
-    # Contrib tests - shard 1
     - <<: *default_test_config
       env:
         - SHARD="Python contrib tests - shard 1"
       script:
         - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 0/2 "${SHARD}"
 
-    # Contrib tests - shard 2
     - <<: *default_test_config
       env:
         - SHARD="Python contrib tests - shard 2"
       script:
         - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 1/2 "${SHARD}"
 
-    # Integration tests - shard 1
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 1"
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 0/7 "${SHARD}"
 
-    # Integration tests - shard 2
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 2"
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 1/7 "${SHARD}"
 
-    # Integration tests - shard 3
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 3"
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 2/7 "${SHARD}"
 
-    # Integration tests - shard 4
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 4"
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 3/7 "${SHARD}"
 
-    # Integration tests - shard 5
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 5"
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 4/7 "${SHARD}"
 
-    # Integration tests - shard 6
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 6"
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 5/7 "${SHARD}"
 
-    # Integration tests - shard 7
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 7"
