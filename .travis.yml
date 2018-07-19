@@ -62,6 +62,47 @@ stages:
 matrix:
   include:
 
+    # Build macOS engine binary
+    - os: osx
+      # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
+      # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
+      # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
+      osx_image: xcode8
+      stage: Test Pants
+      language: generic
+      env:
+        - SHARD="OSX Native Engine Binary Builder"
+        - PREPARE_DEPLOY=1
+      script:
+        - ./pants --version && ./build-support/bin/release.sh -n
+
+    # Build linux engine binary
+    - os: linux
+      stage: Test Pants
+      language: generic
+      services:
+        - docker
+      env:
+        - SHARD="Linux Native Engine Binary Builder"
+        - PREPARE_DEPLOY=1
+      before_script:
+        - ulimit -c unlimited
+      script:
+        - docker build --rm -t travis_ci
+          --build-arg "TRAVIS_USER=$(id -un)"
+          --build-arg "TRAVIS_UID=$(id -u)"
+          --build-arg "TRAVIS_GROUP=$(id -gn)"
+          --build-arg "TRAVIS_GID=$(id -g)"
+            build-support/docker/travis_ci/
+        # Mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain
+        - docker run --rm -t
+          -v "${HOME}:/travis/home"
+          -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+          travis_ci:latest
+          sh -c "git clean -xfd && ./pants --version && ./build-support/bin/release.sh -n"
+      after_failure:
+        - build-support/bin/ci-failure.sh
+
     # Rust tests
     - os: linux
       dist: trusty
@@ -107,47 +148,6 @@ matrix:
       script:
         # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and set -z to run the platform-specific tests.
         - ./build-support/bin/ci.sh -cfjklmnprtxz
-
-    # Build macOS engine binary
-    - os: osx
-      # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
-      # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
-      # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
-      osx_image: xcode8
-      stage: Test Pants
-      language: generic
-      env:
-        - SHARD="OSX Native Engine Binary Builder"
-        - PREPARE_DEPLOY=1
-      script:
-        - ./pants --version && ./build-support/bin/release.sh -n
-
-    # Build linux engine binary
-    - os: linux
-      stage: Test Pants
-      language: generic
-      services:
-        - docker
-      env:
-        - SHARD="Linux Native Engine Binary Builder"
-        - PREPARE_DEPLOY=1
-      before_script:
-        - ulimit -c unlimited
-      script:
-        - docker build --rm -t travis_ci
-          --build-arg "TRAVIS_USER=$(id -un)"
-          --build-arg "TRAVIS_UID=$(id -u)"
-          --build-arg "TRAVIS_GROUP=$(id -gn)"
-          --build-arg "TRAVIS_GID=$(id -g)"
-            build-support/docker/travis_ci/
-        # Mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain
-        - docker run --rm -t
-          -v "${HOME}:/travis/home"
-          -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-          travis_ci:latest
-          sh -c "git clean -xfd && ./pants --version && ./build-support/bin/release.sh -n"
-      after_failure:
-        - build-support/bin/ci-failure.sh
 
     # Linters
     - os: linux
