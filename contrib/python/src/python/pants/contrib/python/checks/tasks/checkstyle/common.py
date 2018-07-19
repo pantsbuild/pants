@@ -198,7 +198,7 @@ class PythonFile(object):
         yield self.translate_logical_line(
             line_number_start,
             token_start[0] + (1 if token_type is tokenize.NEWLINE else -1),
-            list([_f for _f in contents if _f]),
+            [_f for _f in contents if _f],
             indent_stack,
             endmarker=token_type == tokenize.ENDMARKER)
         contents = []
@@ -260,7 +260,7 @@ class Nit(object):
 
   def __init__(self, code, severity, filename, message, line_range=None, lines=None):
     if severity not in self.SEVERITY:
-      raise ValueError('Severity should be one of {}'.format(' '.join(list(self.SEVERITY.values()))))
+      raise ValueError('Severity should be one of {}'.format(' '.join(self.SEVERITY.values())))
     if not re.match(r'[A-Z]\d{3}', code):
       raise ValueError('Code must contain a prefix letter followed by a 3 digit number')
     self.filename = filename

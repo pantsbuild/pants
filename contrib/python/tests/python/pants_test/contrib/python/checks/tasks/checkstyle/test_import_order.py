@@ -49,7 +49,7 @@ IMPORT_CHUNKS = {
 
 
 def strip_newline(stmt):
-  return textwrap.dedent('\n'.join([_f for _f in stmt.splitlines() if _f]))
+  return textwrap.dedent('\n'.join(_f for _f in stmt.splitlines() if _f))
 
 
 def stitch_chunks(newlines, *chunks):
