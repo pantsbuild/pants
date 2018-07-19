@@ -265,7 +265,7 @@ class ClasspathProducts(object):
 
           # Create a unique symlink path by prefixing the base file name with a monotonic
           # increasing `index` to avoid name collisions.
-          _, ext = os.path.splitext(entry.path)
+          _, ext = os.path.splitext(entry.path2)
           symlink_path = '{}{}{}'.format(classpath_prefix_for_target, index, ext)
           real_entry_path = os.path.realpath(entry.path)
           if not os.path.exists(real_entry_path):

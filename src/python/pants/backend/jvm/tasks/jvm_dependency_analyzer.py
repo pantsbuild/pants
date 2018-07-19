@@ -52,7 +52,7 @@ class JvmDependencyAnalyzer(object):
       files = ClasspathUtil.classpath_contents((target,), self.runtime_classpath)
       # And jars; for binary deps, zinc doesn't emit precise deps (yet).
       cp_entries = ClasspathUtil.classpath((target,), self.runtime_classpath)
-      jars = [cpe for cpe in cp_entries if ClasspathUtil.is_jar(cpe)]
+      jars = [cpe.path2 for cpe in cp_entries if ClasspathUtil.is_jar(cpe)]
       for coll in [files, jars]:
         for f in coll:
           yield f

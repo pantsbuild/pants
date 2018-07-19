@@ -87,4 +87,5 @@ class NodeBuild(NodeTask):
                   target.address.reference(), target.payload.build_script, output_dir))
             absolute_symlink(output_dir, os.path.join(vt.results_dir, target.address.target_name))
             bundleable_js_product[target].add_abs_paths(output_dir, [output_dir])
-            runtime_classpath_product.add_for_target(target, [('default', vt.results_dir)])
+            # TODO: Add directory digest
+            runtime_classpath_product.add_for_target(target, [('default', vt.results_dir, None)])

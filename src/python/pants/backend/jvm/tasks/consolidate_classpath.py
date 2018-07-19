@@ -66,7 +66,7 @@ class ConsolidateClasspath(JvmBinaryTask):
             # Regenerate artifact for invalid vts.
             if not vt.valid:
               with self.open_jar(jarpath, overwrite=True, compressed=False) as jar:
-                jar.write(entry.path)
+                jar.write(entry.path2)
 
             # Replace directory classpath entry with its jarpath.
             classpath_products.remove_for_target(vt.target, [(conf, entry.path)])

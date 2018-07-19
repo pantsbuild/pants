@@ -212,4 +212,4 @@ class JvmToolMixin(object):
     if not callback:
       raise TaskError('No bootstrap callback registered for {key} in {scope}'
                       .format(key=key, scope=scope))
-    return callback()
+    return [ce.path2 for ce in callback()]
