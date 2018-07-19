@@ -39,25 +39,30 @@ class IsortRun(FmtTaskMixin, Task):
     round_manager.require_data(IsortPrep.Isort)
 
   def execute(self):
-    sources = self._calculate_isortable_python_sources(
-      self.get_targets(self.is_non_synthetic_python_target))
+    targets = self.get_targets(self.is_non_synthetic_python_target)
+    with self.invalidated(targets=targets) as invalidation_check:
+      if not invalidation_check.invalid_vts:
+        return
 
-    if not sources:
-      logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
-      return
+      invalid_tgts = [vt.target for vt in invalidation_check.invalid_vts]
+      sources = self._calculate_isortable_python_sources(invalid_tgts)
+      if not sources:
+        logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
+        return
 
-    isort = self.context.products.get_data(IsortPrep.Isort)
-    args = self.get_passthru_args() + sources
+      isort = self.context.products.get_data(IsortPrep.Isort)
+      args = self.get_passthru_args() + sources
 
-    # NB: We execute isort out of process to avoid unwanted side-effects from importing it:
-    #   https://github.com/timothycrosley/isort/issues/456
-    with pushd(get_buildroot()):
-      workunit_factory = functools.partial(self.context.new_workunit,
-                                           name='run-isort',
-                                           labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT])
-      cmdline, returncode = isort.run(workunit_factory, args)
-      if returncode != 0:
-        raise TaskError('{} ... exited non-zero ({}).'.format(cmdline, returncode))
+      # NB: We execute isort out of process to avoid unwanted side-effects from importing it:
+      #   https://github.com/timothycrosley/isort/issues/456
+      with pushd(get_buildroot()):
+        workunit_factory = functools.partial(self.context.new_workunit,
+                                             name='run-isort',
+                                             labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT])
+        cmdline, exit_code = isort.run(workunit_factory, args)
+        if exit_code != 0:
+          raise TaskError('{} ... exited non-zero ({}).'.format(cmdline, exit_code),
+                          exit_code=exit_code)
 
   def _calculate_isortable_python_sources(self, targets):
     """Generate a set of source files from the given targets."""

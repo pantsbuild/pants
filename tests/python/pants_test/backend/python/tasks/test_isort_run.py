@@ -75,7 +75,6 @@ class PythonIsortTest(PythonTaskTestBase):
     if options:
       self.set_options(**options)
 
-    self.set_options_for_scope('ip')
     isort_prep_task_type = self.synthesize_task_subtype(IsortPrep, 'ip')
     context = self.context(for_task_types=[isort_prep_task_type],
                            target_roots=target_roots,

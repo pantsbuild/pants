@@ -31,13 +31,13 @@ class IsortPrep(Task):
     def run(self, workunit_factory, args, **kwargs):
       cmdline = ' '.join(self._pex.cmdline(args))
       with workunit_factory(cmd=cmdline) as workunit:
-        returncode = self._pex.run(args,
-                                   stdout=workunit.output('stdout'),
-                                   stderr=workunit.output('stderr'),
-                                   with_chroot=False,
-                                   blocking=True,
-                                   **kwargs)
-        return cmdline, returncode
+        exit_code = self._pex.run(args,
+                                  stdout=workunit.output('stdout'),
+                                  stderr=workunit.output('stderr'),
+                                  with_chroot=False,
+                                  blocking=True,
+                                  **kwargs)
+        return cmdline, exit_code
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -71,7 +71,10 @@ class IsortPrep(Task):
     with self.invalidated(targets=[isort_requirements]) as invalidation_check:
       interpreter = PythonInterpreter.get()
 
-      assert len(invalidation_check.all_vts) == 1, ''
+      assert len(invalidation_check.all_vts) == 1, (
+        'Expected exactly one versioned target found {}: {}'
+        .format(len(invalidation_check.all_vts), invalidation_check.all_vts)
+      )
       vt = invalidation_check.all_vts[0]
       pex_path = os.path.join(vt.results_dir, 'isort.pex')
 
