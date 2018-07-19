@@ -8,6 +8,7 @@ import os
 import re
 import xml.etree.ElementTree as ET
 from abc import abstractmethod
+from builtins import filter, next, object, str
 
 from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.build_graph.files import Files

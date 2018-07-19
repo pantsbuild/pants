@@ -120,8 +120,8 @@ class MutexTaskMixin(Task):
 
     expanded_roots = list(resolve(self.context.target_roots))
 
-    accepted = list(filter(accept_predicate, expanded_roots))
-    rejected = list(filter(reject_predicate, expanded_roots))
+    accepted = [root for root in expanded_roots if accept_predicate(root)]
+    rejected = [root for root in expanded_roots if reject_predicate(root)]
     if len(accepted) == 0:
       # no targets were accepted, regardless of rejects
       return None
