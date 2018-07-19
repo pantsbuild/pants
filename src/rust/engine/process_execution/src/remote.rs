@@ -182,6 +182,9 @@ impl super::CommandRunner for CommandRunner {
                               operations_client
                                 .get()
                                 .get_operation(&operation_request)
+                                .or_else(move |err| {
+                                  rpcerror_recover_cancelled(operation_request.take_name(), err)
+                                })
                                 .map_err(rpcerror_to_string),
                             ).map(move |operation| {
                               future::Loop::Continue((operation, iter_num + 1))
@@ -629,6 +632,27 @@ fn format_error(error: &bazel_protos::status::Status) -> String {
     None => format!("{:?}", error.get_code()),
   };
   format!("{}: {}", error_code, error.get_message())
+}
+
+///
+/// If the given operation represents a cancelled request, recover it into
+/// ExecutionError::NotFinished.
+///
+fn rpcerror_recover_cancelled(
+  operation_name: String,
+  err: grpcio::Error,
+) -> Result<bazel_protos::operations::Operation, grpcio::Error> {
+  // If the error represented cancellation, return an Operation for the given Operation name.
+  match &err {
+    &grpcio::Error::RpcFailure(ref rs) if rs.status == grpcio::RpcStatusCode::Cancelled => {
+      let mut next_operation = bazel_protos::operations::Operation::new();
+      next_operation.set_name(operation_name);
+      return Ok(next_operation);
+    }
+    _ => {}
+  }
+  // Did not represent cancellation.
+  Err(err)
 }
 
 fn rpcerror_to_string(error: grpcio::Error) -> String {
