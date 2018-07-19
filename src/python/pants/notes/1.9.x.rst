@@ -3,7 +3,12 @@
 
 This document describes releases leading up to the ``1.9.x`` ``stable`` series.
 
-1.9.0rc0 (07/18/2018)
+1.9.0rc1 (07/19/2018)
+---------------------
+
+*1.9.0rc0 failed due to a pypi error -- see `Issue 6192 <https://github.com/pantsbuild/pants/issues/6192>`.*
+
+1.9.0rc0 (07/19/2018)
 ---------------------
 
 New features
