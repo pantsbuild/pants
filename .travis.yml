@@ -61,6 +61,8 @@ stages:
 # this duplication up.
 matrix:
   include:
+
+    # Build macOS engine binary
     - os: osx
       # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
       # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
@@ -74,6 +76,7 @@ matrix:
       script:
         - ./pants --version && ./build-support/bin/release.sh -n
 
+    # Build linux engine binary
     - os: linux
       stage: Test Pants
       language: generic
@@ -100,27 +103,53 @@ matrix:
       after_failure:
         - build-support/bin/ci-failure.sh
 
+    # Rust tests
     - os: linux
+      dist: trusty
+      sudo: required
+      stage: Test Pants
       language: python
-      stage: Deploy Pants Pex
+      python: "2.7.13"
+      addons:
+        apt:
+          packages:
+            - cmake
+      before_install:
+        - sudo apt-get install -y pkg-config fuse libfuse-dev
+        - sudo modprobe fuse
+        - sudo chmod 666 /dev/fuse
+        - sudo chown root:$USER /etc/fuse.conf
       env:
-        - PANTS_PEX_RELEASE=stable
+        - SHARD="Rust Tests Linux"
+      before_script:
+        - ulimit -c unlimited
+        - ulimit -n 8192
       script:
-        - ./build-support/bin/release.sh -p
-      deploy:
-        # See https://docs.travis-ci.com/user/deployment/releases/
-        provider: releases
-        # The pantsbuild-ci-bot OAuth token, see the pantsbuild vault for details.
-        api_key:
-          secure: "u0aCsiuVGOg28YxG0sQUovuUm29kKwQfFgHbNz2TT5L+cGoHxGl4aoVOCtuwWYEtbNGmYc8/3WRS3C/jOiqQj6JEgHUzWOsnfKUObEqNhisAmXbzBbKc0wPQTL8WNK+DKFh32sD3yPYcw+a5PTLO56+o7rqlI25LK7A17WesHC4="
-        file_glob: true
-        file: dist/deploy/pex/*
-        skip_cleanup: true
-        on:
-          # We only release a pex for Pants releases, which are tagged.
-          tags: true
-          repo: pantsbuild/pants
+        - ./build-support/bin/ci.sh -bcfjklmnprtx
 
+    # Rust + platform specific
+    - os: osx
+      # Fuse actually works on this image. It hangs on many others.
+      osx_image: xcode8.3
+      stage: Test Pants
+      language: generic
+      env:
+        - SHARD="Rust + Platform-specific Tests OSX"
+        # Specifically avoid the OSX provided 2.7.10 under xcode8.3 since it returns a platform
+        # of `macosx-*-intel` where the `intel` suffix is bogus but pex has not yet been taught to
+        # deal with this. Can be removed when this issue is resolved:
+        # https://github.com/pantsbuild/pex/issues/523
+        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>2.7.10,<3']"
+      before_install:
+        - brew tap caskroom/cask && brew update && brew cask install osxfuse
+      before_script:
+        - ulimit -c unlimited
+        - ulimit -n 8192
+      script:
+        # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and set -z to run the platform-specific tests.
+        - ./build-support/bin/ci.sh -cfjklmnprtxz
+
+    # Linters
     - os: linux
       dist: trusty
       sudo: required
@@ -148,6 +177,7 @@ matrix:
       script:
         - ./build-support/bin/ci.sh -x -cejlpn 'Various pants self checks and lint'
 
+    # Unit tests - shard 1
     - os: linux
       dist: trusty
       sudo: required
@@ -175,6 +205,7 @@ matrix:
       script:
         - ./build-support/bin/ci.sh -x -efkmrcnt -u 0/2 "${SHARD}"
 
+    # Unit tests - shard 2
     - os: linux
       dist: trusty
       sudo: required
@@ -202,6 +233,7 @@ matrix:
       script:
         - ./build-support/bin/ci.sh -x -efkmrcnt -u 1/2 "${SHARD}"
 
+    # Contrib - shard 1
     - os: linux
       dist: trusty
       sudo: required
@@ -229,6 +261,7 @@ matrix:
       script:
         - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 0/2 "${SHARD}"
 
+    # Contrib - shard 2
     - os: linux
       dist: trusty
       sudo: required
@@ -256,6 +289,7 @@ matrix:
       script:
         - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 1/2 "${SHARD}"
 
+    # Integration - shard 1
     - os: linux
       dist: trusty
       sudo: required
@@ -283,6 +317,7 @@ matrix:
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 0/7 "${SHARD}"
 
+    # Integration - shard 2
     - os: linux
       dist: trusty
       sudo: required
@@ -310,6 +345,7 @@ matrix:
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 1/7 "${SHARD}"
 
+    # Integration - shard 3
     - os: linux
       dist: trusty
       sudo: required
@@ -337,6 +373,7 @@ matrix:
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 2/7 "${SHARD}"
 
+    # Integration - shard 4
     - os: linux
       dist: trusty
       sudo: required
@@ -364,6 +401,7 @@ matrix:
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 3/7 "${SHARD}"
 
+    # Integration - shard 5
     - os: linux
       dist: trusty
       sudo: required
@@ -391,6 +429,7 @@ matrix:
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 4/7 "${SHARD}"
 
+    # Integration - shard 6
     - os: linux
       dist: trusty
       sudo: required
@@ -418,6 +457,7 @@ matrix:
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 5/7 "${SHARD}"
 
+    # Integration - shard 7
     - os: linux
       dist: trusty
       sudo: required
@@ -445,50 +485,27 @@ matrix:
       script:
         - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 6/7 "${SHARD}"
 
-    # Rust tests
+    # Deploy
     - os: linux
-      dist: trusty
-      sudo: required
-      stage: Test Pants
       language: python
-      python: "2.7.13"
-      addons:
-        apt:
-          packages:
-            - cmake
-      before_install:
-        - sudo apt-get install -y pkg-config fuse libfuse-dev
-        - sudo modprobe fuse
-        - sudo chmod 666 /dev/fuse
-        - sudo chown root:$USER /etc/fuse.conf
+      stage: Deploy Pants Pex
       env:
-        - SHARD="Rust Tests Linux"
-      before_script:
-        - ulimit -c unlimited
-        - ulimit -n 8192
+        - PANTS_PEX_RELEASE=stable
       script:
-        - ./build-support/bin/ci.sh -bcfjklmnprtx
-
-    - os: osx
-      # Fuse actually works on this image. It hangs on many others.
-      osx_image: xcode8.3
-      stage: Test Pants
-      language: generic
-      env:
-        - SHARD="Rust + Platform-specific Tests OSX"
-        # Specifically avoid the OSX provided 2.7.10 under xcode8.3 since it returns a platform
-        # of `macosx-*-intel` where the `intel` suffix is bogus but pex has not yet been taught to
-        # deal with this. Can be removed when this issue is resolved:
-        # https://github.com/pantsbuild/pex/issues/523
-        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>2.7.10,<3']"
-      before_install:
-        - brew tap caskroom/cask && brew update && brew cask install osxfuse
-      before_script:
-        - ulimit -c unlimited
-        - ulimit -n 8192
-      script:
-        # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and set -z to run the platform-specific tests.
-        - ./build-support/bin/ci.sh -cfjklmnprtxz
+        - ./build-support/bin/release.sh -p
+      deploy:
+        # See https://docs.travis-ci.com/user/deployment/releases/
+        provider: releases
+        # The pantsbuild-ci-bot OAuth token, see the pantsbuild vault for details.
+        api_key:
+          secure: "u0aCsiuVGOg28YxG0sQUovuUm29kKwQfFgHbNz2TT5L+cGoHxGl4aoVOCtuwWYEtbNGmYc8/3WRS3C/jOiqQj6JEgHUzWOsnfKUObEqNhisAmXbzBbKc0wPQTL8WNK+DKFh32sD3yPYcw+a5PTLO56+o7rqlI25LK7A17WesHC4="
+        file_glob: true
+        file: dist/deploy/pex/*
+        skip_cleanup: true
+        on:
+          # We only release a pex for Pants releases, which are tagged.
+          tags: true
+          repo: pantsbuild/pants
 
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/s3/
