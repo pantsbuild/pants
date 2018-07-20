@@ -24,6 +24,7 @@ python_library(
 python_native_code_test_files = [
   'test_build_local_python_distributions.py',
   'test_python_distribution_integration.py',
+  'test_ctypes.py',
   'test_ctypes_integration.py',
 ]
 
@@ -35,12 +36,14 @@ python_tests(
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/native',
+    'src/python/pants/backend/native/targets',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
+    'tests/python/pants_test/backend/python/tasks/util',
     'tests/python/pants_test/engine:scheduler_test_base',
   ],
   tags={'platform_specific_behavior', 'integration'},
