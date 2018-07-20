@@ -12,7 +12,6 @@ from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_compile import NativeTargetDependencies, ObjectFiles
 from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFetch
 from pants.backend.native.tasks.native_task import NativeTask
-from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.collections import assert_single_element
@@ -186,7 +185,6 @@ class LinkSharedLibraries(NativeTask):
                                              native_artifact.as_shared_lib(self.platform))
     self.context.log.debug("resulting_shared_lib_path: {}".format(resulting_shared_lib_path))
     # We are executing in the results_dir, so get absolute paths for everything.
-    buildroot = get_buildroot()
     cmd = ([linker.exe_filename] +
            self.platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS) +
            linker.extra_args +
