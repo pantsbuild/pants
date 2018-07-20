@@ -267,17 +267,17 @@ class ClasspathProducts(object):
           # increasing `index` to avoid name collisions.
           _, ext = os.path.splitext(entry.path2)
           symlink_path = '{}{}{}'.format(classpath_prefix_for_target, index, ext)
-          real_entry_path = os.path.realpath(entry.path)
+          real_entry_path = os.path.realpath(entry.path2)
           if not os.path.exists(real_entry_path):
             raise MissingClasspathEntryError('Could not find {realpath} when attempting to link '
                                              '{src} into {dst}'
-                                             .format(realpath=real_entry_path, src=entry.path, dst=symlink_path))
+                                             .format(realpath=real_entry_path, src=entry.path2, dst=symlink_path))
 
           os.symlink(real_entry_path, symlink_path)
           canonical_classpath.append(symlink_path)
 
         if save_classpath_file:
-          classpath = [entry.path for entry in classpath_entries_for_target]
+          classpath = [entry.path2 for entry in classpath_entries_for_target]
           with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'wb') as classpath_file:
             classpath_file.write(os.pathsep.join(classpath).encode('utf-8'))
             classpath_file.write('\n')
