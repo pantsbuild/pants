@@ -15,6 +15,7 @@ from textwrap import dedent
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy, IvyTaskMixin
 from pants.backend.jvm.tasks.jar_task import JarTask
 from pants.base.exceptions import TaskError
@@ -259,7 +260,8 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       shaded_jar = os.path.join(self._tool_cache_path, 'shaded_jars', jar_name)
 
       if not invalidation_check.invalid_vts and os.path.exists(shaded_jar):
-        return [shaded_jar]
+        # TODO: directory_digest
+        return [ClasspathEntry(shaded_jar, None)]
 
       # Ensure we have a single binary jar we can shade.
       binary_jar = os.path.join(self._tool_cache_path, 'binary_jars', jar_name)
@@ -267,11 +269,11 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
 
       classpath = self._bootstrap_classpath(jvm_tool, targets)
       if len(classpath) == 1:
-        shutil.copy(classpath[0], binary_jar)
+        shutil.copy(classpath[0].path2, binary_jar)
       else:
         with self.open_jar(binary_jar) as jar:
-          for classpath_jar in classpath:
-            jar.writejar(classpath_jar)
+          for classpath_entry in classpath:
+            jar.writejar(classpath_entry.path2)
           jar.main(jvm_tool.main)
 
       # Now shade the binary jar and return that single jar as the safe tool classpath.
@@ -303,7 +305,8 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       if self.artifact_cache_writes_enabled():
         self.update_artifact_cache([(tool_vts, [shaded_jar])])
 
-      return [shaded_jar]
+      # TODO: directory_digest
+      return [ClasspathEntry(shaded_jar, None)]
 
   def check_artifact_cache_for(self, invalidation_check):
     tool_vts = self.tool_vts(invalidation_check)
@@ -317,9 +320,11 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
   def _bootstrap_jvm_tool(self, dep_spec, jvm_tool):
     targets = self._resolve_tool_targets(dep_spec, jvm_tool)
     if jvm_tool.main is None:
-      return self._bootstrap_classpath(jvm_tool, targets)
+      r =  self._bootstrap_classpath(jvm_tool, targets)
+      return r
     else:
-      return self._bootstrap_shaded_jvm_tool(jvm_tool, targets)
+      r = self._bootstrap_shaded_jvm_tool(jvm_tool, targets)
+      return r
 
   def cached_bootstrap_classpath_callback(self, dep_spec, jvm_tool):
     cache = {}
