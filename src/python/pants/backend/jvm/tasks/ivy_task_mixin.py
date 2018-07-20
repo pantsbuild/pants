@@ -12,6 +12,7 @@ from pants.backend.jvm.ivy_utils import NO_RESOLVE_RUN_RESULT, IvyFetchStep, Ivy
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
@@ -164,7 +165,7 @@ class IvyTaskMixin(TaskBase):
     :type targets: collection.Iterable
     """
     result = self._ivy_resolve(targets, silent=silent, workunit_name=workunit_name)
-    return result.resolved_artifact_paths
+    return [ClasspathEntry(path, None) for path in result.resolved_artifact_paths]
 
   def _resolve_subset(self, executor, targets, classpath_products, confs=None, extra_args=None,
               invalidate_dependents=False, pinned_artifacts=None):
