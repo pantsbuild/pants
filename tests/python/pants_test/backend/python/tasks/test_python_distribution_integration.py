@@ -196,12 +196,8 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     # we need to setup a pants.ini that contains two platform defauts:
     # (1) "current" and (2) a different platform than the one we are currently
     # running on. The test target below has `platforms=("current")`.
-    non_current_platform = None
     platform_string = Platform.create().normalized_os_name
-    if platform_string == 'darwin':
-      non_current_platform_string = 'linux-x86_64'
-    else:
-      non_current_platform_string = 'macosx-10.12-x86_64-x86_64'
+    non_current_platform_string = 'macosx-10.12-x86_64-x86_64' if platform_string == 'darwin' else 'linux-x86_64'
     pants_ini_config = {'python-setup': {'platforms': ["current", non_current_platform_string]}}
 
     # Clean all to rebuild requirements pex.
