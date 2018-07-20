@@ -109,7 +109,7 @@ matrix:
       # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
       osx_image: xcode8
       env:
-        - SHARD="OSX Native Engine Binary Builder"
+        - SHARD="OSX Wheel Builder"
       script:
         - ./pants --version && ./build-support/bin/release.sh -n
 
@@ -120,7 +120,7 @@ matrix:
       services:
         - docker
       env:
-        - SHARD="Linux Native Engine Binary Builder"
+        - SHARD="Linux Wheel Builder"
       before_script:
         - ulimit -c unlimited
       script:
@@ -139,11 +139,13 @@ matrix:
       after_failure:
         - build-support/bin/ci-failure.sh
 
-    # Build and deploy an OSX / Linux Pants pex to S3.
+    # Build and deploy an OSX & Linux multi-platform Pants pex to S3.
     - <<: *s3_deploy_config
       stage: Build Pants Pex
       os: linux
       language: python
+      env:
+        - SHARD="Multiplatform Pants pex Builder"
       script:
         - ./build-support/bin/release.sh -p
       before_deploy:
@@ -228,7 +230,7 @@ matrix:
       os: osx
       language: generic
       env:
-        - SHARD="Platform-specific Tests OSX"
+        - SHARD="Platform-specific tests for OSX"
         # Specifically avoid the OSX provided 2.7.10 under xcode8.3 since it returns a platform
         # of `macosx-*-intel` where the `intel` suffix is bogus but pex has not yet been taught to
         # deal with this. Can be removed when this issue is resolved:
@@ -255,7 +257,7 @@ matrix:
         - sudo chmod 666 /dev/fuse
         - sudo chown root:$USER /etc/fuse.conf
       env:
-        - SHARD="Rust Tests Linux & fs_util S3 deploy"
+        - SHARD="Rust tests for Linux & fs_util S3 deploy"
       before_script:
         - ulimit -c unlimited
         - ulimit -n 8192
@@ -270,7 +272,7 @@ matrix:
       osx_image: xcode8.3
       language: generic
       env:
-        - SHARD="Rust Tests OSX & fs_util S3 deploy"
+        - SHARD="Rust tests for OSX & fs_util S3 deploy"
       before_install:
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
       before_script:
