@@ -12,6 +12,7 @@ from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_compile import NativeTargetDependencies, ObjectFiles
 from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFetch
 from pants.backend.native.tasks.native_task import NativeTask
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.collections import assert_single_element
@@ -28,11 +29,14 @@ class LinkSharedLibraryRequest(datatype([
     'object_files',
     'native_artifact',
     'output_dir',
+    # This may be None!
     'external_libs_info'
 ])): pass
 
 
 class LinkSharedLibraries(NativeTask):
+
+  options_scope = 'link-shared-libraries'
 
   @classmethod
   def product_types(cls):
@@ -43,7 +47,7 @@ class LinkSharedLibraries(NativeTask):
     super(LinkSharedLibraries, cls).prepare(options, round_manager)
     round_manager.require(NativeTargetDependencies)
     round_manager.require(ObjectFiles)
-    round_manager.require(NativeExternalLibraryFetch.NativeExternalLibraryFiles)
+    round_manager.optional_product(NativeExternalLibraryFetch.NativeExternalLibraryFiles)
 
   @property
   def cache_target_dirs(self):
@@ -89,7 +93,8 @@ class LinkSharedLibraries(NativeTask):
     native_target_deps_product = self.context.products.get(NativeTargetDependencies)
     compiled_objects_product = self.context.products.get(ObjectFiles)
     shared_libs_product = self.context.products.get(SharedLibrary)
-    external_libs_product = self.context.products.get_data(NativeExternalLibraryFetch.NativeExternalLibraryFiles)
+    external_libs_product = self.context.products.get_data(
+      NativeExternalLibraryFetch.NativeExternalLibraryFiles)
 
     all_shared_libs_by_name = {}
 
@@ -160,6 +165,13 @@ class LinkSharedLibraries(NativeTask):
     'linux': lambda: ['-shared'],
   }
 
+  def _get_third_party_lib_args(self, link_request):
+    ext_libs = link_request.external_libs_info
+    if not ext_libs:
+      return []
+
+    return ext_libs.get_third_party_lib_args()
+
   def _execute_link_request(self, link_request):
     object_files = link_request.object_files
 
@@ -172,11 +184,13 @@ class LinkSharedLibraries(NativeTask):
     output_dir = link_request.output_dir
     resulting_shared_lib_path = os.path.join(output_dir,
                                              native_artifact.as_shared_lib(self.platform))
+    self.context.log.debug("resulting_shared_lib_path: {}".format(resulting_shared_lib_path))
     # We are executing in the results_dir, so get absolute paths for everything.
+    buildroot = get_buildroot()
     cmd = ([linker.exe_filename] +
            self.platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS) +
            linker.extra_args +
-           link_request.external_libs_info.get_third_party_lib_args() +
+           self._get_third_party_lib_args(link_request) +
            ['-o', os.path.abspath(resulting_shared_lib_path)] +
            [os.path.abspath(obj) for obj in object_files])
     self.context.log.debug("linker command: {}".format(cmd))

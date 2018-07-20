@@ -64,7 +64,7 @@ class NativeCompile(NativeTask, AbstractClass):
   @classmethod
   def prepare(cls, options, round_manager):
     super(NativeCompile, cls).prepare(options, round_manager)
-    round_manager.require(NativeExternalLibraryFetch.NativeExternalLibraryFiles)
+    round_manager.optional_data(NativeExternalLibraryFetch.NativeExternalLibraryFiles)
 
   @property
   def cache_target_dirs(self):
@@ -195,6 +195,9 @@ class NativeCompile(NativeTask, AbstractClass):
     return self.get_compiler()
 
   def _get_third_party_include_dirs(self, external_libs_product):
+    if not external_libs_product:
+      return []
+
     directory = external_libs_product.include_dir
     return [directory] if directory else []
 
@@ -221,13 +224,17 @@ class NativeCompile(NativeTask, AbstractClass):
 
     # We are going to execute in the target output, so get absolute paths for everything.
     # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
+    buildroot = get_buildroot()
     argv = (
       [compiler.exe_filename] +
       compiler.extra_args +
       err_flags +
       ['-c', '-fPIC'] +
-      ['-I{}'.format(os.path.abspath(inc_dir)) for inc_dir in compile_request.include_dirs] +
-      [os.path.abspath(src) for src in compile_request.sources])
+      [
+        '-I{}'.format(os.path.join(buildroot, inc_dir))
+        for inc_dir in compile_request.include_dirs
+      ] +
+      [os.path.join(buildroot, src) for src in compile_request.sources])
 
     self.context.log.debug("compile argv: {}".format(argv))
 

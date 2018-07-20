@@ -15,6 +15,8 @@ from pants.util.objects import SubclassesOf
 
 class CCompile(NativeCompile):
 
+  options_scope = 'c-compile'
+
   # Compile only C library targets.
   source_target_constraint = SubclassesOf(CLibrary)
 
