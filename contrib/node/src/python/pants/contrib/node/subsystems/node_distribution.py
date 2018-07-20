@@ -77,7 +77,7 @@ class NodeDistribution(NativeTool):
     if not package_manager_obj:
       raise TaskError(
         'Unknown package manager: {}.\nValid values are {}.'.format(
-          package_manager, NodeDistribution.VALID_PACKAGE_MANAGER_LIST.keys()
+          package_manager, list(NodeDistribution.VALID_PACKAGE_MANAGER_LIST.keys())
       ))
     return package_manager_obj
 
