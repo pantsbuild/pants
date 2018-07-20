@@ -5,6 +5,7 @@ python_library(
   name = 'mock_logger',
   sources = globs('mock_logger.py'),
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/reporting',
   ],
 )
