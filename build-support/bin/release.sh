@@ -221,6 +221,25 @@ function build_pants_packages() {
   pants_version_reset
 }
 
+function build_fs_util() {
+  start_travis_section "fs_util" "Building fs_util binary"
+  # fs_util is a standalone tool which can be used to inspect and manipulate
+  # Pants's engine's file store, and interact with content addressable storage
+  # services which implement the Bazel remote execution API.
+  # It is a useful standalone tool which people may want to consume, for
+  # instance when debugging pants issues, or if they're implementing a remote
+  # execution API.
+  (
+    set -e
+    RUST_BACKTRACE=1 "${ROOT}/build-support/bin/native/cargo" build --release \
+      --manifest-path="${ROOT}/src/rust/engine/fs/fs_util/Cargo.toml"
+    dst_dir="${DEPLOY_DIR}/bin/fs_util/$("${ROOT}/build-support/bin/get_os.sh")/${version}"
+    mkdir -p "${dst_dir}"
+    cp "${ROOT}/src/rust/engine/target/release/fs_util" "${dst_dir}/"
+  ) || die "Failed to build fs_util"
+  end_travis_section
+}
+
 function activate_tmp_venv() {
   VENV_DIR=$(mktemp -d -t pants.XXXXX) && \
   ${ROOT}/build-support/virtualenv $VENV_DIR && \
@@ -653,9 +672,10 @@ function usage() {
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.org/release.html"
   echo
-  echo "Usage: $0 [-d] [-c] (-h|-s|-n|-t|-l|-o|-e|-f|-p)"
+  echo "Usage: $0 [-d] [-c] (-h|-u|-s|-n|-t|-l|-o|-e|-f|-p)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
+  echo " -u  Build fs_util."
   echo " -s  Performs a release dry run."
   echo "       All package distributions will be built."
   echo " -n  Performs a release dry run with sanity checks that dists install and run."
@@ -681,10 +701,11 @@ function usage() {
   fi
 }
 
-while getopts "hdsntcloefpqw" opt; do
+while getopts "hdusntcloefpqw" opt; do
   case ${opt} in
     h) usage ;;
     d) debug="true" ;;
+    u) do_build_fs_util="true" ;;
     s) do_dry_run="true" ;;
     n) do_dry_run_install="true" ;;
     t) test_release="true" ;;
@@ -719,6 +740,12 @@ elif [[ "${do_dry_run_install}" == "true" ]]; then
     dry_run_install && \
     banner "Dry run release and install succeeded"
   ) || die "Dry run release and install failed."
+elif [[ "${do_build_fs_util}" == "true" ]]; then
+  banner "Building fs_util" && \
+  (
+    build_fs_util && \
+    banner "Building fs_util succeeded"
+  ) || die "Building fs_util failed."
 elif [[ "${test_release}" == "true" ]]; then
   banner "Installing and testing the latest released packages" && \
   (

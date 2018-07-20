@@ -223,8 +223,23 @@ matrix:
       script:
         - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 6/7"
 
-    # Test rust code on Linux.
+    # Run OSX platform-specific tests.
     - stage: Test Pants
+      os: osx
+      language: generic
+      env:
+        - SHARD="Platform-specific Tests OSX"
+        # Specifically avoid the OSX provided 2.7.10 under xcode8.3 since it returns a platform
+        # of `macosx-*-intel` where the `intel` suffix is bogus but pex has not yet been taught to
+        # deal with this. Can be removed when this issue is resolved:
+        # https://github.com/pantsbuild/pex/issues/523
+        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>2.7.10,<3']"
+      script:
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -cfjklmnprtxz"
+
+    # Test rust code on Linux.
+    - <<: *s3_deploy_config
+      stage: Test Pants
       os: linux
       dist: trusty
       sudo: required
@@ -240,33 +255,30 @@ matrix:
         - sudo chmod 666 /dev/fuse
         - sudo chown root:$USER /etc/fuse.conf
       env:
-        - SHARD="Rust Tests Linux"
+        - SHARD="Rust Tests Linux & fs_util S3 deploy"
       before_script:
         - ulimit -c unlimited
         - ulimit -n 8192
       script:
-        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -bcfjklmnprtx"
+        - "./build-support/bin/ci.sh -bcfjklmnprtx"
+        - "./build-support/bin/release.sh -u"
 
-    # Test rust code on OSX and runn OSX platform-specific tests.
-    - stage: Test Pants
+    # Test rust code on OSX.
+    - <<: *s3_deploy_config
       os: osx
       # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.3
       language: generic
       env:
-        - SHARD="Rust + Platform-specific Tests OSX"
-        # Specifically avoid the OSX provided 2.7.10 under xcode8.3 since it returns a platform
-        # of `macosx-*-intel` where the `intel` suffix is bogus but pex has not yet been taught to
-        # deal with this. Can be removed when this issue is resolved:
-        # https://github.com/pantsbuild/pex/issues/523
-        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>2.7.10,<3']"
+        - SHARD="Rust Tests OSX & fs_util S3 deploy"
       before_install:
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
       before_script:
         - ulimit -c unlimited
         - ulimit -n 8192
       script:
-        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -cfjklmnprtxz"
+        - "./build-support/bin/ci.sh -bcfjklmnprtx"
+        - "./build-support/bin/release.sh -u"
 
     # Deploy the OSX / Linux Pants pex saved in S3 to Github releases.
     - stage: Deploy Pants Pex
