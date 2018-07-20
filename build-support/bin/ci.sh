@@ -13,11 +13,9 @@ function usage() {
   cat <<EOF
 Runs commons tests for local or hosted CI.
 
-Usage: $0 (-h|-fxbkmsrjlpuyncia)
+Usage: $0 (-h|-fbkmrjlpuneycitz)
  -h           print out this help message
  -f           skip python code formatting checks
- -x           skip bootstrap clean-all (assume bootstrapping from a
-              fresh clone)
  -b           skip bootstrapping pants from local sources
  -k           skip bootstrapped pants self compile check
  -m           skip sanity checks of bootstrapped pants and repo BUILD
@@ -61,11 +59,10 @@ python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
 
-while getopts "hfxbkmrjlpeu:ny:ci:tz" opt; do
+while getopts "hfbkmrjlpu:ney:ci:tz" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_pre_commit_checks="true" ;;
-    x) skip_bootstrap_clean="true" ;;
     b) skip_bootstrap="true" ;;
     k) bootstrap_compile_args=() ;;
     m) skip_sanity_checks="true" ;;
@@ -74,8 +71,8 @@ while getopts "hfxbkmrjlpeu:ny:ci:tz" opt; do
     l) skip_internal_backends="true" ;;
     p) skip_python="true" ;;
     u) python_unit_shard=${OPTARG} ;;
-    e) skip_rust_tests="true" ;;
     n) skip_contrib="true" ;;
+    e) skip_rust_tests="true" ;;
     y) python_contrib_shard=${OPTARG} ;;
     c) skip_integration="true" ;;
     i) python_intg_shard=${OPTARG} ;;
@@ -106,16 +103,21 @@ if [[ "${skip_pre_commit_checks:-false}" == "false" ]]; then
   end_travis_section
 fi
 
+PANTS_COMMAND=./pants
+
 if [[ "${skip_bootstrap:-false}" == "false" ]]; then
   start_travis_section "Bootstrap" "Bootstrapping pants"
   (
-    if [[ "${skip_bootstrap_clean:-false}" == "false" ]]; then
-      ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
+    pants_pex="./pants.pex"
+    if [[ ! -x "${pants_pex}" ]]; then
+      "${PANTS_COMMAND}" ${bootstrap_compile_args[@]} binary \
+        src/python/pants/bin:pants_local_binary && \
+      mv dist/pants_local_binary.pex "${pants_pex}"
     fi
-    ./pants ${bootstrap_compile_args[@]} binary \
-      src/python/pants/bin:pants_local_binary && \
-    mv dist/pants_local_binary.pex pants.pex && \
-    ./pants.pex -V
+
+    PANTS_COMMAND="${pants_pex}"
+    "${PANTS_COMMAND}" --version
+    echo "Using pants command: ${PANTS_COMMAND}"
   ) || die "Failed to bootstrap pants."
   end_travis_section
 fi
@@ -132,7 +134,7 @@ if [[ "${skip_sanity_checks:-false}" == "false" ]]; then
     "targets"
   )
   for cur_test in "${sanity_tests[@]}"; do
-    cmd="./pants.pex ${cur_test}"
+    cmd="${PANTS_COMMAND} ${cur_test}"
     echo "* Executing command '${cmd}' as a sanity test"
     ${cmd} >/dev/null 2>&1 || die "Failed to execute '${cmd}'."
   done
@@ -142,7 +144,7 @@ fi
 if [[ "${skip_lint:-false}" == "false" ]]; then
   start_travis_section "Lint" "Running lint checks"
   (
-    ./pants.pex --tag=-nolint lint contrib:: examples:: src:: tests:: zinc::
+    ${PANTS_COMMAND} --tag=-nolint lint contrib:: examples:: src:: tests:: zinc::
   ) || die "Lint check failure"
   end_travis_section
 fi
@@ -156,7 +158,7 @@ fi
 if [[ "${skip_jvm:-false}" == "false" ]]; then
   start_travis_section "CoreJVM" "Running core jvm tests"
   (
-    ./pants.pex doc test {src,tests}/{java,scala}:: zinc::
+    ${PANTS_COMMAND} doc test {src,tests}/{java,scala}:: zinc::
   ) || die "Core jvm test failure"
   end_travis_section
 fi
@@ -164,7 +166,7 @@ fi
 if [[ "${skip_internal_backends:-false}" == "false" ]]; then
   start_travis_section "BackendTests" "Running internal backend python tests"
   (
-    ./pants.pex test.pytest \
+    ${PANTS_COMMAND} test.pytest \
     pants-plugins/tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Internal backend python test failure"
   end_travis_section
@@ -176,7 +178,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   fi
   start_travis_section "CoreTests" "Running core python tests${shard_desc}"
   (
-    ./pants.pex --tag='-integration' test.pytest --chroot \
+    ${PANTS_COMMAND} --tag='-integration' test.pytest --chroot \
       --test-pytest-test-shard=${python_unit_shard} \
       tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Core python test failure"
@@ -189,7 +191,7 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
   fi
   start_travis_section "ContribTests" "Running contrib python tests${shard_desc}"
   (
-    ./pants.pex --exclude-target-regexp='.*/testprojects/.*' test.pytest \
+    ${PANTS_COMMAND} --exclude-target-regexp='.*/testprojects/.*' test.pytest \
     --test-pytest-test-shard=${python_contrib_shard} \
     contrib:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Contrib python test failure"
@@ -218,7 +220,7 @@ if [[ "${test_platform_specific_behavior:-false}" == 'true' ]]; then
   start_travis_section "Platform-specific tests" \
                        "Running platform-specific testing on platform: $(uname)"
   (
-    ./pants.pex --tag='+platform_specific_behavior' test \
+    ${PANTS_COMMAND} --tag='+platform_specific_behavior' test \
                 tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Pants platform-specific test failure"
   end_travis_section
@@ -231,7 +233,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   fi
   start_travis_section "IntegrationTests" "Running Pants Integration tests${shard_desc}"
   (
-    ./pants.pex --tag='+integration' test.pytest \
+    ${PANTS_COMMAND} --tag='+integration' test.pytest \
       --test-pytest-test-shard=${python_intg_shard} \
       tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Pants Integration test failure"
