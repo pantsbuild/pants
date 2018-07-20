@@ -28,6 +28,8 @@ readonly DEPLOY_PANTS_WHEELS_PATH="wheels/pantsbuild.pants/${HEAD_SHA}"
 readonly DEPLOY_3RDPARTY_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_3RDPARTY_WHEELS_PATH}"
 readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
 
+readonly MULTIPLATFORM_PEX_NAME="pants.${PANTS_UNSTABLE_VERSION}.pex"
+
 # A space-separated list of pants packages to include in any pexes that are built: by default,
 # only pants core is included.
 : ${PANTS_PEX_PACKAGES:="pantsbuild.pants"}
@@ -561,12 +563,10 @@ function build_pex() {
       esac
       local platforms=("${platform}")
       local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.pex"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.pex"
       ;;
     fetch)
       local platforms=("${linux_platform}" "${osx_platform}")
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.pex"
+      local dest="${ROOT}/dist/${MULTIPLATFORM_PEX_NAME}"
       ;;
     *)
       echo >&2 "Bad build_pex mode ${mode}"
@@ -584,8 +584,6 @@ function build_pex() {
     build_3rdparty_packages "${PANTS_UNSTABLE_VERSION}"
   fi
 
-  activate_tmp_venv && trap deactivate RETURN && pip install "pex==1.4.3" || die "Failed to install pex."
-
   local requirements=()
   for pkg_name in $PANTS_PEX_PACKAGES; do
     requirements=("${requirements[@]}" "${pkg_name}==${PANTS_UNSTABLE_VERSION}")
@@ -596,23 +594,44 @@ function build_pex() {
     platform_flags=("${platform_flags[@]}" "--platform=${platform}")
   done
 
-  pex \
-    -o "${dest}" \
-    --entry-point="pants.bin.pants_loader:main" \
-    --no-build \
-    --no-pypi \
-    --disable-cache \
-    "${platform_flags[@]}" \
-    -f "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
-    -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
-    "${requirements[@]}"
+  (
+    PEX_VERSION=1.4.4
+    PEX_PEX=pex27
 
-  if [[ "${PANTS_PEX_RELEASE}" == "stable" ]]; then
-    mkdir -p "$(dirname "${stable_dest}")"
-    cp "${dest}" "${stable_dest}"
-  fi
+    cd $(mktemp -d -t build_pex.XXXXX)
+    trap "rm -rf $(pwd -P)" EXIT
 
+    curl -sSL https://github.com/pantsbuild/pex/releases/download/v${PEX_VERSION}/${PEX_PEX} -O
+    chmod +x ./${PEX_PEX}
+
+    ./${PEX_PEX} \
+      -o "${dest}" \
+      --entry-point="pants.bin.pants_loader:main" \
+      --no-build \
+      --no-pypi \
+      --disable-cache \
+      "${platform_flags[@]}" \
+      -f "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
+      -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
+      "${requirements[@]}"
+  )
   banner "Successfully built ${dest}"
+}
+
+function fetch_pex() {
+  local -r dest="${ROOT}/dist/${MULTIPLATFORM_PEX_NAME}"
+  mkdir -p "$(dirname "${dest}")"
+
+  curl -sSL "${BINARY_BASE_URL}/${MULTIPLATFORM_PEX_NAME}" > "${dest}"
+  if [[ "${PANTS_PEX_RELEASE}" == "stable" ]]; then
+    local -r stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.pex"
+    mkdir -p "$(dirname "${stable_dest}")"
+
+    cp "${dest}" "${stable_dest}"
+    echo "${stable_dest}"
+  else
+    echo "${dest}"
+  fi
 }
 
 function publish_packages() {
@@ -658,6 +677,7 @@ function usage() {
   echo " -l  Lists all pantsbuild packages that this script releases."
   echo " -o  Lists all pantsbuild package owners."
   echo " -e  Check that wheels are prebuilt for this release."
+  echo " -f  Fetch the prebuilt pex for this release and print its path."
   echo " -p  Build a pex from prebuilt wheels for this release."
   echo " -q  Build a pex which only works on the host platform, using the code as exists on disk."
   echo
@@ -670,7 +690,7 @@ function usage() {
   fi
 }
 
-while getopts "hdntcloepqw" opt; do
+while getopts "hdntcloefpqw" opt; do
   case ${opt} in
     h) usage ;;
     d) debug="true" ;;
@@ -679,6 +699,7 @@ while getopts "hdntcloepqw" opt; do
     l) run_local_pants -q run src/python/pants/releases:packages -- list ; exit $? ;;
     o) run_local_pants -q run src/python/pants/releases:packages -- list-owners ; exit $? ;;
     e) fetch_and_check_prebuilt_wheels ; exit $? ;;
+    f) fetch_pex ; exit $? ;;
     p) build_pex fetch ; exit $? ;;
     q) build_pex build ; exit $? ;;
     w) list_prebuilt_wheels ; exit $? ;;

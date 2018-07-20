@@ -53,11 +53,14 @@ cache:
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
+  - Build Wheels
+  - Build Pants Pex
   - Test Pants
   - name: Deploy Pants Pex
     if: tag IS present AND tag =~ ^release_.*$
 
 default_test_config: &default_test_config
+  stage: Test Pants
   os: linux
   dist: trusty
   sudo: required
@@ -71,7 +74,6 @@ default_test_config: &default_test_config
         - python-dev
         - openssl
         - libssl-dev
-  stage: Test Pants
   language: python
   python: "2.7.13"
   before_install:
@@ -81,32 +83,49 @@ default_test_config: &default_test_config
     - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
     - jdk_switcher use oraclejdk8
 
+s3_deploy_config: &s3_deploy_config
+  language: generic
+  deploy:
+    # See: https://docs.travis-ci.com/user/deployment/s3/
+    provider: s3
+    access_key_id: AKIAIWOKBXVU3JLY6EGQ
+    secret_access_key:
+      secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM=
+    bucket: binaries.pantsbuild.org
+    local_dir: dist/deploy
+    # Otherwise travis will stash dist/deploy and the deploy will fail.
+    skip_cleanup: true
+    acl: public_read
+    on:
+      # NB: We mainly want deploys for `master` commits; but we also need new binaries for stable
+      # release branches; eg `1.3.x`
+      all_branches: true
+      repo: pantsbuild/pants
+
 matrix:
   include:
 
-    # Build macOS engine
-    - os: osx
+    # Build and deploy macOS wheels to S3.
+    - <<: *s3_deploy_config
+      stage: Build Wheels
+      os: osx
       # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
       # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
       # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
       osx_image: xcode8
-      stage: Test Pants
-      language: generic
       env:
         - SHARD="OSX Native Engine Binary Builder"
-        - PREPARE_DEPLOY=1
       script:
         - ./pants --version && ./build-support/bin/release.sh -n
 
-    # Build Linux engine
-    - os: linux
-      stage: Test Pants
-      language: generic
+    # Build and deploy Linux wheels to S3.
+    - <<: *s3_deploy_config
+      stage: Build Wheels
+      os: linux
       services:
         - docker
       env:
         - SHARD="Linux Native Engine Binary Builder"
-        - PREPARE_DEPLOY=1
       before_script:
         - ulimit -c unlimited
       script:
@@ -125,105 +144,95 @@ matrix:
       after_failure:
         - build-support/bin/ci-failure.sh
 
-    # Deploy Pex
-    - os: linux
+    # Build and deploy an OSX / Linux Pants pex to S3.
+    - <<: *s3_deploy_config
+      stage: Build Pants Pex
+      os: linux
       language: python
-      stage: Deploy Pants Pex
-      env:
-        - PANTS_PEX_RELEASE=stable
       script:
         - ./build-support/bin/release.sh -p
-      deploy:
-        # See https://docs.travis-ci.com/user/deployment/releases/
-        provider: releases
-        # The pantsbuild-ci-bot OAuth token, see the pantsbuild vault for details.
-        api_key:
-          secure: "u0aCsiuVGOg28YxG0sQUovuUm29kKwQfFgHbNz2TT5L+cGoHxGl4aoVOCtuwWYEtbNGmYc8/3WRS3C/jOiqQj6JEgHUzWOsnfKUObEqNhisAmXbzBbKc0wPQTL8WNK+DKFh32sD3yPYcw+a5PTLO56+o7rqlI25LK7A17WesHC4="
-        file_glob: true
-        file: dist/deploy/pex/*
-        skip_cleanup: true
-        on:
-          # We only release a pex for Pants releases, which are tagged.
-          tags: true
-          repo: pantsbuild/pants
+      before_deploy:
+        # Wheels were downloaded to dist/deploy from S3 and we don't to re-upload them to S3, but
+        # we do want to upload the pex so shuffle dist/deploy/ contents pre-deploy.
+        - "rm -rf dist/deploy && mkdir -p dist/deploy && mv dist/pants.*.pex dist/deploy/"
 
     - <<: *default_test_config
       env:
         - SHARD="Various pants self checks and lint"
       script:
-        - ./build-support/bin/ci.sh -x -cejlpn 'Various pants self checks and lint'
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -cejlpn"
 
     - <<: *default_test_config
       env:
         - SHARD="Unit tests for pants and pants-plugins - shard 1"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcnt -u 0/2 "${SHARD}"
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrcnt -u 0/2"
 
     - <<: *default_test_config
       env:
         - SHARD="Unit tests for pants and pants-plugins - shard 2"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcnt -u 1/2 "${SHARD}"
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrcnt -u 1/2"
 
     - <<: *default_test_config
       env:
         - SHARD="Python contrib tests - shard 1"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 0/2 "${SHARD}"
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrcjlpt -y 0/2"
 
     - <<: *default_test_config
       env:
         - SHARD="Python contrib tests - shard 2"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 1/2 "${SHARD}"
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrcjlpt -y 1/2"
 
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 1"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 0/7 "${SHARD}"
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 0/7"
 
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 2"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 1/7 "${SHARD}"
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 1/7"
 
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 3"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 2/7 "${SHARD}"
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 2/7"
 
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 4"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 3/7 "${SHARD}"
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 3/7"
 
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 5"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 4/7 "${SHARD}"
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 4/7"
 
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 6"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 5/7 "${SHARD}"
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 5/7"
 
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 7"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 6/7 "${SHARD}"
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 6/7"
 
-    # Rust on linux
-    - os: linux
+    # Test rust code on Linux.
+    - stage: Test Pants
+      os: linux
       dist: trusty
       sudo: required
-      stage: Test Pants
       language: python
       python: "2.7.13"
       addons:
@@ -241,13 +250,13 @@ matrix:
         - ulimit -c unlimited
         - ulimit -n 8192
       script:
-        - ./build-support/bin/ci.sh -bcfjklmnprtx
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -bcfjklmnprtx"
 
-    # Rust on macOS
-    - os: osx
+    # Test rust code on OSX and runn OSX platform-specific tests.
+    - stage: Test Pants
+      os: osx
       # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.3
-      stage: Test Pants
       language: generic
       env:
         - SHARD="Rust + Platform-specific Tests OSX"
@@ -263,25 +272,29 @@ matrix:
         - ulimit -n 8192
       script:
         # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and set -z to run the platform-specific tests.
-        - ./build-support/bin/ci.sh -cfjklmnprtxz
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -cfjklmnprtxz"
 
-deploy:
-  # See: https://docs.travis-ci.com/user/deployment/s3/
-  provider: s3
-  access_key_id: AKIAIWOKBXVU3JLY6EGQ
-  secret_access_key:
-    secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM=
-  bucket: binaries.pantsbuild.org
-  local_dir: dist/deploy
-  # Otherwise travis will stash dist/deploy and the deploy will fail.
-  skip_cleanup: true
-  acl: public_read
-  on:
-    condition: $PREPARE_DEPLOY = 1
-    # NB: We mainly want deploys for `master` commits; but we also need new binaries for stable
-    # release branches; eg `1.3.x`
-    all_branches: true
-    repo: pantsbuild/pants
+    # Deploy the OSX / Linux Pants pex saved in S3 to Github releases.
+    - stage: Deploy Pants Pex
+      os: linux
+      language: generic
+      env:
+        - PANTS_PEX_RELEASE=stable
+      script:
+        - ./build-support/bin/release.sh -f
+      deploy:
+        # See https://docs.travis-ci.com/user/deployment/releases/
+        provider: releases
+        # The pantsbuild-ci-bot OAuth token, see the pantsbuild vault for details.
+        api_key:
+          secure: "u0aCsiuVGOg28YxG0sQUovuUm29kKwQfFgHbNz2TT5L+cGoHxGl4aoVOCtuwWYEtbNGmYc8/3WRS3C/jOiqQj6JEgHUzWOsnfKUObEqNhisAmXbzBbKc0wPQTL8WNK+DKFh32sD3yPYcw+a5PTLO56+o7rqlI25LK7A17WesHC4="
+        file_glob: true
+        file: dist/deploy/pex/*
+        skip_cleanup: true
+        on:
+          # We only release a pex for Pants releases, which are tagged.
+          tags: true
+          repo: pantsbuild/pants
 
 # We accept the default travis-ci email author+committer notification
 # for now which is enabled even with no `notifications` config.
