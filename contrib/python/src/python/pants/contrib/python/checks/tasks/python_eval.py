@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import hashlib
 import os
 import pkgutil
+from builtins import str
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_repos import PythonRepos
@@ -156,7 +157,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
           builder.freeze()
 
       exec_pex = PEX(exec_pex_path, interpreter)
-      extra_pex_paths = [pex.path() for pex in filter(None, [reqs_pex, srcs_pex])]
+      extra_pex_paths = [pex.path() for pex in [_f for _f in [reqs_pex, srcs_pex] if _f]]
       pex = WrappedPEX(exec_pex, extra_pex_paths)
 
       with self.context.new_workunit(name='eval',
@@ -213,7 +214,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     reqs_pex_path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity),
                                                   vt.cache_key.hash))
     if not os.path.isdir(reqs_pex_path):
-      req_libs = filter(has_python_requirements, vt.target.closure())
+      req_libs =  [t for t in vt.target.closure() if has_python_requirements(t)]
       with safe_concurrent_creation(reqs_pex_path) as safe_path:
         builder = PEXBuilder(safe_path, interpreter=interpreter, copy=True)
         dump_requirement_libs(builder, interpreter, req_libs, self.context.log)

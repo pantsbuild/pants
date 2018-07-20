@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import ast
 import textwrap
+from builtins import map
 
 from pants_test.contrib.python.checks.tasks.checkstyle.plugin_test_base import \
   CheckstylePluginTestBase
@@ -48,7 +49,7 @@ IMPORT_CHUNKS = {
 
 
 def strip_newline(stmt):
-  return textwrap.dedent('\n'.join(filter(None, stmt.splitlines())))
+  return textwrap.dedent('\n'.join(_f for _f in stmt.splitlines() if _f))
 
 
 def stitch_chunks(newlines, *chunks):
