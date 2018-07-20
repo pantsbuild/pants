@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from abc import abstractmethod
+from builtins import filter
 from collections import defaultdict
 
 from pants.base.exceptions import TaskError
@@ -120,8 +121,8 @@ class MutexTaskMixin(Task):
 
     expanded_roots = list(resolve(self.context.target_roots))
 
-    accepted = [root for root in expanded_roots if accept_predicate(root)]
-    rejected = [root for root in expanded_roots if reject_predicate(root)]
+    accepted = list(filter(accept_predicate, expanded_roots))
+    rejected = list(filter(reject_predicate, expanded_roots))
     if len(accepted) == 0:
       # no targets were accepted, regardless of rejects
       return None

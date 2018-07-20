@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import sys
 from abc import abstractmethod
-from builtins import map, object, str, zip
+from builtins import filter, map, object, str, zip
 from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
@@ -232,7 +232,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :API: public
     """
     return (self.context.targets(predicate) if self.act_transitively
-            else [root for root in self.context.target_roots if predicate(root)])
+            else list(filter(predicate, self.context.target_roots)))
 
   @memoized_property
   def workdir(self):
