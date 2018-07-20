@@ -32,7 +32,6 @@ python_tests(
   name='python_native_code_testing',
   sources=python_native_code_test_files,
   dependencies=[
-    ':python_task_test_base',
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/native',
