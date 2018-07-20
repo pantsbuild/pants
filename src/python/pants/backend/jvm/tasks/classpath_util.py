@@ -128,7 +128,7 @@ class ClasspathUtil(object):
     :rtype: :class:`collections.Iterator` of string
     """
     classpath_iter = cls._classpath_iter(targets, classpath_products, confs=confs)
-    for f in cls.classpath_entries_contents(classpath_iter):
+    for f in cls.classpath_entries_contents([ce.path2 for ce in classpath_iter]):
       yield f
 
   @classmethod
