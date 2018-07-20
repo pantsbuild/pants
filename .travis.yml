@@ -96,16 +96,11 @@ s3_deploy_config: &s3_deploy_config
     # Otherwise travis will stash dist/deploy and the deploy will fail.
     skip_cleanup: true
     acl: public_read
-    on:
-      # NB: We mainly want deploys for `master` commits; but we also need new binaries for stable
-      # release branches; eg `1.3.x`
-      all_branches: true
-      repo: pantsbuild/pants
 
 matrix:
   include:
 
-    # Build and deploy macOS wheels to S3.
+    # Build and deploy OSX wheels to S3.
     - <<: *s3_deploy_config
       stage: Build Wheels
       os: osx
@@ -152,8 +147,8 @@ matrix:
       script:
         - ./build-support/bin/release.sh -p
       before_deploy:
-        # Wheels were downloaded to dist/deploy from S3 and we don't to re-upload them to S3, but
-        # we do want to upload the pex so shuffle dist/deploy/ contents pre-deploy.
+        # Wheels were downloaded to dist/deploy from S3 and we don't want to re-upload them to S3,
+        # but we do want to upload the pex so shuffle dist/deploy/ contents pre-deploy.
         - "rm -rf dist/deploy && mkdir -p dist/deploy && mv dist/pants.*.pex dist/deploy/"
 
     - <<: *default_test_config
@@ -271,7 +266,6 @@ matrix:
         - ulimit -c unlimited
         - ulimit -n 8192
       script:
-        # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and set -z to run the platform-specific tests.
         - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -cfjklmnprtxz"
 
     # Deploy the OSX / Linux Pants pex saved in S3 to Github releases.
