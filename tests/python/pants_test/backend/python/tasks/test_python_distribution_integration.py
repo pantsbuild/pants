@@ -190,6 +190,25 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants(command=command, config=pants_ini_config)
       self.assert_success(pants_run)
 
+  def test_pants_native_source_detection_when_running_local_dists_for_current_platform_only(self):
+    # Test that `./pants run` respects python_binary platforms
+    # arguments when the closure contains native sources. To do this,
+    # we need to setup a pants.ini that contains two platform defauts:
+    # (1) "current" and (2) a different platform than the one we are currently
+    # running on. The test target below has `platforms=("current")`.
+    platform_string = Platform.create().normalized_os_name
+    non_current_platform_string = 'macosx-10.12-x86_64-x86_64' if platform_string == 'darwin' else 'linux-x86_64'
+    pants_ini_config = {'python-setup': {'platforms': ["current", non_current_platform_string]}}
+
+    # Clean all to rebuild requirements pex.
+    command = [
+      'clean-all',
+      'run',
+      'testprojects/src/python/python_distribution/ctypes:bin'
+    ]
+    pants_run = self.run_pants(command=command, config=pants_ini_config)
+    self.assert_success(pants_run)
+
   def test_python_distribution_with_setup_requires(self):
     # Validate that setup_requires dependencies are present and functional.
     # PANTS_TEST_SETUP_REQUIRES triggers test functionality in this particular setup.py.

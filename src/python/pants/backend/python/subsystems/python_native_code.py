@@ -15,7 +15,7 @@ from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.base.exceptions import IncompatiblePlatformsError
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
-from pants.util.objects import Exactly
+from pants.util.objects import Exactly, SubclassesOf
 
 
 class PythonNativeCode(Subsystem):
@@ -64,7 +64,7 @@ class PythonNativeCode(Subsystem):
   def _native_target_matchers(self):
     return {
       Exactly(PythonDistribution): self.pydist_has_native_sources,
-      Exactly(NativeLibrary): self.native_target_has_native_sources,
+      SubclassesOf(NativeLibrary): self.native_target_has_native_sources,
     }
 
   def _any_targets_have_native_sources(self, targets):
