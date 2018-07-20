@@ -143,7 +143,7 @@ class FindBugs(NailgunTask):
     runtime_classpath = runtime_classpaths.get_for_targets(target.closure(bfs=True))
     aux_classpath = OrderedSet(jar.path2 for conf, jar in runtime_classpath if conf == 'default')
 
-    target_jars = OrderedSet(jar for conf, jar in runtime_classpaths.get_for_target(target) if conf == 'default')
+    target_jars = OrderedSet(jar.path2 for conf, jar in runtime_classpaths.get_for_target(target) if conf == 'default')
 
     bug_counts = { 'error': 0, 'high': 0, 'normal': 0, 'low': 0 }
 
