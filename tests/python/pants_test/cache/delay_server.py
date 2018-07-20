@@ -4,11 +4,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import http.server
 import socketserver
 import threading
 import time
-
-import http.server
 
 
 def get_delayed_handler(delay):

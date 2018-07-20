@@ -4,14 +4,13 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import http.server
 import os
 import re
 import socketserver
 from builtins import object
 from contextlib import contextmanager
 from multiprocessing import Process, Queue
-
-import http.server
 
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir
