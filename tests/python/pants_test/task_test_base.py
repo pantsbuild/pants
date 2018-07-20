@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import glob
 import os
 from contextlib import closing, contextmanager
-from StringIO import StringIO
+from io import BytesIO
 
 from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
@@ -189,7 +189,7 @@ class ConsoleTaskTestBase(TaskTestBase):
     Returns the text output of the task.
     """
     options = options or {}
-    with closing(StringIO()) as output:
+    with closing(BytesIO()) as output:
       self.set_options(**options)
       context = self.context(target_roots=targets, console_outstream=output)
       task = self.create_task(context)

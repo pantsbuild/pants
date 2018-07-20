@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import ConfigParser
+import configparser
 import glob
 import os
 import shutil
@@ -231,7 +231,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
     if config:
       config_data = config.copy()
-      ini = ConfigParser.ConfigParser(defaults=config_data.pop('DEFAULT', None))
+      ini = configparser.ConfigParser(defaults=config_data.pop('DEFAULT', None))
       for section, section_config in config_data.items():
         ini.add_section(section)
         for key, value in section_config.items():

@@ -8,6 +8,7 @@ import itertools
 import logging
 import os
 import unittest
+from builtins import object
 from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
@@ -413,8 +414,7 @@ class BaseTest(unittest.TestCase):
                    sources=('sources=%s,' % repr(sources)
                               if sources else ''),
                    java_sources=('java_sources=[%s],'
-                                 % ','.join(map(lambda str_target: '"%s"' % str_target,
-                                                kwargs.get('java_sources')))
+                                 % ','.join('"%s"' % str_target for str_target in kwargs.get('java_sources'))
                                  if 'java_sources' in kwargs else ''),
                    provides=('provides=%s,' % kwargs.get('provides')
                               if 'provides' in kwargs else ''),
