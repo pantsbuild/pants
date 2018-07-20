@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os.path
+from builtins import range, str
 from hashlib import sha1
 
 import mock

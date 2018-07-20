@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import os
+from builtins import object, str
 
 import mock
 
@@ -49,10 +50,10 @@ class BinaryUtilTest(TestBase):
       return path_or_fd
 
     def keys(self):
-      return self._map.keys()
+      return list(self._map.keys())
 
     def values(self):
-      return self._map.values()
+      return list(self._map.values())
 
     def __getitem__(self, key):
       return self._map[key]  # Vanilla internal map access (without lambda shenanigans).

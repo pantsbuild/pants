@@ -5,7 +5,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-import urlparse
+from builtins import object
+
+from future.moves.urllib import parse
 
 from pants.base.build_environment import get_buildroot
 from pants.base.hash_utils import stable_json_hash
@@ -115,7 +117,7 @@ class JarDependency(datatype([
   @memoized_method
   def get_url(self, relative=False):
     if self.url:
-      parsed_url = urlparse.urlparse(self.url)
+      parsed_url = parse.urlparse(self.url)
       if parsed_url.scheme == 'file':
         if relative and os.path.isabs(parsed_url.path):
           relative_path = os.path.relpath(parsed_url.path,

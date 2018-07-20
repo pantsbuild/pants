@@ -169,6 +169,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Troy Howard
 + Ugo Di Girolamo
 + Wei An
++ Wilhelmina Drengwitz
 + Wolfram Arnold
 + Xaelias
 + Yi Cheng

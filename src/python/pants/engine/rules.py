@@ -11,6 +11,7 @@ from abc import abstractproperty
 from collections import OrderedDict
 from types import TypeType
 
+import six
 from twitter.common.collections import OrderedSet
 
 from pants.engine.selectors import Get, type_or_constraint_repr
@@ -32,13 +33,31 @@ class _RuleVisitor(ast.NodeVisitor):
     self.gets.append(Get.extract_constraints(node))
 
 
-def rule(output_type, input_selectors):
+class GoalProduct(object):
+  PRODUCT_MAP = {}
+
+  @staticmethod
+  def _synthesize_goal_product(name):
+    product_type_name = '{}GoalExecution'.format(name.capitalize())
+    return type(six.binary_type(product_type_name), (datatype(['result']),), {})
+
+  @classmethod
+  def for_name(cls, name):
+    assert isinstance(name, six.string_types)
+    name = six.text_type(name)
+    if name not in cls.PRODUCT_MAP:
+      cls.PRODUCT_MAP[name] = cls._synthesize_goal_product(name)
+    return cls.PRODUCT_MAP[name]
+
+
+def _make_rule(output_type, input_selectors, for_goal=None):
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
   :param Constraint output_type: The return/output type for the Rule. This may be either a
     concrete Python type, or an instance of `Exactly` representing a union of multiple types.
   :param list input_selectors: A list of Selector instances that matches the number of arguments
     to the @decorated function.
+  :param str for_goal: If this is a @console_rule, which goal string it's called for.
   """
 
   def wrapper(func):
@@ -64,8 +83,19 @@ def rule(output_type, input_selectors):
         gets.update(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
 
     func._rule = TaskRule(output_type, input_selectors, func, input_gets=list(gets))
+    func.output_type = output_type
+    func.goal = for_goal
     return func
   return wrapper
+
+
+def rule(output_type, input_selectors):
+  return _make_rule(output_type, input_selectors)
+
+
+def console_rule(goal_name, input_selectors):
+  output_type = GoalProduct.for_name(goal_name)
+  return _make_rule(output_type, input_selectors, goal_name)
 
 
 class Rule(AbstractClass):

@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import map, object
 from collections import OrderedDict, namedtuple
 from hashlib import sha1
 
@@ -186,7 +187,7 @@ class BundleField(tuple, PayloadField):
     return hasher.hexdigest()
 
   def _compute_fingerprint(self):
-    return combine_hashes(map(BundleField._hash_bundle, self))
+    return combine_hashes(list(map(BundleField._hash_bundle, self)))
 
 
 class AppBase(Target):

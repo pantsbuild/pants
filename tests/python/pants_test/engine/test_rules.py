@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
+from builtins import object, str
 from textwrap import dedent
 
 from pants.engine.build_files import create_graph_rules

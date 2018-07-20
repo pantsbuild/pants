@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import sys
 import tokenize
+from builtins import range
 from collections import defaultdict
 
 from pants.contrib.python.checks.tasks.checkstyle.common import CheckstylePlugin

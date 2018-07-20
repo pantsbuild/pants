@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import shutil
 import sys
+from builtins import object
 from hashlib import sha1
 
 from pants.build_graph.build_graph import sort_targets
@@ -328,7 +329,7 @@ class InvalidationCacheManager(object):
     Callers can inspect these vts and rebuild the invalid ones, for example.
     """
     all_vts = self.wrap_targets(targets, topological_order=topological_order)
-    invalid_vts = filter(lambda vt: not vt.valid, all_vts)
+    invalid_vts = [vt for vt in all_vts if not vt.valid]
     return InvalidationCheck(all_vts, invalid_vts)
 
   @property

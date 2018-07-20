@@ -71,23 +71,28 @@ def select_linker(platform, native_toolchain):
   #   'darwin': lambda: Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools),
   #   'linux': lambda: Get(Linker, Binutils, native_toolchain._binutils),
   # })
-  if platform.normalized_os_name == 'darwin':
-    # TODO(#5663): turn this into LLVM when lld works.
-    linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
-  else:
-    linker = yield Get(Linker, Binutils, native_toolchain._binutils)
-
-  libc_dirs = native_toolchain._libc_dev.get_libc_dirs(platform)
-
+  #
   # NB: We need to link through a provided compiler's frontend, and we need to know where all the
   # compiler's libraries/etc are, so we set the executable name to the C++ compiler, which can find
   # its own set of C++-specific files for the linker if necessary. Using e.g. 'g++' as the linker
   # appears to produce byte-identical output when linking even C-only object files, and also
   # happens to work when C++ is used.
-  gcc_c_compiler = yield Get(GCCCCompiler, NativeToolchain, native_toolchain)
-  c_compiler = gcc_c_compiler.c_compiler
-  gcc_cpp_compiler = yield Get(GCCCppCompiler, NativeToolchain, native_toolchain)
-  cpp_compiler = gcc_cpp_compiler.cpp_compiler
+  # Currently, OSX links through the clang++ frontend, and Linux links through the g++ frontend.
+  if platform.normalized_os_name == 'darwin':
+    # TODO(#5663): turn this into LLVM when lld works.
+    linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    llvm_c_compiler = yield Get(LLVMCCompiler, NativeToolchain, native_toolchain)
+    c_compiler = llvm_c_compiler.c_compiler
+    llvm_cpp_compiler = yield Get(LLVMCppCompiler, NativeToolchain, native_toolchain)
+    cpp_compiler = llvm_cpp_compiler.cpp_compiler
+  else:
+    linker = yield Get(Linker, Binutils, native_toolchain._binutils)
+    gcc_c_compiler = yield Get(GCCCCompiler, NativeToolchain, native_toolchain)
+    c_compiler = gcc_c_compiler.c_compiler
+    gcc_cpp_compiler = yield Get(GCCCppCompiler, NativeToolchain, native_toolchain)
+    cpp_compiler = gcc_cpp_compiler.cpp_compiler
+
+  libc_dirs = native_toolchain._libc_dev.get_libc_dirs(platform)
 
   # NB: If needing to create an environment for process invocation that could use either a compiler
   # or a linker (e.g. when we compile native code from `python_dist()`s), use the environment from
@@ -96,14 +101,14 @@ def select_linker(platform, native_toolchain):
   # FIXME(#5951): we need a way to compose executables more hygienically.
   linker = Linker(
     path_entries=(
-      c_compiler.path_entries +
       cpp_compiler.path_entries +
+      c_compiler.path_entries +
       linker.path_entries),
     exe_filename=cpp_compiler.exe_filename,
     library_dirs=(
       libc_dirs +
-      c_compiler.library_dirs +
       cpp_compiler.library_dirs +
+      c_compiler.library_dirs +
       linker.library_dirs))
 
   yield linker
@@ -147,7 +152,7 @@ def select_llvm_cpp_compiler(platform, native_toolchain):
       path_entries=(provided_clangpp.path_entries + xcode_clang.path_entries),
       exe_filename=provided_clangpp.exe_filename,
       library_dirs=(provided_clangpp.library_dirs + xcode_clang.library_dirs),
-      include_dirs=(xcode_clang.include_dirs + provided_clangpp.include_dirs))
+      include_dirs=(provided_clangpp.include_dirs + xcode_clang.include_dirs))
     final_llvm_cpp_compiler = LLVMCppCompiler(clang_with_xcode_paths)
   else:
     gcc_cpp_compiler = yield Get(GCCCppCompiler, GCC, native_toolchain._gcc)
@@ -231,16 +236,28 @@ def select_gcc_cpp_compiler(platform, native_toolchain):
   yield final_gcc_cpp_compiler
 
 
-@rule(CCompiler, [Select(NativeToolchain)])
-def select_c_compiler(native_toolchain):
-  llvm_c_compiler = yield Get(LLVMCCompiler, NativeToolchain, native_toolchain)
-  yield llvm_c_compiler.c_compiler
+@rule(CCompiler, [Select(NativeToolchain), Select(Platform)])
+def select_c_compiler(native_toolchain, platform):
+  if platform.normalized_os_name == 'darwin':
+    llvm_c_compiler = yield Get(LLVMCCompiler, NativeToolchain, native_toolchain)
+    c_compiler = llvm_c_compiler.c_compiler
+  else:
+    gcc_c_compiler = yield Get(GCCCCompiler, NativeToolchain, native_toolchain)
+    c_compiler = gcc_c_compiler.c_compiler
+
+  yield c_compiler
 
 
-@rule(CppCompiler, [Select(NativeToolchain)])
-def select_cpp_compiler(native_toolchain):
-  llvm_cpp_compiler = yield Get(LLVMCppCompiler, NativeToolchain, native_toolchain)
-  yield llvm_cpp_compiler.cpp_compiler
+@rule(CppCompiler, [Select(NativeToolchain), Select(Platform)])
+def select_cpp_compiler(native_toolchain, platform):
+  if platform.normalized_os_name == 'darwin':
+    llvm_cpp_compiler = yield Get(LLVMCppCompiler, NativeToolchain, native_toolchain)
+    cpp_compiler = llvm_cpp_compiler.cpp_compiler
+  else:
+    gcc_cpp_compiler = yield Get(GCCCppCompiler, NativeToolchain, native_toolchain)
+    cpp_compiler = gcc_cpp_compiler.cpp_compiler
+
+  yield cpp_compiler
 
 
 def create_native_toolchain_rules():

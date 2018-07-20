@@ -4,13 +4,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.binaries.binary_tool import Script
+from pants.rules.core.fastlist import fast_list
 
 
-class Isort(Script):
-  options_scope = 'isort'
-  default_version = '4.2.5'
-  suffix = '.pex'
-
-  replaces_scope = 'fmt.isort'
-  replaces_name = 'version'
+def create_core_rules():
+  return [
+    fast_list,
+  ]

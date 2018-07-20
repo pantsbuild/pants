@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import object
 from textwrap import dedent
 
 # TODO: Create a dummy target type in this test and remove this dep.

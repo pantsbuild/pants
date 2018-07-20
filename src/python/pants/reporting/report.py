@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import threading
 import time
+from builtins import object
 
 
 class ReportingError(Exception):

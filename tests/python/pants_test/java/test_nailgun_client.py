@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import signal
 import socket
 import unittest
+from builtins import object
 
 import mock
 
@@ -54,6 +55,7 @@ class TestNailgunClientSession(unittest.TestCase):
     )
 
     self.mock_stdin_reader = mock.create_autospec(NailgunStreamWriter, spec_set=True)
+    self.mock_stdin_reader.is_alive.side_effect = [False, True]
     self.nailgun_client_session._input_writer = self.mock_stdin_reader
 
   def tearDown(self):

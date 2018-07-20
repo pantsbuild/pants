@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import json
 import re
+from builtins import object, str
 from collections import namedtuple
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel

@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import itertools
 import logging
 from abc import abstractmethod
+from builtins import filter, object
 from collections import OrderedDict, defaultdict, deque
 
 from twitter.common.collections import OrderedSet
@@ -322,7 +323,7 @@ class BuildGraph(AbstractClass):
 
     :param predicate: A target predicate that will be used to filter the targets returned.
     """
-    return filter(predicate, self._target_by_address.values())
+    return list(filter(predicate, self._target_by_address.values()))
 
   def sorted_targets(self):
     """

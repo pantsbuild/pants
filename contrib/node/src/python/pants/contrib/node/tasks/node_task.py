@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import str
+
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.task.task import Task
 from pants.util.memo import memoized_property

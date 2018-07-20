@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import str
+
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jar_library import JarLibrary

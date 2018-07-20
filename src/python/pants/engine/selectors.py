@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import ast
 from abc import abstractproperty
+from builtins import str
 
 import six
 

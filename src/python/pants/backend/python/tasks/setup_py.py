@@ -13,7 +13,6 @@ from abc import abstractmethod
 from builtins import map, object, str, zip
 from collections import OrderedDict, defaultdict
 
-from pex import pep425tags
 from pex.compatibility import string, to_bytes
 from pex.installer import InstallerBase, Packager
 from pex.interpreter import PythonInterpreter
@@ -56,16 +55,6 @@ setup(**
 
 class SetupPyRunner(InstallerBase):
   _EXTRAS = ('setuptools', 'wheel')
-
-  DIST_DIR = 'dist'
-
-  @classmethod
-  def for_bdist_wheel(cls, source_dir, is_platform_specific, **kw):
-    cmd = ['bdist_wheel']
-    if is_platform_specific:
-      cmd.extend(['--plat-name', pep425tags.get_platform()])
-    cmd.extend(['--dist-dir', cls.DIST_DIR])
-    return cls(source_dir, cmd, **kw)
 
   def __init__(self, source_dir, setup_command, **kw):
     self.__setup_command = setup_command

@@ -38,12 +38,12 @@ class Reporting(Subsystem):
              default=PlainTextReporter.LABEL_FORMATTING,
              help='Controls the printing of workunit labels to the console.  Workunit types are '
                   '{workunits}.  Possible formatting values are {formats}'.format(
-               workunits=WorkUnitLabel.keys(), formats=LabelFormat.keys()))
+               workunits=list(WorkUnitLabel.keys()), formats=list(LabelFormat.keys())))
     register('--console-tool-output-format', advanced=True, type=dict,
              default=PlainTextReporter.TOOL_OUTPUT_FORMATTING,
              help='Controls the printing of workunit tool output to the console. Workunit types are '
                   '{workunits}.  Possible formatting values are {formats}'.format(
-               workunits=WorkUnitLabel.keys(), formats=ToolOutputFormat.keys()))
+               workunits=list(WorkUnitLabel.keys()), formats=list(ToolOutputFormat.keys())))
 
   def initialize(self, run_tracker, start_time=None):
     """Initialize with the given RunTracker.
