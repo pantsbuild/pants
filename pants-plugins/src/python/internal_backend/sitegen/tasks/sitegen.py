@@ -10,10 +10,10 @@ import json
 import os
 import re
 import shutil
+from builtins import object, range
 from datetime import datetime
 
 from pystache import Renderer
-from six.moves import range
 
 from pants.backend.docgen.tasks.generate_pants_reference import GeneratePantsReference
 from pants.backend.docgen.tasks.markdown_to_html import MarkdownToHtml
@@ -234,7 +234,7 @@ def ensure_page_headings_linkable(soup):
 
 def link_pantsrefs(soups, precomputed):
   """Transorm soups: <a pantsref="foo"> becomes <a href="../foo_page.html#foo">"""
-  for (page, soup) in soups.items():
+  for (page, soup) in list(soups.items()):
     for a in soup.find_all('a'):
       if a.has_attr('pantsref'):
         pantsref = a['pantsref']
