@@ -687,9 +687,9 @@ function usage() {
   echo "       and can be installed in an ephemeral virtualenv."
   echo " -l  Lists all pantsbuild packages that this script releases."
   echo " -o  Lists all pantsbuild package owners."
-  echo " -e  Check that wheels are prebuilt for this release."
-  echo " -f  Fetch the prebuilt pex for this release and print its path."
-  echo " -p  Build a pex from prebuilt wheels for this release."
+  echo " -e  Check that wheels are prebuilt for HEAD."
+  echo " -f  Fetch the prebuilt pex for HEAD and print its path."
+  echo " -p  Build a pex from prebuilt wheels for HEAD."
   echo " -q  Build a pex which only works on the host platform, using the code as exists on disk."
   echo
   echo "All options (except for '-d') are mutually exclusive."
