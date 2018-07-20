@@ -22,7 +22,15 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, SchedulerTestBas
   def task_type(cls):
     return BuildLocalPythonDistributions
 
+  # This is an informally-specified nested dict -- see ../test_ctypes.py for an example. Special
+  # keys are 'key' (used to index into `self.target_dict`) and 'filemap' (creates files at the
+  # specified relative paths). The rest of the keys are fed into `self.make_target()`. An
+  # `OrderedDict` of 2-tuples may be used if targets need to be created in a specific order (e.g. if
+  # they have dependencies on each other).
   _dist_specs = None
+  # By default, we just use a `BuildLocalPythonDistributions` task. When testing with C/C++ targets,
+  # we want to compile and link them as well to get the resulting dist to build, so we add those
+  # task types here and execute them beforehand.
   _extra_relevant_task_types = None
 
   def setUp(self):
