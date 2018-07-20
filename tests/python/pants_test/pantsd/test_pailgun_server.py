@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import socket
 import threading
 import unittest
-from builtins import bytes
 from contextlib import contextmanager
 from socketserver import TCPServer
 
@@ -82,7 +81,7 @@ class TestPailgunHandler(unittest.TestCase):
     self.handler.handle_error()
     last_chunk_type, last_payload = list(NailgunProtocol.iter_chunks(self.client_sock))[-1]
     self.assertEquals(last_chunk_type, ChunkType.EXIT)
-    self.assertEquals(bytes(last_payload), '1')
+    self.assertEquals(last_payload, '1')
 
   @mock.patch.object(PailgunHandler, '_run_pants', **PATCH_OPTS)
   def test_handle_request(self, mock_run_pants):
