@@ -228,7 +228,8 @@ matrix:
     # Run OSX platform-specific tests.
     - stage: Test Pants
       os: osx
-      language: generic
+      language: python
+      python: "2.7.13"
       env:
         - SHARD="Platform-specific tests for OSX"
         # Specifically avoid the OSX provided 2.7.10 under xcode8.3 since it returns a platform
@@ -245,8 +246,7 @@ matrix:
       os: linux
       dist: trusty
       sudo: required
-      language: python
-      python: "2.7.13"
+      language: generic
       addons:
         apt:
           packages:
