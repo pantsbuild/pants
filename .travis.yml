@@ -59,6 +59,30 @@ stages:
   - name: Deploy Pants Pex
     if: tag IS present AND tag =~ ^release_.*$
 
+default_test_config: &default_test_config
+  stage: Test Pants
+  os: linux
+  dist: trusty
+  sudo: required
+  addons:
+    apt:
+      packages:
+        - lib32stdc++6
+        - lib32z1
+        - lib32z1-dev
+        - gcc-multilib
+        - python-dev
+        - openssl
+        - libssl-dev
+  language: python
+  python: "2.7.13"
+  before_install:
+    # Remove bad openjdk6 from trusty image, so
+    # Pants will pick up oraclejdk6 from `packages` above.
+    - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+    - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+    - jdk_switcher use oraclejdk8
+
 matrix:
   include:
 
@@ -130,34 +154,11 @@ matrix:
         - "rm -rf dist/deploy && mkdir -p dist/deploy && mv dist/pants.*.pex dist/deploy/"
       deploy: *s3_deploy
 
-    # Various pants self checks and lint.
-    - <<: &default_test_config
-        stage: Test Pants
-        os: linux
-        dist: trusty
-        sudo: required
-        addons:
-          apt:
-            packages:
-              - lib32stdc++6
-              - lib32z1
-              - lib32z1-dev
-              - gcc-multilib
-              - python-dev
-              - openssl
-              - libssl-dev
-        language: python
-        python: "2.7.13"
-        before_install:
-          # Remove bad openjdk6 from trusty image, so
-          # Pants will pick up oraclejdk6 from `packages` above.
-          - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-          - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-          - jdk_switcher use oraclejdk8
-        env:
-          - SHARD="Various pants self checks and lint"
-        script:
-          - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -cejlpn"
+    - <<: *default_test_config
+      env:
+        - SHARD="Various pants self checks and lint"
+      script:
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -cejlpn"
 
     - <<: *default_test_config
       env:
