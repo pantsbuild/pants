@@ -99,7 +99,7 @@ jobs:
         - S3_DEPLOY = 1
       script:
         - ./pants --version && ./build-support/bin/release.sh -s
-      deploy: &s3_deploy
+      deploy:
         # See: https://docs.travis-ci.com/user/deployment/s3/
         provider: s3
         access_key_id: AKIAIWOKBXVU3JLY6EGQ
@@ -137,7 +137,19 @@ jobs:
           -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
           travis_ci:latest
           sh -c "git clean -xfd && ./pants --version && ./build-support/bin/release.sh -s"
-      deploy: *s3_deploy
+      deploy:
+        # See: https://docs.travis-ci.com/user/deployment/s3/
+        provider: s3
+        access_key_id: AKIAIWOKBXVU3JLY6EGQ
+        secret_access_key:
+          secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM=
+        bucket: binaries.pantsbuild.org
+        local_dir: dist/deploy
+        # Otherwise travis will stash dist/deploy and the deploy will fail.
+        skip_cleanup: true
+        acl: public_read
+        on:
+          condition: $S3_DEPLOY = 1
 
     # Build and deploy an OSX & Linux multi-platform Pants pex to S3.
     - stage: Build Pants Pex
@@ -152,7 +164,20 @@ jobs:
         # Wheels were downloaded to dist/deploy from S3 and we don't want to re-upload them to S3,
         # but we do want to upload the pex so shuffle dist/deploy/ contents pre-deploy.
         - "rm -rf dist/deploy && mkdir -p dist/deploy && mv dist/pants.*.pex dist/deploy/"
-      deploy: *s3_deploy
+      deploy:
+        # See: https://docs.travis-ci.com/user/deployment/s3/
+        provider: s3
+        access_key_id: AKIAIWOKBXVU3JLY6EGQ
+        secret_access_key:
+          secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM=
+        bucket: binaries.pantsbuild.org
+        local_dir: dist/deploy
+        # Otherwise travis will stash dist/deploy and the deploy will fail.
+        skip_cleanup: true
+        acl: public_read
+        on:
+          condition: $S3_DEPLOY = 1
+
 
     - <<: *default_test_config
       env:
@@ -266,7 +291,20 @@ jobs:
         - ./build-support/bin/ci.sh -bcfjklmnprtx
       before_deploy:
         - ./build-support/bin/release.sh -u
-      deploy: *s3_deploy
+      deploy:
+        # See: https://docs.travis-ci.com/user/deployment/s3/
+        provider: s3
+        access_key_id: AKIAIWOKBXVU3JLY6EGQ
+        secret_access_key:
+          secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM=
+        bucket: binaries.pantsbuild.org
+        local_dir: dist/deploy
+        # Otherwise travis will stash dist/deploy and the deploy will fail.
+        skip_cleanup: true
+        acl: public_read
+        on:
+          condition: $S3_DEPLOY = 1
+
 
     # Test rust code on OSX.
     - os: osx
@@ -285,7 +323,19 @@ jobs:
         - ./build-support/bin/ci.sh -bcfjklmnprtx
       before_deploy:
         - ./build-support/bin/release.sh -u
-      deploy: *s3_deploy
+      deploy:
+        # See: https://docs.travis-ci.com/user/deployment/s3/
+        provider: s3
+        access_key_id: AKIAIWOKBXVU3JLY6EGQ
+        secret_access_key:
+          secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM=
+        bucket: binaries.pantsbuild.org
+        local_dir: dist/deploy
+        # Otherwise travis will stash dist/deploy and the deploy will fail.
+        skip_cleanup: true
+        acl: public_read
+        on:
+          condition: $S3_DEPLOY = 1
 
     # Deploy the OSX / Linux Pants pex saved in S3 to Github releases.
     - stage: Deploy Pants Pex
