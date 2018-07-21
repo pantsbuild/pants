@@ -94,6 +94,8 @@ jobs:
       # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
       osx_image: xcode8
       language: generic
+      before_install:
+        - brew update && brew install bash
       env:
         - SHARD="OSX Wheel Builder"
         - S3_DEPLOY = 1
@@ -256,6 +258,8 @@ jobs:
       os: osx
       language: python
       python: "2.7.13"
+      before_install:
+        - brew update && brew install bash
       env:
         - SHARD="Platform-specific tests for OSX"
         # Specifically avoid the OSX provided 2.7.10 under xcode8.3 since it returns a platform
@@ -311,11 +315,11 @@ jobs:
       # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.3
       language: generic
+      before_install:
+        - brew tap caskroom/cask && brew update && brew cask install osxfuse && brew install bash
       env:
         - SHARD="Rust tests for OSX & fs_util deploy"
         - S3_DEPLOY = 1
-      before_install:
-        - brew tap caskroom/cask && brew update && brew cask install osxfuse
       before_script:
         - ulimit -c unlimited
         - ulimit -n 8192
