@@ -14,7 +14,7 @@ import pycountry
 # This is for testing purposes so we can assert that setup_requires is functioning
 # correctly (because Pants swallows print statements).
 if os.getenv('PANTS_TEST_SETUP_REQUIRES', ''):
-  output = [str(pycountry)]
+  output = [bytes(pycountry)]
   output.extend(os.listdir(os.getenv('PYTHONPATH', '')))
   raise Exception(str(output))
 
