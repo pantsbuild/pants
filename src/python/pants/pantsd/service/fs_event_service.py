@@ -130,7 +130,7 @@ class FSEventService(PantsService):
 
     futures = {}
     id_counter = 0
-    subscriptions = self._handlers.values()
+    subscriptions = list(self._handlers.values())
 
     # Setup subscriptions and begin the main event firing loop.
     for handler_name, event_data in self._watchman.subscribed(self._build_root, subscriptions):

@@ -32,6 +32,7 @@ python_library(
   name = 'scheduler_service',
   sources = ['scheduler_service.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     ':pants_service'
   ]
@@ -41,6 +42,7 @@ python_library(
   name = 'store_gc_service',
   sources = ['store_gc_service.py'],
   dependencies = [
+    '3rdparty/python:future',
     ':pants_service',
   ]
 )

@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import os
-import Queue
+import queue
 import threading
 
 from twitter.common.dirutil import Fileset
@@ -52,7 +52,7 @@ class SchedulerService(PantsService):
 
     self._scheduler = legacy_graph_scheduler.scheduler
     self._logger = logging.getLogger(__name__)
-    self._event_queue = Queue.Queue(maxsize=self.QUEUE_SIZE)
+    self._event_queue = queue.Queue(maxsize=self.QUEUE_SIZE)
     self._watchman_is_running = threading.Event()
     self._invalidating_files = set()
 
@@ -125,7 +125,7 @@ class SchedulerService(PantsService):
     """File event notification queue processor."""
     try:
       event = self._event_queue.get(timeout=1)
-    except Queue.Empty:
+    except queue.Empty:
       return
 
     try:

@@ -16,6 +16,7 @@ python_tests(
   sources = ['test_fs_event_service.py'],
   coverage = ['pants.pantsd.service.fs_event_service'],
   dependencies = [
+    '3rdparty/python:future',
     'tests/python/pants_test/pantsd:test_deps',
     'src/python/pants/pantsd/service:fs_event_service'
   ]
@@ -26,6 +27,7 @@ python_tests(
   sources = ['test_pailgun_service.py'],
   coverage = ['pants.pantsd.service.pailgun_service'],
   dependencies = [
+    '3rdparty/python:future',
     'tests/python/pants_test/pantsd:test_deps',
     'src/python/pants/pantsd/service:pailgun_service'
   ]
