@@ -4,6 +4,7 @@
 python_tests(
   sources=['test_subsystem.py'],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/option',
     'src/python/pants/subsystem',
   ],
