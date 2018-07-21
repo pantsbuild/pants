@@ -83,44 +83,46 @@ default_test_config: &default_test_config
     - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
     - jdk_switcher use oraclejdk8
 
-sss_deploy_config: &sss_deploy_config
-  language: generic
-  deploy:
-    # See: https://docs.travis-ci.com/user/deployment/s3/
-    provider: s3
-    access_key_id: AKIAIWOKBXVU3JLY6EGQ
-    secret_access_key:
-      secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM=
-    bucket: binaries.pantsbuild.org
-    local_dir: dist/deploy
-    # Otherwise travis will stash dist/deploy and the deploy will fail.
-    skip_cleanup: true
-    acl: public_read
+deploy:
+  # See: https://docs.travis-ci.com/user/deployment/s3/
+  provider: s3
+  access_key_id: AKIAIWOKBXVU3JLY6EGQ
+  secret_access_key:
+    secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM=
+  bucket: binaries.pantsbuild.org
+  local_dir: dist/deploy
+  # Otherwise travis will stash dist/deploy and the deploy will fail.
+  skip_cleanup: true
+  acl: public_read
+  on:
+    condition: $S3_DEPLOY = 1
 
 matrix:
   include:
 
     # Build and deploy OSX wheels to S3.
-    - <<: *sss_deploy_config
-      stage: Build Wheels
+    - stage: Build Wheels
       os: osx
       # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
       # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
       # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
       osx_image: xcode8
+      language: generic
       env:
         - SHARD="OSX Wheel Builder"
+        - S3_DEPLOY = 1
       script:
         - ./pants --version && ./build-support/bin/release.sh -s
 
     # Build and deploy Linux wheels to S3.
-    - <<: *sss_deploy_config
-      stage: Build Wheels
+    - stage: Build Wheels
       os: linux
+      language: generic
       services:
         - docker
       env:
         - SHARD="Linux Wheel Builder"
+        - S3_DEPLOY = 1
       before_script:
         - ulimit -c unlimited
       script:
@@ -138,12 +140,12 @@ matrix:
           sh -c "git clean -xfd && ./pants --version && ./build-support/bin/release.sh -s"
 
     # Build and deploy an OSX & Linux multi-platform Pants pex to S3.
-    - <<: *sss_deploy_config
-      stage: Build Pants Pex
+    - stage: Build Pants Pex
       os: linux
       language: python
       env:
         - SHARD="Multiplatform Pants pex Builder"
+        - S3_DEPLOY = 1
       script:
         - ./build-support/bin/release.sh -p
       before_deploy:
@@ -239,8 +241,7 @@ matrix:
         - CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -cfjklmnprtxz
 
     # Test rust code on Linux.
-    - <<: *sss_deploy_config
-      stage: Test Pants
+    - stage: Test Pants
       os: linux
       dist: trusty
       sudo: required
@@ -255,7 +256,8 @@ matrix:
         - sudo chmod 666 /dev/fuse
         - sudo chown root:$USER /etc/fuse.conf
       env:
-        - SHARD="Rust tests for Linux & fs_util S3 deploy"
+        - SHARD="Rust tests for Linux & fs_util deploy"
+        - S3_DEPLOY = 1
       before_script:
         - ulimit -c unlimited
         - ulimit -n 8192
@@ -265,13 +267,13 @@ matrix:
         - ./build-support/bin/release.sh -u
 
     # Test rust code on OSX.
-    - <<: *sss_deploy_config
-      os: osx
+    - os: osx
       # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.3
       language: generic
       env:
-        - SHARD="Rust tests for OSX & fs_util S3 deploy"
+        - SHARD="Rust tests for OSX & fs_util deploy"
+        - S3_DEPLOY = 1
       before_install:
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
       before_script:
