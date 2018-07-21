@@ -93,8 +93,7 @@ jobs:
       # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
       # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
       osx_image: xcode8
-      language: python
-      python: "2.7.13"
+      language: generic
       before_install:
         - brew update && brew install bash
       env:
@@ -257,8 +256,7 @@ jobs:
     # Run OSX platform-specific tests.
     - stage: Test Pants
       os: osx
-      language: python
-      python: "2.7.13"
+      language: generic
       before_install:
         - brew update && brew install bash
       env:
