@@ -83,7 +83,7 @@ default_test_config: &default_test_config
     - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
     - jdk_switcher use oraclejdk8
 
-s3_deploy_config: &s3_deploy_config
+sss_deploy_config: &sss_deploy_config
   language: generic
   deploy:
     # See: https://docs.travis-ci.com/user/deployment/s3/
@@ -101,7 +101,7 @@ matrix:
   include:
 
     # Build and deploy OSX wheels to S3.
-    - <<: *s3_deploy_config
+    - <<: *sss_deploy_config
       stage: Build Wheels
       os: osx
       # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
@@ -111,10 +111,10 @@ matrix:
       env:
         - SHARD="OSX Wheel Builder"
       script:
-        - ./pants --version && ./build-support/bin/release.sh -n
+        - ./pants --version && ./build-support/bin/release.sh -s
 
     # Build and deploy Linux wheels to S3.
-    - <<: *s3_deploy_config
+    - <<: *sss_deploy_config
       stage: Build Wheels
       os: linux
       services:
@@ -135,12 +135,10 @@ matrix:
           -v "${HOME}:/travis/home"
           -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
           travis_ci:latest
-          sh -c "git clean -xfd && ./pants --version && ./build-support/bin/release.sh -n"
-      after_failure:
-        - build-support/bin/ci-failure.sh
+          sh -c "git clean -xfd && ./pants --version && ./build-support/bin/release.sh -s"
 
     # Build and deploy an OSX & Linux multi-platform Pants pex to S3.
-    - <<: *s3_deploy_config
+    - <<: *sss_deploy_config
       stage: Build Pants Pex
       os: linux
       language: python
@@ -238,10 +236,10 @@ matrix:
         # https://github.com/pantsbuild/pex/issues/523
         - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>2.7.10,<3']"
       script:
-        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -cfjklmnprtxz"
+        - CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -cfjklmnprtxz
 
     # Test rust code on Linux.
-    - <<: *s3_deploy_config
+    - <<: *sss_deploy_config
       stage: Test Pants
       os: linux
       dist: trusty
@@ -262,11 +260,12 @@ matrix:
         - ulimit -c unlimited
         - ulimit -n 8192
       script:
-        - "./build-support/bin/ci.sh -bcfjklmnprtx"
-        - "./build-support/bin/release.sh -u"
+        - ./build-support/bin/ci.sh -bcfjklmnprtx
+      before_deploy:
+        - ./build-support/bin/release.sh -u
 
     # Test rust code on OSX.
-    - <<: *s3_deploy_config
+    - <<: *sss_deploy_config
       os: osx
       # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.3
@@ -279,8 +278,9 @@ matrix:
         - ulimit -c unlimited
         - ulimit -n 8192
       script:
-        - "./build-support/bin/ci.sh -bcfjklmnprtx"
-        - "./build-support/bin/release.sh -u"
+        - ./build-support/bin/ci.sh -bcfjklmnprtx
+      before_deploy:
+        - ./build-support/bin/release.sh -u
 
     # Deploy the OSX / Linux Pants pex saved in S3 to Github releases.
     - stage: Deploy Pants Pex
