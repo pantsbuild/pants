@@ -4,13 +4,13 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import http.server
 import os
 import re
-import SocketServer
+import socketserver
+from builtins import object
 from contextlib import contextmanager
 from multiprocessing import Process, Queue
-
-from six.moves import SimpleHTTPServer
 
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir
@@ -18,14 +18,14 @@ from pants_test.testutils.file_test_util import exact_files
 
 
 # A very trivial server that serves files under the cwd.
-class SimpleRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+class SimpleRESTHandler(http.server.SimpleHTTPRequestHandler):
   def __init__(self, request, client_address, server):
     # The base class implements GET and HEAD.
     # Old-style class, so we must invoke __init__ this way.
-    SimpleHTTPServer.SimpleHTTPRequestHandler.__init__(self, request, client_address, server)
+    http.server.SimpleHTTPRequestHandler.__init__(self, request, client_address, server)
 
   def do_HEAD(self):
-    return SimpleHTTPServer.SimpleHTTPRequestHandler.do_HEAD(self)
+    return http.server.SimpleHTTPRequestHandler.do_HEAD(self)
 
   def do_PUT(self):
     path = self.translate_path(self.path)
@@ -47,12 +47,12 @@ class SimpleRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     self.end_headers()
 
 
-class FailRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+class FailRESTHandler(http.server.SimpleHTTPRequestHandler):
   """Reject all requests"""
 
   def __init__(self, request, client_address, server):
     # Old-style class, so we must invoke __init__ this way.
-    SimpleHTTPServer.SimpleHTTPRequestHandler.__init__(self, request, client_address, server)
+    http.server.SimpleHTTPRequestHandler.__init__(self, request, client_address, server)
 
   def _return_failed(self):
     self.send_response(401, 'Forced test failure')
@@ -117,7 +117,7 @@ def _cache_server_process(queue, return_failed, cache_root):
           handler = FailRESTHandler
         else:
           handler = SimpleRESTHandler
-        httpd = SocketServer.TCPServer(('localhost', 0), handler)
+        httpd = socketserver.TCPServer(('localhost', 0), handler)
         port = httpd.server_address[1]
         queue.put(port)
         httpd.serve_forever()
