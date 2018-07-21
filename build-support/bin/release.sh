@@ -40,7 +40,10 @@ function find_pkg() {
   local -r pkg_name=$1
   local -r version=$2
   local -r search_dir=$3
-  find "${search_dir}" -type f -name "${pkg_name}-${version}-*.whl"
+  find "${search_dir}" \
+    -path "${DEPLOY_DIR}" -prune \
+      -o \
+    -type f -name "${pkg_name}-${version}-*.whl" -print
 }
 
 function find_plat_name() {
@@ -201,21 +204,34 @@ function build_pants_packages() {
   rm -rf "${DEPLOY_PANTS_WHEEL_DIR}"
   mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
 
-  pants_version_set "${version}"
+  local -A wheel_configs
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
     NAME=$(pkg_name $PACKAGE)
     BUILD_TARGET=$(pkg_build_target $PACKAGE)
     BDIST_WHEEL_FLAGS=$(bdist_wheel_flags $PACKAGE)
+    local bdist_wheel_flags="${BDIST_WHEEL_FLAGS:---python-tag py27}"
+    if test "${wheel_configs[${bdist_wheel_flags}]+isset}"
+    then
+      local config="${wheel_configs[${bdist_wheel_flags}]}"
+    else
+      local config=""
+    fi
+    wheel_configs["${bdist_wheel_flags}"]+="${BUILD_TARGET} "
+  done
 
-    start_travis_section "${NAME}" "Building package ${NAME}-${version} with target '${BUILD_TARGET}'"
+  pants_version_set "${version}"
+  for wheel_flags in "${!wheel_configs[@]}"
+  do
+    local targets="${wheel_configs[${wheel_flags}]%% }"
+    start_travis_section "${NAME}" "Building packages for ${targets} at version ${version}"
     (
       run_local_pants setup-py \
-        --run="bdist_wheel ${BDIST_WHEEL_FLAGS:---python-tag py27}" \
-          ${BUILD_TARGET} && \
-      wheel=$(find_pkg ${NAME} ${version} "${ROOT}/dist") && \
-      cp -p "${wheel}" "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
-    ) || die "Failed to build package ${NAME}-${version} with target '${BUILD_TARGET}'!"
+        --run="bdist_wheel ${wheel_flags}" \
+          ${targets} && \
+      local -a wheels=($(find_pkg '*' ${version} "${ROOT}/dist")) && \
+      cp -p "${wheels[@]}" "${DEPLOY_PANTS_WHEEL_DIR}/${version}/"
+    ) || die "Failed to build packages for ${targets} at version ${version}!"
     end_travis_section
   done
   pants_version_reset
