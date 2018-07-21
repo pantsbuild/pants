@@ -95,7 +95,7 @@ jobs:
       osx_image: xcode8
       language: generic
       before_install:
-        - brew install bash
+        - brew upgrade ruby && brew install bash
       env:
         - SHARD="OSX Wheel Builder"
         - S3_DEPLOY = 1
@@ -259,7 +259,7 @@ jobs:
       language: python
       python: "2.7.13"
       before_install:
-        - brew install bash
+        - brew upgrade ruby && brew install bash
       env:
         - SHARD="Platform-specific tests for OSX"
         # Specifically avoid the OSX provided 2.7.10 under xcode8.3 since it returns a platform
