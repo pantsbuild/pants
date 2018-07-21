@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import sqlite3
+from builtins import object, str
 from contextlib import contextmanager
 
 from pants.subsystem.subsystem import Subsystem
