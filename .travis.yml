@@ -93,10 +93,10 @@ jobs:
       # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
       # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
       osx_image: xcode8
-      language: ruby
-      rvm: 2.5.1
+      language: python
+      python: "2.7.13"
       before_install:
-        - brew install bash
+        - brew update && brew install bash
       env:
         - SHARD="OSX Wheel Builder"
         - S3_DEPLOY = 1
@@ -257,10 +257,10 @@ jobs:
     # Run OSX platform-specific tests.
     - stage: Test Pants
       os: osx
-      language: ruby
-      rvm: 2.5.1
+      language: python
+      python: "2.7.13"
       before_install:
-        - brew install bash
+        - brew update && brew install bash
       env:
         - SHARD="Platform-specific tests for OSX"
         # Specifically avoid the OSX provided 2.7.10 under xcode8.3 since it returns a platform
