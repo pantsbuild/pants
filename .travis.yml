@@ -94,6 +94,7 @@ jobs:
       # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
       osx_image: xcode8
       language: ruby
+      rvm: 2.5.1
       before_install:
         - brew install bash
       env:
@@ -257,6 +258,7 @@ jobs:
     - stage: Test Pants
       os: osx
       language: ruby
+      rvm: 2.5.1
       before_install:
         - brew install bash
       env:
