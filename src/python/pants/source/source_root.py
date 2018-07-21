@@ -5,9 +5,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import object, range
 from collections import namedtuple
-
-from six.moves import range
 
 from pants.base.project_tree_factory import get_project_tree
 from pants.subsystem.subsystem import Subsystem
