@@ -4,18 +4,19 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import BaseHTTPServer
 import hashlib
+import http.server
 import os
-import SocketServer
+import socketserver
 import unittest
+from builtins import str
 from contextlib import closing, contextmanager
 from functools import reduce
+from io import StringIO
 from threading import Thread
 
 import mock
 import requests
-from six import StringIO
 
 from pants.net.http.fetcher import Fetcher
 from pants.util.contextutil import temporary_dir, temporary_file
@@ -320,12 +321,12 @@ class FetcherRedirectTest(unittest.TestCase):
 
   # A trivial HTTP server that serves up a redirect from /url2 --> /url1 and some hard-coded
   # responses in the HTTP message body.
-  class RedirectHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+  class RedirectHTTPHandler(http.server.BaseHTTPRequestHandler):
 
     def __init__(self, request, client_address, server):
       # The base class implements GET and HEAD.
       # Old-style class, so we must invoke __init__ this way.
-      BaseHTTPServer.BaseHTTPRequestHandler.__init__(self, request, client_address, server)
+      http.server.BaseHTTPRequestHandler.__init__(self, request, client_address, server)
 
     def do_GET(self):
       if self.path.endswith('url2'):
@@ -349,7 +350,7 @@ class FetcherRedirectTest(unittest.TestCase):
     httpd_thread = None
     try:
       handler = self.RedirectHTTPHandler
-      httpd = SocketServer.TCPServer(('localhost', 0), handler)
+      httpd = socketserver.TCPServer(('localhost', 0), handler)
       port = httpd.server_address[1]
       httpd_thread = Thread(target=httpd.serve_forever)
       httpd_thread.start()
