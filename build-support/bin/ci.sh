@@ -101,8 +101,8 @@ PANTS_COMMAND=./pants
 
 if [[ "${skip_bootstrap:-false}" == "false" ]]; then
   start_travis_section "Bootstrap" "Bootstrapping pants"
+  pants_pex="./pants.pex"
   (
-    pants_pex="./pants.pex"
     if [[ ! -f "${pants_pex}" ]]; then
       "${PANTS_COMMAND}" ${bootstrap_compile_args[@]} binary \
         src/python/pants/bin:pants_local_binary && \
@@ -111,14 +111,14 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
       chmod +x "${pants_pex}"
       echo "Re-using existing ${pants_pex}."
     fi
-    PANTS_COMMAND="${pants_pex}"
-    "${PANTS_COMMAND}" --version
-    echo "Using pants command: ${PANTS_COMMAND}"
+    "${pants_pex}" --version
   ) || die "Failed to bootstrap pants."
+  PANTS_COMMAND="${pants_pex}"
   end_travis_section
 fi
 
 export PANTS_COMMAND
+echo "Using pants command: ${PANTS_COMMAND}"
 
 if [[ "${skip_pre_commit_checks:-false}" == "false" ]]; then
   start_travis_section "PreCommit" "Running pre-commit checks"
