@@ -74,7 +74,11 @@ public class PantsRunnerTest {
 
   @BeforeClass
   public static void setUpClass() throws Exception {
-    String command = "./pants bundle " + TEST_PROJECT;
+    String pants_command = System.getenv("PANTS_COMMAND");
+    if (pants_command == null) {
+      pants_command = "./pants";
+    }
+    String command = pants_command + " bundle " + TEST_PROJECT;
     Process process = Runtime.getRuntime().exec(command);
     StreamReader stdout = StreamReader.start(process.getInputStream());
     StreamReader stderr = StreamReader.start(process.getErrorStream());
