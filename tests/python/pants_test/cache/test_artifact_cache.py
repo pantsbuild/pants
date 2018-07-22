@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import unittest
+from builtins import str
 from contextlib import contextmanager
 
 from pants.cache.artifact_cache import (NonfatalArtifactCacheError, call_insert,
@@ -182,26 +183,26 @@ class TestArtifactCache(unittest.TestCase):
     key = CacheKey('muppet_key', 'fake_hash')
 
     with self.setup_local_cache() as cache:
-      self.assertEquals(map(call_use_cached_files, [(cache, key, None)]), [False])
+      self.assertFalse(call_use_cached_files((cache, key, None)))
       with self.setup_test_file(cache.artifact_root) as path:
-        map(call_insert, [(cache, key, [path], False)])
-      self.assertEquals(map(call_use_cached_files, [(cache, key, None)]), [True])
+        call_insert((cache, key, [path], False))
+      self.assertTrue(call_use_cached_files((cache, key, None)))
 
     with self.setup_rest_cache() as cache:
-      self.assertEquals(map(call_use_cached_files, [(cache, key, None)]), [False])
+      self.assertFalse(call_use_cached_files((cache, key, None)))
       with self.setup_test_file(cache.artifact_root) as path:
-        map(call_insert, [(cache, key, [path], False)])
-      self.assertEquals(map(call_use_cached_files, [(cache, key, None)]), [True])
+        call_insert((cache, key, [path], False))
+      self.assertTrue(call_use_cached_files((cache, key, None)))
 
   def test_failed_multiproc(self):
     key = CacheKey('muppet_key', 'fake_hash')
 
     # Failed requests should return failure status, but not raise exceptions
     with self.setup_rest_cache(return_failed=True) as cache:
-      self.assertFalse(map(call_use_cached_files, [(cache, key, None)])[0])
+      self.assertFalse(call_use_cached_files((cache, key, None)))
       with self.setup_test_file(cache.artifact_root) as path:
-        map(call_insert, [(cache, key, [path], False)])
-      self.assertFalse(map(call_use_cached_files, [(cache, key, None)])[0])
+        call_insert((cache, key, [path], False))
+      self.assertFalse(call_use_cached_files((cache, key, None)))
 
   def test_successful_request_cleans_result_dir(self):
     key = CacheKey('muppet_key', 'fake_hash')
@@ -216,8 +217,8 @@ class TestArtifactCache(unittest.TestCase):
     with self.setup_test_file(cache.artifact_root) as path:
       with temporary_dir() as results_dir:
         with temporary_file_path(root_dir=results_dir) as canary:
-          map(call_insert, [(cache, key, [path], False)])
-          map(call_use_cached_files, [(cache, key, results_dir)])
+          call_insert((cache, key, [path], False))
+          call_use_cached_files((cache, key, results_dir))
           # Results content should have been deleted.
           self.assertFalse(os.path.exists(canary))
 
@@ -226,15 +227,13 @@ class TestArtifactCache(unittest.TestCase):
     with temporary_dir() as results_dir:
       with temporary_file_path(root_dir=results_dir) as canary:
         with self.setup_local_cache() as cache:
-          self.assertEquals(
-            map(call_use_cached_files, [(cache, key, results_dir)]),
-            [False])
+          self.assertFalse(
+            call_use_cached_files((cache, key, results_dir)))
           self.assertTrue(os.path.exists(canary))
 
         with self.setup_rest_cache() as cache:
-          self.assertEquals(
-            map(call_use_cached_files, [(cache, key, results_dir)]),
-            [False])
+          self.assertFalse(
+            call_use_cached_files((cache, key, results_dir)))
           self.assertTrue(os.path.exists(canary))
 
   def test_corrupted_cached_file_cleaned_up(self):

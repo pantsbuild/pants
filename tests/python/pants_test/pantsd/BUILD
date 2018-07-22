@@ -45,6 +45,7 @@ python_tests(
   sources = ['test_pailgun_server.py'],
   coverage = ['pants.pantsd.pailgun_server'],
   dependencies = [
+    '3rdparty/python:future',
     ':test_deps',
     'src/python/pants/pantsd:pailgun_server'
   ]

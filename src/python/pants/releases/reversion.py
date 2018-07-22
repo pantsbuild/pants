@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import zipfile
+from builtins import str
 
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import read_file, safe_file_dump

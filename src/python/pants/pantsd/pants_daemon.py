@@ -8,6 +8,7 @@ import logging
 import os
 import sys
 import threading
+from builtins import object
 from contextlib import contextmanager
 
 from setproctitle import setproctitle as set_process_title

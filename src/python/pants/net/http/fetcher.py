@@ -11,6 +11,7 @@ import sys
 import tempfile
 import time
 from abc import abstractmethod, abstractproperty
+from builtins import object, str
 from contextlib import closing, contextmanager
 
 import requests

@@ -4,14 +4,14 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import http.server
+import socketserver
 import threading
 import time
 
-from six.moves import SimpleHTTPServer, socketserver
-
 
 def get_delayed_handler(delay):
-  class DelayResponseHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+  class DelayResponseHandler(http.server.SimpleHTTPRequestHandler):
     def do_HEAD(self):
       time.sleep(delay)
       self.send_response(200)

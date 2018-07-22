@@ -74,7 +74,7 @@ class ConfluencePublish(Task):
       html_info = genmap.get((wiki_artifact, page))
       if len(html_info) > 1:
         raise TaskError('Unexpected resources for {}: {}'.format(page, html_info))
-      basedir, htmls = html_info.items()[0]
+      basedir, htmls = list(html_info.items())[0]
       if len(htmls) != 1:
         raise TaskError('Unexpected resources for {}: {}'.format(page, htmls))
       with safe_open(os.path.join(basedir, htmls[0])) as contents:

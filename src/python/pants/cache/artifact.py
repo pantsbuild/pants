@@ -8,6 +8,7 @@ import errno
 import os
 import shutil
 import tarfile
+from builtins import object, str
 
 from pants.util.contextutil import open_tar
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_walk

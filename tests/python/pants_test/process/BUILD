@@ -3,6 +3,7 @@
 
 python_tests(
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:mock',
     '3rdparty/python:six',
     'src/python/pants/process',
