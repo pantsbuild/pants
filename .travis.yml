@@ -19,6 +19,8 @@ cache:
     - dist/travis-cache
 
 before_cache:
+  # Ensure permissions to do the below removals, which happen with or without caching enabled.
+  - sudo chown -R travis:$(id -gn travis) "${HOME}" "${TRAVIS_BUILD_DIR}"
   # Kill all python bytecode in our cached venvs.  Some files appear to
   # get bytecode compiled in non-yet-understood circumstances leading to
   # a full cache re-pack due to new bytecode files.
