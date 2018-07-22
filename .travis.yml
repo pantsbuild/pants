@@ -28,13 +28,10 @@ before_cache:
   # The stats cache contains timestamped reports unused by CI but that
   # thrash the cache.  Skip caching these.
   - rm -rf ${HOME}/.cache/pants/stats
-  # While the bin directory and rust toolchains are relatively large, they're also very quick to
-  # restore/install: prune them to keep the total cache size down.
-  #   see https://docs.travis-ci.com/user/caching/#Things-not-to-cache
-  # NB: We do _not_ prune the cargo cache, since that holds compiled tools and outputs, and
-  # individually resolved artifacts.
+  # While the bin directory is relatively large, it's also very quick to restore/install;
+  # so prune it to keep the total cache size down. See:
+  #   https://docs.travis-ci.com/user/caching/#Things-not-to-cache
   - rm -rf ${HOME}/.cache/pants/bin
-  - rm -rf ${HOME}/.cache/pants/rust/rustup
   - rm -rf ${HOME}/.cache/pants/lmdb_store
   # Render a summary of what is left in the home directory, to assist with further pruning of
   # the cache.
@@ -50,63 +47,57 @@ cache:
     - ${HOME}/.npm
     - build-support/isort.venv
     - build-support/pants_dev_deps.venv
+    - src/rust/engine/target
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
+  - Build Wheels
+  - Build Pants Pex
   - Test Pants
   - name: Deploy Pants Pex
     if: tag IS present AND tag =~ ^release_.*$
 
-default_test_config: &default_test_config
-  os: linux
-  dist: trusty
-  sudo: required
-  addons:
-    apt:
-      packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-  stage: Test Pants
-  language: python
-  python: "2.7.13"
-  before_install:
-    # Remove bad openjdk6 from trusty image, so
-    # Pants will pick up oraclejdk6 from `packages` above.
-    - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-    - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-    - jdk_switcher use oraclejdk8
-
-matrix:
+jobs:
   include:
 
-    # Build macOS engine
-    - os: osx
+    # Build and deploy OSX wheels to S3.
+    - stage: Build Wheels
+      os: osx
       # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
       # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
       # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
       osx_image: xcode8
-      stage: Test Pants
       language: generic
+      before_install:
+        - brew update && brew install bash
       env:
-        - SHARD="OSX Native Engine Binary Builder"
-        - PREPARE_DEPLOY=1
+        - SHARD="OSX Wheel Builder"
+        - S3_DEPLOY = 1
       script:
-        - ./pants --version && ./build-support/bin/release.sh -n
+        - ./pants --version && ./build-support/bin/release.sh -s
+      deploy: &s3_deploy
+        # See: https://docs.travis-ci.com/user/deployment/s3/
+        provider: s3
+        access_key_id: AKIAIWOKBXVU3JLY6EGQ
+        secret_access_key:
+          secure: "UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM="
+        bucket: binaries.pantsbuild.org
+        local_dir: dist/deploy
+        # Otherwise travis will stash dist/deploy and the deploy will fail.
+        skip_cleanup: true
+        acl: public_read
+        on:
+          condition: $S3_DEPLOY = 1
 
-    # Build Linux engine
-    - os: linux
-      stage: Test Pants
+    # Build and deploy Linux wheels to S3.
+    - stage: Build Wheels
+      os: linux
       language: generic
       services:
         - docker
       env:
-        - SHARD="Linux Native Engine Binary Builder"
-        - PREPARE_DEPLOY=1
+        - SHARD="Linux Wheel Builder"
+        - S3_DEPLOY = 1
       before_script:
         - ulimit -c unlimited
       script:
@@ -121,18 +112,188 @@ matrix:
           -v "${HOME}:/travis/home"
           -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
           travis_ci:latest
-          sh -c "git clean -xfd && ./pants --version && ./build-support/bin/release.sh -n"
-      after_failure:
-        - build-support/bin/ci-failure.sh
+          sh -c "./pants --version && ./build-support/bin/release.sh -s"
+      deploy: *s3_deploy
 
-    # Deploy Pex
-    - os: linux
+    # Build and deploy an OSX & Linux multi-platform Pants pex to S3.
+    - stage: Build Pants Pex
+      os: linux
       language: python
-      stage: Deploy Pants Pex
+      env:
+        - SHARD="Multiplatform Pants pex Builder"
+        - S3_DEPLOY = 1
+      script:
+        - ./build-support/bin/release.sh -p
+      before_deploy:
+        # Wheels were downloaded to dist/deploy from S3 and we don't want to re-upload them to S3,
+        # but we do want to upload the pex so shuffle dist/deploy/ contents pre-deploy.
+        - "rm -rf dist/deploy && mkdir -p dist/deploy && mv dist/pants.*.pex dist/deploy/"
+      deploy: *s3_deploy
+
+    - &default_test_config
+      stage: Test Pants
+      os: linux
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - lib32stdc++6
+            - lib32z1
+            - lib32z1-dev
+            - gcc-multilib
+            - python-dev
+            - openssl
+            - libssl-dev
+      language: python
+      python: "2.7.13"
+      before_install:
+        # Remove bad openjdk6 from trusty image, so
+        # Pants will pick up oraclejdk6 from `packages` above.
+        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+        - jdk_switcher use oraclejdk8
+      env:
+        - SHARD="Various pants self checks and lint"
+      script:
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -cejlpn"
+
+    - <<: *default_test_config
+      env:
+        - SHARD="Unit tests for pants and pants-plugins - shard 1"
+      script:
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrcnt -u 0/2"
+
+    - <<: *default_test_config
+      env:
+        - SHARD="Unit tests for pants and pants-plugins - shard 2"
+      script:
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrcnt -u 1/2"
+
+    - <<: *default_test_config
+      env:
+        - SHARD="Python contrib tests - shard 1"
+      script:
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrcjlpt -y 0/2"
+
+    - <<: *default_test_config
+      env:
+        - SHARD="Python contrib tests - shard 2"
+      script:
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrcjlpt -y 1/2"
+
+    - <<: *default_test_config
+      env:
+        - SHARD="Python integration tests for pants - shard 1"
+      script:
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 0/7"
+
+    - <<: *default_test_config
+      env:
+        - SHARD="Python integration tests for pants - shard 2"
+      script:
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 1/7"
+
+    - <<: *default_test_config
+      env:
+        - SHARD="Python integration tests for pants - shard 3"
+      script:
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 2/7"
+
+    - <<: *default_test_config
+      env:
+        - SHARD="Python integration tests for pants - shard 4"
+      script:
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 3/7"
+
+    - <<: *default_test_config
+      env:
+        - SHARD="Python integration tests for pants - shard 5"
+      script:
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 4/7"
+
+    - <<: *default_test_config
+      env:
+        - SHARD="Python integration tests for pants - shard 6"
+      script:
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 5/7"
+
+    - <<: *default_test_config
+      env:
+        - SHARD="Python integration tests for pants - shard 7"
+      script:
+        - "CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 6/7"
+
+    # Run OSX platform-specific tests.
+    - stage: Test Pants
+      os: osx
+      language: generic
+      before_install:
+        - brew update && brew install bash
+      env:
+        - SHARD="Platform-specific tests for OSX"
+        # Specifically avoid the OSX provided 2.7.10 under xcode8.3 since it returns a platform
+        # of `macosx-*-intel` where the `intel` suffix is bogus but pex has not yet been taught to
+        # deal with this. Can be removed when this issue is resolved:
+        # https://github.com/pantsbuild/pex/issues/523
+        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>2.7.10,<3']"
+      script:
+        - CI_USE_PREBUILT_PANTS_PEX=1 ./build-support/bin/ci.sh -cfjklmnprtxz
+
+    # Test rust code on Linux.
+    - stage: Test Pants
+      os: linux
+      dist: trusty
+      sudo: required
+      language: generic
+      addons:
+        apt:
+          packages:
+            - cmake
+      before_install:
+        - sudo apt-get install -y pkg-config fuse libfuse-dev
+        - sudo modprobe fuse
+        - sudo chmod 666 /dev/fuse
+        - sudo chown root:$USER /etc/fuse.conf
+      env:
+        - SHARD="Rust tests for Linux & fs_util deploy"
+        - S3_DEPLOY = 1
+      before_script:
+        - ulimit -c unlimited
+        - ulimit -n 8192
+      script:
+        - ./build-support/bin/ci.sh -bcfjklmnprtx
+      before_deploy:
+        - ./build-support/bin/release.sh -u
+      deploy: *s3_deploy
+
+    # Test rust code on OSX.
+    - os: osx
+      # Fuse actually works on this image. It hangs on many others.
+      osx_image: xcode8.3
+      language: generic
+      before_install:
+        - brew tap caskroom/cask && brew update && brew cask install osxfuse && brew install bash
+      env:
+        - SHARD="Rust tests for OSX & fs_util deploy"
+        - S3_DEPLOY = 1
+      before_script:
+        - ulimit -c unlimited
+        - ulimit -n 8192
+      script:
+        - ./build-support/bin/ci.sh -bcfjklmnprtx
+      before_deploy:
+        - ./build-support/bin/release.sh -u
+      deploy: *s3_deploy
+
+    # Deploy the OSX / Linux Pants pex saved in S3 to Github releases.
+    - stage: Deploy Pants Pex
+      os: linux
+      language: generic
       env:
         - PANTS_PEX_RELEASE=stable
       script:
-        - ./build-support/bin/release.sh -p
+        - ./build-support/bin/release.sh -f
       deploy:
         # See https://docs.travis-ci.com/user/deployment/releases/
         provider: releases
@@ -146,142 +307,6 @@ matrix:
           # We only release a pex for Pants releases, which are tagged.
           tags: true
           repo: pantsbuild/pants
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Various pants self checks and lint"
-      script:
-        - ./build-support/bin/ci.sh -x -cejlpn 'Various pants self checks and lint'
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Unit tests for pants and pants-plugins - shard 1"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrcnt -u 0/2 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Unit tests for pants and pants-plugins - shard 2"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrcnt -u 1/2 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python contrib tests - shard 1"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 0/2 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python contrib tests - shard 2"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 1/2 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python integration tests for pants - shard 1"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 0/7 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python integration tests for pants - shard 2"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 1/7 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python integration tests for pants - shard 3"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 2/7 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python integration tests for pants - shard 4"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 3/7 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python integration tests for pants - shard 5"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 4/7 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python integration tests for pants - shard 6"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 5/7 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python integration tests for pants - shard 7"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 6/7 "${SHARD}"
-
-    # Rust on linux
-    - os: linux
-      dist: trusty
-      sudo: required
-      stage: Test Pants
-      language: python
-      python: "2.7.13"
-      addons:
-        apt:
-          packages:
-            - cmake
-      before_install:
-        - sudo apt-get install -y pkg-config fuse libfuse-dev
-        - sudo modprobe fuse
-        - sudo chmod 666 /dev/fuse
-        - sudo chown root:$USER /etc/fuse.conf
-      env:
-        - SHARD="Rust Tests Linux"
-      before_script:
-        - ulimit -c unlimited
-        - ulimit -n 8192
-      script:
-        - ./build-support/bin/ci.sh -bcfjklmnprtx
-
-    # Rust on macOS
-    - os: osx
-      # Fuse actually works on this image. It hangs on many others.
-      osx_image: xcode8.3
-      stage: Test Pants
-      language: generic
-      env:
-        - SHARD="Rust + Platform-specific Tests OSX"
-        # Specifically avoid the OSX provided 2.7.10 under xcode8.3 since it returns a platform
-        # of `macosx-*-intel` where the `intel` suffix is bogus but pex has not yet been taught to
-        # deal with this. Can be removed when this issue is resolved:
-        # https://github.com/pantsbuild/pex/issues/523
-        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>2.7.10,<3']"
-      before_install:
-        - brew tap caskroom/cask && brew update && brew cask install osxfuse
-      before_script:
-        - ulimit -c unlimited
-        - ulimit -n 8192
-      script:
-        # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and set -z to run the platform-specific tests.
-        - ./build-support/bin/ci.sh -cfjklmnprtxz
-
-deploy:
-  # See: https://docs.travis-ci.com/user/deployment/s3/
-  provider: s3
-  access_key_id: AKIAIWOKBXVU3JLY6EGQ
-  secret_access_key:
-    secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM=
-  bucket: binaries.pantsbuild.org
-  local_dir: dist/deploy
-  # Otherwise travis will stash dist/deploy and the deploy will fail.
-  skip_cleanup: true
-  acl: public_read
-  on:
-    condition: $PREPARE_DEPLOY = 1
-    # NB: We mainly want deploys for `master` commits; but we also need new binaries for stable
-    # release branches; eg `1.3.x`
-    all_branches: true
-    repo: pantsbuild/pants
 
 # We accept the default travis-ci email author+committer notification
 # for now which is enabled even with no `notifications` config.
