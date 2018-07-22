@@ -97,28 +97,32 @@ case "${OSTYPE}" in
            ;;
 esac
 
-if [[ "${skip_pre_commit_checks:-false}" == "false" ]]; then
-  start_travis_section "PreCommit" "Running pre-commit checks"
-  FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
-  end_travis_section
-fi
-
 PANTS_COMMAND=./pants
 
 if [[ "${skip_bootstrap:-false}" == "false" ]]; then
   start_travis_section "Bootstrap" "Bootstrapping pants"
   (
     pants_pex="./pants.pex"
-    if [[ ! -x "${pants_pex}" ]]; then
+    if [[ ! -f "${pants_pex}" ]]; then
       "${PANTS_COMMAND}" ${bootstrap_compile_args[@]} binary \
         src/python/pants/bin:pants_local_binary && \
       mv dist/pants_local_binary.pex "${pants_pex}"
+    else
+      chmod +x "${pants_pex}"
+      echo "Re-using existing ${pants_pex}."
     fi
-
     PANTS_COMMAND="${pants_pex}"
     "${PANTS_COMMAND}" --version
     echo "Using pants command: ${PANTS_COMMAND}"
   ) || die "Failed to bootstrap pants."
+  end_travis_section
+fi
+
+export PANTS_COMMAND
+
+if [[ "${skip_pre_commit_checks:-false}" == "false" ]]; then
+  start_travis_section "PreCommit" "Running pre-commit checks"
+  FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
   end_travis_section
 fi
 

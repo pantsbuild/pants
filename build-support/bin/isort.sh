@@ -5,6 +5,8 @@ cd ${REPO_ROOT}
 
 source build-support/common.sh
 
+export PANTS_COMMAND="${PANTS_COMMAND:-./pants}"
+
 function usage() {
   echo "Checks import sort order for python files, optionally fixing incorrect"
   echo "sorts."
@@ -33,4 +35,4 @@ do
   esac
 done
 
-./pants -q --changed-parent=master fmt.isort -- ${isort_args[@]}
+"${PANTS_COMMAND}" -q --changed-parent=master fmt.isort -- ${isort_args[@]}
