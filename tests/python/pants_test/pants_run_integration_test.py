@@ -231,15 +231,12 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
     if config:
       config_data = config.copy()
-      ini = configparser.ConfigParser(defaults=config_data.pop('DEFAULT', None))
+      # TODO(python3port): RawConfigParser is legacy. Investigate updating to modern API.
+      ini = configparser.RawConfigParser(defaults=config_data.pop('DEFAULT', None))
       for section, section_config in config_data.items():
         ini.add_section(section)
         for key, value in section_config.items():
-          if isinstance(value, list):
-            for v in value:
-              ini.set(section, key, v)
-          else:
-            ini.set(section, key, value)
+          ini.set(section, key, value)
       ini_file_name = os.path.join(workdir, 'pants.ini')
       with safe_open(ini_file_name, mode='w') as fp:
         ini.write(fp)
