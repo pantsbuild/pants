@@ -675,7 +675,7 @@ function usage() {
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
   echo " -u  Build fs_util."
-  echo " -n  Performs a release dry run with sanity checks that dists install and run."
+  echo " -n  Performs a release dry run."
   echo "       All package distributions will be built, installed locally in"
   echo "       an ephemeral virtualenv and exercised to validate basic"
   echo "       functioning."
