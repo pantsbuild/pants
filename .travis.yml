@@ -68,7 +68,7 @@ jobs:
       osx_image: xcode8
       language: generic
       before_install: brew update && brew install bash
-      script: ./pants --version && ./build-support/bin/release.sh -q && mkdir dist/travis-cache && mv dist/pants.*.pex dist/travis-cache/pants.pex
+      script: ./pants --version && ./build-support/bin/release.sh -q && rm -rf dist/travis-cache && mkdir dist/travis-cache && mv dist/pants.*.pex dist/travis-cache/pants.pex
       deploy: &s3_deploy
         # See: https://docs.travis-ci.com/user/deployment/s3/
         provider: s3
@@ -101,7 +101,7 @@ jobs:
           -v "${HOME}:/travis/home"
           -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
           travis_ci:latest
-          sh -c "./pants --version && ./build-support/bin/release.sh -q && mkdir dist/travis-cache && mv dist/pants.*.pex dist/travis-cache/pants.pex"
+          sh -c "./pants --version && ./build-support/bin/release.sh -q && rm -rf dist/travis-cache && mkdir dist/travis-cache && mv dist/pants.*.pex dist/travis-cache/pants.pex"
       deploy: *s3_deploy
 
     - &default_test_config
