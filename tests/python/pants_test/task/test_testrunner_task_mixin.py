@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import collections
 import os
+from builtins import next, object
 from contextlib import contextmanager
 from unittest import TestCase
 from xml.etree.ElementTree import ParseError

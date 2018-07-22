@@ -5,6 +5,7 @@ python_tests(
   name = 'console_task',
   sources = ['test_console_task.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/task',
     'tests/python/pants_test:task_test_base',
   ]
@@ -35,6 +36,7 @@ python_tests(
   name = 'simple_codegen_task',
   sources = ['test_simple_codegen_task.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/base:payload',
     'src/python/pants/build_graph',
     'src/python/pants/task',
@@ -57,6 +59,7 @@ python_tests(
 python_tests(
   sources=['test_task.py'],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
@@ -71,6 +74,7 @@ python_tests(
   name='testrunner_task_mixin',
   sources=['test_testrunner_task_mixin.py'],
   dependencies=[
+    '3rdparty/python:future',
     '3rdparty/python:mock',
     'src/python/pants/task',
     'src/python/pants/util:process_handler',

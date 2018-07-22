@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 from abc import abstractmethod
+from builtins import zip
 from collections import OrderedDict
 
 from future.utils import text_type

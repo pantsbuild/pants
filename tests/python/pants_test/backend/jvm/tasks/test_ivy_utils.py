@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 import os
 import xml.etree.ElementTree as ET
+from builtins import str
 from collections import namedtuple
 from textwrap import dedent
 
@@ -666,7 +667,7 @@ class IvyFrozenResolutionTest(TestBase):
       target = self.make_target(spec, JarLibrary, jars=[jar])
       frozen_resolution = FrozenResolution()
       frozen_resolution.add_resolved_jars(target, [])
-      self.assertEquals(frozen_resolution.coordinate_to_attributes.values(), expected_attributes)
+      self.assertEquals(list(frozen_resolution.coordinate_to_attributes.values()), expected_attributes)
 
     verify_url_attributes('t1', jar1, [{'url': 'file:a/b/c', 'base_path': '.'}])
     verify_url_attributes('t2', jar2, [{'url': 'file:a/b/c', 'base_path': '.'}])

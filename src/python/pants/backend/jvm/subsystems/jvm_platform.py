@@ -5,6 +5,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+from builtins import object, str
+from functools import total_ordering
 
 from pants.base.exceptions import TaskError
 from pants.base.revision import Revision
@@ -184,6 +186,7 @@ class JvmPlatform(Subsystem):
     return Revision(*version.components[:2])
 
 
+@total_ordering
 class JvmPlatformSettings(object):
   """Simple information holder to keep track of common arguments to java compilers."""
 
@@ -230,14 +233,12 @@ class JvmPlatformSettings(object):
   def __eq__(self, other):
     return tuple(self) == tuple(other)
 
-  def __ne__(self, other):
-    return not self.__eq__(other)
+  # TODO(python3port): decide if this should raise NotImplemented on invalid comparisons
+  def __lt__(self, other):
+    return tuple(self) < tuple(other)
 
   def __hash__(self):
     return hash(tuple(self))
-
-  def __cmp__(self, other):
-    return cmp(tuple(self), tuple(other))
 
   def __str__(self):
     return 'source={source},target={target},args=({args})'.format(

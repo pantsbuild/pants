@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import object
 
 from twitter.common.collections import OrderedSet
 
@@ -237,8 +238,8 @@ class ClasspathProducts(object):
     processed_entries = set()
     for target, classpath_entries_for_target in target_to_classpath.items():
       if internal_classpath_only:
-        classpath_entries_for_target = filter(ClasspathEntry.is_internal_classpath_entry,
-                                              classpath_entries_for_target)
+        classpath_entries_for_target = [entry for entry in classpath_entries_for_target
+                                        if ClasspathEntry.is_internal_classpath_entry(entry)]
       if len(classpath_entries_for_target) > 0:
         classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
 
@@ -433,7 +434,8 @@ class ClasspathProducts(object):
     # set of targets was included here, their closure must be included.
     closure = BuildGraph.closure(root_targets, bfs=True)
     excludes = self._excludes.get_for_targets(closure)
-    return filter(_not_excluded_filter(excludes), classpath_target_tuples)
+    return [target_tuple for target_tuple in classpath_target_tuples
+            if _not_excluded_filter(excludes)(target_tuple)]
 
   def _add_excludes_for_target(self, target):
     if isinstance(target, ExportableJvmLibrary) and target.provides:

@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import time
+from builtins import range
 
 from pants.java.jar.manifest import Manifest
 from pants.util.contextutil import open_zip

@@ -8,6 +8,7 @@ import os
 import shutil
 import tempfile
 from abc import abstractmethod
+from builtins import object
 from contextlib import contextmanager
 
 import six
@@ -229,7 +230,7 @@ class Jar(object):
       def as_cli_entry(entry):
         src = entry.materialize(manifest_stage_dir)
         return '{}={}'.format(src, entry.dest) if entry.dest else src
-      files = map(as_cli_entry, self._entries) if self._entries else []
+      files = [as_cli_entry(entry) for entry in self._entries] if self._entries else []
 
       jars = self._jars or []
 

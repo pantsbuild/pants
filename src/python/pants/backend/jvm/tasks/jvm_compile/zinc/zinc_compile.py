@@ -276,7 +276,7 @@ class BaseZincCompile(JvmCompile):
               settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     self._verify_zinc_classpath(classpath)
-    self._verify_zinc_classpath(upstream_analysis.keys())
+    self._verify_zinc_classpath(list(upstream_analysis.keys()))
 
     zinc_args = []
 
@@ -409,7 +409,7 @@ class BaseZincCompile(JvmCompile):
     if not scalac_plugin_map:
       return []
 
-    plugin_jar_map = self._find_scalac_plugins(scalac_plugin_map.keys(), classpath)
+    plugin_jar_map = self._find_scalac_plugins(list(scalac_plugin_map.keys()), classpath)
     ret = []
     for name, cp_entries in plugin_jar_map.items():
       # Note that the first element in cp_entries is the one containing the plugin's metadata,

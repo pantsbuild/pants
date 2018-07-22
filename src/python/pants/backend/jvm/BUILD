@@ -46,6 +46,7 @@ python_library(
   sources=['ivy_utils.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:future',
     '3rdparty/python:six',
     ':ivy_utils_resources',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
@@ -71,6 +72,9 @@ resources(
 python_library(
   name='repository',
   sources=['repository.py'],
+  dependencies = [
+    '3rdparty/python:future',
+  ]
 )
 
 python_library(
@@ -87,7 +91,7 @@ python_library(
   name='ossrh_publication_metadata',
   sources=['ossrh_publication_metadata.py'],
   dependencies=[
-    '3rdparty/python:six',
+    '3rdparty/python:future',
     ':artifact',
     'src/python/pants/base:validation',
   ],

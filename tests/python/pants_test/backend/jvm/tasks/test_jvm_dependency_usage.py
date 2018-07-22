@@ -22,7 +22,7 @@ class TestJvmDependencyUsage(TaskTestBase):
 
   def _setup(self, target_classfiles):
     """Takes a dict mapping targets to lists of classfiles."""
-    context = self.context(target_roots=target_classfiles.keys())
+    context = self.context(target_roots=list(target_classfiles.keys()))
 
     # Create classfiles in a target-specific directory, and add it to the classpath for the target.
     classpath_products = context.products.get_data('runtime_classpath',

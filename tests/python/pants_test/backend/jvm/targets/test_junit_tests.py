@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import str
+
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.base.exceptions import TargetDefinitionException

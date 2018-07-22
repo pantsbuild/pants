@@ -251,7 +251,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       def complete_config(config):
         # Clone the input config and add cache settings.
         cache_settings = {'write_to': [cache_dir], 'read_from': [cache_dir]}
-        return dict(config.items() + [('cache.compile.zinc', cache_settings)])
+        return dict(list(config.items()) + [('cache.compile.zinc', cache_settings)])
 
       buildfile = os.path.join(src_dir, 'BUILD')
       spec = os.path.join(src_dir, ':cachetest')

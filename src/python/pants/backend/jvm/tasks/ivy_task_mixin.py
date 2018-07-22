@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import hashlib
 import logging
 import os
+from builtins import str
 
 from pants.backend.jvm.ivy_utils import NO_RESOLVE_RUN_RESULT, IvyFetchStep, IvyResolveStep
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement

@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import str
 from collections import defaultdict
 from contextlib import contextmanager
 from functools import reduce
@@ -55,7 +56,7 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
     settings_and_targets = defaultdict(set)
     for target in targets:
       settings_and_targets[target.platform].add(target)
-    return settings_and_targets.items()
+    return list(settings_and_targets.items())
 
   def _partition(self, targets, **options):
     self._task_setup(targets, **options)
@@ -102,7 +103,7 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
         self._java('j1{}'.format(version), '1.{}'.format(version)),
         self._java('j{}'.format(version), '{}'.format(version)),
       }
-    partition = self._partition(list(reduce(set.union, expected.values(), set())),
+    partition = self._partition(list(reduce(set.union, list(expected.values()), set())),
                                 platforms=self._platforms('6', '7', '8', '1.6', '1.7', '1.8'))
     self.assertEqual(len(expected), len(partition))
     self.assert_partitions_equal(expected, partition)

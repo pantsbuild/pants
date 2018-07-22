@@ -98,11 +98,10 @@ class RewriteBase(NailgunTask, AbstractClass):
     """
 
   def _get_non_synthetic_targets(self, targets):
-    return filter(
-      lambda target: isinstance(target, self._formatted_target_types)
-                     and target.has_sources(self.source_extension())
-                     and (not target.is_synthetic),
-      targets)
+    return [target for target in targets
+            if isinstance(target, self._formatted_target_types)
+            and target.has_sources(self.source_extension())
+            and not target.is_synthetic]
 
   def _calculate_sources(self, targets):
     return [(target, os.path.join(get_buildroot(), source))

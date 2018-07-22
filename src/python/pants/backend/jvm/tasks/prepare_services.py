@@ -33,7 +33,7 @@ class PrepareServices(ResourcesTask):
 
   def find_all_relevant_resources_targets(self):
     def may_have_jvm_services(target):
-      return isinstance(target, JvmTarget) and target.services.values()
+      return isinstance(target, JvmTarget) and list(target.services.values())
     return self.context.targets(predicate=may_have_jvm_services)
 
   def create_invalidation_strategy(self):

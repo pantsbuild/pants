@@ -105,7 +105,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
                                       confs=self.get_options().confs,
                                       extra_args=self._args)
     if self._report:
-      results_with_resolved_artifacts = filter(lambda r: r.has_resolved_artifacts, results)
+      results_with_resolved_artifacts = [r for r in results if r.has_resolved_artifacts]
 
       if not results_with_resolved_artifacts:
         self.context.log.info("Not generating a report. No resolution performed.")
