@@ -181,7 +181,8 @@ jobs:
       os: osx
       osx_image: xcode8
       language: generic
-      before_install: brew update && brew install bash
+      before_install:
+        brew tap caskroom/cask && brew update && brew cask install osxfuse && brew install bash
       name: Platform-specific tests for OSX
       before_script:
         - cp dist/travis-cache/pants.pex pants.pex
@@ -225,7 +226,7 @@ jobs:
       osx_image: xcode8.3
       language: generic
       before_install:
-        - brew tap caskroom/cask && brew update && brew cask install osxfuse && brew install bash
+        brew tap caskroom/cask && brew update && brew cask install osxfuse && brew install bash
       before_script:
         - ulimit -c unlimited
         - ulimit -n 8192
