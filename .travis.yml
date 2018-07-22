@@ -16,6 +16,7 @@ cache:
     - ${HOME}/.npm
     - build-support/pants_dev_deps.venv
     - src/rust/engine/target
+    - dist/travis-cache
 
 before_cache:
   # Kill all python bytecode in our cached venvs.  Some files appear to
@@ -65,7 +66,7 @@ jobs:
       osx_image: xcode8
       language: generic
       before_install: brew update && brew install bash
-      script: ./pants --version && ./build-support/bin/release.sh -q && mv dist/pants.*.pex pants.pex
+      script: ./pants --version && ./build-support/bin/release.sh -q && mkdir dist/travis-cache && mv dist/pants.*.pex dist/travis-cache/pants.pex
       deploy: &s3_deploy
         # See: https://docs.travis-ci.com/user/deployment/s3/
         provider: s3
@@ -98,7 +99,7 @@ jobs:
           -v "${HOME}:/travis/home"
           -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
           travis_ci:latest
-          sh -c "./pants --version && ./build-support/bin/release.sh -q  && mv dist/pants.*.pex pants.pex"
+          sh -c "./pants --version && ./build-support/bin/release.sh -q && mkdir dist/travis-cache && mv dist/pants.*.pex dist/travis-cache/pants.pex"
       deploy: *s3_deploy
 
     - &default_test_config
@@ -124,6 +125,7 @@ jobs:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
+      before_script: cp dist/travis-cache/pants.pex pants.pex
       script: ./build-support/bin/ci.sh -cejlpn
 
     - <<: *default_test_config
@@ -177,6 +179,7 @@ jobs:
       language: generic
       before_install: brew update && brew install bash
       name: Platform-specific tests for OSX
+      before_script: cp dist/travis-cache/pants.pex pants.pex
       script:
         # Specifically avoid the OSX provided 2.7.10 under xcode8.3 since it returns a platform
         # of `macosx-*-intel` where the `intel` suffix is bogus but pex has not yet been taught to
