@@ -235,7 +235,11 @@ class PantsRunIntegrationTest(unittest.TestCase):
       for section, section_config in config_data.items():
         ini.add_section(section)
         for key, value in section_config.items():
-          ini.set(section, key, value)
+          if isinstance(value, list):
+            for v in value:
+              ini.set(section, key, v)
+          else:
+            ini.set(section, key, value)
       ini_file_name = os.path.join(workdir, 'pants.ini')
       with safe_open(ini_file_name, mode='w') as fp:
         ini.write(fp)
