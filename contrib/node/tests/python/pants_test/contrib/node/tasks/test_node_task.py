@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 import os
 import string
+from builtins import zip
 from textwrap import dedent
 
 from pants.build_graph.target import Target
@@ -76,10 +77,10 @@ class NodeTaskTest(TaskTestBase):
     target_names = [':' + letter for letter in list(string.ascii_lowercase)]
     types_with_target_names = zip(types, target_names)
 
-    type_check_results = [(type, type_check_function(self.make_target(target_name, type)))
-                          for (type, target_name) in types_with_target_names]
+    type_check_results = {type: type_check_function(self.make_target(target_name, type))
+                          for type, target_name in types_with_target_names}
 
-    return dict(type_check_results)
+    return type_check_results
 
   def test_execute_node(self):
     task = self.create_task(self.context())

@@ -4,9 +4,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import str
 from hashlib import sha1
 
-import six
+import future
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
@@ -40,7 +41,7 @@ class IntermediateTargetFactoryBase(AbstractClass):
     :param string suffix: A string used as a suffix of the intermediate target name.
     :returns: The address of a synthetic intermediary target.
     """
-    if not isinstance(address, six.string_types):
+    if not isinstance(address, future.utils.string_types):
       raise self.ExpectedAddressError("Expected string address argument, got type {type}"
                                       .format(type=type(address)))
 

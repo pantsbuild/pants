@@ -5,8 +5,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
-import urlparse
 
+from future.moves.urllib.parse import urlparse
 from requests import RequestException
 
 from pants.cache.pinger import BestUrlSelector, InvalidRESTfulCacheProtoError, Pinger
@@ -87,7 +87,7 @@ class TestBestUrlSelector(TestBase):
   def call_url(self, expected_url, with_error=False):
     try:
       with self.best_url_selector.select_best_url() as url:
-        self.assertEquals(urlparse.urlparse(expected_url), url)
+        self.assertEquals(urlparse(expected_url), url)
 
         if with_error:
           raise RequestException('error connecting to {}'.format(url))

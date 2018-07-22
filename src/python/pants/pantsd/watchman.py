@@ -8,6 +8,7 @@ import functools
 import json
 import logging
 import os
+from builtins import str
 from collections import namedtuple
 
 from pants.pantsd.process_manager import ProcessManager

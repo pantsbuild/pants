@@ -3,6 +3,7 @@
 
 python_library(
   dependencies=[
+    '3rdparty/python:future',
     ':resources',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python/targets:python',

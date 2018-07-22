@@ -6,8 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import multiprocessing
-import Queue
+import queue
 import threading
+from builtins import object
 
 import requests
 from requests import RequestException
@@ -144,5 +145,5 @@ def _log_if_no_response(timeout_seconds, message, getter):
     try:
       getter(True, timeout_seconds)
       return
-    except Queue.Empty:
+    except queue.Empty:
       logger.info(message)

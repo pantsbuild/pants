@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 import logging
 from abc import abstractmethod
+from builtins import object, str
 
 import requests
 

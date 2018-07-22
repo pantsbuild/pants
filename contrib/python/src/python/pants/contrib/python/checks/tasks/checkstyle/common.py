@@ -12,6 +12,7 @@ import re
 import textwrap
 import tokenize
 from abc import abstractmethod
+from builtins import object
 from collections import Sequence
 
 import six
@@ -197,7 +198,7 @@ class PythonFile(object):
         yield self.translate_logical_line(
             line_number_start,
             token_start[0] + (1 if token_type is tokenize.NEWLINE else -1),
-            list(filter(None, contents)),
+            [_f for _f in contents if _f],
             indent_stack,
             endmarker=token_type == tokenize.ENDMARKER)
         contents = []

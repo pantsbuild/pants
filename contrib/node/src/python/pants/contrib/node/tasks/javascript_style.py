@@ -43,12 +43,10 @@ class JavascriptStyleBase(NodeTask):
     raise NotImplementedError()
 
   def get_lintable_node_targets(self, targets):
-    return filter(
-      lambda target: isinstance(target, NodeModule)
+    return [target for target in targets if isinstance(target, NodeModule)
                      and (target.has_sources(self._JS_SOURCE_EXTENSION)
                           or target.has_sources(self._JSX_SOURCE_EXTENSION))
-                     and (not target.is_synthetic),
-      targets)
+                     and (not target.is_synthetic)]
 
   def get_javascript_sources(self, target):
     sources = set()

@@ -9,11 +9,12 @@ import os
 import re
 import time
 import uuid
+from builtins import range, str
 from collections import defaultdict, namedtuple
 from textwrap import dedent
 
+from future.moves.itertools import zip_longest
 from six import string_types
-from six.moves import range
 
 from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
@@ -381,9 +382,9 @@ class HtmlReporter(Reporter):
       if isinstance(element, string_types):
         element = [element]
 
-      # Map assumes None for missing values, so this will pick the default for those.
-      (text, detail, detail_id, detail_initially_visible) = \
-        map(lambda x, y: x or y, element, ('', None, None, False))
+      # zip_longest assumes None for missing values, so this generator will pick the default for those.
+      default_values = ('', None, None, False)
+      (text, detail, detail_id, detail_initially_visible) = (x or y for x, y in zip_longest(element, default_values))
 
       htmlified_text = self._htmlify_text(text)
 

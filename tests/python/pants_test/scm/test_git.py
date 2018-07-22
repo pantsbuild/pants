@@ -432,7 +432,7 @@ class GitTest(unittest.TestCase):
 
       # Prove our non-utf-8 encodings were stored in the commit metadata.
       log = subprocess.check_output(['git', 'log', '--format=%e'])
-      self.assertEqual(['us-ascii', 'latin1', 'iso-8859-1'], filter(None, log.strip().splitlines()))
+      self.assertEqual(['us-ascii', 'latin1', 'iso-8859-1'], [_f for _f in log.strip().splitlines() if _f])
 
       # And show that the git log successfully transcodes all the commits none-the-less to utf-8
       changelog = self.git.changelog()
