@@ -95,7 +95,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
   PANTS_SUCCESS_CODE = 0
 
   # Support CI replacing ./pants with a binary; ie ./pants.pex.
-  PANTS_SCRIPT_NAME = os.getenv('PANTS_COMMAND', 'pants')
+  _PANTS_COMMAND_ENV_VAR_NAME = 'PANTS_COMMAND'
+  PANTS_SCRIPT_NAME = os.getenv(_PANTS_COMMAND_ENV_VAR_NAME, 'pants')
 
   @classmethod
   def hermetic(cls):
@@ -112,6 +113,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
         # Used in the wrapper script to locate a rust install.
         'HOME',
         'PANTS_PROFILE',
+        # Used to locate the correct ./pants script to use.
+        cls._PANTS_COMMAND_ENV_VAR_NAME,
       ]
 
   @classmethod
@@ -451,14 +454,15 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # N.B. BUILD.tools, contrib, 3rdparty needs to be copied vs symlinked to avoid
     # symlink prefix check error in v1 and v2 engine.
     files_to_copy = ('BUILD.tools',)
-    files_to_link = ('.pants.d',
+    files_to_link = {'.pants.d',
                      'build-support',
                      'pants',
+                     self.PANTS_SCRIPT_NAME,
                      'pants-plugins',
                      'pants.ini',
                      'pants.travis-ci.ini',
                      'rust-toolchain',
-                     'src')
+                     'src'}
     dirs_to_copy = ('3rdparty', 'contrib') + tuple(dirs_to_copy or [])
 
     with self.temporary_workdir() as tmp_dir:
