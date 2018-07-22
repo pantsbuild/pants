@@ -97,7 +97,7 @@ case "${OSTYPE}" in
            ;;
 esac
 
-PANTS_COMMAND=./pants
+PANTS_COMMAND="./pants"
 
 if [[ "${skip_bootstrap:-false}" == "false" ]]; then
   start_travis_section "Bootstrap" "Bootstrapping pants"

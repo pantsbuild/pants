@@ -3,7 +3,7 @@
 
 set -e
 
-VIRTUALENV_VERSION=15.2.0
+VIRTUALENV_VERSION=16.0.0
 VIRTUALENV_PACKAGE_LOCATION=${VIRTUALENV_PACKAGE_LOCATION:-https://pypi.io/packages/source/v/virtualenv}
 
 if [[ $GIT_HOOK == 1 ]] ; then
