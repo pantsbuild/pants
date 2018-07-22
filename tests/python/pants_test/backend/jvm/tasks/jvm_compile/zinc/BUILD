@@ -3,9 +3,10 @@
 
 
 python_library(
-  name='zinc_compile_integration_base',
-  sources=['zinc_compile_integration_base.py'],
-  dependencies=[
+  name = 'zinc_compile_integration_base',
+  sources = ['zinc_compile_integration_base.py'],
+  dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
   ],
 )

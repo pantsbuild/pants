@@ -11,9 +11,9 @@ import os
 import shutil
 import sys
 from abc import abstractmethod
+from builtins import object, range, str
 from contextlib import contextmanager
 
-from six.moves import range
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm import argfile

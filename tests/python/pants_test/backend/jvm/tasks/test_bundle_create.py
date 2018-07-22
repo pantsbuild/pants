@@ -178,7 +178,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
   def _check_products(self, products, product_fullname):
     self.assertIsNotNone(products)
     product_data = products.get(self.app_target)
-    product_basedir = product_data.keys()[0]
+    product_basedir = list(product_data.keys())[0]
     self.assertIn(self.pants_workdir, product_basedir)
     self.assertEquals(product_data[product_basedir], [product_fullname])
     product_path = os.path.join(product_basedir, product_fullname)

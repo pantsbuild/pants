@@ -85,7 +85,7 @@ class AnalysisExtraction(NailgunTask):
     fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
         classpath_product)
 
-    targets = zinc_analysis.keys()
+    targets = list(zinc_analysis.keys())
     with self.invalidated(targets,
                           fingerprint_strategy=fingerprint_strategy,
                           invalidate_dependents=True) as invalidation_check:

@@ -11,6 +11,7 @@ import os
 import pkgutil
 import shutil
 import sys
+from builtins import input, next, object, str
 from collections import OrderedDict, defaultdict, namedtuple
 from copy import copy
 
@@ -164,7 +165,7 @@ class PomWriter(object):
 
     target_jar = self._internaldep(self._as_versioned_jar(target), target)
     if target_jar:
-      target_jar = target_jar.extend(dependencies=dependencies.values())
+      target_jar = target_jar.extend(dependencies=list(dependencies.values()))
 
     template_relpath = os.path.join(_TEMPLATES_RELPATH, 'pom.xml.mustache')
     template_text = pkgutil.get_data(__name__, template_relpath)
@@ -472,7 +473,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
       isatty = False
     if not isatty:
       return True
-    push = raw_input('\nPublish {} with revision {} ? [y|N] '.format(
+    push = input('\nPublish {} with revision {} ? [y|N] '.format(
       coord, version
     ))
     print('\n')
@@ -867,8 +868,10 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
     def exportable(tgt):
       return tgt in candidates and self._is_exported(tgt)
 
-    return OrderedSet(filter(exportable,
-                             reversed(sort_targets(filter(exportable, candidates)))))
+    return OrderedSet(target for target in
+                      reversed(sort_targets(candidate for candidate in candidates
+                                            if exportable(candidate)))
+                      if exportable(target))
 
   def entry_fingerprint(self, target, fingerprint_internal):
     sha = hashlib.sha1()
@@ -894,7 +897,8 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   def changelog(self, target, sha):
     # Filter synthetic files.
-    files = filter(lambda filename: not filename.startswith(os.pardir), target.sources_relative_to_buildroot())
+    files = [filename for filename in target.sources_relative_to_buildroot()
+             if not filename.startswith(os.pardir)]
     return ensure_text(self.scm.changelog(from_commit=sha, files=files))
 
   def fetch_ivysettings(self, ivy):

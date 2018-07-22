@@ -8,8 +8,10 @@ import hashlib
 import itertools
 import json
 import os
-import urllib
+from builtins import str, zip
 from collections import defaultdict
+
+from future.moves.urllib import parse
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
@@ -250,7 +252,7 @@ class CoursierMixin(NailgunTask):
 
     repos = coursier_subsystem_instance.get_options().repos
     # make [repoX, repoY] -> ['-r', repoX, '-r', repoY]
-    repo_args = list(itertools.chain(*zip(['-r'] * len(repos), repos)))
+    repo_args = list(itertools.chain(*list(zip(['-r'] * len(repos), repos))))
     artifact_types_arg = ['-A', ','.join(coursier_subsystem_instance.get_options().artifact_types)]
     advanced_options = coursier_subsystem_instance.get_options().fetch_options
     common_args = ['fetch',
@@ -373,7 +375,7 @@ class CoursierMixin(NailgunTask):
 
       if j.get_url():
         jar_url = j.get_url()
-        module += ',url={}'.format(urllib.quote_plus(jar_url))
+        module += ',url={}'.format(parse.quote_plus(jar_url))
         
       if j.intransitive:
         cmd_args.append('--intransitive')

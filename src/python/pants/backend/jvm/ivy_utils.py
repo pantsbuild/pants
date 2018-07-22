@@ -12,7 +12,9 @@ import pkgutil
 import threading
 import xml.etree.ElementTree as ET
 from abc import abstractmethod
+from builtins import object, str
 from collections import OrderedDict, defaultdict, namedtuple
+from functools import total_ordering
 
 import six
 from twitter.common.collections import OrderedSet
@@ -512,6 +514,7 @@ class IvyResolveMappingError(Exception):
   """Raised when there is a failure mapping the ivy resolve results to pants objects."""
 
 
+@total_ordering
 class IvyModuleRef(object):
   """
   :API: public
@@ -532,8 +535,11 @@ class IvyModuleRef(object):
   def __eq__(self, other):
     return isinstance(other, IvyModuleRef) and self._id == other._id
 
-  def __ne__(self, other):
-    return not self == other
+  # TODO(python3port): Return NotImplemented if other does not have attributes
+  def __lt__(self, other):
+    # We can't just re-use __repr__ or __str_ because we want to order rev last
+    return ((self.org, self.name, self.classifier, self.ext, self.rev) <
+            (other.org, other.name, other.classifier, other.ext, other.rev))
 
   def __hash__(self):
     return hash(self._id)
@@ -544,11 +550,6 @@ class IvyModuleRef(object):
   def __repr__(self):
     return ('IvyModuleRef(org={!r}, name={!r}, rev={!r}, classifier={!r}, ext={!r})'
             .format(*self._id))
-
-  def __cmp__(self, other):
-    # We can't just re-use __repr__ or __str_ because we want to order rev last
-    return cmp((self.org, self.name, self.classifier, self.ext, self.rev),
-               (other.org, other.name, other.classifier, other.ext, other.rev))
 
   @property
   def caller_key(self):
@@ -723,7 +724,7 @@ class IvyUtils(object):
       return []
     else:
       with safe_open(path, 'r') as cp:
-        return filter(None, (path.strip() for path in cp.read().split(os.pathsep)))
+        return [_f for _f in (path.strip() for path in cp.read().split(os.pathsep)) if _f]
 
   @classmethod
   def do_resolve(cls, executor, extra_args, ivyxml, jvm_options, workdir_report_paths_by_conf,
@@ -1096,7 +1097,7 @@ class IvyUtils(object):
         new_jars[coordinate] = jar.copy(excludes=jar.excludes + additional_excludes)
       jars = new_jars
 
-    return jars.values(), global_excludes
+    return list(jars.values()), global_excludes
 
   @classmethod
   def _resolve_conflict(cls, existing, proposed):
@@ -1177,7 +1178,7 @@ class IvyUtils(object):
         mutable=jar_attributes.mutable,
         force=jar_attributes.force,
         transitive=jar_attributes.transitive,
-        artifacts=artifacts.values(),
+        artifacts=list(artifacts.values()),
         any_have_url=any_have_url,
         excludes=[cls._generate_exclude_template(exclude) for exclude in excludes])
 
@@ -1221,7 +1222,7 @@ class IvyUtils(object):
         module=jar_attributes.name,
         version=jar_attributes.rev,
         mutable=jar_attributes.mutable,
-        artifacts=artifacts.values(),
+        artifacts=list(artifacts.values()),
         any_have_url=any_have_url,
         excludes=[])
 
