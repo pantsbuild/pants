@@ -57,30 +57,6 @@ stages:
   - name: Deploy Pants Pex
     if: tag IS present AND tag =~ ^release_.*$
 
-default_test_config: &default_test_config
-  stage: Test Pants
-  os: linux
-  dist: trusty
-  sudo: required
-  addons:
-    apt:
-      packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-  language: python
-  python: "2.7.13"
-  before_install:
-    # Remove bad openjdk6 from trusty image, so
-    # Pants will pick up oraclejdk6 from `packages` above.
-    - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-    - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-    - jdk_switcher use oraclejdk8
-
 jobs:
   include:
 
@@ -99,12 +75,12 @@ jobs:
         - S3_DEPLOY = 1
       script:
         - ./pants --version && ./build-support/bin/release.sh -s
-      deploy:
+      deploy: &s3_deploy
         # See: https://docs.travis-ci.com/user/deployment/s3/
         provider: s3
         access_key_id: AKIAIWOKBXVU3JLY6EGQ
         secret_access_key:
-          secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM=
+          secure: "UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM="
         bucket: binaries.pantsbuild.org
         local_dir: dist/deploy
         # Otherwise travis will stash dist/deploy and the deploy will fail.
@@ -137,19 +113,7 @@ jobs:
           -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
           travis_ci:latest
           sh -c "./pants --version && ./build-support/bin/release.sh -s"
-      deploy:
-        # See: https://docs.travis-ci.com/user/deployment/s3/
-        provider: s3
-        access_key_id: AKIAIWOKBXVU3JLY6EGQ
-        secret_access_key:
-          secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM=
-        bucket: binaries.pantsbuild.org
-        local_dir: dist/deploy
-        # Otherwise travis will stash dist/deploy and the deploy will fail.
-        skip_cleanup: true
-        acl: public_read
-        on:
-          condition: $S3_DEPLOY = 1
+      deploy: *s3_deploy
 
     # Build and deploy an OSX & Linux multi-platform Pants pex to S3.
     - stage: Build Pants Pex
@@ -164,22 +128,31 @@ jobs:
         # Wheels were downloaded to dist/deploy from S3 and we don't want to re-upload them to S3,
         # but we do want to upload the pex so shuffle dist/deploy/ contents pre-deploy.
         - "rm -rf dist/deploy && mkdir -p dist/deploy && mv dist/pants.*.pex dist/deploy/"
-      deploy:
-        # See: https://docs.travis-ci.com/user/deployment/s3/
-        provider: s3
-        access_key_id: AKIAIWOKBXVU3JLY6EGQ
-        secret_access_key:
-          secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM=
-        bucket: binaries.pantsbuild.org
-        local_dir: dist/deploy
-        # Otherwise travis will stash dist/deploy and the deploy will fail.
-        skip_cleanup: true
-        acl: public_read
-        on:
-          condition: $S3_DEPLOY = 1
+      deploy: *s3_deploy
 
-
-    - <<: *default_test_config
+    - &default_test_config
+      stage: Test Pants
+      os: linux
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - lib32stdc++6
+            - lib32z1
+            - lib32z1-dev
+            - gcc-multilib
+            - python-dev
+            - openssl
+            - libssl-dev
+      language: python
+      python: "2.7.13"
+      before_install:
+        # Remove bad openjdk6 from trusty image, so
+        # Pants will pick up oraclejdk6 from `packages` above.
+        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+        - jdk_switcher use oraclejdk8
       env:
         - SHARD="Various pants self checks and lint"
       script:
@@ -292,20 +265,7 @@ jobs:
         - ./build-support/bin/ci.sh -bcfjklmnprtx
       before_deploy:
         - ./build-support/bin/release.sh -u
-      deploy:
-        # See: https://docs.travis-ci.com/user/deployment/s3/
-        provider: s3
-        access_key_id: AKIAIWOKBXVU3JLY6EGQ
-        secret_access_key:
-          secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM=
-        bucket: binaries.pantsbuild.org
-        local_dir: dist/deploy
-        # Otherwise travis will stash dist/deploy and the deploy will fail.
-        skip_cleanup: true
-        acl: public_read
-        on:
-          condition: $S3_DEPLOY = 1
-
+      deploy: *s3_deploy
 
     # Test rust code on OSX.
     - os: osx
@@ -324,19 +284,7 @@ jobs:
         - ./build-support/bin/ci.sh -bcfjklmnprtx
       before_deploy:
         - ./build-support/bin/release.sh -u
-      deploy:
-        # See: https://docs.travis-ci.com/user/deployment/s3/
-        provider: s3
-        access_key_id: AKIAIWOKBXVU3JLY6EGQ
-        secret_access_key:
-          secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM=
-        bucket: binaries.pantsbuild.org
-        local_dir: dist/deploy
-        # Otherwise travis will stash dist/deploy and the deploy will fail.
-        skip_cleanup: true
-        acl: public_read
-        on:
-          condition: $S3_DEPLOY = 1
+      deploy: *s3_deploy
 
     # Deploy the OSX / Linux Pants pex saved in S3 to Github releases.
     - stage: Deploy Pants Pex
