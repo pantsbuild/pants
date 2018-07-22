@@ -93,7 +93,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
   """A base class useful for integration tests for targets in the same repo."""
 
   PANTS_SUCCESS_CODE = 0
-  PANTS_SCRIPT_NAME = 'pants'
+
+  # Support CI replacing ./pants with a binary; ie ./pants.pex.
+  PANTS_SCRIPT_NAME = os.getenv('PANTS_COMMAND', 'pants')
 
   @classmethod
   def hermetic(cls):
