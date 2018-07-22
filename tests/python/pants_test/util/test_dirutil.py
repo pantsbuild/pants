@@ -10,8 +10,8 @@ import time
 import unittest
 from contextlib import contextmanager
 
-import future
 import mock
+from future.utils import text_type
 
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
@@ -120,10 +120,10 @@ class DirutilTest(unittest.TestCase):
     # unicode constructor.
     with temporary_dir() as tmpdir:
       safe_mkdir(os.path.join(tmpdir, '中文'))
-      if isinstance(tmpdir, future.utils.text_type):
+      if isinstance(tmpdir, text_type):
         tmpdir = tmpdir.encode('utf-8')
       for _, dirs, _ in dirutil.safe_walk(tmpdir):
-        self.assertTrue(all(isinstance(dirname, future.utils.text_type) for dirname in dirs))
+        self.assertTrue(all(isinstance(dirname, text_type) for dirname in dirs))
 
   @contextmanager
   def tree(self):

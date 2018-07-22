@@ -6,14 +6,14 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from builtins import object
 
-import future
+from future.utils import string_types
 
 from pants.backend.jvm.artifact import PublicationMetadata
 from pants.base.validation import assert_list
 
 
 def _validate_maybe_string(name, item):
-  if item and not isinstance(item, future.utils.string_types):
+  if item and not isinstance(item, string_types):
     raise ValueError('{} was expected to be of type {} but given {}'.format(name, type(item), item))
   return item
 

@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from builtins import object, str
 
-import future
+from future.utils import string_types
 
 from pants.build_graph.intermediate_target_factory import IntermediateTargetFactoryBase
 
@@ -28,7 +28,7 @@ class Scope(frozenset):
     """
     if not scope:
       return ('default',)
-    if isinstance(scope, future.utils.string_types):
+    if isinstance(scope, string_types):
       scope = scope.split(' ')
     scope = {str(s).lower() for s in scope if s}
     return scope or ('default',)
