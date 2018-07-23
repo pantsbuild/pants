@@ -255,6 +255,14 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
         description=''
       )
 
+  def test_create_from_snapshot_with_env(self):
+    req = ExecuteProcessRequest.create_with_empty_snapshot(
+      argv=('foo',),
+      description="Some process",
+      env={'VAR': 'VAL'},
+    )
+    self.assertEquals(req.env, ('VAR', 'VAL'))
+
 
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
