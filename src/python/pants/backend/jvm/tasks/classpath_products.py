@@ -26,8 +26,9 @@ class ClasspathEntry(object):
   :API: public
   """
 
-  def __init__(self, path):
+  def __init__(self, path, directory_digest=None):
     self._path = path
+    self._directory_digest = directory_digest
 
   @property
   def path(self):
@@ -41,6 +42,16 @@ class ClasspathEntry(object):
     """
     return self._path
 
+  @property
+  def directory_digest(self):
+    """Returns the directory digest which contains this file. May be None.
+
+    This API is experimental, and subject to change.
+
+    :rtype: pants.engine.fs.DirectoryDigest
+    """
+    return self._directory_digest
+
   def is_excluded_by(self, excludes):
     """Returns `True` if this classpath entry should be excluded given the `excludes` in play.
 
@@ -51,16 +62,23 @@ class ClasspathEntry(object):
     return False
 
   def __hash__(self):
-    return hash(self.path)
+    return hash((self.path, self.directory_digest))
 
   def __eq__(self, other):
-    return isinstance(other, ClasspathEntry) and self.path == other.path
+    return (
+      isinstance(other, ClasspathEntry) and
+      self.path == other.path and
+      self.directory_digest == other.directory_digest
+    )
 
   def __ne__(self, other):
     return not self == other
 
   def __repr__(self):
-    return 'ClasspathEntry(path={!r})'.format(self.path)
+    return 'ClasspathEntry(path={!r}, directory_digest={!r})'.format(
+      self.path,
+      self.directory_digest,
+    )
 
   @classmethod
   def is_artifact_classpath_entry(cls, classpath_entry):
@@ -83,8 +101,8 @@ class ArtifactClasspathEntry(ClasspathEntry):
   :API: public
   """
 
-  def __init__(self, path, coordinate, cache_path):
-    super(ArtifactClasspathEntry, self).__init__(path)
+  def __init__(self, path, coordinate, cache_path, directory_digest=None):
+    super(ArtifactClasspathEntry, self).__init__(path, directory_digest)
     self._coordinate = coordinate
     self._cache_path = cache_path
 
@@ -122,14 +140,17 @@ class ArtifactClasspathEntry(ClasspathEntry):
     return (isinstance(other, ArtifactClasspathEntry) and
             self.path == other.path and
             self.coordinate == other.coordinate and
-            self.cache_path == other.cache_path)
+            self.cache_path == other.cache_path and
+            self.directory_digest == other.directory_digest)
 
   def __ne__(self, other):
     return not self == other
 
   def __repr__(self):
-    return ('ArtifactClasspathEntry(path={!r}, coordinate={!r}, cache_path={!r})'
-            .format(self.path, self.coordinate, self.cache_path))
+    return (
+      'ArtifactClasspathEntry(path={!r}, coordinate={!r}, cache_path={!r}, directory_digest={!r})'
+        .format(self.path, self.coordinate, self.cache_path, self.directory_digest)
+    )
 
 
 def _matches_exclude(coordinate, exclude):
