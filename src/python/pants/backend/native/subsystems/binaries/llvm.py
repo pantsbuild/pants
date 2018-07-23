@@ -68,7 +68,8 @@ class LLVM(NativeTool):
       path_entries=self.path_entries(),
       exe_filename=platform.resolve_platform_specific(
         self._PLATFORM_SPECIFIC_LINKER_NAME),
-      library_dirs=[])
+      library_dirs=[],
+      linking_library_dirs=[])
 
   # FIXME: use ParseSearchDirs for this and other include directories -- we shouldn't be trying to
   # guess the path here.

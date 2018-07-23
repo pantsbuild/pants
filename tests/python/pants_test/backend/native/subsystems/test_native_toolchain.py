@@ -8,8 +8,10 @@ import os
 import re
 from contextlib import contextmanager
 
-from pants.backend.native.config.environment import (GCCCCompiler, GCCCppCompiler, Linker,
-                                                     LLVMCCompiler, LLVMCppCompiler, Platform)
+from pants.backend.native.config.environment import (GCCCCompiler, GCCCppCompiler, GCCCppToolchain,
+                                                     GCCCToolchain, Linker, LLVMCCompiler,
+                                                     LLVMCppCompiler, LLVMCppToolchain,
+                                                     LLVMCToolchain, Platform)
 from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
@@ -39,66 +41,69 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     self.toolchain = global_subsystem_instance(NativeToolchain)
     self.rules = native_backend_rules()
 
+    gcc_subsystem = global_subsystem_instance(GCC)
+    self.gcc_version = gcc_subsystem.version()
+    llvm_subsystem = global_subsystem_instance(LLVM)
+    self.llvm_version = llvm_subsystem.version()
+
   def _sched(self, *args, **kwargs):
     return self.mk_scheduler(rules=self.rules, *args, **kwargs)
 
   def test_gcc_version(self):
     scheduler = self._sched()
+    gcc_c_toolchain = self.execute_expecting_one_result(
+      scheduler, GCCCToolchain, self.toolchain).value
 
-    platform = Platform.create()
-
-    gcc_subsystem = global_subsystem_instance(GCC)
-    gcc_version = gcc_subsystem.version()
-
-    gcc_c_compiler = self.execute_expecting_one_result(
-      scheduler, GCCCCompiler, self.toolchain).value
-    gcc = gcc_c_compiler.c_compiler
+    gcc = gcc_c_toolchain.gcc_c_compiler.c_compiler
     gcc_version_out = self._invoke_capturing_output(
       [gcc.exe_filename, '--version'],
-      env=gcc.get_invocation_environment_dict(platform))
+      env=gcc.get_invocation_environment_dict(self.platform))
 
-    gcc_version_regex = re.compile('^gcc.*{}$'.format(re.escape(gcc_version)),
+    gcc_version_regex = re.compile('^gcc.*{}$'.format(re.escape(self.gcc_version)),
                                    flags=re.MULTILINE)
     self.assertIsNotNone(gcc_version_regex.search(gcc_version_out))
 
-    gcc_cpp_compiler = self.execute_expecting_one_result(
-      scheduler, GCCCppCompiler, self.toolchain).value
-    gpp = gcc_cpp_compiler.cpp_compiler
+  def test_gpp_version(self):
+    scheduler = self._sched()
+    gcc_cpp_toolchain = self.execute_expecting_one_result(
+      scheduler, GCCCppToolchain, self.toolchain).value
+
+    gpp = gcc_cpp_toolchain.gcc_cpp_compiler.cpp_compiler
     gpp_version_out = self._invoke_capturing_output(
       [gpp.exe_filename, '--version'],
-      env=gpp.get_invocation_environment_dict(platform))
+      env=gpp.get_invocation_environment_dict(self.platform))
 
-    gpp_version_regex = re.compile(r'^g\+\+.*{}$'.format(re.escape(gcc_version)),
+    gpp_version_regex = re.compile(r'^g\+\+.*{}$'.format(re.escape(self.gcc_version)),
                                    flags=re.MULTILINE)
     self.assertIsNotNone(gpp_version_regex.search(gpp_version_out))
 
   def test_clang_version(self):
     scheduler = self._sched()
+    llvm_c_toolchain = self.execute_expecting_one_result(
+      scheduler, LLVMCToolchain, self.toolchain).value
 
-    platform = Platform.create()
-
-    llvm_subsystem = global_subsystem_instance(LLVM)
-    llvm_version = llvm_subsystem.version()
-    llvm_version_regex = re.compile('^clang version {}'.format(re.escape(llvm_version)),
-                                    flags=re.MULTILINE)
-
-    llvm_c_compiler = self.execute_expecting_one_result(
-      scheduler, LLVMCCompiler, self.toolchain).value
-    clang = llvm_c_compiler.c_compiler
-    llvm_version_out = self._invoke_capturing_output(
+    clang = llvm_c_toolchain.llvm_c_compiler.c_compiler
+    clang_version_out = self._invoke_capturing_output(
       [clang.exe_filename, '--version'],
-      env=clang.get_invocation_environment_dict(platform))
+      env=clang.get_invocation_environment_dict(self.platform))
 
-    self.assertIsNotNone(llvm_version_regex.search(llvm_version_out))
+    clang_version_regex = re.compile('^clang version {}'.format(re.escape(self.llvm_version)),
+                                     flags=re.MULTILINE)
+    self.assertIsNotNone(clang_version_regex.search(clang_version_out))
 
-    llvm_cpp_compiler = self.execute_expecting_one_result(
-      scheduler, LLVMCppCompiler, self.toolchain).value
-    clangpp = llvm_cpp_compiler.cpp_compiler
-    gpp_version_out = self._invoke_capturing_output(
+  def test_clangpp_version(self):
+    scheduler = self._sched()
+    clangpp_version_regex = re.compile('^clang version {}'.format(re.escape(self.llvm_version)),
+                                       flags=re.MULTILINE)
+
+    llvm_cpp_toolchain = self.execute_expecting_one_result(
+      scheduler, LLVMCppToolchain, self.toolchain).value
+    clangpp = llvm_cpp_toolchain.llvm_cpp_compiler.cpp_compiler
+    clanggpp_version_out = self._invoke_capturing_output(
       [clangpp.exe_filename, '--version'],
-      env=clangpp.get_invocation_environment_dict(platform))
+      env=clangpp.get_invocation_environment_dict(self.platform))
 
-    self.assertIsNotNone(llvm_version_regex.search(gpp_version_out))
+    self.assertIsNotNone(clangpp_version_regex.search(clanggpp_version_out))
 
   @contextmanager
   def _hello_world_source_environment(self, file_name, contents, scheduler_request_specs):

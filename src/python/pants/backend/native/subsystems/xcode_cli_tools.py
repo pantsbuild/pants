@@ -140,7 +140,8 @@ class XCodeCLITools(Subsystem):
     return Linker(
       path_entries=self.path_entries(),
       exe_filename='ld',
-      library_dirs=[])
+      library_dirs=[],
+      linking_library_dirs=[])
 
   @memoized_method
   def c_compiler(self):

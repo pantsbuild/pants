@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
-from pants.backend.native.config.environment import Linker, Platform
+from pants.backend.native.config.environment import LLVMCppToolchain, Platform
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_compile import NativeTargetDependencies, ObjectFiles
@@ -59,12 +59,17 @@ class LinkSharedLibraries(NativeTask):
     return super(LinkSharedLibraries, cls).subsystem_dependencies() + (NativeToolchain.scoped(cls),)
 
   @memoized_property
-  def _toolchain(self):
+  def _native_toolchain(self):
     return NativeToolchain.scoped_instance(self)
 
   @memoized_property
+  def _cpp_toolchain(self):
+    llvm_cpp_toolchain = self._request_single(LLVMCppToolchain, self._native_toolchain)
+    return llvm_cpp_toolchain.as_cpp_toolchain
+
+  @memoized_property
   def linker(self):
-    return self._request_single(Linker, self._toolchain)
+    return self._cpp_toolchain.cpp_linker
 
   def _retrieve_single_product_at_target_base(self, product_mapping, target):
     self.context.log.debug("product_mapping: {}".format(product_mapping))

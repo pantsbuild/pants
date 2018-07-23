@@ -8,7 +8,7 @@ import os
 from abc import abstractproperty
 from builtins import object
 
-from pants.engine.rules import SingletonRule
+from pants.engine.rules import RootRule, SingletonRule
 from pants.util.objects import datatype
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
 from pants.util.strutil import create_path_env_var, safe_shlex_join
@@ -82,6 +82,7 @@ class Linker(datatype([
     'path_entries',
     'exe_filename',
     'library_dirs',
+    'linking_library_dirs',
 ]), Executable):
 
   # FIXME(#5951): We need a way to compose executables more hygienically. This could be done
@@ -99,10 +100,7 @@ class Linker(datatype([
     })
     ret.update({
       'LDSHARED': self.exe_filename,
-      # FIXME: this overloads the meaning of 'library_dirs' to also mean "directories containing
-      # static libraries required for creating an executable" (currently, libc). These concepts
-      # should be distinct.
-      'LIBRARY_PATH': create_path_env_var(self.library_dirs),
+      'LIBRARY_PATH': create_path_env_var(self.linking_library_dirs),
       'LDFLAGS': safe_shlex_join(all_ldflags_for_platform),
     })
 
@@ -166,13 +164,93 @@ class CppCompiler(datatype([
 class GCCCCompiler(datatype([('c_compiler', CCompiler)])): pass
 
 
-class LLVMCCompiler(datatype([('c_compiler', CCompiler)])): pass
+class GCCCLinker(datatype([('c_linker', Linker)])): pass
 
 
 class GCCCppCompiler(datatype([('cpp_compiler', CppCompiler)])): pass
 
 
+class GCCCppLinker(datatype([('cpp_linker', Linker)])): pass
+
+
+class LLVMCCompiler(datatype([('c_compiler', CCompiler)])): pass
+
+
+class LLVMCLinker(datatype([('c_linker', Linker)])): pass
+
+
 class LLVMCppCompiler(datatype([('cpp_compiler', CppCompiler)])): pass
+
+
+class LLVMCppLinker(datatype([('cpp_linker', Linker)])): pass
+
+
+class CToolchain(datatype([('c_compiler', CCompiler), ('c_linker', Linker)])): pass
+
+
+class CToolchainProvider(object):
+
+  @abstractproperty
+  def as_c_toolchain(self):
+    """???"""
+
+
+class LLVMCToolchain(datatype([
+    ('llvm_c_compiler', LLVMCCompiler),
+    ('llvm_c_linker', LLVMCLinker),
+]), CToolchainProvider):
+
+  @property
+  def as_c_toolchain(self):
+    return CToolchain(
+      c_compiler=self.llvm_c_compiler.c_compiler,
+      c_linker=self.llvm_c_linker.c_linker)
+
+
+class GCCCToolchain(datatype([
+    ('gcc_c_compiler', GCCCCompiler),
+    ('gcc_c_linker', GCCCLinker),
+]), CToolchainProvider):
+
+  @property
+  def as_c_toolchain(self):
+    return CToolchain(
+      c_compiler=self.gcc_c_compiler.c_compiler,
+      c_linker=self.gcc_c_linker.c_linker)
+
+
+class CppToolchain(datatype([('cpp_compiler', CppCompiler), ('cpp_linker', Linker)])): pass
+
+
+class CppToolchainProvider(object):
+
+  @abstractproperty
+  def as_cpp_toolchain(self):
+    """???"""
+
+
+class LLVMCppToolchain(datatype([
+    ('llvm_cpp_compiler', LLVMCppCompiler),
+    ('llvm_cpp_linker', LLVMCppLinker),
+]), CppToolchainProvider):
+
+  @property
+  def as_cpp_toolchain(self):
+    return CppToolchain(
+      cpp_compiler=self.llvm_cpp_compiler.cpp_compiler,
+      cpp_linker=self.llvm_cpp_linker.cpp_linker)
+
+
+class GCCCppToolchain(datatype([
+    ('gcc_cpp_compiler', GCCCppCompiler),
+    ('gcc_cpp_linker', GCCCppLinker),
+]), CppToolchainProvider):
+
+  @property
+  def as_cpp_toolchain(self):
+    return CppToolchain(
+      cpp_compiler=self.gcc_cpp_compiler.cpp_compiler,
+      cpp_linker=self.gcc_cpp_linker.cpp_linker)
 
 
 # FIXME: make this an @rule, after we can automatically produce LibcDev and other subsystems in the
@@ -185,5 +263,9 @@ class HostLibcDev(datatype(['crti_object', 'fingerprint'])):
 
 def create_native_environment_rules():
   return [
+    RootRule(LLVMCToolchain),
+    RootRule(GCCCToolchain),
+    RootRule(LLVMCppToolchain),
+    RootRule(LLVMCppToolchain),
     SingletonRule(Platform, Platform.create()),
   ]
