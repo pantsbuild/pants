@@ -182,7 +182,7 @@ jobs:
       osx_image: xcode8
       language: generic
       before_install:
-        brew tap caskroom/cask && brew update && brew cask install osxfuse && brew install bash
+        brew update && brew tap caskroom/cask && brew update && brew cask install osxfuse && brew install bash
       name: Platform-specific tests for OSX
       before_script:
         - cp dist/travis-cache/pants.pex pants.pex
