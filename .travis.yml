@@ -58,15 +58,15 @@ before_cache:
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
-  - Build wheels and pants pex
-  - Test pants
-  - name: Deploy pants pex
+  - bootstrap
+  - test
+  - name: release
     if: tag IS present AND tag =~ ^release_.*$
 
 jobs:
   include:
 
-    - stage: Build wheels and pants pex
+    - stage: bootstrap
       name: OSX Wheel and Pants PEX Builder
       os: osx
       # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
@@ -88,7 +88,7 @@ jobs:
         skip_cleanup: true
         acl: public_read
 
-    - stage: Build wheels and pants pex
+    - stage: bootstrap
       name: Linux Wheel and Pants PEX Builder
       os: linux
       dist: trusty
@@ -113,7 +113,7 @@ jobs:
       deploy: *s3_deploy
 
     - &default_test_config
-      stage: Test pants
+      stage: test
       name: Various pants self checks and lint
       os: linux
       dist: trusty
@@ -186,16 +186,18 @@ jobs:
       script: ./build-support/bin/ci.sh -efkmrjlpnt -i 6/7
 
     # Run OSX platform-specific tests.
-    - stage: Test pants
+    - stage: test
+      name: Platform-specific tests for OSX
       os: osx
       osx_image: xcode8
       language: generic
       before_install:
         brew update && brew tap caskroom/cask && brew update && brew cask install osxfuse && brew install bash
-      name: Platform-specific tests for OSX
       before_script:
         - cp dist/travis-cache/pants.pex pants.pex
         - cp dist/travis-cache/native_engine.so src/python/pants/engine/native_engine.so
+        - ulimit -c unlimited
+        - ulimit -n 8192
       script:
         # Specifically avoid the OSX provided 2.7.10 under xcode8.3 since it returns a platform
         # of `macosx-*-intel` where the `intel` suffix is bogus but pex has not yet been taught to
@@ -205,7 +207,7 @@ jobs:
           ./build-support/bin/ci.sh -cfjklmnprtz
 
     # Test rust code on Linux.
-    - stage: Test pants
+    - stage: test
       name: Rust tests for Linux & fs_util deploy
       os: linux
       dist: trusty
@@ -229,7 +231,7 @@ jobs:
       deploy: *s3_deploy
 
     # Test rust code on OSX.
-    - stage: Test pants
+    - stage: test
       name: Rust tests for OSX & fs_util deploy
       os: osx
       # Fuse actually works on this image. It hangs on many others.
@@ -245,7 +247,8 @@ jobs:
       deploy: *s3_deploy
 
     # Deploy the OSX / Linux Pants pex saved in S3 to Github releases.
-    - stage: Deploy pants pex
+    - stage: release
+      name: Release Pants PEX
       os: linux
       dist: trusty
       language: python
