@@ -34,19 +34,19 @@ class BuildConfigInitializer(object):
   _cached_build_config = None
 
   @classmethod
-  def get(cls, options_bootstrapper, working_set=None):
+  def get(cls, options_bootstrapper):
     if cls._cached_build_config is None:
-      cls._cached_build_config = cls(options_bootstrapper, working_set).setup()
+      cls._cached_build_config = cls(options_bootstrapper).setup()
     return cls._cached_build_config
 
   @classmethod
   def reset(cls):
     cls._cached_build_config = None
 
-  def __init__(self, options_bootstrapper, working_set=None):
+  def __init__(self, options_bootstrapper):
     self._options_bootstrapper = options_bootstrapper
     self._bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
-    self._working_set = working_set or PluginResolver(self._options_bootstrapper).resolve()
+    self._working_set = PluginResolver(self._options_bootstrapper).resolve()
 
   def _load_plugins(self, working_set, python_paths, plugins, backend_packages):
     # Add any extra paths to python path (e.g., for loading extra source backends).
