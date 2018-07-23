@@ -442,7 +442,7 @@ class JvmCompile(NailgunTaskBase):
                                      invalid_targets,
                                      invalidation_check.invalid_vts)
 
-    exec_graph = ExecutionGraph(jobs)
+    exec_graph = ExecutionGraph(jobs, self.get_options().print_exception_stacktrace)
     try:
       exec_graph.execute(worker_pool, self.context.log)
     except ExecutionFailure as e:

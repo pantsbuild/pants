@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import queue
+import sys
 import threading
 import traceback
 from builtins import map, object, str
@@ -154,11 +155,12 @@ class ExecutionGraph(object):
   global execution graph.
   """
 
-  def __init__(self, job_list):
+  def __init__(self, job_list, print_stack_trace):
     """
 
     :param job_list Job: list of Jobs to schedule and run.
     """
+    self._print_stack_trace = print_stack_trace
     self._dependencies = defaultdict(list)
     self._dependees = defaultdict(list)
     self._jobs = {}
@@ -264,8 +266,9 @@ class ExecutionGraph(object):
         try:
           work()
           result = (worker_key, SUCCESSFUL, None)
-        except Exception as e:
-          result = (worker_key, FAILED, e)
+        except Exception:
+          _, exc_value, exc_traceback = sys.exc_info()
+          result = (worker_key, FAILED, (exc_value, traceback.format_tb(exc_traceback)))
         finished_queue.put(result)
         jobs_in_flight.decrement()
 
@@ -325,7 +328,10 @@ class ExecutionGraph(object):
 
         # Log success or failure for this job.
         if result_status is FAILED:
-          log.error("{} failed: {}".format(finished_key, value))
+          exception, tb = value
+          log.error("{} failed: {}".format(finished_key, exception))
+          if self._print_stack_trace:
+            log.error('Traceback:\n{}'.format('\n'.join(tb)))
         else:
           log.debug("{} finished with status {}".format(finished_key, result_status))
     except ExecutionFailure:
