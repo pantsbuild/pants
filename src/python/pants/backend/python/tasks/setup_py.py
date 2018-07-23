@@ -158,7 +158,7 @@ class SetupPyExecutionEnvironment(datatype([
     # only creating an environment at the very end.
     native_tools = self.setup_py_native_tools
     if native_tools:
-      # TODO: an as_tuple() method for datatypes would make this destructuring cleaner!
+      # TODO: an as_tuple() method for datatypes could make this destructuring cleaner!
       plat = native_tools.platform
       c_toolchain = native_tools.c_toolchain
       c_compiler = c_toolchain.c_compiler

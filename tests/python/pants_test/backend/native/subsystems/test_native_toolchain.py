@@ -226,20 +226,4 @@ int main() {
       compiler = llvm_cpp_toolchain.llvm_cpp_compiler.cpp_compiler
       linker = llvm_cpp_toolchain.llvm_cpp_linker.cpp_linker
 
-      # lib_path_var = self.platform.resolve_platform_specific({
-      #   'darwin': lambda: 'DYLD_LIBRARY_PATH',
-      #   'linux': lambda: 'LD_LIBRARY_PATH',
-      # })
-      # runtime_libs_path = {lib_path_var: create_path_env_var(compiler.library_dirs)}
-      # Otherwise we get some header errors on Linux because clang++ will prefer the system
-      # headers if they are allowed, and we provide our own already in the LLVM subsystem (and
-      # pass them in through CPATH).
-      # extra_compile_args=['-nostdinc++'],
-      # # LLVM will prefer LLVM's libc++ on OSX, and seemingly requires it even if it does not use
-      # # its own C++ library implementation, and uses libstdc++, which we provide in the linker's
-      # # LIBRARY_PATH. See https://libcxx.llvm.org/ for more info.
-      # extra_link_args=['-lc++'],
-      # # We need to provide libc++ on the runtime library path as well on Linux (OSX will have it
-      # # already).
-      # extra_invocation_env=runtime_libs_path
       self._do_compile_link(compiler, linker, 'hello.cpp', 'hello_clangpp', "I C the world, ++ more!")

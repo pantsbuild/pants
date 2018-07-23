@@ -90,15 +90,9 @@ class Linker(datatype([
     'extra_args',
 ]), Executable):
 
-  # FIXME(#5951): We need a way to compose executables more hygienically. This could be done
-  # declaratively -- something like: { 'LIBRARY_PATH': DelimitedPathDirectoryEnvVar(...) }.  We
-  # could also just use safe_shlex_join() and create_path_env_var() and keep all the state in the
-  # environment -- but then we have to remember to use those each time we specialize.
   def get_invocation_environment_dict(self, platform):
     ret = super(Linker, self).get_invocation_environment_dict(platform).copy()
 
-    # TODO: set all LDFLAGS in here or in further specializations of Linker instead of in individual
-    # tasks.
     all_ldflags_for_platform = platform.resolve_platform_specific({
       'darwin': lambda: ['-mmacosx-version-min=10.11'],
       'linux': lambda: [],
@@ -118,8 +112,6 @@ class CompilerMixin(Executable):
   def include_dirs(self):
     """Directories to search for header files to #include during compilation."""
 
-  # FIXME: LIBRARY_PATH and (DY)?LD_LIBRARY_PATH are used for entirely different purposes, but are
-  # both sourced from the same `self.library_dirs`!
   def get_invocation_environment_dict(self, platform):
     ret = super(CompilerMixin, self).get_invocation_environment_dict(platform).copy()
 

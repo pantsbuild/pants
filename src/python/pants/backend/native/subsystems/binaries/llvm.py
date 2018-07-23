@@ -72,9 +72,6 @@ class LLVM(NativeTool):
       linking_library_dirs=[],
       extra_args=[])
 
-  # FIXME: use ParseSearchDirs for this and other include directories -- we shouldn't be trying to
-  # guess the path here.
-  # https://github.com/pantsbuild/pants/issues/6143
   @memoized_property
   def _common_include_dirs(self):
     return [os.path.join(self.select(), 'lib/clang', self.version(), 'include')]

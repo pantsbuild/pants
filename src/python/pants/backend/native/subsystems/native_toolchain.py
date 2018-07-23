@@ -166,7 +166,7 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
       library_dirs=(provided_clang.library_dirs + xcode_clang.library_dirs),
       include_dirs=(provided_clang.include_dirs + xcode_clang.include_dirs),
       # On OSX, this uses the libc++ (LLVM) C++ standard library implementation. This is
-      # feature-complete for OSX. <FIXME: insert link citation for that fact here!>
+      # feature-complete for OSX, but not for Linux (see https://libcxx.llvm.org/ for more info).
       extra_args=(llvm_cpp_compiler_args + xcode_clang.extra_args))
     linking_library_dirs = []
     linker_extra_args = []
