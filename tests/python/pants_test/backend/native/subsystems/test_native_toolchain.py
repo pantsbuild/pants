@@ -18,7 +18,7 @@ from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import is_executable, safe_open
 from pants.util.process_handler import subprocess
-from pants.util.strutil import create_path_env_var, safe_shlex_join
+from pants.util.strutil import safe_shlex_join
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystems
 from pants_test.test_base import TestBase
@@ -119,13 +119,13 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
         yield tuple(self.execute_literal(scheduler, execution_request))
 
   def _invoke_compiler(self, compiler, args):
-    cmd = [compiler.exe_filename] + args
+    cmd = [compiler.exe_filename] + compiler.extra_args + args
     return self._invoke_capturing_output(
       cmd,
       compiler.get_invocation_environment_dict(self.platform))
 
   def _invoke_linker(self, linker, args):
-    cmd = [linker.exe_filename] + args
+    cmd = [linker.exe_filename] + linker.extra_args + args
     return self._invoke_capturing_output(
       cmd,
       linker.get_invocation_environment_dict(self.platform))
@@ -149,22 +149,19 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
                 out=e.output),
         e)
 
-  def _do_compile_link(self, compiler, linker, source_file, outfile, output,
-                       extra_compile_args=None, extra_link_args=None,
-                       extra_invocation_env=None):
+  def _do_compile_link(self, compiler, linker, source_file, outfile, output):
 
     intermediate_obj_file_name = '{}.o'.format(outfile)
     self._invoke_compiler(
       compiler,
-      ['-c', source_file, '-o', intermediate_obj_file_name] + (extra_compile_args or []))
+      ['-c', source_file, '-o', intermediate_obj_file_name])
     self.assertTrue(os.path.isfile(intermediate_obj_file_name))
 
     self._invoke_linker(
       linker,
-      [intermediate_obj_file_name, '-o', outfile] + (extra_link_args or []))
+      [intermediate_obj_file_name, '-o', outfile])
     self.assertTrue(is_executable(outfile))
-    program_out = self._invoke_capturing_output([os.path.abspath(outfile)],
-                                                env=extra_invocation_env)
+    program_out = self._invoke_capturing_output([os.path.abspath(outfile)])
     self.assertEqual((output + '\n'), program_out)
 
   def test_hello_c_gcc(self):
@@ -229,22 +226,20 @@ int main() {
       compiler = llvm_cpp_toolchain.llvm_cpp_compiler.cpp_compiler
       linker = llvm_cpp_toolchain.llvm_cpp_linker.cpp_linker
 
-      lib_path_var = self.platform.resolve_platform_specific({
-        'darwin': lambda: 'DYLD_LIBRARY_PATH',
-        'linux': lambda: 'LD_LIBRARY_PATH',
-      })
-      runtime_libs_path = {lib_path_var: create_path_env_var(compiler.library_dirs)}
-      self._do_compile_link(
-        compiler, linker, 'hello.cpp', 'hello_clangpp',
-        "I C the world, ++ more!",
-        # Otherwise we get some header errors on Linux because clang++ will prefer the system
-        # headers if they are allowed, and we provide our own already in the LLVM subsystem (and
-        # pass them in through CPATH).
-        extra_compile_args=['-nostdinc++'],
-        # LLVM will prefer LLVM's libc++ on OSX, and seemingly requires it even if it does not use
-        # its own C++ library implementation, and uses libstdc++, which we provide in the linker's
-        # LIBRARY_PATH. See https://libcxx.llvm.org/ for more info.
-        extra_link_args=['-lc++'],
-        # We need to provide libc++ on the runtime library path as well on Linux (OSX will have it
-        # already).
-        extra_invocation_env=runtime_libs_path)
+      # lib_path_var = self.platform.resolve_platform_specific({
+      #   'darwin': lambda: 'DYLD_LIBRARY_PATH',
+      #   'linux': lambda: 'LD_LIBRARY_PATH',
+      # })
+      # runtime_libs_path = {lib_path_var: create_path_env_var(compiler.library_dirs)}
+      # Otherwise we get some header errors on Linux because clang++ will prefer the system
+      # headers if they are allowed, and we provide our own already in the LLVM subsystem (and
+      # pass them in through CPATH).
+      # extra_compile_args=['-nostdinc++'],
+      # # LLVM will prefer LLVM's libc++ on OSX, and seemingly requires it even if it does not use
+      # # its own C++ library implementation, and uses libstdc++, which we provide in the linker's
+      # # LIBRARY_PATH. See https://libcxx.llvm.org/ for more info.
+      # extra_link_args=['-lc++'],
+      # # We need to provide libc++ on the runtime library path as well on Linux (OSX will have it
+      # # already).
+      # extra_invocation_env=runtime_libs_path
+      self._do_compile_link(compiler, linker, 'hello.cpp', 'hello_clangpp', "I C the world, ++ more!")

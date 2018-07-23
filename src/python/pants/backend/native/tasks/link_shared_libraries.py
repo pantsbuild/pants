@@ -154,12 +154,9 @@ class LinkSharedLibraries(NativeTask):
       external_libs_info=external_libs_product)
 
   _SHARED_CMDLINE_ARGS = {
-    'darwin': lambda: ['-mmacosx-version-min=10.11', '-Wl,-dylib'],
+    'darwin': lambda: ['-Wl,-dylib'],
     'linux': lambda: ['-shared'],
   }
-
-  def _get_shared_lib_cmdline_args(self, platform):
-    return platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
 
   def _execute_link_request(self, link_request):
     object_files = link_request.object_files
@@ -175,7 +172,7 @@ class LinkSharedLibraries(NativeTask):
     resulting_shared_lib_path = os.path.join(output_dir, native_artifact.as_shared_lib(platform))
     # We are executing in the results_dir, so get absolute paths for everything.
     cmd = ([linker.exe_filename] +
-           self._get_shared_lib_cmdline_args(platform) +
+           platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS) +
            linker.extra_args +
            link_request.external_libs_info.get_third_party_lib_args() +
            ['-o', os.path.abspath(resulting_shared_lib_path)] +

@@ -14,10 +14,6 @@ from pants.engine.selectors import Select
 from pants.util.memo import memoized_method
 
 
-def _raise_empty_exception():
-  raise Exception("???")
-
-
 class GCC(NativeTool):
   options_scope = 'gcc'
   default_version = '7.3.0'
@@ -28,7 +24,7 @@ class GCC(NativeTool):
     return [os.path.join(self.select(), 'bin')]
 
   _PLATFORM_INTERMEDIATE_DIRNAME = {
-    'darwin': _raise_empty_exception,
+    'darwin': lambda: 'x86_64-apple-darwin17.5.0',
     'linux': lambda: 'x86_64-pc-linux-gnu',
   }
 
