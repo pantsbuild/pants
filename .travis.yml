@@ -45,6 +45,11 @@ before_cache:
   #   https://docs.travis-ci.com/user/caching/#Things-not-to-cache
   - rm -rf ${HOME}/.cache/pants/bin
   - rm -rf ${HOME}/.cache/pants/lmdb_store
+  # The interpreter cache contains absolute paths which is problematic since its initially populated
+  # in a docker container and th by downstream non-docker container shards.
+  # TODO(John Sirois): Kill this prune when https://github.com/pantsbuild/pants/issues/3416 is
+  # fixed.
+  - rm -rf ${HOME}/.cache/pants/python_cache/interpreters/
   # Render a summary of what is left in the home directory, to assist with further pruning of
   # the cache.
   - du -d2 ${HOME} | sort -r -n | head -25
