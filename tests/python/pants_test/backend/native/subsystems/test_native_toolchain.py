@@ -8,10 +8,8 @@ import os
 import re
 from contextlib import contextmanager
 
-from pants.backend.native.config.environment import (GCCCCompiler, GCCCppCompiler, GCCCppToolchain,
-                                                     GCCCToolchain, Linker, LLVMCCompiler,
-                                                     LLVMCppCompiler, LLVMCppToolchain,
-                                                     LLVMCToolchain, Platform)
+from pants.backend.native.config.environment import (GCCCppToolchain, GCCCToolchain,
+                                                     LLVMCppToolchain, LLVMCToolchain, Platform)
 from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
@@ -106,7 +104,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     self.assertIsNotNone(clangpp_version_regex.search(clanggpp_version_out))
 
   @contextmanager
-  def _hello_world_source_environment(self, file_name, contents, scheduler_request_specs):
+  def _hello_world_source_environment(self, toolchain_type, file_name, contents):
     with temporary_dir() as tmpdir:
       scheduler = self._sched(work_dir=tmpdir)
 
@@ -114,7 +112,8 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
       with safe_open(source_file_path, mode='wb') as fp:
         fp.write(contents)
 
-      execution_request = scheduler.execution_request_literal(scheduler_request_specs)
+      execution_request = scheduler.execution_request_literal(
+        [(self.toolchain, toolchain_type)])
 
       with pushd(tmpdir):
         yield tuple(self.execute_literal(scheduler, execution_request))
@@ -169,108 +168,74 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     self.assertEqual((output + '\n'), program_out)
 
   def test_hello_c_gcc(self):
-    scheduler_request_specs = [
-      (self.toolchain, GCCCCompiler),
-      (self.toolchain, Linker),
-    ]
-
-    with self._hello_world_source_environment('hello.c', contents="""
+    with self._hello_world_source_environment(GCCCToolchain, 'hello.c', contents="""
 #include "stdio.h"
 
 int main() {
   printf("%s\\n", "I C the world!");
 }
-""", scheduler_request_specs=scheduler_request_specs) as products:
+""") as products:
 
-      gcc_wrapper, linker = products
-      gcc = gcc_wrapper.c_compiler
+      gcc_c_toolchain, = products
 
-      self._do_compile_link(gcc, linker, 'hello.c', 'hello_gcc', "I C the world!")
+      compiler = gcc_c_toolchain.gcc_c_compiler.c_compiler
+      linker = gcc_c_toolchain.gcc_c_linker.c_linker
+
+      self._do_compile_link(compiler, linker, 'hello.c', 'hello_gcc', "I C the world!")
 
   def test_hello_c_clang(self):
-
-    scheduler_request_specs = [
-      (self.toolchain, LLVMCCompiler),
-      (self.toolchain, Linker),
-    ]
-
-    with self._hello_world_source_environment('hello.c', contents="""
+    with self._hello_world_source_environment(LLVMCToolchain, 'hello.c', contents="""
 #include "stdio.h"
 
 int main() {
   printf("%s\\n", "I C the world!");
 }
-""", scheduler_request_specs=scheduler_request_specs) as products:
+""") as products:
 
-      clang_wrapper, linker = products
-      clang = clang_wrapper.c_compiler
+      llvm_c_toolchain, = products
 
-      self._do_compile_link(clang, linker, 'hello.c', 'hello_clang', "I C the world!")
+      compiler = llvm_c_toolchain.llvm_c_compiler.c_compiler
+      linker = llvm_c_toolchain.llvm_c_linker.c_linker
+
+      self._do_compile_link(compiler, linker, 'hello.c', 'hello_clang', "I C the world!")
 
   def test_hello_cpp_gpp(self):
-
-    scheduler_request_specs = [
-      (self.toolchain, GCCCppCompiler),
-      (self.toolchain, LLVMCppCompiler),
-      (self.toolchain, Linker),
-    ]
-
-    with self._hello_world_source_environment('hello.cpp', contents="""
+    with self._hello_world_source_environment(GCCCppToolchain, 'hello.cpp', contents="""
 #include <iostream>
 
 int main() {
   std::cout << "I C the world, ++ more!" << std::endl;
 }
-""", scheduler_request_specs=scheduler_request_specs) as products:
+""") as products:
 
-      gpp_wrapper, clangpp_wrapper, linker = products
-      gpp = gpp_wrapper.cpp_compiler
-      clangpp = clangpp_wrapper.cpp_compiler
+      gcc_cpp_toolchain, = products
 
-      # FIXME(#5951): we should be matching the linker to the compiler here, instead of trying to
-      # use the same linker for everything. This is a temporary workaround.
-      linker_with_gpp_workaround = Linker(
-        path_entries=(gpp.path_entries + linker.path_entries),
-        exe_filename=gpp.exe_filename,
-        library_dirs=(gpp.library_dirs + linker.library_dirs + clangpp.library_dirs))
+      compiler = gcc_cpp_toolchain.gcc_cpp_compiler.cpp_compiler
+      linker = gcc_cpp_toolchain.gcc_cpp_linker.cpp_linker
 
-      self._do_compile_link(gpp, linker_with_gpp_workaround, 'hello.cpp', 'hello_gpp', "I C the world, ++ more!")
+      self._do_compile_link(compiler, linker, 'hello.cpp', 'hello_gpp', "I C the world, ++ more!")
 
   def test_hello_cpp_clangpp(self):
-
-    scheduler_request_specs = [
-      # We need GCC to provide libstdc++.so.6, which clang needs to run on Linux.
-      (self.toolchain, GCCCppCompiler),
-      (self.toolchain, LLVMCppCompiler),
-      (self.toolchain, Linker),
-    ]
-
-    with self._hello_world_source_environment('hello.cpp', contents="""
+    with self._hello_world_source_environment(LLVMCppToolchain, 'hello.cpp', contents="""
 #include <iostream>
 
 int main() {
   std::cout << "I C the world, ++ more!" << std::endl;
 }
-""", scheduler_request_specs=scheduler_request_specs) as products:
+""") as products:
 
-      gpp_wrapper, clangpp_wrapper, linker = products
-      gpp = gpp_wrapper.cpp_compiler
-      clangpp = clangpp_wrapper.cpp_compiler
+      llvm_cpp_toolchain, = products
 
-      # FIXME(#5951): we should be matching the linker to the compiler here, instead of trying to
-      # use the same linker for everything. This is a temporary workaround.
-      linker_with_clangpp_workaround = Linker(
-        path_entries=(clangpp.path_entries + linker.path_entries),
-        exe_filename=clangpp.exe_filename,
-        library_dirs=(gpp.library_dirs + linker.library_dirs + clangpp.library_dirs))
+      compiler = llvm_cpp_toolchain.llvm_cpp_compiler.cpp_compiler
+      linker = llvm_cpp_toolchain.llvm_cpp_linker.cpp_linker
 
       lib_path_var = self.platform.resolve_platform_specific({
         'darwin': lambda: 'DYLD_LIBRARY_PATH',
         'linux': lambda: 'LD_LIBRARY_PATH',
       })
-      runtime_libs_path = {lib_path_var: create_path_env_var(clangpp.library_dirs)}
+      runtime_libs_path = {lib_path_var: create_path_env_var(compiler.library_dirs)}
       self._do_compile_link(
-        clangpp, linker_with_clangpp_workaround, 'hello.cpp', 'hello_clangpp',
+        compiler, linker, 'hello.cpp', 'hello_clangpp',
         "I C the world, ++ more!",
         # Otherwise we get some header errors on Linux because clang++ will prefer the system
         # headers if they are allowed, and we provide our own already in the LLVM subsystem (and
