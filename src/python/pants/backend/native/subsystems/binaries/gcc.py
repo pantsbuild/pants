@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import glob
 import os
 
 from pants.backend.native.config.environment import (CCompiler, CppCompiler, GCCCCompiler,
@@ -11,6 +12,7 @@ from pants.backend.native.config.environment import (CCompiler, CppCompiler, GCC
 from pants.binaries.binary_tool import NativeTool
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
+from pants.util.collections import assert_single_element
 from pants.util.memo import memoized_method
 
 
@@ -23,10 +25,29 @@ class GCC(NativeTool):
   def path_entries(self):
     return [os.path.join(self.select(), 'bin')]
 
-  _PLATFORM_INTERMEDIATE_DIRNAME = {
-    'darwin': lambda: 'x86_64-apple-darwin17.5.0',
-    'linux': lambda: 'x86_64-pc-linux-gnu',
-  }
+  class GCCResourceLocationError(Exception): pass
+
+  def _get_check_single_path_by_glob(self, *components):
+    """Assert that the path components (which are joined into a glob) match exactly one path.
+
+    The matched path may be a file or a directory. This method is used to avoid having to guess
+    platform-specific intermediate directory names, e.g. 'x86_64-linux-gnu' or
+    'x86_64-apple-darwin17.5.0'."""
+    glob_path_string = os.path.join(*components)
+    expanded_glob = glob.glob(glob_path_string)
+
+    try:
+      return assert_single_element(expanded_glob)
+    except StopIteration as e:
+      raise self.GCCResourceLocationError(
+        "No elements for glob '{}' -- expected exactly one."
+        .format(glob_path_string),
+        e)
+    except ValueError as e:
+      raise self.GCCResourceLocationError(
+        "Should have exactly one path matching expansion of glob '{}'."
+        .format(glob_path_string),
+        e)
 
   @memoized_method
   def _common_lib_dirs(self, platform):
@@ -34,19 +55,16 @@ class GCC(NativeTool):
       os.path.join(self.select(), 'lib'),
       os.path.join(self.select(), 'lib64'),
       os.path.join(self.select(), 'lib/gcc'),
-      os.path.join(self.select(), 'lib/gcc',
-                   platform.resolve_platform_specific(self._PLATFORM_INTERMEDIATE_DIRNAME),
-                   self.version()),
+      self._get_check_single_path_by_glob(
+        self.select(), 'lib/gcc/*', self.version()),
     ]
 
   @memoized_method
   def _common_include_dirs(self, platform):
     return [
       os.path.join(self.select(), 'include'),
-      os.path.join(self.select(), 'lib/gcc',
-                   platform.resolve_platform_specific(self._PLATFORM_INTERMEDIATE_DIRNAME),
-                   self.version(),
-                   'include'),
+      self._get_check_single_path_by_glob(
+        self.select(), 'lib/gcc/*', self.version(), 'include'),
     ]
 
   def c_compiler(self, platform):
@@ -59,10 +77,13 @@ class GCC(NativeTool):
 
   @memoized_method
   def _cpp_include_dirs(self, platform):
+    # FIXME: explain why this is necessary!
+    cpp_config_header_path = self._get_check_single_path_by_glob(
+      self.select(), 'include/c++', self.version(), '*/bits/c++config.h')
     return [
       os.path.join(self.select(), 'include/c++', self.version()),
-      os.path.join(self.select(), 'include/c++', self.version(),
-                   platform.resolve_platform_specific(self._PLATFORM_INTERMEDIATE_DIRNAME)),
+      # Get the directory that makes `#include <bits/c++config.h>` work.
+      os.path.dirname(os.path.dirname(cpp_config_header_path)),
     ]
 
   def cpp_compiler(self, platform):
