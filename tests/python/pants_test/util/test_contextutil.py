@@ -16,6 +16,7 @@ from builtins import next, object, range, str
 from contextlib import contextmanager
 
 import mock
+from future.utils import PY3
 
 from pants.util.contextutil import (HardSystemExit, InvalidZipPath, Timer, environment_as,
                                     exception_logging, hard_exit_handler, hermetic_environment_as,
@@ -67,7 +68,7 @@ class ContextutilTest(unittest.TestCase):
   def test_hermetic_environment_subprocesses(self):
     self.assertIn('USER', os.environ)
     with hermetic_environment_as(**dict(AAA='333')):
-      output = subprocess.check_output('env', shell=True)
+      output = subprocess.check_output('env', shell=True).decode('utf-8')
       self.assertNotIn('USER=', output)
       self.assertIn('AAA', os.environ)
       self.assertEquals(os.environ['AAA'], '333')
@@ -77,12 +78,13 @@ class ContextutilTest(unittest.TestCase):
   def test_hermetic_environment_unicode(self):
     UNICODE_CHAR = '¡'
     ENCODED_CHAR = UNICODE_CHAR.encode('utf-8')
+    expected_output = UNICODE_CHAR if PY3 else ENCODED_CHAR
     with environment_as(**dict(XXX=UNICODE_CHAR)):
-      self.assertEquals(os.environ['XXX'], ENCODED_CHAR)
+      self.assertEquals(os.environ['XXX'], expected_output)
       with hermetic_environment_as(**dict(AAA=UNICODE_CHAR)):
         self.assertIn('AAA', os.environ)
-        self.assertEquals(os.environ['AAA'], ENCODED_CHAR)
-      self.assertEquals(os.environ['XXX'], ENCODED_CHAR)
+        self.assertEquals(os.environ['AAA'], expected_output)
+      self.assertEquals(os.environ['XXX'], expected_output)
 
   def test_simple_pushd(self):
     pre_cwd = os.getcwd()
