@@ -117,9 +117,6 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
   end_travis_section
 fi
 
-export PANTS_COMMAND
-echo "Using pants command: ${PANTS_COMMAND}"
-
 if [[ "${skip_pre_commit_checks:-false}" == "false" ]]; then
   start_travis_section "PreCommit" "Running pre-commit checks"
   FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
