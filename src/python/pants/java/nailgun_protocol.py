@@ -148,7 +148,7 @@ class NailgunProtocol(object):
   def construct_chunk(cls, chunk_type, payload, encoding='utf-8'):
     """Construct and return a single chunk."""
     if isinstance(payload, six.text_type):
-      payload =  payload.encode(encoding)
+      payload = payload.encode(encoding)
     elif not isinstance(payload, six.binary_type):
       raise TypeError('cannot encode type: {}'.format(type(payload)))
 
