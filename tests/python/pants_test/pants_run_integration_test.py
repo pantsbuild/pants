@@ -8,7 +8,6 @@ import configparser
 import glob
 import os
 import shutil
-import sys
 import unittest
 from collections import namedtuple
 from contextlib import contextmanager
@@ -22,7 +21,7 @@ from pants.base.build_file import BuildFile
 from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_mkdtemp, safe_open
+from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_open
 from pants.util.process_handler import SubprocessProcessHandler, subprocess
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
@@ -259,7 +258,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
     # Only whitelisted entries will be included in the environment if hermetic=True.
     if self.hermetic():
-      env = self._create_hermetic_env()
+      env = dict()
       for h in self.hermetic_env_whitelist():
         value = os.getenv(h)
         if value is not None:
@@ -284,11 +283,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
     return pants_command, subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
       stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
-
-  def _create_hermetic_env(self):
-    isolated_path = safe_mkdtemp()
-    os.symlink(sys.executable, os.path.join(isolated_path, os.path.basename(sys.executable)))
-    return {'PATH': isolated_path}
 
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, tee_output=False, **kwargs):
     if config:
