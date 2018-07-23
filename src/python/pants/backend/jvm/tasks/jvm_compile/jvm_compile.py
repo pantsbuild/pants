@@ -599,12 +599,11 @@ class JvmCompile(NailgunTaskBase):
 
         path_to_buildozer = self.get_options().buildozer
         if path_to_buildozer:
-          suggestion_msg += ("\nYou can do this by running {buildozer} "
-                             "'add dependencies {deps}' {target}".format(
-                                 buildozer=path_to_buildozer,
-                                 deps=" ".join(sorted(suggested_deps)),
-                                 target=target.address.spec
-                             )
+          suggestion_msg += ("\nYou can do this by running:\n"
+                             "  {buildozer} 'add dependencies {deps}' {target}".format(
+                               buildozer=path_to_buildozer,
+                               deps=" ".join(sorted(suggested_deps)),
+                               target=target.address.spec)
                             )
 
         self.context.log.info(suggestion_msg)

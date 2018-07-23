@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from builtins import range, str
 from textwrap import dedent
 
-import future
+from future.utils import string_types
 
 
 def parse_expression(val, acceptable_types, name=None, raise_type=ValueError):
@@ -26,7 +26,7 @@ def parse_expression(val, acceptable_types, name=None, raise_type=ValueError):
   def format_type(typ):
     return typ.__name__
 
-  if not isinstance(val, future.utils.string_types):
+  if not isinstance(val, string_types):
     raise raise_type('The raw `val` is not a string.  Given {} of type {}.'
                      .format(val, format_type(type(val))))
 
