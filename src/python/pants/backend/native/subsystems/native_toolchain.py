@@ -149,13 +149,13 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
       include_dirs=(xcode_clang.include_dirs + provided_clang.include_dirs))
   else:
     gcc_cpp_compiler = yield Get(GCCCppCompiler, GCC, native_toolchain._gcc)
-    provided_gcc = gcc_cpp_compiler.cpp_compiler
+    provided_gpp = gcc_cpp_compiler.cpp_compiler
     working_cpp_compiler = CppCompiler(
       path_entries=provided_clang.path_entries,
       exe_filename=provided_clang.exe_filename,
       # We need this version of GLIBCXX to be able to run, unfortunately.
-      library_dirs=(provided_gcc.library_dirs + provided_clang.library_dirs),
-      include_dirs=(provided_clang.include_dirs + provided_gcc.include_dirs))
+      library_dirs=(provided_gpp.library_dirs + provided_clang.library_dirs),
+      include_dirs=(provided_clang.include_dirs + provided_gpp.include_dirs))
 
   base_linker_wrapper = yield Get(BaseLinker, NativeToolchain, native_toolchain)
   base_linker = base_linker_wrapper.linker

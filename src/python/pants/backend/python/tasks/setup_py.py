@@ -194,8 +194,8 @@ class SetupPyExecutionEnvironment(datatype([
       ret['CPATH'] = create_path_env_var(all_include_dirs)
 
       all_cflags_for_platform = plat.resolve_platform_specific({
-        'darwin': lambda: ['-mmacosx-version-min=10.11'],
-        'linux': lambda: [],
+        'darwin': lambda: ['-mmacosx-version-min=10.11', '-nostdinc++'],
+        'linux': lambda: ['-nostdinc++'],
       })
       ret['CFLAGS'] = safe_shlex_join(all_cflags_for_platform)
 

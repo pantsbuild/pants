@@ -67,6 +67,8 @@ class BuildLocalPythonDistributions(Task):
       PythonNativeCode.scoped(cls),
     )
 
+  class BuildLocalPythonDistributionsError(TaskError): pass
+
   @memoized_property
   def _python_native_code_settings(self):
     return PythonNativeCode.scoped_instance(self)
@@ -266,9 +268,24 @@ class BuildLocalPythonDistributions(Task):
       setup_command=setup_py_snapshot_version_argv,
       interpreter=interpreter)
 
-    with environment_as(**setup_py_execution_environment.as_environment()):
+    setup_py_env = setup_py_execution_environment.as_environment()
+    with environment_as(**setup_py_env):
       # Build a whl using SetupPyRunner and return its absolute path.
-      setup_runner.run()
+      was_installed_successfully = setup_runner.run()
+      # FIXME: Make a run_raising_error() method in SetupPyRunner that doesn't print directly to
+      # stderr like pex does (better: put this in pex itself).
+      if not was_installed_successfully:
+        raise self.BuildLocalPythonDistributionsError(
+          "Installation of python distribution from target {target} into directory {into_dir} "
+          "failed.\n"
+          "The chosen interpreter was: {interpreter}.\n"
+          "The execution environment was: {env}.\n"
+          "The setup command was: {command}."
+          .format(target=dist_tgt,
+                  into_dir=dist_target_dir,
+                  interpreter=interpreter,
+                  env=setup_py_env,
+                  command=setup_py_snapshot_version_argv))
 
   def _inject_synthetic_dist_requirements(self, dist, req_lib_addr):
     """Inject a synthetic requirements library that references a local wheel.
@@ -290,8 +307,10 @@ class BuildLocalPythonDistributions(Task):
     dist_dir = cls._get_dist_dir(install_dir)
     dists = glob.glob(os.path.join(dist_dir, '*.whl'))
     if len(dists) == 0:
-      raise TaskError('No distributions were produced by python_create_distribution task.')
+      raise cls.BuildLocalPythonDistributionsError(
+        'No distributions were produced by python_create_distribution task.')
     if len(dists) > 1:
       # TODO: is this ever going to happen?
-      raise TaskError('Ambiguous local python distributions found: {}'.format(dists))
+      raise cls.BuildLocalPythonDistributionsError('Ambiguous local python distributions found: {}'
+                                                   .format(dists))
     return dists[0]
