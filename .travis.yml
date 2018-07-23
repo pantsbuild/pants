@@ -14,7 +14,9 @@ cache:
     # using its own isolated cache:
     #   https://github.com/pantsbuild/pants/issues/2485
     - ${HOME}/.npm
-    - build-support/pants_dev_deps.venv
+    # TODO(John Sirois): Re-nable venv caching once all linux shards run inside the same Docker
+    # container: https://github.com/pantsbuild/pants/issues/6215
+    # - build-support/pants_dev_deps.venv
     - src/rust/engine/target
     - dist/travis-cache
 
