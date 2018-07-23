@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.native.config.environment import LLVMCppToolchain
+from pants.backend.native.config.environment import CppToolchain
 from pants.backend.native.subsystems.native_compile_settings import CppCompileSettings
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import CppLibrary
@@ -40,8 +40,7 @@ class CppCompile(NativeCompile):
 
   @memoized_property
   def _cpp_toolchain(self):
-    llvm_cpp_toolchain = self._request_single(LLVMCppToolchain, self._native_toolchain)
-    return llvm_cpp_toolchain.as_cpp_toolchain
+    return self._request_single(CppToolchain, self._native_toolchain)
 
   def get_compiler(self):
     return self._cpp_toolchain.cpp_compiler

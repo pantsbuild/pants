@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.native.config.environment import LLVMCToolchain
+from pants.backend.native.config.environment import CToolchain
 from pants.backend.native.subsystems.native_compile_settings import CCompileSettings
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import CLibrary
@@ -40,8 +40,7 @@ class CCompile(NativeCompile):
 
   @memoized_property
   def _c_toolchain(self):
-    llvm_c_toolchain = self._request_single(LLVMCToolchain, self._native_toolchain)
-    return llvm_c_toolchain.as_c_toolchain
+    return self._request_single(CToolchain, self._native_toolchain)
 
   def get_compiler(self):
     return self._c_toolchain.c_compiler

@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
-from pants.backend.native.config.environment import LLVMCppToolchain, Platform
+from pants.backend.native.config.environment import CppToolchain, Platform
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_compile import NativeTargetDependencies, ObjectFiles
@@ -64,8 +64,7 @@ class LinkSharedLibraries(NativeTask):
 
   @memoized_property
   def _cpp_toolchain(self):
-    llvm_cpp_toolchain = self._request_single(LLVMCppToolchain, self._native_toolchain)
-    return llvm_cpp_toolchain.as_cpp_toolchain
+    return self._request_single(CppToolchain, self._native_toolchain)
 
   @memoized_property
   def linker(self):
