@@ -20,7 +20,8 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 from wheel.install import WheelFile
 
-from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
+from pants.backend.native.config.environment import (CppToolchain, CToolchain, LLVMCppToolchain,
+                                                     LLVMCToolchain, Platform)
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -81,9 +82,8 @@ class SetupPyRunner(InstallerBase):
 
 
 class SetupPyNativeTools(datatype([
-    ('c_compiler', CCompiler),
-    ('cpp_compiler', CppCompiler),
-    ('linker', Linker),
+    ('c_toolchain', CToolchain),
+    ('cpp_toolchain', CppToolchain),
     ('platform', Platform),
 ])):
   """The native tools needed for a setup.py invocation.
@@ -92,12 +92,11 @@ class SetupPyNativeTools(datatype([
   """
 
 
-@rule(SetupPyNativeTools, [Select(CCompiler), Select(CppCompiler), Select(Linker), Select(Platform)])
-def get_setup_py_native_tools(c_compiler, cpp_compiler, linker, platform):
+@rule(SetupPyNativeTools, [Select(LLVMCToolchain), Select(LLVMCppToolchain), Select(Platform)])
+def get_setup_py_native_tools(llvm_c_toolchain, llvm_cpp_toolchain, platform):
   yield SetupPyNativeTools(
-    c_compiler=c_compiler,
-    cpp_compiler=cpp_compiler,
-    linker=linker,
+    c_toolchain=llvm_c_toolchain.as_c_toolchain,
+    cpp_toolchain=llvm_cpp_toolchain.as_cpp_toolchain,
     platform=platform)
 
 
@@ -161,37 +160,48 @@ class SetupPyExecutionEnvironment(datatype([
     if native_tools:
       # TODO: an as_tuple() method for datatypes would make this destructuring cleaner!
       plat = native_tools.platform
-      cc = native_tools.c_compiler
-      cxx = native_tools.cpp_compiler
-      linker = native_tools.linker
+      c_toolchain = native_tools.c_toolchain
+      c_compiler = c_toolchain.c_compiler
+      c_linker = c_toolchain.c_linker
 
-      all_path_entries = cc.path_entries + cxx.path_entries + linker.path_entries
+      cpp_toolchain = native_tools.cpp_toolchain
+      cpp_compiler = cpp_toolchain.cpp_compiler
+      cpp_linker = cpp_toolchain.cpp_linker
+
+      all_path_entries = (
+        c_compiler.path_entries +
+        c_linker.path_entries +
+        cpp_compiler.path_entries +
+        cpp_linker.path_entries)
       ret['PATH'] = create_path_env_var(all_path_entries)
 
-      all_library_dirs = cc.library_dirs + cxx.library_dirs + linker.library_dirs
-      if all_library_dirs:
-        joined_library_dirs = create_path_env_var(all_library_dirs)
-        ret['LIBRARY_PATH'] = joined_library_dirs
-        dynamic_lib_env_var = plat.resolve_platform_specific({
-          'darwin': lambda: 'DYLD_LIBRARY_PATH',
-          'linux': lambda: 'LD_LIBRARY_PATH',
-        })
-        ret[dynamic_lib_env_var] = joined_library_dirs
+      all_library_dirs = (
+        c_compiler.library_dirs +
+        c_linker.library_dirs +
+        cpp_compiler.library_dirs +
+        cpp_linker.library_dirs)
+      joined_library_dirs = create_path_env_var(all_library_dirs)
+      dynamic_lib_env_var = plat.resolve_platform_specific({
+        'darwin': lambda: 'DYLD_LIBRARY_PATH',
+        'linux': lambda: 'LD_LIBRARY_PATH',
+      })
+      ret[dynamic_lib_env_var] = joined_library_dirs
 
-      all_include_dirs = cc.include_dirs + cxx.include_dirs
-      if all_include_dirs:
-        ret['CPATH'] = create_path_env_var(all_include_dirs)
+      all_linking_library_dirs = (c_linker.linking_library_dirs + cpp_linker.linking_library_dirs)
+      ret['LIBRARY_PATH'] = create_path_env_var(all_linking_library_dirs)
+
+      all_include_dirs = c_compiler.include_dirs + cpp_compiler.include_dirs
+      ret['CPATH'] = create_path_env_var(all_include_dirs)
 
       all_cflags_for_platform = plat.resolve_platform_specific({
         'darwin': lambda: ['-mmacosx-version-min=10.11'],
         'linux': lambda: [],
       })
-      if all_cflags_for_platform:
-        ret['CFLAGS'] = safe_shlex_join(all_cflags_for_platform)
+      ret['CFLAGS'] = safe_shlex_join(all_cflags_for_platform)
 
-      ret['CC'] = cc.exe_filename
-      ret['CXX'] = cxx.exe_filename
-      ret['LDSHARED'] = linker.exe_filename
+      ret['CC'] = c_compiler.exe_filename
+      ret['CXX'] = cpp_compiler.exe_filename
+      ret['LDSHARED'] = cpp_linker.exe_filename
 
       all_new_ldflags = plat.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
       ret['LDFLAGS'] = safe_shlex_join(all_new_ldflags)
