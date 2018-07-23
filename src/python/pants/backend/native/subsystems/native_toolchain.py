@@ -5,11 +5,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.native.config.environment import (Assembler, CCompiler, CppCompiler,
-                                                     GCCCCompiler, GCCCLinker, GCCCppCompiler,
-                                                     GCCCppLinker, GCCCppToolchain, GCCCToolchain,
-                                                     Linker, LLVMCCompiler, LLVMCLinker,
-                                                     LLVMCppCompiler, LLVMCppLinker,
-                                                     LLVMCppToolchain, LLVMCToolchain, Platform)
+                                                     CppToolchain, CToolchain, GCCCppToolchain,
+                                                     GCCCToolchain, Linker, LLVMCppToolchain,
+                                                     LLVMCToolchain, Platform)
 from pants.backend.native.subsystems.binaries.binutils import Binutils
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
@@ -102,8 +100,7 @@ def select_base_linker(platform, native_toolchain):
 
 @rule(LLVMCToolchain, [Select(Platform), Select(NativeToolchain)])
 def select_llvm_c_toolchain(platform, native_toolchain):
-  original_llvm_c_compiler = yield Get(LLVMCCompiler, LLVM, native_toolchain._llvm)
-  provided_clang = original_llvm_c_compiler.c_compiler
+  provided_clang = yield Get(CCompiler, LLVM, native_toolchain._llvm)
 
   # These arguments are shared across platforms.
   llvm_c_compiler_args = [
@@ -121,8 +118,7 @@ def select_llvm_c_toolchain(platform, native_toolchain):
       include_dirs=(provided_clang.include_dirs + xcode_clang.include_dirs),
       extra_args=(llvm_c_compiler_args + xcode_clang.extra_args))
   else:
-    gcc_c_compiler = yield Get(GCCCCompiler, GCC, native_toolchain._gcc)
-    provided_gcc = gcc_c_compiler.c_compiler
+    provided_gcc = yield Get(CCompiler, GCC, native_toolchain._gcc)
     working_c_compiler = CCompiler(
       path_entries=provided_clang.path_entries,
       exe_filename=provided_clang.exe_filename,
@@ -141,14 +137,12 @@ def select_llvm_c_toolchain(platform, native_toolchain):
     linking_library_dirs=libc_dev.get_libc_dirs(platform),
     extra_args=[])
 
-  yield LLVMCToolchain(llvm_c_compiler=LLVMCCompiler(working_c_compiler),
-                       llvm_c_linker=LLVMCLinker(working_linker))
+  yield LLVMCToolchain(CToolchain(working_c_compiler, working_linker))
 
 
 @rule(LLVMCppToolchain, [Select(Platform), Select(NativeToolchain)])
 def select_llvm_cpp_toolchain(platform, native_toolchain):
-  original_llvm_cpp_compiler = yield Get(LLVMCppCompiler, LLVM, native_toolchain._llvm)
-  provided_clang = original_llvm_cpp_compiler.cpp_compiler
+  provided_clang = yield Get(CppCompiler, LLVM, native_toolchain._llvm)
 
   # These arguments are shared across platforms.
   llvm_cpp_compiler_args = [
@@ -171,8 +165,7 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
     linking_library_dirs = []
     linker_extra_args = []
   else:
-    gcc_cpp_compiler = yield Get(GCCCppCompiler, GCC, native_toolchain._gcc)
-    provided_gpp = gcc_cpp_compiler.cpp_compiler
+    provided_gpp = yield Get(CppCompiler, GCC, native_toolchain._gcc)
     working_cpp_compiler = CppCompiler(
       path_entries=provided_clang.path_entries,
       exe_filename=provided_clang.exe_filename,
@@ -195,14 +188,12 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
     linking_library_dirs=(linking_library_dirs + libc_dev.get_libc_dirs(platform)),
     extra_args=linker_extra_args)
 
-  yield LLVMCppToolchain(llvm_cpp_compiler=LLVMCppCompiler(working_cpp_compiler),
-                         llvm_cpp_linker=LLVMCppLinker(working_linker))
+  yield LLVMCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
 
 
 @rule(GCCCToolchain, [Select(Platform), Select(NativeToolchain)])
 def select_gcc_c_toolchain(platform, native_toolchain):
-  original_gcc_c_compiler = yield Get(GCCCCompiler, GCC, native_toolchain._gcc)
-  provided_gcc = original_gcc_c_compiler.c_compiler
+  provided_gcc = yield Get(CCompiler, GCC, native_toolchain._gcc)
 
   # GCC needs an assembler, so we provide that (platform-specific) tool here.
   assembler = yield Get(Assembler, NativeToolchain, native_toolchain)
@@ -235,14 +226,12 @@ def select_gcc_c_toolchain(platform, native_toolchain):
     linking_library_dirs=libc_dev.get_libc_dirs(platform),
     extra_args=[])
 
-  yield GCCCToolchain(gcc_c_compiler=GCCCCompiler(working_c_compiler),
-                      gcc_c_linker=GCCCLinker(working_linker))
+  yield GCCCToolchain(CToolchain(working_c_compiler, working_linker))
 
 
 @rule(GCCCppToolchain, [Select(Platform), Select(NativeToolchain)])
 def select_gcc_cpp_toolchain(platform, native_toolchain):
-  original_gcc_cpp_compiler = yield Get(GCCCppCompiler, GCC, native_toolchain._gcc)
-  provided_gpp = original_gcc_cpp_compiler.cpp_compiler
+  provided_gpp = yield Get(CppCompiler, GCC, native_toolchain._gcc)
 
   # GCC needs an assembler, so we provide that (platform-specific) tool here.
   assembler = yield Get(Assembler, NativeToolchain, native_toolchain)
@@ -275,8 +264,7 @@ def select_gcc_cpp_toolchain(platform, native_toolchain):
     linking_library_dirs=libc_dev.get_libc_dirs(platform),
     extra_args=[])
 
-  yield GCCCppToolchain(gcc_cpp_compiler=GCCCppCompiler(working_cpp_compiler),
-                        gcc_cpp_linker=GCCCppLinker(working_linker))
+  yield GCCCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
 
 
 def create_native_toolchain_rules():

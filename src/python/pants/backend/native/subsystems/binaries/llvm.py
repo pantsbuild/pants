@@ -6,8 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
-from pants.backend.native.config.environment import (CCompiler, CppCompiler, Linker, LLVMCCompiler,
-                                                     LLVMCppCompiler, Platform)
+from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
 from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.rules import RootRule, rule
@@ -107,14 +106,14 @@ def get_lld(platform, llvm):
   return llvm.linker(platform)
 
 
-@rule(LLVMCCompiler, [Select(LLVM)])
+@rule(CCompiler, [Select(LLVM)])
 def get_clang(llvm):
-  yield LLVMCCompiler(llvm.c_compiler())
+  return llvm.c_compiler()
 
 
-@rule(LLVMCppCompiler, [Select(LLVM)])
+@rule(CppCompiler, [Select(LLVM)])
 def get_clang_plusplus(llvm):
-  yield LLVMCppCompiler(llvm.cpp_compiler())
+  return llvm.cpp_compiler()
 
 
 def create_llvm_rules():

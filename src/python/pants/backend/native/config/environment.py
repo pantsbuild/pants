@@ -160,96 +160,22 @@ class CppCompiler(datatype([
 
 
 # TODO(#4020): These classes are performing the work of variants.
-class GCCCCompiler(datatype([('c_compiler', CCompiler)])): pass
-
-
-class GCCCLinker(datatype([('c_linker', Linker)])): pass
-
-
-class GCCCppCompiler(datatype([('cpp_compiler', CppCompiler)])): pass
-
-
-class GCCCppLinker(datatype([('cpp_linker', Linker)])): pass
-
-
-class LLVMCCompiler(datatype([('c_compiler', CCompiler)])): pass
-
-
-class LLVMCLinker(datatype([('c_linker', Linker)])): pass
-
-
-class LLVMCppCompiler(datatype([('cpp_compiler', CppCompiler)])): pass
-
-
-class LLVMCppLinker(datatype([('cpp_linker', Linker)])): pass
-
-
 class CToolchain(datatype([('c_compiler', CCompiler), ('c_linker', Linker)])): pass
 
 
-class CToolchainProvider(object):
-
-  @abstractproperty
-  def as_c_toolchain(self):
-    """???"""
+class LLVMCToolchain(datatype([('c_toolchain', CToolchain)])): pass
 
 
-class LLVMCToolchain(datatype([
-    ('llvm_c_compiler', LLVMCCompiler),
-    ('llvm_c_linker', LLVMCLinker),
-]), CToolchainProvider):
-
-  @property
-  def as_c_toolchain(self):
-    return CToolchain(
-      c_compiler=self.llvm_c_compiler.c_compiler,
-      c_linker=self.llvm_c_linker.c_linker)
-
-
-class GCCCToolchain(datatype([
-    ('gcc_c_compiler', GCCCCompiler),
-    ('gcc_c_linker', GCCCLinker),
-]), CToolchainProvider):
-
-  @property
-  def as_c_toolchain(self):
-    return CToolchain(
-      c_compiler=self.gcc_c_compiler.c_compiler,
-      c_linker=self.gcc_c_linker.c_linker)
+class GCCCToolchain(datatype([('c_toolchain', CToolchain)])): pass
 
 
 class CppToolchain(datatype([('cpp_compiler', CppCompiler), ('cpp_linker', Linker)])): pass
 
 
-class CppToolchainProvider(object):
-
-  @abstractproperty
-  def as_cpp_toolchain(self):
-    """???"""
+class LLVMCppToolchain(datatype([('cpp_toolchain', CppToolchain)])): pass
 
 
-class LLVMCppToolchain(datatype([
-    ('llvm_cpp_compiler', LLVMCppCompiler),
-    ('llvm_cpp_linker', LLVMCppLinker),
-]), CppToolchainProvider):
-
-  @property
-  def as_cpp_toolchain(self):
-    return CppToolchain(
-      cpp_compiler=self.llvm_cpp_compiler.cpp_compiler,
-      cpp_linker=self.llvm_cpp_linker.cpp_linker)
-
-
-class GCCCppToolchain(datatype([
-    ('gcc_cpp_compiler', GCCCppCompiler),
-    ('gcc_cpp_linker', GCCCppLinker),
-]), CppToolchainProvider):
-
-  @property
-  def as_cpp_toolchain(self):
-    return CppToolchain(
-      cpp_compiler=self.gcc_cpp_compiler.cpp_compiler,
-      cpp_linker=self.gcc_cpp_linker.cpp_linker)
+class GCCCppToolchain(datatype([('cpp_toolchain', CppToolchain)])): pass
 
 
 # FIXME: make this an @rule, after we can automatically produce LibcDev and other subsystems in the

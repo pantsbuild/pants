@@ -15,11 +15,13 @@ from pex.interpreter import PythonInterpreter
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.subsystems.python_native_code import (PythonNativeCode,
+                                                                SetupPyExecutionEnvironment,
+                                                                SetupPyNativeTools,
+                                                                ensure_setup_requires_site_dir)
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.pex_build_util import is_local_python_dist
-from pants.backend.python.tasks.setup_py import (SetupPyExecutionEnvironment, SetupPyNativeTools,
-                                                 SetupPyRunner, ensure_setup_requires_site_dir)
+from pants.backend.python.tasks.setup_py import SetupPyRunner
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.address import Address
@@ -81,8 +83,7 @@ class BuildLocalPythonDistributions(Task):
 
   @memoized_property
   def _setup_py_native_tools(self):
-    native_toolchain = self._python_native_code_settings.native_toolchain
-    return self._request_single(SetupPyNativeTools, native_toolchain)
+    return self._request_single(SetupPyNativeTools, self._python_native_code_settings)
 
   # TODO: This should probably be made into an @classproperty (see PR #5901).
   @property

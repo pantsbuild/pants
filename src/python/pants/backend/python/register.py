@@ -8,6 +8,7 @@ from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
+from pants.backend.python.subsystems.python_native_code import create_python_native_code_rules
 from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
@@ -29,7 +30,7 @@ from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
-from pants.backend.python.tasks.setup_py import SetupPy, create_setup_py_rules
+from pants.backend.python.tasks.setup_py import SetupPy
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -76,4 +77,4 @@ def register_goals():
 
 
 def rules():
-  return create_setup_py_rules()
+  return create_python_native_code_rules()

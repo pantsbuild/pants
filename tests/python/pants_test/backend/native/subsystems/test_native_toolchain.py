@@ -52,7 +52,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     gcc_c_toolchain = self.execute_expecting_one_result(
       scheduler, GCCCToolchain, self.toolchain).value
 
-    gcc = gcc_c_toolchain.gcc_c_compiler.c_compiler
+    gcc = gcc_c_toolchain.c_toolchain.c_compiler
     gcc_version_out = self._invoke_capturing_output(
       [gcc.exe_filename, '--version'],
       env=gcc.get_invocation_environment_dict(self.platform))
@@ -66,7 +66,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     gcc_cpp_toolchain = self.execute_expecting_one_result(
       scheduler, GCCCppToolchain, self.toolchain).value
 
-    gpp = gcc_cpp_toolchain.gcc_cpp_compiler.cpp_compiler
+    gpp = gcc_cpp_toolchain.cpp_toolchain.cpp_compiler
     gpp_version_out = self._invoke_capturing_output(
       [gpp.exe_filename, '--version'],
       env=gpp.get_invocation_environment_dict(self.platform))
@@ -80,7 +80,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     llvm_c_toolchain = self.execute_expecting_one_result(
       scheduler, LLVMCToolchain, self.toolchain).value
 
-    clang = llvm_c_toolchain.llvm_c_compiler.c_compiler
+    clang = llvm_c_toolchain.c_toolchain.c_compiler
     clang_version_out = self._invoke_capturing_output(
       [clang.exe_filename, '--version'],
       env=clang.get_invocation_environment_dict(self.platform))
@@ -96,7 +96,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
 
     llvm_cpp_toolchain = self.execute_expecting_one_result(
       scheduler, LLVMCppToolchain, self.toolchain).value
-    clangpp = llvm_cpp_toolchain.llvm_cpp_compiler.cpp_compiler
+    clangpp = llvm_cpp_toolchain.cpp_toolchain.cpp_compiler
     clanggpp_version_out = self._invoke_capturing_output(
       [clangpp.exe_filename, '--version'],
       env=clangpp.get_invocation_environment_dict(self.platform))
@@ -112,11 +112,10 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
       with safe_open(source_file_path, mode='wb') as fp:
         fp.write(contents)
 
-      execution_request = scheduler.execution_request_literal(
-        [(self.toolchain, toolchain_type)])
+      toolchain = self.execute_expecting_one_result(scheduler, toolchain_type, self.toolchain).value
 
       with pushd(tmpdir):
-        yield tuple(self.execute_literal(scheduler, execution_request))
+        yield toolchain
 
   def _invoke_compiler(self, compiler, args):
     cmd = [compiler.exe_filename] + compiler.extra_args + args
@@ -171,12 +170,11 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
 int main() {
   printf("%s\\n", "I C the world!");
 }
-""") as products:
+""") as gcc_c_toolchain:
 
-      gcc_c_toolchain, = products
-
-      compiler = gcc_c_toolchain.gcc_c_compiler.c_compiler
-      linker = gcc_c_toolchain.gcc_c_linker.c_linker
+      c_toolchain = gcc_c_toolchain.c_toolchain
+      compiler = c_toolchain.c_compiler
+      linker = c_toolchain.c_linker
 
       self._do_compile_link(compiler, linker, 'hello.c', 'hello_gcc', "I C the world!")
 
@@ -187,12 +185,11 @@ int main() {
 int main() {
   printf("%s\\n", "I C the world!");
 }
-""") as products:
+""") as llvm_c_toolchain:
 
-      llvm_c_toolchain, = products
-
-      compiler = llvm_c_toolchain.llvm_c_compiler.c_compiler
-      linker = llvm_c_toolchain.llvm_c_linker.c_linker
+      c_toolchain = llvm_c_toolchain.c_toolchain
+      compiler = c_toolchain.c_compiler
+      linker = c_toolchain.c_linker
 
       self._do_compile_link(compiler, linker, 'hello.c', 'hello_clang', "I C the world!")
 
@@ -203,12 +200,11 @@ int main() {
 int main() {
   std::cout << "I C the world, ++ more!" << std::endl;
 }
-""") as products:
+""") as gcc_cpp_toolchain:
 
-      gcc_cpp_toolchain, = products
-
-      compiler = gcc_cpp_toolchain.gcc_cpp_compiler.cpp_compiler
-      linker = gcc_cpp_toolchain.gcc_cpp_linker.cpp_linker
+      cpp_toolchain = gcc_cpp_toolchain.cpp_toolchain
+      compiler = cpp_toolchain.cpp_compiler
+      linker = cpp_toolchain.cpp_linker
 
       self._do_compile_link(compiler, linker, 'hello.cpp', 'hello_gpp', "I C the world, ++ more!")
 
@@ -219,11 +215,11 @@ int main() {
 int main() {
   std::cout << "I C the world, ++ more!" << std::endl;
 }
-""") as products:
+""") as llvm_cpp_toolchain:
 
-      llvm_cpp_toolchain, = products
+      cpp_toolchain = llvm_cpp_toolchain.cpp_toolchain
+      compiler = cpp_toolchain.cpp_compiler
+      linker = cpp_toolchain.cpp_linker
 
-      compiler = llvm_cpp_toolchain.llvm_cpp_compiler.cpp_compiler
-      linker = llvm_cpp_toolchain.llvm_cpp_linker.cpp_linker
-
-      self._do_compile_link(compiler, linker, 'hello.cpp', 'hello_clangpp', "I C the world, ++ more!")
+      self._do_compile_link(compiler, linker, 'hello.cpp', 'hello_clangpp',
+                            "I C the world, ++ more!")

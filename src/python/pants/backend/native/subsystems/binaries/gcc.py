@@ -7,8 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import glob
 import os
 
-from pants.backend.native.config.environment import (CCompiler, CppCompiler, GCCCCompiler,
-                                                     GCCCppCompiler, Platform)
+from pants.backend.native.config.environment import CCompiler, CppCompiler, Platform
 from pants.binaries.binary_tool import NativeTool
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
@@ -95,14 +94,14 @@ class GCC(NativeTool):
       extra_args=[])
 
 
-@rule(GCCCCompiler, [Select(GCC), Select(Platform)])
+@rule(CCompiler, [Select(GCC), Select(Platform)])
 def get_gcc(gcc, platform):
-  yield GCCCCompiler(gcc.c_compiler(platform))
+  return gcc.c_compiler(platform)
 
 
-@rule(GCCCppCompiler, [Select(GCC), Select(Platform)])
+@rule(CppCompiler, [Select(GCC), Select(Platform)])
 def get_gplusplus(gcc, platform):
-  yield GCCCppCompiler(gcc.cpp_compiler(platform))
+  return gcc.cpp_compiler(platform)
 
 
 def create_gcc_rules():
