@@ -208,10 +208,6 @@ class NativeCompile(NativeTask, AbstractClass):
         'fatal_warnings', target),
       output_dir=versioned_target.results_dir)
 
-  @abstractmethod
-  def extra_compile_args(self):
-    """Return a list of task-specific arguments to use to compile sources."""
-
   def _make_compile_argv(self, compile_request):
     """Return a list of arguments to use to compile sources. Subclasses can override and append."""
     compiler = compile_request.compiler
@@ -229,11 +225,13 @@ class NativeCompile(NativeTask, AbstractClass):
     argv = (
       [compiler.exe_filename] +
       platform_specific_flags +
-      self.extra_compile_args() +
+      compiler.extra_args +
       err_flags +
       ['-c', '-fPIC'] +
       ['-I{}'.format(os.path.abspath(inc_dir)) for inc_dir in compile_request.include_dirs] +
       [os.path.abspath(src) for src in compile_request.sources])
+
+    self.context.log.debug("compile argv: {}".format(argv))
 
     return argv
 

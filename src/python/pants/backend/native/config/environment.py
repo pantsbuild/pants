@@ -59,6 +59,10 @@ class Executable(object):
   def exe_filename(self):
     """The "entry point" -- which file to invoke when PATH is set to `path_entries()`."""
 
+  @property
+  def extra_args(self):
+    return []
+
   def get_invocation_environment_dict(self, platform):
     lib_env_var = platform.resolve_platform_specific({
       'darwin': lambda: 'DYLD_LIBRARY_PATH',
@@ -83,6 +87,7 @@ class Linker(datatype([
     'exe_filename',
     'library_dirs',
     'linking_library_dirs',
+    'extra_args',
 ]), Executable):
 
   # FIXME(#5951): We need a way to compose executables more hygienically. This could be done
@@ -135,6 +140,7 @@ class CCompiler(datatype([
     'exe_filename',
     'library_dirs',
     'include_dirs',
+    'extra_args',
 ]), CompilerMixin):
 
   def get_invocation_environment_dict(self, platform):
@@ -150,6 +156,7 @@ class CppCompiler(datatype([
     'exe_filename',
     'library_dirs',
     'include_dirs',
+    'extra_args',
 ]), CompilerMixin):
 
   def get_invocation_environment_dict(self, platform):

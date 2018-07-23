@@ -141,7 +141,8 @@ class XCodeCLITools(Subsystem):
       path_entries=self.path_entries(),
       exe_filename='ld',
       library_dirs=[],
-      linking_library_dirs=[])
+      linking_library_dirs=[],
+      extra_args=['-mmacosx-version-min=10.11'])
 
   @memoized_method
   def c_compiler(self):
@@ -149,7 +150,8 @@ class XCodeCLITools(Subsystem):
       path_entries=self.path_entries(),
       exe_filename='clang',
       library_dirs=self.lib_dirs(),
-      include_dirs=self.include_dirs())
+      include_dirs=self.include_dirs(),
+      extra_args=['-mmacosx-version-min=10.11'])
 
   @memoized_method
   def cpp_compiler(self):
@@ -157,7 +159,8 @@ class XCodeCLITools(Subsystem):
       path_entries=self.path_entries(),
       exe_filename='clang++',
       library_dirs=self.lib_dirs(),
-      include_dirs=self.include_dirs())
+      include_dirs=self.include_dirs(),
+      extra_args=['-mmacosx-version-min=10.11'])
 
 
 @rule(Assembler, [Select(XCodeCLITools)])

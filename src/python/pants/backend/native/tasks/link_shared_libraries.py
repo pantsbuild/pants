@@ -102,6 +102,7 @@ class LinkSharedLibraries(NativeTask):
           # https://github.com/pantsbuild/pants/issues/6178
           link_request = self._make_link_request(
             vt, compiled_objects_product, native_target_deps_product, external_libs_product)
+          self.context.log.debug("link_request: {}".format(link_request))
           shared_library = self._execute_link_request(link_request)
 
         same_name_shared_lib = all_shared_libs_by_name.get(shared_library.name, None)
@@ -175,9 +176,14 @@ class LinkSharedLibraries(NativeTask):
     # We are executing in the results_dir, so get absolute paths for everything.
     cmd = ([linker.exe_filename] +
            self._get_shared_lib_cmdline_args(platform) +
+           linker.extra_args +
            link_request.external_libs_info.get_third_party_lib_args() +
            ['-o', os.path.abspath(resulting_shared_lib_path)] +
            [os.path.abspath(obj) for obj in object_files])
+    self.context.log.debug("linker command: {}".format(cmd))
+
+    env = linker.get_invocation_environment_dict(platform)
+    self.context.log.debug("linker invocation environment: {}".format(env))
 
     with self.context.new_workunit(name='link-shared-libraries',
                                    labels=[WorkUnitLabel.LINKER]) as workunit:
@@ -187,7 +193,7 @@ class LinkSharedLibraries(NativeTask):
           cwd=output_dir,
           stdout=workunit.output('stdout'),
           stderr=workunit.output('stderr'),
-          env=linker.get_invocation_environment_dict(platform))
+          env=env)
       except OSError as e:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.LinkSharedLibrariesError(

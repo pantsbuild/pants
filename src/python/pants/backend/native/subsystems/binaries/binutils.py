@@ -31,7 +31,8 @@ class Binutils(NativeTool):
       path_entries=self.path_entries(),
       exe_filename='ld',
       library_dirs=[],
-      linking_library_dirs=[])
+      linking_library_dirs=[],
+      extra_args=[])
 
 
 @rule(Assembler, [Select(Binutils)])

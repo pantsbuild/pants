@@ -45,8 +45,3 @@ class CCompile(NativeCompile):
 
   def get_compiler(self):
     return self._c_toolchain.c_compiler
-
-  # FIXME(#5951): don't have any command-line args in the task or in the subsystem -- rather,
-  # subsystem options should be used to populate an `Executable` which produces its own arguments.
-  def extra_compile_args(self):
-    return ['-x', 'c', '-std=c11']

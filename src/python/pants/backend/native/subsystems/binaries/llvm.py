@@ -69,7 +69,8 @@ class LLVM(NativeTool):
       exe_filename=platform.resolve_platform_specific(
         self._PLATFORM_SPECIFIC_LINKER_NAME),
       library_dirs=[],
-      linking_library_dirs=[])
+      linking_library_dirs=[],
+      extra_args=[])
 
   # FIXME: use ParseSearchDirs for this and other include directories -- we shouldn't be trying to
   # guess the path here.
@@ -87,7 +88,8 @@ class LLVM(NativeTool):
       path_entries=self.path_entries(),
       exe_filename='clang',
       library_dirs=self._common_lib_dirs,
-      include_dirs=self._common_include_dirs)
+      include_dirs=self._common_include_dirs,
+      extra_args=[])
 
   @memoized_property
   def _cpp_include_dirs(self):
@@ -98,7 +100,8 @@ class LLVM(NativeTool):
       path_entries=self.path_entries(),
       exe_filename='clang++',
       library_dirs=self._common_lib_dirs,
-      include_dirs=(self._cpp_include_dirs + self._common_include_dirs))
+      include_dirs=(self._cpp_include_dirs + self._common_include_dirs),
+      extra_args=[])
 
 
 # FIXME(#5663): use this over the XCode linker!
