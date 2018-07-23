@@ -8,7 +8,7 @@ import os
 from abc import abstractproperty
 from builtins import object
 
-from pants.engine.rules import RootRule, SingletonRule
+from pants.engine.rules import SingletonRule
 from pants.util.objects import datatype
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
 from pants.util.strutil import create_path_env_var, safe_shlex_join
@@ -262,9 +262,5 @@ class HostLibcDev(datatype(['crti_object', 'fingerprint'])):
 
 def create_native_environment_rules():
   return [
-    RootRule(LLVMCToolchain),
-    RootRule(GCCCToolchain),
-    RootRule(LLVMCppToolchain),
-    RootRule(LLVMCppToolchain),
     SingletonRule(Platform, Platform.create()),
   ]
