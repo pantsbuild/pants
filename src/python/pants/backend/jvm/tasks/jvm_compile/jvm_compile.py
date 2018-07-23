@@ -9,6 +9,7 @@ import os
 from builtins import object, str
 from multiprocessing import cpu_count
 
+from six import string_types
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
@@ -18,6 +19,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
+from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
   CLASS_NOT_FOUND_ERROR_PATTERNS
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
@@ -258,6 +260,9 @@ class JvmCompile(NailgunTaskBase):
   # ------------------------
   def extra_compile_time_classpath_elements(self):
     """Extra classpath elements common to all compiler invocations.
+
+    These should be of type ClasspathEntry, but strings are also supported for backwards
+    compatibility.
 
     E.g., jars for compiler plugins.
 
@@ -828,6 +833,10 @@ class JvmCompile(NailgunTaskBase):
     def extra_compile_classpath_iter():
       for conf in self._confs:
         for jar in self.extra_compile_time_classpath_elements():
+          if isinstance(jar, string_types):
+            # Backwards compatibility
+            # TODO: Deprecation warning if this code is hit.
+            jar = ClasspathEntry(jar)
           yield (conf, jar)
 
     return list(extra_compile_classpath_iter())

@@ -164,9 +164,15 @@ python_library(
 )
 
 python_library(
+  name = 'classpath_entry',
+  sources = ['classpath_entry.py'],
+)
+
+python_library(
   name = 'classpath_util',
   sources = ['classpath_util.py'],
   dependencies = [
+    ':classpath_entry',
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/util:contextutil',
@@ -180,6 +186,7 @@ python_library(
   sources = ['classpath_products.py'],
   dependencies = [
     '3rdparty/python:future',
+    ':classpath_entry',
     ':classpath_util',
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
