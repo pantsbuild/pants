@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import struct
-from builtins import object, str, zip
+from builtins import bytes, object, str, zip
 
 import six
 from future.utils import binary_type
@@ -85,18 +85,12 @@ class NailgunProtocol(object):
     """Raised if there is a socket error while reading the payload bytes."""
 
   @classmethod
-  def _encode_unicode(cls, payload, encoding='utf-8'):
-    """Convert unicode to bytes."""
-    if isinstance(payload, six.text_type):
-      return payload.encode(encoding)
-    elif not isinstance(payload, six.binary_type):
-      raise TypeError('cannot encode type: {}'.format(type(payload)))
-    return payload
-
-  @classmethod
-  def _encode_unicode_seq(cls, seq):
+  def _decode_unicode_seq(cls, seq):
     for item in seq:
-      yield cls._encode_unicode(item)
+      if isinstance(item, bytes):
+        yield item.decode('utf-8')
+      else:
+        yield item
 
   @classmethod
   def send_request(cls, sock, working_dir, command, *arguments, **environment):
@@ -107,7 +101,7 @@ class NailgunProtocol(object):
     for item_tuple in environment.items():
       cls.write_chunk(sock,
                       ChunkType.ENVIRONMENT,
-                      cls.ENVIRON_SEP.join(cls._encode_unicode_seq(item_tuple)))
+                      cls.ENVIRON_SEP.join(cls._decode_unicode_seq(item_tuple)))
 
     cls.write_chunk(sock, ChunkType.WORKING_DIR, working_dir)
     cls.write_chunk(sock, ChunkType.COMMAND, command)
@@ -153,7 +147,11 @@ class NailgunProtocol(object):
   @classmethod
   def construct_chunk(cls, chunk_type, payload, encoding='utf-8'):
     """Construct and return a single chunk."""
-    payload = cls._encode_unicode(payload)
+    if isinstance(payload, six.text_type):
+      payload =  payload.encode(encoding)
+    elif not isinstance(payload, six.binary_type):
+      raise TypeError('cannot encode type: {}'.format(type(payload)))
+
     header = struct.pack(cls.HEADER_FMT, len(payload), chunk_type)
     return header + payload
 
