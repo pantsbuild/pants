@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import inspect
+import sys
 import warnings
 from functools import wraps
 
@@ -81,7 +82,7 @@ def validate_removal_semver(removal_version):
                                  '{}'.format(removal_version, e))
 
 
-def get_frame_info(stacklevel, context):
+def get_frame_info(stacklevel, context=1):
   """Get a Traceback for the given `stacklevel`.
 
   stacklevel=0 means this function's frame (get_frame_info()).
@@ -118,6 +119,10 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None, sta
   if hint:
     msg += '\n  {}'.format(hint)
 
+  # We need to have filename and line_number for warnings.formatwarning, which appears to be the only
+  # way to get a warning message to display to stderr. We get that from frame_info -- it's too bad
+  # we have to reconstruct the `stacklevel` logic ourselves (but multiple lines of context is also
+  # cool).
   if frame_info is None:
     frame_info = get_frame_info(stacklevel)
   _, filename, line_number, _, code_context, _ = frame_info
@@ -125,7 +130,9 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None, sta
 
   if removal_semver > PANTS_SEMVER:
     if ensure_stderr:
-      warnings.showwarning(msg, DeprecationWarning, filename, line_number, line=context_lines)
+      warning_msg = warnings.formatwarning(
+        msg, DeprecationWarning, filename, line_number, line=context_lines)
+      print(warning_msg, file=sys.stderr)
     else:
       warnings.warn_explicit(msg, DeprecationWarning, filename, line_number, line=context_lines)
   else:

@@ -41,9 +41,6 @@ class DeprecatedFlagMatcher(datatype([('scope_flags_fun', CallableWrapper)])):
     callable_predicate = CallableWrapper(predicate)
     def generated_callable(*args, **kwargs):
       if callable_predicate(*args, **kwargs):
-        # FIXME: remove these print statements!
-        print("args: {}, kwargs: {}".format(args, kwargs), file=sys.stderr)
-        print("kw: {}".format(kw), file=sys.stderr)
         return kw
     return cls(CallableWrapper(generated_callable))
 
@@ -356,7 +353,7 @@ class Options(object):
   _quiet_flag_regex = re.compile(r'\A(\-q|\-\-([^=]+\-)?quiet(=.*)?)\Z')
 
   def _match_recursive_quiet_flag(self, scope, flags):
-    if scope == GLOBAL_SCOPE:
+    if scope != GLOBAL_SCOPE:
       found_flag = None
       for f in flags:
         if self._quiet_flag_regex.match(f):
@@ -373,7 +370,7 @@ class Options(object):
           "for all tasks and only produce the output from e.g. ./pants run.\nThe flag provided "
           "was '{}' in scope '{}'."
           .format(found_flag, scope),
-          frame_info=get_frame_info(stacklevel=2, context=1),
+          frame_info=get_frame_info(stacklevel=2),
           ensure_stderr=True)
 
   @memoized_property
