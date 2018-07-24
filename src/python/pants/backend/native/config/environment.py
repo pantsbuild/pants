@@ -121,6 +121,15 @@ class CompilerMixin(Executable):
   def include_dirs(self):
     """Directories to search for header files to #include during compilation."""
 
+  @property
+  def as_invocation_environment_dict(self):
+    ret = super(CompilerMixin, self).as_invocation_environment_dict.copy()
+
+    if self.include_dirs:
+      ret['CPATH'] = create_path_env_var(self.include_dirs)
+
+    return ret
+
 
 class CCompiler(datatype([
     'path_entries',
@@ -132,10 +141,7 @@ class CCompiler(datatype([
 
   @property
   def as_invocation_environment_dict(self):
-    ret = super(CompilerMixin, self).as_invocation_environment_dict.copy()
-
-    if self.include_dirs:
-      ret['C_INCLUDE_PATH'] = create_path_env_var(self.include_dirs)
+    ret = super(CCompiler, self).as_invocation_environment_dict.copy()
 
     ret['CC'] = self.exe_filename
 
@@ -152,10 +158,7 @@ class CppCompiler(datatype([
 
   @property
   def as_invocation_environment_dict(self):
-    ret = super(CompilerMixin, self).as_invocation_environment_dict.copy()
-
-    if self.include_dirs:
-      ret['CPLUS_INCLUDE_PATH'] = create_path_env_var(self.include_dirs)
+    ret = super(CppCompiler, self).as_invocation_environment_dict.copy()
 
     ret['CXX'] = self.exe_filename
 
