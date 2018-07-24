@@ -1,5 +1,6 @@
 extern crate bazel_protos;
 extern crate clap;
+extern crate dirs;
 extern crate env_logger;
 extern crate errno;
 extern crate fs;
@@ -585,7 +586,7 @@ pub fn mount<'a, P: AsRef<Path>>(
 }
 
 fn main() {
-  let default_store_path = std::env::home_dir()
+  let default_store_path = dirs::home_dir()
     .expect("Couldn't find homedir")
     .join(".cache")
     .join("pants")

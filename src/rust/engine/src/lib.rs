@@ -16,6 +16,7 @@ mod types;
 
 #[macro_use]
 extern crate boxfuture;
+extern crate dirs;
 #[macro_use]
 extern crate enum_primitive;
 extern crate fnv;
