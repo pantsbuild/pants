@@ -647,12 +647,18 @@ fn main() {
 
 #[cfg(target_os = "macos")]
 fn unmount(mount_path: &str) -> i32 {
-  unsafe { libc::unmount(CString::new(mount_path).unwrap().as_ptr(), 0) }
+  unsafe {
+    let path = CString::new(mount_path).unwrap();
+    libc::unmount(path.as_ptr(), 0)
+  }
 }
 
 #[cfg(target_os = "linux")]
 fn unmount(mount_path: &str) -> i32 {
-  unsafe { libc::umount(CString::new(mount_path).unwrap().as_ptr()) }
+  unsafe {
+    let path = CString::new(mount_path).unwrap();
+    libc::umount(path.as_ptr())
+  }
 }
 
 #[cfg(test)]
