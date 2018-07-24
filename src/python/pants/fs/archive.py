@@ -11,6 +11,8 @@ from collections import OrderedDict
 from contextlib import contextmanager
 from zipfile import ZIP_DEFLATED
 
+from future.utils import PY2
+
 from pants.util.contextutil import open_tar, open_zip, temporary_dir
 from pants.util.dirutil import is_executable, safe_concurrent_rename, safe_walk
 from pants.util.meta import AbstractClass
@@ -67,7 +69,17 @@ class TarArchiver(Archiver):
 
   def _extract(self, path_or_file, outdir, **kwargs):
     with open_tar(path_or_file, errorlevel=1, **kwargs) as tar:
-      tar.extractall(outdir)
+      if PY2:
+        # TarFile in Py2 grabs files as byte strings and doesn't store the encoding.
+        # Unicode will thus fail, as it tries to coerce it through Ascii.
+        # See https://superuser.com/questions/60379/how-can-i-create-a-zip-tgz-in-linux-such-that-windows-has-proper-filenames/190786#190786.
+        decoded_members = []
+        for m in tar.getmembers():
+          m.name = m.name.decode('utf-8')
+          decoded_members.append(m)
+        tar.extractall(outdir, members=decoded_members)
+      else:
+        tar.extractall(outdir)
 
   def __init__(self, mode, extension):
     """
