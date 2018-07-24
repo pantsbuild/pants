@@ -8,6 +8,7 @@ import ast
 import inspect
 import logging
 from abc import abstractproperty
+from builtins import bytes, str
 from collections import OrderedDict
 
 from future.utils import PY2
@@ -44,8 +45,9 @@ class GoalProduct(object):
 
   @classmethod
   def for_name(cls, name):
-    assert isinstance(name, six.string_types)
-    name = six.text_type(name)
+    assert isinstance(name, (bytes, str))
+    if name is bytes:
+      name = name.decode('utf-8')
     if name not in cls.PRODUCT_MAP:
       cls.PRODUCT_MAP[name] = cls._synthesize_goal_product(name)
     return cls.PRODUCT_MAP[name]
