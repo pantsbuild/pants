@@ -6,8 +6,6 @@ python_library(
     '3rdparty/python:future',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
-    'src/python/pants/engine:rules',
-    'src/python/pants/engine:selectors',
     'src/python/pants/option',
     'src/python/pants/subsystem',
   ],

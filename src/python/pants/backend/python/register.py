@@ -8,7 +8,6 @@ from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
-from pants.backend.python.subsystems.python_native_code import create_python_native_code_rules
 from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
@@ -74,7 +73,3 @@ def register_goals():
   task(name='isort-prep', action=IsortPrep).install('fmt')
   task(name='isort', action=IsortRun).install('fmt')
   task(name='py', action=PythonBundle).install('bundle')
-
-
-def rules():
-  return create_python_native_code_rules()

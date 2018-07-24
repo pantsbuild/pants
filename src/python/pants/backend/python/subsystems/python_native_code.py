@@ -10,8 +10,7 @@ from collections import defaultdict
 
 from wheel.install import WheelFile
 
-from pants.backend.native.config.environment import (CppToolchain, CToolchain, LLVMCppToolchain,
-                                                     LLVMCToolchain, Platform)
+from pants.backend.native.config.environment import CppToolchain, CToolchain, Platform
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.subsystems.xcode_cli_tools import MIN_OSX_VERSION_ARG
 from pants.backend.native.targets.native_library import NativeLibrary
@@ -20,8 +19,6 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.tasks.pex_build_util import resolve_multi
 from pants.base.exceptions import IncompatiblePlatformsError
-from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get, Select
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.objects import Exactly, datatype
@@ -141,19 +138,6 @@ class PythonNativeCode(Subsystem):
       .format(str(platforms_with_sources)))
 
 
-@rule(CToolchain, [Select(PythonNativeCode)])
-def select_c_toolchain_for_local_dist_compilation(python_native_code):
-  llvm_c_toolchain = yield Get(LLVMCToolchain, NativeToolchain, python_native_code.native_toolchain)
-  yield llvm_c_toolchain.c_toolchain
-
-
-@rule(CppToolchain, [Select(PythonNativeCode)])
-def select_cpp_toolchain_for_local_dist_compilation(python_native_code):
-  llvm_cpp_toolchain = yield Get(
-    LLVMCppToolchain, NativeToolchain, python_native_code.native_toolchain)
-  yield llvm_cpp_toolchain.cpp_toolchain
-
-
 class SetupPyNativeTools(datatype([
     ('c_toolchain', CToolchain),
     ('cpp_toolchain', CppToolchain),
@@ -163,15 +147,6 @@ class SetupPyNativeTools(datatype([
 
   This class exists because `SetupPyExecutionEnvironment` is created manually, one per target.
   """
-
-
-# TODO: could this kind of @rule be automatically generated?
-@rule(SetupPyNativeTools, [Select(CToolchain), Select(CppToolchain), Select(Platform)])
-def get_setup_py_native_tools(c_toolchain, cpp_toolchain, platform):
-  yield SetupPyNativeTools(
-    c_toolchain=c_toolchain,
-    cpp_toolchain=cpp_toolchain,
-    platform=platform)
 
 
 class SetupRequiresSiteDir(datatype(['site_dir'])): pass
@@ -284,12 +259,3 @@ class SetupPyExecutionEnvironment(datatype([
       ret['LDFLAGS'] = safe_shlex_join(all_new_ldflags)
 
     return ret
-
-
-def create_python_native_code_rules():
-  return [
-    select_c_toolchain_for_local_dist_compilation,
-    select_cpp_toolchain_for_local_dist_compilation,
-    get_setup_py_native_tools,
-    RootRule(PythonNativeCode),
-  ]

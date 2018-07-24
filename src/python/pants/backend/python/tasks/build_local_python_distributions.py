@@ -12,6 +12,7 @@ import shutil
 from pex import pep425tags
 from pex.interpreter import PythonInterpreter
 
+from pants.backend.native.config.environment import LLVMCppToolchain, LLVMCToolchain, Platform
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
 from pants.backend.python.python_requirement import PythonRequirement
@@ -29,7 +30,7 @@ from pants.task.task import Task
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdir_for, split_basename_and_dirname
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_classproperty, memoized_property
 
 
 class BuildLocalPythonDistributions(Task):
@@ -71,6 +72,10 @@ class BuildLocalPythonDistributions(Task):
 
   class BuildLocalPythonDistributionsError(TaskError): pass
 
+  @memoized_classproperty
+  def _platform(cls):
+    return Platform.create()
+
   @memoized_property
   def _python_native_code_settings(self):
     return PythonNativeCode.scoped_instance(self)
@@ -82,8 +87,16 @@ class BuildLocalPythonDistributions(Task):
     return self.context._scheduler.product_request(product, [subject])[0]
 
   @memoized_property
-  def _setup_py_native_tools(self):
-    return self._request_single(SetupPyNativeTools, self._python_native_code_settings)
+  def _c_toolchain(self):
+    llvm_c_toolchain = self._request_single(
+      LLVMCToolchain, self._python_native_code_settings.native_toolchain)
+    return llvm_c_toolchain.c_toolchain
+
+  @memoized_property
+  def _cpp_toolchain(self):
+    llvm_cpp_toolchain = self._request_single(
+      LLVMCppToolchain, self._python_native_code_settings.native_toolchain)
+    return llvm_cpp_toolchain.cpp_toolchain
 
   # TODO: This should probably be made into an @classproperty (see PR #5901).
   @property
@@ -199,7 +212,10 @@ class BuildLocalPythonDistributions(Task):
     if self._python_native_code_settings.pydist_has_native_sources(dist_target):
       # We add the native tools if we need to compile code belonging to this python_dist() target.
       # TODO: test this branch somehow!
-      native_tools = self._setup_py_native_tools
+      native_tools = SetupPyNativeTools(
+        c_toolchain=self._c_toolchain,
+        cpp_toolchain=self._cpp_toolchain,
+        platform=self._platform)
       # Native code in this python_dist() target requires marking the dist as platform-specific.
       is_platform_specific = True
     elif len(all_native_artifacts) > 0:
