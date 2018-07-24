@@ -343,16 +343,14 @@ impl BuildResultFS {
 
               Ok(entries)
             }
-            Ok(None) => {
-              return Err(libc::ENOENT);
-            }
+            Ok(None) => Err(libc::ENOENT),
             Err(err) => {
               error!("Error loading directory {:?}: {}", digest, err);
-              return Err(libc::EINVAL);
+              Err(libc::EINVAL)
             }
           }
         }
-        _ => return Err(libc::ENOENT),
+        _ => Err(libc::ENOENT),
       },
     }
   }
