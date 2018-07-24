@@ -9,6 +9,6 @@ import pkgutil
 from packaging.version import Version
 
 
-VERSION = pkgutil.get_data(__name__, 'VERSION').strip()
+VERSION = pkgutil.get_data(__name__, 'VERSION').strip().decode('utf-8')
 
 PANTS_SEMVER = Version(VERSION)
