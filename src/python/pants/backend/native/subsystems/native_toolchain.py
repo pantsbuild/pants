@@ -291,18 +291,6 @@ def select_gcc_cpp_toolchain(platform, native_toolchain):
   yield GCCCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
 
 
-@rule(CToolchain, [Select(NativeToolchain)])
-def select_default_c_toolchain(native_toolchain):
-  llvm_c_toolchain = yield Get(LLVMCToolchain, NativeToolchain, native_toolchain)
-  yield llvm_c_toolchain.c_toolchain
-
-
-@rule(CppToolchain, [Select(NativeToolchain)])
-def select_default_cpp_toolchain(native_toolchain):
-  llvm_cpp_toolchain = yield Get(LLVMCppToolchain, NativeToolchain, native_toolchain)
-  yield llvm_cpp_toolchain.cpp_toolchain
-
-
 def create_native_toolchain_rules():
   return [
     select_libc_dev,
@@ -313,7 +301,5 @@ def create_native_toolchain_rules():
     select_llvm_cpp_toolchain,
     select_gcc_c_toolchain,
     select_gcc_cpp_toolchain,
-    select_default_c_toolchain,
-    select_default_cpp_toolchain,
     RootRule(NativeToolchain),
   ]

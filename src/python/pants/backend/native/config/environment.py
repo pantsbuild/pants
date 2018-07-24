@@ -165,7 +165,10 @@ class CppCompiler(datatype([
     return ret
 
 
-# TODO(#4020): These classes are performing the work of variants.
+# NB: These wrapper classes for LLVM and GCC toolchains are performing the work of variants. A
+# CToolchain cannot be requested directly, but native_toolchain.py provides an LLVMCToolchain,
+# which contains a CToolchain representing the clang compiler and a linker paired to work with
+# objects compiled by that compiler.
 class CToolchain(datatype([('c_compiler', CCompiler), ('c_linker', Linker)])): pass
 
 
