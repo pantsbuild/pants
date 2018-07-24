@@ -9,9 +9,8 @@ import inspect
 import logging
 from abc import abstractproperty
 from collections import OrderedDict
-from types import TypeType
 
-import six
+from future.utils import PY2
 from twitter.common.collections import OrderedSet
 
 from pants.engine.selectors import Get, type_or_constraint_repr
@@ -39,7 +38,9 @@ class GoalProduct(object):
   @staticmethod
   def _synthesize_goal_product(name):
     product_type_name = '{}GoalExecution'.format(name.capitalize())
-    return type(six.binary_type(product_type_name), (datatype(['result']),), {})
+    if PY2:
+      product_type_name = product_type_name.encode('utf-8')
+    return type(product_type_name, (datatype(['result']),), {})
 
   @classmethod
   def for_name(cls, name):
