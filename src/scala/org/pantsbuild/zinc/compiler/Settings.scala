@@ -5,7 +5,8 @@
 package org.pantsbuild.zinc.compiler
 
 import java.io.File
-import java.nio.file.Path
+import sbt.internal.util.{ ConsoleLogger, ConsoleOut }
+import java.nio.file.{Files, Path}
 import java.lang.{ Boolean => JBoolean }
 import java.util.function.{ Function => JFunction }
 import java.util.{ List => JList, logging => jlogging }
@@ -38,6 +39,7 @@ case class Settings(
   _sources: Seq[File]               = Seq.empty,
   classpath: Seq[File]              = Seq.empty,
   _classesDirectory: Option[File]   = None,
+  outputJar: Option[File]           = None,
   scala: ScalaLocation              = ScalaLocation(),
   scalacOptions: Seq[String]        = Seq.empty,
   javaHome: Option[File]            = None,
@@ -47,7 +49,8 @@ case class Settings(
   compileOrder: CompileOrder        = CompileOrder.Mixed,
   sbt: SbtJars                      = SbtJars(),
   _incOptions: IncOptions           = IncOptions(),
-  analysis: AnalysisOptions         = AnalysisOptions()
+  analysis: AnalysisOptions         = AnalysisOptions(),
+  creationTime: Long                = 0
 ) {
   import Settings._
 
@@ -58,11 +61,7 @@ case class Settings(
   lazy val sources: Seq[File] = _sources map normalise
 
   lazy val classesDirectory: File =
-    normalise(
-      _classesDirectory.getOrElse {
-        throw new RuntimeException(s"The ${Settings.ZincCacheDirOpt} option is required.")
-      }
-    )
+    normalise(_classesDirectory.getOrElse(defaultClassesDirectory()))
 
   lazy val incOptions: IncOptions = {
     _incOptions.copy(
@@ -88,15 +87,15 @@ case class ConsoleOptions(
 ) {
   def javaLogLevel: jlogging.Level = logLevel match {
     case Level.Info =>
-      jlogging.Level.INFO   
+      jlogging.Level.INFO
     case Level.Warn =>
       jlogging.Level.WARNING
     case Level.Error =>
-      jlogging.Level.SEVERE 
+      jlogging.Level.SEVERE
     case Level.Debug =>
       jlogging.Level.FINE
     case x =>
-      sys.error(s"Unsupported log level: $x")    
+      sys.error(s"Unsupported log level: $x")
   }
 
   /**
@@ -214,6 +213,7 @@ case class IncOptions(
 
 object Settings extends OptionSet[Settings] {
   val DestinationOpt = "-d"
+  val JarDestinationOpt = "-jar"
   val ZincCacheDirOpt = "-zinc-cache-dir"
   val CompilerBridgeOpt = "-compiler-bridge"
   val CompilerInterfaceOpt = "-compiler-interface"
@@ -243,6 +243,8 @@ object Settings extends OptionSet[Settings] {
     header("Compile options:"),
     path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
     file(     DestinationOpt, "directory",     "Destination for compiled classes",           (s: Settings, f: File) => s.copy(_classesDirectory = Some(f))),
+    file(     JarDestinationOpt, "directory",     "Jar destination for compiled classes",           (s: Settings, f: File) => s.copy(outputJar = Some(f))),
+    long("-jar-creation-time", "n",        "Creation timestamp for compiled jars, default is current time", (s: Settings, l: Long) => s.copy(creationTime = l)),
 
     header("Scala options:"),
     file(      "-scala-home", "directory",     "Scala home directory (for locating jars)",   (s: Settings, f: File) => s.copy(scala = s.scala.copy(home = Some(f)))),
@@ -311,7 +313,15 @@ object Settings extends OptionSet[Settings] {
   /**
    * By default the backup location is relative to the classes directory (for example, target/classes/../backup/classes).
    */
-  def defaultBackupLocation(classesDir: File) = {
+  def defaultBackupLocation(classesDir: File): File = {
     classesDir.getParentFile / "backup" / classesDir.getName
+  }
+
+  /**
+   * If a settings.classesDirectory option isnt specified, create a temporary directory for output
+   * classes to be written to.
+   */
+  def defaultClassesDirectory(): File = {
+    Files.createTempDirectory("temp-zinc-classes").toFile
   }
 }

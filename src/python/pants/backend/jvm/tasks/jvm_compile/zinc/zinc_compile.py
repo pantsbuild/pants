@@ -279,7 +279,6 @@ class BaseZincCompile(JvmCompile):
     self._verify_zinc_classpath(list(upstream_analysis.keys()))
 
     zinc_args = []
-
     zinc_args.extend([
       '-log-level', self.get_options().level,
       '-analysis-cache', ctx.analysis_file,
