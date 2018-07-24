@@ -48,7 +48,7 @@ impl Core {
     tasks: Tasks,
     types: Types,
     build_root: &Path,
-    ignore_patterns: Vec<String>,
+    ignore_patterns: &[String],
     work_dir: PathBuf,
     remote_store_server: Option<String>,
     remote_execution_server: Option<String>,

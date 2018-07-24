@@ -274,7 +274,7 @@ pub extern "C" fn scheduler_create(
     tasks,
     types,
     build_root_buf.to_os_string().as_ref(),
-    ignore_patterns,
+    &ignore_patterns,
     PathBuf::from(work_dir_buf.to_os_string()),
     if remote_store_server_string.is_empty() {
       None
