@@ -6,9 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import shutil
-import sys
 from builtins import object
 from hashlib import sha1
+
+from future.utils import raise_from
 
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
@@ -389,8 +390,6 @@ class InvalidationCacheManager(object):
     except Exception as e:
       # This is a catch-all for problems we haven't caught up with and given a better diagnostic.
       # TODO(Eric Ayers): If you see this exception, add a fix to catch the problem earlier.
-      exc_info = sys.exc_info()
       new_exception = self.CacheValidationError("Problem validating target {} in {}: {}"
                                                 .format(target.id, target.address.spec_path, e))
-
-      raise self.CacheValidationError, new_exception, exc_info[2]
+      raise_from(self.CacheValidationError(new_exception), e)
