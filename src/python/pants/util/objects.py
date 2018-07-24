@@ -100,6 +100,9 @@ def datatype(field_decls, superclass_name=None, **kwargs):
     def __ne__(self, other):
       return not (self == other)
 
+    def __hash__(self):
+      return super(DataType, self).__hash__()
+
     # NB: As datatype is not iterable, we need to override both __iter__ and all of the
     # namedtuple methods that expect self to be iterable.
     def __iter__(self):
