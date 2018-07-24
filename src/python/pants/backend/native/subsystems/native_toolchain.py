@@ -99,6 +99,10 @@ def select_base_linker(platform, native_toolchain):
 
 
 class GCCInstallLocationForLLVM(datatype(['toolchain_dir'])):
+  """This class is convertible into a list of command line arguments for clang and clang++.
+
+  This is only used on Linux. The option --gcc-toolchain stops clang from searching for another gcc
+  on the host system. The option appears to only exist on Linux clang and clang++."""
 
   @property
   def as_clang_argv(self):
@@ -114,12 +118,11 @@ def select_gcc_install_location(gcc):
 def select_llvm_c_toolchain(platform, native_toolchain):
   provided_clang = yield Get(CCompiler, LLVM, native_toolchain._llvm)
 
-  gcc_install = yield Get(GCCInstallLocationForLLVM, GCC, native_toolchain._gcc)
-
   # These arguments are shared across platforms.
   llvm_c_compiler_args = [
     '-x', 'c', '-std=c11',
-  ] + gcc_install.as_clang_argv
+    '-nobuiltininc',
+  ]
 
   if platform.normalized_os_name == 'darwin':
     xcode_clang = yield Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
@@ -130,6 +133,7 @@ def select_llvm_c_toolchain(platform, native_toolchain):
       include_dirs=(provided_clang.include_dirs + xcode_clang.include_dirs),
       extra_args=(llvm_c_compiler_args + xcode_clang.extra_args))
   else:
+    gcc_install = yield Get(GCCInstallLocationForLLVM, GCC, native_toolchain._gcc)
     provided_gcc = yield Get(CCompiler, GCC, native_toolchain._gcc)
     working_c_compiler = CCompiler(
       path_entries=provided_clang.path_entries,
@@ -137,7 +141,7 @@ def select_llvm_c_toolchain(platform, native_toolchain):
       # We need g++'s version of the GLIBCXX library to be able to run, unfortunately.
       library_dirs=(provided_gcc.library_dirs + provided_clang.library_dirs),
       include_dirs=provided_gcc.include_dirs,
-      extra_args=llvm_c_compiler_args)
+      extra_args=(llvm_c_compiler_args + gcc_install.as_clang_argv))
 
   base_linker_wrapper = yield Get(BaseLinker, NativeToolchain, native_toolchain)
   base_linker = base_linker_wrapper.linker
@@ -156,16 +160,15 @@ def select_llvm_c_toolchain(platform, native_toolchain):
 def select_llvm_cpp_toolchain(platform, native_toolchain):
   provided_clangpp = yield Get(CppCompiler, LLVM, native_toolchain._llvm)
 
-  gcc_install = yield Get(GCCInstallLocationForLLVM, GCC, native_toolchain._gcc)
-
   # These arguments are shared across platforms.
   llvm_cpp_compiler_args = [
     '-x', 'c++', '-std=c++11',
     # This mean we don't use any of the headers from our LLVM distribution's C++ stdlib
     # implementation, or any from the host system. Instead, we use include dirs from the
     # XCodeCLITools or GCC.
+    '-nobuiltininc',
     '-nostdinc++',
-  ] + gcc_install.as_clang_argv
+  ]
 
   if platform.normalized_os_name == 'darwin':
     xcode_clang = yield Get(CppCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
@@ -180,6 +183,7 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
     linking_library_dirs = []
     linker_extra_args = []
   else:
+    gcc_install = yield Get(GCCInstallLocationForLLVM, GCC, native_toolchain._gcc)
     provided_gpp = yield Get(CppCompiler, GCC, native_toolchain._gcc)
     working_cpp_compiler = CppCompiler(
       path_entries=provided_clangpp.path_entries,
@@ -188,7 +192,7 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
       library_dirs=(provided_gpp.library_dirs + provided_clangpp.library_dirs),
       # NB: we use g++'s headers on Linux, and therefore their C++ standard library.
       include_dirs=provided_gpp.include_dirs,
-      extra_args=llvm_cpp_compiler_args)
+      extra_args=(llvm_cpp_compiler_args + gcc_install.as_clang_argv))
     linking_library_dirs = provided_gpp.library_dirs + provided_clangpp.library_dirs
     # Ensure we use libstdc++, provided by g++, during the linking stage.
     linker_extra_args=['-stdlib=libstdc++']
@@ -269,7 +273,10 @@ def select_gcc_cpp_toolchain(platform, native_toolchain):
     exe_filename=provided_gpp.exe_filename,
     library_dirs=provided_gpp.library_dirs,
     include_dirs=new_include_dirs,
-    extra_args=(['-x', 'c++', '-std=c++11']))
+    extra_args=([
+      '-x', 'c++', '-std=c++11',
+      '-nostdinc++',
+    ]))
 
   base_linker_wrapper = yield Get(BaseLinker, NativeToolchain, native_toolchain)
   base_linker = base_linker_wrapper.linker

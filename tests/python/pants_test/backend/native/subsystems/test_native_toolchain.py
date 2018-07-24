@@ -160,6 +160,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
       linker,
       [intermediate_obj_file_name, '-o', outfile])
     self.assertTrue(is_executable(outfile))
+
     program_out = self._invoke_capturing_output([os.path.abspath(outfile)])
     self.assertEqual((output + '\n'), program_out)
 
