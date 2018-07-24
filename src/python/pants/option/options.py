@@ -35,7 +35,6 @@ class CallableWrapper(datatype(['callable_object'])):
 
 class DeprecatedFlagMatcher(datatype([('scope_flags_fun', CallableWrapper)])):
 
-  # FIXME: this is currently unused!
   @classmethod
   def for_static_kwargs(cls, predicate, **kw):
     callable_predicate = CallableWrapper(predicate)
@@ -54,9 +53,7 @@ class DeprecatedFlagMatcher(datatype([('scope_flags_fun', CallableWrapper)])):
         raise self.make_type_error("scope_flags_fun must return a dict, or None (was: {!r})"
                                    .format(maybe_deprecation_warning_kwargs))
 
-      # FIXME: I think this should actually be a smaller `stacklevel` -- figure out what level
-      # becomes most useful when applied in the `_check_deprecations()` method!
-      warn_or_error(stacklevel=4, **maybe_deprecation_warning_kwargs)
+      warn_or_error(**maybe_deprecation_warning_kwargs)
 
 
 class Options(object):

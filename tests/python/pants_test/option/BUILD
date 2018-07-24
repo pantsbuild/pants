@@ -11,6 +11,7 @@ python_tests(
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:test_base',
+    'tests/python/pants_test/util:contextutil-test-base',
   ],
   timeout=30,
 )

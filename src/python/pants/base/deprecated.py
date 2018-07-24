@@ -121,8 +121,8 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None, sta
 
   # We need to have filename and line_number for warnings.formatwarning, which appears to be the only
   # way to get a warning message to display to stderr. We get that from frame_info -- it's too bad
-  # we have to reconstruct the `stacklevel` logic ourselves (but multiple lines of context is also
-  # cool).
+  # we have to reconstruct the `stacklevel` logic ourselves, but we do also gain the ability to have
+  # multiple lines of context, which is neat.
   if frame_info is None:
     frame_info = get_frame_info(stacklevel)
   _, filename, line_number, _, code_context, _ = frame_info

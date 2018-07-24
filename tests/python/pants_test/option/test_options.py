@@ -7,8 +7,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import io
 import os
 import shlex
+import tempfile
 import unittest
 import warnings
+from abc import abstractmethod
 from builtins import open, str
 from contextlib import contextmanager
 from textwrap import dedent
@@ -33,6 +35,7 @@ from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
+from pants_test.util.contextutil_test_base import ContextutilTestBase
 
 
 def task(scope):
@@ -47,7 +50,60 @@ def subsystem(scope):
   return ScopeInfo(scope, ScopeInfo.SUBSYSTEM)
 
 
-class OptionsTest(unittest.TestCase):
+class OptionsTestBase(ContextutilTestBase):
+
+  @contextmanager
+  def warnings_catcher(self):
+    with warnings.catch_warnings(record=True) as w:
+      warnings.simplefilter('always')
+      yield w
+
+  @contextmanager
+  def stderr_catcher(self, expected_msg):
+    with self.stdio_as_tempfiles(
+        stdin_data='',
+        stdout_data='',
+        stderr_data=expected_msg,
+        strict_text_match=False):
+      yield
+
+  def assertWarning(self, w, option_string):
+    self.assertEquals(1, len(w))
+    self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
+    warning_message = str(w[-1].message)
+    self.assertIn("will be removed in version",
+                  warning_message)
+    self.assertIn(option_string, warning_message)
+
+  @contextmanager
+  def _write_config_to_file(self, fp, config):
+    for section, options in config.items():
+      fp.write('[{}]\n'.format(section))
+      for key, value in options.items():
+        fp.write('{}: {}\n'.format(key, value))
+
+  def _create_config(self, config):
+    with open(os.path.join(safe_mkdtemp(), 'test_config.ini'), 'w') as fp:
+      self._write_config_to_file(fp, config)
+    return Config.load(config_paths=[fp.name])
+
+  def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None, options_cls=None):
+    args = shlex.split(str(args_str))
+    options_type = options_cls or Options
+    options = options_type.create(env=env or {},
+                                  config=self._create_config(config or {}),
+                                  known_scope_infos=OptionsTest._known_scope_infos,
+                                  args=args,
+                                  bootstrap_option_values=bootstrap_option_values,
+                                  option_tracker=OptionTracker())
+    self._register(options)
+    return options
+
+  @abstractmethod
+  def _register(self, options): pass
+
+
+class OptionsTest(OptionsTestBase):
   _known_scope_infos = [intermediate('compile'),
                         task('compile.java'),
                         task('compile.scala'),
@@ -158,30 +214,6 @@ class OptionsTest(unittest.TestCase):
     options.register('fingerprinting', '--definitely-not-inverted', daemon=False)
     options.register('fingerprinting', '--fingerprinted', fingerprint=True)
     options.register('fingerprinting', '--definitely-not-fingerprinted', fingerprint=False)
-
-  @contextmanager
-  def _write_config_to_file(self, fp, config):
-    for section, options in config.items():
-      fp.write('[{}]\n'.format(section))
-      for key, value in options.items():
-        fp.write('{}: {}\n'.format(key, value))
-
-  def _create_config(self, config):
-    with open(os.path.join(safe_mkdtemp(), 'test_config.ini'), 'w') as fp:
-      self._write_config_to_file(fp, config)
-    return Config.load(config_paths=[fp.name])
-
-  def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None, options_cls=None):
-    args = shlex.split(str(args_str))
-    options_type = options_cls or Options
-    options = options_type.create(env=env or {},
-                                  config=self._create_config(config or {}),
-                                  known_scope_infos=OptionsTest._known_scope_infos,
-                                  args=args,
-                                  bootstrap_option_values=bootstrap_option_values,
-                                  option_tracker=OptionTracker())
-    self._register(options)
-    return options
 
   def test_env_type_int(self):
     options = Options.create(env={'PANTS_FOO_BAR': "['123','456']"},
