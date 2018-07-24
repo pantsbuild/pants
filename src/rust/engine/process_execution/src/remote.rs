@@ -541,7 +541,7 @@ impl CommandRunner {
     impl fs::StoreFileByDigest<String> for StoreOneOffRemoteDigest {
       fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
         match self.map_of_paths_to_digests.get(&file.path) {
-          Some(digest) => future::ok(digest.clone()),
+          Some(digest) => future::ok(*digest),
           None => future::err(format!(
             "Didn't know digest for path in remote execution response: {:?}",
             file.path

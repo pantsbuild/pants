@@ -91,8 +91,8 @@ impl RawNode {
     };
 
     RawNode {
-      subject: subject.clone(),
-      product: product.clone(),
+      subject: *subject,
+      product: *product,
       state_tag: state_tag,
       state_handle: state_value.into(),
     }

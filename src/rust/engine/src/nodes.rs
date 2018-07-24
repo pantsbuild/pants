@@ -269,7 +269,7 @@ impl Select {
     // Compute PathGlobs for the subject.
     let context = context.clone();
     Select::new(
-      context.core.types.path_globs.clone(),
+      context.core.types.path_globs,
       self.subject,
       self.variants.clone(),
       &edges,
@@ -320,7 +320,7 @@ impl Select {
         |entry| match context.core.rule_graph.rule_for_inner(entry) {
           &rule_graph::Rule::Task(ref task) => context.get(Task {
             subject: self.subject,
-            product: self.product().clone(),
+            product: *self.product(),
             variants: self.variants.clone(),
             task: task.clone(),
             entry: Arc::new(entry.clone()),
@@ -804,7 +804,7 @@ impl Task {
           .expect("edges for task exist.")
           .entries_for(&rule_graph::SelectKey::JustGet(selectors::Get {
             product: product,
-            subject: subject.type_id().clone(),
+            subject: *subject.type_id(),
           }));
         Select::new_with_entries(product, subject, Variants::default(), entries)
           .run(context.clone())

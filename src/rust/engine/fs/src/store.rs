@@ -311,9 +311,7 @@ impl Store {
               let entry_type = digest_entry_types[&digest];
               let remote = remote2.clone();
               local
-                .load_bytes_with(entry_type.clone(), digest.0, move |bytes| {
-                  remote.store_bytes(bytes)
-                })
+                .load_bytes_with(entry_type, digest.0, move |bytes| remote.store_bytes(bytes))
                 .and_then(move |maybe_future| match maybe_future {
                   Some(future) => Ok(future),
                   None => Err(format!("Failed to upload digest {:?}: Not found", digest)),

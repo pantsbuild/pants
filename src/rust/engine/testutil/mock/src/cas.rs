@@ -104,7 +104,7 @@ impl StubCAS {
   }
 
   pub fn read_request_count(&self) -> usize {
-    self.read_request_count.lock().unwrap().clone()
+    *self.read_request_count.lock().unwrap()
   }
 }
 

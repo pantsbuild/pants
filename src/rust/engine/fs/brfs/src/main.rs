@@ -395,11 +395,11 @@ impl fuse::Filesystem for BuildResultFS {
         let maybe_cache_entry = self
           .inode_digest_cache
           .get(&parent)
-          .map(|entry| entry.clone())
+          .cloned()
           .ok_or(libc::ENOENT);
         maybe_cache_entry
           .and_then(|cache_entry| {
-            let parent_digest = cache_entry.digest.clone();
+            let parent_digest = cache_entry.digest;
             self
               .store
               .load_directory(parent_digest)
