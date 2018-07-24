@@ -54,7 +54,7 @@ fn attr_for(inode: Inode, size: u64, kind: fuse::FileType, perm: u16) -> fuse::F
 }
 
 pub fn digest_from_filepath(str: &str) -> Result<Digest, String> {
-  let mut parts = str.split("-");
+  let mut parts = str.split('-');
   let fingerprint_str = parts
     .next()
     .ok_or_else(|| format!("Invalid digest: {} wasn't of form fingerprint-size", str))?;
