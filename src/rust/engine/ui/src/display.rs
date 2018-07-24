@@ -2,7 +2,7 @@ extern crate rand;
 extern crate termion;
 extern crate unicode_segmentation;
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 use std::io::Write;
 use std::io::{stdout, Result, Stdout};
 use std::thread;
@@ -25,7 +25,7 @@ pub struct EngineDisplay {
   poll_interval_ms: Duration,
   padding: String,
   terminal: Console,
-  action_map: HashMap<String, String>,
+  action_map: BTreeMap<String, String>,
   logs: VecDeque<String>,
   running: bool,
   is_tty: bool,
@@ -35,6 +35,7 @@ pub struct EngineDisplay {
 
 // TODO: Prescribe a threading/polling strategy for callers - or implement a built-in one.
 // TODO: Better error handling for .flush() and .write() failure modes.
+// TODO: Permit scrollback in the terminal - both at exit and during the live run.
 impl EngineDisplay {
   pub fn for_stdout(indent_level: u16) -> EngineDisplay {
     let write_handle = stdout();
@@ -44,10 +45,7 @@ impl EngineDisplay {
       sigil: '⚡',
       divider: "▵".to_string(),
       poll_interval_ms: Duration::from_millis(55),
-      padding: (0..indent_level)
-        .map({ |_| " " })
-        .collect::<Vec<&str>>()
-        .concat(),
+      padding: " ".repeat(indent_level.into()),
       terminal: if !is_tty {
         Console::Pipe(write_handle)
       } else {
@@ -56,8 +54,11 @@ impl EngineDisplay {
           Err(_) => Console::Pipe(stdout()),
         }
       },
-      action_map: HashMap::new(),
-      logs: VecDeque::new(),
+      action_map: BTreeMap::new(),
+      // This is arbitrary based on a guesstimated peak terminal row size for modern displays.
+      // The reason this can't be capped to e.g. the starting size is because of resizing - we
+      // want to be able to fill the entire screen if resized much larger than when we started.
+      logs: VecDeque::with_capacity(500),
       running: false,
       is_tty: is_tty,
       // N.B. This will cause the screen to clear - but with some improved position
@@ -77,21 +78,15 @@ impl EngineDisplay {
   // Gets the current terminal's cursor position, if applicable.
   fn get_cursor_pos(&mut self) -> (u16, u16) {
     match self.terminal {
-      Console::Terminal(ref mut t) => match &t.cursor_pos() {
-        Ok((x, y)) => (*x, *y),
-        // N.B. Real TTY coordinates start at 1.
-        Err(_) => (0, 0),
-      },
+      // N.B. Real TTY coordinates start at (1, 1).
+      Console::Terminal(ref mut t) => t.cursor_pos().unwrap_or((0, 0)),
       Console::Pipe(_) => (0, 0),
     }
   }
 
   // Gets the current terminal's width and height, if applicable.
   fn get_size() -> (u16, u16) {
-    match termion::terminal_size() {
-      Ok((x, y)) => (x, y),
-      Err(_) => (0, 0),
-    }
+    termion::terminal_size().unwrap_or((0, 0))
   }
 
   // Whether or not the EngineDisplay is running (whether .start() has been called).
@@ -106,6 +101,8 @@ impl EngineDisplay {
 
   // Sets the terminal size for signal-free resize detection.
   fn get_max_log_rows(&self) -> usize {
+    // TODO: If the terminal size is smaller than the action map, we should fall back
+    // to non-tty mode output to avoid.
     self.terminal_size.1 as usize - self.action_map.len() - 1
   }
 
@@ -113,7 +110,7 @@ impl EngineDisplay {
   fn clear(&mut self) {
     let cursor_start = self.cursor_start;
     self
-      .write(format!(
+      .write(&format!(
         "{goto_origin}{clear}",
         goto_origin = cursor::Goto(cursor_start.0, cursor_start.1),
         clear = clear::AfterCursor,
@@ -130,7 +127,7 @@ impl EngineDisplay {
   }
 
   // Writes output to the terminal.
-  fn write(&mut self, msg: String) -> Result<usize> {
+  fn write(&mut self, msg: &str) -> Result<usize> {
     match self.terminal {
       Console::Terminal(ref mut t) => t.write(msg.as_bytes()),
       Console::Pipe(ref mut p) => p.write(msg.as_bytes()),
@@ -144,7 +141,7 @@ impl EngineDisplay {
     let divider = self.divider.clone();
 
     self
-      .write(format!(
+      .write(&format!(
         "{pos}{clear_line}{padding}{blue}{divider}{reset}",
         pos = cursor::Goto(1, cursor_start.1 + offset),
         clear_line = clear::CurrentLine,
@@ -173,7 +170,7 @@ impl EngineDisplay {
         .collect();
 
       self
-        .write(format!(
+        .write(&format!(
           "{pos}{clear_line}{entry}",
           pos = cursor::Goto(1, cursor_start.1 + n as u16),
           clear_line = clear::CurrentLine,
@@ -191,11 +188,8 @@ impl EngineDisplay {
 
   // Renders one frame of the action portion of the screen.
   fn render_actions(&mut self, start_row: usize) {
-    let mut worker_states: Vec<(String, String)> = self.action_map.clone().into_iter().collect();
-
-    worker_states.sort_by_key(|k| k.clone().0);
-
     let cursor_start = self.cursor_start;
+    let worker_states = self.action_map.clone();
 
     // For every active worker in the action map, jump to the exact cursor
     // representing the swimlane for this worker and lay down a text label.
@@ -214,7 +208,7 @@ impl EngineDisplay {
         .collect();
 
       self
-        .write(format!(
+        .write(&format!(
           "{pos}{entry}",
           pos = cursor::Goto(1, cursor_start.1 + start_row as u16 + n as u16),
           entry = line_shortened_output
@@ -258,7 +252,7 @@ impl EngineDisplay {
     self.running = true;
     let cursor_start = self.cursor_start;
     self
-      .write(format!(
+      .write(&format!(
         "{hide_cursor}{cursor_init}{clear_after_cursor}",
         hide_cursor = termion::cursor::Hide,
         cursor_init = cursor::Goto(cursor_start.0, cursor_start.1),
@@ -269,10 +263,8 @@ impl EngineDisplay {
 
   // Adds a worker/thread to the visual representation.
   pub fn add_worker(&mut self, worker_name: String) {
-    self.update(
-      worker_name.clone(),
-      String::from(format!("booting {}", worker_name)),
-    );
+    let action_msg = format!("booting {}", worker_name);
+    self.update(worker_name, action_msg);
   }
 
   // Updates the status of a worker/thread.
@@ -281,8 +273,8 @@ impl EngineDisplay {
   }
 
   // Removes a worker/thread from the visual representation.
-  pub fn remove_worker(&mut self, worker_id: String) {
-    self.action_map.remove(&worker_id);
+  pub fn remove_worker(&mut self, worker_id: &str) {
+    self.action_map.remove(worker_id);
   }
 
   // Adds a log entry for display.
@@ -296,7 +288,7 @@ impl EngineDisplay {
     let current_pos = self.get_cursor_pos();
     let action_count = self.action_map.len() as u16;
     self
-      .write(format!(
+      .write(&format!(
         "{park_cursor}{clear_after_cursor}{reveal_cursor}",
         park_cursor = cursor::Goto(1, current_pos.1 - action_count),
         clear_after_cursor = clear::AfterCursor,
