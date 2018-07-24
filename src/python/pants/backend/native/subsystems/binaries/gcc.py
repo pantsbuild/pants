@@ -4,71 +4,63 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import glob
 import os
 
 from pants.backend.native.config.environment import CCompiler, CppCompiler
+from pants.backend.native.subsystems.utils.archive_file_mapper import ArchiveFileMapper
 from pants.binaries.binary_tool import NativeTool
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
-from pants.util.collections import assert_single_element
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.memo import memoized_property
 
 
 class GCC(NativeTool):
+  """Subsystem wrapping an archive providing a GCC distribution.
+
+  This subsystem provides the gcc and g++ compilers.
+
+  NB: The lib and include dirs provided by this distribution are produced by using known relative
+  paths into the distribution of GCC provided on Pantsbuild S3. If we change how we distribute GCC,
+  these methods may have to change. They should be stable to version upgrades, however.
+  """
   options_scope = 'gcc'
   default_version = '7.3.0'
   archive_type = 'tgz'
 
-  @memoized_method
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(GCC, cls).subsystem_dependencies() + (ArchiveFileMapper.scoped(cls),)
+
+  @memoized_property
+  def _file_mapper(self):
+    return ArchiveFileMapper.scoped_instance(self)
+
+  def _filemap(self, all_components_list):
+    return self._file_mapper.map_files(self.select(), all_components_list)
+
+  @memoized_property
   def path_entries(self):
-    return [os.path.join(self.select(), 'bin')]
-
-  class GCCResourceLocationError(Exception): pass
-
-  def _get_check_single_path_by_glob(self, *components):
-    """Assert that the path components (which are joined into a glob) match exactly one path.
-
-    The matched path may be a file or a directory. This method is used to avoid having to guess
-    platform-specific intermediate directory names, e.g. 'x86_64-linux-gnu' or
-    'x86_64-apple-darwin17.5.0'."""
-    glob_path_string = os.path.join(*components)
-    expanded_glob = glob.glob(glob_path_string)
-
-    try:
-      return assert_single_element(expanded_glob)
-    except StopIteration as e:
-      raise self.GCCResourceLocationError(
-        "No elements for glob '{}' -- expected exactly one."
-        .format(glob_path_string),
-        e)
-    except ValueError as e:
-      raise self.GCCResourceLocationError(
-        "Should have exactly one path matching expansion of glob '{}'."
-        .format(glob_path_string),
-        e)
+    return self._filemap([('bin',)])
 
   @memoized_property
   def _common_lib_dirs(self):
-    return [
-      os.path.join(self.select(), 'lib'),
-      os.path.join(self.select(), 'lib64'),
-      os.path.join(self.select(), 'lib/gcc'),
-      self._get_check_single_path_by_glob(
-        self.select(), 'lib/gcc/*', self.version()),
-    ]
+    return self._filemap([
+      ('lib',),
+      ('lib64',),
+      ('lib/gcc',),
+      ('lib/gcc/*', self.version()),
+    ])
 
   @memoized_property
   def _common_include_dirs(self):
-    return [
-      os.path.join(self.select(), 'include'),
-      self._get_check_single_path_by_glob(
-        self.select(), 'lib/gcc/*', self.version(), 'include'),
-    ]
+    return self._filemap([
+      ('include',),
+      ('lib/gcc/*', self.version(), 'include'),
+    ])
 
   def c_compiler(self):
     return CCompiler(
-      path_entries=self.path_entries(),
+      path_entries=self.path_entries,
       exe_filename='gcc',
       library_dirs=self._common_lib_dirs,
       include_dirs=self._common_include_dirs,
@@ -76,18 +68,23 @@ class GCC(NativeTool):
 
   @memoized_property
   def _cpp_include_dirs(self):
-    # FIXME: explain why this is necessary!
-    cpp_config_header_path = self._get_check_single_path_by_glob(
-      self.select(), 'include/c++', self.version(), '*/bits/c++config.h')
-    return [
-      os.path.join(self.select(), 'include/c++', self.version()),
-      # Get the directory that makes `#include <bits/c++config.h>` work.
-      os.path.dirname(os.path.dirname(cpp_config_header_path)),
-    ]
+    most_cpp_include_dirs = self._filemap([
+      ('include/c++', self.version()),
+    ])
+
+    # This file is needed for C++ compilation.
+    cpp_config_header_path = self._file_mapper.assert_single_path_by_glob(
+      # NB: There are multiple paths matching this glob unless we provide the full path to
+      # c++config.h, which is why we bypass self._filemap() here.
+      [self.select(), 'include/c++', self.version(), '*/bits/c++config.h'])
+    # Get the directory that makes `#include <bits/c++config.h>` work.
+    plat_cpp_header_dir =  os.path.dirname(os.path.dirname(cpp_config_header_path))
+
+    return most_cpp_include_dirs + [plat_cpp_header_dir]
 
   def cpp_compiler(self):
     return CppCompiler(
-      path_entries=self.path_entries(),
+      path_entries=self.path_entries,
       exe_filename='g++',
       library_dirs=self._common_lib_dirs,
       include_dirs=(self._common_include_dirs + self._cpp_include_dirs),
