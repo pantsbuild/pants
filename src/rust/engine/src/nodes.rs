@@ -790,7 +790,7 @@ pub struct Task {
 impl Task {
   fn gen_get(
     context: &Context,
-    entry: Arc<rule_graph::Entry>,
+    entry: &Arc<rule_graph::Entry>,
     gets: Vec<externs::Get>,
   ) -> NodeFuture<Vec<Value>> {
     let get_futures = gets
@@ -800,7 +800,7 @@ impl Task {
         let entries = context
           .core
           .rule_graph
-          .edges_for_inner(&entry)
+          .edges_for_inner(entry)
           .expect("edges for task exist.")
           .entries_for(&rule_graph::SelectKey::JustGet(selectors::Get {
             product: product,
@@ -828,10 +828,10 @@ impl Task {
       let entry = entry.clone();
       future::result(externs::generator_send(&generator, &input)).and_then(move |response| {
         match response {
-          externs::GeneratorResponse::Get(get) => Self::gen_get(&context, entry, vec![get])
+          externs::GeneratorResponse::Get(get) => Self::gen_get(&context, &entry, vec![get])
             .map(|vs| future::Loop::Continue(vs.into_iter().next().unwrap()))
             .to_boxed(),
-          externs::GeneratorResponse::GetMulti(gets) => Self::gen_get(&context, entry, gets)
+          externs::GeneratorResponse::GetMulti(gets) => Self::gen_get(&context, &entry, gets)
             .map(|vs| future::Loop::Continue(externs::store_tuple(&vs)))
             .to_boxed(),
           externs::GeneratorResponse::Break(val) => future::ok(future::Loop::Break(val)).to_boxed(),
