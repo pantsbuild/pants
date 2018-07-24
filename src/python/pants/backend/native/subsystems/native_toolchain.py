@@ -120,7 +120,8 @@ def select_llvm_c_toolchain(platform, native_toolchain):
   llvm_c_compiler_args = [
     '-x', 'c', '-std=c11',
     # This means we don't use any of the C standard library headers from our packaged LLVM
-    # distribution. Instead, we use include dirs from the XCodeCLITools or GCC.
+    # distribution, or any from the host system. Instead, we use include dirs from the XCodeCLITools
+    # or GCC.
     '-nostdinc',
   ] + gcc_install.as_clang_argv
 
@@ -165,8 +166,9 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
   llvm_cpp_compiler_args = [
     '-x', 'c++', '-std=c++11',
     # This mean we don't use any of the headers from our LLVM distribution's C++ stdlib
-    # implementation. Instead, we use include dirs from the XCodeCLITools or GCC.
-    # TODO: why does -nostdinc work for LLVMCToolchain but not LLVMCppToolchain?
+    # implementation, or any from the host system. Instead, we use include dirs from the
+    # XCodeCLITools or GCC.
+    # TODO: why does -nostdinc work for LLVMCToolchain but not LLVMCppToolchain (on Linux)?
     '-nostdinc++',
   ] + gcc_install.as_clang_argv
 
