@@ -76,11 +76,9 @@ class LLVM(NativeTool):
   def _filemap(self, all_components_list):
     return self._file_mapper.map_files(self.select(), all_components_list)
 
-  _bin_paths = [('bin',)]
-
   @memoized_property
   def path_entries(self):
-    return self._filemap(self._bin_paths)
+    return self._filemap([('bin',)])
 
   _PLATFORM_SPECIFIC_LINKER_NAME = {
     'darwin': lambda: 'ld64.lld',

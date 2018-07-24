@@ -15,7 +15,9 @@ class ArchiveFileMapper(Subsystem):
   """Index into known paths relative to a base directory.
 
   This is used with `NativeTool`s that wrap a compressed archive, which may have slightly different
-  paths across platforms. The helper methods from this class """
+  paths across platforms. The helper methods from this class make it concise to express searching
+  for a single exact match for each of a set of directory path globs.
+  """
 
   options_scope = 'archive-file-mapper'
 
@@ -26,7 +28,8 @@ class ArchiveFileMapper(Subsystem):
 
     The matched path may be a file or a directory. This method is used to avoid having to guess
     platform-specific intermediate directory names, e.g. 'x86_64-linux-gnu' or
-    'x86_64-apple-darwin17.5.0'."""
+    'x86_64-apple-darwin17.5.0'.
+    """
     glob_path_string = os.path.join(*components)
     expanded_glob = glob.glob(glob_path_string)
 
