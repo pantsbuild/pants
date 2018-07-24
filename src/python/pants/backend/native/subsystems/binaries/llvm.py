@@ -6,8 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
-from pants.backend.native.config.environment import (CCompiler, CppCompiler, Linker, LLVMCCompiler,
-                                                     LLVMCppCompiler, Platform)
+from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
+from pants.backend.native.subsystems.utils.archive_file_mapper import ArchiveFileMapper
 from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.rules import RootRule, rule
@@ -36,6 +36,16 @@ class LLVMReleaseUrlGenerator(BinaryToolUrlGenerator):
 
 
 class LLVM(NativeTool):
+  """Subsystem wrapping an archive providing an LLVM distribution.
+
+  This subsystem provides the clang and clang++ compilers. It also provides lld, which is not
+  currently used.
+
+  NB: The lib and include dirs provided by this distribution are produced by using known relative
+  paths into the distribution of LLVM from LLVMReleaseUrlGenerator. If LLVM changes the structure of
+  their release archives, these methods may have to change. They should be stable to version
+  upgrades, however.
+  """
   options_scope = 'llvm'
   default_version = '6.0.0'
   archive_type = 'txz'
@@ -47,7 +57,7 @@ class LLVM(NativeTool):
   def select(self):
     unpacked_path = super(LLVM, self).select()
     # The archive from releases.llvm.org wraps the extracted content into a directory one level
-    # deeper, but the one from our S3 does not.
+    # deeper, but the one from our S3 does not. We account for both here.
     children = os.listdir(unpacked_path)
     if len(children) == 1:
       llvm_base_dir = os.path.join(unpacked_path, children[0])
@@ -55,8 +65,20 @@ class LLVM(NativeTool):
       return llvm_base_dir
     return unpacked_path
 
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(LLVM, cls).subsystem_dependencies() + (ArchiveFileMapper.scoped(cls),)
+
+  @memoized_property
+  def _file_mapper(self):
+    return ArchiveFileMapper.scoped_instance(self)
+
+  def _filemap(self, all_components_list):
+    return self._file_mapper.map_files(self.select(), all_components_list)
+
+  @memoized_property
   def path_entries(self):
-    return [os.path.join(self.select(), 'bin')]
+    return self._filemap([('bin',)])
 
   _PLATFORM_SPECIFIC_LINKER_NAME = {
     'darwin': lambda: 'ld64.lld',
@@ -65,39 +87,40 @@ class LLVM(NativeTool):
 
   def linker(self, platform):
     return Linker(
-      path_entries=self.path_entries(),
+      path_entries=self.path_entries,
       exe_filename=platform.resolve_platform_specific(
         self._PLATFORM_SPECIFIC_LINKER_NAME),
-      library_dirs=[])
+      library_dirs=[],
+      linking_library_dirs=[],
+      extra_args=[])
 
-  # FIXME: use ParseSearchDirs for this and other include directories -- we shouldn't be trying to
-  # guess the path here.
-  # https://github.com/pantsbuild/pants/issues/6143
   @memoized_property
   def _common_include_dirs(self):
-    return [os.path.join(self.select(), 'lib/clang', self.version(), 'include')]
+    return self._filemap([('lib/clang', self.version(), 'include')])
 
   @memoized_property
   def _common_lib_dirs(self):
-    return [os.path.join(self.select(), 'lib')]
+    return self._filemap([('lib',)])
 
   def c_compiler(self):
     return CCompiler(
-      path_entries=self.path_entries(),
+      path_entries=self.path_entries,
       exe_filename='clang',
       library_dirs=self._common_lib_dirs,
-      include_dirs=self._common_include_dirs)
+      include_dirs=self._common_include_dirs,
+      extra_args=[])
 
   @memoized_property
   def _cpp_include_dirs(self):
-    return [os.path.join(self.select(), 'include/c++/v1')]
+    return self._filemap([('include/c++/v1',)])
 
   def cpp_compiler(self):
     return CppCompiler(
-      path_entries=self.path_entries(),
+      path_entries=self.path_entries,
       exe_filename='clang++',
       library_dirs=self._common_lib_dirs,
-      include_dirs=(self._cpp_include_dirs + self._common_include_dirs))
+      include_dirs=(self._cpp_include_dirs + self._common_include_dirs),
+      extra_args=[])
 
 
 # FIXME(#5663): use this over the XCode linker!
@@ -106,14 +129,14 @@ def get_lld(platform, llvm):
   return llvm.linker(platform)
 
 
-@rule(LLVMCCompiler, [Select(LLVM)])
+@rule(CCompiler, [Select(LLVM)])
 def get_clang(llvm):
-  yield LLVMCCompiler(llvm.c_compiler())
+  return llvm.c_compiler()
 
 
-@rule(LLVMCppCompiler, [Select(LLVM)])
+@rule(CppCompiler, [Select(LLVM)])
 def get_clang_plusplus(llvm):
-  yield LLVMCppCompiler(llvm.cpp_compiler())
+  return llvm.cpp_compiler()
 
 
 def create_llvm_rules():
