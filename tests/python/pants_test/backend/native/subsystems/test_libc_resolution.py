@@ -74,6 +74,6 @@ class TestLibcCompilerSearchFailure(TestBase):
     with self.assertRaises(ParseSearchDirs.ParseSearchDirsError) as cm:
       self.libc.get_libc_dirs(self.platform)
     expected_msg = (
-      "Invocation of 'this_executable_does_not_exist' with argv "
-      "'this_executable_does_not_exist -print-search-dirs' failed.")
+      "Process invocation with argv "
+      "'this_executable_does_not_exist -print-search-dirs' and environment None failed.")
     self.assertIn(expected_msg, str(cm.exception))

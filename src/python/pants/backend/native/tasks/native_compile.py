@@ -9,7 +9,7 @@ from abc import abstractmethod
 from builtins import filter
 from collections import defaultdict
 
-from pants.backend.native.config.environment import Executable, Platform
+from pants.backend.native.config.environment import Executable
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFetch
 from pants.backend.native.tasks.native_task import NativeTask
@@ -208,32 +208,22 @@ class NativeCompile(NativeTask, AbstractClass):
         'fatal_warnings', target),
       output_dir=versioned_target.results_dir)
 
-  @abstractmethod
-  def extra_compile_args(self):
-    """Return a list of task-specific arguments to use to compile sources."""
-
   def _make_compile_argv(self, compile_request):
     """Return a list of arguments to use to compile sources. Subclasses can override and append."""
     compiler = compile_request.compiler
     err_flags = ['-Werror'] if compile_request.fatal_warnings else []
 
-    platform = Platform.create()
-
-    platform_specific_flags = platform.resolve_platform_specific({
-      'linux': lambda: [],
-      'darwin': lambda: ['-mmacosx-version-min=10.11'],
-    })
-
     # We are going to execute in the target output, so get absolute paths for everything.
     # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
     argv = (
       [compiler.exe_filename] +
-      platform_specific_flags +
-      self.extra_compile_args() +
+      compiler.extra_args +
       err_flags +
       ['-c', '-fPIC'] +
       ['-I{}'.format(os.path.abspath(inc_dir)) for inc_dir in compile_request.include_dirs] +
       [os.path.abspath(src) for src in compile_request.sources])
+
+    self.context.log.debug("compile argv: {}".format(argv))
 
     return argv
 
@@ -255,8 +245,7 @@ class NativeCompile(NativeTask, AbstractClass):
     output_dir = compile_request.output_dir
 
     argv = self._make_compile_argv(compile_request)
-
-    platform = Platform.create()
+    env = compiler.as_invocation_environment_dict
 
     with self.context.new_workunit(
         name=self.workunit_label, labels=[WorkUnitLabel.COMPILER]) as workunit:
@@ -266,19 +255,20 @@ class NativeCompile(NativeTask, AbstractClass):
           cwd=output_dir,
           stdout=workunit.output('stdout'),
           stderr=workunit.output('stderr'),
-          env=compiler.get_invocation_environment_dict(platform))
+          env=env)
       except OSError as e:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.NativeCompileError(
-          "Error invoking '{exe}' with command {cmd} for request {req}: {err}"
-          .format(exe=compiler.exe_filename, cmd=argv, req=compile_request, err=e))
+          "Error invoking '{exe}' with command {cmd} and environment {env} for request {req}: {err}"
+          .format(exe=compiler.exe_filename, cmd=argv, env=env, req=compile_request, err=e))
 
       rc = process.wait()
       if rc != 0:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.NativeCompileError(
-          "Error in '{section_name}' with command {cmd} for request {req}. Exit code was: {rc}."
-          .format(section_name=self.workunit_label, cmd=argv, req=compile_request, rc=rc))
+          "Error in '{section_name}' with command {cmd} and environment {env} for request {req}. "
+          "Exit code was: {rc}."
+          .format(section_name=self.workunit_label, cmd=argv, env=env, req=compile_request, rc=rc))
 
   def collect_cached_objects(self, versioned_target):
     """Scan `versioned_target`'s results directory and return the output files from that directory.
