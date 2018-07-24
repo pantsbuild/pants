@@ -640,7 +640,9 @@ fn main() {
   }.expect("Error making store");
 
   let _fs = mount(mount_path, store).expect("Error mounting");
-  loop {}
+  loop {
+    std::thread::sleep(std::time::Duration::from_secs(1));
+  }
 }
 
 #[cfg(target_os = "macos")]
