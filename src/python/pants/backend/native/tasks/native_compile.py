@@ -245,6 +245,7 @@ class NativeCompile(NativeTask, AbstractClass):
     output_dir = compile_request.output_dir
 
     argv = self._make_compile_argv(compile_request)
+    env = compiler.as_invocation_environment_dict
 
     with self.context.new_workunit(
         name=self.workunit_label, labels=[WorkUnitLabel.COMPILER]) as workunit:
@@ -254,19 +255,20 @@ class NativeCompile(NativeTask, AbstractClass):
           cwd=output_dir,
           stdout=workunit.output('stdout'),
           stderr=workunit.output('stderr'),
-          env=compiler.as_invocation_environment_dict)
+          env=env)
       except OSError as e:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.NativeCompileError(
-          "Error invoking '{exe}' with command {cmd} for request {req}: {err}"
-          .format(exe=compiler.exe_filename, cmd=argv, req=compile_request, err=e))
+          "Error invoking '{exe}' with command {cmd} and environment {env} for request {req}: {err}"
+          .format(exe=compiler.exe_filename, cmd=argv, env=env, req=compile_request, err=e))
 
       rc = process.wait()
       if rc != 0:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.NativeCompileError(
-          "Error in '{section_name}' with command {cmd} for request {req}. Exit code was: {rc}."
-          .format(section_name=self.workunit_label, cmd=argv, req=compile_request, rc=rc))
+          "Error in '{section_name}' with command {cmd} and environment {env} for request {req}. "
+          "Exit code was: {rc}."
+          .format(section_name=self.workunit_label, cmd=argv, env=env, req=compile_request, rc=rc))
 
   def collect_cached_objects(self, versioned_target):
     """Scan `versioned_target`'s results directory and return the output files from that directory.

@@ -193,15 +193,17 @@ class LinkSharedLibraries(NativeTask):
       except OSError as e:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.LinkSharedLibrariesError(
-          "Error invoking the native linker with command {} for request {}: {}"
-          .format(cmd, link_request, e),
+          "Error invoking the native linker with command {cmd} and environment {env} "
+          "for request {req}: {err}."
+          .format(cmd=cmd, env=env, req=link_request, err=e),
           e)
 
       rc = process.wait()
       if rc != 0:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.LinkSharedLibrariesError(
-          "Error linking native objects with command {} for request {}. Exit code was: {}."
-          .format(cmd, link_request, rc))
+          "Error linking native objects with command {cmd} and environment {env} "
+          "for request {req}. Exit code was: {rc}."
+          .format(cmd=cmd, env=env, req=link_request, rc=rc))
 
     return SharedLibrary(name=native_artifact.lib_name, path=resulting_shared_lib_path)
