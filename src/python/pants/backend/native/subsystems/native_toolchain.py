@@ -119,10 +119,6 @@ def select_llvm_c_toolchain(platform, native_toolchain):
   # These arguments are shared across platforms.
   llvm_c_compiler_args = [
     '-x', 'c', '-std=c11',
-    # This means we don't use any of the C standard library headers from our packaged LLVM
-    # distribution, or any from the host system. Instead, we use include dirs from the XCodeCLITools
-    # or GCC.
-    '-nostdinc',
   ] + gcc_install.as_clang_argv
 
   if platform.normalized_os_name == 'darwin':
@@ -168,7 +164,6 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
     # This mean we don't use any of the headers from our LLVM distribution's C++ stdlib
     # implementation, or any from the host system. Instead, we use include dirs from the
     # XCodeCLITools or GCC.
-    # TODO: why does -nostdinc work for LLVMCToolchain but not LLVMCppToolchain (on Linux)?
     '-nostdinc++',
   ] + gcc_install.as_clang_argv
 
