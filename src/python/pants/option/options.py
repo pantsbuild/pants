@@ -9,7 +9,7 @@ import re
 import sys
 from builtins import object, open, str
 
-from pants.base.deprecated import warn_or_error
+from pants.base.deprecated import get_frame_info, warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_util import is_list_option
@@ -372,7 +372,9 @@ class Options(object):
           "command line before any other goals. This will silence all pants logging "
           "for all tasks and only produce the output from e.g. ./pants run.\nThe flag provided "
           "was '{}' in scope '{}'."
-          .format(found_flag, scope))
+          .format(found_flag, scope),
+          frame_info=get_frame_info(stacklevel=2, context=1),
+          ensure_stderr=True)
 
   @memoized_property
   def flag_matchers(self):
