@@ -55,7 +55,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     gcc = gcc_c_toolchain.c_toolchain.c_compiler
     gcc_version_out = self._invoke_capturing_output(
       [gcc.exe_filename, '--version'],
-      env=gcc.get_invocation_environment_dict(self.platform))
+      env=gcc.as_invocation_environment_dict)
 
     gcc_version_regex = re.compile('^gcc.*{}$'.format(re.escape(self.gcc_version)),
                                    flags=re.MULTILINE)
@@ -69,7 +69,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     gpp = gcc_cpp_toolchain.cpp_toolchain.cpp_compiler
     gpp_version_out = self._invoke_capturing_output(
       [gpp.exe_filename, '--version'],
-      env=gpp.get_invocation_environment_dict(self.platform))
+      env=gpp.as_invocation_environment_dict)
 
     gpp_version_regex = re.compile(r'^g\+\+.*{}$'.format(re.escape(self.gcc_version)),
                                    flags=re.MULTILINE)
@@ -83,7 +83,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     clang = llvm_c_toolchain.c_toolchain.c_compiler
     clang_version_out = self._invoke_capturing_output(
       [clang.exe_filename, '--version'],
-      env=clang.get_invocation_environment_dict(self.platform))
+      env=clang.as_invocation_environment_dict)
 
     clang_version_regex = re.compile('^clang version {}'.format(re.escape(self.llvm_version)),
                                      flags=re.MULTILINE)
@@ -99,7 +99,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     clangpp = llvm_cpp_toolchain.cpp_toolchain.cpp_compiler
     clanggpp_version_out = self._invoke_capturing_output(
       [clangpp.exe_filename, '--version'],
-      env=clangpp.get_invocation_environment_dict(self.platform))
+      env=clangpp.as_invocation_environment_dict)
 
     self.assertIsNotNone(clangpp_version_regex.search(clanggpp_version_out))
 
@@ -121,13 +121,13 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     cmd = [compiler.exe_filename] + compiler.extra_args + args
     return self._invoke_capturing_output(
       cmd,
-      compiler.get_invocation_environment_dict(self.platform))
+      compiler.as_invocation_environment_dict)
 
   def _invoke_linker(self, linker, args):
     cmd = [linker.exe_filename] + linker.extra_args + args
     return self._invoke_capturing_output(
       cmd,
-      linker.get_invocation_environment_dict(self.platform))
+      linker.as_invocation_environment_dict)
 
   def _invoke_capturing_output(self, cmd, env=None):
     if env is None:

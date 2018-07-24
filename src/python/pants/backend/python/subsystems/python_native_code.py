@@ -13,6 +13,7 @@ from wheel.install import WheelFile
 from pants.backend.native.config.environment import (CppToolchain, CToolchain, LLVMCppToolchain,
                                                      LLVMCToolchain, Platform)
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
+from pants.backend.native.subsystems.xcode_cli_tools import MIN_OSX_VERSION_ARG
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -213,7 +214,7 @@ class SetupPyExecutionEnvironment(datatype([
 
   _SHARED_CMDLINE_ARGS = {
     'darwin': lambda: [
-      '-mmacosx-version-min=10.11',
+      MIN_OSX_VERSION_ARG,
       '-Wl,-dylib',
       '-undefined',
       'dynamic_lookup',
@@ -264,20 +265,22 @@ class SetupPyExecutionEnvironment(datatype([
       all_linking_library_dirs = (c_linker.linking_library_dirs + cpp_linker.linking_library_dirs)
       ret['LIBRARY_PATH'] = create_path_env_var(all_linking_library_dirs)
 
-      all_include_dirs = c_compiler.include_dirs + cpp_compiler.include_dirs
+      all_include_dirs = cpp_compiler.include_dirs + c_compiler.include_dirs
       ret['CPATH'] = create_path_env_var(all_include_dirs)
 
-      all_cflags_for_platform = plat.resolve_platform_specific({
-        'darwin': lambda: ['-mmacosx-version-min=10.11', '-nostdinc++'],
-        'linux': lambda: ['-nostdinc++'],
-      })
-      ret['CFLAGS'] = safe_shlex_join(all_cflags_for_platform)
+      shared_compile_flags = safe_shlex_join(plat.resolve_platform_specific({
+        'darwin': lambda: [MIN_OSX_VERSION_ARG],
+        'linux': lambda: [],
+      }))
+      ret['CFLAGS'] = shared_compile_flags
+      ret['CXXFLAGS'] = shared_compile_flags
 
       ret['CC'] = c_compiler.exe_filename
       ret['CXX'] = cpp_compiler.exe_filename
       ret['LDSHARED'] = cpp_linker.exe_filename
 
-      all_new_ldflags = plat.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
+      all_new_ldflags = cpp_linker.extra_args + plat.resolve_platform_specific(
+        self._SHARED_CMDLINE_ARGS)
       ret['LDFLAGS'] = safe_shlex_join(all_new_ldflags)
 
     return ret

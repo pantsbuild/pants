@@ -11,7 +11,7 @@ from builtins import object
 from pants.engine.rules import SingletonRule
 from pants.util.objects import datatype
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
-from pants.util.strutil import create_path_env_var, safe_shlex_join
+from pants.util.strutil import create_path_env_var
 
 
 class Platform(datatype(['normalized_os_name'])):
@@ -53,7 +53,10 @@ class Executable(object):
 
   @abstractproperty
   def library_dirs(self):
-    """Directories containing shared libraries required for a subprocess to run."""
+    """Directories containing shared libraries that must be on the runtime library search path.
+
+    Note: this is for libraries needed for the current Executable to run -- see LinkerMixin below
+    for libraries that are needed at link time."""
 
   @abstractproperty
   def exe_filename(self):
@@ -63,8 +66,11 @@ class Executable(object):
   def extra_args(self):
     return []
 
-  def get_invocation_environment_dict(self, platform):
-    lib_env_var = platform.resolve_platform_specific({
+  _platform = Platform.create()
+
+  @property
+  def as_invocation_environment_dict(self):
+    lib_env_var = self._platform.resolve_platform_specific({
       'darwin': lambda: 'DYLD_LIBRARY_PATH',
       'linux': lambda: 'LD_LIBRARY_PATH',
     })
@@ -82,28 +88,31 @@ class Assembler(datatype([
   pass
 
 
+class LinkerMixin(Executable):
+
+  @abstractproperty
+  def linking_library_dirs(self):
+    """Directories to search for libraries needed at link time."""
+
+  @property
+  def as_invocation_environment_dict(self):
+    ret = super(LinkerMixin, self).as_invocation_environment_dict.copy()
+
+    ret.update({
+      'LDSHARED': self.exe_filename,
+      'LIBRARY_PATH': create_path_env_var(self.linking_library_dirs),
+    })
+
+    return ret
+
+
 class Linker(datatype([
     'path_entries',
     'exe_filename',
     'library_dirs',
     'linking_library_dirs',
     'extra_args',
-]), Executable):
-
-  def get_invocation_environment_dict(self, platform):
-    ret = super(Linker, self).get_invocation_environment_dict(platform).copy()
-
-    all_ldflags_for_platform = platform.resolve_platform_specific({
-      'darwin': lambda: ['-mmacosx-version-min=10.11'],
-      'linux': lambda: [],
-    })
-    ret.update({
-      'LDSHARED': self.exe_filename,
-      'LIBRARY_PATH': create_path_env_var(self.linking_library_dirs),
-      'LDFLAGS': safe_shlex_join(all_ldflags_for_platform),
-    })
-
-    return ret
+]), LinkerMixin): pass
 
 
 class CompilerMixin(Executable):
@@ -111,20 +120,6 @@ class CompilerMixin(Executable):
   @abstractproperty
   def include_dirs(self):
     """Directories to search for header files to #include during compilation."""
-
-  def get_invocation_environment_dict(self, platform):
-    ret = super(CompilerMixin, self).get_invocation_environment_dict(platform).copy()
-
-    if self.include_dirs:
-      ret['CPATH'] = create_path_env_var(self.include_dirs)
-
-    all_cflags_for_platform = platform.resolve_platform_specific({
-      'darwin': lambda: ['-mmacosx-version-min=10.11'],
-      'linux': lambda: [],
-    })
-    ret['CFLAGS'] = safe_shlex_join(all_cflags_for_platform)
-
-    return ret
 
 
 class CCompiler(datatype([
@@ -135,8 +130,12 @@ class CCompiler(datatype([
     'extra_args',
 ]), CompilerMixin):
 
-  def get_invocation_environment_dict(self, platform):
-    ret = super(CCompiler, self).get_invocation_environment_dict(platform).copy()
+  @property
+  def as_invocation_environment_dict(self):
+    ret = super(CompilerMixin, self).as_invocation_environment_dict.copy()
+
+    if self.include_dirs:
+      ret['C_INCLUDE_PATH'] = create_path_env_var(self.include_dirs)
 
     ret['CC'] = self.exe_filename
 
@@ -151,8 +150,12 @@ class CppCompiler(datatype([
     'extra_args',
 ]), CompilerMixin):
 
-  def get_invocation_environment_dict(self, platform):
-    ret = super(CppCompiler, self).get_invocation_environment_dict(platform).copy()
+  @property
+  def as_invocation_environment_dict(self):
+    ret = super(CompilerMixin, self).as_invocation_environment_dict.copy()
+
+    if self.include_dirs:
+      ret['CPLUS_INCLUDE_PATH'] = create_path_env_var(self.include_dirs)
 
     ret['CXX'] = self.exe_filename
 

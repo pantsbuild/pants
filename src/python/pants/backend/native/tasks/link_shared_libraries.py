@@ -178,7 +178,7 @@ class LinkSharedLibraries(NativeTask):
            [os.path.abspath(obj) for obj in object_files])
     self.context.log.debug("linker command: {}".format(cmd))
 
-    env = linker.get_invocation_environment_dict(platform)
+    env = linker.as_invocation_environment_dict
     self.context.log.debug("linker invocation environment: {}".format(env))
 
     with self.context.new_workunit(name='link-shared-libraries',

@@ -7,12 +7,12 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import glob
 import os
 
-from pants.backend.native.config.environment import CCompiler, CppCompiler, Platform
+from pants.backend.native.config.environment import CCompiler, CppCompiler
 from pants.binaries.binary_tool import NativeTool
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
 from pants.util.collections import assert_single_element
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_method, memoized_property
 
 
 class GCC(NativeTool):
@@ -48,8 +48,8 @@ class GCC(NativeTool):
         .format(glob_path_string),
         e)
 
-  @memoized_method
-  def _common_lib_dirs(self, platform):
+  @memoized_property
+  def _common_lib_dirs(self):
     return [
       os.path.join(self.select(), 'lib'),
       os.path.join(self.select(), 'lib64'),
@@ -58,24 +58,24 @@ class GCC(NativeTool):
         self.select(), 'lib/gcc/*', self.version()),
     ]
 
-  @memoized_method
-  def _common_include_dirs(self, platform):
+  @memoized_property
+  def _common_include_dirs(self):
     return [
       os.path.join(self.select(), 'include'),
       self._get_check_single_path_by_glob(
         self.select(), 'lib/gcc/*', self.version(), 'include'),
     ]
 
-  def c_compiler(self, platform):
+  def c_compiler(self):
     return CCompiler(
       path_entries=self.path_entries(),
       exe_filename='gcc',
-      library_dirs=self._common_lib_dirs(platform),
-      include_dirs=self._common_include_dirs(platform),
+      library_dirs=self._common_lib_dirs,
+      include_dirs=self._common_include_dirs,
       extra_args=[])
 
-  @memoized_method
-  def _cpp_include_dirs(self, platform):
+  @memoized_property
+  def _cpp_include_dirs(self):
     # FIXME: explain why this is necessary!
     cpp_config_header_path = self._get_check_single_path_by_glob(
       self.select(), 'include/c++', self.version(), '*/bits/c++config.h')
@@ -85,23 +85,23 @@ class GCC(NativeTool):
       os.path.dirname(os.path.dirname(cpp_config_header_path)),
     ]
 
-  def cpp_compiler(self, platform):
+  def cpp_compiler(self):
     return CppCompiler(
       path_entries=self.path_entries(),
       exe_filename='g++',
-      library_dirs=self._common_lib_dirs(platform),
-      include_dirs=(self._common_include_dirs(platform) + self._cpp_include_dirs(platform)),
+      library_dirs=self._common_lib_dirs,
+      include_dirs=(self._common_include_dirs + self._cpp_include_dirs),
       extra_args=[])
 
 
-@rule(CCompiler, [Select(GCC), Select(Platform)])
-def get_gcc(gcc, platform):
-  return gcc.c_compiler(platform)
+@rule(CCompiler, [Select(GCC)])
+def get_gcc(gcc):
+  return gcc.c_compiler()
 
 
-@rule(CppCompiler, [Select(GCC), Select(Platform)])
-def get_gplusplus(gcc, platform):
-  return gcc.cpp_compiler(platform)
+@rule(CppCompiler, [Select(GCC)])
+def get_gplusplus(gcc):
+  return gcc.cpp_compiler()
 
 
 def create_gcc_rules():
