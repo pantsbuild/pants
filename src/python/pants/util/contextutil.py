@@ -123,7 +123,7 @@ def _stdio_stream_as(src_fd, dst_fd, dst_sys_attribute, mode):
 
 
 @contextmanager
-def stdio_as(stdout_fd, stderr_fd, stdin_fd):
+def stdio_as(stdout_fd, stderr_fd, stdin_fd, binary_mode=False):
   """Redirect sys.{stdout, stderr, stdin} to alternate file descriptors.
 
   As a special case, if a given destination fd is `-1`, we will replace it with an open file handle
@@ -134,9 +134,12 @@ def stdio_as(stdout_fd, stderr_fd, stdin_fd):
   impossible for this method to locate all python objects which refer to those fds, so it's up
   to the caller to guarantee that `0, 1, 2` are safe to replace.
   """
-  with _stdio_stream_as(stdin_fd,  0, 'stdin',  'rb'),\
-       _stdio_stream_as(stdout_fd, 1, 'stdout', 'wb'),\
-       _stdio_stream_as(stderr_fd, 2, 'stderr', 'wb'):
+  # Python3 streams default to unicode, and access bytes by calling stream.buffer
+  read_mode = 'r' if not binary_mode else 'rb'
+  write_mode = 'w' if not binary_mode else 'wb'
+  with _stdio_stream_as(stdin_fd,  0, 'stdin',  read_mode),\
+       _stdio_stream_as(stdout_fd, 1, 'stdout', write_mode),\
+       _stdio_stream_as(stderr_fd, 2, 'stderr', write_mode):
     yield
 
 
@@ -155,7 +158,7 @@ def signal_handler_as(sig, handler):
 
 
 @contextmanager
-def temporary_dir(root_dir=None, cleanup=True, suffix=b'', permissions=None, prefix=tempfile.template):
+def temporary_dir(root_dir=None, cleanup=True, suffix='', permissions=None, prefix=tempfile.template):
   """
     A with-context that creates a temporary directory.
 
@@ -194,7 +197,7 @@ def temporary_file_path(root_dir=None, cleanup=True, suffix='', permissions=None
 
 
 @contextmanager
-def temporary_file(root_dir=None, cleanup=True, suffix='', permissions=None):
+def temporary_file(root_dir=None, cleanup=True, suffix='', permissions=None, binary_mode=True):
   """
     A with-context that creates a temporary file and returns a writeable file descriptor to it.
 
@@ -207,8 +210,10 @@ def temporary_file(root_dir=None, cleanup=True, suffix='', permissions=None):
                        if you need one, put it at the beginning of suffix.
                        See :py:class:`tempfile.NamedTemporaryFile`.
     :param int permissions: If provided, sets the file to use these permissions.
+    :param bool binary_mode: Whether file opens in binary or text mode.
   """
-  with tempfile.NamedTemporaryFile(suffix=suffix, dir=root_dir, delete=False) as fd:
+  mode = 'w+b' if binary_mode else 'w+'  # tempfile's default is 'w+b'
+  with tempfile.NamedTemporaryFile(suffix=suffix, dir=root_dir, delete=False, mode=mode) as fd:
     try:
       if permissions is not None:
         os.chmod(fd.name, permissions)
