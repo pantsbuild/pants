@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
-from pants.backend.native.config.environment import Linker, Platform
+from pants.backend.native.config.environment import LLVMCppToolchain, Platform
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_compile import NativeTargetDependencies, ObjectFiles
@@ -59,12 +59,16 @@ class LinkSharedLibraries(NativeTask):
     return super(LinkSharedLibraries, cls).subsystem_dependencies() + (NativeToolchain.scoped(cls),)
 
   @memoized_property
-  def _toolchain(self):
+  def _native_toolchain(self):
     return NativeToolchain.scoped_instance(self)
 
   @memoized_property
+  def _cpp_toolchain(self):
+    return self._request_single(LLVMCppToolchain, self._native_toolchain).cpp_toolchain
+
+  @memoized_property
   def linker(self):
-    return self._request_single(Linker, self._toolchain)
+    return self._cpp_toolchain.cpp_linker
 
   def _retrieve_single_product_at_target_base(self, product_mapping, target):
     self.context.log.debug("product_mapping: {}".format(product_mapping))
@@ -97,6 +101,7 @@ class LinkSharedLibraries(NativeTask):
           # https://github.com/pantsbuild/pants/issues/6178
           link_request = self._make_link_request(
             vt, compiled_objects_product, native_target_deps_product, external_libs_product)
+          self.context.log.debug("link_request: {}".format(link_request))
           shared_library = self._execute_link_request(link_request)
 
         same_name_shared_lib = all_shared_libs_by_name.get(shared_library.name, None)
@@ -148,12 +153,9 @@ class LinkSharedLibraries(NativeTask):
       external_libs_info=external_libs_product)
 
   _SHARED_CMDLINE_ARGS = {
-    'darwin': lambda: ['-mmacosx-version-min=10.11', '-Wl,-dylib'],
+    'darwin': lambda: ['-Wl,-dylib'],
     'linux': lambda: ['-shared'],
   }
-
-  def _get_shared_lib_cmdline_args(self, platform):
-    return platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
 
   def _execute_link_request(self, link_request):
     object_files = link_request.object_files
@@ -169,10 +171,15 @@ class LinkSharedLibraries(NativeTask):
     resulting_shared_lib_path = os.path.join(output_dir, native_artifact.as_shared_lib(platform))
     # We are executing in the results_dir, so get absolute paths for everything.
     cmd = ([linker.exe_filename] +
-           self._get_shared_lib_cmdline_args(platform) +
+           platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS) +
+           linker.extra_args +
            link_request.external_libs_info.get_third_party_lib_args() +
            ['-o', os.path.abspath(resulting_shared_lib_path)] +
            [os.path.abspath(obj) for obj in object_files])
+    self.context.log.debug("linker command: {}".format(cmd))
+
+    env = linker.as_invocation_environment_dict
+    self.context.log.debug("linker invocation environment: {}".format(env))
 
     with self.context.new_workunit(name='link-shared-libraries',
                                    labels=[WorkUnitLabel.LINKER]) as workunit:
@@ -182,19 +189,21 @@ class LinkSharedLibraries(NativeTask):
           cwd=output_dir,
           stdout=workunit.output('stdout'),
           stderr=workunit.output('stderr'),
-          env=linker.get_invocation_environment_dict(platform))
+          env=env)
       except OSError as e:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.LinkSharedLibrariesError(
-          "Error invoking the native linker with command {} for request {}: {}"
-          .format(cmd, link_request, e),
+          "Error invoking the native linker with command {cmd} and environment {env} "
+          "for request {req}: {err}."
+          .format(cmd=cmd, env=env, req=link_request, err=e),
           e)
 
       rc = process.wait()
       if rc != 0:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.LinkSharedLibrariesError(
-          "Error linking native objects with command {} for request {}. Exit code was: {}."
-          .format(cmd, link_request, rc))
+          "Error linking native objects with command {cmd} and environment {env} "
+          "for request {req}. Exit code was: {rc}."
+          .format(cmd=cmd, env=env, req=link_request, rc=rc))
 
     return SharedLibrary(name=native_artifact.lib_name, path=resulting_shared_lib_path)

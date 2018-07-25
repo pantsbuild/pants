@@ -8,7 +8,10 @@ import logging
 import signal
 import sys
 import time
+from builtins import object, str
 from contextlib import contextmanager
+
+from future.utils import raise_with_traceback
 
 from pants.console.stty_utils import STTYSettings
 from pants.java.nailgun_client import NailgunClient
@@ -122,9 +125,10 @@ class RemotePantsRunner(object):
         # Ensure a newline.
         logger.fatal('')
         logger.fatal('lost active connection to pantsd!')
-        raise self.Terminated, (
+        raise_with_traceback(
+          self.Terminated,
           'abruptly lost active connection to pantsd runner: {!r}'.format(e)
-        ), e.traceback
+        )
 
   def _connect_and_execute(self, port):
     # Merge the nailgun TTY capability environment variables with the passed environment dict.

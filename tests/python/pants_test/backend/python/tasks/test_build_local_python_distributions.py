@@ -9,7 +9,6 @@ from builtins import next, str
 from textwrap import dedent
 
 from pants.backend.native.register import rules as native_backend_rules
-from pants.backend.python.register import rules as python_backend_rules
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
@@ -100,11 +99,7 @@ class TestBuildLocalPythonDistributions(PythonTaskTestBase, SchedulerTestBase):
     return list(self.target_dict.values())
 
   def _scheduling_context(self, **kwargs):
-    rules = (
-      native_backend_rules() +
-      python_backend_rules()
-    )
-    scheduler = self.mk_scheduler(rules=rules)
+    scheduler = self.mk_scheduler(rules=native_backend_rules())
     return self.context(scheduler=scheduler, **kwargs)
 
   def _retrieve_single_product_at_target_base(self, product_mapping, target):

@@ -37,10 +37,10 @@ exit 1
 """], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     process_handler = SubprocessProcessHandler(process)
     self.assertEquals(process_handler.communicate_teeing_stdout_and_stderr(), (
-"""1out
+b"""1out
 2out
 3out
-""", """1err
+""", b"""1err
 2err
 3err
 """))

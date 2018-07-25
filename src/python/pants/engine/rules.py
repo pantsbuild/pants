@@ -8,10 +8,10 @@ import ast
 import inspect
 import logging
 from abc import abstractproperty
+from builtins import bytes, str
 from collections import OrderedDict
-from types import TypeType
 
-import six
+from future.utils import PY2
 from twitter.common.collections import OrderedSet
 
 from pants.engine.selectors import Get, type_or_constraint_repr
@@ -39,12 +39,15 @@ class GoalProduct(object):
   @staticmethod
   def _synthesize_goal_product(name):
     product_type_name = '{}GoalExecution'.format(name.capitalize())
-    return type(six.binary_type(product_type_name), (datatype(['result']),), {})
+    if PY2:
+      product_type_name = product_type_name.encode('utf-8')
+    return type(product_type_name, (datatype(['result']),), {})
 
   @classmethod
   def for_name(cls, name):
-    assert isinstance(name, six.string_types)
-    name = six.text_type(name)
+    assert isinstance(name, (bytes, str))
+    if name is bytes:
+      name = name.decode('utf-8')
     if name not in cls.PRODUCT_MAP:
       cls.PRODUCT_MAP[name] = cls._synthesize_goal_product(name)
     return cls.PRODUCT_MAP[name]
@@ -69,7 +72,7 @@ def _make_rule(output_type, input_selectors, for_goal=None):
 
     def resolve_type(name):
       resolved = caller_frame.f_globals.get(name) or caller_frame.f_builtins.get(name)
-      if not isinstance(resolved, (TypeType, Exactly)):
+      if not isinstance(resolved, (type, Exactly)):
         # TODO: should this say "...or Exactly instance;"?
         raise ValueError('Expected either a `type` constructor or TypeConstraint instance; '
                          'got: {}'.format(name))

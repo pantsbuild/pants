@@ -140,6 +140,7 @@ python_library(
   name='rules',
   sources=['rules.py'],
   dependencies=[
+    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':selectors',
     'src/python/pants/base:specs',
