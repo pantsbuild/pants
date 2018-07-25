@@ -21,7 +21,7 @@ from pants.backend.python.tasks.pex_build_util import resolve_multi
 from pants.base.exceptions import IncompatiblePlatformsError
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
-from pants.util.objects import Exactly, SubclassesOf, datatype
+from pants.util.objects import SubclassesOf, datatype
 from pants.util.strutil import create_path_env_var, safe_shlex_join
 
 
