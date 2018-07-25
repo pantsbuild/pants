@@ -9,6 +9,7 @@ import signal
 
 from pex.pex_info import PexInfo
 
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_execution_task_base import PythonExecutionTaskBase
@@ -30,6 +31,8 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
              help='The IPython REPL entry point.')
     register('--ipython-requirements', advanced=True, type=list, default=['ipython==1.0.0'],
              help='The IPython interpreter version to use.')
+    register('--interpreter-compatibility', advanced=True, type=list, default=[],
+             help='Add constraints to the interpreter version to use.')
 
   @classmethod
   def select_targets(cls, target):
@@ -46,8 +49,19 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
       entry_point = self.get_options().ipython_entry_point
     else:
       entry_point = 'code:interact'
+    # Merge interpreter constraints
+    repl_constraints = self.get_options().interpreter_compatibility
+    target_constraints = [constraint for target in targets for constraint in target.compatibility]
+    if repl_constraints and target_constraints:
+      interpreter_constraints = [",".join(pair) for pair in zip(repl_constraints, target_constraints)]
+    else:
+      python_setup = PythonSetup.global_instance()
+      setup_constraints = python_setup.interpreter_constraints
+      interpreter_constraints = [",".join(pair) for pair in zip(repl_constraints, setup_constraints)]
     pex_info = PexInfo.default()
     pex_info.entry_point = entry_point
+    for constraint in interpreter_constraints:
+      pex_info.add_interpreter_constraint(constraint)
     return self.create_pex(pex_info)
 
   # N.B. **pex_run_kwargs is used by tests only.
