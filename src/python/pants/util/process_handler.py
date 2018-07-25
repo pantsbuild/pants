@@ -10,7 +10,7 @@ import os
 import sys
 from abc import abstractmethod
 
-from future.utils import PY2
+from future.utils import PY2, PY3
 
 from pants.util.meta import AbstractClass
 
@@ -106,8 +106,8 @@ class SubprocessProcessHandler(ProcessHandler):
 
 def _tee(infile, outfile, return_function):
   accumulator = io.BytesIO()
-  for line in iter(infile.readline, ""):
+  for line in iter(infile.readline, b""):
     accumulator.write(line)
-    outfile.write(line)
+    outfile.buffer.write(line) if PY3 else outfile.write(line)
   infile.close()
   return_function(accumulator.getvalue())
