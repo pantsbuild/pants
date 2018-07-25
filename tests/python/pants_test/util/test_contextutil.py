@@ -223,9 +223,9 @@ class ContextutilTest(unittest.TestCase):
     stdout_data = u('stdout')
     stderr_data = u('stderr')
 
-    with temporary_file() as tmp_stdin,\
-         temporary_file() as tmp_stdout,\
-         temporary_file() as tmp_stderr:
+    with temporary_file(binary_mode=False) as tmp_stdin,\
+         temporary_file(binary_mode=False) as tmp_stdout,\
+         temporary_file(binary_mode=False) as tmp_stderr:
       print(stdin_data, file=tmp_stdin)
       tmp_stdin.seek(0)
       # Read prepared content from stdin, and write content to stdout/stderr.
@@ -274,7 +274,7 @@ class ContextutilTest(unittest.TestCase):
       # Read/write from/to `/dev/null`, which will be validated by the harness as not
       # affecting the tempfiles.
       with stdio_as(stdout_fd=-1, stderr_fd=-1, stdin_fd=-1):
-        self.assertEquals(b'', sys.stdin.read())
+        self.assertEquals('', sys.stdin.read())
         print('garbage', file=sys.stdout)
         print('garbage', file=sys.stderr)
 
