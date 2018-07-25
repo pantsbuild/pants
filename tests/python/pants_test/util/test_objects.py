@@ -9,7 +9,7 @@ import pickle
 from abc import abstractmethod
 from builtins import object, str
 
-from future.utils import PY2, text_type
+from future.utils import PY2, PY3, text_type
 
 from pants.util.objects import (Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
                                 TypedDatatypeInstanceConstructionError, datatype)
@@ -310,36 +310,47 @@ class TypedDatatypeTest(BaseTest):
     with self.assertRaises(ValueError) as cm:
       class NonStrType(datatype([int])): pass
     expected_msg = (
-      "Type names and field names can only contain alphanumeric "
-      "characters and underscores: \"<type 'int'>\"")
+      "Type names and field names must be valid identifiers: \"<class 'int'>\""
+      if PY3 else
+      "Type names and field names can only contain alphanumeric characters and underscores: \"<type 'int'>\""
+    )
     self.assertEqual(str(cm.exception), expected_msg)
 
     # This raises a TypeError because it doesn't provide a required argument.
     with self.assertRaises(TypeError) as cm:
       class NoFields(datatype()): pass
-    expected_msg = "datatype() takes at least 1 argument (0 given)"
+    expected_msg = (
+      "datatype() missing 1 required positional argument: 'field_decls'"
+      if PY3 else
+      "datatype() takes at least 1 argument (0 given)"
+    )
     self.assertEqual(str(cm.exception), expected_msg)
 
     with self.assertRaises(ValueError) as cm:
       class JustTypeField(datatype([text_type])): pass
-    def compare_str(unicode_type_name):
-      expected_message = (
-        "Type names and field names can only contain alphanumeric characters "
-        "and underscores: \"<type '{}'>\"").format(unicode_type_name)
-      self.assertEqual(str(cm.exception), expected_message)
-    if PY2:
-      compare_str('unicode')
-    else:
-      compare_str('str')
+    expected_msg = (
+      "Type names and field names must be valid identifiers: \"<class 'str'>\""
+      if PY3 else
+      "Type names and field names can only contain alphanumeric characters and underscores: \"<type 'unicode'>\""
+    )
+    self.assertEqual(str(cm.exception), expected_msg)
 
     with self.assertRaises(ValueError) as cm:
       class NonStringField(datatype([3])): pass
-    expected_msg = "Type names and field names cannot start with a number: '3'"
+    expected_msg = (
+      "Type names and field names must be valid identifiers: '3'"
+      if PY3 else
+      "Type names and field names cannot start with a number: '3'"
+    )
     self.assertEqual(str(cm.exception), expected_msg)
 
     with self.assertRaises(ValueError) as cm:
       class NonStringTypeField(datatype([(32, int)])): pass
-    expected_msg = "Type names and field names cannot start with a number: '32'"
+    expected_msg = (
+      "Type names and field names must be valid identifiers: '32'"
+      if PY3 else
+      "Type names and field names cannot start with a number: '32'"
+    )
     self.assertEqual(str(cm.exception), expected_msg)
 
     with self.assertRaises(ValueError) as cm:
@@ -457,13 +468,23 @@ class TypedDatatypeTest(BaseTest):
     # not providing all the fields
     with self.assertRaises(TypeError) as cm:
       SomeTypedDatatype()
-    expected_msg = "error: in constructor of type SomeTypedDatatype: type check error:\n__new__() takes exactly 2 arguments (1 given)"
+    expected_msg_ending = (
+      "__new__() missing 1 required positional argument: 'val'"
+      if PY3 else
+      "__new__() takes exactly 2 arguments (1 given)"
+    )
+    expected_msg = "error: in constructor of type SomeTypedDatatype: type check error:\n" + expected_msg_ending
     self.assertEqual(str(cm.exception), expected_msg)
 
     # unrecognized fields
     with self.assertRaises(TypeError) as cm:
       SomeTypedDatatype(3, 4)
-    expected_msg = "error: in constructor of type SomeTypedDatatype: type check error:\n__new__() takes exactly 2 arguments (3 given)"
+    expected_msg_ending = (
+      "__new__() takes 2 positional arguments but 3 were given"
+      if PY3 else
+      "__new__() takes exactly 2 arguments (3 given)"
+    )
+    expected_msg = "error: in constructor of type SomeTypedDatatype: type check error:\n" + expected_msg_ending
     self.assertEqual(str(cm.exception), expected_msg)
 
     with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
