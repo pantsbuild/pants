@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
-from pants.backend.native.config.environment import LLVMCppToolchain, Platform
+from pants.backend.native.config.environment import Linker, LLVMCppToolchain, Platform
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.backend.native.targets.native_library import NativeLibrary
