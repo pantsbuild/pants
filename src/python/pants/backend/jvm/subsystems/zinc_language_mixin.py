@@ -58,7 +58,7 @@ class ZincLanguageMixin(object):
     :rtype: list
     """
     option_sets = self.get_options().compiler_option_sets
-    if 'fatal_warnings' not in option_sets and self.fatal_warnings:
+    if 'fatal_warnings' not in option_sets and self.get_options().fatal_warnings:
       option_sets.append('fatal_warnings')
     return option_sets
 
