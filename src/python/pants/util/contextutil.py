@@ -123,7 +123,7 @@ def _stdio_stream_as(src_fd, dst_fd, dst_sys_attribute, mode):
 
 
 @contextmanager
-def stdio_as(stdout_fd, stderr_fd, stdin_fd, binary_mode=False):
+def stdio_as(stdout_fd, stderr_fd, stdin_fd):
   """Redirect sys.{stdout, stderr, stdin} to alternate file descriptors.
 
   As a special case, if a given destination fd is `-1`, we will replace it with an open file handle
@@ -133,13 +133,12 @@ def stdio_as(stdout_fd, stderr_fd, stdin_fd, binary_mode=False):
   possible that the OS has repurposed fds `0, 1, 2` to represent other files or sockets. It's
   impossible for this method to locate all python objects which refer to those fds, so it's up
   to the caller to guarantee that `0, 1, 2` are safe to replace.
+
+  In Python3, the streams expect unicode. To write and read bytes, access their buffer, e.g. `stdin.buffer.read()`.
   """
-  # Python3 streams default to unicode, and access bytes by calling stream.buffer
-  read_mode = 'r' if not binary_mode else 'rb'
-  write_mode = 'w' if not binary_mode else 'wb'
-  with _stdio_stream_as(stdin_fd,  0, 'stdin',  read_mode),\
-       _stdio_stream_as(stdout_fd, 1, 'stdout', write_mode),\
-       _stdio_stream_as(stderr_fd, 2, 'stderr', write_mode):
+  with _stdio_stream_as(stdin_fd,  0, 'stdin',  'r'),\
+       _stdio_stream_as(stdout_fd, 1, 'stdout', 'w'),\
+       _stdio_stream_as(stderr_fd, 2, 'stderr', 'w'):
     yield
 
 
