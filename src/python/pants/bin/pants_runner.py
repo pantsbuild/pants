@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import sys
+from builtins import object
 
 from pants.bin.remote_pants_runner import RemotePantsRunner
 from pants.option.options_bootstrapper import OptionsBootstrapper

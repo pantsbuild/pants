@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import struct
-from builtins import object, str, zip
+from builtins import bytes, object, str, zip
 
 import six
 from future.utils import binary_type
@@ -87,7 +87,10 @@ class NailgunProtocol(object):
   @classmethod
   def _decode_unicode_seq(cls, seq):
     for item in seq:
-      yield item.decode('utf-8')
+      if isinstance(item, bytes):
+        yield item.decode('utf-8')
+      else:
+        yield item
 
   @classmethod
   def send_request(cls, sock, working_dir, command, *arguments, **environment):

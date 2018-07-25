@@ -29,7 +29,7 @@ from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
-from pants.backend.python.tasks.setup_py import SetupPy, create_setup_py_rules
+from pants.backend.python.tasks.setup_py import SetupPy
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -73,7 +73,3 @@ def register_goals():
   task(name='isort-prep', action=IsortPrep).install('fmt')
   task(name='isort', action=IsortRun).install('fmt')
   task(name='py', action=PythonBundle).install('bundle')
-
-
-def rules():
-  return create_setup_py_rules()

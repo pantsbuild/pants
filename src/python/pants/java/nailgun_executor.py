@@ -72,7 +72,7 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
   FINGERPRINT_CMD_KEY = b'-Dpants.nailgun.fingerprint'
   _PANTS_NG_ARG_PREFIX = b'-Dpants.buildroot'
   _PANTS_OWNER_ARG_PREFIX = b'-Dpants.nailgun.owner'
-  _PANTS_NG_BUILDROOT_ARG = '='.join((_PANTS_NG_ARG_PREFIX, get_buildroot()))
+  _PANTS_NG_BUILDROOT_ARG = b'='.join((_PANTS_NG_ARG_PREFIX, get_buildroot().encode('utf-8')))
 
   _NAILGUN_SPAWN_LOCK = threading.Lock()
   _SELECT_WAIT = 1

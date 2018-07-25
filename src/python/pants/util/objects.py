@@ -9,6 +9,8 @@ from abc import abstractmethod
 from builtins import map, object, zip
 from collections import OrderedDict, namedtuple
 
+from future.utils import PY2
+
 from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
 
@@ -99,6 +101,9 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
     def __ne__(self, other):
       return not (self == other)
+
+    def __hash__(self):
+      return super(DataType, self).__hash__()
 
     # NB: As datatype is not iterable, we need to override both __iter__ and all of the
     # namedtuple methods that expect self to be iterable.
@@ -329,7 +334,9 @@ class Collection(object):
   @memoized
   def of(cls, *element_types):
     union = '|'.join(element_type.__name__ for element_type in element_types)
-    type_name = b'{}.of({})'.format(cls.__name__, union)
+    type_name = '{}.of({})'.format(cls.__name__, union)
+    if PY2:
+      type_name = type_name.encode('utf-8')
     # TODO: could we allow type checking in the datatype() invocation here?
     supertypes = (cls, datatype(['dependencies'], superclass_name='Collection'))
     properties = {'element_types': element_types}
