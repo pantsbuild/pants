@@ -111,9 +111,8 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
           # Add the extra requirements first, so they take precedence over any colliding version
           # in the target set's dependency closure.
           pexes = [extra_requirements_pex] + pexes
-        constraints = {constraint for rt in relevant_targets if is_python_target(rt)
-                       for constraint in rt.compatibility}
-
+        constraints = pex_info.interpreter_constraints
+        print(constraints)
         with self.merged_pex(path, pex_info, interpreter, pexes, constraints) as builder:
           for extra_file in self.extra_files():
             extra_file.add_to(builder)
