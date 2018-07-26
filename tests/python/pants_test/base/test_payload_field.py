@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import str
 from hashlib import sha1
 
 from pants.backend.python.python_requirement import PythonRequirement
@@ -72,7 +73,7 @@ class PayloadTest(TestBase):
     )
     self.assertEqual(
       PrimitiveField('foo').fingerprint(),
-      PrimitiveField(b'foo').fingerprint(),
+      PrimitiveField('foo').fingerprint(),
     )
     self.assertNotEqual(
       PrimitiveField('foo').fingerprint(),
@@ -105,6 +106,8 @@ class PayloadTest(TestBase):
 
       def fingerprint(self):
         hasher = sha1()
+        if isinstance(self.test_value, str):
+          self.test_value = self.test_value.encode('utf-8')
         hasher.update(self.test_value)
         return hasher.hexdigest()
 

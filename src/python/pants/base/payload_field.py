@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from abc import abstractmethod
-from builtins import object
+from builtins import object, str
 from hashlib import sha1
 
 from twitter.common.collections import OrderedSet
@@ -19,6 +19,8 @@ def combine_hashes(hashes):
   """A simple helper function to combine other hashes.  Sorts the hashes before rolling them in."""
   hasher = sha1()
   for h in sorted(hashes):
+    if isinstance(h, str):
+      h = h.encode('utf-8')
     hasher.update(h)
   return hasher.hexdigest()
 
