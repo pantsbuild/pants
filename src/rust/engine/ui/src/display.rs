@@ -156,7 +156,7 @@ impl EngineDisplay {
   // Renders one frame of the log portion of the screen.
   fn render_logs(&mut self, max_entries: usize) -> usize {
     let cursor_start = self.cursor_start;
-    let printable_logs: Vec<String> = self.logs.clone().into_iter().take(max_entries).collect();
+    let printable_logs: Vec<String> = self.logs.iter().take(max_entries).cloned().collect();
 
     let mut counter: usize = 0;
     for (n, log_entry) in printable_logs.iter().rev().enumerate() {
