@@ -9,11 +9,10 @@ from builtins import filter
 from pants.backend.graph_info.tasks.cloc import CountLinesOfCode
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.task_test_base import ConsoleTaskTestBase
 
 
-class ClocTest(ConsoleTaskTestBase, SchedulerTestBase):
+class ClocTest(ConsoleTaskTestBase):
   @classmethod
   def task_type(cls):
     return CountLinesOfCode
@@ -48,6 +47,7 @@ class ClocTest(ConsoleTaskTestBase, SchedulerTestBase):
     res = self.execute_console_task(
       targets=[py_tgt, java_tgt],
       options={'transitive': True},
+      scheduler=self.scheduler,
     )
     assert_counts(res, 'Python', files=3, blank=2, comment=3, code=3)
     assert_counts(res, 'Java', files=1, blank=0, comment=1, code=1)
@@ -55,6 +55,7 @@ class ClocTest(ConsoleTaskTestBase, SchedulerTestBase):
     res = self.execute_console_task(
       targets=[py_tgt, java_tgt],
       options={'transitive': False},
+      scheduler=self.scheduler,
     )
     assert_counts(res, 'Python', files=2, blank=2, comment=3, code=2)
     assert_counts(res, 'Java', files=1, blank=0, comment=1, code=1)
@@ -67,6 +68,7 @@ class ClocTest(ConsoleTaskTestBase, SchedulerTestBase):
     res = self.execute_console_task(
       targets=[py_tgt],
       options={'ignored': True},
+      scheduler=self.scheduler,
     )
     self.assertEquals(['Ignored the following files:',
                        'src/py/foo/empty.py: zero sized file'],

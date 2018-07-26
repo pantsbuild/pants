@@ -356,6 +356,11 @@ class TestBase(unittest.TestCase):
     return os.path.join(cls._build_root(), '.pants.d')
 
   @classmethod
+  def extra_rules(cls):
+    """Override this to register extra rules in this class's scheduler."""
+    return []
+
+  @classmethod
   def _init_engine(cls):
     if cls._scheduler is not None:
       return
@@ -370,7 +375,7 @@ class TestBase(unittest.TestCase):
       build_configuration=cls.build_config(),
       build_ignore_patterns=None,
       # Required for sources_for:
-      rules=[RootRule(SourcesField)],
+      rules=cls.extra_rules() + [RootRule(SourcesField)],
     ).new_session()
     cls._scheduler = graph_session.scheduler_session
     cls._build_graph, cls._address_mapper = graph_session.create_build_graph(
