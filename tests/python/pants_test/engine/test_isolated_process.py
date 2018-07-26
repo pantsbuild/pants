@@ -11,10 +11,9 @@ from builtins import str
 from future.utils import text_type
 
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, FileContent, FilesContent,
-                             PathGlobs, Snapshot, create_fs_rules)
+                             PathGlobs, Snapshot)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
-                                           FallibleExecuteProcessResult, ProcessExecutionFailure,
-                                           create_process_rules)
+                                           FallibleExecuteProcessResult, ProcessExecutionFailure)
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, Select
