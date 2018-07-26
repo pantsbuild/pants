@@ -7,10 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import tarfile
 from builtins import str
 
-from future.utils import implements_iterator
 
-
-@implements_iterator
 class TarFile(tarfile.TarFile):
 
   def __next__(self):
@@ -79,3 +76,5 @@ class TarFile(tarfile.TarFile):
       self._loaded = True
 
     return tarinfo
+
+  next = __next__  # Still needed for Py3 because stdlib using next() instead of __next__().
