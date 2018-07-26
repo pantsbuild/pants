@@ -15,6 +15,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
+from pants.util.contextutil import temporary_file_path
 from pants.util.memo import memoized_property
 
 
@@ -32,6 +33,8 @@ class AnalysisExtraction(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(AnalysisExtraction, cls).register_options(register)
+    register('--dump-debug', type=bool, advanced=True, fingerprint=True,
+             help='Dump a (mostly) human readable form of the analysis while extracting it.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -49,7 +52,7 @@ class AnalysisExtraction(NailgunTask):
     Returns true if the task should run.
     """
 
-    should_run = False
+    should_run = self.get_options().dump_debug
     if self.context.products.is_required_data('classes_by_source'):
       should_run = True
       make_products = lambda: defaultdict(MultipleRootedProducts)
@@ -106,13 +109,20 @@ class AnalysisExtraction(NailgunTask):
     analysis_by_cp_entry = self._analysis_by_runtime_entry
     upstream_analysis = list(self._upstream_analysis(target_classpath, analysis_by_cp_entry))
     args = [
-        '-summary-json', summary_json_file,
         '-analysis-cache', analysis_file,
         '-classpath', ':'.join(target_classpath),
         '-analysis-map', ','.join('{}:{}'.format(k, v) for k, v in upstream_analysis),
       ]
     args.extend(self._zinc.rebase_map_args)
 
+    self._run(target, args + ['-summary-json', summary_json_file])
+    if self.get_options().dump_debug:
+      with temporary_file_path() as dump_file:
+        self._run(target, args + ['-debug-dump', dump_file])
+        with open(dump_file, 'r') as f:
+          self.context.log.info(f.read())
+
+  def _run(self, target, args):
     result = self.runjava(classpath=self._zinc.extractor,
                           main=Zinc.ZINC_EXTRACT_MAIN,
                           args=args,

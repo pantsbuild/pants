@@ -59,7 +59,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_COMPILER_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.5'),
+                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.6'),
                             ],
                             main=Zinc.ZINC_COMPILE_MAIN,
                             custom_rules=shader_rules)
@@ -89,7 +89,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_EXTRACTOR_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.4')
+                              JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.5')
                             ])
 
     @classmethod

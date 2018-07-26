@@ -7,24 +7,41 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import re
 from collections import namedtuple
+from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
+from pants.util.objects import datatype
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
 
-class Compile(namedtuple('Compile', ['srcfiles', 'config', 'artifact_count'])):
+class Compile(datatype(['srcfiles', 'config', 'artifact_count'])):
+  pass
+
+
+class PortabilityWorkspace(datatype([
+  'src_dir',
+  'dependency_spec',
+  'dependency_files',
+  'dependency_build_file',
+  'consumer_spec',
+  'consumer_files',
+  'consumer_build_file',
+])):
   pass
 
 
 class CacheCompileIntegrationTest(BaseCompileIT):
 
-  def run_compile(self, target_spec, config, workdir):
-    args = ['compile', target_spec]
+  def run_compile(self, target_spec, config, workdir, success=True):
+    args = self._EXTRA_TASK_ARGS + ['compile', target_spec]
     pants_run = self.run_pants_with_workdir(args, workdir, config)
-    self.assert_success(pants_run)
+    if success:
+      self.assert_success(pants_run)
+    else:
+      self.assert_failure(pants_run)
     return pants_run
 
   def create_file(self, path, value):
@@ -164,40 +181,20 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       self.assertEquals(sorted(classfiles(w) for w in target_workdirs if w != 'current'),
                         sorted([['A.class', 'Main.class'], ['A.class', 'NotMain.class']]))
 
-  def test_analysis_portability(self):
+  def test_analysis_portability_noop(self):
     # Tests that analysis can be relocated between workdirs and still result in incremental
     # compile.
-    with temporary_dir() as cache_dir, temporary_dir(root_dir=get_buildroot()) as src_dir:
-
+    with temporary_dir() as cache_dir, self._portable_sources_dir() as workspace:
       config = {
         'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
       }
 
-      dep_src_file = os.path.join(src_dir, 'org', 'pantsbuild', 'dep', 'A.scala')
-      dep_build_file = os.path.join(src_dir, 'org', 'pantsbuild', 'dep', 'BUILD')
-      con_src_file = os.path.join(src_dir, 'org', 'pantsbuild', 'consumer', 'B.scala')
-      con_build_file = os.path.join(src_dir, 'org', 'pantsbuild', 'consumer', 'BUILD')
-
-      dep_spec = os.path.join(os.path.basename(src_dir), 'org', 'pantsbuild', 'dep')
-      con_spec = os.path.join(os.path.basename(src_dir), 'org', 'pantsbuild', 'consumer')
-
-      dep_src = "package org.pantsbuild.dep; class A {}"
-
-      self.create_file(dep_src_file, dep_src)
-      self.create_file(dep_build_file, "scala_library()")
-      self.create_file(con_src_file, dedent(
-        """package org.pantsbuild.consumer
-           import org.pantsbuild.dep.A
-           class B { def mkA: A = new A() }"""))
-      self.create_file(con_build_file, "scala_library(dependencies=['{}'])".format(dep_spec))
-
-      with self.temporary_workdir() as workdir:
+      with self.temporary_workdir() as workdir1, self.temporary_workdir() as workdir2:
         # 1) Compile in one workdir.
-        self.run_compile(con_spec, config, workdir)
+        self.run_compile(workspace.consumer_spec, config, workdir1)
 
-      with self.temporary_workdir() as workdir:
         # 2) Compile in another workdir and check that we hit the cache.
-        run_two = self.run_compile(con_spec, config, workdir)
+        run_two = self.run_compile(workspace.consumer_spec, config, workdir2)
         self.assertTrue(
             re.search(
               "\[zinc\][^[]*\[cache\][^[]*Using cached artifacts for 2 targets.",
@@ -206,16 +203,71 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
         # 3) Edit the dependency in a way that should trigger an incremental
         #    compile of the consumer.
+        dep_src_file, dep_src = list(workspace.dependency_files.items())[0]
         self.create_file(dep_src_file, dep_src + "; /* this is a comment */")
 
         # 4) Compile and confirm that the analysis fetched from the cache in
         #    step 2 causes incrementalism: ie, zinc does not report compiling any files.
-        run_three = self.run_compile(con_spec, config, workdir)
+        run_three = self.run_compile(workspace.consumer_spec, config, workdir2)
         self.assertTrue(
             re.search(
               r"/org/pantsbuild/consumer:consumer\)[^[]*\[compile\][^[]*\[zinc\]\W*\[info\] Compile success",
               run_three.stdout_data),
             run_three.stdout_data)
+
+  def test_analysis_portability_changed_deps(self):
+    # Tests that analysis relocated between workdirs still results in a failure after removal of a dep.
+    with temporary_dir() as cache_dir, self._portable_sources_dir() as workspace:
+      config = {
+        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+      }
+
+      with self.temporary_workdir() as workdir1, self.temporary_workdir() as workdir2:
+        # 1) Compile in one workdir.
+        self.run_compile(workspace.consumer_spec, config, workdir1)
+
+        # 2) Compile in another workdir and check that we hit the cache.
+        run_two = self.run_compile(workspace.consumer_spec, config, workdir2)
+        self.assertTrue(
+            re.search(
+              "\[zinc\][^[]*\[cache\][^[]*Using cached artifacts for 2 targets.",
+              run_two.stdout_data),
+            run_two.stdout_data)
+
+        # 3) Edit the consumer to remove all of its deps, which should cause it to fail.
+        self.create_file(workspace.consumer_build_file, "scala_library()")
+
+        # 4) Compile.
+        self.run_compile(workspace.consumer_spec, config, workdir2, success=False)
+
+  def test_analysis_portability_workdir_references(self):
+    # Tests that analysis relocated between workdirs does not reference a previous workdir.
+    with temporary_dir() as cache_dir, self._portable_sources_dir() as workspace:
+      config = {
+        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+      }
+
+      with self.temporary_workdir() as workdir1, self.temporary_workdir() as workdir2:
+        # 1) Compile in one workdir.
+        self.run_compile(workspace.consumer_spec, config, workdir1)
+
+        # 2) Extract analysis in another workdir and check that we hit the cache.
+        run_two = self.run_pants_with_workdir(self._EXTRA_TASK_ARGS + [
+            'analysis.zinc',
+            '--dump-debug',
+            workspace.consumer_spec,
+          ], workdir2, config)
+        self.assert_success(run_two)
+        self.assertTrue(
+            re.search(
+              "\[zinc\][^[]*\[cache\][^[]*Using cached artifacts for 2 targets.",
+              run_two.stdout_data),
+            run_two.stdout_data)
+
+        # 3) Confirm no references to the previous workdir, or to `/dev/null/*`, which we use as
+        # the rebase placeholder.
+        self.assertNotIn(workdir1, run_two.stdout_data, "{} was in {}".format(workdir1, run_two.stdout_data))
+        self.assertNotIn('/dev/null', run_two.stdout_data, "/dev/null was in {}".format(run_two.stdout_data))
 
   def test_incremental_caching(self):
     """Tests that with --no-incremental-caching, we don't write incremental artifacts."""
@@ -241,6 +293,38 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         Compile({srcfile: "final class A {}"}, config, 2),
         Compile({srcfile: "public final class A {}"}, config, 3),
     )
+
+  @contextmanager
+  def _portable_sources_dir(self):
+    with temporary_dir(root_dir=get_buildroot()) as src_dir:
+      dep_src_file = os.path.join(src_dir, 'org', 'pantsbuild', 'dep', 'A.scala')
+      dep_build_file = os.path.join(src_dir, 'org', 'pantsbuild', 'dep', 'BUILD')
+      con_src_file = os.path.join(src_dir, 'org', 'pantsbuild', 'consumer', 'B.scala')
+      con_build_file = os.path.join(src_dir, 'org', 'pantsbuild', 'consumer', 'BUILD')
+
+      dep_spec = os.path.join(os.path.basename(src_dir), 'org', 'pantsbuild', 'dep')
+      con_spec = os.path.join(os.path.basename(src_dir), 'org', 'pantsbuild', 'consumer')
+
+      dep_src = "package org.pantsbuild.dep; class A {}"
+      con_src = dedent(
+        """package org.pantsbuild.consumer
+           import org.pantsbuild.dep.A
+           class B { def mkA: A = new A() }""")
+
+      self.create_file(dep_src_file, dep_src)
+      self.create_file(dep_build_file, "scala_library()")
+      self.create_file(con_src_file, con_src)
+      self.create_file(con_build_file, "scala_library(dependencies=['{}'])".format(dep_spec))
+
+      yield PortabilityWorkspace(
+          src_dir,
+          dep_spec,
+          {dep_src_file: dep_src},
+          dep_build_file,
+          con_spec,
+          {con_src_file: con_src},
+          con_build_file,
+        )
 
   def _do_test_caching(self, *compiles):
     """Tests that the given compiles within the same workspace produce the given artifact counts."""
