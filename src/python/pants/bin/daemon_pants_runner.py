@@ -13,6 +13,7 @@ import time
 from builtins import str, zip
 from contextlib import contextmanager
 
+from future.utils import raise_with_traceback
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
@@ -241,7 +242,7 @@ class DaemonPantsRunner(ProcessManager):
         # Expect `_deferred_exception` to be a 3-item tuple of the values returned by sys.exc_info().
         # This permits use the 3-arg form of the `raise` statement to preserve the original traceback.
         exc_type, exc_value, exc_traceback = self._deferred_exception
-        raise exc_type, exc_value, exc_traceback
+        raise_with_traceback(exc_type(exc_value), exc_traceback)
       except ValueError:
         # If `_deferred_exception` isn't a 3-item tuple, treat it like a bare exception.
         raise self._deferred_exception
