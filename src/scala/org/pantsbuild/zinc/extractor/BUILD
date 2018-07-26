@@ -12,6 +12,7 @@ scala_library(
     '3rdparty/jvm/com/fasterxml/jackson/module:scala',
     '3rdparty/jvm/org/scala-lang/modules:scala-java8-compat',
     '3rdparty/jvm/org/scala-sbt:zinc',
+    '3rdparty:guava',
     'src/scala/org/pantsbuild/zinc/analysis',
     'src/scala/org/pantsbuild/zinc/options',
   ],
