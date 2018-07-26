@@ -10,8 +10,11 @@ from builtins import str
 
 class TarFile(tarfile.TarFile):
 
-  def __next__(self):
+  def next(self):
     """A copy and modification of the next() method in tarfile module.
+
+    Note: this function should stay named next(), not __next__(), to reflect CPython.
+    See https://github.com/python/cpython/blob/master/Lib/tarfile.py#L2255.
 
     The copy is from tarfile.py of CPython @102457:95df96aa2f5a
 
@@ -76,5 +79,3 @@ class TarFile(tarfile.TarFile):
       self._loaded = True
 
     return tarinfo
-
-  next = __next__  # Still needed for Py3 because stdlib using next() instead of __next__().
