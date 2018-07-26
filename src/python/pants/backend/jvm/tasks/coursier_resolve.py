@@ -613,7 +613,7 @@ class CoursierMixin(NailgunTask):
 
       if not os.path.exists(pants_path):
         safe_mkdir(os.path.dirname(pants_path))
-        os.symlink(jar_path, pants_path)
+        os.link(jar_path, pants_path)
 
       coord = cls.to_m2_coord(coord)
       resolved_jar = ResolvedJar(coord,
