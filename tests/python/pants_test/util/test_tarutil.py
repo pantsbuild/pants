@@ -30,11 +30,12 @@ class TarutilTest(unittest.TestCase):
     safe_rmtree(self.basedir)
 
   def inject_corruption(self):
-    with open(self.file_tar, 'r+w') as fp:
+    with open(self.file_tar, 'r+b') as fp:
       content = fp.read()
       fp.seek(0)
       # Replace 8 bytes of good data with garbage.
-      fp.write(content[:512+148] + 'aaaaaaaa' + content[512+156:])
+      fp.write(content[:512+148] + b'aaaaaaaa' + content[512+156:])
+      fp.truncate()
 
   def extract_tar(self, path, **kwargs):
     with TarFile.open(self.file_tar, mode='r', **kwargs) as tar:
