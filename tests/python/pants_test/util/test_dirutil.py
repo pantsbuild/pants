@@ -8,10 +8,10 @@ import errno
 import os
 import time
 import unittest
+from builtins import str
 from contextlib import contextmanager
 
 import mock
-from future.utils import text_type
 
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
@@ -120,10 +120,10 @@ class DirutilTest(unittest.TestCase):
     # unicode constructor.
     with temporary_dir() as tmpdir:
       safe_mkdir(os.path.join(tmpdir, '中文'))
-      if isinstance(tmpdir, text_type):
+      if isinstance(tmpdir, str):
         tmpdir = tmpdir.encode('utf-8')
       for _, dirs, _ in dirutil.safe_walk(tmpdir):
-        self.assertTrue(all(isinstance(dirname, text_type) for dirname in dirs))
+        self.assertTrue(all(isinstance(dirname, str) for dirname in dirs))
 
   @contextmanager
   def tree(self):
@@ -149,7 +149,7 @@ class DirutilTest(unittest.TestCase):
   class File(datatype(['path', 'contents'])):
     @classmethod
     def empty(cls, path):
-      return cls(path, contents=b'')
+      return cls(path, contents='')
 
     @classmethod
     def read(cls, root, relpath):
@@ -194,11 +194,11 @@ class DirutilTest(unittest.TestCase):
                        self.Dir('a/b'),
 
                        # Existing overlapping file should be overlayed.
-                       self.File('a/b/1', contents=b'1'),
+                       self.File('a/b/1', contents='1'),
 
                        self.File.empty('a/b/2'),
                        self.Dir('b'),
-                       self.File('b/1', contents=b'1'),
+                       self.File('b/1', contents='1'),
                        self.File.empty('b/2'),
                        self.Dir('c'),
 
@@ -227,10 +227,10 @@ class DirutilTest(unittest.TestCase):
                        self.Dir('a'),
                        self.File.empty('a/2'),
                        self.Dir('a/b'),
-                       self.File('a/b/1', contents=b'1'),
+                       self.File('a/b/1', contents='1'),
                        self.File.empty('a/b/2'),
                        self.Dir('b'),
-                       self.File('b/1', contents=b'1'),
+                       self.File('b/1', contents='1'),
                        self.File.empty('b/2'))
 
   def test_mergetree_ignore_files(self):
@@ -246,7 +246,7 @@ class DirutilTest(unittest.TestCase):
                        self.File.empty('a/2'),
                        self.Dir('a/b'),
                        self.Dir('b'),
-                       self.File('b/1', contents=b'1'),
+                       self.File('b/1', contents='1'),
                        self.File.empty('b/2'))
 
   def test_mergetree_ignore_dirs(self):
@@ -261,7 +261,7 @@ class DirutilTest(unittest.TestCase):
                        self.Dir('a'),
                        self.File.empty('a/2'),
                        self.Dir('b'),
-                       self.File('b/1', contents=b'1'),
+                       self.File('b/1', contents='1'),
                        self.File.empty('b/2'))
 
   def test_mergetree_symlink(self):
@@ -272,7 +272,7 @@ class DirutilTest(unittest.TestCase):
                        self.Dir('a'),
                        self.Symlink('a/2'),
                        self.Dir('a/b'),
-                       self.File('a/b/1', contents=b'1'),
+                       self.File('a/b/1', contents='1'),
                        self.File.empty('a/b/2'),
 
                        # NB: assert_tree does not follow symlinks and so does not descend into the
@@ -396,7 +396,7 @@ class DirutilTest(unittest.TestCase):
   def test_readwrite_file(self):
     with temporary_dir() as td:
       test_filename = os.path.join(td, 'test.out')
-      test_content = '3333'
+      test_content = b'3333'
       safe_file_dump(test_filename, test_content)
       self.assertEqual(read_file(test_filename), test_content)
 
