@@ -157,7 +157,7 @@ def signal_handler_as(sig, handler):
 
 
 @contextmanager
-def temporary_dir(root_dir=None, cleanup=True, suffix=b'', permissions=None, prefix=tempfile.template):
+def temporary_dir(root_dir=None, cleanup=True, suffix='', permissions=None, prefix=tempfile.template):
   """
     A with-context that creates a temporary directory.
 
