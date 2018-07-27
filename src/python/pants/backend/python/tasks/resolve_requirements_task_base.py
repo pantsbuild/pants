@@ -114,9 +114,9 @@ class ResolveRequirementsTaskBase(Task):
 
     with safe_concurrent_creation(path) as safe_path:
       builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
-      if interpeter_constraints:
-        for constraint in interpeter_constraints:
-          builder.add_interpreter_constraint(constraint)
+      # if interpeter_constraints:
+      #   for constraint in interpeter_constraints:
+      #     builder.add_interpreter_constraint(constraint)
       yield builder
 
   @classmethod
