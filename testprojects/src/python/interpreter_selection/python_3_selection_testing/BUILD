@@ -67,3 +67,29 @@ python_tests(
   ],
   compatibility=['CPython>2.7.6,<3']
 )
+
+python_binary(
+  name='main_py23',
+  source='main_py23.py',
+  compatibility=['CPython>2.7.6,<4'],
+  dependencies=[
+    ':lib_py23'
+  ]
+)
+
+python_library(
+  name='lib_py23',
+  sources=['lib_py23.py'],
+  compatibility=['CPython>2.7.6,<4']
+)
+
+python_tests(
+  name='test_py23',
+  sources=[
+    'test_py23.py',
+  ],
+  dependencies=[
+    ':main_py23'
+  ],
+  compatibility=['CPython>2.7.6,<4']
+)
