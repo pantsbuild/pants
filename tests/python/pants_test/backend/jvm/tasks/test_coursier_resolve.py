@@ -8,9 +8,8 @@ import os
 from builtins import str
 from contextlib import contextmanager
 
-from future.backports.test.support import rmdir
 from mock import MagicMock
-from psutil.tests import safe_remove, safe_rmdir
+from psutil.tests import safe_remove
 
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     PinnedJarArtifactSet)
