@@ -159,7 +159,6 @@ class ScalaFmtFormatTest(ScalaFmtTestBase):
         context = self.context(
           for_task_types=[check_fmt_task_type],
           target_roots=self.library,
-          workunit_output_dir=workunit_dir,
         )
         self.execute(context)
 

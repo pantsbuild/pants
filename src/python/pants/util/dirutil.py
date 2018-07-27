@@ -83,6 +83,15 @@ def safe_mkdir_for(path, clean=False):
   safe_mkdir(os.path.dirname(path), clean=clean)
 
 
+def safe_mkdir_for_all(paths):
+  created_dirs = set()
+  for path in paths:
+    dir_to_make = os.path.dirname(path)
+    if dir_to_make not in created_dirs:
+      safe_mkdir(dir_to_make)
+      created_dirs.add(dir_to_make)
+
+
 def safe_file_dump(filename, payload):
   """Write a string to a file.
 

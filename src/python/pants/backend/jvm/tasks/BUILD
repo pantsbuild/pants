@@ -679,6 +679,7 @@ python_library(
     'src/python/pants/java/jar',
     'src/python/pants/option',
     'src/python/pants/task',
+    'src/python/pants/util:dirutil',
   ]
 )
 
