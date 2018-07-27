@@ -794,7 +794,7 @@ class IvyUtils(object):
     ivy_args.extend(args)
 
     ivy_jvm_options = list(jvm_options)
-    # Disable cache in File.getCanonicalPath(), makes Ivy work with -hardlink option properly on ng.
+    # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
     ivy_jvm_options.append('-Dsun.io.useCanonCaches=false')
 
     runner = ivy.runner(jvm_options=ivy_jvm_options, args=ivy_args, executor=executor)

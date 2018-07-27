@@ -237,8 +237,6 @@ class CoursierResolveTest(JvmToolTaskTestBase):
         # Take a sample jar path, remove it, then call the task again, it should invoke coursier again
         conf, path = jar_cp[0]
 
-        self.assertFalse(os.path.islink(path))
-
         # Remove the hard link under .pants.d/
         safe_remove(path)
 
