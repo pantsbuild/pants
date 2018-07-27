@@ -4,11 +4,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import errno
 import os
 import random
 import shutil
-
-import errno
 from uuid import uuid4
 
 from pants.util.contextutil import temporary_file
