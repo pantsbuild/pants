@@ -4,17 +4,14 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import os
-import shutil
 from abc import abstractproperty
 
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
-from pants.option.custom_types import dir_option, file_option
+from pants.option.custom_types import file_option
 from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.lint_task_mixin import LintTaskMixin
-from pants.util.dirutil import fast_relpath, safe_mkdir_for_all
 
 
 class ScalaFmt(RewriteBase):
@@ -29,9 +26,6 @@ class ScalaFmt(RewriteBase):
     super(ScalaFmt, cls).register_options(register)
     register('--configuration', advanced=True, type=file_option, fingerprint=True,
               help='Path to scalafmt config file, if not specified default scalafmt config used')
-    register('--output-dir', advanced=True, type=dir_option, fingerprint=True,
-              help='Path to scalafmt output directory. Any updated files will be written here. '
-                   'If not specified, files will be modified in-place.')
 
     cls.register_jvm_tool(register,
                           'scalafmt',
@@ -53,29 +47,17 @@ class ScalaFmt(RewriteBase):
   def implementation_version(cls):
     return super(ScalaFmt, cls).implementation_version() + [('ScalaFmt', 5)]
 
-  def invoke_tool(self, buildroot, target_sources):
+  def invoke_tool(self, _root, target_sources):
     # If no config file is specified use default scalafmt config.
     config_file = self.get_options().configuration
     args = list(self.additional_args)
     if config_file is not None:
       args.extend(['--config', config_file])
-
-    files = [source for _, source in target_sources]
-
-    if self.get_options().output_dir:
-      moved_files = [
-        os.path.join(self.get_options().output_dir, fast_relpath(source, buildroot))
-        for _, source in target_sources
-      ]
-      safe_mkdir_for_all(moved_files)
-      for src, dst in zip(files, moved_files):
-        shutil.copyfile(src, dst)
-      files = moved_files
-
+    args.extend([source for _target, source in target_sources])
 
     return self.runjava(classpath=self.tool_classpath('scalafmt'),
                         main='org.scalafmt.cli.Cli',
-                        args=args + files,
+                        args=args,
                         workunit_name='scalafmt',
                         jvm_options=self.get_options().jvm_options)
 
