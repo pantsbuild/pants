@@ -165,13 +165,14 @@ class Git(Scm):
     uncommitted_changes = self._check_output(['diff', '--name-only', 'HEAD'] + rel_suffix,
                                              raise_type=Scm.LocalException)
 
-    files = set(uncommitted_changes.split())
+    files = set(uncommitted_changes.splitlines())
     if from_commit:
       # Grab the diff from the merge-base to HEAD using ... syntax.  This ensures we have just
       # the changes that have occurred on the current branch.
       committed_cmd = ['diff', '--name-only', from_commit + '...HEAD'] + rel_suffix
       committed_changes = self._check_output(committed_cmd,
                                              raise_type=Scm.LocalException)
+
       files.update(committed_changes.split())
     if include_untracked:
       untracked_cmd = ['ls-files', '--other', '--exclude-standard'] + rel_suffix
