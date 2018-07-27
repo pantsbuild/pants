@@ -172,7 +172,6 @@ class Git(Scm):
       committed_cmd = ['diff', '--name-only', from_commit + '...HEAD'] + rel_suffix
       committed_changes = self._check_output(committed_cmd,
                                              raise_type=Scm.LocalException)
-
       files.update(committed_changes.split())
     if include_untracked:
       untracked_cmd = ['ls-files', '--other', '--exclude-standard'] + rel_suffix
