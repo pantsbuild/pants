@@ -148,23 +148,22 @@ class ScalaFmtFormatTest(ScalaFmtTestBase):
 
   def test_output_dir(self):
     with temporary_dir() as output_dir:
-      with temporary_dir() as workunit_dir:
-        self.set_options(skip=False, output_dir=output_dir)
+      self.set_options(skip=False, output_dir=output_dir)
 
-        lint_options_scope = 'sfcf'
-        check_fmt_task_type = self.synthesize_task_subtype(ScalaFmtCheckFormat, lint_options_scope)
-        self.set_options_for_scope(lint_options_scope)
+      lint_options_scope = 'sfcf'
+      check_fmt_task_type = self.synthesize_task_subtype(ScalaFmtCheckFormat, lint_options_scope)
+      self.set_options_for_scope(lint_options_scope)
 
-        # format an incorrectly formatted file.
-        context = self.context(
-          for_task_types=[check_fmt_task_type],
-          target_roots=self.library,
-        )
-        self.execute(context)
+      # format an incorrectly formatted file.
+      context = self.context(
+        for_task_types=[check_fmt_task_type],
+        target_roots=self.library,
+      )
+      self.execute(context)
 
-        with open(self.test_file, 'rb') as fp:
-          self.assertEqual(self.test_file_contents, fp.read())
+      with open(self.test_file, 'rb') as fp:
+        self.assertEqual(self.test_file_contents, fp.read())
 
-        relative_test_file = fast_relpath(self.test_file, self.build_root)
-        with open(os.path.join(output_dir, relative_test_file), 'rb') as fp:
-          self.assertNotEqual(self.test_file_contents, fp.read())
+      relative_test_file = fast_relpath(self.test_file, self.build_root)
+      with open(os.path.join(output_dir, relative_test_file), 'rb') as fp:
+        self.assertNotEqual(self.test_file_contents, fp.read())
