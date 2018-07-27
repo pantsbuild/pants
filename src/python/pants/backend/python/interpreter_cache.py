@@ -77,18 +77,23 @@ class PythonInterpreterCache(object):
     """Pick an interpreter compatible with all the specified targets."""
     tgts_by_compatibilities = defaultdict(list)
     filters = set()
-    for target in targets:
-      if isinstance(target, PythonTarget):
-        c = self._python_setup.compatibility_or_constraints(target)
-        tgts_by_compatibilities[c].append(target)
-        filters.update(c)
+
+    if self._python_setup.get_options().is_flagged('interpreter_constraints'):
+      # Reverse to prioritize flagged option over default value
+      filters.update(reversed(self._python_setup.get_options().interpreter_constraints))
+    else:
+      for target in targets:
+        if isinstance(target, PythonTarget) and target.compatibility:
+          tgts_with_compatibilities.append(target)
+          filters.update(target.compatibility)
 
     allowed_interpreters = set(self.setup(filters=filters))
 
-    # Constrain allowed_interpreters based on each target's compatibility requirements.
-    for compatibility in tgts_by_compatibilities.keys():
-      compatible_with_target = set(self._matching(allowed_interpreters, compatibility))
-      allowed_interpreters &= compatible_with_target
+    if not self._python_setup.get_options().is_flagged('interpreter_constraints'):
+      # Constrain allowed_interpreters based on each target's compatibility requirements.
+      for target in tgts_with_compatibilities:
+        compatible_with_target = set(self._matching(allowed_interpreters, target.compatibility))
+        allowed_interpreters &= compatible_with_target
 
     if not allowed_interpreters:
       # Create a helpful error message.
@@ -153,10 +158,6 @@ class PythonInterpreterCache(object):
     # We filter the interpreter cache itself (and not just the interpreters we pull from it)
     # because setting up some python versions (e.g., 3<=python<3.3) crashes, and this gives us
     # an escape hatch.
-    if self._python_setup.get_options().is_flagged('interpreter_constraints'):
-      filters = self._python_setup.get_options().interpreter_constraints
-    else:
-      filters = filters if any(filters) else self._python_setup.interpreter_constraints
     setup_paths = (paths
                    or self.pex_python_paths()
                    or self._python_setup.interpreter_search_paths
