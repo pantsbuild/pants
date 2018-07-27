@@ -56,10 +56,14 @@ class Zinc(object):
           Shader.exclude_package('org.apache.logging.log4j', recursive=True),
         ]
 
+      # TODO: Overriding to test #6239.
+      persist_jar = JarDependency('org.scala-sbt', 'zinc-persist_2.11', '1.1.4-SNAPSHOT', force=True)
+
       cls.register_jvm_tool(register,
                             Zinc.ZINC_COMPILER_TOOL_NAME,
                             classpath=[
                               JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.6'),
+                              persist_jar,
                             ],
                             main=Zinc.ZINC_COMPILE_MAIN,
                             custom_rules=shader_rules)
@@ -89,7 +93,8 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_EXTRACTOR_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.5')
+                              JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.5'),
+                              persist_jar,
                             ])
 
     @classmethod
