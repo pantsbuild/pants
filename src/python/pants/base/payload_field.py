@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from abc import abstractmethod
-from builtins import object, str
+from builtins import object
 from hashlib import sha1
 
 from twitter.common.collections import OrderedSet
@@ -13,14 +13,14 @@ from twitter.common.collections import OrderedSet
 from pants.base.deprecated import deprecated
 from pants.base.hash_utils import stable_json_hash
 from pants.util.meta import AbstractClass
+from pants.util.strutil import ensure_binary
 
 
 def combine_hashes(hashes):
   """A simple helper function to combine other hashes.  Sorts the hashes before rolling them in."""
   hasher = sha1()
   for h in sorted(hashes):
-    if isinstance(h, str):
-      h = h.encode('utf-8')
+    h = ensure_binary(h)
     hasher.update(h)
   return hasher.hexdigest()
 

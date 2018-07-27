@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import str
 from hashlib import sha1
 
 from pants.backend.python.python_requirement import PythonRequirement
@@ -13,6 +12,7 @@ from pants.base.payload_field import (ExcludesField, FingerprintedField, Fingerp
                                       PythonRequirementsField)
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
+from pants.util.strutil import ensure_binary
 from pants_test.test_base import TestBase
 
 
@@ -106,8 +106,7 @@ class PayloadTest(TestBase):
 
       def fingerprint(self):
         hasher = sha1()
-        if isinstance(self.test_value, str):
-          self.test_value = self.test_value.encode('utf-8')
+        self.test_value = ensure_binary(self.test_value)
         hasher.update(self.test_value)
         return hasher.hexdigest()
 

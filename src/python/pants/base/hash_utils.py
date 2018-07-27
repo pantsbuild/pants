@@ -6,7 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import hashlib
 import json
-from builtins import object, str
+from builtins import object
+
+from pants.util.strutil import ensure_binary
 
 
 def hash_all(strs, digest=None):
@@ -16,8 +18,7 @@ def hash_all(strs, digest=None):
   """
   digest = digest or hashlib.sha1()
   for s in strs:
-    if isinstance(s, str):
-      s = s.encode('utf-8')
+    s = ensure_binary(s)
     digest.update(s)
   return digest.hexdigest()
 
