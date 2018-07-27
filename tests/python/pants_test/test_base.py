@@ -142,7 +142,7 @@ class TestBase(unittest.TestCase):
     relative_symlink(src, dst)
     self._invalidate_for(reldst)
 
-  def create_file(self, relpath, contents='', mode='wb'):
+  def create_file(self, relpath, contents=b'', mode='wb'):
     """Writes to a file under the buildroot.
 
     :API: public
@@ -168,7 +168,7 @@ class TestBase(unittest.TestCase):
     for f in files:
       self.create_file(os.path.join(path, f), contents=f)
 
-  def create_workdir_file(self, relpath, contents='', mode='wb'):
+  def create_workdir_file(self, relpath, contents=b'', mode='wb'):
     """Writes to a file under the work directory.
 
     :API: public
