@@ -12,6 +12,7 @@ from builtins import str, zip
 from collections import defaultdict
 
 from future.moves.urllib import parse
+from pex.common import safe_copy
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
@@ -613,7 +614,7 @@ class CoursierMixin(NailgunTask):
 
       if not os.path.exists(pants_path):
         safe_mkdir(os.path.dirname(pants_path))
-        os.link(jar_path, pants_path)
+        safe_copy(jar_path, pants_path)
 
       coord = cls.to_m2_coord(coord)
       resolved_jar = ResolvedJar(coord,

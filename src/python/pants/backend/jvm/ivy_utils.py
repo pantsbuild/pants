@@ -17,6 +17,7 @@ from collections import OrderedDict, defaultdict, namedtuple
 from functools import total_ordering
 
 import six
+from pex.common import safe_copy
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
@@ -858,12 +859,7 @@ class IvyUtils(object):
         # Skip paths that aren't going to be hardlinked.
         continue
       safe_mkdir(os.path.dirname(hardlink))
-      try:
-        os.link(path, hardlink)
-      except OSError as e:
-        # We don't delete and recreate the hardlink, as this may break concurrently executing code.
-        if e.errno != errno.EEXIST:
-          raise
+      safe_copy(path, hardlink)
 
     # (re)create the classpath with all of the paths
     with safe_open(outpath, 'w') as outfile:
