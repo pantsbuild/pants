@@ -12,10 +12,10 @@ bytes = "0.4.5"
 digest = "0.6.2"
 fs = { path = "../fs" }
 futures = "^0.1.16"
-grpcio = { version = "0.2.0", features = ["secure"] }
+grpcio = { version = "0.3", features = ["secure"] }
 hashing = { path = "../hashing" }
 log = "0.4"
-protobuf = { version = "1.4.1", features = ["with-bytes"] }
+protobuf = { version = "2.0.4", features = ["with-bytes"] }
 resettable = { path = "../resettable" }
 sha2 = "0.6.0"
 tempfile = "3"

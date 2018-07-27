@@ -15,7 +15,7 @@ futures = "^0.1.16"
 hashing = { path = "../../hashing" }
 libc = "0.2.39"
 log = "0.4.1"
-protobuf = { version = "1.4.1", features = ["with-bytes"] }
+protobuf = { version = "2.0.4", features = ["with-bytes"] }
 time = "0.1.39"
 
 [dev-dependencies]
