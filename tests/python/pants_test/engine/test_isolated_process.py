@@ -258,6 +258,13 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
 
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
+  def rules(cls):
+    return super(IsolatedProcessTest, cls).rules() + [
+      RootRule(JavacVersionExecutionRequest),
+      process_request_from_javac_version,
+      get_javac_version_output,
+    ] + create_cat_stdout_rules() + create_javac_compile_rules()
+
   def test_integration_concat_with_snapshots_stdout(self):
     scheduler = self.mk_scheduler_in_example_fs(create_cat_stdout_rules())
 

@@ -269,9 +269,15 @@ class TestBase(unittest.TestCase):
     return BuildFileAliases(targets={'target': Target})
 
   @classmethod
+  def rules(cls):
+    # Required for sources_for:
+    return [RootRule(SourcesField)]
+
+  @classmethod
   def build_config(cls):
     build_config = BuildConfiguration()
     build_config.register_aliases(cls.alias_groups())
+    build_config.register_rules(cls.rules())
     return build_config
 
   def setUp(self):
@@ -368,8 +374,6 @@ class TestBase(unittest.TestCase):
       native=init_native(),
       build_configuration=cls.build_config(),
       build_ignore_patterns=None,
-      # Required for sources_for:
-      rules=[RootRule(SourcesField)],
     ).new_session()
     cls._scheduler = graph_session.scheduler_session
     cls._build_graph, cls._address_mapper = graph_session.create_build_graph(
