@@ -13,6 +13,7 @@ from pants.backend.native.config.environment import Executable
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFetch
 from pants.backend.native.tasks.native_task import NativeTask
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.dependency_context import DependencyContext
@@ -59,6 +60,11 @@ class NativeCompile(NativeTask, AbstractClass):
   @classmethod
   def product_types(cls):
     return [ObjectFiles, NativeTargetDependencies]
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(NativeCompile, cls).prepare(options, round_manager)
+    round_manager.require(NativeExternalLibraryFetch.NativeExternalLibraryFiles)
 
   @property
   def cache_target_dirs(self):
@@ -138,7 +144,7 @@ class NativeCompile(NativeTask, AbstractClass):
   # This may be calculated many times for a target, so we memoize it.
   @memoized_method
   def _include_dirs_for_target(self, target):
-    return target.sources_relative_to_target_base().rel_root
+    return os.path.join(get_buildroot(), target.target_base)
 
   class NativeSourcesByType(datatype(['rel_root', 'headers', 'sources'])): pass
 
@@ -172,7 +178,7 @@ class NativeCompile(NativeTask, AbstractClass):
         "Conflicting filenames:\n{}"
         .format(target.address.spec, target.alias(), '\n'.join(duplicate_filename_err_msgs)))
 
-    return [os.path.join(rel_root, src) for src in target_relative_sources]
+    return [os.path.join(get_buildroot(), rel_root, src) for src in target_relative_sources]
 
   # FIXME(#5951): expand `Executable` to cover argv generation (where an `Executable` is subclassed
   # to modify or extend the argument list, as declaratively as possible) to remove

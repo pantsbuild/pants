@@ -40,6 +40,7 @@ class LinkSharedLibraries(NativeTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super(LinkSharedLibraries, cls).prepare(options, round_manager)
     round_manager.require(NativeTargetDependencies)
     round_manager.require(ObjectFiles)
     round_manager.require(NativeExternalLibraryFetch.NativeExternalLibraryFiles)
@@ -70,6 +71,11 @@ class LinkSharedLibraries(NativeTask):
   def linker(self):
     return self._cpp_toolchain.cpp_linker
 
+  @memoized_property
+  def platform(self):
+    # FIXME: convert this to a v2 engine dependency injection.
+    return Platform.create()
+
   def _retrieve_single_product_at_target_base(self, product_mapping, target):
     self.context.log.debug("product_mapping: {}".format(product_mapping))
     self.context.log.debug("target: {}".format(target))
@@ -87,14 +93,11 @@ class LinkSharedLibraries(NativeTask):
 
     all_shared_libs_by_name = {}
 
-    # FIXME: convert this to a v2 engine dependency injection.
-    platform = Platform.create()
-
     with self.invalidated(targets_providing_artifacts,
                           invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
         if vt.valid:
-          shared_library = self._retrieve_shared_lib_from_cache(vt, platform)
+          shared_library = self._retrieve_shared_lib_from_cache(vt)
         else:
           # FIXME: We need to partition links based on proper dependency edges and not
           # perform a link to every native_external_library for all targets in the closure.
@@ -117,10 +120,10 @@ class LinkSharedLibraries(NativeTask):
 
         shared_libs_product.add(vt.target, vt.target.target_base).append(shared_library)
 
-  def _retrieve_shared_lib_from_cache(self, vt, platform):
+  def _retrieve_shared_lib_from_cache(self, vt):
     native_artifact = vt.target.ctypes_native_library
     path_to_cached_lib = os.path.join(
-      vt.results_dir, native_artifact.as_shared_lib(platform))
+      vt.results_dir, native_artifact.as_shared_lib(self.platform))
     if not os.path.isfile(path_to_cached_lib):
       raise self.LinkSharedLibrariesError("The shared library at {} does not exist!"
                                           .format(path_to_cached_lib))
@@ -164,14 +167,14 @@ class LinkSharedLibraries(NativeTask):
       raise self.LinkSharedLibrariesError("No object files were provided in request {}!"
                                           .format(link_request))
 
-    platform = Platform.create()
     linker = link_request.linker
     native_artifact = link_request.native_artifact
     output_dir = link_request.output_dir
-    resulting_shared_lib_path = os.path.join(output_dir, native_artifact.as_shared_lib(platform))
+    resulting_shared_lib_path = os.path.join(output_dir,
+                                             native_artifact.as_shared_lib(self.platform))
     # We are executing in the results_dir, so get absolute paths for everything.
     cmd = ([linker.exe_filename] +
-           platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS) +
+           self.platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS) +
            linker.extra_args +
            link_request.external_libs_info.get_third_party_lib_args() +
            ['-o', os.path.abspath(resulting_shared_lib_path)] +
