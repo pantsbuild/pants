@@ -5,7 +5,7 @@ use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use futures::{future, Future};
 use hashing::Digest;
-use protobuf::core::Message;
+use protobuf::Message;
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::Write;
