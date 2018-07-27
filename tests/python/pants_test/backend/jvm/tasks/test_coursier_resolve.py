@@ -218,36 +218,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
       task.execute()
       task.runjava.assert_not_called()
 
-  def test_when_invalid_artifact_symlink_should_trigger_resolve(self):
-    jar_lib = self._make_junit_target()
-    with self._temp_workdir():
-      self.set_options_for_scope('coursier', cache_dir='coursier')
-
-      context = self.context(target_roots=[jar_lib])
-      task = self.execute(context)
-      compile_classpath = context.products.get_data('compile_classpath')
-
-      jar_cp = compile_classpath.get_for_target(jar_lib)
-
-      # └─ junit:junit:4.12
-      #    └─ org.hamcrest:hamcrest-core:1.3
-      self.assertEquals(2, len(jar_cp))
-
-      # Take a sample jar path, remove it, then call the task again, it should invoke coursier again
-      conf, path = jar_cp[0]
-      safe_remove(os.path.realpath(path))
-
-      task.runjava = MagicMock()
-
-      # Ignore any error because runjava may fail due to undefined behavior
-      try:
-        task.execute()
-      except TaskError:
-        pass
-
-      task.runjava.assert_called()
-
-  def test_when_invalid_coursier_cache_should_trigger_resolve(self):
+  def test_when_invalid_hardlink_and_coursier_cache_should_trigger_resolve(self):
     jar_lib = self._make_junit_target()
     with self._temp_workdir():
       with temporary_dir() as couriser_cache_dir:
