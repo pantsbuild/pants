@@ -12,7 +12,6 @@ from builtins import str, zip
 from collections import defaultdict
 
 from future.moves.urllib import parse
-from pex.common import safe_copy
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
@@ -30,6 +29,7 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir
+from pants.util.fileutil import safe_hardlink_or_copy
 
 
 class CoursierResultNotFound(Exception):
@@ -614,7 +614,7 @@ class CoursierMixin(NailgunTask):
 
       if not os.path.exists(pants_path):
         safe_mkdir(os.path.dirname(pants_path))
-        safe_copy(jar_path, pants_path)
+        safe_hardlink_or_copy(jar_path, pants_path)
 
       coord = cls.to_m2_coord(coord)
       resolved_jar = ResolvedJar(coord,

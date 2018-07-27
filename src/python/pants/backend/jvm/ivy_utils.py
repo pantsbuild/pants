@@ -16,7 +16,6 @@ from collections import OrderedDict, defaultdict, namedtuple
 from functools import total_ordering
 
 import six
-from pex.common import safe_copy
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
@@ -32,7 +31,7 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.java.util import execute_runner
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir, safe_open
-from pants.util.fileutil import atomic_copy
+from pants.util.fileutil import atomic_copy, safe_hardlink_or_copy
 
 
 class IvyResolutionStep(object):
@@ -858,7 +857,7 @@ class IvyUtils(object):
         # Skip paths that aren't going to be hardlinked.
         continue
       safe_mkdir(os.path.dirname(hardlink))
-      safe_copy(path, hardlink)
+      safe_hardlink_or_copy(path, hardlink)
 
     # (re)create the classpath with all of the paths
     with safe_open(outpath, 'w') as outfile:
