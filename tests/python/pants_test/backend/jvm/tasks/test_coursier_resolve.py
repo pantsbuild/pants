@@ -8,8 +8,9 @@ import os
 from builtins import str
 from contextlib import contextmanager
 
+from future.backports.test.support import rmdir
 from mock import MagicMock
-from psutil.tests import safe_remove
+from psutil.tests import safe_remove, safe_rmdir
 
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     PinnedJarArtifactSet)
@@ -25,6 +26,7 @@ from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir, temporary_file_path
+from pants.util.dirutil import safe_rmtree
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.task_test_base import TaskTestBase
@@ -219,6 +221,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
   def test_when_invalid_artifact_symlink_should_trigger_resolve(self):
     jar_lib = self._make_junit_target()
     with self._temp_workdir():
+      self.set_options_for_scope('coursier', cache_dir='coursier')
 
       context = self.context(target_roots=[jar_lib])
       task = self.execute(context)
@@ -247,34 +250,40 @@ class CoursierResolveTest(JvmToolTaskTestBase):
   def test_when_invalid_coursier_cache_should_trigger_resolve(self):
     jar_lib = self._make_junit_target()
     with self._temp_workdir():
+      with temporary_dir() as couriser_cache_dir:
+        self.set_options_for_scope('coursier', cache_dir=couriser_cache_dir)
 
-      context = self.context(target_roots=[jar_lib])
-      task = self.execute(context)
-      compile_classpath = context.products.get_data('compile_classpath')
+        context = self.context(target_roots=[jar_lib])
+        task = self.execute(context)
+        compile_classpath = context.products.get_data('compile_classpath')
 
-      jar_cp = compile_classpath.get_for_target(jar_lib)
+        jar_cp = compile_classpath.get_for_target(jar_lib)
 
-      # └─ junit:junit:4.12
-      #    └─ org.hamcrest:hamcrest-core:1.3
-      self.assertEquals(2, len(jar_cp))
+        # └─ junit:junit:4.12
+        #    └─ org.hamcrest:hamcrest-core:1.3
+        self.assertEquals(2, len(jar_cp))
 
 
-      # Take a sample jar path, remove it, then call the task again, it should invoke coursier again
-      conf, path = jar_cp[0]
+        # Take a sample jar path, remove it, then call the task again, it should invoke coursier again
+        conf, path = jar_cp[0]
 
-      self.assertTrue(os.path.islink(path))
+        self.assertFalse(os.path.islink(path))
 
-      safe_remove(os.path.realpath(path))
+        # Remove the hard link under .pants.d/
+        safe_remove(path)
 
-      task.runjava = MagicMock()
+        # Remove coursier's cache
+        safe_rmtree(couriser_cache_dir)
 
-      # Ignore any error because runjava may fail due to undefined behavior
-      try:
-        task.execute()
-      except TaskError:
-        pass
+        task.runjava = MagicMock()
 
-      task.runjava.assert_called()
+        # Ignore any error because runjava may fail due to undefined behavior
+        try:
+          task.execute()
+        except TaskError:
+          pass
+
+        task.runjava.assert_called()
 
   def test_resolve_jarless_pom(self):
     jar = JarDependency('org.apache.commons', 'commons-weaver-privilizer-parent', '1.3')
