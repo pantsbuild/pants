@@ -59,7 +59,7 @@ class WikiPageTest(TestBase):
         )
     """))
 
-    self.create_file('src/docs/README.md', contents=dedent("""
+    self.create_file('src/docs/README.md', mode='w', contents=dedent("""
 some text
 
 * [[Link to the other readme file|pants('src/docs:readme2')]]
@@ -70,7 +70,7 @@ some text
 
     """))
 
-    self.create_file('src/docs/README2.md', contents=dedent("""
+    self.create_file('src/docs/README2.md', mode='w', contents=dedent("""
 This is the second readme file! Isn't it exciting?
 
 [[link to the first readme file|pants('src/docs:readme')]]

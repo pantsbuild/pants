@@ -116,7 +116,7 @@ class MarkdownToHtmlTest(TaskTestBase):
     task.execute()
 
   def test_rst_render_failure_fail(self):
-    self.create_file('bad.rst', contents=dedent("""
+    self.create_file('bad.rst', mode='w', contents=dedent("""
     A bad link:
 
     * `RB #2363 https://rbcommons.com/s/twitter/r/2363/>`_
@@ -138,7 +138,7 @@ class MarkdownToHtmlTest(TaskTestBase):
     return pages_by_name.get(rendered_basename)
 
   def test_rst_render_failure_warn(self):
-    self.create_file('bad.rst', contents=dedent("""
+    self.create_file('bad.rst', mode='w', contents=dedent("""
     A bad link:
 
     * `RB #2363 https://rbcommons.com/s/twitter/r/2363/>`_
@@ -164,7 +164,7 @@ class MarkdownToHtmlTest(TaskTestBase):
       self.assertIn('A bad link:', html)
 
   def test_rst_render_success(self):
-    self.create_file('good.rst', contents=dedent("""
+    self.create_file('good.rst', mode='w', contents=dedent("""
     A good link:
 
     * `RB #2363 <https://rbcommons.com/s/twitter/r/2363/>`_
