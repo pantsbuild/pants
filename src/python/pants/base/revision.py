@@ -95,7 +95,7 @@ class Revision(object):
 
   def _fill_value_if_missing(self, ours, theirs):
     if theirs is None:
-      return ours, type(ours)()
+      return ours, type(ours)()  # gets type's zero-value, e.g. 0 or ""
     elif ours is None:
       return type(theirs)(), theirs
     return ours, theirs
