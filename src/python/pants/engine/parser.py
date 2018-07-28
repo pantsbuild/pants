@@ -24,7 +24,7 @@ class SymbolTable(AbstractClass):
   def constraint(self):
     """Returns the typeconstraint for the symbol table"""
     # NB Sort types so that multiple calls get the same tuples.
-    symbol_table_types = sorted(set(self.table().values()))
+    symbol_table_types = sorted(set(self.table().values()), key=repr)
     return Exactly(*symbol_table_types, description='symbol table types')
 
 
