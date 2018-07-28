@@ -288,8 +288,9 @@ class InvalidationCacheManager(object):
 
     # Create the task-versioned prefix of the results dir, and a stable symlink to it
     # (useful when debugging).
+    task_version_sha = sha1(self._task_version.encode('utf-8')).hexdigest()[:12]
     self._results_dir_prefix = os.path.join(results_dir_root,
-                                            sha1(self._task_version).hexdigest()[:12])
+                                            task_version_sha)
     safe_mkdir(self._results_dir_prefix)
     stable_prefix = os.path.join(results_dir_root, self._STABLE_DIR_NAME)
     safe_delete(stable_prefix)
