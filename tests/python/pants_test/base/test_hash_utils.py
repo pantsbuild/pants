@@ -17,15 +17,15 @@ class TestHashUtils(unittest.TestCase):
 
   def test_hash_all(self):
     expected_hash = hashlib.md5()
-    expected_hash.update('jakejones')
+    expected_hash.update(b'jakejones')
     self.assertEqual(expected_hash.hexdigest(), hash_all(['jake', 'jones'], digest=hashlib.md5()))
 
   def test_hash_file(self):
     expected_hash = hashlib.md5()
-    expected_hash.update('jake jones')
+    expected_hash.update(b'jake jones')
 
     with temporary_file() as fd:
-      fd.write('jake jones')
+      fd.write(b'jake jones')
       fd.close()
 
       self.assertEqual(expected_hash.hexdigest(), hash_file(fd.name, digest=hashlib.md5()))

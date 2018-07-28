@@ -93,6 +93,18 @@ class Revision(object):
   def _is_valid_operand(self, other):
     return hasattr(other, '_components')
 
+  def _fill_value_if_missing(self, ours, theirs):
+    if theirs is None:
+      return ours, type(ours)()  # gets type's zero-value, e.g. 0 or ""
+    elif ours is None:
+      return type(theirs)(), theirs
+    return ours, theirs
+
+  def _stringify_if_different_types(self, ours, theirs):
+    if any(isinstance(v, str) for v in (ours, theirs)):
+      return str(ours), str(theirs)
+    return ours, theirs
+
   def __repr__(self):
     return '{}({})'.format(self.__class__.__name__, ', '.join(map(repr, self._components)))
 
@@ -106,8 +118,10 @@ class Revision(object):
     if not self._is_valid_operand(other):
       return AttributeError  # TODO(python3port): typically this should return NotImplemented.
                              # Returning AttributeError for now to avoid changing prior API.
-    for ours, theirs in zip_longest(self._components, other._components, fillvalue=0):
+    for ours, theirs in zip_longest(self._components, other._components, fillvalue=None):
       if ours != theirs:
+        ours, theirs = self._fill_value_if_missing(ours, theirs)
+        ours, theirs = self._stringify_if_different_types(ours, theirs)
         return ours < theirs
     return False
 
