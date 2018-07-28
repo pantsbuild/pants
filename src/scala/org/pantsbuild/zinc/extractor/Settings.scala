@@ -15,6 +15,7 @@ import org.pantsbuild.zinc.analysis.AnalysisOptions
 case class Settings(
   help: Boolean             = false,
   summaryJson: Option[File] = None,
+  debugDump: Option[File]   = None,
   classpath: Seq[File]      = Seq(),
   analysis: AnalysisOptions = AnalysisOptions()
 )
@@ -26,6 +27,8 @@ object Settings extends OptionSet[Settings] {
     header("Output options:"),
     boolean(  ("-help", "-h"),                 "Print this usage message",
       (s: Settings) => s.copy(help = true)),
+    file(      "-debug-dump", "file",          "A destination file to write a human readable analysis dump to.",
+      (s: Settings, f: File) => s.copy(debugDump = Some(f))),
     file(      "-summary-json", "file",        "Output file to write an analysis summary to.",
       (s: Settings, f: File) => s.copy(summaryJson = Some(f))),
 

@@ -598,7 +598,7 @@ fn make_execute_request(
     })
     .collect::<Result<Vec<String>, String>>()?;
   output_files.sort();
-  command.set_output_files(protobuf::repeated::RepeatedField::from_vec(output_files));
+  command.set_output_files(protobuf::RepeatedField::from_vec(output_files));
 
   let mut output_directories = req
     .output_directories
@@ -610,9 +610,7 @@ fn make_execute_request(
     })
     .collect::<Result<Vec<String>, String>>()?;
   output_directories.sort();
-  command.set_output_directories(protobuf::repeated::RepeatedField::from_vec(
-    output_directories,
-  ));
+  command.set_output_directories(protobuf::RepeatedField::from_vec(output_directories));
 
   let mut action = bazel_protos::remote_execution::Action::new();
   action.set_command_digest(digest(&command)?);

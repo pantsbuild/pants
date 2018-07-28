@@ -12,4 +12,4 @@ env_logger = "0.5.4"
 fs = { path = ".." }
 futures = "^0.1.16"
 hashing = { path = "../../hashing" }
-protobuf = { version = "1.4.1", features = ["with-bytes"] }
+protobuf = { version = "2.0.4", features = ["with-bytes"] }
