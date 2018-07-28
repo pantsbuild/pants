@@ -9,5 +9,5 @@ bazel_protos = { path = "../process_execution/bazel_protos" }
 bytes = "0.4.5"
 digest = "0.6.2"
 hashing = { path = "../hashing" }
-protobuf = { version = "1.4.1", features = ["with-bytes"] }
+protobuf = { version = "2.0.4", features = ["with-bytes"] }
 sha2 = "0.6.0"

@@ -9,9 +9,14 @@ import java.io.File
 
 import scala.compat.java8.OptionConverters._
 
+import sbt.internal.inc.text.TextAnalysisFormat
+
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
+
+import com.google.common.base.Charsets
+import com.google.common.io.Files
 
 import org.pantsbuild.zinc.analysis.{AnalysisMap, PortableAnalysisMappers}
 import org.pantsbuild.zinc.options.Parsed
@@ -26,6 +31,31 @@ object Main {
     val mapper = new ObjectMapper with ScalaObjectMapper
     mapper.registerModule(DefaultScalaModule)
     mapper
+  }
+
+  /**
+   * Write a summary of products and dependencies.
+   */
+  def summarize(summaryJson: File, extractor: Extractor) {
+    om.writeValue(
+      summaryJson,
+      Summary(
+        extractor.products,
+        extractor.dependencies
+      )
+    )
+  }
+
+  /**
+   * Dump a human readable debug form of the analysis to the given file.
+   */
+  def dump(debugDump: File, extractor: Extractor) {
+    val writer = Files.asCharSink(debugDump, Charsets.UTF_8).openBufferedStream()
+    try {
+      TextAnalysisFormat.write(writer, extractor.analysis.getAnalysis, extractor.analysis.getMiniSetup)
+    } finally {
+      writer.close()
+    }
   }
 
   def main(args: Array[String]): Unit = {
@@ -43,11 +73,6 @@ object Main {
       return
     }
 
-    val summaryJson =
-      settings.summaryJson.getOrElse {
-        throw new RuntimeException(s"An output file is required.")
-      }
-
     // Load relevant analysis.
     val analysisMap = AnalysisMap.create(settings.analysis)
     val analysis =
@@ -57,18 +82,18 @@ object Main {
         .getOrElse {
           throw new RuntimeException(s"Failed to load analysis from ${settings.analysis.cache}")
         }
-        .getAnalysis
 
-    // Extract products and dependencies.
     val extractor = new Extractor(settings.classpath, analysis, analysisMap)
 
-    om.writeValue(
-      summaryJson,
-      Summary(
-        extractor.products,
-        extractor.dependencies
-      )
-    )
+    (settings.summaryJson, settings.debugDump) match {
+      case (Some(summaryJson), None) =>
+        summarize(summaryJson, extractor)
+      case (None, Some(debugDump)) =>
+        dump(debugDump, extractor)
+      case (summaryJson, debugDump) =>
+        throw new RuntimeException(
+          s"Exactly one output mode was expected: got $summaryJson and $debugDump.")
+    }
   }
 }
 

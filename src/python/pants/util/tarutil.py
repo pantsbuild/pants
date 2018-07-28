@@ -7,14 +7,14 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import tarfile
 from builtins import str
 
-from future.utils import implements_iterator
 
-
-@implements_iterator
 class TarFile(tarfile.TarFile):
 
-  def __next__(self):
+  def next(self):
     """A copy and modification of the next() method in tarfile module.
+
+    Note: this function should stay named next(), not __next__(), to reflect CPython.
+    See https://github.com/python/cpython/blob/master/Lib/tarfile.py#L2255.
 
     The copy is from tarfile.py of CPython @102457:95df96aa2f5a
 

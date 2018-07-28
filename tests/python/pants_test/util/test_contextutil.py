@@ -35,7 +35,7 @@ class ContextutilTest(unittest.TestCase):
       pass
 
   def test_override_single_variable(self):
-    with temporary_file() as output:
+    with temporary_file(binary_mode=False) as output:
       # test that the override takes place
       with environment_as(HORK='BORK'):
         subprocess.Popen([sys.executable, '-c', 'import os; print(os.environ["HORK"])'],
@@ -44,14 +44,14 @@ class ContextutilTest(unittest.TestCase):
         self.assertEquals('BORK\n', output.read())
 
       # test that the variable is cleared
-      with temporary_file() as new_output:
+      with temporary_file(binary_mode=False) as new_output:
         subprocess.Popen([sys.executable, '-c', 'import os; print("HORK" in os.environ)'],
                          stdout=new_output).wait()
         new_output.seek(0)
         self.assertEquals('False\n', new_output.read())
 
   def test_environment_negation(self):
-    with temporary_file() as output:
+    with temporary_file(binary_mode=False) as output:
       with environment_as(HORK='BORK'):
         with environment_as(HORK=None):
           # test that the variable is cleared

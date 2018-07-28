@@ -21,7 +21,7 @@ from pants.backend.python.tasks.pex_build_util import resolve_multi
 from pants.base.exceptions import IncompatiblePlatformsError
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
-from pants.util.objects import Exactly, datatype
+from pants.util.objects import SubclassesOf, datatype
 from pants.util.strutil import create_path_env_var, safe_shlex_join
 
 
@@ -70,8 +70,8 @@ class PythonNativeCode(Subsystem):
   @memoized_property
   def _native_target_matchers(self):
     return {
-      Exactly(PythonDistribution): self.pydist_has_native_sources,
-      Exactly(NativeLibrary): self.native_target_has_native_sources,
+      SubclassesOf(PythonDistribution): self.pydist_has_native_sources,
+      SubclassesOf(NativeLibrary): self.native_target_has_native_sources,
     }
 
   def _any_targets_have_native_sources(self, targets):
@@ -104,7 +104,7 @@ class PythonNativeCode(Subsystem):
                                           '--platforms option or a pants.ini file.']
     return targets_by_platforms
 
-  _PYTHON_PLATFORM_TARGETS_CONSTRAINT = Exactly(PythonBinary, PythonDistribution)
+  _PYTHON_PLATFORM_TARGETS_CONSTRAINT = SubclassesOf(PythonBinary, PythonDistribution)
 
   def check_build_for_current_platform_only(self, targets):
     """

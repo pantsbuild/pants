@@ -268,12 +268,12 @@ class ExecuteProcessRequestTest(unittest.TestCase):
 class IsolatedProcessTest(TestBase, unittest.TestCase):
 
   @classmethod
-  def extra_rules(cls):
-    return create_cat_stdout_rules() + create_javac_compile_rules() + [
+  def rules(cls):
+    return super(IsolatedProcessTest, cls).rules() + [
       RootRule(JavacVersionExecutionRequest),
       process_request_from_javac_version,
       get_javac_version_output,
-    ]
+    ] + create_cat_stdout_rules() + create_javac_compile_rules()
 
   def test_integration_concat_with_snapshots_stdout(self):
 
