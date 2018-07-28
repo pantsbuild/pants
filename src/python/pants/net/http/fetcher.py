@@ -16,10 +16,11 @@ from contextlib import closing, contextmanager
 
 import requests
 import six
+from future.utils import PY3
 
 from pants.util.dirutil import safe_open
 from pants.util.meta import AbstractClass
-from pants.util.strutil import strip_prefix
+from pants.util.strutil import ensure_binary, strip_prefix
 
 
 class Fetcher(object):
@@ -111,6 +112,7 @@ class Fetcher(object):
       self._fh = fh
 
     def recv_chunk(self, data):
+      data = [ensure_binary(v) for v in data] if isinstance(data, list) else ensure_binary(data)
       self._fh.write(data)
 
   class ChecksumListener(Listener):
@@ -126,6 +128,7 @@ class Fetcher(object):
       self._checksum = None
 
     def recv_chunk(self, data):
+      data = [ensure_binary(v) for v in data] if isinstance(data, list) else ensure_binary(data)
       self.digest.update(data)
 
     def finished(self):
@@ -160,7 +163,7 @@ class Fetcher(object):
       if not isinstance(self._width, six.integer_types):
         raise ValueError('The width must be an integer, given {}'.format(self._width))
       self._chunk_size_bytes = chunk_size_bytes or 10 * 1024
-      self._stream = stream or sys.stderr
+      self._stream = stream or (sys.stderr.buffer if PY3 else sys.stderr)
       self._start = time.time()
 
     def status(self, code, content_length=None):
@@ -176,24 +179,26 @@ class Fetcher(object):
       self.read = 0
 
     def recv_chunk(self, data):
+      data = [str(num).encode('utf-8') for num in data] if isinstance(data, list) else str(data).encode('utf-8')
       self.read += len(data)
       chunk_count = int(self.read / self.chunk_size)
       if chunk_count > self.chunks:
         self.chunks = chunk_count
         if self.size:
-          self._stream.write('\r')
-          self._stream.write('{:3}% '.format(int(self.read * 1.0 / self.size * 100)))
-        self._stream.write('.' * self.chunks)
+          self._stream.write(b'\r')
+          self._stream.write('{:3}% '.format(int(self.read * 1.0 / self.size * 100)).encode('utf-8'))
+        self._stream.write(b'.' * self.chunks)
         if self.size:
           size_width = len(str(self.download_size))
           downloaded = int(self.read / 1024)
           self._stream.write('{} {} KB'.format(' ' * (self._width - self.chunks),
-                                               str(downloaded).rjust(size_width)))
+                                               str(downloaded).rjust(size_width))
+                             .encode('utf-8'))
         self._stream.flush()
 
     def finished(self):
       if self.chunks > 0:
-        self._stream.write(' {:.3f}s\n'.format(time.time() - self._start))
+        self._stream.write(' {:.3f}s\n'.format(time.time() - self._start).encode('utf-8'))
         self._stream.flush()
 
   def __init__(self, root_dir, requests_api=None):
@@ -374,7 +379,7 @@ class Fetcher(object):
         if not _path_or_fd:
           fd, _path_or_fd = tempfile.mkstemp()
           os.close(fd)
-        with safe_open(_path_or_fd, 'w') as fp:
+        with safe_open(_path_or_fd, 'wb') as fp:
           yield fp, _path_or_fd
 
     with download_fp(path_or_fd) as (fp, path):

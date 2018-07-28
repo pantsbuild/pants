@@ -12,7 +12,7 @@ import unittest
 from builtins import str
 from contextlib import closing, contextmanager
 from functools import reduce
-from io import StringIO
+from io import BytesIO
 from threading import Thread
 
 import mock
@@ -43,7 +43,7 @@ class FetcherTest(unittest.TestCase):
     self.assertEqual(expected_listener_calls, self.listener.method_calls)
 
   def assert_local_file_fetch(self, url_prefix=''):
-    chunks = ['0123456789', 'a']
+    chunks = [b'0123456789', b'a']
     with temporary_file() as fp:
       for chunk in chunks:
         fp.write(chunk)
@@ -96,7 +96,7 @@ class FetcherTest(unittest.TestCase):
 
   @contextmanager
   def expect_get(self, url, chunk_size_bytes, timeout_secs, chunks=None, listener=True):
-    chunks = chunks or ['0123456789', 'a']
+    chunks = chunks or [b'0123456789', b'a']
     size = sum(len(c) for c in chunks)
 
     self.requests.get.return_value = self.response
@@ -150,14 +150,14 @@ class FetcherTest(unittest.TestCase):
     self.response.close.assert_called_once_with()
 
   def concat_chunks(self, chunks):
-    return reduce(lambda acc, c: acc + c, chunks, '')
+    return reduce(lambda acc, c: acc + c, chunks, b'')
 
   def test_download_listener(self):
     with self.expect_get('http://foo',
                          chunk_size_bytes=1048576,
                          timeout_secs=3600) as (chunks, expected_listener_calls):
 
-      with closing(StringIO()) as fp:
+      with closing(BytesIO()) as fp:
         self.fetcher.fetch('http://foo',
                            Fetcher.DownloadListener(fp).wrap(self.listener),
                            chunk_size_bytes=1024 * 1024,
@@ -266,7 +266,7 @@ class FetcherTest(unittest.TestCase):
   def test_download(self):
     downloaded, path = self.expect_download()
     try:
-      with open(path) as fp:
+      with open(path, 'rb') as fp:
         self.assertEqual(downloaded, fp.read())
     finally:
       os.unlink(path)
@@ -276,7 +276,7 @@ class FetcherTest(unittest.TestCase):
       downloaded, path = self.expect_download(path_or_fd=fd)
       self.assertEqual(path, fd.name)
       fd.close()
-      with open(path) as fp:
+      with open(path, 'rb') as fp:
         self.assertEqual(downloaded, fp.read())
 
   def test_download_path(self):
@@ -284,14 +284,14 @@ class FetcherTest(unittest.TestCase):
       fd.close()
       downloaded, path = self.expect_download(path_or_fd=fd.name)
       self.assertEqual(path, fd.name)
-      with open(path) as fp:
+      with open(path, 'rb') as fp:
         self.assertEqual(downloaded, fp.read())
 
   @mock.patch('time.time')
   def test_progress_listener(self, timer):
     timer.side_effect = [0, 1.137]
 
-    stream = StringIO()
+    stream = BytesIO()
     progress_listener = Fetcher.ProgressListener(width=5, chunk_size_bytes=1, stream=stream)
 
     with self.expect_get('http://baz',
@@ -308,7 +308,7 @@ class FetcherTest(unittest.TestCase):
 
     # We just test the last progress line which should indicate a 100% complete download.
     # We control progress bar width (5 dots), size (1KB) and total time downloading (fake 1.137s).
-    self.assertEqual('100% ..... 1 KB 1.137s\n', stream.getvalue().split('\r')[-1])
+    self.assertEqual('100% ..... 1 KB 1.137s\n', stream.getvalue().decode('utf-8').split('\r')[-1])
 
 
 class FetcherRedirectTest(unittest.TestCase):
@@ -334,11 +334,12 @@ class FetcherRedirectTest(unittest.TestCase):
         redirect_url = '{}/url1'.format(FetcherRedirectTest._URL)
         self.send_header('Location',redirect_url)
         self.end_headers()
-        self.wfile.write('\nredirecting you to {}'.format(redirect_url))
+        self.wfile.write('redirecting you to {}'.format(redirect_url).encode('utf-8'))
         FetcherRedirectTest._URL2_ACCESSED = True
       elif self.path.endswith('url1'):
         self.send_response(200)
-        self.wfile.write('\nreturned from redirect')
+        self.end_headers()
+        self.wfile.write(b'returned from redirect')
         FetcherRedirectTest._URL1_ACCESSED = True
       else:
         self.send_response(404)
@@ -378,4 +379,4 @@ class FetcherRedirectTest(unittest.TestCase):
       self.assertTrue(self._URL1_ACCESSED)
 
       with open(path) as fp:
-        self.assertEqual('returned from redirect\r\n', fp.read())
+        self.assertIn(fp.read(), ['returned from redirect\n', 'returned from redirect\r\n'])
