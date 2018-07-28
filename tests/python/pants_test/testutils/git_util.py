@@ -22,7 +22,7 @@ def git_version():
   (stdout, stderr) = process.communicate()
   assert process.returncode == 0, "Failed to determine git version."
   # stdout is like 'git version 1.9.1.598.g9119e8b\n'  We want '1.9.1.598'
-  matches = re.search(r'\s(\d+(?:\.\d+)*)[\s\.]', stdout)
+  matches = re.search(r'\s(\d+(?:\.\d+)*)[\s\.]', stdout.decode('utf-8'))
   return Revision.lenient(matches.group(1))
 
 

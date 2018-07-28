@@ -67,7 +67,7 @@ class GitTest(unittest.TestCase):
       subprocess.check_call(['git', 'push', '--tags', 'depot', 'master'])
       subprocess.check_call(['git', 'branch', '--set-upstream-to', 'depot/master'])
 
-      with safe_open(self.readme_file, 'w') as readme:
+      with safe_open(self.readme_file, 'wb') as readme:
         readme.write('Hello World.\u2764'.encode('utf-8'))
       subprocess.check_call(['git', 'commit', '-am', 'Update README.'])
 
@@ -105,29 +105,29 @@ class GitTest(unittest.TestCase):
 
     for dirname in '.', './.':
       results = reader.listdir(dirname)
-      self.assertEquals(['README',
-                         'dir',
-                         'link-to-dir',
-                         'loop1',
-                         'loop2',
-                         'not-a-dir'],
+      self.assertEquals([b'README',
+                         b'dir',
+                         b'link-to-dir',
+                         b'loop1',
+                         b'loop2',
+                         b'not-a-dir'],
                         sorted(results))
 
     for dirname in 'dir', './dir':
       results = reader.listdir(dirname)
-      self.assertEquals(['f',
+      self.assertEquals([b'f',
                          'not-absolute\u2764'.encode('utf-8'),
-                         'relative-dotdot',
-                         'relative-nonexistent',
-                         'relative-symlink'],
+                         b'relative-dotdot',
+                         b'relative-nonexistent',
+                         b'relative-symlink'],
                         sorted(results))
 
     results = reader.listdir('link-to-dir')
-    self.assertEquals(['f',
+    self.assertEquals([b'f',
                        'not-absolute\u2764'.encode('utf-8'),
-                       'relative-dotdot',
-                       'relative-nonexistent',
-                       'relative-symlink'],
+                       b'relative-dotdot',
+                       b'relative-nonexistent',
+                       b'relative-symlink'],
                       sorted(results))
 
     with self.assertRaises(reader.MissingFileException):
@@ -158,14 +158,14 @@ class GitTest(unittest.TestCase):
     reader = self.git.repo_reader(self.initial_rev)
 
     with reader.open('README') as f:
-      self.assertEquals('', f.read())
+      self.assertEquals(b'', f.read())
 
     with reader.open('dir/f') as f:
-      self.assertEquals('file in subdir', f.read())
+      self.assertEquals(b'file in subdir', f.read())
 
     with self.assertRaises(reader.MissingFileException):
       with reader.open('no-such-file') as f:
-        self.assertEquals('', f.read())
+        self.assertEquals(b'', f.read())
 
     with self.assertRaises(reader.MissingFileException):
       with reader.open('dir/no-such-file') as f:
@@ -173,7 +173,7 @@ class GitTest(unittest.TestCase):
 
     with self.assertRaises(reader.IsDirException):
       with reader.open('dir') as f:
-        self.assertEquals('', f.read())
+        self.assertEquals(b'', f.read())
 
     current_reader = self.git.repo_reader(self.current_rev)
 
@@ -181,10 +181,10 @@ class GitTest(unittest.TestCase):
       self.assertEquals('Hello World.\u2764'.encode('utf-8'), f.read())
 
     with current_reader.open('link-to-dir/f') as f:
-      self.assertEquals('file in subdir', f.read())
+      self.assertEquals(b'file in subdir', f.read())
 
     with current_reader.open('dir/relative-symlink') as f:
-      self.assertEquals('file in subdir', f.read())
+      self.assertEquals(b'file in subdir', f.read())
 
     with self.assertRaises(current_reader.SymlinkLoopException):
       with current_reader.open('loop1') as f:
@@ -432,7 +432,7 @@ class GitTest(unittest.TestCase):
 
       # Prove our non-utf-8 encodings were stored in the commit metadata.
       log = subprocess.check_output(['git', 'log', '--format=%e'])
-      self.assertEqual(['us-ascii', 'latin1', 'iso-8859-1'], [_f for _f in log.strip().splitlines() if _f])
+      self.assertEqual([b'us-ascii', b'latin1', b'iso-8859-1'], [_f for _f in log.strip().splitlines() if _f])
 
       # And show that the git log successfully transcodes all the commits none-the-less to utf-8
       changelog = self.git.changelog()

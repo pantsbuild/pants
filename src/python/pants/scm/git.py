@@ -4,18 +4,19 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import binascii
 import io
 import logging
 import os
 import traceback
-from builtins import object
+from builtins import bytes, object
 from contextlib import contextmanager
 
 from pants.scm.scm import Scm
 from pants.util.contextutil import pushd
 from pants.util.memo import memoized_method
 from pants.util.process_handler import subprocess
-from pants.util.strutil import ensure_binary
+from pants.util.strutil import ensure_binary, ensure_text
 
 
 # 40 is Linux's hard-coded limit for total symlinks followed when resolving a path.
@@ -148,7 +149,7 @@ class Git(Scm):
     # Calls to git describe can have bad performance on large repos.  Be aware
     # of the performance hit if you use this property.
     tag = self._check_output(['describe', '--tags', '--always'], raise_type=Scm.LocalException)
-    return None if b'cannot' in tag else tag
+    return None if 'cannot' in tag else tag
 
   @property
   def branch_name(self):
@@ -468,10 +469,10 @@ class GitRepositoryReader(object):
       return
 
     object_type, data = self._read_object_from_repo(rev=self.rev, relpath=path)
-    if object_type == 'tree':
+    if object_type == b'tree':
       raise self.IsDirException(self.rev, relpath)
-    assert object_type == 'blob'
-    yield io.BytesIO(data)
+    assert object_type == b'blob'
+    yield io.BytesIO(b''.join(data))
 
   @memoized_method
   def _realpath(self, relpath):
@@ -505,7 +506,7 @@ class GitRepositoryReader(object):
       path_so_far += component
 
       try:
-        obj = parent_tree[component]
+        obj = parent_tree[component.encode('utf-8')]
       except KeyError:
         raise self.MissingFileException(self.rev, relpath)
 
@@ -526,20 +527,21 @@ class GitRepositoryReader(object):
         # A git symlink is stored as a blob containing the name of the target.
         # Read that blob.
         object_type, path_data = self._read_object_from_repo(sha=obj.sha)
-        assert object_type == 'blob'
+        assert object_type == b'blob'
 
-        if path_data[0] == '/':
+        if path_data[0] == b'/':
           # Is absolute, thus likely points outside the repo.
           raise self.ExternalSymlinkException(self.rev, relpath)
 
-        link_to = os.path.normpath(os.path.join(parent_path, path_data))
+        path_data_unicode = ''.join(v.decode('utf-8') for v in path_data)
+        link_to = os.path.normpath(os.path.join(parent_path, path_data_unicode))
         if link_to.startswith('../') or link_to[0] == '/':
           # Points outside the repo.
           raise self.ExternalSymlinkException(self.rev, relpath)
 
         # Restart our search at the top with the new path.
         # Git stores symlinks in terms of Unix paths, so split on '/' instead of os.path.sep
-        components = link_to.split(SLASH) + components
+        components = link_to.split(SLASH.decode('utf-8')) + components
         path_so_far = ''
       else:
         # Programmer error
@@ -567,27 +569,28 @@ class GitRepositoryReader(object):
       return tree
     tree = {}
     object_type, tree_data = self._read_object_from_repo(rev=self.rev, relpath=path)
-    assert object_type == 'tree'
+    assert object_type == b'tree'
     # The tree data here is (mode ' ' filename \0 20-byte-sha)*
     i = 0
     while i < len(tree_data):
       start = i
-      while tree_data[i] != ' ':
+      while tree_data[i] != b' ':
         i += 1
-      mode = tree_data[start:i]
+      mode = b''.join(tree_data[start:i])
       i += 1  # skip space
       start = i
       while tree_data[i] != NUL:
         i += 1
-      name = tree_data[start:i]
-      sha = tree_data[i + 1:i + 1 + GIT_HASH_LENGTH].encode('hex')
+      name = b''.join(tree_data[start:i])
+      sha = b''.join(tree_data[i + 1:i + 1 + GIT_HASH_LENGTH])
+      sha_hex = binascii.hexlify(sha)
       i += 1 + GIT_HASH_LENGTH
-      if mode == '120000':
-        tree[name] = self.Symlink(name, sha)
-      elif mode == '40000':
-        tree[name] = self.Dir(name, sha)
+      if mode == b'120000':
+        tree[name] = self.Symlink(name, sha_hex)
+      elif mode == b'40000':
+        tree[name] = self.Dir(name, sha_hex)
       else:
-        tree[name] = self.File(name, sha)
+        tree[name] = self.File(name, sha_hex)
     self._trees[path] = tree
     return tree
 
@@ -596,12 +599,14 @@ class GitRepositoryReader(object):
     This is implemented via a pipe to git cat-file --batch
     """
     if sha:
-      spec = sha + '\n'
+      spec = sha + b'\n'
     else:
       assert rev is not None
       assert relpath is not None
+      rev = ensure_text(rev)
+      relpath = ensure_text(relpath)
       relpath = self._fixup_dot_relative(relpath)
-      spec = '{}:{}\n'.format(rev, relpath)
+      spec = '{}:{}\n'.format(rev, relpath).encode('utf-8')
 
     self._maybe_start_cat_file_process()
     self._cat_file_process.stdin.write(spec)
@@ -615,16 +620,17 @@ class GitRepositoryReader(object):
     header = header.rstrip()
     parts = header.rsplit(SPACE, 2)
     if len(parts) == 2:
-      assert parts[1] == 'missing'
+      assert parts[1] == b'missing'
       raise self.MissingFileException(rev, relpath)
 
     _, object_type, object_len = parts
 
     # Read the object data
     blob = self._cat_file_process.stdout.read(int(object_len))
+    blob = [bytes([b]) for b in bytes(blob)]
 
     # Read the trailing newline
-    assert self._cat_file_process.stdout.read(1) == '\n'
+    assert self._cat_file_process.stdout.read(1) == b'\n'
     assert len(blob) == int(object_len)
     return object_type, blob
 
