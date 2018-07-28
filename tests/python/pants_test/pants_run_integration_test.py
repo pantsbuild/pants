@@ -274,7 +274,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       env['PANTS_PROFILE'] = prof
       # Make a note the subprocess command, so the user can correctly interpret the profile files.
       with open('{}.cmd'.format(prof), 'w') as fp:
-        fp.write(b' '.join(pants_command))
+        fp.write(' '.join(pants_command))
 
     return pants_command, subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
       stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
