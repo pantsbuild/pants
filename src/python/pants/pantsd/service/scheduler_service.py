@@ -57,6 +57,8 @@ class SchedulerService(PantsService):
     self._watchman_is_running = threading.Event()
     self._invalidating_files = set()
 
+    self._loop_condition = LoopCondition()
+
   @staticmethod
   def _combined_invalidating_fileset_from_globs(glob_strs, root):
     return set.union(*(Fileset.globs(glob_str, root=root)() for glob_str in glob_strs))
@@ -116,11 +118,12 @@ class SchedulerService(PantsService):
   def _handle_batch_event(self, files):
     self._logger.debug('handling change event for: %s', files)
 
-    with self.lifecycle_lock:
-      self._maybe_invalidate_scheduler_batch(files)
+    self._maybe_invalidate_scheduler_batch(files)
 
     with self.fork_lock:
-      self._scheduler.invalidate_files(files)
+      invalidated = self._scheduler.invalidate_files(files)
+      if invalidated:
+        self._loop_condition.notify_all()
 
   def _process_event_queue(self):
     """File event notification queue processor."""
@@ -172,6 +175,23 @@ class SchedulerService(PantsService):
       self._watchman_is_running.wait()
 
     session = self._graph_helper.new_session()
+    if options.for_global_scope().loop:
+      return session, self._prefork_loop(session, options)
+    else:
+      return session, self._prefork_body(session, options)
+
+  def _prefork_loop(self, session, options):
+    iterations = options.for_global_scope().loop_max
+    target_roots = None
+    while iterations and not self.is_killed:
+      target_roots = self._prefork_body(session, options)
+
+      iterations -= 1
+      while iterations and not self.is_killed and not self._loop_condition.wait(timeout=1):
+        continue
+    return target_roots
+
+  def _prefork_body(self, session, options):
     with self.fork_lock:
       global_options = options.for_global_scope()
       target_roots = TargetRootsCalculator.create(
@@ -192,9 +212,38 @@ class SchedulerService(PantsService):
         # N.B. @console_rules run pre-fork in order to cache the products they request during execution.
         session.run_console_rules(options.goals, target_roots)
 
-      return session, target_roots
+      return target_roots
 
   def run(self):
     """Main service entrypoint."""
     while not self.is_killed:
       self._process_event_queue()
+
+
+class LoopCondition(object):
+  """A wrapped condition variable to handle deciding when loop consumers should re-run.
+
+  Any number of threads may wait and/or notify the condition.
+  """
+
+  def __init__(self):
+    super(LoopCondition, self).__init__()
+    self._condition = threading.Condition(threading.Lock())
+    self._iteration = 0
+
+  def notify_all(self):
+    """Notifies all threads waiting for the condition."""
+    with self._condition:
+      self._iteration += 1
+      self._condition.notify_all()
+
+  def wait(self, timeout):
+    """Waits for the condition for at most the given timeout and returns True if the condition triggered.
+
+    Generally called in a loop until the condition triggers.
+    """
+
+    with self._condition:
+      previous_iteration = self._iteration
+      self._condition.wait(timeout)
+      return previous_iteration != self._iteration

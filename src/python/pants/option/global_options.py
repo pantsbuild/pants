@@ -125,6 +125,12 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('-q', '--quiet', type=bool, recursive=True, daemon=False,
              help='Squelches most console output. NOTE: Some tasks default to behaving quietly: '
                   'inverting this option supports making them noisier than they would be otherwise.')
+
+    register('--loop', type=bool, daemon=True,
+             help='Run continuously as file changes are detected.')
+    register('--loop-max', type=int, default=2**32, daemon=True, advanced=True,
+             help='The maximum number of times to loop.')
+
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
     register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True, daemon=False,
