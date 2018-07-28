@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import queue
+import sys
 import threading
 from builtins import open
 
@@ -184,7 +185,11 @@ class SchedulerService(PantsService):
     iterations = options.for_global_scope().loop_max
     target_roots = None
     while iterations and not self.is_killed:
-      target_roots = self._prefork_body(session, options)
+      try:
+        target_roots = self._prefork_body(session, options)
+      except session.scheduler_session.execution_error_type as e:
+        # Render retryable exceptions raised by the Scheduler.
+        print(e, file=sys.stderr)
 
       iterations -= 1
       while iterations and not self.is_killed and not self._loop_condition.wait(timeout=1):

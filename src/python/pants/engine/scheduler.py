@@ -25,6 +25,7 @@ from pants.engine.struct import HasProducts, Variants
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
 from pants.util.objects import Collection, SubclassesOf, datatype
+from pants.util.strutil import pluralize
 
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,7 @@ class ExecutionResult(datatype(['error', 'root_products'])):
 
 
 class ExecutionError(Exception):
-  def __init__(self, message, wrapped_exceptions):
+  def __init__(self, message, wrapped_exceptions=None):
     super(ExecutionError, self).__init__(message)
     self.wrapped_exceptions = wrapped_exceptions or ()
 
@@ -403,6 +404,8 @@ class SchedulerSession(object):
   a Session.
   """
 
+  execution_error_type = ExecutionError
+
   def __init__(self, scheduler, session):
     self._scheduler = scheduler
     self._session = session
@@ -541,19 +544,18 @@ class SchedulerSession(object):
     throw_root_states = tuple(state for root, state in result.root_products if type(state) is Throw)
     if throw_root_states:
       unique_exceptions = tuple(set(t.exc for t in throw_root_states))
+      exception_noun = pluralize(len(unique_exceptions), 'Exception')
 
       if self._scheduler.include_trace_on_error:
         cumulative_trace = '\n'.join(self.trace(request))
         raise ExecutionError(
-          'Received unexpected Throw state(s):\n{}'.format(cumulative_trace),
+          '{} encountered:\n{}'.format(exception_noun, cumulative_trace),
           unique_exceptions,
         )
-
-      if len(unique_exceptions) == 1:
-        raise throw_root_states[0].exc
       else:
         raise ExecutionError(
-          'Multiple exceptions encountered:\n  {}'.format(
+          '{} encountered:\n  {}'.format(
+            exception_noun,
             '\n  '.join('{}: {}'.format(type(t).__name__, str(t)) for t in unique_exceptions)),
           unique_exceptions
         )

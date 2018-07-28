@@ -168,20 +168,20 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'goal_ma
     """
     return target_roots.specs or []
 
-  def _execute(self, *args, **kwargs):
-    request = self.scheduler_session.execution_request(*args, **kwargs)
-    result = self.scheduler_session.execute(request)
-    if result.error:
-      raise result.error
-
   def warm_product_graph(self, target_roots):
     """Warm the scheduler's `ProductGraph` with `TransitiveHydratedTargets` products.
+
+    This method raises only fatal errors, and does not cosider failed roots: in the v1 codepath,
+    failed roots are accounted for post-fork.
 
     :param TargetRoots target_roots: The targets root of the request.
     """
     logger.debug('warming target_roots for: %r', target_roots)
     subjects = self._determine_subjects(target_roots)
-    self._execute([TransitiveHydratedTargets], subjects)
+    request = self.scheduler_session.execution_request([TransitiveHydratedTargets], subjects)
+    result = self.scheduler_session.execute(request)
+    if result.error:
+      raise result.error
 
   def validate_goals(self, goals):
     """Checks for @console_rules that satisfy requested goals.
@@ -195,6 +195,8 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'goal_ma
   def run_console_rules(self, goals, target_roots):
     """Runs @console_rules sequentially and interactively by requesting their implicit Goal products.
 
+    For retryable failures, raises scheduler.ExecutionError.
+
     :param list goals: The list of requested goal names as passed on the commandline.
     :param TargetRoots target_roots: The targets root of the request.
     """
@@ -204,7 +206,7 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'goal_ma
     for goal in goals:
       goal_product = self.goal_map[goal]
       logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
-      self._execute([goal_product], subjects)
+      self.scheduler_session.product_request(goal_product, subjects)
 
   def create_build_graph(self, target_roots, build_root=None):
     """Construct and return a `BuildGraph` given a set of input specs.
