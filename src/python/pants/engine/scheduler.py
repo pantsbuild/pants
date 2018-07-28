@@ -107,7 +107,7 @@ class Scheduler(object):
 
     # Validate and register all provided and intrinsic tasks.
     rule_index = RuleIndex.create(list(rules))
-    self._root_subject_types = sorted(rule_index.roots)
+    self._root_subject_types = sorted(rule_index.roots, key=repr)
 
     # Create the native Scheduler and Session.
     # TODO: This `_tasks` reference could be a local variable, since it is not used
@@ -155,7 +155,7 @@ class Scheduler(object):
       self._assert_ruleset_valid()
 
   def _root_type_ids(self):
-    return self._to_ids_buf(sorted(self._root_subject_types))
+    return self._to_ids_buf(sorted(self._root_subject_types, key=repr))
 
   def graph_trace(self, execution_request):
     with temporary_file_path() as path:
