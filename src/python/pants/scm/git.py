@@ -541,7 +541,7 @@ class GitRepositoryReader(object):
 
         # Restart our search at the top with the new path.
         # Git stores symlinks in terms of Unix paths, so split on '/' instead of os.path.sep
-        components = link_to.split(SLASH.decode('utf-8')) + components
+        components = link_to.split('/') + components
         path_so_far = ''
       else:
         # Programmer error
