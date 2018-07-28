@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
+import functools
 import inspect
 import logging
 from abc import abstractproperty
@@ -41,7 +42,7 @@ class GoalProduct(object):
     product_type_name = '{}GoalExecution'.format(name.capitalize())
     if PY2:
       product_type_name = product_type_name.encode('utf-8')
-    return type(product_type_name, (datatype(['result']),), {})
+    return type(product_type_name, (datatype([]),), {})
 
   @classmethod
   def for_name(cls, name):
@@ -85,10 +86,21 @@ def _make_rule(output_type, input_selectors, for_goal=None):
         rule_visitor.visit(node)
         gets.update(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
 
-    func._rule = TaskRule(output_type, input_selectors, func, input_gets=list(gets))
-    func.output_type = output_type
-    func.goal = for_goal
-    return func
+    # For @console_rule, redefine the function to avoid needing a literal return of the output type.
+    if for_goal:
+      def goal_and_return(*args, **kwargs):
+        func(*args, **kwargs)
+        return output_type()
+      functools.update_wrapper(goal_and_return, func)
+      wrapped_func = goal_and_return
+    else:
+      wrapped_func = func
+
+    wrapped_func._rule = TaskRule(output_type, input_selectors, wrapped_func, input_gets=list(gets))
+    wrapped_func.output_type = output_type
+    wrapped_func.goal = for_goal
+
+    return wrapped_func
   return wrapper
 
 
