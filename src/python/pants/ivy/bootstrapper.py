@@ -107,10 +107,10 @@ class Bootstrapper(object):
                                      'tools', 'jvm', 'ivy')
     digest = hashlib.sha1()
     if os.path.isfile(self._version_or_ivyxml):
-      with open(self._version_or_ivyxml) as fp:
+      with open(self._version_or_ivyxml, 'rb') as fp:
         digest.update(fp.read())
     else:
-      digest.update(self._version_or_ivyxml)
+      digest.update(self._version_or_ivyxml.encode('utf-8'))
     classpath = os.path.join(ivy_bootstrap_dir, '{}.classpath'.format(digest.hexdigest()))
 
     if not os.path.exists(classpath):
