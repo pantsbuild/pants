@@ -14,6 +14,8 @@ from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
 
+from future.utils import PY2
+
 from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -303,11 +305,13 @@ class BaseTest(unittest.TestCase):
       # If task is expected to inherit goal-level options, register those directly on the task,
       # by subclassing the goal options registrar and settings its scope to the task scope.
       if issubclass(task_type, GoalOptionsMixin):
-        subclass_name = b'test_{}_{}_{}'.format(
+        subclass_name = 'test_{}_{}_{}'.format(
           task_type.__name__, task_type.goal_options_registrar_cls.options_scope,
           task_type.options_scope)
+        if PY2:
+          subclass_name = subclass_name.encode('utf-8')
         optionables.add(type(subclass_name, (task_type.goal_options_registrar_cls, ),
-                             {b'options_scope': task_type.options_scope}))
+                             {'options_scope': task_type.options_scope}))
 
     # Now expand to all deps.
     all_optionables = set()
