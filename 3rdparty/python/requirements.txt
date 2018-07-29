@@ -1,5 +1,5 @@
 ansicolors==1.0.2
-beautifulsoup4>=4.3.2,<4.4
+beautifulsoup4>=4.6.0,<4.7
 cffi==1.11.1
 configparser==3.5.0
 contextlib2==0.5.5

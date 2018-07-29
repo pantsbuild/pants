@@ -140,7 +140,7 @@ class ProjectTree(AbstractClass):
       matched_dirs = self.ignore.match_files([os.path.join(root, "{}/".format(d)) for d in dirs])
       matched_files = self.ignore.match_files([os.path.join(root, f) for f in files])
       for matched_dir in matched_dirs:
-        dirs.remove(fast_relpath(matched_dir, root).rstrip(b'/'))
+        dirs.remove(fast_relpath(matched_dir, root).rstrip('/'))
 
       for matched_file in matched_files:
         files.remove(fast_relpath(matched_file, root))
@@ -180,7 +180,7 @@ class ProjectTree(AbstractClass):
     return [entry for path, entry in prefixed_entries if path not in ignored_paths]
 
   def _relpath_no_dot(self, relpath):
-    return relpath.lstrip(b'./') if relpath != b'.' else b''
+    return relpath.lstrip('./') if relpath != '.' else ''
 
   def _raise_access_ignored(self, relpath):
     """Raises exception when accessing ignored path."""
@@ -188,7 +188,7 @@ class ProjectTree(AbstractClass):
 
   def _append_trailing_slash(self, relpath):
     """Add a trailing slash if not already has one."""
-    return relpath if relpath.endswith(b'/') or len(relpath) == 0 else relpath + b'/'
+    return relpath if relpath.endswith('/') or len(relpath) == 0 else relpath + '/'
 
   def _append_slash_if_dir_path(self, relpath):
     """For a dir path return a path that has a trailing slash."""

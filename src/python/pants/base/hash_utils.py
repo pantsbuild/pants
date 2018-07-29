@@ -8,6 +8,8 @@ import hashlib
 import json
 from builtins import object
 
+from pants.util.strutil import ensure_binary
+
 
 def hash_all(strs, digest=None):
   """Returns a hash of the concatenation of all the strings in strs.
@@ -16,6 +18,7 @@ def hash_all(strs, digest=None):
   """
   digest = digest or hashlib.sha1()
   for s in strs:
+    s = ensure_binary(s)
     digest.update(s)
   return digest.hexdigest()
 
