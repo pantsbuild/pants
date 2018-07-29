@@ -252,8 +252,8 @@ class SetupPyExecutionEnvironment(datatype([
       # FIXME: distutils will use CFLAGS to populate LDFLAGS and CXXFLAGS as well if specified --
       # this probably requires a workaround as discused in #5661.
       ret['CFLAGS'] = safe_shlex_join(plat.resolve_platform_specific({
-        'darwin': lambda: [MIN_OSX_VERSION_ARG],
-        'linux': lambda: [],
+        'darwin': lambda: [MIN_OSX_VERSION_ARG, '-nobuiltininc', '-nostdinc', '-nostdinc++'],
+        'linux': lambda: ['-nostdinc', '-nostdinc++'],
       }))
       # ret['CFLAGS'] = safe_shlex_join(c_compiler.extra_args)
       # ret['CXXFLAGS'] = safe_shlex_join(cpp_compiler.extra_args)

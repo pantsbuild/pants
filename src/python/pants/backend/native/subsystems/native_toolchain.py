@@ -323,7 +323,7 @@ def select_llvm_c_toolchain(platform, native_toolchain):
       path_entries=(provided_clang.path_entries + xcode_clang.path_entries),
       runtime_library_dirs=(provided_clang.runtime_library_dirs + xcode_clang.runtime_library_dirs),
       include_dirs=(provided_clang.include_dirs + xcode_clang.include_dirs),
-      extra_args=(provided_clang.extra_args + llvm_c_compiler_args + xcode_clang.extra_args))
+      extra_args=(llvm_c_compiler_args + xcode_clang.extra_args + ['-nobuiltininc']))
   else:
     gcc_install = yield Get(GCCInstallLocationForLLVM, GCC, native_toolchain._gcc)
     provided_gcc = yield Get(CCompiler, GCC, native_toolchain._gcc)
@@ -372,7 +372,7 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
       include_dirs=(provided_clangpp.include_dirs + xcode_clang.include_dirs),
       # On OSX, this uses the libc++ (LLVM) C++ standard library implementation. This is
       # feature-complete for OSX, but not for Linux (see https://libcxx.llvm.org/ for more info).
-      extra_args=(llvm_cpp_compiler_args + provided_clangpp.extra_args + xcode_clang.extra_args))
+      extra_args=(llvm_cpp_compiler_args + xcode_clang.extra_args + ['-nobuiltininc']))
     linking_library_dirs = []
     linker_extra_args = []
   else:
