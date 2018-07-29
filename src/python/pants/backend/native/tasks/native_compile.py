@@ -225,7 +225,7 @@ class NativeCompile(NativeTask, AbstractClass):
     buildroot = get_buildroot()
     argv = (
       [compiler.exe_filename] +
-      compiler.extra_args +
+      list(compiler.extra_args) +
       err_flags +
       ['-c', '-fPIC'] +
       [

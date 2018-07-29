@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import logging
 import os
 from builtins import str
 from collections import defaultdict
@@ -23,6 +24,9 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.objects import SubclassesOf, datatype
 from pants.util.strutil import create_path_env_var, safe_shlex_join
+
+
+logger = logging.getLogger(__name__)
 
 
 class PythonNativeCode(Subsystem):
@@ -242,22 +246,19 @@ class SetupPyExecutionEnvironment(datatype([
       all_linking_library_dirs = (c_linker.linking_library_dirs + cpp_linker.linking_library_dirs)
       ret['LIBRARY_PATH'] = create_path_env_var(all_linking_library_dirs)
 
-      all_include_dirs = cpp_compiler.include_dirs + c_compiler.include_dirs
-      ret['CPATH'] = create_path_env_var(all_include_dirs)
+      ret['CPATH'] = create_path_env_var(c_compiler.include_dirs)
+      ret['CPLUS_INCLUDE_PATH'] = create_path_env_var(cpp_compiler.include_dirs)
 
-      shared_compile_flags = safe_shlex_join(plat.resolve_platform_specific({
-        'darwin': lambda: [MIN_OSX_VERSION_ARG],
-        'linux': lambda: [],
-      }))
-      ret['CFLAGS'] = shared_compile_flags
-      ret['CXXFLAGS'] = shared_compile_flags
+      ret['CFLAGS'] = safe_shlex_join(c_compiler.extra_args)
+      ret['CXXFLAGS'] = safe_shlex_join(cpp_compiler.extra_args)
 
       ret['CC'] = c_compiler.exe_filename
       ret['CXX'] = cpp_compiler.exe_filename
       ret['LDSHARED'] = cpp_linker.exe_filename
 
-      all_new_ldflags = cpp_linker.extra_args + plat.resolve_platform_specific(
+      all_new_ldflags = list(cpp_linker.extra_args) + plat.resolve_platform_specific(
         self._SHARED_CMDLINE_ARGS)
+      logger.debug("all_new_ldflags: {}".format(all_new_ldflags))
       ret['LDFLAGS'] = safe_shlex_join(all_new_ldflags)
 
     return ret

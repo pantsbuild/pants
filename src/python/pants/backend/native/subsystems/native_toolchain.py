@@ -4,20 +4,30 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.native.config.environment import (Assembler, CCompiler, CppCompiler,
-                                                     CppToolchain, CToolchain, GCCCppToolchain,
-                                                     GCCCToolchain, Linker, LLVMCppToolchain,
-                                                     LLVMCToolchain, Platform)
+import logging
+import os
+import re
+
+from twitter.common.collections import OrderedSet
+
+from pants.backend.native.config.environment import (Assembler, CCompiler, CompilerMixin,
+                                                     CppCompiler, CppToolchain, CToolchain,
+                                                     GCCCppToolchain, GCCCToolchain, Linker,
+                                                     LLVMCppToolchain, LLVMCToolchain, Platform)
 from pants.backend.native.subsystems.binaries.binutils import Binutils
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
-from pants.backend.native.subsystems.libc_dev import LibcDev
 from pants.backend.native.subsystems.xcode_cli_tools import XCodeCLITools
+from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
 from pants.subsystem.subsystem import Subsystem
+from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_property
-from pants.util.objects import datatype
+from pants.util.objects import SubclassesOf, datatype
+
+
+logger = logging.getLogger(__name__)
 
 
 class NativeToolchain(Subsystem):
@@ -39,7 +49,6 @@ class NativeToolchain(Subsystem):
     return super(NativeToolchain, cls).subsystem_dependencies() + (
       Binutils.scoped(cls),
       GCC.scoped(cls),
-      LibcDev.scoped(cls),
       LLVM.scoped(cls),
       XCodeCLITools.scoped(cls),
     )
@@ -60,14 +69,159 @@ class NativeToolchain(Subsystem):
   def _xcode_cli_tools(self):
     return XCodeCLITools.scoped_instance(self)
 
-  @memoized_property
-  def _libc_dev(self):
-    return LibcDev.scoped_instance(self)
+
+class CompilerSystemDirSearchError(Exception):
+  """Thrown for errors in finding system includes and lib dirs for a compiler."""
 
 
-@rule(LibcDev, [Select(NativeToolchain)])
-def select_libc_dev(native_toolchain):
-  yield native_toolchain._libc_dev
+class DirCollectionRequest(datatype([('dir_paths', tuple)])): pass
+
+
+class ExistingDirCollection(datatype([('dirs', tuple)])): pass
+
+
+# FIXME: use snapshots for this!!!
+@rule(ExistingDirCollection, [Select(DirCollectionRequest)])
+def filter_existing_dirs(dir_collection_request):
+  real_dirs = OrderedSet()
+  for maybe_existing_dir in dir_collection_request.dir_paths:
+    # Could use a `seen_dir_paths` set if we want to avoid pinging the fs for duplicate entries.
+    if is_readable_dir(maybe_existing_dir):
+      real_dirs.add(os.path.realpath(maybe_existing_dir))
+    else:
+      logger.debug("found non-existent or non-accessible directory '{}' from request {}"
+                   .format(maybe_existing_dir, dir_collection_request))
+
+
+  return ExistingDirCollection(dirs=tuple(real_dirs))
+
+
+class CompilerSearchRequest(datatype([('compiler', SubclassesOf(CompilerMixin))])): pass
+
+
+class LibDirsFromCompiler(ExistingDirCollection): pass
+
+
+_search_dirs_libraries_regex = re.compile('^libraries: =(.*)$', flags=re.MULTILINE)
+
+
+@rule(LibDirsFromCompiler, [Select(CompilerSearchRequest)])
+def parse_known_lib_dirs(compiler_search_request):
+  # FIXME: convert this to using `copy()` when #6269 is merged.
+  print_search_dirs_exe = compiler_search_request.compiler.copy(extra_args=['-print-search-dirs'])
+  exe_response = yield Get(
+    ExecuteProcessResult,
+    ExecuteProcessRequest,
+    print_search_dirs_exe.as_execute_process_request())
+
+  compiler_output = exe_response.stdout + exe_response.stderr
+  libs_line = _search_dirs_libraries_regex.search(compiler_output)
+  if not libs_line:
+    raise CompilerSystemDirSearchError(
+      "Could not parse libraries for compiler search request {!r}. Output:\n{}"
+      .format(compiler_search_request, compiler_output))
+
+  dir_collection_request = DirCollectionRequest(dir_paths=tuple(libs_line.group(1).split(':')))
+  existing_dir_collection = yield Get(
+    ExistingDirCollection,
+    DirCollectionRequest,
+    dir_collection_request)
+
+  yield LibDirsFromCompiler(dirs=existing_dir_collection.dirs)
+
+
+class IncludeDirsFromCompiler(ExistingDirCollection): pass
+
+
+_include_dir_paths_start_line = '#include <...> search starts here:'
+_include_dir_paths_end_line = 'End of search list.'
+
+
+@rule(IncludeDirsFromCompiler, [Select(CompilerSearchRequest)])
+def parse_known_include_dirs(compiler_search_request):
+  print_include_search_exe = compiler_search_request.compiler.copy(extra_args=['-E', '-Wp,-v', '-'])
+  exe_response = yield Get(
+    ExecuteProcessResult,
+    ExecuteProcessRequest,
+    print_include_search_exe.as_execute_process_request())
+
+  compiler_output = exe_response.stdout + exe_response.stderr
+  parsed_include_paths = None
+  for output_line in compiler_output.split('\n'):
+    if output_line == _include_dir_paths_start_line:
+      parsed_include_paths = []
+      continue
+    elif output_line == _include_dir_paths_end_line:
+      break
+
+    if parsed_include_paths is not None:
+      # Each line starts with a single initial space.
+      parsed_include_paths.append(output_line[1:])
+
+  dir_collection_request = DirCollectionRequest(dir_paths=tuple(parsed_include_paths))
+  existing_dir_collection = yield Get(
+    ExistingDirCollection,
+    DirCollectionRequest,
+    dir_collection_request)
+
+  yield IncludeDirsFromCompiler(dirs=existing_dir_collection.dirs)
+
+
+class CompilerSearchOutput(datatype([
+    ('lib_dirs', LibDirsFromCompiler),
+    ('include_dirs', IncludeDirsFromCompiler),
+])): pass
+
+
+@rule(CompilerSearchOutput, [Select(CompilerSearchRequest)])
+def get_compiler_resources(compiler_search_request):
+  lib_dirs = yield Get(LibDirsFromCompiler, CompilerSearchRequest, compiler_search_request)
+  include_dirs = yield Get(IncludeDirsFromCompiler, CompilerSearchRequest, compiler_search_request)
+  yield CompilerSearchOutput(lib_dirs=lib_dirs, include_dirs=include_dirs)
+
+
+class CToolchainRequest(datatype([
+    ('c_compiler', CCompiler),
+    ('c_linker', Linker)
+])): pass
+
+
+@rule(CToolchain, [Select(CToolchainRequest)])
+def resolve_c_toolchain(c_toolchain_request):
+  c_compiler = c_toolchain_request.c_compiler
+  c_linker = c_toolchain_request.c_linker
+  compiler_search_output = yield Get(
+    CompilerSearchOutput,
+    CompilerSearchRequest,
+    CompilerSearchRequest(compiler=c_compiler))
+
+  resolved_c_toolchain = CToolchain(
+    c_compiler=c_compiler.copy(include_dirs=compiler_search_output.include_dirs.dirs),
+    c_linker=c_linker.copy(linking_library_dirs=compiler_search_output.lib_dirs.dirs))
+
+  yield resolved_c_toolchain
+
+
+class CppToolchainRequest(datatype([
+    ('cpp_compiler', CppCompiler),
+    ('cpp_linker', Linker)
+])): pass
+
+
+@rule(CppToolchain, [Select(CppToolchainRequest)])
+def resolve_cpp_toolchain(cpp_toolchain_request):
+  cpp_compiler = cpp_toolchain_request.cpp_compiler
+  cpp_linker = cpp_toolchain_request.cpp_linker
+  compiler_search_output = yield Get(
+    CompilerSearchOutput,
+    CompilerSearchRequest,
+    CompilerSearchRequest(compiler=cpp_compiler))
+
+  resolved_cpp_toolchain = CppToolchain(
+    cpp_compiler=cpp_compiler.copy(include_dirs=compiler_search_output.include_dirs.dirs),
+    cpp_linker=cpp_linker.copy(linking_library_dirs=compiler_search_output.lib_dirs.dirs))
+
+  yield resolved_cpp_toolchain
 
 
 @rule(Assembler, [Select(Platform), Select(NativeToolchain)])
@@ -121,7 +275,7 @@ def select_llvm_c_toolchain(platform, native_toolchain):
   # These arguments are shared across platforms.
   llvm_c_compiler_args = [
     '-x', 'c', '-std=c11',
-    '-nobuiltininc',
+    '-nostdinc',
   ]
 
   if platform.normalized_os_name == 'darwin':
@@ -142,14 +296,16 @@ def select_llvm_c_toolchain(platform, native_toolchain):
 
   base_linker_wrapper = yield Get(BaseLinker, NativeToolchain, native_toolchain)
   base_linker = base_linker_wrapper.linker
-  libc_dev = yield Get(LibcDev, NativeToolchain, native_toolchain)
   working_linker = base_linker.copy(
     path_entries=(base_linker.path_entries + working_c_compiler.path_entries),
     exe_filename=working_c_compiler.exe_filename,
-    library_dirs=(base_linker.library_dirs + working_c_compiler.library_dirs),
-    linking_library_dirs=(base_linker.linking_library_dirs + libc_dev.get_libc_dirs(platform)))
+    library_dirs=(base_linker.library_dirs + working_c_compiler.library_dirs))
 
-  yield LLVMCToolchain(CToolchain(working_c_compiler, working_linker))
+  c_toolchain_request = CToolchainRequest(
+    c_compiler=working_c_compiler.with_tupled_collections,
+    c_linker=working_linker.with_tupled_collections)
+  resolved_toolchain = yield Get(CToolchain, CToolchainRequest, c_toolchain_request)
+  yield LLVMCToolchain(resolved_toolchain)
 
 
 @rule(LLVMCppToolchain, [Select(Platform), Select(NativeToolchain)])
@@ -162,7 +318,7 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
     # This mean we don't use any of the headers from our LLVM distribution's C++ stdlib
     # implementation, or any from the host system. Instead, we use include dirs from the
     # XCodeCLITools or GCC.
-    '-nobuiltininc',
+    '-nostdinc',
     '-nostdinc++',
   ]
 
@@ -190,7 +346,6 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
     # Ensure we use libstdc++, provided by g++, during the linking stage.
     linker_extra_args=['-stdlib=libstdc++']
 
-  libc_dev = yield Get(LibcDev, NativeToolchain, native_toolchain)
   base_linker_wrapper = yield Get(BaseLinker, NativeToolchain, native_toolchain)
   base_linker = base_linker_wrapper.linker
   working_linker = base_linker.copy(
@@ -198,11 +353,14 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
     exe_filename=working_cpp_compiler.exe_filename,
     library_dirs=(base_linker.library_dirs + working_cpp_compiler.library_dirs),
     linking_library_dirs=(base_linker.linking_library_dirs +
-                          linking_library_dirs +
-                          libc_dev.get_libc_dirs(platform)),
+                          linking_library_dirs),
     extra_args=(base_linker.extra_args + linker_extra_args))
 
-  yield LLVMCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
+  cpp_toolchain_request = CppToolchainRequest(
+    cpp_compiler=working_cpp_compiler.with_tupled_collections,
+    cpp_linker=working_linker.with_tupled_collections)
+  resolved_toolchain = yield Get(CppToolchain, CppToolchainRequest, cpp_toolchain_request)
+  yield LLVMCppToolchain(resolved_toolchain)
 
 
 @rule(GCCCToolchain, [Select(Platform), Select(NativeToolchain)])
@@ -226,18 +384,20 @@ def select_gcc_c_toolchain(platform, native_toolchain):
   working_c_compiler = provided_gcc.copy(
     path_entries=(provided_gcc.path_entries + assembler.path_entries),
     include_dirs=new_include_dirs,
-    extra_args=['-x', 'c', '-std=c11'])
+    extra_args=['-x', 'c', '-std=c11', '-nobuiltininc', '-nostdinc'])
 
   base_linker_wrapper = yield Get(BaseLinker, NativeToolchain, native_toolchain)
   base_linker = base_linker_wrapper.linker
-  libc_dev = yield Get(LibcDev, NativeToolchain, native_toolchain)
   working_linker = base_linker.copy(
     path_entries=(working_c_compiler.path_entries + base_linker.path_entries),
     exe_filename=working_c_compiler.exe_filename,
-    library_dirs=(base_linker.library_dirs + working_c_compiler.library_dirs),
-    linking_library_dirs=(base_linker.linking_library_dirs + libc_dev.get_libc_dirs(platform)))
+    library_dirs=(base_linker.library_dirs + working_c_compiler.library_dirs))
 
-  yield GCCCToolchain(CToolchain(working_c_compiler, working_linker))
+  c_toolchain_request = CToolchainRequest(
+    c_compiler=working_c_compiler.with_tupled_collections,
+    c_linker=working_linker.with_tupled_collections)
+  resolved_toolchain = yield Get(CToolchain, CToolchainRequest, c_toolchain_request)
+  yield GCCCToolchain(resolved_toolchain)
 
 
 @rule(GCCCppToolchain, [Select(Platform), Select(NativeToolchain)])
@@ -263,24 +423,37 @@ def select_gcc_cpp_toolchain(platform, native_toolchain):
     include_dirs=new_include_dirs,
     extra_args=([
       '-x', 'c++', '-std=c++11',
+      '-nobuiltininc',
+      '-nostdinc',
       '-nostdinc++',
     ]))
 
   base_linker_wrapper = yield Get(BaseLinker, NativeToolchain, native_toolchain)
   base_linker = base_linker_wrapper.linker
-  libc_dev = yield Get(LibcDev, NativeToolchain, native_toolchain)
   working_linker = base_linker.copy(
     path_entries=(working_cpp_compiler.path_entries + base_linker.path_entries),
     exe_filename=working_cpp_compiler.exe_filename,
-    library_dirs=(base_linker.library_dirs + working_cpp_compiler.library_dirs),
-    linking_library_dirs=(base_linker.linking_library_dirs + libc_dev.get_libc_dirs(platform)))
+    library_dirs=(base_linker.library_dirs + working_cpp_compiler.library_dirs))
 
-  yield GCCCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
+  cpp_toolchain_request = CppToolchainRequest(
+    cpp_compiler=working_cpp_compiler.with_tupled_collections,
+    cpp_linker=working_linker.with_tupled_collections)
+  resolved_toolchain = yield Get(CppToolchain, CppToolchainRequest, cpp_toolchain_request)
+  yield GCCCppToolchain(resolved_toolchain)
 
 
 def create_native_toolchain_rules():
   return [
-    select_libc_dev,
+    filter_existing_dirs,
+    RootRule(DirCollectionRequest),
+    parse_known_lib_dirs,
+    parse_known_include_dirs,
+    get_compiler_resources,
+    RootRule(CompilerSearchRequest),
+    resolve_c_toolchain,
+    RootRule(CToolchainRequest),
+    resolve_cpp_toolchain,
+    RootRule(CppToolchainRequest),
     select_assembler,
     select_base_linker,
     select_gcc_install_location,

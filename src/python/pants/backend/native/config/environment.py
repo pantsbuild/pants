@@ -8,6 +8,7 @@ import os
 from abc import abstractproperty
 from builtins import object
 
+from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.engine.rules import SingletonRule
 from pants.util.objects import datatype
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
@@ -79,6 +80,13 @@ class Executable(object):
       lib_env_var: create_path_env_var(self.library_dirs),
     }
 
+  def as_execute_process_request(self, more_args=None):
+    argv = [self.exe_filename] + self.extra_args + (more_args or [])
+    return ExecuteProcessRequest.create_with_empty_snapshot(
+      argv=tuple(argv),
+      description=repr(self),
+      env=self.as_invocation_environment_dict)
+
 
 class Assembler(datatype([
     'path_entries',
@@ -112,7 +120,16 @@ class Linker(datatype([
     'library_dirs',
     'linking_library_dirs',
     'extra_args',
-]), LinkerMixin): pass
+]), LinkerMixin):
+
+  @property
+  def with_tupled_collections(self):
+    """???"""
+    return self.copy(
+      path_entries=tuple(self.path_entries),
+      library_dirs=tuple(self.library_dirs),
+      linking_library_dirs=tuple(self.linking_library_dirs),
+      extra_args=tuple(self.extra_args))
 
 
 class CompilerMixin(Executable):
@@ -147,6 +164,15 @@ class CCompiler(datatype([
 
     return ret
 
+  @property
+  def with_tupled_collections(self):
+    """???"""
+    return self.copy(
+      path_entries=tuple(self.path_entries),
+      library_dirs=tuple(self.library_dirs),
+      include_dirs=tuple(self.include_dirs),
+      extra_args=tuple(self.extra_args))
+
 
 class CppCompiler(datatype([
     'path_entries',
@@ -163,6 +189,15 @@ class CppCompiler(datatype([
     ret['CXX'] = self.exe_filename
 
     return ret
+
+  @property
+  def with_tupled_collections(self):
+    """???"""
+    return self.copy(
+      path_entries=tuple(self.path_entries),
+      library_dirs=tuple(self.library_dirs),
+      include_dirs=tuple(self.include_dirs),
+      extra_args=tuple(self.extra_args))
 
 
 # NB: These wrapper classes for LLVM and GCC toolchains are performing the work of variants. A
