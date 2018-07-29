@@ -5,6 +5,7 @@ python_library(
   name = 'plugin',
   sources = ['__init__.py', 'register.py'],
   dependencies = [
+    ':distutils_extensions',
     ':pants_requirement',
     ':python_artifact',
     ':python_requirement',
@@ -91,4 +92,9 @@ python_library(
   dependencies = [
     '3rdparty/python:pex',
   ]
+)
+
+python_library(
+  name='distutils_extensions',
+  sources = ['distutils_extensions.py']
 )

@@ -50,6 +50,7 @@ python_tests(
     'src/python/pants/base:build_environment',
   ],
   tags={'integration'},
+  timeout=2400,
 )
 
 python_library(
