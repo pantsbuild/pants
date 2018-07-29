@@ -175,7 +175,7 @@ class ZipArchiver(Archiver):
     with open_zip(path) as archive_file:
       for name in archive_file.namelist():
         # While we're at it, we also perform this safety test.
-        if name.startswith(b'/') or name.startswith(b'..'):
+        if name.startswith('/') or name.startswith('..'):
           raise ValueError('Zip file contains unsafe path: {}'.format(name))
         if (not filter_func or filter_func(name)):
           archive_file.extract(name, outdir)
