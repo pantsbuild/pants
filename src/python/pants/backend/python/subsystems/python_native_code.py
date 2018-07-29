@@ -261,4 +261,7 @@ class SetupPyExecutionEnvironment(datatype([
       logger.debug("all_new_ldflags: {}".format(all_new_ldflags))
       ret['LDFLAGS'] = safe_shlex_join(all_new_ldflags)
 
+      # This avoids decoding errors parsing unicode smart quotes that gcc outputs for fun.
+      ret['LC_ALL'] = 'C'
+
     return ret

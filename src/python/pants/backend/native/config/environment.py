@@ -45,19 +45,21 @@ class Platform(datatype(['normalized_os_name'])):
 
 class Executable(object):
 
-  @abstractproperty
+  @property
   def path_entries(self):
     """A list of directory paths containing this executable, to be used in a subprocess's PATH.
 
     This may be multiple directories, e.g. if the main executable program invokes any subprocesses.
     """
+    return []
 
-  @abstractproperty
+  @property
   def runtime_library_dirs(self):
     """Directories containing shared libraries that must be on the runtime library search path.
 
     Note: this is for libraries needed for the current Executable to run -- see LinkerMixin below
     for libraries that are needed at link time."""
+    return []
 
   @abstractproperty
   def exe_filename(self):
@@ -167,7 +169,11 @@ class CCompiler(datatype([
   def as_invocation_environment_dict(self):
     ret = super(CCompiler, self).as_invocation_environment_dict.copy()
 
-    ret['CC'] = self.exe_filename
+    ret.update({
+      'CC': self.exe_filename,
+      # This avoids decoding errors parsing unicode smart quotes that gcc outputs for fun.
+      'LC_ALL': 'C',
+    })
 
     return ret
 
@@ -200,7 +206,11 @@ class CppCompiler(datatype([
   def as_invocation_environment_dict(self):
     ret = super(CppCompiler, self).as_invocation_environment_dict.copy()
 
-    ret['CXX'] = self.exe_filename
+    ret.update({
+      'CXX': self.exe_filename,
+      # This avoids decoding errors parsing unicode smart quotes that gcc outputs for fun.
+      'LC_ALL': 'C',
+    })
 
     return ret
 

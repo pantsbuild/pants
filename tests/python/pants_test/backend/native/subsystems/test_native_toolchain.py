@@ -13,14 +13,14 @@ from pants.backend.native.config.environment import (GCCCppToolchain, GCCCToolch
 from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
-from pants.backend.native.subsystems.libc_dev import LibcDev
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
+from pants.engine.isolated_process import create_process_rules
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import is_executable, safe_open
 from pants.util.process_handler import subprocess
 from pants.util.strutil import safe_shlex_join
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
-from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystems
+from pants_test.subsystem.subsystem_util import global_subsystem_instance
 from pants_test.test_base import TestBase
 
 
@@ -29,15 +29,9 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
   def setUp(self):
     super(TestNativeToolchain, self).setUp()
 
-    init_subsystems([LibcDev, NativeToolchain], options={
-      'libc': {
-        'enable_libc_search': True,
-      },
-    })
-
     self.platform = Platform.create()
     self.toolchain = global_subsystem_instance(NativeToolchain)
-    self.rules = native_backend_rules()
+    self.rules = (native_backend_rules() + create_process_rules())
 
     gcc_subsystem = global_subsystem_instance(GCC)
     self.gcc_version = gcc_subsystem.version()
@@ -118,13 +112,13 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
         yield toolchain
 
   def _invoke_compiler(self, compiler, args):
-    cmd = [compiler.exe_filename] + compiler.extra_args + args
+    cmd = [compiler.exe_filename] + list(compiler.extra_args) + args
     return self._invoke_capturing_output(
       cmd,
       compiler.as_invocation_environment_dict)
 
   def _invoke_linker(self, linker, args):
-    cmd = [linker.exe_filename] + linker.extra_args + args
+    cmd = [linker.exe_filename] + list(linker.extra_args) + args
     return self._invoke_capturing_output(
       cmd,
       linker.as_invocation_environment_dict)
