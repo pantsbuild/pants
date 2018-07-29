@@ -67,10 +67,11 @@ python_library(
   name = 'pantsd_integration_test_base',
   sources = ['pantsd_integration_test_base.py'],
   dependencies = [
+    '3rdparty/python:ansicolors',
     'src/python/pants/pantsd:process_manager',
     'src/python/pants/util:collections',
+    'tests/python/pants_test/testutils:process_test_util',
     'tests/python/pants_test:int-test',
-    '3rdparty/python:ansicolors'
   ],
 )
 

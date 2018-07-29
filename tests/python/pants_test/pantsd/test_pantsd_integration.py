@@ -14,7 +14,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
-from pants_test.pants_run_integration_test import PantsResult
 from pants_test.pantsd.pantsd_integration_test_base import (PantsDaemonIntegrationTestBase,
                                                             full_pantsd_log, read_pantsd_log)
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
@@ -374,7 +373,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
   def test_pantsd_multiple_parallel_runs(self):
     with self.pantsd_test_context() as (workdir, config, checker):
       file_to_make = os.path.join(workdir, 'some_magic_file')
-      waiter_pants_command, waiter_pants_process = self.run_pants_with_workdir_without_waiting(
+      waiter_handle = self.run_pants_with_workdir_without_waiting(
         ['run', 'testprojects/src/python/coordinated_runs:waiter', '--', file_to_make],
         workdir,
         config,
@@ -385,21 +384,14 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
       checker.assert_started()
 
-      creator_pants_command, creator_pants_process = self.run_pants_with_workdir_without_waiting(
+      creator_handle = self.run_pants_with_workdir_without_waiting(
         ['run', 'testprojects/src/python/coordinated_runs:creator', '--', file_to_make],
         workdir,
         config,
       )
 
-      (creator_stdout_data, creator_stderr_data) = creator_pants_process.communicate()
-      creator_result = PantsResult(creator_pants_command, creator_pants_process.returncode, creator_stdout_data.decode("utf-8"),
-        creator_stderr_data.decode("utf-8"), workdir)
-      self.assert_success(creator_result)
-
-      (waiter_stdout_data, waiter_stderr_data) = waiter_pants_process.communicate()
-      waiter_result = PantsResult(waiter_pants_command, waiter_pants_process.returncode, waiter_stdout_data.decode("utf-8"),
-        waiter_stderr_data.decode("utf-8"), workdir)
-      self.assert_success(waiter_result)
+      self.assert_success(creator_handle.join())
+      self.assert_success(waiter_handle.join())
 
   def test_pantsd_environment_scrubbing(self):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env
