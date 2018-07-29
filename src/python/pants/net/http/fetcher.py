@@ -20,7 +20,7 @@ from future.utils import PY3
 
 from pants.util.dirutil import safe_open
 from pants.util.meta import AbstractClass
-from pants.util.strutil import ensure_binary, strip_prefix
+from pants.util.strutil import strip_prefix
 
 
 class Fetcher(object):
@@ -112,7 +112,6 @@ class Fetcher(object):
       self._fh = fh
 
     def recv_chunk(self, data):
-      data = [ensure_binary(v) for v in data] if isinstance(data, list) else ensure_binary(data)
       self._fh.write(data)
 
   class ChecksumListener(Listener):
@@ -128,7 +127,6 @@ class Fetcher(object):
       self._checksum = None
 
     def recv_chunk(self, data):
-      data = [ensure_binary(v) for v in data] if isinstance(data, list) else ensure_binary(data)
       self.digest.update(data)
 
     def finished(self):
@@ -179,7 +177,6 @@ class Fetcher(object):
       self.read = 0
 
     def recv_chunk(self, data):
-      data = [str(num).encode('utf-8') for num in data] if isinstance(data, list) else str(data).encode('utf-8')
       self.read += len(data)
       chunk_count = int(self.read / self.chunk_size)
       if chunk_count > self.chunks:
