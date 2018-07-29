@@ -124,12 +124,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
         raise ValueError('Got unexpected field names: %r' % kwds.keys())
       return result
 
-    # TODO: would we want to expose a self.as_tuple() method (which just calls __getnewargs__) so we
-    # can tuple assign? E.g.:
-    # class A(datatype(['field'])): pass
-    # x = A(field='asdf')
-    # field_value, = x.as_tuple()
-    # print(field_value) # => 'asdf'
+    # NB: it is *not* recommended to rely on the ordering of the tuple returned by this method.
     def __getnewargs__(self):
       '''Return self as a plain tuple.  Used by copy and pickle.'''
       return tuple(self._super_iter())
