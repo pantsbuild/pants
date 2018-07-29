@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import inspect
 import logging
 import os
 import tokenize
@@ -64,7 +65,7 @@ class LegacyPythonCallbacksParser(Parser):
       def __init__(self, parse_context, type_alias, object_type):
         self._parse_context = parse_context
         self._type_alias = type_alias
-        self._object_type = object_type
+        self._object_type = object_type if inspect.isclass(object_type) else type(object_type)
         self._serializable = Serializable.is_serializable_type(self._object_type)
 
       @memoized_property
