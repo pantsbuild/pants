@@ -9,6 +9,9 @@ import logging
 import mimetypes
 from builtins import object, str
 from os.path import basename
+from xmlrpc.client import Binary
+from xmlrpc.client import Error as XMLRPCError
+from xmlrpc.client import ServerProxy
 
 from future.moves.urllib.parse import quote_plus
 
@@ -21,10 +24,6 @@ log = logging.getLogger(__name__)
 
 """Code to ease publishing text to Confluence wikis."""
 
-try:
-  from xmlrpc.client import ServerProxy, Error as XMLRPCError, Binary
-except ImportError:
-  from xmlrpclib import ServerProxy, Error as XMLRPCError, Binary
 
 mimetypes.init()
 
