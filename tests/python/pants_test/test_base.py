@@ -219,7 +219,7 @@ class TestBase(unittest.TestCase):
     if make_missing_sources and 'sources' in kwargs:
       for source in kwargs['sources']:
         if '*' not in source:
-          self.create_file(os.path.join(address.spec_path, source), mode='a')
+          self.create_file(os.path.join(address.spec_path, source), mode='a', contents='')
       kwargs['sources'] = self.sources_for(kwargs['sources'], address.spec_path)
 
     target = target_type(name=address.target_name,
