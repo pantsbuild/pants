@@ -584,8 +584,6 @@ function build_pex() {
     build_3rdparty_packages "${PANTS_UNSTABLE_VERSION}"
   fi
 
-  activate_tmp_venv && trap deactivate RETURN && pip install "pex==1.4.3" || die "Failed to install pex."
-
   local requirements=()
   for pkg_name in $PANTS_PEX_PACKAGES; do
     requirements=("${requirements[@]}" "${pkg_name}==${PANTS_UNSTABLE_VERSION}")
@@ -596,16 +594,27 @@ function build_pex() {
     platform_flags=("${platform_flags[@]}" "--platform=${platform}")
   done
 
-  pex \
-    -o "${dest}" \
-    --entry-point="pants.bin.pants_loader:main" \
-    --no-build \
-    --no-pypi \
-    --disable-cache \
-    "${platform_flags[@]}" \
-    -f "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
-    -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
-    "${requirements[@]}"
+  (
+    PEX_VERSION=$(grep "pex==" "${ROOT}/3rdparty/python/requirements.txt" | sed -e "s|pex==||")
+    PEX_PEX=pex27
+
+    cd $(mktemp -d -t build_pex.XXXXX)
+    trap "rm -rf $(pwd -P)" EXIT
+
+    curl -sSL https://github.com/pantsbuild/pex/releases/download/v${PEX_VERSION}/${PEX_PEX} -O
+    chmod +x ./${PEX_PEX}
+
+    ./${PEX_PEX} \
+      -o "${dest}" \
+      -c pants \
+      --no-build \
+      --no-pypi \
+      --disable-cache \
+      "${platform_flags[@]}" \
+      -f "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
+      -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
+      "${requirements[@]}"
+  )
 
   if [[ "${PANTS_PEX_RELEASE}" == "stable" ]]; then
     mkdir -p "$(dirname "${stable_dest}")"

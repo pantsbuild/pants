@@ -13,7 +13,7 @@ from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import resolve
 from pex.variables import Variables
 
-from pants.backend.python.pex_util import create_bare_interpreter, expand_and_maybe_adjust_platform
+from pants.backend.python.pex_util import expand_and_maybe_adjust_platform
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
 from pants.process.lock import OwnerPrintingInterProcessFileLock
@@ -105,7 +105,7 @@ class PythonInterpreterCache(object):
       executable = os.readlink(os.path.join(path, 'python'))
     except OSError:
       return None
-    interpreter = create_bare_interpreter(executable)
+    interpreter = PythonInterpreter.from_binary(executable, include_site_extras=False)
     if self._matches(interpreter, filters):
       return self._resolve(interpreter)
     return None

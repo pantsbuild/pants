@@ -19,7 +19,6 @@ class WrappedPEX(object):
   """
 
   _PEX_PATH_ENV_VAR_NAME = 'PEX_PATH'
-  _PEX_PYTHON_PATH_ENV_VAR_NAME = 'PEX_PYTHON_PATH'
 
   def __init__(self, pex, extra_pex_paths=None):
     """
@@ -38,27 +37,16 @@ class WrappedPEX(object):
 
   def cmdline(self, args=()):
     cmdline = ' '.join(self._pex.cmdline(args))
-
-    def render_env_var(key, value):
-      return '{key}={value}'.format(key=key, value=value)
-
-    env_vars = [(self._PEX_PYTHON_PATH_ENV_VAR_NAME, self._pex._interpreter.binary)]
-
     pex_path = self._pex_path()
     if pex_path:
-      env_vars.append((self._PEX_PATH_ENV_VAR_NAME, pex_path))
-
-    return '{execution_control_env_vars} {cmdline}'.format(
-      execution_control_env_vars=' '.join(render_env_var(k, v) for k, v in env_vars),
-      cmdline=cmdline
-    )
+      return '{env_var_name}={pex_path} {cmdline}'.format(env_var_name=self._PEX_PATH_ENV_VAR_NAME,
+                                                          pex_path=pex_path,
+                                                          cmdline=cmdline)
+    else:
+      return cmdline
 
   def run(self, *args, **kwargs):
     env = copy(kwargs.pop('env', {}))
-
-    # Hack around bug in PEX where custom interpreters are not forwarded to PEXEnvironments.
-    # TODO(John Sirois): Remove when https://github.com/pantsbuild/pex/issues/522 is fixed.
-    env[self._PEX_PYTHON_PATH_ENV_VAR_NAME] = self._pex._interpreter.binary
 
     pex_path = self._pex_path()
     if pex_path:
