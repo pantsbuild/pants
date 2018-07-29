@@ -10,6 +10,7 @@ from abc import abstractmethod, abstractproperty
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.option.custom_types import dir_option
 from pants.process.xargs import Xargs
@@ -28,9 +29,20 @@ class RewriteBase(NailgunTask, AbstractClass):
              default=cls.target_types(),
              advanced=True, type=list,
              help='The target types to apply formatting to.')
-    register('--output-dir', advanced=True, type=dir_option, fingerprint=True,
-             help='Path to scalafmt output directory. Any updated files will be written here. '
-             'If not specified, files will be modified in-place.')
+    try:
+      sideeffecting = cls.sideeffecting
+    except AttributeError:
+      deprecated_conditional(
+        lambda: True,
+        '1.12.0.dev0',
+        "RewriteBase's sideeffecting property should be a class property, not an instance property "
+        "but class {} didn't have a class property.".format(cls.__name__),
+      )
+      sideeffecting = False
+    if sideeffecting:
+      register('--output-dir', advanced=True, type=dir_option, fingerprint=True,
+               help='Path to scalafmt output directory. Any updated files will be written here. '
+               'If not specified, files will be modified in-place.')
 
   @classmethod
   def target_types(cls):
@@ -79,7 +91,7 @@ class RewriteBase(NailgunTask, AbstractClass):
   def _invoke_tool_in_or_out_of_place(self, target_sources):
     buildroot = get_buildroot()
     toolroot = buildroot
-    if self.get_options().output_dir:
+    if self.sideeffecting and self.get_options().output_dir:
       toolroot = self.get_options().output_dir
       new_sources = [
         (target, os.path.join(toolroot, fast_relpath(source, buildroot)))
