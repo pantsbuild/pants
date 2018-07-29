@@ -10,6 +10,7 @@ from builtins import next
 from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
+from pants.engine.isolated_process import create_process_rules
 from pants.util.collections import assert_single_element
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -56,7 +57,8 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, SchedulerTestBas
     return list(self.target_dict.values())
 
   def _scheduling_context(self, **kwargs):
-    scheduler = self.mk_scheduler(rules=native_backend_rules())
+    all_rules = (native_backend_rules() + create_process_rules())
+    scheduler = self.mk_scheduler(rules=all_rules)
     return self.context(scheduler=scheduler, **kwargs)
 
   def _retrieve_single_product_at_target_base(self, product_mapping, target):
