@@ -38,6 +38,9 @@ class Package(object):
   def __eq__(self, other):
     return self.name == other.name
 
+  def __hash__(self):
+    return super(Package, self).__hash__()
+
   def __str__(self):
     return self.name
 
@@ -79,7 +82,9 @@ core_packages = {
 
 
 def contrib_packages():
-  output = subprocess.check_output(('bash', '-c', 'source contrib/release_packages.sh ; for pkg in "${CONTRIB_PACKAGES[@]}"; do echo "${!pkg}"; done'))
+  output = subprocess.check_output(
+    ('bash', '-c', 'source contrib/release_packages.sh ; for pkg in "${CONTRIB_PACKAGES[@]}"; do echo "${!pkg}"; done')
+  ).decode('utf-8')
   return set(Package(name) for name in output.strip().split('\n'))
 
 

@@ -16,10 +16,10 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 _HEADER = 'invocation_id,task_name,targets_hash,target_id,cache_key_id,cache_key_hash,phase,valid\n'
 _REPORT_LOCATION = 'reports/latest/invalidation-report.csv'
 
-_ENTRY = re.compile(ur'^\d+,\S+,(init|pre-check|post-check),(True|False)')
-_INIT = re.compile(ur'^\d+,ZincCompile_compile_zinc,\w+,\S+,init,(True|False)')
-_POST = re.compile(ur'^\d+,ZincCompile_compile_zinc,\w+,\S+,post-check,(True|False)')
-_PRE = re.compile(ur'^\d+,ZincCompile_compile_zinc,\w+,\S+,pre-check,(True|False)')
+_ENTRY = re.compile(r'^\d+,\S+,(init|pre-check|post-check),(True|False)')
+_INIT = re.compile(r'^\d+,ZincCompile_compile_zinc,\w+,\S+,init,(True|False)')
+_POST = re.compile(r'^\d+,ZincCompile_compile_zinc,\w+,\S+,post-check,(True|False)')
+_PRE = re.compile(r'^\d+,ZincCompile_compile_zinc,\w+,\S+,pre-check,(True|False)')
 
 
 class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
