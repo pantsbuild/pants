@@ -10,7 +10,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensur
 class TestConsoleRuleIntegration(PantsRunIntegrationTest):
 
   # TODO: Running this command a second time with the daemon will result in no output because
-  # of product caching.
+  # of product caching. See #6146.
   @ensure_daemon
   def test_v2_list(self):
     result = self.do_command(
