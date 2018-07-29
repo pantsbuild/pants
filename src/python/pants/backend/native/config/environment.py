@@ -125,11 +125,18 @@ class Linker(datatype([
   @property
   def with_tupled_collections(self):
     """???"""
-    return self.copy(
+    # FIXME: convert these to using `copy()` when #6269 is merged.
+    return Linker(
       path_entries=tuple(self.path_entries),
+      exe_filename=self.exe_filename,
       runtime_library_dirs=tuple(self.runtime_library_dirs),
       linking_library_dirs=tuple(self.linking_library_dirs),
       extra_args=tuple(self.extra_args))
+    # return self.copy(
+    #   path_entries=tuple(self.path_entries),
+    #   runtime_library_dirs=tuple(self.runtime_library_dirs),
+    #   linking_library_dirs=tuple(self.linking_library_dirs),
+    #   extra_args=tuple(self.extra_args))
 
 
 class CompilerMixin(Executable):
@@ -167,11 +174,18 @@ class CCompiler(datatype([
   @property
   def with_tupled_collections(self):
     """???"""
-    return self.copy(
+    # FIXME: convert these to using `copy()` when #6269 is merged.
+    return CCompiler(
       path_entries=tuple(self.path_entries),
+      exe_filename=self.exe_filename,
       runtime_library_dirs=tuple(self.runtime_library_dirs),
       include_dirs=tuple(self.include_dirs),
       extra_args=tuple(self.extra_args))
+    # return self.copy(
+    #   path_entries=tuple(self.path_entries),
+    #   runtime_library_dirs=tuple(self.runtime_library_dirs),
+    #   include_dirs=tuple(self.include_dirs),
+    #   extra_args=tuple(self.extra_args))
 
 
 class CppCompiler(datatype([
@@ -193,11 +207,18 @@ class CppCompiler(datatype([
   @property
   def with_tupled_collections(self):
     """???"""
-    return self.copy(
+    # FIXME: convert these to using `copy()` when #6269 is merged.
+    return CppCompiler(
       path_entries=tuple(self.path_entries),
+      exe_filename=self.exe_filename,
       runtime_library_dirs=tuple(self.runtime_library_dirs),
       include_dirs=tuple(self.include_dirs),
       extra_args=tuple(self.extra_args))
+    # return self.copy(
+    #   path_entries=tuple(self.path_entries),
+    #   runtime_library_dirs=tuple(self.runtime_library_dirs),
+    #   include_dirs=tuple(self.include_dirs),
+    #   extra_args=tuple(self.extra_args))
 
 
 # NB: These wrapper classes for LLVM and GCC toolchains are performing the work of variants. A
