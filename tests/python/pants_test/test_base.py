@@ -168,7 +168,7 @@ class TestBase(unittest.TestCase):
      files: List of file names.
     """
     for f in files:
-      self.create_file(os.path.join(path, f), contents=f)
+      self.create_file(os.path.join(path, f), contents=f, mode='w')
 
   def create_workdir_file(self, relpath, contents=b'', mode='wb'):
     """Writes to a file under the work directory.
