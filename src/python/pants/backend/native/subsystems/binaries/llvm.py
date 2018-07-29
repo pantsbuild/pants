@@ -90,7 +90,7 @@ class LLVM(NativeTool):
       path_entries=self.path_entries,
       exe_filename=platform.resolve_platform_specific(
         self._PLATFORM_SPECIFIC_LINKER_NAME),
-      library_dirs=[],
+      runtime_library_dirs=[],
       linking_library_dirs=[],
       extra_args=[])
 
@@ -106,7 +106,7 @@ class LLVM(NativeTool):
     return CCompiler(
       path_entries=self.path_entries,
       exe_filename='clang',
-      library_dirs=self._common_lib_dirs,
+      runtime_library_dirs=self._common_lib_dirs,
       include_dirs=self._common_include_dirs,
       extra_args=[])
 
@@ -118,7 +118,7 @@ class LLVM(NativeTool):
     return CppCompiler(
       path_entries=self.path_entries,
       exe_filename='clang++',
-      library_dirs=self._common_lib_dirs,
+      runtime_library_dirs=self._common_lib_dirs,
       include_dirs=(self._cpp_include_dirs + self._common_include_dirs),
       extra_args=[])
 

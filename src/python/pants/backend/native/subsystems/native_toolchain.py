@@ -108,7 +108,13 @@ _search_dirs_libraries_regex = re.compile('^libraries: =(.*)$', flags=re.MULTILI
 @rule(LibDirsFromCompiler, [Select(CompilerSearchRequest)])
 def parse_known_lib_dirs(compiler_search_request):
   # FIXME: convert this to using `copy()` when #6269 is merged.
-  print_search_dirs_exe = compiler_search_request.compiler.copy(extra_args=['-print-search-dirs'])
+  cmplr = compiler_search_request.compiler
+  print_search_dirs_exe = type(cmplr)(path_entries=cmplr.path_entries,
+                                      exe_filename=cmplr.exe_filename,
+                                      runtime_library_dirs=cmplr.runtime_library_dirs,
+                                      include_dirs=cmplr.include_dirs,
+                                      extra_args=['-print-search-dirs'])
+  # print_search_dirs_exe = compiler_search_request.compiler.copy(extra_args=['-print-search-dirs'])
   exe_response = yield Get(
     ExecuteProcessResult,
     ExecuteProcessRequest,
@@ -139,7 +145,14 @@ _include_dir_paths_end_line = 'End of search list.'
 
 @rule(IncludeDirsFromCompiler, [Select(CompilerSearchRequest)])
 def parse_known_include_dirs(compiler_search_request):
-  print_include_search_exe = compiler_search_request.compiler.copy(extra_args=['-E', '-Wp,-v', '-'])
+  # FIXME: convert this to using `copy()` when #6269 is merged.
+  cmplr = compiler_search_request.compiler
+  print_include_search_exe = type(cmplr)(path_entries=cmplr.path_entries,
+                                      exe_filename=cmplr.exe_filename,
+                                      runtime_library_dirs=cmplr.runtime_library_dirs,
+                                      include_dirs=cmplr.include_dirs,
+                                      extra_args=['-E', '-Wp,-v', '-'])
+  # print_include_search_exe = compiler_search_request.compiler.copy(extra_args=['-E', '-Wp,-v', '-'])
   exe_response = yield Get(
     ExecuteProcessResult,
     ExecuteProcessRequest,
@@ -195,9 +208,22 @@ def resolve_c_toolchain(c_toolchain_request):
     CompilerSearchRequest,
     CompilerSearchRequest(compiler=c_compiler))
 
+  # FIXME: convert these to using `copy()` when #6269 is merged.
+  # resolved_c_toolchain = CToolchain(
+  #   c_compiler=c_compiler.copy(include_dirs=compiler_search_output.include_dirs.dirs),
+  #   c_linker=c_linker.copy(linking_library_dirs=compiler_search_output.lib_dirs.dirs)))
   resolved_c_toolchain = CToolchain(
-    c_compiler=c_compiler.copy(include_dirs=compiler_search_output.include_dirs.dirs),
-    c_linker=c_linker.copy(linking_library_dirs=compiler_search_output.lib_dirs.dirs))
+    c_compiler=CCompiler(path_entries=c_compiler.path_entries,
+                         exe_filename=c_compiler.exe_filename,
+                         runtime_library_dirs=c_compiler.runtime_library_dirs,
+                         include_dirs=compiler_search_output.include_dirs.dirs,
+                         extra_args=c_compiler.extra_args),
+    c_linker=Linker(
+      path_entries=c_linker.path_entries,
+      exe_filename=c_linker.exe_filename,
+      runtime_library_dirs=c_linker.runtime_library_dirs,
+      linking_library_dirs=compiler_search_output.lib_dirs.dirs,
+      extra_args=c_linker.extra_args))
 
   yield resolved_c_toolchain
 
@@ -217,9 +243,22 @@ def resolve_cpp_toolchain(cpp_toolchain_request):
     CompilerSearchRequest,
     CompilerSearchRequest(compiler=cpp_compiler))
 
+  # FIXME: convert these to using `copy()` when #6269 is merged.
+  # resolved_cpp_toolchain = CppToolchain(
+  #   cpp_compiler=cpp_compiler.copy(include_dirs=compiler_search_output.include_dirs.dirs),
+  #   cpp_linker=cpp_linker.copy(linking_library_dirs=compiler_search_output.lib_dirs.dirs)))
   resolved_cpp_toolchain = CppToolchain(
-    cpp_compiler=cpp_compiler.copy(include_dirs=compiler_search_output.include_dirs.dirs),
-    cpp_linker=cpp_linker.copy(linking_library_dirs=compiler_search_output.lib_dirs.dirs))
+    cpp_compiler=CppCompiler(path_entries=cpp_compiler.path_entries,
+                         exe_filename=cpp_compiler.exe_filename,
+                         runtime_library_dirs=cpp_compiler.runtime_library_dirs,
+                         include_dirs=compiler_search_output.include_dirs.dirs,
+                         extra_args=cpp_compiler.extra_args),
+    cpp_linker=Linker(
+      path_entries=cpp_linker.path_entries,
+      exe_filename=cpp_linker.exe_filename,
+      runtime_library_dirs=cpp_linker.runtime_library_dirs,
+      linking_library_dirs=compiler_search_output.lib_dirs.dirs,
+      extra_args=cpp_linker.extra_args))
 
   yield resolved_cpp_toolchain
 
@@ -282,7 +321,7 @@ def select_llvm_c_toolchain(platform, native_toolchain):
     xcode_clang = yield Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
     working_c_compiler = provided_clang.copy(
       path_entries=(provided_clang.path_entries + xcode_clang.path_entries),
-      library_dirs=(provided_clang.library_dirs + xcode_clang.library_dirs),
+      runtime_library_dirs=(provided_clang.runtime_library_dirs + xcode_clang.runtime_library_dirs),
       include_dirs=(provided_clang.include_dirs + xcode_clang.include_dirs),
       extra_args=(provided_clang.extra_args + llvm_c_compiler_args + xcode_clang.extra_args))
   else:
@@ -290,7 +329,8 @@ def select_llvm_c_toolchain(platform, native_toolchain):
     provided_gcc = yield Get(CCompiler, GCC, native_toolchain._gcc)
     working_c_compiler = provided_clang.copy(
       # We need g++'s version of the GLIBCXX library to be able to run, unfortunately.
-      library_dirs=(provided_gcc.library_dirs + provided_clang.library_dirs),
+      runtime_library_dirs=(provided_gcc.runtime_library_dirs +
+                            provided_clang.runtime_library_dirs),
       include_dirs=provided_gcc.include_dirs,
       extra_args=(llvm_c_compiler_args + provided_clang.extra_args + gcc_install.as_clang_argv))
 
@@ -299,7 +339,8 @@ def select_llvm_c_toolchain(platform, native_toolchain):
   working_linker = base_linker.copy(
     path_entries=(base_linker.path_entries + working_c_compiler.path_entries),
     exe_filename=working_c_compiler.exe_filename,
-    library_dirs=(base_linker.library_dirs + working_c_compiler.library_dirs))
+    runtime_library_dirs=(base_linker.runtime_library_dirs +
+                          working_c_compiler.runtime_library_dirs))
 
   c_toolchain_request = CToolchainRequest(
     c_compiler=working_c_compiler.with_tupled_collections,
@@ -326,7 +367,8 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
     xcode_clang = yield Get(CppCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
     working_cpp_compiler = provided_clangpp.copy(
       path_entries=(provided_clangpp.path_entries + xcode_clang.path_entries),
-      library_dirs=(provided_clangpp.library_dirs + xcode_clang.library_dirs),
+      runtime_library_dirs=(provided_clangpp.runtime_library_dirs +
+                            xcode_clang.runtime_library_dirs),
       include_dirs=(provided_clangpp.include_dirs + xcode_clang.include_dirs),
       # On OSX, this uses the libc++ (LLVM) C++ standard library implementation. This is
       # feature-complete for OSX, but not for Linux (see https://libcxx.llvm.org/ for more info).
@@ -338,11 +380,11 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
     provided_gpp = yield Get(CppCompiler, GCC, native_toolchain._gcc)
     working_cpp_compiler = provided_clangpp.copy(
       # We need g++'s version of the GLIBCXX library to be able to run, unfortunately.
-      library_dirs=(provided_gpp.library_dirs + provided_clangpp.library_dirs),
+      runtime_library_dirs=(provided_gpp.runtime_library_dirs + provided_clangpp.runtime_library_dirs),
       # NB: we use g++'s headers on Linux, and therefore their C++ standard library.
       include_dirs=provided_gpp.include_dirs,
-      extra_args=(llvm_cpp_compiler_args + provided_clangpp.extra_args + gcc_install.as_clang_argv))
-    linking_library_dirs = provided_gpp.library_dirs + provided_clangpp.library_dirs
+      extra_args=(llvm_cpp_compiler_args + gcc_install.as_clang_argv))
+    linking_library_dirs = provided_gpp.runtime_library_dirs + provided_clangpp.runtime_library_dirs
     # Ensure we use libstdc++, provided by g++, during the linking stage.
     linker_extra_args=['-stdlib=libstdc++']
 
@@ -351,7 +393,7 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
   working_linker = base_linker.copy(
     path_entries=(base_linker.path_entries + working_cpp_compiler.path_entries),
     exe_filename=working_cpp_compiler.exe_filename,
-    library_dirs=(base_linker.library_dirs + working_cpp_compiler.library_dirs),
+    runtime_library_dirs=(base_linker.runtime_library_dirs + working_cpp_compiler.runtime_library_dirs),
     linking_library_dirs=(base_linker.linking_library_dirs +
                           linking_library_dirs),
     extra_args=(base_linker.extra_args + linker_extra_args))
@@ -391,7 +433,9 @@ def select_gcc_c_toolchain(platform, native_toolchain):
   working_linker = base_linker.copy(
     path_entries=(working_c_compiler.path_entries + base_linker.path_entries),
     exe_filename=working_c_compiler.exe_filename,
-    library_dirs=(base_linker.library_dirs + working_c_compiler.library_dirs))
+    runtime_library_dirs=(base_linker.runtime_library_dirs +
+                          working_c_compiler.runtime_library_dirs),
+    linking_library_dirs=(base_linker.linking_library_dirs))
 
   c_toolchain_request = CToolchainRequest(
     c_compiler=working_c_compiler.with_tupled_collections,
@@ -433,7 +477,8 @@ def select_gcc_cpp_toolchain(platform, native_toolchain):
   working_linker = base_linker.copy(
     path_entries=(working_cpp_compiler.path_entries + base_linker.path_entries),
     exe_filename=working_cpp_compiler.exe_filename,
-    library_dirs=(base_linker.library_dirs + working_cpp_compiler.library_dirs))
+    runtime_library_dirs=(base_linker.runtime_library_dirs +
+                          working_cpp_compiler.runtime_library_dirs))
 
   cpp_toolchain_request = CppToolchainRequest(
     cpp_compiler=working_cpp_compiler.with_tupled_collections,

@@ -53,7 +53,7 @@ class Executable(object):
     """
 
   @abstractproperty
-  def library_dirs(self):
+  def runtime_library_dirs(self):
     """Directories containing shared libraries that must be on the runtime library search path.
 
     Note: this is for libraries needed for the current Executable to run -- see LinkerMixin below
@@ -77,7 +77,7 @@ class Executable(object):
     })
     return {
       'PATH': create_path_env_var(self.path_entries),
-      lib_env_var: create_path_env_var(self.library_dirs),
+      lib_env_var: create_path_env_var(self.runtime_library_dirs),
     }
 
   def as_execute_process_request(self, more_args=None):
@@ -91,7 +91,7 @@ class Executable(object):
 class Assembler(datatype([
     'path_entries',
     'exe_filename',
-    'library_dirs',
+    'runtime_library_dirs',
 ]), Executable):
   pass
 
@@ -117,7 +117,7 @@ class LinkerMixin(Executable):
 class Linker(datatype([
     'path_entries',
     'exe_filename',
-    'library_dirs',
+    'runtime_library_dirs',
     'linking_library_dirs',
     'extra_args',
 ]), LinkerMixin):
@@ -127,7 +127,7 @@ class Linker(datatype([
     """???"""
     return self.copy(
       path_entries=tuple(self.path_entries),
-      library_dirs=tuple(self.library_dirs),
+      runtime_library_dirs=tuple(self.runtime_library_dirs),
       linking_library_dirs=tuple(self.linking_library_dirs),
       extra_args=tuple(self.extra_args))
 
@@ -151,7 +151,7 @@ class CompilerMixin(Executable):
 class CCompiler(datatype([
     'path_entries',
     'exe_filename',
-    'library_dirs',
+    'runtime_library_dirs',
     'include_dirs',
     'extra_args',
 ]), CompilerMixin):
@@ -169,7 +169,7 @@ class CCompiler(datatype([
     """???"""
     return self.copy(
       path_entries=tuple(self.path_entries),
-      library_dirs=tuple(self.library_dirs),
+      runtime_library_dirs=tuple(self.runtime_library_dirs),
       include_dirs=tuple(self.include_dirs),
       extra_args=tuple(self.extra_args))
 
@@ -177,7 +177,7 @@ class CCompiler(datatype([
 class CppCompiler(datatype([
     'path_entries',
     'exe_filename',
-    'library_dirs',
+    'runtime_library_dirs',
     'include_dirs',
     'extra_args',
 ]), CompilerMixin):
@@ -195,7 +195,7 @@ class CppCompiler(datatype([
     """???"""
     return self.copy(
       path_entries=tuple(self.path_entries),
-      library_dirs=tuple(self.library_dirs),
+      runtime_library_dirs=tuple(self.runtime_library_dirs),
       include_dirs=tuple(self.include_dirs),
       extra_args=tuple(self.extra_args))
 

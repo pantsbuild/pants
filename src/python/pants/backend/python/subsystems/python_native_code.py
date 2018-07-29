@@ -232,10 +232,10 @@ class SetupPyExecutionEnvironment(datatype([
       ret['PATH'] = create_path_env_var(all_path_entries)
 
       all_library_dirs = (
-        c_compiler.library_dirs +
-        c_linker.library_dirs +
-        cpp_compiler.library_dirs +
-        cpp_linker.library_dirs)
+        c_compiler.runtime_library_dirs +
+        c_linker.runtime_library_dirs +
+        cpp_compiler.runtime_library_dirs +
+        cpp_linker.runtime_library_dirs)
       joined_library_dirs = create_path_env_var(all_library_dirs)
       dynamic_lib_env_var = plat.resolve_platform_specific({
         'darwin': lambda: 'DYLD_LIBRARY_PATH',
