@@ -93,7 +93,7 @@ class GoBuildgenTest(TaskTestBase):
       task.execute()
 
   def test_existing_targets_wrong_type(self):
-    self.create_file(relpath='src/go/src/fred/foo.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/fred/foo.go', mode='w', contents=dedent("""
       package main
 
       import "fmt"
@@ -109,7 +109,7 @@ class GoBuildgenTest(TaskTestBase):
     self.assertEqual(GoTargetGenerator.WrongLocalSourceTargetTypeError, type(exc.exception.cause))
 
   def test_noop_applicable_targets_simple(self):
-    self.create_file(relpath='src/go/src/fred/foo.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/fred/foo.go', mode='w', contents=dedent("""
       package main
 
       import "fmt"
@@ -125,13 +125,13 @@ class GoBuildgenTest(TaskTestBase):
     self.assertEqual(expected, context.targets())
 
   def test_noop_applicable_targets_complete_graph(self):
-    self.create_file(relpath='src/go/src/jane/bar.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/jane/bar.go', mode='w', contents=dedent("""
       package jane
 
       var PublicConstant = 42
     """))
     jane = self.make_target('src/go/src/jane', GoLibrary)
-    self.create_file(relpath='src/go/src/fred/foo.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/fred/foo.go', mode='w', contents=dedent("""
       package main
 
       import (
@@ -157,12 +157,12 @@ class GoBuildgenTest(TaskTestBase):
       # We need physical directories on disk for `--materialize` since it does scans.
       self.create_dir('src/go/src')
 
-    self.create_file(relpath='src/go/src/jane/bar.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/jane/bar.go', mode='w', contents=dedent("""
         package jane
 
         var PublicConstant = 42
       """))
-    self.create_file(relpath='src/go/src/fred/foo.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/fred/foo.go', mode='w', contents=dedent("""
         package main
 
         import (
@@ -218,14 +218,14 @@ class GoBuildgenTest(TaskTestBase):
       self.create_dir('3rdparty/go')
       self.create_dir('src/go/src')
 
-    self.create_file(relpath='src/go/src/jane/bar.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/jane/bar.go', mode='w', contents=dedent("""
         package jane
 
         import "pantsbuild.org/fake/prod"
 
         var PublicConstant = prod.DoesNotExistButWeShouldNotCareWhenCheckingDepsAndNotInstalling
       """))
-    self.create_file(relpath='src/go/src/fred/foo.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/fred/foo.go', mode='w', contents=dedent("""
         package main
 
         import (
@@ -318,7 +318,7 @@ class GoBuildgenTest(TaskTestBase):
     self.add_to_build_file(relpath='3rdparty/go/pantsbuild.org/fake',
                            target='go_remote_library(rev="v4.5.6")')
 
-    self.create_file(relpath='src/go/src/jane/bar.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/jane/bar.go', mode='w', contents=dedent("""
         package jane
 
         import "pantsbuild.org/fake"
@@ -339,12 +339,12 @@ class GoBuildgenTest(TaskTestBase):
   def test_issues_2616(self):
     self.set_options(remote=False)
 
-    self.create_file(relpath='src/go/src/jane/bar.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/jane/bar.go', mode='w', contents=dedent("""
         package jane
 
         var PublicConstant = 42
       """))
-    self.create_file(relpath='src/go/src/fred/foo.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/fred/foo.go', mode='w', contents=dedent("""
         package main
 
         /*
@@ -379,19 +379,19 @@ class GoBuildgenTest(TaskTestBase):
 
     self.set_options(remote=False, materialize=False)
 
-    self.create_file(relpath='src/go/src/helper/helper.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/helper/helper.go', mode='w', contents=dedent("""
         package helper
 
         const PublicConstant = 42
       """))
 
-    self.create_file(relpath='src/go/src/lib/lib.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/lib/lib.go', mode='w', contents=dedent("""
         package lib
 
         const privateConstant = 42
       """))
 
-    self.create_file(relpath='src/go/src/lib/lib_test.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/lib/lib_test.go', mode='w', contents=dedent("""
         package lib_test
 
         import (

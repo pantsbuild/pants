@@ -19,4 +19,4 @@ class GoBinaryIntegrationTest(PantsRunIntegrationTest):
             'contrib/go/examples/src/go/hello']
     pants_run = self.run_pants(args, extra_env={"GOOS": "windows"})
     self.assert_success(pants_run)
-    self.assertIn("for MS Windows", subprocess.check_output(["file", output_file]))
+    self.assertIn(b"for MS Windows", subprocess.check_output(["file", output_file]))
