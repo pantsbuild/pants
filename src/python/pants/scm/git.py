@@ -472,8 +472,7 @@ class GitRepositoryReader(object):
     if object_type == b'tree':
       raise self.IsDirException(self.rev, relpath)
     assert object_type == b'blob'
-    data = [bytes([b]) for b in data]
-    yield io.BytesIO(b''.join(data))
+    yield io.BytesIO(data)
 
   @memoized_method
   def _realpath(self, relpath):
@@ -534,9 +533,7 @@ class GitRepositoryReader(object):
           # Is absolute, thus likely points outside the repo.
           raise self.ExternalSymlinkException(self.rev, relpath)
 
-        path_data = [bytes([b]) for b in path_data]
-        path_data_unicode = ''.join(v.decode('utf-8') for v in path_data)
-        link_to = os.path.normpath(os.path.join(parent_path, path_data_unicode))
+        link_to = os.path.normpath(os.path.join(parent_path, path_data.decode('utf-8')))
         if link_to.startswith('../') or link_to[0] == '/':
           # Points outside the repo.
           raise self.ExternalSymlinkException(self.rev, relpath)
@@ -573,6 +570,8 @@ class GitRepositoryReader(object):
     object_type, tree_data = self._read_object_from_repo(rev=self.rev, relpath=path)
     assert object_type == b'tree'
     # The tree data here is (mode ' ' filename \0 20-byte-sha)*
+    # It's transformed to a list of byte chars to allow iteration.
+    # See http://python-future.org/compatible_idioms.html#byte-string-literals.
     tree_data = [bytes([b]) for b in tree_data]
     i = 0
     while i < len(tree_data):
