@@ -164,6 +164,11 @@ def datatype(field_decls, superclass_name=None, **kwargs):
         class_name=type(self).__name__,
         typed_tagged_elements=', '.join(elements_formatted))
 
+    def copy(self, **kwargs):
+      field_dict = self._asdict()
+      field_dict.update(kwargs)
+      return type(self)(**field_dict)
+
   # Return a new type with the given name, inheriting from the DataType class
   # just defined, with an empty class body.
   try:  # Python3
