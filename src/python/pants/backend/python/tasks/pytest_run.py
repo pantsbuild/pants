@@ -152,7 +152,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
   class InvalidShardSpecification(TaskError):
     """Indicates an invalid `--test-shard` option."""
 
-  DEFAULT_COVERAGE_CONFIG = dedent(b"""
+  DEFAULT_COVERAGE_CONFIG = dedent("""
     [run]
     branch = True
     timid = False
