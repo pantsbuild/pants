@@ -8,9 +8,13 @@ import os
 import re
 from distutils.dir_util import copy_tree
 
+from pex.interpreter import PythonInterpreter
+
 from pants.backend.native.config.environment import Platform
 from pants.backend.native.subsystems.conan import Conan
 from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
+from pants.backend.python.tasks.wrapped_pex import WrappedPEX
+from pants.base.build_environment import get_pants_cachedir
 from pants.base.exceptions import TaskError
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
@@ -73,6 +77,9 @@ class NativeExternalLibraryFetch(Task):
   options_scope = 'native-external-library-fetch'
   native_library_constraint = Exactly(ExternalNativeLibrary)
 
+  conan_pex_subdir = 'conan-support'
+  conan_pex_filename = 'conan.pex'
+
   class NativeExternalLibraryFetchError(TaskError):
     pass
 
@@ -102,8 +109,21 @@ class NativeExternalLibraryFetch(Task):
     return True
 
   @memoized_property
+  def _conan_python_interpreter(self):
+    return PythonInterpreter.get()
+
+  @memoized_property
+  def _conan_pex_path(self):
+    return os.path.join(get_pants_cachedir(),
+                        self.conan_pex_subdir,
+                        self.conan_pex_filename)
+
+  @memoized_property
   def _conan_binary(self):
-    return Conan.scoped_instance(self).bootstrap_conan()
+    conan_pex = Conan.scoped_instance(self).bootstrap(
+      self._conan_python_interpreter,
+      self._conan_pex_path)
+    return WrappedPEX(conan_pex)
 
   def execute(self):
     native_lib_tgts = self.context.targets(self.native_library_constraint.satisfied_by)
@@ -155,16 +175,16 @@ class NativeExternalLibraryFetch(Task):
                         pkg_sha)
 
   def _remove_conan_center_remote_cmdline(self, conan_binary):
-    return conan_binary.pex.cmdline(['remote',
-                                     'remove',
-                                     'conan-center'])
+    return conan_binary.cmdline(['remote',
+                                 'remove',
+                                 'conan-center'])
 
   def _add_pants_conan_remote_cmdline(self, conan_binary, remote_index_num, remote_url):
-    return conan_binary.pex.cmdline(['remote',
-                                      'add',
-                                      'pants-conan-remote-' + str(remote_index_num),
-                                      remote_url,
-                                      '--insert'])
+    return conan_binary.cmdline(['remote',
+                                 'add',
+                                 'pants-conan-remote-' + str(remote_index_num),
+                                 remote_url,
+                                 '--insert'])
 
   def ensure_conan_remote_configuration(self, conan_binary):
     """
@@ -243,7 +263,7 @@ class NativeExternalLibraryFetch(Task):
         # Prepare conan command line and ensure remote is configured properly.
         self.ensure_conan_remote_configuration(self._conan_binary)
         args = conan_requirement.fetch_cmdline_args
-        cmdline = self._conan_binary.pex.cmdline(args)
+        cmdline = self._conan_binary.cmdline(args)
 
         self.context.log.debug('Running conan.pex cmdline: {}'.format(cmdline))
         self.context.log.debug('Conan remotes: {}'.format(self.get_options().conan_remotes))
