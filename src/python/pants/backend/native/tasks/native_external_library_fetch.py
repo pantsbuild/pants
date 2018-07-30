@@ -179,8 +179,6 @@ class NativeExternalLibraryFetch(Task):
     # and replace it with Pants-controlled remotes.
     remove_conan_center_remote_cmdline = self._remove_conan_center_remote_cmdline(conan_binary)
     try:
-      # Slice the command line because subprocess errors when the first element in the
-      # list of command strings is the setting of an environment variable.
       stdout = subprocess.check_output(remove_conan_center_remote_cmdline)
       self.context.log.debug(stdout)
     except subprocess.CalledProcessError as e:
