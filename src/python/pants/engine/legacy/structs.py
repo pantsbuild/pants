@@ -13,7 +13,7 @@ from six import string_types
 
 from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_list
-from pants.engine.fs import PathGlobs
+from pants.engine.fs import Conjunction, PathGlobs
 from pants.engine.objects import Locatable
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
@@ -59,20 +59,28 @@ class TargetAdaptor(StructWithDeps):
     # N.B. Here we check specifically for `sources is None`, as it's possible for sources
     # to be e.g. an explicit empty list (sources=[]).
     if sources is None and self.default_sources_globs is not None:
-      return Globs(*self.default_sources_globs,
-                    spec_path=self.address.spec_path,
-                    exclude=self.default_sources_exclude_globs or [])
-    return sources
+      sources = Globs(*self.default_sources_globs,
+                      spec_path=self.address.spec_path,
+                      exclude=self.default_sources_exclude_globs or [])
+      conjunction_globs = GlobsWithConjunction(sources, Conjunction('or'))
+    else:
+      conjunction_globs = GlobsWithConjunction(sources, Conjunction('and'))
+
+    return conjunction_globs
 
   @property
   def field_adaptors(self):
     """Returns a tuple of Fields for captured fields which need additional treatment."""
     with exception_logging(logger, 'Exception in `field_adaptors` property'):
-      sources = self.get_sources()
+      conjunction_globs = self.get_sources()
+      sources = conjunction_globs.non_path_globs
+      conjunction = conjunction_globs.conjunction
+
       if not sources:
         return tuple()
       base_globs = BaseGlobs.from_sources_field(sources, self.address.spec_path)
-      path_globs = base_globs.to_path_globs(self.address.spec_path)
+      path_globs = base_globs.to_path_globs(self.address.spec_path, conjunction)
+
       return (SourcesField(
         self.address,
         'sources',
@@ -215,6 +223,7 @@ class AppAdaptor(TargetAdaptor):
       # TODO: we want to have this field set from the global option --glob-expansion-failure, or
       # something set on the target. Should we move --glob-expansion-failure to be a bootstrap
       # option? See #5864.
+      # FIXME: get the right value for `conjunction`!
       path_globs = base_globs.to_path_globs(rel_root)
 
       filespecs_list.append(base_globs.filespecs)
@@ -243,6 +252,7 @@ class PythonTargetAdaptor(TargetAdaptor):
       if getattr(self, 'resources', None) is None:
         return field_adaptors
       base_globs = BaseGlobs.from_sources_field(self.resources, self.address.spec_path)
+      # FIXME: get the right value for `conjunction`!
       path_globs = base_globs.to_path_globs(self.address.spec_path)
       sources_field = SourcesField(self.address,
                                    'resources',
@@ -348,12 +358,12 @@ class BaseGlobs(Locatable, AbstractClass):
     else:
       return []
 
-  def to_path_globs(self, relpath):
+  def to_path_globs(self, relpath, conjunction):
     """Return a PathGlobs representing the included and excluded Files for these patterns."""
     return PathGlobs(
-      tuple(os.path.join(relpath, glob) for glob in self._file_globs),
-      tuple(os.path.join(relpath, exclude) for exclude in self._excluded_file_globs),
-    )
+      include=tuple(os.path.join(relpath, glob) for glob in self._file_globs),
+      exclude=tuple(os.path.join(relpath, exclude) for exclude in self._excluded_file_globs),
+      conjunction=conjunction)
 
   def _gen_init_args_str(self):
     all_arg_strs = []
@@ -396,3 +406,9 @@ class RGlobs(BaseGlobs):
 class ZGlobs(BaseGlobs):
   path_globs_kwarg = 'zglobs'
   legacy_globs_class = wrapped_globs.ZGlobs
+
+
+class GlobsWithConjunction(datatype([
+    'non_path_globs',
+    ('conjunction', Conjunction),
+])): pass
