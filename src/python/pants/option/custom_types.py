@@ -236,7 +236,7 @@ class ListValueComponent(object):
     return cls(action, list(appends), list(filters))
 
   def __repr__(self):
-    return b'{} +{} -{}'.format(self._action, self._appends, self._filters)
+    return '{} +{} -{}'.format(self._action, self._appends, self._filters)
 
 
 class DictValueComponent(object):
@@ -305,4 +305,4 @@ class DictValueComponent(object):
     return cls(action, dict(val))
 
   def __repr__(self):
-    return b'{} {}'.format(self.action, self.val)
+    return '{} {}'.format(self.action, self.val)
