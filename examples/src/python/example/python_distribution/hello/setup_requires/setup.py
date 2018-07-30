@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 from setuptools import setup, find_packages
 
-# We require pycountry with setup_requires argument to this setup script's 
+# We require pycountry with setup_requires argument to this setup script's
 # corresponding python_dist.
 import pycountry
 
