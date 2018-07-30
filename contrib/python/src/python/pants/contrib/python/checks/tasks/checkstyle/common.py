@@ -127,8 +127,8 @@ class PythonFile(object):
     else:
       full_filename = filename
 
-    with open(full_filename, 'r') as fp:
-      blob = fp.read().encode('utf-8')
+    with open(full_filename, 'rb') as fp:
+      blob = fp.read()
 
     tree = cls._parse(blob, filename)
 
@@ -272,7 +272,7 @@ class Nit(object):
     self._lines = lines
 
   def __str__(self):
-    """convert ascii for safe terminal output"""
+    """Sanitize to Ascii for safe terminal output"""
     flat = list(self.flatten_lines([self.message], self.lines))
     return '\n     |'.join(flat).encode('ascii', errors='replace').decode('ascii')
 
