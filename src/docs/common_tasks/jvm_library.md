@@ -40,11 +40,11 @@ That library can then be compiled (perhaps for debugging purposes):
     ::python
     $ ./pants compile myproject/src/main/scala
 
-You can combine library targets together into a single target using a **target alias**. More info can be found in [[Create an Alias for a Target|pants('src/docs/common_tasks:alias')]].
+You can combine library targets together into a single target using a **target aggregate**. More info can be found in [[Create a Target Aggregate|pants('src/docs/common_tasks:target_aggregate')]].
 
 ## See Also
 
 * [[Compile a Library Target|pants('src/docs/common_tasks:compile')]]
 * [[Define a JVM Executable|pants('src/docs/common_tasks:jvm_binary')]]
 * [[Create a Bundled zip or Other Archive|pants('src/docs/common_tasks:bundle')]]
-* [[Create an Alias for a Target|pants('src/docs/common_tasks:alias')]]
+* [[Create a Target Aggregate|pants('src/docs/common_tasks:target_aggregate')]]

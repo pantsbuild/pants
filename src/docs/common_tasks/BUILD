@@ -109,6 +109,11 @@ page(
 )
 
 page(
+  name='target_aggregate',
+  source='target_aggregate.md',
+)
+
+page(
   name='test',
   source='test.md',
 )
