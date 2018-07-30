@@ -58,6 +58,7 @@ python_tests(
   name = 'fileutil',
   sources = ['test_fileutil.py'],
   dependencies = [
+    '3rdparty/python:mock',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:fileutil',
   ]
