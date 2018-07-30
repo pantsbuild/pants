@@ -10,9 +10,6 @@ from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import P
 class PyCodeStyleSubsystem(PluginSubsystemBase):
   options_scope = 'pycheck-pycodestyle'
 
-  deprecated_options_scope = 'pycheck-pep8'
-  deprecated_options_scope_removal_version = '1.10.0.dev0'
-
   # Code reference is here: https://pycodestyle.readthedocs.io/en/latest/intro.html#error-codes
   DEFAULT_IGNORE_CODES = (
     # continuation_line_indentation

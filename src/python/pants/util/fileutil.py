@@ -4,9 +4,11 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import errno
 import os
 import random
 import shutil
+from uuid import uuid4
 
 from pants.util.contextutil import temporary_file
 
@@ -37,3 +39,23 @@ def create_size_estimators():
     'nosize': lambda srcs: 0,
     'random': lambda srcs: random.randint(0, 10000),
   }
+
+
+def safe_hardlink_or_copy(source, dest, overwrite=False):
+  def do_copy():
+    temp_dest = dest + uuid4().hex
+    shutil.copyfile(source, temp_dest)
+    os.rename(temp_dest, dest)
+
+  try:
+    os.link(source, dest)
+  except OSError as e:
+    if e.errno == errno.EEXIST:
+      # File already exists.  If overwrite=True, write otherwise skip.
+      if overwrite:
+        do_copy()
+    elif e.errno == errno.EXDEV:
+      # Hard link across devices, fall back on copying
+      do_copy()
+    else:
+      raise

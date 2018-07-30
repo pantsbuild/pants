@@ -4,6 +4,229 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.10.0dev0 (07/27/2018)
+-----------------------
+
+* Remove 1.10.x deprecations (#6268)
+  `PR #6268 <https://github.com/pantsbuild/pants/pull/6268>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add a debug dump flag to the zinc analysis extractor. (#6241)
+  `PR #6241 <https://github.com/pantsbuild/pants/pull/6241>`_
+
+* Add functionality to create jars in zinc wrapper (#6094)
+  `PR #6094 <https://github.com/pantsbuild/pants/pull/6094>`_
+
+* Allow user to specify chunk size (#6173)
+  `PR #6173 <https://github.com/pantsbuild/pants/pull/6173>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix spurious deprecation warning for fatal_warnings (#6237)
+  `PR #6237 <https://github.com/pantsbuild/pants/pull/6237>`_
+
+* Associate cli arguments with executables and refactor llvm/gcc c/c++ toolchain selection (#6217)
+  `PR #6217 <https://github.com/pantsbuild/pants/pull/6217>`_
+
+* Fix pydist native sources selection (#6205)
+  `PR #6205 <https://github.com/pantsbuild/pants/pull/6205>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Convert `fmt.isort` to bootstrapping isort. (#6182)
+  `PR #6182 <https://github.com/pantsbuild/pants/pull/6182>`_
+
+* Fix env construction on ExecuteProcessRequest (#6220)
+  `PR #6220 <https://github.com/pantsbuild/pants/pull/6220>`_
+
+* Ci deduplication (#6186)
+  `PR #6186 <https://github.com/pantsbuild/pants/pull/6186>`_
+
+* [missing-deps-suggest] move buildozer cli to a new line (#6190)
+  `PR #6190 <https://github.com/pantsbuild/pants/pull/6190>`_
+
+* Print stack trace on ExecutionGraph task failures (#6177)
+  `PR #6177 <https://github.com/pantsbuild/pants/pull/6177>`_
+
+* Add basic native task unit tests. (#6179)
+  `PR #6179 <https://github.com/pantsbuild/pants/pull/6179>`_
+
+* Start migrating away from SchedulerTestBase (#5929)
+  `PR #5929 <https://github.com/pantsbuild/pants/pull/5929>`_
+
+* Only clone taken Strings, not all Strings (#6240)
+  `PR #6240 <https://github.com/pantsbuild/pants/pull/6240>`_
+
+* Remove unused custom `working_set` parameters. (#6221)
+  `PR #6221 <https://github.com/pantsbuild/pants/pull/6221>`_
+
+* Update protobuf and grpcio deps (#6248)
+  `PR #6248 <https://github.com/pantsbuild/pants/pull/6248>`_
+
+Migration to Python3 compatibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Python 3 fixes - fix backend/docgen test issues with bytes vs unicode (#6265)
+  `PR #6265 <https://github.com/pantsbuild/pants/pull/6265>`_
+
+* Python 3 fixes - fix scm bytes vs unicode issues (#6257)
+  `PR #6257 <https://github.com/pantsbuild/pants/pull/6257>`_
+
+* Python 3 fixes - fix net/http issues with bytes vs unicode (#6258)
+  `PR #6258 <https://github.com/pantsbuild/pants/pull/6258>`_
+
+* Python 3 fixes - fix test_base.create_files() unicode issue (#6266)
+  `PR #6266 <https://github.com/pantsbuild/pants/pull/6266>`_
+
+* Fix invalidation unicode vs bytes issues (#6262)
+  `PR #6262 <https://github.com/pantsbuild/pants/pull/6262>`_
+
+* Fix fake options unicode vs bytes issues (#6263)
+  `PR #6263 <https://github.com/pantsbuild/pants/pull/6263>`_
+
+* Python 3 fixes - fix ivy issues with unicode vs bytes (#6264)
+  `PR #6264 <https://github.com/pantsbuild/pants/pull/6264>`_
+
+* Bump beautifulsoup4 to 4.6 to fix Python 3 issue. (#6260)
+  `PR #6260 <https://github.com/pantsbuild/pants/pull/6260>`_
+
+* Python 3 fixes - fix unicode and __hash__ issues with release folder (#6261)
+  `PR #6261 <https://github.com/pantsbuild/pants/pull/6261>`_
+
+* Python 3 fixes - fix syntax issue in reporting test (#6259)
+  `PR #6259 <https://github.com/pantsbuild/pants/pull/6259>`_
+
+* Python 3 fixes - fix process test byte issue (#6256)
+  `PR #6256 <https://github.com/pantsbuild/pants/pull/6256>`_
+
+* Split file set by line instead of spaces to resolve errors (#6247)
+  `PR #6247 <https://github.com/pantsbuild/pants/pull/6247>`_
+
+* Python 3 fixes - test root unicode vs bytes (#6253)
+  `PR #6253 <https://github.com/pantsbuild/pants/pull/6253>`_
+
+* Port test/tasks to Python 3 (#6255)
+  `PR #6255 <https://github.com/pantsbuild/pants/pull/6255>`_
+
+* Python 3 fixes - fix base folder (#6252)
+  `PR #6252 <https://github.com/pantsbuild/pants/pull/6252>`_
+
+* Python 3 fixes - fix invalid ABCMeta comparison (#6251)
+  `PR #6251 <https://github.com/pantsbuild/pants/pull/6251>`_
+
+* Fix syntax issue with raising error (#6245)
+  `PR #6245 <https://github.com/pantsbuild/pants/pull/6245>`_
+
+* Exclude faulthandler and futures if Python 3 (#6244)
+  `PR #6244 <https://github.com/pantsbuild/pants/pull/6244>`_
+
+* Python 3 fixes - fix tarutil and contextutil_test (#6243)
+  `PR #6243 <https://github.com/pantsbuild/pants/pull/6243>`_
+
+* Python 3 fixes - use unicode with temporary_directory() file path (#6233)
+  `PR #6233 <https://github.com/pantsbuild/pants/pull/6233>`_
+
+* Python 3 fixes - fix netrc.py, retry.py, and test_objects.py (#6235)
+  `PR #6235 <https://github.com/pantsbuild/pants/pull/6235>`_
+
+* Python 3 fixes - fix dirutil, fileutil, and xml_parser tests (#6229)
+  `PR #6229 <https://github.com/pantsbuild/pants/pull/6229>`_
+  `PR #6228 <https://github.com/pantsbuild/pants/pull/6228>`_
+
+* Fix issue of os.environ expecting bytes vs unicode in Py2 vs Py3 (#6222)
+  `PR #6222 <https://github.com/pantsbuild/pants/pull/6222>`_
+
+* Python 3 fixes - specify binary vs unicode behavior of temporary_file() (#6226)
+  `PR #6226 <https://github.com/pantsbuild/pants/pull/6226>`_
+
+* Python 3 fixes - fix process_handler timing out (#6232)
+  `PR #6232 <https://github.com/pantsbuild/pants/pull/6232>`_
+
+* Port bin to Python 3 (#6126)
+  `PR #6126 <https://github.com/pantsbuild/pants/pull/6126>`_
+
+* Python 3 fixes - fix various TestBase issues (#6228)
+  `PR #6228 <https://github.com/pantsbuild/pants/pull/6228>`_
+
+* An initial engine terminal UI and demo. (#6223)
+  `PR #6223 <https://github.com/pantsbuild/pants/pull/6223>`_
+
+* Python 3 - fix cffi resolver issues  (#6225)
+  `PR #6225 <https://github.com/pantsbuild/pants/pull/6225>`_
+
+* Exclude subprocess32 if Python 3 (#6212)
+  `PR #6212 <https://github.com/pantsbuild/pants/pull/6212>`_
+
+* Fix imports of future.utils (#6213)
+  `PR #6213 <https://github.com/pantsbuild/pants/pull/6213>`_
+
+* Port test's root folder (#6207)
+  `PR #6207 <https://github.com/pantsbuild/pants/pull/6207>`_
+
+* Port task (#6200)
+  `PR #6200 <https://github.com/pantsbuild/pants/pull/6200>`_
+
+* Port backend/jvm (#6092)
+  `PR #6092 <https://github.com/pantsbuild/pants/pull/6092>`_
+
+* Port net (#6162)
+  `PR #6162 <https://github.com/pantsbuild/pants/pull/6162>`_
+
+* Port pantsd/ to python3 (#6136)
+  `PR #6136 <https://github.com/pantsbuild/pants/pull/6136>`_
+
+* futurize confluence (#6115)
+  `PR #6115 <https://github.com/pantsbuild/pants/pull/6115>`_
+
+* Port testutils to Python 3 (#6211)
+  `PR #6211 <https://github.com/pantsbuild/pants/pull/6211>`_
+
+* Port examples to Python 3 (#6210)
+  `PR #6210 <https://github.com/pantsbuild/pants/pull/6210>`_
+
+* Port pants-plugins to Python 3 (#6209)
+  `PR #6209 <https://github.com/pantsbuild/pants/pull/6209>`_
+
+* Port cache to Python 3 (#6129)
+  `PR #6129 <https://github.com/pantsbuild/pants/pull/6129>`_
+
+* Port stats to Python 3 (#6198)
+  `PR #6198 <https://github.com/pantsbuild/pants/pull/6198>`_
+
+* Port subsystem to Python 3 (#6199)
+  `PR #6199 <https://github.com/pantsbuild/pants/pull/6199>`_
+
+* Port source to Python 3 (#6197)
+  `PR #6197 <https://github.com/pantsbuild/pants/pull/6197>`_
+
+* Port scm to Python 3 (#6196)
+  `PR #6196 <https://github.com/pantsbuild/pants/pull/6196>`_
+
+* Port releases to Python 3 (#6194)
+  `PR #6194 <https://github.com/pantsbuild/pants/pull/6194>`_
+
+* Port process package to Python 3 (#6193)
+  `PR #6193 <https://github.com/pantsbuild/pants/pull/6193>`_
+
+* Prepare a noop release for 1.9.0rc1. (#6204)
+  `PR #6204 <https://github.com/pantsbuild/pants/pull/6204>`_
+
+* Port reporting to Python 3 (#6195)
+  `PR #6195 <https://github.com/pantsbuild/pants/pull/6195>`_
+
+* Port build graph to Python 3 (#6128)
+  `PR #6128 <https://github.com/pantsbuild/pants/pull/6128>`_
+
+* Port contrib/node to py3 (#6158)
+  `PR #6158 <https://github.com/pantsbuild/pants/pull/6158>`_
+
+* update contrib/python with py3 compat (#6184)
+  `PR #6184 <https://github.com/pantsbuild/pants/pull/6184>`_
+
 1.9.0rc0 (07/19/2018)
 ---------------------
 

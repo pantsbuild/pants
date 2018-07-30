@@ -83,18 +83,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'list_owners',
-  sources = ['test_list_owners.py'],
-  dependencies = [
-    'src/python/pants/backend/graph_info/tasks',
-    'src/python/pants/backend/python/targets:python',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/build_graph',
-    'tests/python/pants_test:task_test_base',
-  ],
-)
-
-python_tests(
   name = 'minimal_cover',
   sources = ['test_minimal_cover.py'],
   dependencies = [

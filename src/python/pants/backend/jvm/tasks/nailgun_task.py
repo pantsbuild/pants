@@ -27,11 +27,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   @classmethod
   def register_options(cls, register):
     super(NailgunTaskBase, cls).register_options(register)
-    # --use-nailgun is deprecated
-    register('--use-nailgun', type=bool,
-             help='Use nailgun to make repeated invocations of this task quicker.',
-             removal_version='1.10.0.dev0', removal_hint='Please use --execution-strategy instead.')
-    register('--execution-strategy', choices=[cls.NAILGUN, cls.SUBPROCESS, cls.HERMETIC],
+    register('--execution-strategy', choices=[cls.NAILGUN, cls.SUBPROCESS, cls.HERMETIC], default=cls.NAILGUN,
              help='If set to nailgun, nailgun will be enabled and repeated invocations of this '
                   'task will be quicker. If set to subprocess, then the task will be run without nailgun.')
     register('--nailgun-timeout-seconds', advanced=True, default=10, type=float,
@@ -64,16 +60,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
   @memoized_property
   def execution_strategy(self):
-    # This will be more complex as we add more execution strategies are added
-    # Expected behavior: if execution-strategy is set, it will override use-nailgun
-    if not self.get_options().execution_strategy and not self.get_options().use_nailgun:
-      # If both flags are None
-      return self.NAILGUN
-    elif self.get_options().execution_strategy:
-      return self.get_options().execution_strategy
-    elif self.get_options().use_nailgun is False:
-      return self.SUBPROCESS
-    return self.NAILGUN
+    return self.get_options().execution_strategy
 
   def create_java_executor(self, dist=None):
     """Create java executor that uses this task's ng daemon, if allowed.
@@ -96,9 +83,9 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
               workunit_labels=None, workunit_log_config=None, dist=None):
     """Runs the java main using the given classpath and args.
 
-    If --no-use-nailgun is specified then the java main is run in a freshly spawned subprocess,
-    otherwise a persistent nailgun server dedicated to this Task subclass is used to speed up
-    amortized run times.
+    If --execution-strategy=subprocess is specified then the java main is run in a freshly spawned
+    subprocess, otherwise a persistent nailgun server dedicated to this Task subclass is used to
+    speed up amortized run times.
 
     :API: public
     """

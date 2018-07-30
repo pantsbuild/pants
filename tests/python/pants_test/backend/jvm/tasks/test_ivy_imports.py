@@ -65,6 +65,6 @@ class IvyImportsTest(NailgunTaskTestBase):
     jars_by_coordinate = dict(jar_import_products.imports(target))
     self.assertIn(expected_coordinate, jars_by_coordinate)
     jar_filename = jars_by_coordinate[expected_coordinate]
-    self.assertTrue(os.path.islink(jar_filename))
+    self.assertFalse(os.path.islink(jar_filename))
     # Make sure there is a real .jar there
     self.assertTrue(zipfile.is_zipfile(jar_filename))

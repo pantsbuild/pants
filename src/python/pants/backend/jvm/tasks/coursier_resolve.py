@@ -29,6 +29,7 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir
+from pants.util.fileutil import safe_hardlink_or_copy
 
 
 class CoursierResultNotFound(Exception):
@@ -191,7 +192,7 @@ class CoursierMixin(NailgunTask):
 
   def _prepare_workdir(self, pants_workdir):
     """
-    Given pants workdir, prepare the location in pants workdir to store all the symlinks
+    Given pants workdir, prepare the location in pants workdir to store all the hardlinks
     to coursier cache dir.
     """
     pants_jar_base_dir = os.path.join(pants_workdir, 'coursier', 'cache')
@@ -424,7 +425,7 @@ class CoursierMixin(NailgunTask):
     :param compile_classpath: `ClasspathProducts` that will be modified
     :param coursier_cache_path: cache location that is managed by coursier
     :param invalidation_check: InvalidationCheck
-    :param pants_jar_path_base: location under pants workdir that contains all the symlinks to coursier cache
+    :param pants_jar_path_base: location under pants workdir that contains all the hardlinks to coursier cache
     :param result: result dict converted from the json produced by one coursier run
     :return: n/a
     """
@@ -592,7 +593,7 @@ class CoursierMixin(NailgunTask):
 
     :param result: coursier json output
     :param coursier_cache_path: coursier cache location
-    :param pants_jar_path_base: location under pants workdir to store the symlink to the coursier cache
+    :param pants_jar_path_base: location under pants workdir to store the hardlink to the coursier cache
     :return: a map from maven coordinate to a resolved jar.
     """
 
@@ -613,7 +614,7 @@ class CoursierMixin(NailgunTask):
 
       if not os.path.exists(pants_path):
         safe_mkdir(os.path.dirname(pants_path))
-        os.symlink(jar_path, pants_path)
+        safe_hardlink_or_copy(jar_path, pants_path)
 
       coord = cls.to_m2_coord(coord)
       resolved_jar = ResolvedJar(coord,
@@ -632,7 +633,7 @@ class CoursierMixin(NailgunTask):
     Create the path to the jar that will live in .pants.d
     
     :param coursier_cache_path: coursier cache location
-    :param pants_jar_path_base: location under pants workdir to store the symlink to the coursier cache
+    :param pants_jar_path_base: location under pants workdir to store the hardlink to the coursier cache
     :param jar_path: path of the jar
     :return:
     """
