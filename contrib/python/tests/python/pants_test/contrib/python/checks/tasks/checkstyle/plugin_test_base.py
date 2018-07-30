@@ -27,7 +27,7 @@ class CheckstylePluginTestBase(unittest.TestCase):
   def create_python_file(self, file_content):
     if self.file_required:
       tmpdir = safe_mkdtemp()
-      with open(os.path.join(tmpdir, 'file.py'), 'wb') as fp:
+      with open(os.path.join(tmpdir, 'file.py'), 'w') as fp:
         fp.write(file_content)
         fp.close()
         return PythonFile.parse(fp.name)
