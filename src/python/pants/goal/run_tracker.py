@@ -359,7 +359,7 @@ class RunTracker(Subsystem):
     # TODO(benjy): Do we really need these, once the statsdb is mature?
     stats_file = os.path.join(get_pants_cachedir(), 'stats',
                               '{}.json'.format(self.run_info.get_info('id')))
-    safe_file_dump(stats_file, json.dumps(stats))
+    safe_file_dump(stats_file, json.dumps(stats), binary_mode=False)
 
     # Add to local stats db.
     StatsDBFactory.global_instance().get_db().insert_stats(stats)
