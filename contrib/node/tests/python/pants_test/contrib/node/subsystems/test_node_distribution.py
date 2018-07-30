@@ -26,18 +26,18 @@ class NodeDistributionTest(unittest.TestCase):
 
   def test_node(self):
     node_command = self.distribution.node_command(args=['--interactive'])  # Force a REPL session.
-    repl = node_command.run(stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
+    repl = node_command.run(stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    out, err = repl.communicate('console.log("Hello World!")')
-    self.assertEqual('', err)
+    out, err = repl.communicate(b'console.log("Hello World!")')
+    self.assertEqual(b'', err)
     self.assertEqual(0, repl.returncode)
 
     for line in out.splitlines():
-      if line.endswith('Hello World!'):
+      if line.endswith(b'Hello World!'):
         break
     else:
       self.fail('Did not find the expected "Hello World!" in the REPL session '
-                'output:\n{}'.format(out))
+                'output:\n{}'.format(out.decode('utf-8')))
 
   def test_npm(self):
     npm_version_flag = self.distribution.get_package_manager('npm').run_command(
