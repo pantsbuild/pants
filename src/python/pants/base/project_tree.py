@@ -8,7 +8,6 @@ import logging
 import os
 from abc import abstractmethod, abstractproperty
 
-import six
 from pathspec.pathspec import PathSpec
 from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
@@ -214,18 +213,18 @@ class File(datatype(['path']), Stat):
   """A file."""
 
   def __new__(cls, path):
-    return super(File, cls).__new__(cls, six.binary_type(path))
+    return super(File, cls).__new__(cls, path)
 
 
 class Dir(datatype(['path']), Stat):
   """A directory."""
 
   def __new__(cls, path):
-    return super(Dir, cls).__new__(cls, six.binary_type(path))
+    return super(Dir, cls).__new__(cls, path)
 
 
 class Link(datatype(['path']), Stat):
   """A symbolic link."""
 
   def __new__(cls, path):
-    return super(Link, cls).__new__(cls, six.binary_type(path))
+    return super(Link, cls).__new__(cls, path)
