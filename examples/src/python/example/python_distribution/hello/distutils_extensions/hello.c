@@ -12,7 +12,6 @@ static const char *hello_str = "Hello from outside of Pants!";
 
     static PyObject *
     hello(PyObject *self, PyObject *args) {
-  /* FIXME: make this depend on some env var we pass in!? */
   return Py_BuildValue("s", hello_str);
 }
 

@@ -121,6 +121,8 @@ def select_llvm_c_toolchain(platform, native_toolchain):
   # These arguments are shared across platforms.
   llvm_c_compiler_args = [
     '-x', 'c', '-std=c11',
+    # FIXME: we need #6271 so we can get all the system header/lib dirs before we can use this --
+    # (otherwise compilation will fail).
     '-nobuiltininc',
   ]
 

@@ -245,12 +245,8 @@ class SetupPyExecutionEnvironment(datatype([
       all_include_dirs = cpp_compiler.include_dirs + c_compiler.include_dirs
       ret['CPATH'] = create_path_env_var(all_include_dirs)
 
-      shared_compile_flags = safe_shlex_join(plat.resolve_platform_specific({
-        'darwin': lambda: [MIN_OSX_VERSION_ARG],
-        'linux': lambda: [],
-      }))
-      ret['CFLAGS'] = shared_compile_flags
-      ret['CXXFLAGS'] = shared_compile_flags
+      ret['CFLAGS'] = safe_shlex_join(c_compiler.extra_args)
+      ret['CXXFLAGS'] = safe_shlex_join(cpp_compiler.extra_args)
 
       ret['CC'] = c_compiler.exe_filename
       ret['CXX'] = cpp_compiler.exe_filename

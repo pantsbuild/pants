@@ -31,6 +31,16 @@ def customize_compiler_from_env(compiler):
     compiler_cxx=cxx_cmd,
     linker_so=link_cmd)
 
+  include_dirs = os.environ['CPATH'].split(':')
+  compiler.set_include_dirs(include_dirs)
+
+  lib_dirs = os.environ['LIBRARY_PATH'].split(':')
+  compiler.set_library_dirs(lib_dirs)
+
+  all_runtime_library_dir_candidates = (os.environ.get('LD_LIBRARY_PATH', '').split(':') +
+                                        os.environ.get('DYLD_LIBRARY_PATH', '').split(':'))
+  compiler.set_runtime_library_dirs(all_runtime_library_dir_candidates)
+
 
 class pants_build_ext(distutils_build_ext):
   """???"""
@@ -96,6 +106,7 @@ class pants_build_ext(distutils_build_ext):
         self._append_to_compiler_property(self.rpath, self.compiler.add_runtime_library_dir)
         self._append_to_compiler_property(self.link_objects, self.compiler.add_link_object)
 
+        # TODO: ???
         self.compiler.define_macro('PANTS_PYTHON_DIST', None)
 
         # Now actually compile and link everything.

@@ -10,7 +10,7 @@ from setuptools import find_packages
 # FIXME: do an integration test showing that each of these works (can be imported and run)!
 try:
   from pants.backend.python.distutils_extensions import pants_setup as setup
-except ImportError as e:
+except ImportError:
   from setuptools import setup
 
 
