@@ -8,10 +8,6 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class ListOwnersIntegrationTest(PantsRunIntegrationTest):
-  # TODO: This test provides additional coverage for list-owners, which is already covered by
-  # unit tests. Unfortunately, those are not covering the v2 engine:
-  #  see: https://github.com/pantsbuild/pants/issues/4401
-
   def get_target_set(self, std_out):
     return sorted([l for l in std_out.split('\n') if l])
 
@@ -19,5 +15,5 @@ class ListOwnersIntegrationTest(PantsRunIntegrationTest):
     return self.get_target_set(self.do_command(*args, success=True).stdout_data)
 
   def test_list_owners(self):
-    targets = self.targets_for('list-owners', '--', 'contrib/go/examples/src/go/server/main.go')
+    targets = self.targets_for('--owner-of=contrib/go/examples/src/go/server/main.go', 'list')
     self.assertEqual(['contrib/go/examples/src/go/server:server'], targets)

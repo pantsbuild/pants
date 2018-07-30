@@ -8,7 +8,6 @@ import os
 import re
 from builtins import object
 
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 
 
@@ -22,21 +21,7 @@ class FileExcluder(object):
         for line in fh.readlines():
           if line and not line.startswith('#') and '::' in line:
             pattern, plugins = line.strip().split('::', 2)
-            plugins = plugins.split()
-
-            deprecated_conditional(
-              lambda: 'pep8' in plugins,
-              '1.10.0.dev0',
-              'The pep8 check has been renamed to pycodestyle. '
-              'Please update your suppression file: "{}". The pep8 option'.format(excludes_path)
-            )
-
-            style_plugins = []
-            for p in plugins:
-              if p == 'pep8':
-                style_plugins.append('pycodestyle')
-              else:
-                style_plugins.append(p)
+            style_plugins = plugins.split()
 
             self.excludes[pattern] = {
               'regex': re.compile(pattern),

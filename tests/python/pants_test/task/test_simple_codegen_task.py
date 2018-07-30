@@ -60,6 +60,8 @@ class DummyGen(SimpleCodegenTask):
   by SimpleCodegenTask.
   """
 
+  sources_globs = ('**/*.java',)
+
   def __init__(self, *args, **kwargs):
     super(DummyGen, self).__init__(*args, **kwargs)
     self._test_case = None
@@ -99,7 +101,9 @@ class DummyGen(SimpleCodegenTask):
           line = line.strip()
           if line:
             package_name, class_name = line.split(' ')
-            yield os.path.join(target_workdir, os.path.join(*package_name.split('.')), class_name)
+            yield os.path.join(target_workdir,
+                               os.path.join(*package_name.split('.')),
+                               '{}.java'.format(class_name))
 
   def synthetic_target_type(self, target):
     return SyntheticDummyLibrary
@@ -268,11 +272,11 @@ class SimpleCodegenTaskTest(TaskTestBase):
     self.assertEqual('copythis', task.codegen_targets()[0].copied)
 
   def test_invalidation_of_generated_sources(self):
-    self.create_file('src/thrift/com/foo/one.thrift', 'initial state')
+    self.create_file('src/dummy/com/foo/one.dummy', 'com.foo InitialState')
 
-    t1 = self.make_target(spec='src/thrift/com/foo:one',
+    t1 = self.make_target(spec='src/dummy/com/foo:one',
                           target_type=DummyLibrary,
-                          sources=['one.thrift'])
+                          sources=['one.dummy'])
 
     task1 = self._create_dummy_task(target_roots=t1)
     task1.execute()
@@ -285,11 +289,11 @@ class SimpleCodegenTaskTest(TaskTestBase):
 
     self.reset_build_graph()
 
-    self.create_file('src/thrift/com/foo/one.thrift', 'changed state')
+    self.create_file('src/dummy/com/foo/one.dummy', 'com.foo ChangedState')
 
-    t2 = self.make_target(spec='src/thrift/com/foo:one',
+    t2 = self.make_target(spec='src/dummy/com/foo:one',
                           target_type=DummyLibrary,
-                          sources=['one.thrift'])
+                          sources=['one.dummy'])
 
     task2 = self._create_dummy_task(target_roots=t2)
     task2.execute()
