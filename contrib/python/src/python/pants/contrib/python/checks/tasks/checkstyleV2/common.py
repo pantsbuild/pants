@@ -2,7 +2,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import ast
 import codecs
@@ -12,7 +13,6 @@ import re
 import textwrap
 import tokenize
 from abc import abstractmethod
-from builtins import object
 from collections import Sequence
 
 import six
@@ -198,7 +198,7 @@ class PythonFile(object):
         yield self.translate_logical_line(
             line_number_start,
             token_start[0] + (1 if token_type is tokenize.NEWLINE else -1),
-            [_f for _f in contents if _f],
+            list(filter(None, contents)),
             indent_stack,
             endmarker=token_type == tokenize.ENDMARKER)
         contents = []
