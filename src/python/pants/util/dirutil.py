@@ -84,6 +84,12 @@ def safe_mkdir_for(path, clean=False):
 
 
 def safe_mkdir_for_all(paths):
+  """Make directories which would contain all of the passed paths.
+
+  This avoids attempting to re-make the same directories, which may be noticeably expensive if many
+  paths mostly fall in the same set of directories.
+  :type paths list<string>
+  """
   created_dirs = set()
   for path in paths:
     dir_to_make = os.path.dirname(path)

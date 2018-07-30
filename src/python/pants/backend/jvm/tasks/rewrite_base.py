@@ -41,7 +41,7 @@ class RewriteBase(NailgunTask, AbstractClass):
       sideeffecting = False
     if sideeffecting:
       register('--output-dir', advanced=True, type=dir_option, fingerprint=True,
-               help='Path to scalafmt output directory. Any updated files will be written here. '
+               help='Path to output directory. Any updated files will be written here. '
                'If not specified, files will be modified in-place.')
 
   @classmethod
@@ -83,12 +83,12 @@ class RewriteBase(NailgunTask, AbstractClass):
     if not target_sources:
       return
 
-    result = Xargs(self._invoke_tool_in_or_out_of_place).execute(target_sources)
+    result = Xargs(self._invoke_tool).execute(target_sources)
     if result != 0:
       raise TaskError('{} is improperly implemented: a failed process '
                       'should raise an exception earlier.'.format(type(self).__name__))
 
-  def _invoke_tool_in_or_out_of_place(self, target_sources):
+  def _invoke_tool(self, target_sources):
     buildroot = get_buildroot()
     toolroot = buildroot
     if self.sideeffecting and self.get_options().output_dir:
