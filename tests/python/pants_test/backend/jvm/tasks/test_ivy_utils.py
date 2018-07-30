@@ -332,10 +332,10 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
   def assert_attributes(self, elem, **kwargs):
     self.assertEqual(dict(**kwargs), dict(elem.attrib))
 
-  def test_construct_and_load_symlink_map(self):
+  def test_construct_and_load_hardlink_map(self):
     self.maxDiff = None
     with temporary_dir() as mock_cache_dir:
-      with temporary_dir() as symlink_dir:
+      with temporary_dir() as hardlink_dir:
         with temporary_dir() as classpath_dir:
           input_path = os.path.join(classpath_dir, 'inpath')
           output_path = os.path.join(classpath_dir, 'classpath')
@@ -345,21 +345,21 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
           with open(input_path, 'w') as inpath:
             inpath.write(foo_path)
-          result_classpath, result_map = IvyUtils.construct_and_load_symlink_map(symlink_dir,
+          result_classpath, result_map = IvyUtils.construct_and_load_hardlink_map(hardlink_dir,
                                                                                  mock_cache_dir,
                                                                                  input_path,
                                                                                  output_path)
-          symlink_foo_path = os.path.join(symlink_dir, 'foo.jar')
-          self.assertEquals([symlink_foo_path], result_classpath)
+          hardlink_foo_path = os.path.join(hardlink_dir, 'foo.jar')
+          self.assertEquals([hardlink_foo_path], result_classpath)
           self.assertEquals(
             {
-              os.path.realpath(foo_path): symlink_foo_path
+              os.path.realpath(foo_path): hardlink_foo_path
             },
             result_map)
           with open(output_path, 'r') as outpath:
-            self.assertEquals(symlink_foo_path, outpath.readline())
-          self.assertTrue(os.path.islink(symlink_foo_path))
-          self.assertTrue(os.path.exists(symlink_foo_path))
+            self.assertEquals(hardlink_foo_path, outpath.readline())
+          self.assertFalse(os.path.islink(hardlink_foo_path))
+          self.assertTrue(os.path.exists(hardlink_foo_path))
 
           # Now add an additional path to the existing map
           bar_path = os.path.join(mock_cache_dir, 'bar.jar')
@@ -367,35 +367,35 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
             bar.write("test jar contents2")
           with open(input_path, 'w') as inpath:
             inpath.write(os.pathsep.join([foo_path, bar_path]))
-          result_classpath, result_map = IvyUtils.construct_and_load_symlink_map(symlink_dir,
+          result_classpath, result_map = IvyUtils.construct_and_load_hardlink_map(hardlink_dir,
                                                                                  mock_cache_dir,
                                                                                  input_path,
                                                                                  output_path)
-          symlink_bar_path = os.path.join(symlink_dir, 'bar.jar')
+          hardlink_bar_path = os.path.join(hardlink_dir, 'bar.jar')
           self.assertEquals(
             {
-              os.path.realpath(foo_path): symlink_foo_path,
-              os.path.realpath(bar_path): symlink_bar_path,
+              os.path.realpath(foo_path): hardlink_foo_path,
+              os.path.realpath(bar_path): hardlink_bar_path,
             },
             result_map)
-          self.assertEquals([symlink_foo_path, symlink_bar_path], result_classpath)
+          self.assertEquals([hardlink_foo_path, hardlink_bar_path], result_classpath)
 
           with open(output_path, 'r') as outpath:
-            self.assertEquals(symlink_foo_path + os.pathsep + symlink_bar_path, outpath.readline())
-          self.assertTrue(os.path.islink(symlink_foo_path))
-          self.assertTrue(os.path.exists(symlink_foo_path))
-          self.assertTrue(os.path.islink(symlink_bar_path))
-          self.assertTrue(os.path.exists(symlink_bar_path))
+            self.assertEquals(hardlink_foo_path + os.pathsep + hardlink_bar_path, outpath.readline())
+          self.assertFalse(os.path.islink(hardlink_foo_path))
+          self.assertTrue(os.path.exists(hardlink_foo_path))
+          self.assertFalse(os.path.islink(hardlink_bar_path))
+          self.assertTrue(os.path.exists(hardlink_bar_path))
 
           # Reverse the ordering and make sure order is preserved in the output path
           with open(input_path, 'w') as inpath:
             inpath.write(os.pathsep.join([bar_path, foo_path]))
-          IvyUtils.construct_and_load_symlink_map(symlink_dir,
+          IvyUtils.construct_and_load_hardlink_map(hardlink_dir,
                                                   mock_cache_dir,
                                                   input_path,
                                                   output_path)
           with open(output_path, 'r') as outpath:
-            self.assertEquals(symlink_bar_path + os.pathsep + symlink_foo_path, outpath.readline())
+            self.assertEquals(hardlink_bar_path + os.pathsep + hardlink_foo_path, outpath.readline())
 
   def test_missing_ivy_report(self):
     self.set_options_for_scope(IvySubsystem.options_scope,
@@ -587,7 +587,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
 
 class IvyUtilsResolveStepsTest(TestBase):
-  def test_if_not_all_symlinked_files_exist_after_successful_resolve_fail(self):
+  def test_if_not_all_hardlinked_files_exist_after_successful_resolve_fail(self):
     resolve = IvyResolveStep(
       ['default'],
       'hash_name',
@@ -604,7 +604,7 @@ class IvyUtilsResolveStepsTest(TestBase):
     with self.assertRaises(IvyResolveMappingError):
       resolve.exec_and_load(None, None, [], None, None, None)
 
-  def test_if_not_all_symlinked_files_exist_after_successful_fetch_fail(self):
+  def test_if_not_all_hardlinked_files_exist_after_successful_fetch_fail(self):
     fetch = IvyFetchStep(['default'],
                          'hash_name',
                          False,
@@ -620,9 +620,9 @@ class IvyUtilsResolveStepsTest(TestBase):
     with self.assertRaises(IvyResolveMappingError):
       fetch.exec_and_load(None, None, [], None, None, None)
 
-  def test_missing_symlinked_jar_in_candidates(self):
-    empty_symlink_map = {}
-    result = IvyResolveResult(['non-existent-file-location'], empty_symlink_map, 'hash-name',
+  def test_missing_hardlinked_jar_in_candidates(self):
+    empty_hardlink_map = {}
+    result = IvyResolveResult(['non-existent-file-location'], empty_hardlink_map, 'hash-name',
                               {'default':
                                  self.ivy_report_path('ivy_utils_resources/report_with_diamond.xml')
                                })

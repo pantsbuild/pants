@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import errno
 import json
 import logging
 import os
@@ -32,7 +31,7 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.java.util import execute_runner
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir, safe_open
-from pants.util.fileutil import atomic_copy
+from pants.util.fileutil import atomic_copy, safe_hardlink_or_copy
 
 
 class IvyResolutionStep(object):
@@ -86,19 +85,19 @@ class IvyResolutionStep(object):
     return os.path.join(self.global_ivy_workdir, self.hash_name)
 
   @property
-  def symlink_classpath_filename(self):
+  def hardlink_classpath_filename(self):
     return os.path.join(self.workdir, 'classpath')
 
   @property
   def ivy_cache_classpath_filename(self):
-    return '{}.raw'.format(self.symlink_classpath_filename)
+    return '{}.raw'.format(self.hardlink_classpath_filename)
 
   @property
   def frozen_resolve_file(self):
     return os.path.join(self.workdir, 'resolution.json')
 
   @property
-  def symlink_dir(self):
+  def hardlink_dir(self):
     return os.path.join(self.global_ivy_workdir, 'jars')
 
   @abstractmethod
@@ -109,13 +108,13 @@ class IvyResolutionStep(object):
   def resolve_report_path(self, conf):
     """Location of the resolve report in the workdir."""
 
-  def _construct_and_load_symlink_map(self):
-    artifact_paths, symlink_map = IvyUtils.construct_and_load_symlink_map(
-      self.symlink_dir,
+  def _construct_and_load_hardlink_map(self):
+    artifact_paths, hardlink_map = IvyUtils.construct_and_load_hardlink_map(
+      self.hardlink_dir,
       self.ivy_repository_cache_dir,
       self.ivy_cache_classpath_filename,
-      self.symlink_classpath_filename)
-    return artifact_paths, symlink_map
+      self.hardlink_classpath_filename)
+    return artifact_paths, hardlink_map
 
   def _call_ivy(self, executor, extra_args, ivyxml, jvm_options, hash_name_for_report,
                 workunit_factory, workunit_name):
@@ -179,9 +178,9 @@ class IvyFetchStep(IvyResolutionStep):
     return result
 
   def _load_from_fetch(self, frozen_resolutions):
-    artifact_paths, symlink_map = self._construct_and_load_symlink_map()
+    artifact_paths, hardlink_map = self._construct_and_load_hardlink_map()
     return IvyFetchResolveResult(artifact_paths,
-                                 symlink_map,
+                                 hardlink_map,
                                  self.hash_name,
                                  self.workdir_reports_by_conf,
                                  frozen_resolutions)
@@ -227,9 +226,9 @@ class IvyResolveStep(IvyResolutionStep):
     return os.path.join(self.workdir, 'resolve-ivy.xml')
 
   def load(self, targets):
-    artifact_paths, symlink_map = self._construct_and_load_symlink_map()
+    artifact_paths, hardlink_map = self._construct_and_load_hardlink_map()
     return IvyResolveResult(artifact_paths,
-                            symlink_map,
+                            hardlink_map,
                             self.hash_name,
                             self.workdir_reports_by_conf)
 
@@ -381,11 +380,11 @@ class IvyResolveResult(object):
   and the targets that requested them and the hash name of the resolve.
   """
 
-  def __init__(self, resolved_artifact_paths, symlink_map, resolve_hash_name, reports_by_conf):
+  def __init__(self, resolved_artifact_paths, hardlink_map, resolve_hash_name, reports_by_conf):
     self._reports_by_conf = reports_by_conf
     self.resolved_artifact_paths = resolved_artifact_paths
     self.resolve_hash_name = resolve_hash_name
-    self._symlink_map = symlink_map
+    self._hardlink_map = hardlink_map
 
   @property
   def has_resolved_artifacts(self):
@@ -437,7 +436,7 @@ class IvyResolveResult(object):
     ivy_jar_memo = {}
     for target in jar_library_targets:
       # Add the artifacts from each dependency module.
-      resolved_jars = self._resolved_jars_with_symlinks(conf, ivy_info, ivy_jar_memo,
+      resolved_jars = self._resolved_jars_with_hardlinks(conf, ivy_info, ivy_jar_memo,
                                                         self._jar_dependencies_for_target(conf,
                                                                                           target),
                                                         target)
@@ -450,33 +449,33 @@ class IvyResolveResult(object):
     report_path = self._reports_by_conf.get(conf)
     return IvyUtils.parse_xml_report(conf, report_path)
 
-  def _new_resolved_jar_with_symlink_path(self, conf, target, resolved_jar_without_symlink):
+  def _new_resolved_jar_with_hardlink_path(self, conf, target, resolved_jar_without_hardlink):
     def candidate_cache_paths():
       # There is a focus on being lazy here to avoid `os.path.realpath` when we can.
-      yield resolved_jar_without_symlink.cache_path
-      yield os.path.realpath(resolved_jar_without_symlink.cache_path)
+      yield resolved_jar_without_hardlink.cache_path
+      yield os.path.realpath(resolved_jar_without_hardlink.cache_path)
 
     for cache_path in candidate_cache_paths():
-      pants_path = self._symlink_map.get(cache_path)
+      pants_path = self._hardlink_map.get(cache_path)
       if pants_path:
         break
     else:
 
       raise IvyResolveMappingError(
         'Jar {resolved_jar} in {spec} not resolved to the ivy '
-        'symlink map in conf {conf}.'
+        'hardlink map in conf {conf}.'
           .format(spec=target.address.spec,
-                  resolved_jar=resolved_jar_without_symlink.cache_path,
+                  resolved_jar=resolved_jar_without_hardlink.cache_path,
                   conf=conf))
 
-    return ResolvedJar(coordinate=resolved_jar_without_symlink.coordinate,
+    return ResolvedJar(coordinate=resolved_jar_without_hardlink.coordinate,
                        pants_path=pants_path,
-                       cache_path=resolved_jar_without_symlink.cache_path)
+                       cache_path=resolved_jar_without_hardlink.cache_path)
 
-  def _resolved_jars_with_symlinks(self, conf, ivy_info, ivy_jar_memo, coordinates, target):
+  def _resolved_jars_with_hardlinks(self, conf, ivy_info, ivy_jar_memo, coordinates, target):
     raw_resolved_jars = ivy_info.get_resolved_jars_for_coordinates(coordinates,
                                                                    memo=ivy_jar_memo)
-    resolved_jars = [self._new_resolved_jar_with_symlink_path(conf, target, raw_resolved_jar)
+    resolved_jars = [self._new_resolved_jar_with_hardlink_path(conf, target, raw_resolved_jar)
                      for raw_resolved_jar in raw_resolved_jars]
     return resolved_jars
 
@@ -484,9 +483,9 @@ class IvyResolveResult(object):
 class IvyFetchResolveResult(IvyResolveResult):
   """A resolve result that uses the frozen resolution to look up dependencies."""
 
-  def __init__(self, resolved_artifact_paths, symlink_map, resolve_hash_name, reports_by_conf,
+  def __init__(self, resolved_artifact_paths, hardlink_map, resolve_hash_name, reports_by_conf,
                frozen_resolutions):
-    super(IvyFetchResolveResult, self).__init__(resolved_artifact_paths, symlink_map,
+    super(IvyFetchResolveResult, self).__init__(resolved_artifact_paths, hardlink_map,
                                                 resolve_hash_name, reports_by_conf)
     self._frozen_resolutions = frozen_resolutions
 
@@ -693,8 +692,8 @@ class IvyUtils(object):
   # Protects ivy executions.
   _ivy_lock = threading.RLock()
 
-  # Protect writes to the global map of jar path -> symlinks to that jar.
-  _symlink_map_lock = threading.Lock()
+  # Protect writes to the global map of jar path -> hardlinks to that jar.
+  _hardlink_map_lock = threading.Lock()
 
   INTERNAL_ORG_NAME = 'internal'
 
@@ -810,66 +809,61 @@ class IvyUtils(object):
       raise IvyUtils.IvyError(e)
 
   @classmethod
-  def construct_and_load_symlink_map(cls, symlink_dir, ivy_repository_cache_dir,
-                                     ivy_cache_classpath_filename, symlink_classpath_filename):
-    # Make our actual classpath be symlinks, so that the paths are uniform across systems.
+  def construct_and_load_hardlink_map(cls, hardlink_dir, ivy_repository_cache_dir,
+                                     ivy_cache_classpath_filename, hardlink_classpath_filename):
+    # Make our actual classpath be hardlinks, so that the paths are uniform across systems.
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
-    # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
-    with IvyUtils._symlink_map_lock:
-      # A common dir for symlinks into the ivy2 cache. This ensures that paths to jars
+    # cache. If we cache the target_classpath_file we won't know how to create the hardlinks.
+    with IvyUtils._hardlink_map_lock:
+      # A common dir for hardlinks into the ivy2 cache. This ensures that paths to jars
       # in artifact-cached analysis files are consistent across systems.
-      # Note that we have one global, well-known symlink dir, again so that paths are
+      # Note that we have one global, well-known hardlink dir, again so that paths are
       # consistent across builds.
-      symlink_map = cls._symlink_cachepath(ivy_repository_cache_dir,
+      hardlink_map = cls._hardlink_cachepath(ivy_repository_cache_dir,
                                            ivy_cache_classpath_filename,
-                                           symlink_dir,
-                                           symlink_classpath_filename)
-    classpath = cls._load_classpath_from_cachepath(symlink_classpath_filename)
-    return classpath, symlink_map
+                                           hardlink_dir,
+                                           hardlink_classpath_filename)
+    classpath = cls._load_classpath_from_cachepath(hardlink_classpath_filename)
+    return classpath, hardlink_map
 
   @classmethod
-  def _symlink_cachepath(cls, ivy_repository_cache_dir, inpath, symlink_dir, outpath):
-    """Symlinks all paths listed in inpath that are under ivy_repository_cache_dir into symlink_dir.
+  def _hardlink_cachepath(cls, ivy_repository_cache_dir, inpath, hardlink_dir, outpath):
+    """hardlinks all paths listed in inpath that are under ivy_repository_cache_dir into hardlink_dir.
 
-    If there is an existing symlink for a file under inpath, it is used rather than creating
-    a new symlink. Preserves all other paths. Writes the resulting paths to outpath.
-    Returns a map of path -> symlink to that path.
+    If there is an existing hardlink for a file under inpath, it is used rather than creating
+    a new hardlink. Preserves all other paths. Writes the resulting paths to outpath.
+    Returns a map of path -> hardlink to that path.
     """
-    safe_mkdir(symlink_dir)
-    # The ivy_repository_cache_dir might itself be a symlink. In this case, ivy may return paths that
+    safe_mkdir(hardlink_dir)
+    # The ivy_repository_cache_dir might itself be a hardlink. In this case, ivy may return paths that
     # reference the realpath of the .jar file after it is resolved in the cache dir. To handle
-    # this case, add both the symlink'ed path and the realpath to the jar to the symlink map.
+    # this case, add both the hardlink'ed path and the realpath to the jar to the hardlink map.
     real_ivy_cache_dir = os.path.realpath(ivy_repository_cache_dir)
-    symlink_map = OrderedDict()
+    hardlink_map = OrderedDict()
 
     inpaths = cls._load_classpath_from_cachepath(inpath)
     paths = OrderedSet([os.path.realpath(path) for path in inpaths])
 
     for path in paths:
       if path.startswith(real_ivy_cache_dir):
-        symlink_map[path] = os.path.join(symlink_dir, os.path.relpath(path, real_ivy_cache_dir))
+        hardlink_map[path] = os.path.join(hardlink_dir, os.path.relpath(path, real_ivy_cache_dir))
       else:
-        # This path is outside the cache. We won't symlink it.
-        symlink_map[path] = path
+        # This path is outside the cache. We won't hardlink it.
+        hardlink_map[path] = path
 
-    # Create symlinks for paths in the ivy cache dir.
-    for path, symlink in six.iteritems(symlink_map):
-      if path == symlink:
-        # Skip paths that aren't going to be symlinked.
+    # Create hardlinks for paths in the ivy cache dir.
+    for path, hardlink in six.iteritems(hardlink_map):
+      if path == hardlink:
+        # Skip paths that aren't going to be hardlinked.
         continue
-      safe_mkdir(os.path.dirname(symlink))
-      try:
-        os.symlink(path, symlink)
-      except OSError as e:
-        # We don't delete and recreate the symlink, as this may break concurrently executing code.
-        if e.errno != errno.EEXIST:
-          raise
+      safe_mkdir(os.path.dirname(hardlink))
+      safe_hardlink_or_copy(path, hardlink)
 
     # (re)create the classpath with all of the paths
     with safe_open(outpath, 'w') as outfile:
-      outfile.write(':'.join(OrderedSet(symlink_map.values())))
+      outfile.write(':'.join(OrderedSet(hardlink_map.values())))
 
-    return dict(symlink_map)
+    return dict(hardlink_map)
 
   @classmethod
   def xml_report_path(cls, resolution_cache_dir, resolve_hash_name, conf):
