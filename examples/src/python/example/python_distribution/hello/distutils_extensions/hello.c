@@ -4,9 +4,16 @@
 
 #include <Python.h>
 
-static PyObject *hello(PyObject *self, PyObject *args) {
+#ifdef PANTS_PYTHON_DIST
+static const char *hello_str = "Hello from Pants!";
+#else
+static const char *hello_str = "Hello from outside of Pants!";
+#endif
+
+    static PyObject *
+    hello(PyObject *self, PyObject *args) {
   /* FIXME: make this depend on some env var we pass in!? */
-  return Py_BuildValue("s", "Hello from C!");
+  return Py_BuildValue("s", hello_str);
 }
 
 static PyMethodDef Methods[] = {

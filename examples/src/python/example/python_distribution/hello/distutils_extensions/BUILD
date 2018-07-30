@@ -3,9 +3,10 @@
 
 python_dist(
   sources=['setup.py', 'hello.c'],
-  setup_requires=[
-    'testprojects/pants-plugins/3rdparty/python/pants',
-  ],
+  # FIXME: setup_requires needs to provide transitive deps of all the requested packages too!
+  # setup_requires=[
+  #   'testprojects/pants-plugins/3rdparty/python/pants',
+  # ],
 )
 
 python_binary(

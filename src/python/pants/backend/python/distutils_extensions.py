@@ -32,7 +32,7 @@ def customize_compiler_from_env(compiler):
     linker_so=link_cmd)
 
 
-class env_only_build_ext(distutils_build_ext):
+class pants_build_ext(distutils_build_ext):
   """???"""
 
   def _append_to_compiler_property(elements, append_fun):
@@ -96,6 +96,8 @@ class env_only_build_ext(distutils_build_ext):
         self._append_to_compiler_property(self.rpath, self.compiler.add_runtime_library_dir)
         self._append_to_compiler_property(self.link_objects, self.compiler.add_link_object)
 
+        self.compiler.define_macro('PANTS_PYTHON_DIST', None)
+
         # Now actually compile and link everything.
         self.build_extensions()
 
@@ -109,6 +111,6 @@ def pants_setup(cmdclass=None, *args, **kwargs):
       "Overriding 'build_ext' in the 'cmdclass' keyword argument of pants_setup() "
       "is not supported.")
 
-  cmdclass.add('build_ext', env_only_build_ext)
+  cmdclass.add('build_ext', pants_build_ext)
 
   setuptools_setup(*args, cmdclass=cmdclass, **kwargs)

@@ -11,14 +11,13 @@ from setuptools import find_packages
 try:
   from pants.backend.python.distutils_extensions import pants_setup as setup
 except ImportError as e:
-  raise e
   from setuptools import setup
 
 
 c_module = Extension(b'hello', sources=[b'hello.c'])
 
 setup(
-  name='distutils_extensions'
+  name='distutils_extensions',
   version='0.0.1',
   ext_modules=[c_module],
   packages=find_packages(),
