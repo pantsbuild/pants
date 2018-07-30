@@ -13,20 +13,6 @@ from pex.platforms import Platform
 logger = logging.getLogger(__name__)
 
 
-def create_bare_interpreter(binary_path):
-  """Creates an interpreter for python binary at the given path.
-
-  The interpreter is bare in that it has no extras associated with it.
-
-  :returns: A bare python interpreter with no extras.
-  :rtype: :class:`pex.interpreter.PythonInterpreter`
-  """
-  # TODO(John Sirois): Replace with a more direct PythonInterpreter construction API call when
-  # https://github.com/pantsbuild/pex/issues/510 is fixed.
-  interpreter_with_extras = PythonInterpreter.from_binary(binary_path)
-  return PythonInterpreter(binary_path, interpreter_with_extras.identity, extras=None)
-
-
 def _interpreter_str(interp):
   ident = interp.identity
   return ('PythonInterpreter({binary!r}, {identity!r} with extended info: '

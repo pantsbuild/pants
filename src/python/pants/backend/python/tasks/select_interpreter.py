@@ -10,7 +10,6 @@ import os
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.backend.python.pex_util import create_bare_interpreter
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -102,7 +101,7 @@ class SelectInterpreter(Task):
     with open(interpreter_path_file, 'r') as infile:
       lines = infile.readlines()
       binary = lines[0].strip()
-      interpreter = create_bare_interpreter(binary)
+      interpreter = PythonInterpreter.from_binary(binary, include_site_extras=False)
       for line in lines[1:]:
         dist_name, dist_version, location = line.strip().split('\t')
         interpreter = interpreter.with_extra(dist_name, dist_version, location)
