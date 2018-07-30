@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import sys
 from abc import abstractmethod
-from builtins import map, object, zip
+from builtins import object, zip
 from collections import OrderedDict, namedtuple
 
 from future.utils import PY2
@@ -119,10 +119,11 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
     def _replace(_self, **kwds):
       '''Return a new datatype object replacing specified fields with new values'''
-      result = _self._make(map(kwds.pop, _self._fields, _self._super_iter()))
-      if kwds:
-        raise ValueError('Got unexpected field names: %r' % kwds.keys())
-      return result
+      field_dict = _self._asdict()
+      field_dict.update(**kwds)
+      return type(_self)(**field_dict)
+
+    copy = _replace
 
     # NB: it is *not* recommended to rely on the ordering of the tuple returned by this method.
     def __getnewargs__(self):
@@ -158,11 +159,6 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       return '{class_name}({typed_tagged_elements})'.format(
         class_name=type(self).__name__,
         typed_tagged_elements=', '.join(elements_formatted))
-
-    def copy(self, **kwargs):
-      field_dict = self._asdict()
-      field_dict.update(kwargs)
-      return type(self)(**field_dict)
 
   # Return a new type with the given name, inheriting from the DataType class
   # just defined, with an empty class body.
