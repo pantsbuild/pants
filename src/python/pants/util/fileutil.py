@@ -41,31 +41,21 @@ def create_size_estimators():
   }
 
 
-# Copied from pex for JVM related code not to depend on pex
-# https://github.com/pantsbuild/pex/blob/d1f946c8b46f8c5123b01bcd376c87bb67c8a884/pex/common.py#L25-L50
 def safe_hardlink_or_copy(source, dest, overwrite=False):
   def do_copy():
     temp_dest = dest + uuid4().hex
     shutil.copyfile(source, temp_dest)
     os.rename(temp_dest, dest)
 
-  # If the platform supports hard-linking, use that and fall back to copying.
-  # Windows does not support hard-linking.
-  if hasattr(os, 'link'):
-    try:
-      os.link(source, dest)
-    except OSError as e:
-      if e.errno == errno.EEXIST:
-        # File already exists.  If overwrite=True, write otherwise skip.
-        if overwrite:
-          do_copy()
-      elif e.errno == errno.EXDEV:
-        # Hard link across devices, fall back on copying
+  try:
+    os.link(source, dest)
+  except OSError as e:
+    if e.errno == errno.EEXIST:
+      # File already exists.  If overwrite=True, write otherwise skip.
+      if overwrite:
         do_copy()
-      else:
-        raise
-  elif os.path.exists(dest):
-    if overwrite:
+    elif e.errno == errno.EXDEV:
+      # Hard link across devices, fall back on copying
       do_copy()
-  else:
-    do_copy()
+    else:
+      raise
