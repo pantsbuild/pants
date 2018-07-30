@@ -11,7 +11,7 @@ from collections import OrderedDict, namedtuple
 
 from future.utils import PY2
 
-from pants.util.memo import memoized
+from pants.util.memo import memoized, memoized_classproperty
 from pants.util.meta import AbstractClass
 
 
@@ -166,6 +166,43 @@ def datatype(field_decls, superclass_name=None, **kwargs):
     return type(superclass_name, (DataType,), {})
   except TypeError:  # Python2
     return type(superclass_name.encode('utf-8'), (DataType,), {})
+
+
+def enum(field_name, all_values):
+  """???"""
+
+  class ChoiceDatatype(datatype([field_name])):
+
+    allowed_values = all_values
+    default_value = all_values[0]
+
+    @memoized_classproperty
+    def _singletons(cls):
+      return {
+        value: cls(value) for value in cls.allowed_values
+      }
+
+    @classmethod
+    def create(cls, value=None):
+      if isinstance(value, cls):
+        return value
+      if not value:
+        value = cls.default_value
+      return cls._singletons[value]
+
+    def __new__(cls, *args, **kwargs):
+      this_object = super(ChoiceDatatype, cls).__new__(cls, *args, **kwargs)
+
+      field_value = getattr(this_object, field_name)
+
+      if field_value not in cls.allowed_values:
+        raise cls.make_type_error(
+          "Value {!r} for '{}' must be one of: {!r}."
+          .format(field_value, field_name, cls.allowed_values))
+
+      return this_object
+
+  return ChoiceDatatype
 
 
 class TypedDatatypeClassConstructionError(Exception):
