@@ -15,6 +15,8 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.source.source_root import SourceRootConfig
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import fast_relpath
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 
@@ -143,3 +145,25 @@ class ScalaFmtFormatTest(ScalaFmtTestBase):
     check_fmt_workdir = os.path.join(self.pants_workdir, check_fmt_task_type.stable_name())
     check_fmt_task = check_fmt_task_type(context, check_fmt_workdir)
     check_fmt_task.execute()
+
+  def test_output_dir(self):
+    with temporary_dir() as output_dir:
+      self.set_options(skip=False, output_dir=output_dir)
+
+      lint_options_scope = 'sfcf'
+      check_fmt_task_type = self.synthesize_task_subtype(ScalaFmtCheckFormat, lint_options_scope)
+      self.set_options_for_scope(lint_options_scope)
+
+      # format an incorrectly formatted file.
+      context = self.context(
+        for_task_types=[check_fmt_task_type],
+        target_roots=self.library,
+      )
+      self.execute(context)
+
+      with open(self.test_file, 'rb') as fp:
+        self.assertEqual(self.test_file_contents, fp.read())
+
+      relative_test_file = fast_relpath(self.test_file, self.build_root)
+      with open(os.path.join(output_dir, relative_test_file), 'rb') as fp:
+        self.assertNotEqual(self.test_file_contents, fp.read())
