@@ -16,10 +16,10 @@ from pants.backend.native.config.environment import LLVMCppToolchain, LLVMCToolc
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems.python_native_code import (PythonNativeCode,
+from pants.backend.python.subsystems.python_native_code import (BuildSetupRequiresPex,
+                                                                PythonNativeCode,
                                                                 SetupPyExecutionEnvironment,
-                                                                SetupPyNativeTools,
-                                                                ensure_setup_requires_site_dir)
+                                                                SetupPyNativeTools)
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.pex_build_util import is_local_python_dist
 from pants.backend.python.tasks.setup_py import SetupPyRunner
@@ -44,6 +44,8 @@ class BuildLocalPythonDistributions(Task):
   # This will contain the sources used to build the python_dist().
   _DIST_SOURCE_SUBDIR = 'python_dist_subdir'
 
+  setup_requires_pex_filename = 'setup-requires.pex'
+
   # This defines the output directory when building the dist, so we know where the output wheel is
   # located. It is a subdirectory of `_DIST_SOURCE_SUBDIR`.
   _DIST_OUTPUT_DIR = 'dist'
@@ -67,6 +69,7 @@ class BuildLocalPythonDistributions(Task):
   @classmethod
   def subsystem_dependencies(cls):
     return super(BuildLocalPythonDistributions, cls).subsystem_dependencies() + (
+      BuildSetupRequiresPex.scoped(cls),
       PythonNativeCode.scoped(cls),
     )
 
@@ -79,6 +82,10 @@ class BuildLocalPythonDistributions(Task):
   @memoized_property
   def _python_native_code_settings(self):
     return PythonNativeCode.scoped_instance(self)
+
+  @memoized_property
+  def _build_setup_requires_pex_settings(self):
+    return BuildSetupRequiresPex.scoped_instance(self)
 
   # FIXME(#5869): delete this and get Subsystems from options, when that is possible.
   def _request_single(self, product, subject):
@@ -222,6 +229,8 @@ class BuildLocalPythonDistributions(Task):
       # We are including a platform-specific shared lib in this dist, so mark it as such.
       is_platform_specific = True
 
+    versioned_target_fingerprint = versioned_target.cache_key.hash
+
     setup_requires_dir = os.path.join(results_dir, self._SETUP_REQUIRES_SITE_SUBDIR)
     setup_reqs_to_resolve = self._get_setup_requires_to_resolve(dist_target)
     if setup_reqs_to_resolve:
@@ -229,17 +238,17 @@ class BuildLocalPythonDistributions(Task):
                              'Installing setup requirements: {}\n\n'
                              .format([req.key for req in setup_reqs_to_resolve]))
 
-    setup_requires_site_dir = ensure_setup_requires_site_dir(
-      setup_reqs_to_resolve, interpreter, setup_requires_dir, platforms=['current'])
-    if setup_requires_site_dir:
-      self.context.log.debug('Setting PYTHONPATH with setup_requires site directory: {}'
-                             .format(setup_requires_site_dir))
+    setup_reqs_pex_path = os.path.join(
+      setup_requires_dir,
+      'setup-requires-{}.pex'.format(versioned_target_fingerprint))
+    setup_requires_pex = self._build_setup_requires_pex_settings.bootstrap(
+      interpreter, setup_reqs_pex_path, extra_reqs=setup_reqs_to_resolve)
+    self.context.log.debug('Using pex file as setup.py interpreter: {}'
+                           .format(setup_requires_pex))
 
     setup_py_execution_environment = SetupPyExecutionEnvironment(
-      setup_requires_site_dir=setup_requires_site_dir,
+      setup_requires_pex=setup_requires_pex,
       setup_py_native_tools=native_tools)
-
-    versioned_target_fingerprint = versioned_target.cache_key.hash
 
     self._create_dist(
       dist_target,
@@ -280,29 +289,36 @@ class BuildLocalPythonDistributions(Task):
     setup_py_snapshot_version_argv = self._generate_snapshot_bdist_wheel_argv(
       snapshot_fingerprint, is_platform_specific)
 
+    setup_requires_interpreter = PythonInterpreter(
+      binary=setup_py_execution_environment.setup_requires_pex.path(),
+      identity=interpreter.identity,
+      extras=interpreter.extras)
+
     setup_runner = SetupPyRunner(
       source_dir=dist_target_dir,
       setup_command=setup_py_snapshot_version_argv,
-      interpreter=interpreter)
+      file_input='setup.py',
+      interpreter=setup_requires_interpreter)
 
     setup_py_env = setup_py_execution_environment.as_environment()
     with environment_as(**setup_py_env):
       # Build a whl using SetupPyRunner and return its absolute path.
-      was_installed_successfully = setup_runner.run()
-      # FIXME: Make a run_raising_error() method in SetupPyRunner that doesn't print directly to
-      # stderr like pex does (better: put this in pex itself).
-      if not was_installed_successfully:
+      try:
+        setup_runner.run()
+      except SetupPyRunner.SetupPyRunnerError as e:
         raise self.BuildLocalPythonDistributionsError(
           "Installation of python distribution from target {target} into directory {into_dir} "
           "failed.\n"
           "The chosen interpreter was: {interpreter}.\n"
           "The execution environment was: {env}.\n"
-          "The setup command was: {command}."
+          "The setup command was: {command}.\n{err}"
           .format(target=dist_tgt,
                   into_dir=dist_target_dir,
-                  interpreter=interpreter,
+                  interpreter=setup_requires_interpreter,
                   env=setup_py_env,
-                  command=setup_py_snapshot_version_argv))
+                  command=setup_py_snapshot_version_argv,
+                  err=e),
+          e)
 
   def _inject_synthetic_dist_requirements(self, dist, req_lib_addr):
     """Inject a synthetic requirements library that references a local wheel.

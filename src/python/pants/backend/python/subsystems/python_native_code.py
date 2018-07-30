@@ -4,21 +4,21 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import os
 from builtins import str
 from collections import defaultdict
 
-from wheel.install import WheelFile
+from pex.pex import PEX
 
 from pants.backend.native.config.environment import CppToolchain, CToolchain, Platform
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.subsystems.xcode_cli_tools import MIN_OSX_VERSION_ARG
 from pants.backend.native.targets.native_library import NativeLibrary
+from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
-from pants.backend.python.tasks.pex_build_util import resolve_multi
 from pants.base.exceptions import IncompatiblePlatformsError
+from pants.binaries.executable_pex_tool import ExecutablePexTool
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.objects import SubclassesOf, datatype
@@ -138,6 +138,25 @@ class PythonNativeCode(Subsystem):
       .format(str(platforms_with_sources)))
 
 
+class BuildSetupRequiresPex(ExecutablePexTool):
+  options_scope = 'build-setup-requires-pex'
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(BuildSetupRequiresPex, cls).subsystem_dependencies() + (PythonSetup.scoped(cls),)
+
+  @property
+  def base_requirements(self):
+    return [
+      PythonRequirement('setuptools'),
+      PythonRequirement('wheel'),
+    ]
+
+  @memoized_property
+  def _python_setup(self):
+    return PythonSetup.scoped_instance(self)
+
+
 class SetupPyNativeTools(datatype([
     ('c_toolchain', CToolchain),
     ('cpp_toolchain', CppToolchain),
@@ -149,43 +168,15 @@ class SetupPyNativeTools(datatype([
   """
 
 
-class SetupRequiresSiteDir(datatype(['site_dir'])): pass
-
-
-# TODO: This could be formulated as an @rule if targets and `PythonInterpreter` are made available
-# to the v2 engine.
-def ensure_setup_requires_site_dir(reqs_to_resolve, interpreter, site_dir,
-                                   platforms=None):
-  if not reqs_to_resolve:
-    return None
-
-  setup_requires_dists = resolve_multi(interpreter, reqs_to_resolve, platforms, None)
-
-  # FIXME: there's no description of what this does or why it's necessary.
-  overrides = {
-    'purelib': site_dir,
-    'headers': os.path.join(site_dir, 'headers'),
-    'scripts': os.path.join(site_dir, 'bin'),
-    'platlib': site_dir,
-    'data': site_dir
-  }
-
-  # The `python_dist` target builds for the current platform only.
-  # FIXME: why does it build for the current platform only?
-  for obj in setup_requires_dists['current']:
-    wf = WheelFile(obj.location)
-    wf.install(overrides=overrides, force=True)
-
-  return SetupRequiresSiteDir(site_dir)
-
-
 # TODO: It might be pretty useful to have an Optional TypeConstraint.
 class SetupPyExecutionEnvironment(datatype([
     # If None, don't set PYTHONPATH in the setup.py environment.
-    'setup_requires_site_dir',
+    ('setup_requires_pex', PEX),
     # If None, don't execute in the toolchain environment.
     'setup_py_native_tools',
 ])):
+
+
 
   _SHARED_CMDLINE_ARGS = {
     'darwin': lambda: [
@@ -199,9 +190,6 @@ class SetupPyExecutionEnvironment(datatype([
 
   def as_environment(self):
     ret = {}
-
-    if self.setup_requires_site_dir:
-      ret['PYTHONPATH'] = self.setup_requires_site_dir.site_dir
 
     # FIXME(#5951): the below is a lot of error-prone repeated logic -- we need a way to compose
     # executables more hygienically. We should probably be composing each datatype's members, and

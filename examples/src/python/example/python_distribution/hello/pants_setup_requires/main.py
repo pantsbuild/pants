@@ -4,13 +4,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from setuptools import setup, find_packages
+import pkg_resources
 
-from pants.version import VERSION as pants_version
 
-setup(
-  name='hello_again',
-  # FIXME: test the wheel version in a unit test!
-  version=pants_version,
-  packages=find_packages(),
-)
+hello_module_version = pkg_resources.get_distribution('hello_again').version
+
+if __name__ == '__main__':
+  print(hello_module_version)

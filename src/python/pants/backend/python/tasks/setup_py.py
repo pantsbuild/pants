@@ -14,8 +14,11 @@ from builtins import map, object, str, zip
 from collections import OrderedDict, defaultdict
 
 from future.utils import PY2, PY3
+from pex.compatibility import string, to_bytes
+from pex.executor import Executor
 from pex.installer import InstallerBase, Packager
 from pex.interpreter import PythonInterpreter
+from pex.tracer import TRACER
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
@@ -51,8 +54,11 @@ setup(**
 class SetupPyRunner(InstallerBase):
   _EXTRAS = ('setuptools', 'wheel')
 
-  def __init__(self, source_dir, setup_command, **kw):
+  class SetupPyRunnerError(Exception): pass
+
+  def __init__(self, source_dir, setup_command, file_input=None, **kw):
     self.__setup_command = setup_command
+    self._file_input = file_input
     super(SetupPyRunner, self).__init__(source_dir, **kw)
 
   def mixins(self):
@@ -73,6 +79,42 @@ class SetupPyRunner(InstallerBase):
 
   def _setup_command(self):
     return self.__setup_command
+
+  def run(self):
+    """???/ripped from the pex installer class
+
+    Used so we can control the command line, and raise an exception on failure.
+    """
+    if self._installed is not None:
+      return self._installed
+
+    if self._file_input is None:
+      stdin_payload = self.bootstrap_script.encode('ascii')
+      init_args = [self._interpreter.binary, '-']
+    else:
+      stdin_payload = None
+      init_args = [self._interpreter.binary, self._file_input, '--']
+
+    full_command = init_args + self._setup_command()
+
+    with TRACER.timed('Installing %s' % self._install_tmp, V=2):
+      try:
+        Executor.execute(full_command,
+                         env=self._interpreter.sanitized_environment(),
+                         cwd=self._source_dir,
+                         stdin_payload=stdin_payload)
+        self._installed = True
+      except Executor.NonZeroExit as e:
+        self._installed = False
+        name = os.path.basename(self._source_dir)
+        raise self.SetupPyRunnerError(
+          '**** Failed to install {name} (caused by: {error}\n):'
+          'stdout:\n{stdout}\nstderr:\n{stderr}\n'
+          .format(name=name,
+                  error=e,
+                  stdout=e.stdout,
+                  stderr=e.stderr))
+        return self._installed
 
 
 class TargetAncestorIterator(object):
