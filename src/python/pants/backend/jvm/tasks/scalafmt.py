@@ -47,7 +47,7 @@ class ScalaFmt(RewriteBase):
   def implementation_version(cls):
     return super(ScalaFmt, cls).implementation_version() + [('ScalaFmt', 5)]
 
-  def invoke_tool(self, _root, target_sources):
+  def invoke_tool(self, absolute_root, target_sources):
     # If no config file is specified use default scalafmt config.
     config_file = self.get_options().configuration
     args = list(self.additional_args)
