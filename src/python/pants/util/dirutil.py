@@ -88,7 +88,8 @@ def safe_mkdir_for_all(paths):
 
   This avoids attempting to re-make the same directories, which may be noticeably expensive if many
   paths mostly fall in the same set of directories.
-  :type paths list<string>
+
+  :param list of str paths: The paths for which containing directories should be created.
   """
   created_dirs = set()
   for path in paths:
