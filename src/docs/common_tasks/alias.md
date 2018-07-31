@@ -38,8 +38,9 @@ stored in a more convenient location in the directory tree, for example in the r
 
     :: python
     # myproject/BUILD
-    target(name='myproject',
-      target='myproject/src/main/scala/com/twitter/myproject/subproject/util:scala'
+    alias(
+        name='myproject',
+        target='myproject/src/main/scala/com/twitter/myproject/subproject/util:scala'
     )
 
 Now, other projects can depend on the library target in a more concise manner:

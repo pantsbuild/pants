@@ -6,15 +6,15 @@ You want to create a common target that when run in turn run several other targe
 
 ## Solution
 
-Use the `target` goal and specify an aggregate target that depends on all the targets you wish to run
+Use a literal `target` definition in your BUILD file to specify an aggregate target that depends on all the targets you wish to run
 
-Here's an example `target` definition that creates a target names `agg` dependent on two modules `dep1` and `dep2`:
+Here's an example `target` definition that creates a target names `agg` dependent on two modules named `dep1` and `dep2`:
 
     :: python
     # agg/BUILD
     target(name='agg',
       dependencies=[
-        'myproject/src/main/scala/com/twitter/myproject/subproject/dep1:scala'
+        'myproject/src/main/scala/com/twitter/myproject/subproject/dep1:scala',
         'myproject/src/main/scala/com/twitter/myproject/subproject/dep2:scala'
       ]
     )
