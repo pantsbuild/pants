@@ -78,7 +78,7 @@ class PythonInterpreterCache(object):
     filters = set()
     for target in targets:
       if isinstance(target, PythonTarget):
-        c = self._python_setup.compatibility_or_constraintstar(target)
+        c = self._python_setup.compatibility_or_constraints(target)
         targets = tgts_by_compatibilities.get(c)
         if not targets:
           targets = tgts_by_compatibilities[c] = []
