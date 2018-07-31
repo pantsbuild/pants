@@ -41,7 +41,7 @@ class PythonRun(PythonExecutionTaskBase):
 
       self.context.release_lock()
       with self.context.new_workunit(name='run',
-                                     cmd=pex.cmdline(args),
+                                     cmd=' '.join(pex.cmdline(args)),
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.RUN]):
         po = pex.run(blocking=False, args=args, env=os.environ.copy())
         try:
