@@ -19,13 +19,6 @@ class PythonSetup(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(PythonSetup, cls).register_options(register)
-    # Note: This replaces two options:
-    # A) The global --interpreter option in the old python tasks.
-    #    That flag is only relevant in the python backend, and should never have been
-    #    global to begin with.
-    # B) The --interpreter-requirement option above.  That flag merely served to set the
-    #    effective default for when no other constraints were set, so we might as well
-    #    roll that into the more general constraints.
     register('--interpreter-constraints', advanced=True, default=['CPython>=2.7,<3'], type=list,
              metavar='<requirement>',
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "

@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import shutil
 from builtins import map, object, str
+from collections import defaultdict
 
 from pex.interpreter import PythonInterpreter
 from pex.package import EggPackage, Package, SourcePackage
@@ -74,15 +75,12 @@ class PythonInterpreterCache(object):
 
   def select_interpreter_for_targets(self, targets):
     """Pick an interpreter compatible with all the specified targets."""
-    tgts_by_compatibilities = {}
+    tgts_by_compatibilities = defaultdict(list)
     filters = set()
     for target in targets:
       if isinstance(target, PythonTarget):
         c = self._python_setup.compatibility_or_constraints(target)
-        targets = tgts_by_compatibilities.get(c)
-        if not targets:
-          targets = tgts_by_compatibilities[c] = []
-        targets.append(target)
+        tgts_by_compatibilities[c].append(target)
         filters.update(c)
 
     allowed_interpreters = set(self.setup(filters=filters))
@@ -96,8 +94,7 @@ class PythonInterpreterCache(object):
       # Create a helpful error message.
       unique_compatibilities = set(tuple(c) for c in tgts_by_compatibilities.keys())
       unique_compatibilities_strs = [','.join(x) for x in unique_compatibilities if x]
-      tgts_by_compatibilities_strs = [targets[0].address.spec
-                                      for targets in tgts_by_compatibilities.values()]
+      tgts_by_compatibilities_strs = [t[0].address.spec for t in tgts_by_compatibilities.values()]
       raise self.UnsatisfiableInterpreterConstraintsError(
         'Unable to detect a suitable interpreter for compatibilities: {} '
         '(Conflicting targets: {})'.format(' && '.join(sorted(unique_compatibilities_strs)),

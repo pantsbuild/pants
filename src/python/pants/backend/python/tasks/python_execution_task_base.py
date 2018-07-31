@@ -10,6 +10,7 @@ from builtins import str
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -18,7 +19,6 @@ from pants.backend.python.tasks.pex_build_util import is_python_target
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.backend.python.tasks.wrapped_pex import WrappedPEX
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.build_graph.files import Files
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.util.contextutil import temporary_file
