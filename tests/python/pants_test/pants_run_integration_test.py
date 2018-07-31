@@ -429,13 +429,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
       os.rename(real_path, test_path)
 
   @contextmanager
-  def temporary_file_content(self, path, content):
+  def temporary_file_content(self, path, content, binary_mode=True):
     """Temporarily write content to a file for the purpose of an integration test."""
     path = os.path.realpath(path)
     assert path.startswith(
       os.path.realpath(get_buildroot())), 'cannot write paths outside of the buildroot!'
     assert not os.path.exists(path), 'refusing to overwrite an existing path!'
-    with open(path, 'wb') as fh:
+    mode = 'wb' if binary_mode else 'w'
+    with open(path, mode) as fh:
       fh.write(content)
     try:
       yield

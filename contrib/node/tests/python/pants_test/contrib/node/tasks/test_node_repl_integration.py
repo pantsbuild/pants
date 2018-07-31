@@ -57,7 +57,7 @@ class NodeReplIntegrationTest(PantsRunIntegrationTest):
         var calc = new Calculator(0);
         calc.add(1);
         console.log('React: ' + reactElem + ', Calc + 1: ' + calc.number);
-      """)
+      """).encode('utf-8')
     pants_run = self.run_pants(command=command, stdin_data=program)
 
     self.assert_success(pants_run)

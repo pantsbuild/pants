@@ -110,7 +110,7 @@ class ScroogeGenTest(NailgunTaskTestBase):
       }
     ''')
 
-    self.create_file(relpath='test_smoke/a.thrift', contents=contents)
+    self.create_file(relpath='test_smoke/a.thrift', mode='w', contents=contents)
     build_string = self._test_create_build_str(language, compiler_args)
     self.add_to_build_file('test_smoke', build_string)
 
@@ -171,6 +171,6 @@ class ScroogeGenTest(NailgunTaskTestBase):
 
   def _test_dependencies_help(self, contents, declares_service, declares_exception):
     source = 'test_smoke/a.thrift'
-    self.create_file(relpath=source, contents=contents)
+    self.create_file(relpath=source, mode='w', contents=contents)
     self.assertEquals(ScroogeGen._declares_service(source), declares_service)
     self.assertEquals(ScroogeGen._declares_exception(source), declares_exception)
