@@ -9,7 +9,6 @@ from textwrap import dedent
 
 from pants.option.custom_types import ListValueComponent, UnsetBool, dict_option, list_option
 from pants.option.errors import ParseError
-from pants.util.strutil import ensure_binary
 
 
 class CustomTypesTest(unittest.TestCase):
@@ -116,12 +115,12 @@ class CustomTypesTest(unittest.TestCase):
     """
     self._do_test(
       ['Hi there!', 'This is an element in a list of strings.'],
-      ensure_binary(dedent(u"""
+      dedent("""
       [
         'Hi there!',
         # This is a comment with ‘sneaky‘ unicode characters.
         'This is an element in a list of strings.',
         # This is a comment with an obvious unicode character ☺.
         ]
-      """).strip()),
+      """).strip(),
     )

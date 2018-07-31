@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import io
 import os
 import shlex
-import tempfile
 import unittest
 import warnings
 from builtins import str
@@ -686,7 +685,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(4, options.for_scope('compile.java').c)
 
   def test_file_spec_args(self):
-    with tempfile.NamedTemporaryFile() as tmp:
+    with temporary_file(binary_mode=False) as tmp:
       tmp.write(dedent(
         """
         foo
@@ -1116,7 +1115,7 @@ class OptionsTest(unittest.TestCase):
 
   def assert_fromfile(self, parse_func, expected_append=None, append_contents=None):
     def _do_assert_fromfile(dest, expected, contents):
-      with temporary_file() as fp:
+      with temporary_file(binary_mode=False) as fp:
         fp.write(contents)
         fp.close()
         options = parse_func(dest, fp.name)
