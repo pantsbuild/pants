@@ -813,7 +813,7 @@ class OptionsTest(unittest.TestCase):
   def assertWarning(self, w, option_string):
     self.assertEqual(1, len(w))
     self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
-    warning_message = str(w[-1].message)
+    warning_message = str(w[-1].message.args)
     self.assertIn("will be removed in version",
                   warning_message)
     self.assertIn(option_string, warning_message)
@@ -1291,7 +1291,7 @@ class OptionsTest(unittest.TestCase):
     # Check that we got a warning, but not for the inherited option.
     self.assertEqual(1, len(w))
     self.assertTrue(isinstance(w[0].message, DeprecationWarning))
-    self.assertNotIn('inherited', w[0].message)
+    self.assertNotIn('inherited', w[0].message.args)
 
     # Check values.
     # Deprecated scope takes precedence at equal rank.
@@ -1306,7 +1306,7 @@ class OptionsTest(unittest.TestCase):
     # Check that we got a warning.
     self.assertEqual(1, len(w))
     self.assertTrue(isinstance(w[0].message, DeprecationWarning))
-    self.assertNotIn('inherited', w[0].message)
+    self.assertNotIn('inherited', w[0].message.args)
 
     # Check values.
     self.assertEqual('uu', vals2.qux)
