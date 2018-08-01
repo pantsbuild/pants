@@ -149,23 +149,23 @@ matrix:
 
     - <<: *default_test_config
       env:
-        - SHARD="Various pants self checks and lint"
+        - SHARD="Self checks, lint, and JVM tests"
       script:
-        - ./build-support/bin/ci.sh -x -cejlpn 'Various pants self checks and lint'
+        - ./build-support/bin/ci.sh -x -celpn "${SHARD}"
 
     - <<: *default_test_config
       env:
         - SHARD="Unit tests for pants and pants-plugins - Python 2"
         - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=2.7,<3"]'
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcnt "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrjcnt "${SHARD}"
 
     - <<: *default_test_config
       env:
         - SHARD="Unit tests for pants and pants-plugins - Python 3"
         - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.5,<4"]'
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcnt "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrjcnt "${SHARD}"
 
     - <<: *default_test_config
       env:
