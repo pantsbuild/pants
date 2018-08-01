@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import open
 from textwrap import dedent
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
