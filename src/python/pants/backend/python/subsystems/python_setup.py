@@ -134,7 +134,7 @@ class PythonSetup(Subsystem):
 
   def compatibility_or_constraints(self, target):
     """Return either the compatibility of the given target, or the interpreter constraints."""
-    return target.compatibility or self.interpreter_constraints
+    return tuple(target.compatibility or self.interpreter_constraints)
 
   def setuptools_requirement(self):
     return self._failsafe_parse('setuptools=={0}'.format(self.setuptools_version))
