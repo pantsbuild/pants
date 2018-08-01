@@ -8,7 +8,7 @@ definition (for example when specifying dependencies).
 
 ## Solution
 
-Specify a `target` definition that refers to a target deeper in the directory
+Specify an `alias` definition that refers to a target deeper in the directory
 tree and acts as a proxy for it.
 
 ## Discussion
@@ -32,16 +32,15 @@ In addition, Pants commands would be similarly verbose:
     
     $ ./pants compile myproject/src/main/scala/com/twitter/myproject:scala
 
-You can simplify this by creating a `target` definition in a `BUILD` file
+You can simplify this by creating an `alias` definition in a `BUILD` file
 stored in a more convenient location in the directory tree, for example in the root directory. Here's an example:
 
 
     :: python
     # myproject/BUILD
-    target(name='myproject',
-      dependencies=[
-        'myproject/src/main/scala/com/twitter/myproject/subproject/util:scala'
-      ]
+    alias(
+        name='myproject',
+        target='myproject/src/main/scala/com/twitter/myproject/subproject/util:scala'
     )
 
 Now, other projects can depend on the library target in a more concise manner:
@@ -53,17 +52,15 @@ Now, other projects can depend on the library target in a more concise manner:
       # ...
     ]
 
-Pants commands involving the target are simplified as well. Here's a comparison:
+Pants commands involving the alias are simplified as well. Here's a comparison:
 
     :: bash
     
-    # Without target alias
+    # Without an alias
     $ ./pants compile myproject/src/main/scala/com/twitter/myproject/subproject/util:scala
     
-    # With target alias
+    # With an alias
     $ ./pants compile myproject:myproject
-
-NOTE: Proper aliases always contain exactly one destination. Using them to combine multiple library targets introduces false dependencies between the dependent and the dependency. 
 
 See Also
 --------
