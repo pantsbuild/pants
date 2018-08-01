@@ -17,7 +17,6 @@ from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pex_build_util import is_python_target
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
-from pants.backend.python.tasks.wrapped_pex import WrappedPEX
 from pants.build_graph.files import Files
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.util.contextutil import temporary_file
@@ -119,4 +118,4 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
             extra_file.add_to(builder)
           builder.freeze()
 
-    return WrappedPEX(PEX(path, interpreter))
+    return PEX(path, interpreter)

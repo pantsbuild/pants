@@ -17,7 +17,6 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_sources,
                                                        has_python_requirements, has_python_sources)
-from pants.backend.python.tasks.python_execution_task_base import WrappedPEX
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
@@ -138,7 +137,10 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
       # Create the executable pex.
       exec_pex_parent = os.path.join(self.workdir, 'executable_pex')
       executable_file_content = self._get_executable_file_content(exec_pex_parent, modules)
+
       hasher = hashlib.sha1()
+      hasher.update(reqs_pex.path())
+      hasher.update(srcs_pex.path())
       hasher.update(executable_file_content)
       exec_file_hash = hasher.hexdigest()
       exec_pex_path = os.path.realpath(os.path.join(exec_pex_parent, exec_file_hash))
@@ -153,17 +155,16 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
           # executable_file_content does what the user intends (including, probably, calling that
           # underlying entry point).
           pex_info.entry_point = self._EXEC_NAME
+          pex_info.pex_path = ':'.join(pex.path() for pex in (reqs_pex, srcs_pex) if pex)
           builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
           builder.freeze()
 
-      exec_pex = PEX(exec_pex_path, interpreter)
-      extra_pex_paths = [pex.path() for pex in [_f for _f in [reqs_pex, srcs_pex] if _f]]
-      pex = WrappedPEX(exec_pex, extra_pex_paths)
+      pex = PEX(exec_pex_path, interpreter)
 
       with self.context.new_workunit(name='eval',
                                      labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.RUN,
                                              WorkUnitLabel.TOOL],
-                                     cmd=' '.join(exec_pex.cmdline())) as workunit:
+                                     cmd=' '.join(pex.cmdline())) as workunit:
         returncode = pex.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
         workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
         if returncode != 0:

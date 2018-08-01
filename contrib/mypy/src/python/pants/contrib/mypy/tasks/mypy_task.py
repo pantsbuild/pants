@@ -15,7 +15,6 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
-from pants.backend.python.tasks.wrapped_pex import WrappedPEX
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -98,7 +97,7 @@ class MypyTask(ResolveRequirementsTaskBase):
     path = os.path.realpath(os.path.join(self.workdir, str(py3_interpreter.identity), mypy_version))
     if not os.path.isdir(path):
       self.merge_pexes(path, pex_info, py3_interpreter, [mypy_requirement_pex])
-    pex = WrappedPEX(PEX(path, py3_interpreter))
+    pex = PEX(path, py3_interpreter)
     return pex.run(mypy_args, **kwargs)
 
   def execute(self):
