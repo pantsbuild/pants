@@ -69,6 +69,7 @@ default_test_config: &default_test_config
         - lib32z1-dev
         - gcc-multilib
         - python-dev
+        - python3
         - openssl
         - libssl-dev
   stage: Test Pants
@@ -163,7 +164,7 @@ matrix:
     - <<: *default_test_config
       env:
         - SHARD="Unit tests for pants and pants-plugins - Python 3"
-        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.5,<4"]'
+        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.4,<4"]'
       script:
         - ./build-support/bin/ci.sh -x -efkmrjcnt "${SHARD}"
 
