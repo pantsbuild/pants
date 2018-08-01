@@ -155,15 +155,17 @@ matrix:
 
     - <<: *default_test_config
       env:
-        - SHARD="Unit tests for pants and pants-plugins - shard 1"
+        - SHARD="Unit tests for pants and pants-plugins - Python 2"
+        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=2.7,<3"]'
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcnt -u 0/2 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrcnt "${SHARD}"
 
     - <<: *default_test_config
       env:
-        - SHARD="Unit tests for pants and pants-plugins - shard 2"
+        - SHARD="Unit tests for pants and pants-plugins - Python 3"
+        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.5,<4"]'
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcnt -u 1/2 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrcnt "${SHARD}"
 
     - <<: *default_test_config
       env:
