@@ -9,6 +9,8 @@ from builtins import str
 from collections import namedtuple
 from textwrap import dedent
 
+from future.utils import PY3
+
 from pants.base.build_file import BuildFile
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import BuildFileAddress
@@ -70,8 +72,10 @@ class BuildFileParserBasicsTest(BaseTestWithParser):
   def test_addressable_exceptions(self):
     self.add_to_build_file('b/BUILD', 'java_library(name="foo", "bad_arg")')
     build_file_b = self.create_buildfile('b/BUILD')
-    self.assert_parser_error(build_file_b,
-                             'non-keyword arg after keyword arg')
+    expected_msg = ('positional argument follows keyword argument'
+                    if PY3 else
+                    'non-keyword arg after keyword arg')
+    self.assert_parser_error(build_file_b, expected_msg)
 
     self.add_to_build_file('d/BUILD', dedent(
       """
@@ -95,6 +99,7 @@ class BuildFileParserBasicsTest(BaseTestWithParser):
 
   def test_invalid_unicode_in_build_file(self):
     """Demonstrate that unicode characters causing parse errors raise real parse errors."""
+    # TODO(python3port): remove ensure_binary once safe_open() uses backport. This test fails on Py3.
     self.add_to_build_file('BUILD', ensure_binary(dedent(
       """
       jvm_binary(name = ‘hello’,  # Parse error due to smart quotes (non ascii characters)
@@ -104,10 +109,11 @@ class BuildFileParserBasicsTest(BaseTestWithParser):
       """
     )))
     build_file = self.create_buildfile('BUILD')
-    self.assert_parser_error(build_file, 'invalid syntax')
+    self.assert_parser_error(build_file, 'invalid character' if PY3 else 'invalid syntax')
 
   def test_unicode_string_in_build_file(self):
     """Demonstrates that a string containing unicode should work in a BUILD file."""
+    # TODO(python3port): remove ensure_binary once safe_open() uses backport. This test fails on Py3.
     self.add_to_build_file('BUILD', ensure_binary(dedent(
         """
         java_library(
@@ -319,7 +325,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTestWithParser):
                  make_lib("com.foo.test", "does_not_exists", "1.0")
                  path_util("baz")
                """)
-    self.create_file('3rdparty/BUILD', contents)
+    self.create_file('3rdparty/BUILD', contents, mode='w')
 
     build_file = BuildFile(FileSystemProjectTree(self.build_root), '3rdparty/BUILD')
     address_map = self.build_file_parser.parse_build_file(build_file)
