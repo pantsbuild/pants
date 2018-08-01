@@ -129,7 +129,7 @@ class BinaryUtilTest(TestBase):
   def test_support_url_multi(self):
     """Tests to make sure existing base urls function as expected."""
 
-    bootstrap_dir = '/private/tmp'
+    bootstrap_dir = '/tmp'
 
     with temporary_dir() as invalid_local_files, temporary_dir() as valid_local_files:
       binary_util = self._gen_binary_util(
