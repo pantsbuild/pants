@@ -8,7 +8,7 @@ import logging
 import multiprocessing
 import queue
 import threading
-from builtins import object
+from builtins import object, open
 
 import requests
 from requests import RequestException
