@@ -215,7 +215,7 @@ class ProcessMetadataManager(object):
     try:
       rm_rf(meta_dir)
     except OSError as e:
-      raise self.MetadataError('failed to purge metadata directory {}: {!r}'.format(meta_dir, e))
+      raise ProcessMetadataManager.MetadataError('failed to purge metadata directory {}: {!r}'.format(meta_dir, e))
 
 
 class ProcessManager(ProcessMetadataManager):
@@ -400,7 +400,7 @@ class ProcessManager(ProcessMetadataManager):
     :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
     """
     if not force and self.is_alive():
-      raise self.MetadataError('cannot purge metadata for a running process!')
+      raise ProcessMetadataManager.MetadataError('cannot purge metadata for a running process!')
 
     super(ProcessManager, self).purge_metadata_by_name(self._name)
 
@@ -434,7 +434,7 @@ class ProcessManager(ProcessMetadataManager):
           pass
 
     if alive:
-      raise self.NonResponsiveProcess('failed to kill pid {pid} with signals {chain}'
+      raise ProcessManager.NonResponsiveProcess('failed to kill pid {pid} with signals {chain}'
                                       .format(pid=self.pid, chain=signal_chain))
 
     if purge:

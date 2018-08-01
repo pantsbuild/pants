@@ -90,12 +90,12 @@ class TestWatchman(TestBase):
 
   def test_parse_pid_from_output_bad_output(self):
     output = '{bad JSON.,/#!'
-    with self.assertRaises(self.watchman.InvalidCommandOutput):
+    with self.assertRaises(Watchman.InvalidCommandOutput):
       self.watchman._parse_pid_from_output(output)
 
   def test_parse_pid_from_output_no_pid(self):
     output = json.dumps(dict(nothing=True))
-    with self.assertRaises(self.watchman.InvalidCommandOutput):
+    with self.assertRaises(Watchman.InvalidCommandOutput):
       self.watchman._parse_pid_from_output(output)
 
   def test_launch(self):
