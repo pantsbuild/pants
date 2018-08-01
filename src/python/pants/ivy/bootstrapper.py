@@ -8,7 +8,7 @@ import hashlib
 import logging
 import os
 import shutil
-from builtins import map, object
+from builtins import map, object, open
 
 from pants.base.build_environment import get_buildroot
 from pants.ivy.ivy import Ivy
@@ -127,7 +127,7 @@ class Bootstrapper(object):
         safe_delete(classpath)
         raise self.Error('Failed to bootstrap an ivy classpath! {}'.format(e))
 
-    with open(classpath) as fp:
+    with open(classpath, 'r') as fp:
       cp = fp.read().strip().split(os.pathsep)
       if not all(map(os.path.exists, cp)):
         safe_delete(classpath)
