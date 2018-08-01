@@ -176,7 +176,8 @@ class ProcessMetadataManager(object):
     """
     file_path = self._metadata_file_path(name, metadata_key)
     try:
-      return self._maybe_cast(read_file(file_path).strip(), caster)
+      metadata = read_file(file_path, binary_mode=False).strip()
+      return self._maybe_cast(metadata, caster)
     except (IOError, OSError):
       return None
 
@@ -189,7 +190,7 @@ class ProcessMetadataManager(object):
     """
     self._maybe_init_metadata_dir_by_name(name)
     file_path = self._metadata_file_path(name, metadata_key)
-    safe_file_dump(file_path, metadata_value)
+    safe_file_dump(file_path, metadata_value, binary_mode=False)
 
   def await_metadata_by_name(self, name, metadata_key, timeout, caster=None):
     """Block up to a timeout for process metadata to arrive on disk.
@@ -319,7 +320,7 @@ class ProcessManager(ProcessMetadataManager):
       kwargs.setdefault('stderr', subprocess.STDOUT)
 
     try:
-      return subprocess.check_output(command, **kwargs)
+      return subprocess.check_output(command, **kwargs).decode('utf-8').strip()
     except (OSError, subprocess.CalledProcessError) as e:
       subprocess_output = getattr(e, 'output', '').strip()
       raise cls.ExecutionError(str(e), subprocess_output)
