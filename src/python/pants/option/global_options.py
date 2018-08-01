@@ -12,6 +12,7 @@ from pants.base.build_environment import (get_buildroot, get_default_pants_confi
                                           get_pants_cachedir, get_pants_configdir, pants_version)
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import dir_option
+from pants.option.errors import OptionsError
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
@@ -126,11 +127,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Squelches most console output. NOTE: Some tasks default to behaving quietly: '
                   'inverting this option supports making them noisier than they would be otherwise.')
 
-    register('--loop', type=bool, daemon=True,
-             help='Run continuously as file changes are detected.')
-    register('--loop-max', type=int, default=2**32, daemon=True, advanced=True,
-             help='The maximum number of times to loop.')
-
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
     register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True, daemon=False,
@@ -242,12 +238,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--enable-pantsd', advanced=True, type=bool, default=False,
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
-    # Toggles v1/v2 `Task` vs `@rule` pipelines on/off.
-    register('--v1', advanced=True, type=bool, default=True,
-             help='Enables execution of v1 Tasks.')
-    register('--v2', advanced=True, type=bool, default=False,
-             help='Enables execution of v2 @rules.')
-
     # These facilitate configuring the native engine.
     register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option, daemon=False,
              help='A directory to write execution and rule graphs to as `dot` files. The contents '
@@ -345,6 +335,19 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   "tags ('-' prefix).  Useful with ::, to find subsets of targets "
                   "(e.g., integration tests.)")
 
+    # Toggles v1/v2 `Task` vs `@rule` pipelines on/off.
+    register('--v1', advanced=True, type=bool, default=True,
+             help='Enables execution of v1 Tasks.')
+    register('--v2', advanced=True, type=bool, default=False,
+             help='Enables execution of v2 @console_rules.')
+
+    loop_flag = '--loop'
+    register(loop_flag, type=bool,
+             help='Run v2 @console_rules continuously as file changes are detected. Requires '
+                  '`--v2`, and is best utilized with `--v2 --no-v1`.')
+    register('--loop-max', type=int, default=2**32, advanced=True,
+             help='The maximum number of times to loop when `{}` is specified.'.format(loop_flag))
+
     register('-t', '--timeout', advanced=True, type=int, metavar='<seconds>',
              help='Number of seconds to wait for http connections.')
     # TODO: After moving to the new options system these abstraction leaks can go away.
@@ -364,3 +367,19 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
+
+  @classmethod
+  def validate_instance(cls, opts):
+    """Validates an instance of global options for cases that are not prohibited via registration.
+
+    For example: mutually exclusive options may be registered by passing a `mutually_exclusive_group`,
+    but when multiple flags must be specified together, it can be necessary to specify post-parse
+    checks.
+
+    Raises pants.option.errors.OptionsError on validation failure.
+    """
+    if opts.loop and (not opts.v2 or opts.v1):
+      raise OptionsError('The --loop option only works with @console_rules, and thus requires '
+                         '`--v2 --no-v1` to function as expected.')
+    if opts.loop and not opts.enable_pantsd:
+      raise OptionsError('The --loop option requires `--enable-pantsd`, in order to watch files.')

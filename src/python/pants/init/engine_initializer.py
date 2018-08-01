@@ -171,8 +171,8 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'goal_ma
   def warm_product_graph(self, target_roots):
     """Warm the scheduler's `ProductGraph` with `TransitiveHydratedTargets` products.
 
-    This method raises only fatal errors, and does not cosider failed roots: in the v1 codepath,
-    failed roots are accounted for post-fork.
+    This method raises only fatal errors, and does not consider failed roots in the execution
+    graph: in the v1 codepath, failed roots are accounted for post-fork.
 
     :param TargetRoots target_roots: The targets root of the request.
     """

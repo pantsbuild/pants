@@ -118,6 +118,8 @@ class OptionsInitializer(object):
     # Parse and register options.
     options = cls._construct_options(options_bootstrapper, build_configuration)
 
+    GlobalOptionsRegistrar.validate_instance(options.for_global_scope())
+
     if init_subsystems:
       Subsystem.set_options(options)
 
