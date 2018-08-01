@@ -99,24 +99,28 @@ def safe_mkdir_for_all(paths):
       created_dirs.add(dir_to_make)
 
 
-def safe_file_dump(filename, payload):
+def safe_file_dump(filename, payload, binary_mode=True):
   """Write a string to a file.
 
   :param string filename: The filename of the file to write to.
   :param string payload: The string to write to the file.
+  :param bool binary_mode: Write to file as bytes or unicode.
   """
-  with safe_open(filename, 'wb') as f:
+  mode = 'wb' if binary_mode else 'w'
+  with safe_open(filename, mode) as f:
     f.write(payload)
 
 
-def read_file(filename):
+def read_file(filename, binary_mode=True):
   """Read and return the contents of a file in a single file.read().
 
   :param string filename: The filename of the file to read.
+  :param bool binary_mode: Read from file as bytes or unicode.
   :returns: The contents of the file.
   :rtype: string
   """
-  with open(filename, 'rb') as f:
+  mode = 'rb' if binary_mode else 'r'
+  with open(filename, mode) as f:
     return f.read()
 
 

@@ -177,7 +177,7 @@ class AddressMapper(datatype([
     :param list build_ignore_patterns: A list of path ignore patterns used when searching for BUILD files.
     :param list exclude_target_regexps: A list of regular expressions for excluding targets.
     """
-    build_patterns = tuple(build_patterns or [b'BUILD', b'BUILD.*'])
+    build_patterns = tuple(build_patterns or ['BUILD', 'BUILD.*'])
     build_ignore_patterns = tuple(build_ignore_patterns or [])
     exclude_target_regexps = tuple(exclude_target_regexps or [])
     subproject_roots = tuple(subproject_roots or [])

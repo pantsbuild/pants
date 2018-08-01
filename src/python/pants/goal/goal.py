@@ -6,6 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from builtins import object
 
+from future.utils import PY2
+
 from pants.goal.error import GoalError
 from pants.option.optionable import Optionable
 from pants.util.memo import memoized
@@ -24,13 +26,15 @@ def _create_stable_task_type(superclass, options_scope):
   a class method to an instance method, and instantiating the task much sooner in the
   lifecycle.
   """
-  subclass_name = b'{0}_{1}'.format(superclass.__name__,
-                                    options_scope.replace('.', '_').replace('-', '_'))
+  subclass_name = '{0}_{1}'.format(superclass.__name__,
+                                  options_scope.replace('.', '_').replace('-', '_'))
+  if PY2:
+    subclass_name = subclass_name.encode('utf-8')
   return type(subclass_name, (superclass,), {
-    b'__doc__': superclass.__doc__,
-    b'__module__': superclass.__module__,
-    b'options_scope': options_scope,
-    b'_stable_name': superclass.stable_name()
+    '__doc__': superclass.__doc__,
+    '__module__': superclass.__module__,
+    'options_scope': options_scope,
+    '_stable_name': superclass.stable_name()
   })
 
 

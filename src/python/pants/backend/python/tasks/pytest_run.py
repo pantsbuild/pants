@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import configparser
 import itertools
 import json
 import os
@@ -14,10 +15,8 @@ import uuid
 from builtins import str
 from collections import OrderedDict
 from contextlib import contextmanager
+from io import StringIO
 from textwrap import dedent
-
-from six import StringIO
-from six.moves import configparser
 
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
@@ -152,7 +151,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
   class InvalidShardSpecification(TaskError):
     """Indicates an invalid `--test-shard` option."""
 
-  DEFAULT_COVERAGE_CONFIG = dedent(b"""
+  DEFAULT_COVERAGE_CONFIG = dedent("""
     [run]
     branch = True
     timid = False
@@ -199,8 +198,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     cp.set(plugin_module, 'src_to_target_base', json.dumps(src_to_target_base))
 
   def _generate_coverage_config(self, src_to_target_base):
-    cp = configparser.SafeConfigParser()
-    cp.readfp(StringIO(self.DEFAULT_COVERAGE_CONFIG))
+    cp = configparser.ConfigParser()
+    cp.read_file(StringIO(self.DEFAULT_COVERAGE_CONFIG))
 
     self._add_plugin_config(cp, self._source_chroot_path, src_to_target_base)
 

@@ -15,7 +15,7 @@ from contextlib import closing
 
 import cffi
 import pkg_resources
-from future.utils import binary_type, text_type
+from future.utils import PY2, binary_type, text_type
 
 from pants.engine.selectors import Get, constraint_for
 from pants.util.contextutil import temporary_dir
@@ -294,6 +294,8 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
     temp_output_prefix = os.path.join(tempdir, module_name)
     real_output_prefix = os.path.join(output_dir, module_name)
     temp_c_file = '{}.c'.format(temp_output_prefix)
+    if PY2:
+      temp_c_file = temp_c_file.encode('utf-8')
     c_file = '{}.c'.format(real_output_prefix)
     env_script = '{}.cflags'.format(real_output_prefix)
 
@@ -302,7 +304,7 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
     ffibuilder.cdef(CFFI_HEADERS)
     ffibuilder.cdef(CFFI_EXTERNS)
     ffibuilder.set_source(module_name, CFFI_TYPEDEFS + CFFI_HEADERS)
-    ffibuilder.emit_c_code(binary_type(temp_c_file))
+    ffibuilder.emit_c_code(temp_c_file)
 
     # Work around https://github.com/rust-lang/rust/issues/36342 by renaming initnative_engine to
     # wrapped_initnative_engine so that the rust code can define the symbol initnative_engine.
@@ -313,9 +315,9 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
     # our binaries couldn't be stripped which inflated them by 2~3x, and it reduced the amount of LTO
     # we could use, which led to unmeasured performance hits).
     def rename_symbol_in_file(f):
-      with open(f, 'rb') as fh:
+      with open(f, 'r') as fh:
         for line in fh:
-          if line.startswith(b'init{}'.format(module_name)):
+          if line.startswith('init{}'.format(module_name)) or line.startswith('PyInit_{}'.format(module_name)):
             yield 'wrapped_' + line
           else:
             yield line
@@ -332,12 +334,12 @@ def _replace_file(path, content):
 
   This is useful because cargo uses timestamps to decide whether to compile things."""
   if os.path.exists(path):
-    with open(path, 'rb') as f:
+    with open(path, 'r') as f:
       if content == f.read():
         print("Not overwriting {} because it is unchanged".format(path), file=sys.stderr)
         return
 
-  with open(path, 'wb') as f:
+  with open(path, 'w') as f:
     f.write(content)
 
 

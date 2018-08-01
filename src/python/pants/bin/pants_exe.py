@@ -37,4 +37,4 @@ def main():
     try:
       PantsRunner(exiter, start_time=start_time).run()
     except KeyboardInterrupt:
-      exiter.exit_and_fail(b'Interrupted by user.')
+      exiter.exit_and_fail('Interrupted by user.')
