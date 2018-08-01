@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import hashlib
 import json
-from builtins import object
+from builtins import object, open
 
 from pants.util.strutil import ensure_binary
 

@@ -179,6 +179,7 @@ python_tests(
   name = 'run_info',
   sources = ['test_run_info.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/base:run_info',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:test_base',
@@ -207,6 +208,7 @@ python_tests(
   name = 'exiter',
   sources = ['test_exiter.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/bin',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/option:testing',

@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
+from builtins import open
 
 from pants.base.run_info import RunInfo
 from pants.util.contextutil import temporary_file_path
