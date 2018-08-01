@@ -127,13 +127,13 @@ class JavaCompileIntegrationTest(BaseCompileIT):
         # Locate the report file on the classpath.
         report_file_name = 'deprecation_report.txt'
         reports = [f for f in all_files if f.endswith(report_file_name)]
-        self.assertEquals(1, len(reports),
+        self.assertEqual(1, len(reports),
                           'Expected exactly one {} file; got: {}'.format(report_file_name,
                                                                          all_files))
 
         with open(reports[0]) as fp:
           annotated_classes = [line.rstrip() for line in fp.read().splitlines()]
-          self.assertEquals(
+          self.assertEqual(
             {'org.pantsbuild.testproject.annotation.main.Main',
              'org.pantsbuild.testproject.annotation.main.Main$TestInnerClass'},
             set(annotated_classes))

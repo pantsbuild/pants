@@ -60,7 +60,7 @@ class ExecuteJavaTest(unittest.TestCase):
     :API: public
     """
     with self.mock_safe_classpath_helper():
-      self.assertEquals(0, execute_java(self.TEST_CLASSPATH, self.TEST_MAIN,
+      self.assertEqual(0, execute_java(self.TEST_CLASSPATH, self.TEST_MAIN,
                                         executor=self.executor,
                                         synthetic_jar_dir=self.SYNTHETIC_JAR_DIR))
 
@@ -80,7 +80,7 @@ class ExecuteJavaTest(unittest.TestCase):
     :API: public
     """
     with self.mock_safe_classpath_helper(create_synthetic_jar=False):
-      self.assertEquals(0, execute_java(self.TEST_CLASSPATH, self.TEST_MAIN,
+      self.assertEqual(0, execute_java(self.TEST_CLASSPATH, self.TEST_MAIN,
                                         executor=self.executor,
                                         create_synthetic_jar=False))
 
@@ -120,14 +120,14 @@ class SafeClasspathTest(unittest.TestCase):
     classpath = [jar_file, resource_dir]
 
     safe_cp = safe_classpath(classpath, synthetic_jar_dir)
-    self.assertEquals(1, len(safe_cp))
+    self.assertEqual(1, len(safe_cp))
     safe_jar = safe_cp[0]
     self.assertTrue(os.path.exists(safe_jar))
-    self.assertEquals(synthetic_jar_dir, os.path.dirname(safe_jar))
+    self.assertEqual(synthetic_jar_dir, os.path.dirname(safe_jar))
 
     with open_zip(safe_jar) as synthetic_jar:
       self.assertListEqual([Manifest.PATH], synthetic_jar.namelist())
       # manifest should contain the relative path of both jar and resource directory
-      self.assertEquals('{}: ../{}/{} ../{}/{}/\n'.format(Manifest.CLASS_PATH, LIB_DIR, JAR_FILE,
+      self.assertEqual('{}: ../{}/{} ../{}/{}/\n'.format(Manifest.CLASS_PATH, LIB_DIR, JAR_FILE,
                                                           LIB_DIR, RESOURCES),
                         synthetic_jar.read(Manifest.PATH).replace('\n ', ''))

@@ -139,7 +139,7 @@ class ScalastyleTest(NailgunTaskTestBase):
                                                                  synthetic_scala_target])
 
     # Only the scala target should remain
-    self.assertEquals(1, len(result_targets))
+    self.assertEqual(1, len(result_targets))
     self.assertEqual(scala_target, result_targets[0])
 
   def test_get_non_excluded_scala_sources(self):
@@ -175,7 +175,7 @@ class ScalastyleTest(NailgunTaskTestBase):
       task.get_non_synthetic_scala_targets(context.targets()))
 
     # Only the scala source from target 1 should remain
-    self.assertEquals(1, len(result_sources))
+    self.assertEqual(1, len(result_sources))
     self.assertEqual('a/scala_1/Source1.scala', result_sources[0])
 
   @ensure_cached(Scalastyle, expected_num_artifacts=1)

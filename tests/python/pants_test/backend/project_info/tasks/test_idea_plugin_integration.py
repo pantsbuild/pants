@@ -57,9 +57,9 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
                                 for p in actual_properties
                                 if p.getAttribute('name') == 'incremental_import']
     if incremental_import is None:
-      self.assertEquals(incremental_import_props, [])
+      self.assertEqual(incremental_import_props, [])
     else:
-      self.assertEquals([str(incremental_import)], [p.getAttribute('value')
+      self.assertEqual([str(incremental_import)], [p.getAttribute('value')
                                                     for p in incremental_import_props])
 
   def _get_project_dir(self, output_file):

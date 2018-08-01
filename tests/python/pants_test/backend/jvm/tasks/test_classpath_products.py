@@ -540,7 +540,7 @@ class ClasspathProductsTest(TestBase):
       classpath_products, targets, libs_dir, save_classpath_file=True,
       internal_classpath_only=False, excludes=excludes)
     # check canonical path returned
-    self.assertEquals(expected_canonical_classpath,
+    self.assertEqual(expected_canonical_classpath,
                       relativize_paths(canonical_classpath, libs_dir))
 
     # check canonical path created contain the exact set of files, no more, no less

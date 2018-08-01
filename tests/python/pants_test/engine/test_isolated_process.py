@@ -262,7 +262,7 @@ class ExecuteProcessRequestTest(unittest.TestCase):
       description="Some process",
       env={'VAR': 'VAL'},
     )
-    self.assertEquals(req.env, ('VAR', 'VAL'))
+    self.assertEqual(req.env, ('VAR', 'VAL'))
 
 
 class IsolatedProcessTest(TestBase, unittest.TestCase):
@@ -305,7 +305,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
       [request],
     )[0]
 
-    self.assertEquals(
+    self.assertEqual(
       execute_process_result.output_directory_digest,
       DirectoryDigest(
         fingerprint=text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
@@ -318,7 +318,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
       [execute_process_result.output_directory_digest],
     )[0]
 
-    self.assertEquals(
+    self.assertEqual(
       files_content_result.dependencies,
       (FileContent("roland", "European Burmese"),)
     )
@@ -352,7 +352,7 @@ class Simple {
     result = self.scheduler.product_request(JavacCompileResult, [request])[0]
     files_content = self.scheduler.product_request(FilesContent, [result.directory_digest])[0].dependencies
 
-    self.assertEquals(
+    self.assertEqual(
       tuple(sorted((
         "simple/Simple.java",
         "simple/Simple.class",
@@ -390,7 +390,7 @@ class Broken {
 
     result = self.scheduler.product_request(FallibleExecuteProcessResult, [request])[0]
 
-    self.assertEquals(result.exit_code, 1)
+    self.assertEqual(result.exit_code, 1)
 
   def test_non_fallible_failing_command_raises(self):
     request = ExecuteProcessRequest.create_with_empty_snapshot(

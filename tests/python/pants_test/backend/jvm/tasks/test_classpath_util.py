@@ -99,7 +99,7 @@ class ClasspathUtilTest(TestBase):
 
     # (a, path2) filtered because of conf
     # (b, path3) filtered because of excludes
-    self.assertEquals(OrderedDict([(a, [ClasspathEntry(path1)]),
+    self.assertEqual(OrderedDict([(a, [ClasspathEntry(path1)]),
                                    (b, [ClasspathEntry(path2)])]),
                       ClasspathUtil.classpath_by_targets(a.closure(bfs=True),
                                                          classpath_products))

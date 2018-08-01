@@ -61,7 +61,7 @@ class ScopeRuntimeIntegrationTest(PantsRunIntegrationTest):
         self.assertIn('com/google/gson/stream/JsonReader.class', f.namelist())
       p = Popen(['java', '-jar', binary], stdout=PIPE, stderr=PIPE)
       p.communicate()
-      self.assertEquals(0, p.returncode)
+      self.assertEqual(0, p.returncode)
 
   def test_compile_binary_has_correct_contents_and_runs(self):
     with temporary_dir() as distdir:
@@ -78,7 +78,7 @@ class ScopeRuntimeIntegrationTest(PantsRunIntegrationTest):
         self.assertNotIn('com/google/gson/stream/JsonReader.class', f.namelist())
       p = Popen(['java', '-jar', binary], stdout=PIPE, stderr=PIPE)
       p.communicate()
-      self.assertNotEquals(0, p.returncode)
+      self.assertNotEqual(0, p.returncode)
 
   def test_runtime_bundle_contents(self):
     spec = self._spec('runtime-pass')

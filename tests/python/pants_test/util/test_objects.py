@@ -79,16 +79,16 @@ class ExactlyTest(TypeConstraintTestBase):
 
   def test_str_and_repr(self):
     exactly_b_types = Exactly(self.B, description='B types')
-    self.assertEquals("=(B types)", str(exactly_b_types))
-    self.assertEquals("Exactly(B types)", repr(exactly_b_types))
+    self.assertEqual("=(B types)", str(exactly_b_types))
+    self.assertEqual("Exactly(B types)", repr(exactly_b_types))
 
     exactly_b = Exactly(self.B)
-    self.assertEquals("=B", str(exactly_b))
-    self.assertEquals("Exactly(B)", repr(exactly_b))
+    self.assertEqual("=B", str(exactly_b))
+    self.assertEqual("Exactly(B)", repr(exactly_b))
 
     exactly_multiple = Exactly(self.A, self.B)
-    self.assertEquals("=(A, B)", str(exactly_multiple))
-    self.assertEquals("Exactly(A, B)", repr(exactly_multiple))
+    self.assertEqual("=(A, B)", str(exactly_multiple))
+    self.assertEqual("Exactly(A, B)", repr(exactly_multiple))
 
   def test_checking_via_bare_type(self):
     self.assertTrue(Exactly(self.B).satisfied_by_type(self.B))

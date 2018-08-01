@@ -82,7 +82,7 @@ class TestBuildLocalDistsNativeSources(BuildLocalPythonDistributionsTestBase):
     universal_dist = self.target_dict['universal']
     context, synthetic_target, snapshot_version = self._create_distribution_synthetic_target(
       universal_dist)
-    self.assertEquals(['universal_dist==0.0.0+{}'.format(snapshot_version)],
+    self.assertEqual(['universal_dist==0.0.0+{}'.format(snapshot_version)],
                       [str(x.requirement) for x in synthetic_target.requirements.value])
 
     local_wheel_products = context.products.get('local_wheels')
@@ -94,7 +94,7 @@ class TestBuildLocalDistsNativeSources(BuildLocalPythonDistributionsTestBase):
     platform_specific_dist = self.target_dict['platform_specific']
     context, synthetic_target, snapshot_version = self._create_distribution_synthetic_target(
       platform_specific_dist)
-    self.assertEquals(['platform_specific_dist==0.0.0+{}'.format(snapshot_version)],
+    self.assertEqual(['platform_specific_dist==0.0.0+{}'.format(snapshot_version)],
                       [str(x.requirement) for x in synthetic_target.requirements.value])
 
     local_wheel_products = context.products.get('local_wheels')

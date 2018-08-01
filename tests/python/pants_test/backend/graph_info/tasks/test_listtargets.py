@@ -172,7 +172,7 @@ class ListTargetsTest(BaseListTargetsTest):
     targets = []
     targets.extend(self.targets('a/b/d/::'))
     targets.extend(self.target('f:alias').dependencies)
-    self.assertEquals(3, len(targets), "Expected a duplicate of a/b/d:d")
+    self.assertEqual(3, len(targets), "Expected a duplicate of a/b/d:d")
     self.assert_console_output(
       'a/b/c:c3',
       'a/b/d:d',

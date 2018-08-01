@@ -97,7 +97,7 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, SchedulerTestBas
     context = self._scheduling_context(
       target_roots=([python_dist_target] + extra_targets),
       for_task_types=([self.task_type()] + self._extra_relevant_task_types))
-    self.assertEquals(set(self._all_specified_targets()), set(context.build_graph.targets()))
+    self.assertEqual(set(self._all_specified_targets()), set(context.build_graph.targets()))
 
     python_create_distributions_task = self.create_task(context)
     extra_tasks = [
@@ -110,7 +110,7 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, SchedulerTestBas
     python_create_distributions_task.execute()
 
     synthetic_tgts = set(context.build_graph.targets()) - set(self._all_specified_targets())
-    self.assertEquals(1, len(synthetic_tgts))
+    self.assertEqual(1, len(synthetic_tgts))
     synthetic_target = next(iter(synthetic_tgts))
 
     snapshot_version = self._get_dist_snapshot_version(

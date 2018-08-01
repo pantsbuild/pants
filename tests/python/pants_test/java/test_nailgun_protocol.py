@@ -184,10 +184,10 @@ class TestNailgunProtocol(unittest.TestCase):
     )
 
   def test_isatty_from_empty_env(self):
-    self.assertEquals(NailgunProtocol.isatty_from_env({}), (False, False, False))
+    self.assertEqual(NailgunProtocol.isatty_from_env({}), (False, False, False))
 
   def test_isatty_from_env(self):
-    self.assertEquals(
+    self.assertEqual(
       NailgunProtocol.isatty_from_env({
         'NAILGUN_TTY_0': '1',
         'NAILGUN_TTY_1': '0',
@@ -197,7 +197,7 @@ class TestNailgunProtocol(unittest.TestCase):
     )
 
   def test_isatty_from_env_mixed(self):
-    self.assertEquals(
+    self.assertEqual(
       NailgunProtocol.isatty_from_env({
         'NAILGUN_TTY_0': '0',
         'NAILGUN_TTY_1': '1'
@@ -220,7 +220,7 @@ class TestNailgunProtocol(unittest.TestCase):
     mock_stdout = self._make_mock_stream(True, 1)
     mock_stderr = self._make_mock_stream(True, 2)
 
-    self.assertEquals(
+    self.assertEqual(
       NailgunProtocol.isatty_to_env(mock_stdin, mock_stdout, mock_stderr),
       {
         'NAILGUN_TTY_0': b'1',
@@ -236,7 +236,7 @@ class TestNailgunProtocol(unittest.TestCase):
     mock_stdout = self._make_mock_stream(False, 1)
     mock_stderr = self._make_mock_stream(False, 2)
 
-    self.assertEquals(
+    self.assertEqual(
       NailgunProtocol.isatty_to_env(mock_stdin, mock_stdout, mock_stderr),
       {
         'NAILGUN_TTY_0': b'0',

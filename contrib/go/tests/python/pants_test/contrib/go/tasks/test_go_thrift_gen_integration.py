@@ -108,7 +108,7 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
         root = os.path.join(workdir, 'gen', 'go-thrift', hash_dir,
                             target_dir.replace(os.path.sep, '.'), 'current')
 
-        self.assertEquals(sorted(['src/go/thrifttest/duck/constants.go',
+        self.assertEqual(sorted(['src/go/thrifttest/duck/constants.go',
                                   'src/go/thrifttest/duck/ttypes.go',
                                   'src/go/thrifttest/duck/feeder.go',
                                   'src/go/thrifttest/duck/feeder-remote/feeder-remote.go']),

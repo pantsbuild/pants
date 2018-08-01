@@ -94,8 +94,8 @@ class TestCobertura(TestBase):
 
   def _assert_calls(self, call_collection, frm, to):
     calls_for_target = call_collection[os.path.join(self.pants_workdir, frm)]
-    self.assertEquals(len(calls_for_target), 1, "Should be 1 call for the_target's path.")
-    self.assertEquals(calls_for_target[0], os.path.join(self.pants_workdir, to))
+    self.assertEqual(len(calls_for_target), 1, "Should be 1 call for the_target's path.")
+    self.assertEqual(calls_for_target[0], os.path.join(self.pants_workdir, to))
 
   def _assert_target_copy(self, coverage, frm, to):
     self._assert_calls(coverage.copy2_calls, frm, to)
@@ -123,12 +123,12 @@ class TestCobertura(TestBase):
                                                self.java_target],
                                               classpath_products)
 
-    self.assertEquals(len(syscalls.copy2_calls), 1,
+    self.assertEqual(len(syscalls.copy2_calls), 1,
                       'Should only be 1 call for the single java_library target.')
     self._assert_target_copy(syscalls,
                              frm='java/target/classpath.jar',
                              to='coverage/classes/foo.foo-java/0')
-    self.assertEquals(len(syscalls.copytree_calls), 0,
+    self.assertEqual(len(syscalls.copytree_calls), 0,
                       'Should be no copytree calls when targets are not coverage targets.')
 
   def test_target_with_multiple_path_entries(self):
@@ -147,7 +147,7 @@ class TestCobertura(TestBase):
                                               [self.java_target],
                                               classpath_products)
 
-    self.assertEquals(len(syscalls.copy2_calls), 3,
+    self.assertEqual(len(syscalls.copy2_calls), 3,
                       'Should be 3 call for the single java_library target.')
     self._assert_target_copy(syscalls,
                              frm='java/target/first.jar',
@@ -159,7 +159,7 @@ class TestCobertura(TestBase):
                              frm='java/target/third.jar',
                              to='coverage/classes/foo.foo-java/2')
 
-    self.assertEquals(len(syscalls.copytree_calls), 0,
+    self.assertEqual(len(syscalls.copytree_calls), 0,
                       'Should be no copytree calls when targets are not coverage targets.')
 
   def test_target_annotation_processor(self):
@@ -176,7 +176,7 @@ class TestCobertura(TestBase):
                                               [self.annotation_target],
                                               classpath_products)
 
-    self.assertEquals(len(syscalls.copy2_calls), 0,
+    self.assertEqual(len(syscalls.copy2_calls), 0,
                       'Should be 0 call for the single annotation target.')
     self._assert_target_copytree(syscalls,
                                  frm='anno/target/dir',

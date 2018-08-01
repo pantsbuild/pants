@@ -74,7 +74,7 @@ class CmdLineSpecParserTest(TestBase):
     # By adding a double slash, we are insisting that this absolute path is actually
     # relative to the buildroot. Thus, it should parse correctly.
     double_absolute = '/' + os.path.join(self.build_root, 'a')
-    self.assertEquals('//', double_absolute[:2],
+    self.assertEqual('//', double_absolute[:2],
                       'A sanity check we have a leading-// absolute spec')
     self.assert_parsed(double_absolute, single(double_absolute[2:]))
 

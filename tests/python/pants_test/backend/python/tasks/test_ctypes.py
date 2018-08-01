@@ -97,7 +97,7 @@ class TestBuildLocalDistsWithCtypesNativeSources(BuildLocalPythonDistributionsTe
     platform_specific_dist = self.target_dict['platform_specific_ctypes_c_dist']
     context, synthetic_target, snapshot_version = self._create_distribution_synthetic_target(
       platform_specific_dist, extra_targets=[self.target_dict['ctypes_c_library']])
-    self.assertEquals(['platform_specific_ctypes_c_dist==0.0.0+{}'.format(snapshot_version)],
+    self.assertEqual(['platform_specific_ctypes_c_dist==0.0.0+{}'.format(snapshot_version)],
                       [str(x.requirement) for x in synthetic_target.requirements.value])
     local_wheel_products = context.products.get('local_wheels')
     local_wheel = self._retrieve_single_product_at_target_base(
@@ -108,7 +108,7 @@ class TestBuildLocalDistsWithCtypesNativeSources(BuildLocalPythonDistributionsTe
     platform_specific_dist = self.target_dict['platform_specific_ctypes_cpp_dist']
     context, synthetic_target, snapshot_version = self._create_distribution_synthetic_target(
       platform_specific_dist, extra_targets=[self.target_dict['ctypes_cpp_library']])
-    self.assertEquals(['platform_specific_ctypes_cpp_dist==0.0.0+{}'.format(snapshot_version)],
+    self.assertEqual(['platform_specific_ctypes_cpp_dist==0.0.0+{}'.format(snapshot_version)],
                       [str(x.requirement) for x in synthetic_target.requirements.value])
 
     local_wheel_products = context.products.get('local_wheels')

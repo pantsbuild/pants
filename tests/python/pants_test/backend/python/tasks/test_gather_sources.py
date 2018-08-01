@@ -77,7 +77,7 @@ class GatherSourcesTest(TaskTestBase):
       expected_content = self.filemap[to_filemap_key(path)]
       with open(os.path.join(pex_path, path)) as infile:
         content = infile.read()
-      self.assertEquals(expected_content, content)
+      self.assertEqual(expected_content, content)
 
   def _assert_content_not_in_pex(self, pex, target):
     _, files = self._extract_files(target)

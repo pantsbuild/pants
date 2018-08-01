@@ -105,7 +105,7 @@ class GitTest(unittest.TestCase):
 
     for dirname in '.', './.':
       results = reader.listdir(dirname)
-      self.assertEquals([b'README',
+      self.assertEqual([b'README',
                          b'dir',
                          b'link-to-dir',
                          b'loop1',
@@ -115,7 +115,7 @@ class GitTest(unittest.TestCase):
 
     for dirname in 'dir', './dir':
       results = reader.listdir(dirname)
-      self.assertEquals([b'f',
+      self.assertEqual([b'f',
                          'not-absolute\u2764'.encode('utf-8'),
                          b'relative-dotdot',
                          b'relative-nonexistent',
@@ -123,7 +123,7 @@ class GitTest(unittest.TestCase):
                         sorted(results))
 
     results = reader.listdir('link-to-dir')
-    self.assertEquals([b'f',
+    self.assertEqual([b'f',
                        'not-absolute\u2764'.encode('utf-8'),
                        b'relative-dotdot',
                        b'relative-nonexistent',
@@ -138,34 +138,34 @@ class GitTest(unittest.TestCase):
     reader = self.git.repo_reader(self.initial_rev)
     def lstat(*components):
       return type(reader.lstat(os.path.join(*components)))
-    self.assertEquals(reader.Symlink, lstat('dir', 'relative-symlink'))
-    self.assertEquals(reader.Symlink, lstat('not-a-dir'))
-    self.assertEquals(reader.File, lstat('README'))
-    self.assertEquals(reader.Dir, lstat('dir'))
-    self.assertEquals(type(None), lstat('nope-not-here'))
+    self.assertEqual(reader.Symlink, lstat('dir', 'relative-symlink'))
+    self.assertEqual(reader.Symlink, lstat('not-a-dir'))
+    self.assertEqual(reader.File, lstat('README'))
+    self.assertEqual(reader.Dir, lstat('dir'))
+    self.assertEqual(type(None), lstat('nope-not-here'))
 
   def test_readlink(self):
     reader = self.git.repo_reader(self.initial_rev)
     def readlink(*components):
       return reader.readlink(os.path.join(*components))
-    self.assertEquals('dir/f', readlink('dir', 'relative-symlink'))
-    self.assertEquals(None, readlink('not-a-dir'))
-    self.assertEquals(None, readlink('README'))
-    self.assertEquals(None, readlink('dir'))
-    self.assertEquals(None, readlink('nope-not-here'))
+    self.assertEqual('dir/f', readlink('dir', 'relative-symlink'))
+    self.assertEqual(None, readlink('not-a-dir'))
+    self.assertEqual(None, readlink('README'))
+    self.assertEqual(None, readlink('dir'))
+    self.assertEqual(None, readlink('nope-not-here'))
 
   def test_open(self):
     reader = self.git.repo_reader(self.initial_rev)
 
     with reader.open('README') as f:
-      self.assertEquals(b'', f.read())
+      self.assertEqual(b'', f.read())
 
     with reader.open('dir/f') as f:
-      self.assertEquals(b'file in subdir', f.read())
+      self.assertEqual(b'file in subdir', f.read())
 
     with self.assertRaises(reader.MissingFileException):
       with reader.open('no-such-file') as f:
-        self.assertEquals(b'', f.read())
+        self.assertEqual(b'', f.read())
 
     with self.assertRaises(reader.MissingFileException):
       with reader.open('dir/no-such-file') as f:
@@ -173,18 +173,18 @@ class GitTest(unittest.TestCase):
 
     with self.assertRaises(reader.IsDirException):
       with reader.open('dir') as f:
-        self.assertEquals(b'', f.read())
+        self.assertEqual(b'', f.read())
 
     current_reader = self.git.repo_reader(self.current_rev)
 
     with current_reader.open('README') as f:
-      self.assertEquals('Hello World.\u2764'.encode('utf-8'), f.read())
+      self.assertEqual('Hello World.\u2764'.encode('utf-8'), f.read())
 
     with current_reader.open('link-to-dir/f') as f:
-      self.assertEquals(b'file in subdir', f.read())
+      self.assertEqual(b'file in subdir', f.read())
 
     with current_reader.open('dir/relative-symlink') as f:
-      self.assertEquals(b'file in subdir', f.read())
+      self.assertEqual(b'file in subdir', f.read())
 
     with self.assertRaises(current_reader.SymlinkLoopException):
       with current_reader.open('loop1') as f:
@@ -207,7 +207,7 @@ class GitTest(unittest.TestCase):
         pass
 
     with current_reader.open('dir/relative-dotdot') as f:
-      self.assertEquals('Hello World.\u2764'.encode('utf-8'), f.read())
+      self.assertEqual('Hello World.\u2764'.encode('utf-8'), f.read())
 
   def test_integration(self):
     self.assertEqual(set(), self.git.changed_files())
@@ -465,11 +465,11 @@ class GitTest(unittest.TestCase):
 
       subprocess.check_call(['git', 'commit', '-am', 'Conflict'])
 
-      self.assertEquals(set(), self.git.changed_files(include_untracked=True, from_commit='HEAD'))
+      self.assertEqual(set(), self.git.changed_files(include_untracked=True, from_commit='HEAD'))
       with self.assertRaises(Scm.LocalException):
         self.git.refresh(leave_clean=False)
       # The repo is dirty
-      self.assertEquals({'README'},
+      self.assertEqual({'README'},
                         self.git.changed_files(include_untracked=True, from_commit='HEAD'))
 
       with environment_as(GIT_DIR=self.gitdir, GIT_WORK_TREE=self.worktree):
@@ -479,7 +479,7 @@ class GitTest(unittest.TestCase):
       with self.assertRaises(Scm.LocalException):
         self.git.refresh(leave_clean=True)
       # The repo is clean
-      self.assertEquals(set(), self.git.changed_files(include_untracked=True, from_commit='HEAD'))
+      self.assertEqual(set(), self.git.changed_files(include_untracked=True, from_commit='HEAD'))
 
   def test_commit_with_new_untracked_file_adds_file(self):
     new_file = os.path.join(self.worktree, 'untracked_file')

@@ -63,7 +63,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
                var_key]
     pants_run = self.run_pants(command=command, extra_env={var_key: var_val})
     self.assert_success(pants_run)
-    self.assertEquals(var_val, pants_run.stdout_data.strip())
+    self.assertEqual(var_val, pants_run.stdout_data.strip())
 
   def test_pants_run_interpreter_selection_with_pexrc(self):
     py27 = '2.7'
@@ -169,7 +169,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     v = echo.split('.')  # E.g., 2.7.13.
     self.assertTrue(len(v) > 2, 'Not a valid version string: {}'.format(v))
     expected_components = version.split('.')
-    self.assertEquals(expected_components, v[:len(expected_components,)])
+    self.assertEqual(expected_components, v[:len(expected_components,)])
 
   def _run_echo_version(self, version):
     binary_name = 'echo_interpreter_version_{}'.format(version)

@@ -51,7 +51,7 @@ class JavaProtobufLibraryTest(TestBase):
     '''))
     target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
-    self.assertEquals(1, len(target.imported_jars))
+    self.assertEqual(1, len(target.imported_jars))
     import_jar_dep = target.imported_jars[0]
     self.assertIsInstance(import_jar_dep, JarDependency)
 

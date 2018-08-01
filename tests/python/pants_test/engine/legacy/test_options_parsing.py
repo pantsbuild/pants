@@ -33,9 +33,9 @@ class TestEngineOptionsParsing(unittest.TestCase):
 
     self.assertIn('binary', options.goals)
     global_options = options.for_global_scope()
-    self.assertEquals(global_options.level, 'debug')
-    self.assertEquals(global_options.enable_pantsd, True)
-    self.assertEquals(global_options.binaries_baseurls, ['https://bins.com'])
+    self.assertEqual(global_options.level, 'debug')
+    self.assertEqual(global_options.enable_pantsd, True)
+    self.assertEqual(global_options.binaries_baseurls, ['https://bins.com'])
 
     python_setup_options = options.for_scope('python-setup')
-    self.assertEquals(python_setup_options.wheel_version, '3.13.37')
+    self.assertEqual(python_setup_options.wheel_version, '3.13.37')

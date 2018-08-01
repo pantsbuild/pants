@@ -55,7 +55,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       # The 'latest' link has been removed by clean-all but that's not fatal.
       report_dirs = os.listdir(os.path.join(workdir, 'reports'))
-      self.assertEquals(1, len(report_dirs))
+      self.assertEqual(1, len(report_dirs))
 
       output = os.path.join(workdir, 'reports', report_dirs[0], 'invalidation-report.csv')
       self.assertTrue(os.path.exists(output), msg='Missing report file {}'.format(output))

@@ -26,4 +26,4 @@ class MetaRenameIntegrationTest(PantsRunIntegrationTest):
       '--to=testprojects/tests/java/org/pantsbuild/testproject/buildrefactor:X',
       'testprojects/tests/java/org/pantsbuild/testproject/buildrefactor:Y'])
 
-    self.assertEquals(pre_dependees_run.stdout_data, post_dependees_run.stdout_data)
+    self.assertEqual(pre_dependees_run.stdout_data, post_dependees_run.stdout_data)

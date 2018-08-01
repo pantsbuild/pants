@@ -56,9 +56,9 @@ class TargetTest(TestBase):
     syn_two = self.make_target('y:syn_two', Target, derived_from=syn_one)
 
     # validate
-    self.assertEquals(list(syn_two.derived_from_chain), [syn_one, concrete])
-    self.assertEquals(list(syn_one.derived_from_chain), [concrete])
-    self.assertEquals(list(concrete.derived_from_chain), [])
+    self.assertEqual(list(syn_two.derived_from_chain), [syn_one, concrete])
+    self.assertEqual(list(syn_one.derived_from_chain), [concrete])
+    self.assertEqual(list(concrete.derived_from_chain), [])
 
   def test_is_synthetic(self):
     # add concrete target

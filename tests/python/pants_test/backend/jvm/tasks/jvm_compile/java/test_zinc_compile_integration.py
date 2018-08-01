@@ -208,7 +208,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
             extra_args=['--java-javac=testprojects/3rdparty/javactool:custom_javactool_for_testing'],
             clean_all=True
         )
-        self.assertNotEquals(0, pants_run.returncode)  # Our custom javactool always fails.
+        self.assertNotEqual(0, pants_run.returncode)  # Our custom javactool always fails.
         self.assertIn('Pants caused Zinc to load a custom JavacTool', pants_run.stdout_data)
 
   def test_no_zinc_file_manager(self):
@@ -216,4 +216,4 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     with self.temporary_workdir() as workdir:
       with self.temporary_cachedir() as cachedir:
         pants_run = self.run_test_compile(workdir, cachedir, target_spec, clean_all=True)
-        self.assertEquals(0, pants_run.returncode)
+        self.assertEqual(0, pants_run.returncode)

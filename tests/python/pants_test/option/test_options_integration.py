@@ -41,8 +41,8 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     try:
       output_map = json.loads(pants_run.stdout_data)
       self.assertIn("time", output_map)
-      self.assertEquals(output_map["time"]["source"], "HARDCODED")
-      self.assertEquals(output_map["time"]["value"], False)
+      self.assertEqual(output_map["time"]["source"], "HARDCODED")
+      self.assertEqual(output_map["time"]["value"], False)
     except ValueError:
       self.fail("Invalid JSON output")
 
@@ -52,9 +52,9 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     try:
       output_map = json.loads(pants_run.stdout_data)
       self.assertIn("time", output_map)
-      self.assertEquals(output_map["time"]["source"], "HARDCODED")
-      self.assertEquals(output_map["time"]["value"], False)
-      self.assertEquals(output_map["time"]["history"], [])
+      self.assertEqual(output_map["time"]["source"], "HARDCODED")
+      self.assertEqual(output_map["time"]["value"], False)
+      self.assertEqual(output_map["time"]["history"], [])
       for _, val in output_map.items():
         self.assertIn("history", val)
     except ValueError:

@@ -20,14 +20,14 @@ class RetryTest(unittest.TestCase):
     with self.assertRaises(OSError):
       retry_on_exception(broken_func, 3, (OSError,))
 
-    self.assertEquals(broken_func.call_count, 3)
+    self.assertEqual(broken_func.call_count, 3)
 
   def test_retry_on_exception_immediate_success(self):
     working_func = mock.Mock()
     working_func.return_value = 'works'
 
-    self.assertEquals(retry_on_exception(working_func, 3, (OSError,)), 'works')
-    self.assertEquals(working_func.call_count, 1)
+    self.assertEqual(retry_on_exception(working_func, 3, (OSError,)), 'works')
+    self.assertEqual(working_func.call_count, 1)
 
   @mock.patch('time.sleep', autospec=True, spec_set=True)
   def test_retry_on_exception_eventual_success(self, mock_sleep):
@@ -36,7 +36,7 @@ class RetryTest(unittest.TestCase):
 
     retry_on_exception(broken_func, 3, (OSError,))
 
-    self.assertEquals(broken_func.call_count, 3)
+    self.assertEqual(broken_func.call_count, 3)
 
   @mock.patch('time.sleep', autospec=True, spec_set=True)
   def test_retry_on_exception_not_caught(self, mock_sleep):
@@ -46,7 +46,7 @@ class RetryTest(unittest.TestCase):
     with self.assertRaises(OSError):
       retry_on_exception(broken_func, 3, (TypeError,))
 
-    self.assertEquals(broken_func.call_count, 1)
+    self.assertEqual(broken_func.call_count, 1)
 
   @mock.patch('time.sleep', autospec=True, spec_set=True)
   def test_retry_default_backoff(self, mock_sleep):

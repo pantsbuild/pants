@@ -80,4 +80,4 @@ class RagelGenTest(TaskTestBase):
     with temporary_file() as fp:
       fp.write(ragel_file_contents)
       fp.flush()
-      self.assertEquals(calculate_genfile(fp.name), 'com/example/atoi/Parser.java')
+      self.assertEqual(calculate_genfile(fp.name), 'com/example/atoi/Parser.java')

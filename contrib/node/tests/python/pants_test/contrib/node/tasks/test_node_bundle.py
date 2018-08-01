@@ -58,7 +58,7 @@ class TestNodeBundle(TaskTestBase):
       product_data = product.get(target)
       self.assertIsNotNone(product_data)
       product_basedir = list(product_data.keys())[0]
-      self.assertEquals(product_data[product_basedir], ['{}.tar.gz'.format(self.target_name)])
+      self.assertEqual(product_data[product_basedir], ['{}.tar.gz'.format(self.target_name)])
 
   def test_no_dependencies_for_node_bundle(self):
     with temporary_dir() as tmp_dir:

@@ -88,7 +88,7 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
       'pants_backend_jvm_tasks_consolidate_classpath_ConsolidateClasspath'
     )
     found_files = [os.path.basename(f) for f in self.iter_files(task_dir)]
-    self.assertEquals(
+    self.assertEqual(
       sorted(['output-0.jar', 'Foo.class', 'foo.txt', 'file']),
       sorted(found_files)
     )
@@ -113,7 +113,7 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
       'pants_backend_jvm_tasks_consolidate_classpath_ConsolidateClasspath'
     )
     found_files = [os.path.basename(f) for f in self.iter_files(task_dir)]
-    self.assertEquals(
+    self.assertEqual(
       sorted(['output-0.jar', 'Foo.class', 'foo.txt', 'file']),
       sorted(found_files)
     )

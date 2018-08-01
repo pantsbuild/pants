@@ -428,10 +428,10 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
   def test_has_python_requirements(self):
     result = self.execute_export_json('src/python/has_reqs')
     interpreters = result['python_setup']['interpreters']
-    self.assertEquals(1, len(interpreters))
+    self.assertEqual(1, len(interpreters))
     chroot = list(interpreters.values())[0]['chroot']
     deps = os.listdir(os.path.join(chroot, '.deps'))
-    self.assertEquals(1, len(deps))
+    self.assertEqual(1, len(deps))
     six_whl = deps[0]
     self.assertTrue(six_whl.startswith('six-1.9.0'))
     self.assertTrue(six_whl.endswith('.whl'))

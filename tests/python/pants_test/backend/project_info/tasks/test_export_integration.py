@@ -192,8 +192,8 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertFalse('python_setup' in json_data)
       target_name = 'examples/src/java/org/pantsbuild/example/hello/simple:simple'
       targets = json_data.get('targets')
-      self.assertEquals('java7', targets[target_name]['platform'])
-      self.assertEquals(
+      self.assertEqual('java7', targets[target_name]['platform'])
+      self.assertEqual(
         {
           'default_platform' : 'java7',
           'platforms': {
@@ -214,8 +214,8 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     with self.temporary_workdir() as workdir:
       test_target = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight-test-platform'
       json_data = self.run_export(test_target, workdir)
-      self.assertEquals('java7', json_data['targets'][test_target]['platform'])
-      self.assertEquals('java8', json_data['targets'][test_target]['test_platform'])
+      self.assertEqual('java7', json_data['targets'][test_target]['platform'])
+      self.assertEqual('java8', json_data['targets'][test_target]['test_platform'])
 
   @ensure_resolver
   def test_intellij_integration(self):
@@ -241,7 +241,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
 
       python_target = json_data['targets']['src/python/pants/backend/python/targets:targets']
       self.assertIsNotNone(python_target)
-      self.assertEquals(default_interpreter, python_target['python_interpreter'])
+      self.assertEqual(default_interpreter, python_target['python_interpreter'])
 
   @ensure_resolver
   def test_intransitive_and_scope(self):
@@ -251,8 +251,8 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       json_data = self.run_export(test_target, workdir)
       h = hash_target('{}:shadow'.format(test_path), 'provided')
       synthetic_target = '{}:shadow-unstable-provided-{}'.format(test_path, h)
-      self.assertEquals(False, json_data['targets'][synthetic_target]['transitive'])
-      self.assertEquals('compile test', json_data['targets'][synthetic_target]['scope'])
+      self.assertEqual(False, json_data['targets'][synthetic_target]['transitive'])
+      self.assertEqual('compile test', json_data['targets'][synthetic_target]['scope'])
 
   @ensure_resolver
   def test_export_is_target_roots(self):

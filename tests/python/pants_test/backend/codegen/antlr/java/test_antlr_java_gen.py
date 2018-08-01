@@ -81,7 +81,7 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
 
     actual_sources = [s for s in Fileset.rglobs('*.java', root=target_workdir)]
     expected_sources = syn_target.sources_relative_to_source_root()
-    self.assertEquals(set(expected_sources), set(actual_sources))
+    self.assertEqual(set(expected_sources), set(actual_sources))
 
     # Check that the synthetic target has a valid source root and the generated sources have the
     # expected java package

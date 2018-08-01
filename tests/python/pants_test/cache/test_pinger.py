@@ -87,7 +87,7 @@ class TestBestUrlSelector(TestBase):
   def call_url(self, expected_url, with_error=False):
     try:
       with self.best_url_selector.select_best_url() as url:
-        self.assertEquals(urlparse(expected_url), url)
+        self.assertEqual(urlparse(expected_url), url)
 
         if with_error:
           raise RequestException('error connecting to {}'.format(url))

@@ -180,7 +180,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     product_data = products.get(self.app_target)
     product_basedir = list(product_data.keys())[0]
     self.assertIn(self.pants_workdir, product_basedir)
-    self.assertEquals(product_data[product_basedir], [product_fullname])
+    self.assertEqual(product_data[product_basedir], [product_fullname])
     product_path = os.path.join(product_basedir, product_fullname)
     return product_path
 
