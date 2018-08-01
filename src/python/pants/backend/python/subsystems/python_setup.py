@@ -19,13 +19,6 @@ class PythonSetup(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(PythonSetup, cls).register_options(register)
-    # Note: This replaces two options:
-    # A) The global --interpreter option in the old python tasks.
-    #    That flag is only relevant in the python backend, and should never have been
-    #    global to begin with.
-    # B) The --interpreter-requirement option above.  That flag merely served to set the
-    #    effective default for when no other constraints were set, so we might as well
-    #    roll that into the more general constraints.
     register('--interpreter-constraints', advanced=True, default=['CPython>=2.7,<3'], type=list,
              metavar='<requirement>',
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
@@ -80,8 +73,7 @@ class PythonSetup(Subsystem):
 
   @property
   def interpreter_constraints(self):
-    return (self.get_options().interpreter_constraints or self.get_options().interpreter or
-            [self.get_options().interpreter_requirement or b''])
+    return tuple(self.get_options().interpreter_constraints)
 
   @property
   def interpreter_search_paths(self):
@@ -139,6 +131,10 @@ class PythonSetup(Subsystem):
   @property
   def scratch_dir(self):
     return os.path.join(self.get_options().pants_workdir, *self.options_scope.split('.'))
+
+  def compatibility_or_constraints(self, target):
+    """Return either the compatibility of the given target, or the interpreter constraints."""
+    return tuple(target.compatibility or self.interpreter_constraints)
 
   def setuptools_requirement(self):
     return self._failsafe_parse('setuptools=={0}'.format(self.setuptools_version))

@@ -126,25 +126,30 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     os.remove(py3_pex)
 
   def test_target_constraints_with_no_sources(self):
+    if self.skip_if_no_python('3'):
+      return
+
     with temporary_dir() as interpreters_cache:
+      pants_ini_config = {
+          'python-setup': {
+            'interpreter_cache_dir': interpreters_cache,
+            'interpreter_constraints': ['CPython>3'],
+          }
+        }
       # Run task.
-      py3 = '3'
-      if not self.skip_if_no_python(py3):
-        pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
-        pants_run_3 = self.run_pants(
-          command=['run', '{}:test_bin'.format(os.path.join(self.testproject, 'test_target_with_no_sources'))],
-          config=pants_ini_config
-        )
-        self.assert_success(pants_run_3)
-        self.assertIn('python3', pants_run_3.stdout_data)
+      pants_run = self.run_pants(
+        command=['run', '{}:test_bin'.format(os.path.join(self.testproject, 'test_target_with_no_sources'))],
+        config=pants_ini_config
+      )
+      self.assert_success(pants_run)
+      self.assertIn('python3', pants_run.stdout_data)
 
       # Binary task.
-      pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
-      pants_run_27 = self.run_pants(
+      pants_run = self.run_pants(
         command=['binary', '{}:test_bin'.format(os.path.join(self.testproject, 'test_target_with_no_sources'))],
         config=pants_ini_config
       )
-      self.assert_success(pants_run_27)
+      self.assert_success(pants_run)
 
     # Ensure proper interpreter constraints were passed to built pexes.
     py2_pex = os.path.join(os.getcwd(), 'dist', 'test_bin.pex')

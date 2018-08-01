@@ -10,6 +10,7 @@ from builtins import str
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -69,6 +70,10 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
         add = builder.add_source if self.path.endswith('.py') else builder.add_resource
         add(fp.name, self.path)
 
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(PythonExecutionTaskBase, cls).subsystem_dependencies() + (PythonSetup,)
+
   def extra_files(self):
     """Override to provide extra files needed for execution.
 
@@ -111,7 +116,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
           # in the target set's dependency closure.
           pexes = [extra_requirements_pex] + pexes
         constraints = {constraint for rt in relevant_targets if is_python_target(rt)
-                       for constraint in rt.compatibility}
+                       for constraint in PythonSetup.global_instance().compatibility_or_constraints(rt)}
 
         with self.merged_pex(path, pex_info, interpreter, pexes, constraints) as builder:
           for extra_file in self.extra_files():
