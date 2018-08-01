@@ -137,7 +137,10 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
       # Create the executable pex.
       exec_pex_parent = os.path.join(self.workdir, 'executable_pex')
       executable_file_content = self._get_executable_file_content(exec_pex_parent, modules)
+
       hasher = hashlib.sha1()
+      hasher.update(reqs_pex.path())
+      hasher.update(srcs_pex.path())
       hasher.update(executable_file_content)
       exec_file_hash = hasher.hexdigest()
       exec_pex_path = os.path.realpath(os.path.join(exec_pex_parent, exec_file_hash))
