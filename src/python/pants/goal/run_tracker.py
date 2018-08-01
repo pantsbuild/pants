@@ -12,6 +12,7 @@ import sys
 import threading
 import time
 import uuid
+from builtins import open
 from contextlib import contextmanager
 
 import requests
