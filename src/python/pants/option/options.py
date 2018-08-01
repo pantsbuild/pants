@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import copy
 import sys
-from builtins import object, str
+from builtins import object, open, str
 
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
@@ -122,7 +122,7 @@ class Options(object):
       target_spec_files = bootstrap_option_values.target_spec_files
       if target_spec_files:
         for spec in target_spec_files:
-          with open(spec) as f:
+          with open(spec, 'r') as f:
             target_specs.extend([line for line in [line.strip() for line in f] if line])
 
     help_request = splitter.help_request

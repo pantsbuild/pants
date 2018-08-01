@@ -21,6 +21,7 @@ python_tests(
     'test_options_integration.py',
   ],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],

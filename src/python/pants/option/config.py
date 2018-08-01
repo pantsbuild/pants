@@ -9,6 +9,7 @@ import getpass
 import io
 import itertools
 import os
+from builtins import open
 from contextlib import contextmanager
 
 import six

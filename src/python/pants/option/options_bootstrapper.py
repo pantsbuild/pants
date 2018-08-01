@@ -8,7 +8,7 @@ import itertools
 import logging
 import os
 import sys
-from builtins import filter, next, object
+from builtins import filter, next, object, open
 
 from pants.base.build_environment import get_default_pants_config_file
 from pants.engine.fs import FileContent
@@ -147,7 +147,7 @@ class OptionsBootstrapper(object):
   def construct_and_set_bootstrap_options(self):
     """Populates the internal bootstrap_options cache."""
     def filecontent_for(path):
-      with open(path, 'rb') as fh:
+      with open(path, 'r') as fh:
         return FileContent(path, fh.read())
 
     # N.B. This adaptor is meant to simulate how we would co-operatively invoke options bootstrap

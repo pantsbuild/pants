@@ -9,7 +9,7 @@ import os
 import shlex
 import unittest
 import warnings
-from builtins import str
+from builtins import open, str
 from contextlib import contextmanager
 from textwrap import dedent
 
