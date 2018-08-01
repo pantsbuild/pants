@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import sys
 from abc import abstractmethod
-from builtins import map, object, zip
+from builtins import object, zip
 from collections import OrderedDict, namedtuple
 
 from future.utils import PY2
@@ -119,17 +119,13 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
     def _replace(_self, **kwds):
       '''Return a new datatype object replacing specified fields with new values'''
-      result = _self._make(map(kwds.pop, _self._fields, _self._super_iter()))
-      if kwds:
-        raise ValueError('Got unexpected field names: %r' % kwds.keys())
-      return result
+      field_dict = _self._asdict()
+      field_dict.update(**kwds)
+      return type(_self)(**field_dict)
 
-    # TODO: would we want to expose a self.as_tuple() method (which just calls __getnewargs__) so we
-    # can tuple assign? E.g.:
-    # class A(datatype(['field'])): pass
-    # x = A(field='asdf')
-    # field_value, = x.as_tuple()
-    # print(field_value) # => 'asdf'
+    copy = _replace
+
+    # NB: it is *not* recommended to rely on the ordering of the tuple returned by this method.
     def __getnewargs__(self):
       '''Return self as a plain tuple.  Used by copy and pickle.'''
       return tuple(self._super_iter())

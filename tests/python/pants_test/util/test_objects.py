@@ -564,3 +564,28 @@ value is negative: -3.""")
       """error: in constructor of type WithSubclassTypeConstraint: type check error:
 field 'some_value' was invalid: value 3 (with type 'int') must satisfy this type constraint: SubclassesOf(SomeBaseClass).""")
     self.assertEqual(str(cm.exception), expected_msg)
+
+  def test_copy(self):
+    obj = AnotherTypedDatatype(string='some_string', elements=[1, 2, 3])
+    new_obj = obj.copy(string='another_string')
+
+    self.assertEqual(type(obj), type(new_obj))
+    self.assertEqual(new_obj.string, 'another_string')
+    self.assertEqual(new_obj.elements, obj.elements)
+
+  def test_copy_failure(self):
+    obj = AnotherTypedDatatype(string='some string', elements=[1,2,3])
+
+    with self.assertRaises(TypeCheckError) as cm:
+      obj.copy(nonexistent_field=3)
+    expected_msg = (
+      """error: in constructor of type AnotherTypedDatatype: type check error:
+__new__() got an unexpected keyword argument 'nonexistent_field'""")
+    self.assertEqual(str(cm.exception), expected_msg)
+
+    with self.assertRaises(TypeCheckError) as cm:
+      obj.copy(elements=3)
+    expected_msg = (
+      """error: in constructor of type AnotherTypedDatatype: type check error:
+field 'elements' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly(list).""")
+    self.assertEqual(str(cm.exception), expected_msg)
