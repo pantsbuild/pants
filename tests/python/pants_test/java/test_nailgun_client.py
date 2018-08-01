@@ -35,10 +35,10 @@ class FakeFile(object):
 
 class TestNailgunClientSession(unittest.TestCase):
   BAD_CHUNK_TYPE = b';'
-  TEST_PAYLOAD = 't e s t'
+  TEST_PAYLOAD = b't e s t'
   TEST_WORKING_DIR = '/test_working_dir'
   TEST_MAIN_CLASS = 'test_main_class'
-  TEST_ARGUMENTS = ['t', 'e', 's', 't']
+  TEST_ARGUMENTS = [b't', b'e', b's', b't']
   TEST_ENVIRON = dict(TEST_ENV_VAR='xyz')
 
   def setUp(self):

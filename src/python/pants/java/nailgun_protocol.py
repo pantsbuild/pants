@@ -8,9 +8,6 @@ import os
 import struct
 from builtins import bytes, object, str, zip
 
-import six
-from future.utils import binary_type
-
 
 STDIO_DESCRIPTORS = (0, 1, 2)
 
@@ -147,9 +144,9 @@ class NailgunProtocol(object):
   @classmethod
   def construct_chunk(cls, chunk_type, payload, encoding='utf-8'):
     """Construct and return a single chunk."""
-    if isinstance(payload, six.text_type):
+    if isinstance(payload, str):
       payload = payload.encode(encoding)
-    elif not isinstance(payload, six.binary_type):
+    elif not isinstance(payload, bytes):
       raise TypeError('cannot encode type: {}'.format(type(payload)))
 
     header = struct.pack(cls.HEADER_FMT, len(payload), chunk_type)
@@ -228,7 +225,7 @@ class NailgunProtocol(object):
     cls.write_chunk(sock, ChunkType.STDERR, payload)
 
   @classmethod
-  def send_exit(cls, sock, payload=''):
+  def send_exit(cls, sock, payload=b''):
     """Send the Exit chunk over the specified socket."""
     cls.write_chunk(sock, ChunkType.EXIT, payload)
 
@@ -249,9 +246,9 @@ class NailgunProtocol(object):
     def gen_env_vars():
       for fd_id, fd in zip(STDIO_DESCRIPTORS, (stdin, stdout, stderr)):
         is_atty = fd.isatty()
-        yield (cls.TTY_ENV_TMPL.format(fd_id), binary_type(str(int(is_atty))))
+        yield (cls.TTY_ENV_TMPL.format(fd_id), str(int(is_atty)).encode('utf-8'))
         if is_atty:
-          yield (cls.TTY_PATH_ENV.format(fd_id), os.ttyname(fd.fileno()) or '')
+          yield (cls.TTY_PATH_ENV.format(fd_id), os.ttyname(fd.fileno()) or b'')
     return dict(gen_env_vars())
 
   @classmethod

@@ -68,10 +68,10 @@ class TestNailgunProtocol(unittest.TestCase):
       NailgunProtocol.parse_request(self.server_sock)
 
   def test_read_until(self):
-    recv_chunks = ['1', '234', '56', '789', '0']
+    recv_chunks = [b'1', b'234', b'56', b'789', b'0']
     mock_socket = mock.Mock()
     mock_socket.recv.side_effect = recv_chunks
-    self.assertEqual(NailgunProtocol._read_until(mock_socket, 10), '1234567890')
+    self.assertEqual(NailgunProtocol._read_until(mock_socket, 10), b'1234567890')
     self.assertEqual(mock_socket.recv.call_count, len(recv_chunks))
 
   def test_read_until_truncated_recv(self):
