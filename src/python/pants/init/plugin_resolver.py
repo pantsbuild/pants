@@ -8,7 +8,7 @@ import hashlib
 import logging
 import os
 import site
-from builtins import object
+from builtins import object, open
 
 from pex import resolver
 from pex.base import requirement_is_exact
@@ -101,7 +101,7 @@ class PluginResolver(object):
           fp.write(plugin.location)
           fp.write('\n')
       os.rename(tmp_plugins_list, resolved_plugins_list)
-    with open(resolved_plugins_list) as fp:
+    with open(resolved_plugins_list, 'r') as fp:
       for plugin_location in fp:
         yield plugin_location.strip()
 
