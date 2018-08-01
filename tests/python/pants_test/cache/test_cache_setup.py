@@ -98,16 +98,16 @@ class TestCacheSetup(TestBase):
   def test_sanitize_cache_spec(self):
     cache_factory = self.cache_factory()
 
-    self.assertEquals(self.CACHE_SPEC_LOCAL_ONLY,
+    self.assertEqual(self.CACHE_SPEC_LOCAL_ONLY,
                       cache_factory._sanitize_cache_spec([self.LOCAL_URI]))
 
-    self.assertEquals(self.CACHE_SPEC_REMOTE_ONLY,
+    self.assertEqual(self.CACHE_SPEC_REMOTE_ONLY,
                       cache_factory._sanitize_cache_spec([self.REMOTE_URI_1]))
 
     # (local, remote) and (remote, local) are equivalent as long as they are valid
-    self.assertEquals(self.CACHE_SPEC_LOCAL_REMOTE,
+    self.assertEqual(self.CACHE_SPEC_LOCAL_REMOTE,
                       cache_factory._sanitize_cache_spec([self.LOCAL_URI, self.REMOTE_URI_1]))
-    self.assertEquals(self.CACHE_SPEC_LOCAL_REMOTE,
+    self.assertEqual(self.CACHE_SPEC_LOCAL_REMOTE,
                       cache_factory._sanitize_cache_spec([self.REMOTE_URI_1, self.LOCAL_URI]))
 
     with self.assertRaises(InvalidCacheSpecError):
@@ -135,17 +135,17 @@ class TestCacheSetup(TestBase):
   def test_resolve(self):
     cache_factory = self.cache_factory()
 
-    self.assertEquals(CacheSpec(local=None,
+    self.assertEqual(CacheSpec(local=None,
                                 remote='{}|{}'.format(self.REMOTE_URI_1, self.REMOTE_URI_2)),
                       cache_factory._resolve(self.CACHE_SPEC_RESOLVE_ONLY))
 
-    self.assertEquals(CacheSpec(local=self.LOCAL_URI,
+    self.assertEqual(CacheSpec(local=self.LOCAL_URI,
                                 remote='{}|{}'.format(self.REMOTE_URI_1, self.REMOTE_URI_2)),
                       cache_factory._resolve(self.CACHE_SPEC_LOCAL_RESOLVE))
 
     self.resolver.resolve.side_effect = Resolver.ResolverError()
     # still have local cache if resolver fails
-    self.assertEquals(CacheSpec(local=self.LOCAL_URI, remote=None),
+    self.assertEqual(CacheSpec(local=self.LOCAL_URI, remote=None),
                       cache_factory._resolve(self.CACHE_SPEC_LOCAL_RESOLVE))
     # no cache created if resolver fails and no local cache
     self.assertFalse(cache_factory._resolve(self.CACHE_SPEC_RESOLVE_ONLY))
@@ -154,11 +154,11 @@ class TestCacheSetup(TestBase):
     self.resolver.resolve = Mock(return_value=[])
     cache_factory = self.cache_factory()
 
-    self.assertEquals(self.CACHE_SPEC_LOCAL_ONLY,
+    self.assertEqual(self.CACHE_SPEC_LOCAL_ONLY,
                       cache_factory._resolve(self.CACHE_SPEC_LOCAL_ONLY))
-    self.assertEquals(self.CACHE_SPEC_RESOLVE_ONLY,
+    self.assertEqual(self.CACHE_SPEC_RESOLVE_ONLY,
                       cache_factory._resolve(self.CACHE_SPEC_RESOLVE_ONLY))
-    self.assertEquals(self.CACHE_SPEC_LOCAL_RESOLVE,
+    self.assertEqual(self.CACHE_SPEC_LOCAL_RESOLVE,
                       cache_factory._resolve(self.CACHE_SPEC_LOCAL_RESOLVE))
 
   def test_cache_spec_parsing(self):
@@ -176,7 +176,7 @@ class TestCacheSetup(TestBase):
     def check(expected_type, spec, resolver=None):
       cache = mk_cache(spec, resolver=resolver)
       self.assertIsInstance(cache, expected_type)
-      self.assertEquals(cache.artifact_root, self.pants_workdir)
+      self.assertEqual(cache.artifact_root, self.pants_workdir)
 
     with temporary_dir() as tmpdir:
       cachedir = os.path.join(tmpdir, 'cachedir')  # Must be a real path, so we can safe_mkdir it.

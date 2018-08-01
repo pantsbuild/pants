@@ -122,14 +122,14 @@ class TestRunnerTaskMixinTest(TaskTestBase):
     self.set_options(timeouts=True, timeout_default=2)
     task = self.create_task(self.context())
 
-    self.assertEquals(task._timeout_for_targets([targetA, targetB]), 3)
+    self.assertEqual(task._timeout_for_targets([targetA, targetB]), 3)
 
   def test_get_timeouts_with_maximum(self):
     """If a timeout exceeds the maximum, set it to that."""
 
     self.set_options(timeouts=True, timeout_maximum=1)
     task = self.create_task(self.context())
-    self.assertEquals(task._timeout_for_targets([targetC]), 1)
+    self.assertEqual(task._timeout_for_targets([targetC]), 1)
 
   def test_default_maximum_conflict(self):
     """If the default exceeds the maximum, throw an error."""

@@ -33,7 +33,7 @@ class JavaThriftLibraryFingerprintStrategyTest(TestBase):
 
     fp1 = self.create_strategy(self.options1).compute_fingerprint(a)
     fp2 = self.create_strategy(option_values).compute_fingerprint(a)
-    self.assertNotEquals(fp1, fp2)
+    self.assertNotEqual(fp1, fp2)
 
   def test_fp_diffs_due_to_compiler_args_change(self):
     a = self.make_target(':a', target_type=JavaThriftLibrary, compiler_args=['--foo'])
@@ -41,7 +41,7 @@ class JavaThriftLibraryFingerprintStrategyTest(TestBase):
 
     fp1 = self.create_strategy(self.options1).compute_fingerprint(a)
     fp2 = self.create_strategy(self.options1).compute_fingerprint(b)
-    self.assertNotEquals(fp1, fp2)
+    self.assertNotEqual(fp1, fp2)
 
   def test_hash_and_equal(self):
     self.assertEqual(self.create_strategy(self.options1), self.create_strategy(self.options1))

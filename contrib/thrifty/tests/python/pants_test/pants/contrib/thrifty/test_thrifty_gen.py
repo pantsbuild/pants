@@ -36,7 +36,7 @@ class JavaThriftyGenTest(TaskTestBase):
                               sources=['foo.thrift'])
     context = self.context(target_roots=[target])
     task = self.create_task(context)
-    self.assertEquals([
+    self.assertEqual([
       '--out={}'.format(self.TARGET_WORKDIR),
       '--path={}/src/thrifty'.format(self.build_root),
       'src/thrifty/foo.thrift'],
@@ -50,7 +50,7 @@ class JavaThriftyGenTest(TaskTestBase):
                                   sources=['downstream.thrift'], dependencies=[upstream])
     context = self.context(target_roots=[upstream, downstream])
     task = self.create_task(context)
-    self.assertEquals([
+    self.assertEqual([
       '--out={}'.format(self.TARGET_WORKDIR),
       '--path={}/src/thrifty'.format(self.build_root),
       'src/thrifty/downstream.thrift'],

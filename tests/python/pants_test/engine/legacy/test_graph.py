@@ -162,7 +162,7 @@ class GraphInvalidationTest(GraphTestBase):
     with self.open_scheduler([spec]) as (graph, _, _):
       target = graph.get_target(Address.parse(spec))
       sources = [os.path.basename(s) for s in target.sources_relative_to_buildroot()]
-      self.assertEquals(expected_sources, sources)
+      self.assertEqual(expected_sources, sources)
 
   def test_sources_ordering_literal(self):
     self._ordering_test('testprojects/src/resources/org/pantsbuild/testproject/ordering:literal')

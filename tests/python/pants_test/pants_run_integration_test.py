@@ -387,7 +387,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
         stdout, _ = java_run.communicate()
       java_returncode = java_run.returncode
-      self.assertEquals(java_returncode, 0)
+      self.assertEqual(java_returncode, 0)
       return stdout
 
   def assert_success(self, pants_run, msg=None):

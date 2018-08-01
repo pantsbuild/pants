@@ -228,15 +228,15 @@ class RoundEngineTest(EngineTestBase, TestBase):
     task1_pre, = install()
     Goal.clear()
     task1_post, = install()
-    self.assertEquals(task1_pre, task1_post)
+    self.assertEqual(task1_pre, task1_post)
 
   def test_replace_target_roots(self):
     task1 = self.install_task('task1', goal='goal1')
     task2 = self.install_task('task2', goal='goal2', alternate_target_roots=[42])
     self.create_context(for_task_types=task1+task2)
-    self.assertEquals([], self._context.target_roots)
+    self.assertEqual([], self._context.target_roots)
     self.engine.attempt(self._context, self.as_goals('goal1', 'goal2'))
-    self.assertEquals([42], self._context.target_roots)
+    self.assertEqual([42], self._context.target_roots)
 
   def test_replace_target_roots_conflict(self):
     task1 = self.install_task('task1', goal='goal1', alternate_target_roots=[42])
@@ -253,4 +253,4 @@ class RoundEngineTest(EngineTestBase, TestBase):
 
     self.engine.attempt(self._context, self.as_goals('goal1', 'goal2'))
 
-    self.assertEquals([], self._context.target_roots)
+    self.assertEqual([], self._context.target_roots)

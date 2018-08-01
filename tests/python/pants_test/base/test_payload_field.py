@@ -113,14 +113,14 @@ class PayloadTest(TestBase):
     field1 = TestValue('field1')
     field1_same = TestValue('field1')
     field2 = TestValue('field2')
-    self.assertEquals(field1.fingerprint(), field1_same.fingerprint())
-    self.assertNotEquals(field1.fingerprint(), field2.fingerprint())
+    self.assertEqual(field1.fingerprint(), field1_same.fingerprint())
+    self.assertNotEqual(field1.fingerprint(), field2.fingerprint())
 
     fingerprinted_field1 = FingerprintedField(field1)
     fingerprinted_field1_same = FingerprintedField(field1_same)
     fingerprinted_field2 = FingerprintedField(field2)
-    self.assertEquals(fingerprinted_field1.fingerprint(), fingerprinted_field1_same.fingerprint())
-    self.assertNotEquals(fingerprinted_field1.fingerprint(), fingerprinted_field2.fingerprint())
+    self.assertEqual(fingerprinted_field1.fingerprint(), fingerprinted_field1_same.fingerprint())
+    self.assertNotEqual(fingerprinted_field1.fingerprint(), fingerprinted_field2.fingerprint())
 
   def test_set_of_primitives_field(self):
     # Should preserve `None` values.

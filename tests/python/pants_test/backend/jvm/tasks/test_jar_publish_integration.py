@@ -244,7 +244,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                              'org/pantsbuild/testproject/publish/hello-greet/X/hello-greet-X.jar')
           with open_zip(jar, mode='r') as j:
             with j.open(resource_relative_to_sourceroot) as jar_entry:
-              self.assertEquals(resource_content, jar_entry.read())
+              self.assertEqual(resource_content, jar_entry.read())
 
       # Publish the same target twice with different resource content.
       publish('one')

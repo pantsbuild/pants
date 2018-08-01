@@ -25,7 +25,7 @@ class FileutilTest(unittest.TestCase):
         atomic_copy(src.name, dst.name)
         dst.close()
         with open(dst.name) as new_dst:
-          self.assertEquals(src.name, new_dst.read())
+          self.assertEqual(src.name, new_dst.read())
         self.assertEqual(os.stat(src.name).st_mode, os.stat(dst.name).st_mode)
 
   def test_line_count_estimator(self):

@@ -68,4 +68,4 @@ class ScopeInfoIteratorTest(unittest.TestCase):
 
     expected_scope_infos = [scope_to_infos[x] for x in expected_scopes]
 
-    self.assertEquals(expected_scope_infos, actual)
+    self.assertEqual(expected_scope_infos, actual)

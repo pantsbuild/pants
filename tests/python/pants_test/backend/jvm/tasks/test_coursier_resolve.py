@@ -59,8 +59,8 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     scala_lib = self.make_target('//:b', JavaLibrary, sources=[])
     # Confirm that the deps were added to the appropriate targets.
     compile_classpath = self.resolve([jar_lib, scala_lib])
-    self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
-    self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib)))
+    self.assertEqual(1, len(compile_classpath.get_for_target(jar_lib)))
+    self.assertEqual(0, len(compile_classpath.get_for_target(scala_lib)))
     
   def test_resolve_with_remote_url(self):
     dep_with_url = JarDependency('a', 'b', 'c',
@@ -97,9 +97,9 @@ class CoursierResolveTest(JvmToolTaskTestBase):
       task.resolve([jar_lib, scala_lib], compile_classpath, sources=True, javadoc=True)
 
       # Both javadoc and sources jars are added to the classpath product
-      self.assertEquals(['default', 'src_doc', 'src_doc'],
+      self.assertEqual(['default', 'src_doc', 'src_doc'],
        sorted([c[0] for c in compile_classpath.get_for_target(jar_lib)]))
-      self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib)))
+      self.assertEqual(0, len(compile_classpath.get_for_target(scala_lib)))
 
   def test_resolve_conflicted(self):
     losing_dep = JarDependency('com.google.guava', 'guava', '16.0')
@@ -112,7 +112,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     losing_cp = compile_classpath.get_for_target(losing_lib)
     winning_cp = compile_classpath.get_for_target(winning_lib)
 
-    self.assertEquals(losing_cp, winning_cp)
+    self.assertEqual(losing_cp, winning_cp)
 
     self.assertEqual(1, len(winning_cp))
     conf, path = winning_cp[0]
@@ -177,8 +177,8 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     junit_jar_cp = compile_classpath.get_for_target(junit_jar_lib)
     excluding_cp = compile_classpath.get_for_target(excluding_target)
 
-    self.assertEquals(2, len(junit_jar_cp))
-    self.assertEquals(0, len(excluding_cp))
+    self.assertEqual(2, len(junit_jar_cp))
+    self.assertEqual(0, len(excluding_cp))
 
     def get_coord_in_classpath(cp, targets):
       """
@@ -231,7 +231,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
 
         # └─ junit:junit:4.12
         #    └─ org.hamcrest:hamcrest-core:1.3
-        self.assertEquals(2, len(jar_cp))
+        self.assertEqual(2, len(jar_cp))
 
 
         # Take a sample jar path, remove it, then call the task again, it should invoke coursier again

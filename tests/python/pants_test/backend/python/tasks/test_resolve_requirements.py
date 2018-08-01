@@ -39,7 +39,7 @@ class ResolveRequirementsTest(TaskTestBase):
     # Check that the module is available if specified as a requirement.
     stdout_data, stderr_data = self._exercise_module(self._resolve_requirements([ansicolors_tgt]),
                                                      'colors')
-    self.assertEquals('', stderr_data.strip())
+    self.assertEqual('', stderr_data.strip())
 
     path = stdout_data.strip()
     # Check that the requirement resolved to what we expect.
@@ -59,7 +59,7 @@ class ResolveRequirementsTest(TaskTestBase):
       }
     })
     stdout_data, stderr_data = self._exercise_module(pex, 'cffi')
-    self.assertEquals('', stderr_data.strip())
+    self.assertEqual('', stderr_data.strip())
 
     path = stdout_data.strip()
     wheel_dir = os.path.join(path[0:path.find('{sep}.deps{sep}'.format(sep=os.sep))], '.deps')

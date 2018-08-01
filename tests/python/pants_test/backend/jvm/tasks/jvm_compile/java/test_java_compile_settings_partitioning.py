@@ -174,19 +174,19 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
       ])
     ))
 
-    self.assertEquals('-C1.7', source)
-    self.assertEquals('-C1.7', target)
-    self.assertEquals('foo', foo)
-    self.assertEquals('bar', bar)
+    self.assertEqual('-C1.7', source)
+    self.assertEqual('-C1.7', target)
+    self.assertEqual('foo', foo)
+    self.assertEqual('bar', bar)
     self.assertNotEqual('$JAVA_HOME', single)
     self.assertNotIn('$JAVA_HOME', composite)
-    self.assertEquals('foo:{0}/bar:{0}/foobar'.format(single), composite)
+    self.assertEqual('foo:{0}/bar:{0}/foobar'.format(single), composite)
 
   def test_java_home_extraction_empty(self):
     result = tuple(ZincCompile._get_zinc_arguments(
       JvmPlatformSettings('1.7', '1.7', [])
     ))
-    self.assertEquals(4, len(result),
+    self.assertEqual(4, len(result),
                       msg='_get_zinc_arguments did not correctly handle empty args.')
 
   def test_java_home_extraction_missing_distributions(self):
@@ -246,8 +246,8 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
         target_level=far_future_version,
         args=['$JAVA_HOME/foo', '$JAVA_HOME'],
       ))
-      self.assertEquals(paths[0], results[-1])
-      self.assertEquals('{}/foo'.format(paths[0]), results[-2])
+      self.assertEqual(paths[0], results[-1])
+      self.assertEqual('{}/foo'.format(paths[0]), results[-2])
 
     # Make sure we pick up the strictest possible distribution.
     with fake_distribution_locator(farer_future_version, far_future_version) as paths:
@@ -257,8 +257,8 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
         target_level=far_future_version,
         args=['$JAVA_HOME/foo', '$JAVA_HOME'],
       ))
-      self.assertEquals(far_path, results[-1])
-      self.assertEquals('{}/foo'.format(far_path), results[-2])
+      self.assertEqual(far_path, results[-1])
+      self.assertEqual('{}/foo'.format(far_path), results[-2])
 
     # Make sure we pick the higher distribution when the lower one doesn't work.
     with fake_distribution_locator(farer_future_version, far_future_version) as paths:
@@ -268,5 +268,5 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
         target_level=farer_future_version,
         args=['$JAVA_HOME/foo', '$JAVA_HOME'],
       ))
-      self.assertEquals(farer_path, results[-1])
-      self.assertEquals('{}/foo'.format(farer_path), results[-2])
+      self.assertEqual(farer_path, results[-1])
+      self.assertEqual('{}/foo'.format(farer_path), results[-2])

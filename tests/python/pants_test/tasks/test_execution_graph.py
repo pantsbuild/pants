@@ -300,8 +300,8 @@ class ExecutionGraphTest(unittest.TestCase):
     with self.assertRaises(ExecutionFailure):
       graph.execute(ImmediatelyExecutingPool(), capturing_logger)
     error_logs = capturing_logger.log_entries['error']
-    self.assertEquals(2, len(error_logs), msg='Wanted one error log, got: {}'.format(error_logs))
-    self.assertEquals("A failed: I'm an error", error_logs[0])
+    self.assertEqual(2, len(error_logs), msg='Wanted one error log, got: {}'.format(error_logs))
+    self.assertEqual("A failed: I'm an error", error_logs[0])
     regex = re.compile(
       "Traceback:.*in raising_wrapper.*raise Exception\\(\"I'm an error\"\\)",
       re.DOTALL,

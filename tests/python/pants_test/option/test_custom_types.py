@@ -22,7 +22,7 @@ class CustomTypesTest(unittest.TestCase):
     else:
       raise Exception('Expected value {0} is of unsupported type: {1}'.format(expected_val,
                                                                               type(expected_val)))
-    self.assertEquals(expected_val, val)
+    self.assertEqual(expected_val, val)
 
   def _do_test_dict_error(self, s):
     with self.assertRaises(ParseError):

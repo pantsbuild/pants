@@ -85,8 +85,8 @@ class TestJUnitHtmlReport(TestBase):
     self.assertEqual(1, len(testsuites))
     self.assertEqual(2, testsuites[0].tests)
     self.assertEqual(2, len(testsuites[0].testcases))
-    self.assertEquals(u'org.pantsbuild.PåssingTest', testsuites[0].name)
-    self.assertEquals(u'testTwö', testsuites[0].testcases[1].name)
+    self.assertEqual(u'org.pantsbuild.PåssingTest', testsuites[0].name)
+    self.assertEqual(u'testTwö', testsuites[0].testcases[1].name)
     self.assertIn(u'org.pantsbuild.PåssingTest.testTwö', testsuites[0].testcases[1].error)
 
   def test_open_report(self):

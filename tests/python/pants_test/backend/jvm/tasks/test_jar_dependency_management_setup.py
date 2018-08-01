@@ -55,7 +55,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
     task.execute()
     artifact_set = manager.for_target(jar_library)
     self.assertFalse(artifact_set is None)
-    self.assertEquals('2', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
+    self.assertEqual('2', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
 
   def test_bad_default(self):
     jar_library = self.make_target(spec='//foo:library',
@@ -106,7 +106,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
     task.execute()
     artifact_set = manager.for_target(jar_library)
     self.assertFalse(artifact_set is None)
-    self.assertEquals('2', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
+    self.assertEqual('2', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
 
   def test_explicit_and_default_target(self):
     default_target = self.make_target(spec='//foo:foobar',
@@ -131,7 +131,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
     task.execute()
     artifact_set = manager.for_target(jar_library)
     self.assertFalse(artifact_set is None)
-    self.assertEquals('3', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
+    self.assertEqual('3', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
 
   def test_using_jar_library_address(self):
     pin_jar_library = self.make_target(
@@ -158,7 +158,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
     task.execute()
     artifact_set = manager.for_target(jar_library)
     self.assertFalse(artifact_set is None)
-    self.assertEquals('2', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
+    self.assertEqual('2', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
 
   def test_duplicate_coord_error(self):
     management_target = self.make_target(spec='//foo:management',
@@ -250,7 +250,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
     artifact_set = self._single_artifact_set(manager, [jar_library1, jar_library2,
                                                        unpacked_target])
     self.assertFalse(artifact_set is None)
-    self.assertEquals('2', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
+    self.assertEqual('2', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
 
   def test_indirection(self):
     management_target = self.make_target(
@@ -280,7 +280,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
     task.execute()
     artifact_set = self._single_artifact_set(manager, [jar_library1])
     self.assertFalse(artifact_set is None)
-    self.assertEquals('2', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
+    self.assertEqual('2', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
 
   def test_invalid_managed_jar_libraries(self):
     target_aliases = {
@@ -337,10 +337,10 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
       task.execute()
       artifact_set = self._single_artifact_set(manager, [jar_library1])
       self.assertFalse(artifact_set is None)
-      self.assertEquals('3', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
-      self.assertEquals('1', artifact_set[M2Coordinate('barfoo', 'barfoo')].rev)
-      self.assertEquals('4', artifact_set[M2Coordinate('fruit', 'apple')].rev)
-      self.assertEquals('7', artifact_set[M2Coordinate('foobar', 'foobar', ext='tar')].rev)
+      self.assertEqual('3', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
+      self.assertEqual('1', artifact_set[M2Coordinate('barfoo', 'barfoo')].rev)
+      self.assertEqual('4', artifact_set[M2Coordinate('fruit', 'apple')].rev)
+      self.assertEqual('7', artifact_set[M2Coordinate('foobar', 'foobar', ext='tar')].rev)
 
     manager = self._init_manager(default_target='//foo:management')
     with self.assertRaises(JarDependencyManagementSetup.IllegalVersionOverride):
@@ -397,10 +397,10 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
       task.execute()
       artifact_set = self._single_artifact_set(manager, [jar_library1])
       self.assertFalse(artifact_set is None)
-      self.assertEquals('3', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
-      self.assertEquals('1', artifact_set[M2Coordinate('barfoo', 'barfoo')].rev)
-      self.assertEquals('4', artifact_set[M2Coordinate('fruit', 'apple')].rev)
-      self.assertEquals('7', artifact_set[M2Coordinate('foobar', 'foobar', ext='tar')].rev)
+      self.assertEqual('3', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
+      self.assertEqual('1', artifact_set[M2Coordinate('barfoo', 'barfoo')].rev)
+      self.assertEqual('4', artifact_set[M2Coordinate('fruit', 'apple')].rev)
+      self.assertEqual('7', artifact_set[M2Coordinate('foobar', 'foobar', ext='tar')].rev)
 
     manager = self._init_manager(default_target='//foo:management')
     with self.assertRaises(JarDependencyManagementSetup.IllegalVersionOverride):
@@ -444,7 +444,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
     task.execute()
     artifact_set = self._single_artifact_set(manager, [jar_library_unversioned])
     self.assertFalse(artifact_set is None)
-    self.assertEquals('2', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
+    self.assertEqual('2', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
 
   def test_invalid_artifacts_indirection(self):
     class DummyTarget(Target):

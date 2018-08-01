@@ -70,7 +70,7 @@ a=prop
         self.assertLoaded(props_in, {'it\'s a': 'file'})
 
   def assertLoaded(self, contents, expected):
-    self.assertEquals(expected, Properties.load(contents))
+    self.assertEqual(expected, Properties.load(contents))
 
   def test_dump(self):
     props = OrderedDict()
@@ -80,4 +80,4 @@ a=prop
     props['c'] =' 3 : ='
     out = StringIO()
     Properties.dump(props, out)
-    self.assertEquals('a=1\nb=2\\\n\nc=\\ 3\\ \\:\\ \\=\n', out.getvalue())
+    self.assertEqual('a=1\nb=2\\\n\nc=\\ 3\\ \\:\\ \\=\n', out.getvalue())

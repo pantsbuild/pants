@@ -51,7 +51,7 @@ class JaxWsGenTest(PantsRunIntegrationTest):
                           'contrib.jax_ws.tests.wsdl.org.pantsbuild.contrib.jax_ws.hello-service',
                           'current')
 
-      self.assertEquals(sorted(['com/example/HelloWorldServer.java',
+      self.assertEqual(sorted(['com/example/HelloWorldServer.java',
                                 'com/example/HelloWorldServerImplService.java']),
                         sorted(exact_files(root)))
 

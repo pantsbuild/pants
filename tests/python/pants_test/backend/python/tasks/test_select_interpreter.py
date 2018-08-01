@@ -105,16 +105,16 @@ class SelectInterpreterTest(TaskTestBase):
 
   def test_interpreter_selection(self):
     self.assertIsNone(self._select_interpreter([]))
-    self.assertEquals('IronPython-2.77.777', self._select_interpreter_and_get_version([self.reqtgt]))
-    self.assertEquals('IronPython-2.77.777', self._select_interpreter_and_get_version([self.tgt1]))
-    self.assertEquals('IronPython-2.88.888', self._select_interpreter_and_get_version([self.tgt2]))
-    self.assertEquals('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt3]))
-    self.assertEquals('IronPython-2.77.777', self._select_interpreter_and_get_version([self.tgt4]))
-    self.assertEquals('IronPython-2.88.888', self._select_interpreter_and_get_version([self.tgt20]))
-    self.assertEquals('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt30]))
-    self.assertEquals('IronPython-2.77.777', self._select_interpreter_and_get_version([self.tgt40]))
-    self.assertEquals('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt2, self.tgt3]))
-    self.assertEquals('IronPython-2.88.888', self._select_interpreter_and_get_version([self.tgt2, self.tgt4]))
+    self.assertEqual('IronPython-2.77.777', self._select_interpreter_and_get_version([self.reqtgt]))
+    self.assertEqual('IronPython-2.77.777', self._select_interpreter_and_get_version([self.tgt1]))
+    self.assertEqual('IronPython-2.88.888', self._select_interpreter_and_get_version([self.tgt2]))
+    self.assertEqual('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt3]))
+    self.assertEqual('IronPython-2.77.777', self._select_interpreter_and_get_version([self.tgt4]))
+    self.assertEqual('IronPython-2.88.888', self._select_interpreter_and_get_version([self.tgt20]))
+    self.assertEqual('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt30]))
+    self.assertEqual('IronPython-2.77.777', self._select_interpreter_and_get_version([self.tgt40]))
+    self.assertEqual('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt2, self.tgt3]))
+    self.assertEqual('IronPython-2.88.888', self._select_interpreter_and_get_version([self.tgt2, self.tgt4]))
 
     with self.assertRaises(TaskError) as cm:
       self._select_interpreter_and_get_version([self.tgt3, self.tgt4])
@@ -124,19 +124,19 @@ class SelectInterpreterTest(TaskTestBase):
   def test_interpreter_selection_invalidation(self):
     tgta = self._fake_target('tgta', compatibility=['IronPython>2.77.777'],
                              dependencies=[self.tgt3])
-    self.assertEquals('IronPython-2.99.999',
+    self.assertEqual('IronPython-2.99.999',
                       self._select_interpreter_and_get_version([tgta], should_invalidate=True))
 
     # A new target with different sources, but identical compatibility, shouldn't invalidate.
     self.create_file('tgtb/foo/bar/baz.py', 'fake content')
     tgtb = self._fake_target('tgtb', compatibility=['IronPython>2.77.777'],
                              dependencies=[self.tgt3], sources=['foo/bar/baz.py'])
-    self.assertEquals('IronPython-2.99.999',
+    self.assertEqual('IronPython-2.99.999',
                       self._select_interpreter_and_get_version([tgtb], should_invalidate=False))
 
   def test_compatibility_AND(self):
     tgt = self._fake_target('tgt5', compatibility=['IronPython>2.77.777,<2.99.999'])
-    self.assertEquals('IronPython-2.88.888', self._select_interpreter_and_get_version([tgt]))
+    self.assertEqual('IronPython-2.88.888', self._select_interpreter_and_get_version([tgt]))
 
   def test_compatibility_AND_impossible(self):
     tgt = self._fake_target('tgt5', compatibility=['IronPython>2.77.777,<2.88.888'])
@@ -146,7 +146,7 @@ class SelectInterpreterTest(TaskTestBase):
 
   def test_compatibility_OR(self):
     tgt = self._fake_target('tgt6', compatibility=['IronPython>2.88.888', 'IronPython<2.7'])
-    self.assertEquals('IronPython-2.99.999', self._select_interpreter_and_get_version([tgt]))
+    self.assertEqual('IronPython-2.99.999', self._select_interpreter_and_get_version([tgt]))
 
   def test_compatibility_OR_impossible(self):
     tgt = self._fake_target('tgt6', compatibility=['IronPython>2.99.999', 'IronPython<2.77.777'])

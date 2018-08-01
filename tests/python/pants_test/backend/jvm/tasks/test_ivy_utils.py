@@ -139,11 +139,11 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
     jars.sort(key=lambda jar: jar.classifier)
 
-    self.assertEquals(['fleem', 'morx'], [jar.classifier for jar in jars])
+    self.assertEqual(['fleem', 'morx'], [jar.classifier for jar in jars])
 
   def test_module_ref_str_minus_classifier(self):
     module_ref = IvyModuleRef(org='org', name='name', rev='rev')
-    self.assertEquals("IvyModuleRef(org:name:rev::jar)", str(module_ref))
+    self.assertEqual("IvyModuleRef(org:name:rev::jar)", str(module_ref))
 
   def test_force_override(self):
     jars = list(self.a.payload.jars)
@@ -350,14 +350,14 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
                                                                                  input_path,
                                                                                  output_path)
           hardlink_foo_path = os.path.join(hardlink_dir, 'foo.jar')
-          self.assertEquals([hardlink_foo_path], result_classpath)
-          self.assertEquals(
+          self.assertEqual([hardlink_foo_path], result_classpath)
+          self.assertEqual(
             {
               os.path.realpath(foo_path): hardlink_foo_path
             },
             result_map)
           with open(output_path, 'r') as outpath:
-            self.assertEquals(hardlink_foo_path, outpath.readline())
+            self.assertEqual(hardlink_foo_path, outpath.readline())
           self.assertFalse(os.path.islink(hardlink_foo_path))
           self.assertTrue(os.path.exists(hardlink_foo_path))
 
@@ -372,16 +372,16 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
                                                                                  input_path,
                                                                                  output_path)
           hardlink_bar_path = os.path.join(hardlink_dir, 'bar.jar')
-          self.assertEquals(
+          self.assertEqual(
             {
               os.path.realpath(foo_path): hardlink_foo_path,
               os.path.realpath(bar_path): hardlink_bar_path,
             },
             result_map)
-          self.assertEquals([hardlink_foo_path, hardlink_bar_path], result_classpath)
+          self.assertEqual([hardlink_foo_path, hardlink_bar_path], result_classpath)
 
           with open(output_path, 'r') as outpath:
-            self.assertEquals(hardlink_foo_path + os.pathsep + hardlink_bar_path, outpath.readline())
+            self.assertEqual(hardlink_foo_path + os.pathsep + hardlink_bar_path, outpath.readline())
           self.assertFalse(os.path.islink(hardlink_foo_path))
           self.assertTrue(os.path.exists(hardlink_foo_path))
           self.assertFalse(os.path.islink(hardlink_bar_path))
@@ -395,7 +395,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
                                                   input_path,
                                                   output_path)
           with open(output_path, 'r') as outpath:
-            self.assertEquals(hardlink_bar_path + os.pathsep + hardlink_foo_path, outpath.readline())
+            self.assertEqual(hardlink_bar_path + os.pathsep + hardlink_foo_path, outpath.readline())
 
   def test_missing_ivy_report(self):
     self.set_options_for_scope(IvySubsystem.options_scope,
@@ -414,7 +414,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     return ivy_info
 
   def test_ivy_module_ref_cmp(self):
-    self.assertEquals(
+    self.assertEqual(
       IvyModuleRef('foo', 'bar', '1.2.3'), IvyModuleRef('foo', 'bar', '1.2.3'))
     self.assertTrue(
       IvyModuleRef('foo1', 'bar', '1.2.3') < IvyModuleRef('foo2', 'bar', '1.2.3'))
@@ -481,7 +481,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
         return OrderedSet([dep])
 
       result = [ref for ref in info.traverse_dependency_graph(ref1, collector)]
-      self.assertEquals([ref1, ref2, ref3, ref5, ref6, ref4],
+      self.assertEqual([ref1, ref2, ref3, ref5, ref6, ref4],
                         result)
     # Make sure the order remains unchanged no matter what order we insert the into the structure
     assert_order([module1, module2, module3, module4, module5, module6])
@@ -659,15 +659,15 @@ class IvyFrozenResolutionTest(TestBase):
     jar2 = JarDependency('org', 'name', url=rel_url, base_path='.')
     jar3 = JarDependency('org', 'name', url=abs_url, base_path='a/b')
 
-    self.assertEquals(jar1.get_url(relative=False), jar2.get_url(relative=False))
-    self.assertEquals(jar1.get_url(relative=False), jar3.get_url(relative=False))
-    self.assertEquals(jar1.get_url(relative=True), jar2.get_url(relative=True))
+    self.assertEqual(jar1.get_url(relative=False), jar2.get_url(relative=False))
+    self.assertEqual(jar1.get_url(relative=False), jar3.get_url(relative=False))
+    self.assertEqual(jar1.get_url(relative=True), jar2.get_url(relative=True))
 
     def verify_url_attributes(spec, jar, expected_attributes):
       target = self.make_target(spec, JarLibrary, jars=[jar])
       frozen_resolution = FrozenResolution()
       frozen_resolution.add_resolved_jars(target, [])
-      self.assertEquals(list(frozen_resolution.coordinate_to_attributes.values()), expected_attributes)
+      self.assertEqual(list(frozen_resolution.coordinate_to_attributes.values()), expected_attributes)
 
     verify_url_attributes('t1', jar1, [{'url': 'file:a/b/c', 'base_path': '.'}])
     verify_url_attributes('t2', jar2, [{'url': 'file:a/b/c', 'base_path': '.'}])

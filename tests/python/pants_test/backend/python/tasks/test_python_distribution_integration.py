@@ -146,7 +146,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       try:
         output = subprocess.check_output(pex2)
       except subprocess.CalledProcessError as e:
-        self.assertNotEquals(0, e.returncode)
+        self.assertNotEqual(0, e.returncode)
 
   def test_pants_resolves_local_dists_for_current_platform_only(self):
     # Test that pants will override pants.ini platforms config when building

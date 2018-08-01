@@ -25,76 +25,76 @@ charlie"""
 
 class ChooseLinesTest(unittest.TestCase):
   def test_include_no_params(self):
-    self.assertEquals(
+    self.assertEqual(
         markdown_to_html_utils.choose_include_text(ABC, '', 'fake.md'),
         '\n'.join(['able', 'baker', 'charlie']))
 
   def test_include_start_at(self):
-    self.assertEquals(
+    self.assertEqual(
         markdown_to_html_utils.choose_include_text(ABC, 'start-at=abl', 'fake.md'),
         '\n'.join(['able', 'baker', 'charlie']))
 
-    self.assertEquals(
+    self.assertEqual(
         markdown_to_html_utils.choose_include_text(ABC, 'start-at=bak', 'fake.md'),
         '\n'.join(['baker', 'charlie']))
 
-    self.assertEquals(
+    self.assertEqual(
       markdown_to_html_utils.choose_include_text(ABC, 'start-at=xxx', 'fake.md'),
       '')
 
   def test_include_start_after(self):
-    self.assertEquals(
+    self.assertEqual(
       markdown_to_html_utils.choose_include_text(ABC, 'start-after=bak', 'fake.md'),
       'charlie')
 
-    self.assertEquals(
+    self.assertEqual(
       markdown_to_html_utils.choose_include_text(ABC, 'start-after=cha', 'fake.md'),
       '')
 
-    self.assertEquals(
+    self.assertEqual(
       markdown_to_html_utils.choose_include_text(ABC, 'start-after=xxx', 'fake.md'),
       '')
 
   def test_include_end_at(self):
-    self.assertEquals(
+    self.assertEqual(
       markdown_to_html_utils.choose_include_text(ABC, 'end-at=abl', 'fake.md'),
       'able')
 
-    self.assertEquals(
+    self.assertEqual(
       markdown_to_html_utils.choose_include_text(ABC, 'end-at=bak', 'fake.md'),
       '\n'.join(['able', 'baker']))
 
-    self.assertEquals(
+    self.assertEqual(
       markdown_to_html_utils.choose_include_text(ABC, 'end-at=xxx', 'fake.md'),
       '')
 
   def test_include_end_before(self):
-    self.assertEquals(
+    self.assertEqual(
       markdown_to_html_utils.choose_include_text(ABC, 'end-before=abl', 'fake.md'),
       '')
 
-    self.assertEquals(
+    self.assertEqual(
       markdown_to_html_utils.choose_include_text(ABC, 'end-before=xxx', 'fake.md'),
       '')
 
-    self.assertEquals(
+    self.assertEqual(
       markdown_to_html_utils.choose_include_text(ABC, 'end-before=bak', 'fake.md'),
       'able')
 
   def test_include_start_at_end_at(self):
-    self.assertEquals(
+    self.assertEqual(
       markdown_to_html_utils.choose_include_text(ABC, 'start-at=abl&end-at=abl', 'fake.md'),
       'able')
 
-    self.assertEquals(
+    self.assertEqual(
       markdown_to_html_utils.choose_include_text(ABC, 'start-at=cha&end-at=cha', 'fake.md'),
       'charlie')
 
-    self.assertEquals(
+    self.assertEqual(
       markdown_to_html_utils.choose_include_text(ABC, 'start-at=abl&end-at=bak', 'fake.md'),
       '\n'.join(['able', 'baker']))
 
-    self.assertEquals(
+    self.assertEqual(
       markdown_to_html_utils.choose_include_text(ABC, 'start-at=bak&end-at=abl', 'fake.md'),
       '')
 

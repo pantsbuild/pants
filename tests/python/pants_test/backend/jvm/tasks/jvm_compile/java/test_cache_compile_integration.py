@@ -161,7 +161,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         return sorted(os.listdir(cd))
 
       # One workdir should contain NotMain, and the other should contain Main.
-      self.assertEquals(sorted(classfiles(w) for w in target_workdirs if w != 'current'),
+      self.assertEqual(sorted(classfiles(w) for w in target_workdirs if w != 'current'),
                         sorted([['A.class', 'Main.class'], ['A.class', 'NotMain.class']]))
 
   def test_analysis_portability(self):
@@ -273,7 +273,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
           artifact_dir,
           '{}.cachetest'.format(os.path.basename(src_dir)),
         )
-        self.assertEquals(c.artifact_count, len(os.listdir(cache_test_subdir)))
+        self.assertEqual(c.artifact_count, len(os.listdir(cache_test_subdir)))
 
 
 class CacheCompileIntegrationWithZjarsTest(CacheCompileIntegrationTest):

@@ -20,7 +20,7 @@ class JvmPrepCommandIntegration(PantsRunIntegrationTest):
 
   def assert_prep_compile(self):
     with open_zip('/tmp/running-in-goal-compile.jar') as jar:
-      self.assertEquals(sorted(['BUILD',
+      self.assertEqual(sorted(['BUILD',
                                 'ExampleJvmPrepCommand.java',
                                 'META-INF/', 'META-INF/MANIFEST.MF']),
                         sorted(jar.namelist()))
@@ -53,7 +53,7 @@ class JvmPrepCommandIntegration(PantsRunIntegrationTest):
 args are: "/tmp/running-in-goal-test","foo",
 org.pantsbuild properties: "org.pantsbuild.jvm_prep_command=WORKS-IN-TEST"
 """
-    self.assertEquals(expected, prep_output)
+    self.assertEqual(expected, prep_output)
     self.assert_prep_compile()
 
   def test_jvm_prep_command_in_binary(self):
@@ -72,5 +72,5 @@ org.pantsbuild properties: "org.pantsbuild.jvm_prep_command=WORKS-IN-TEST"
 args are: "/tmp/running-in-goal-binary","bar",
 org.pantsbuild properties: "org.pantsbuild.jvm_prep_command=WORKS-IN-BINARY"
 """
-    self.assertEquals(expected, prep_output)
+    self.assertEqual(expected, prep_output)
     self.assert_prep_compile()

@@ -38,7 +38,7 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
     self.assertIsNotNone(jvm_binary_products)
     product_data = jvm_binary_products.get(binary_target)
     dist_root = os.path.join(self.build_root, 'dist')
-    self.assertEquals({dist_root: ['bar-binary.jar']}, product_data)
+    self.assertEqual({dist_root: ['bar-binary.jar']}, product_data)
 
     with open_zip(os.path.join(dist_root, 'bar-binary.jar')) as jar:
       self.assertEqual(sorted(['META-INF/',
@@ -90,7 +90,7 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
     self.assertIsNotNone(jvm_binary_products)
     product_data = jvm_binary_products.get(binary_target)
     dist_root = os.path.join(self.build_root, 'dist')
-    self.assertEquals({dist_root: ['bar-binary.jar']}, product_data)
+    self.assertEqual({dist_root: ['bar-binary.jar']}, product_data)
 
     with open_zip(os.path.join(dist_root, 'bar-binary.jar')) as jar:
       self.assertEqual(sorted(['META-INF/',

@@ -201,7 +201,7 @@ class BinaryUtilTest(TestBase):
 
     binary_request = binary_util._make_deprecated_binary_request("supportdir", "version", "name")
 
-    self.assertEquals("supportdir/linux/x86_64/version/name",
+    self.assertEqual("supportdir/linux/x86_64/version/name",
                       binary_util._get_download_path(binary_request))
 
   def test_select_binary_base_path_darwin(self):
@@ -212,7 +212,7 @@ class BinaryUtilTest(TestBase):
 
     binary_request = binary_util._make_deprecated_binary_request("supportdir", "version", "name")
 
-    self.assertEquals("supportdir/mac/10.10/version/name",
+    self.assertEqual("supportdir/mac/10.10/version/name",
                       binary_util._get_download_path(binary_request))
 
   def test_select_binary_base_path_missing_os(self):
@@ -280,7 +280,7 @@ class BinaryUtilTest(TestBase):
 
     binary_request = binary_util._make_deprecated_binary_request("supportdir", "version", "name")
 
-    self.assertEquals("supportdir/skynet/42/version/name",
+    self.assertEqual("supportdir/skynet/42/version/name",
                       binary_util._get_download_path(binary_request))
 
   def test_external_url_generator(self):

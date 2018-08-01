@@ -15,5 +15,5 @@ class CredentialsTest(TestBase):
     password = 'seriously, don`t.'
     t = self.make_target(':creds', LiteralCredentials, username=username, password=password)
 
-    self.assertEquals(t.username('anything'), username)
-    self.assertEquals(t.password('anything'), password)
+    self.assertEqual(t.username('anything'), username)
+    self.assertEqual(t.password('anything'), password)

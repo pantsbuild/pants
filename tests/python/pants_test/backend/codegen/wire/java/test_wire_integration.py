@@ -47,7 +47,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
       java_run = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=out_path)
       java_retcode = java_run.wait()
       java_out = java_run.stdout.read()
-      self.assertEquals(java_retcode, 0)
+      self.assertEqual(java_retcode, 0)
       self.assertIn('19 degrees celsius', java_out)
 
   def test_bundle_wire_dependent_targets(self):
@@ -64,7 +64,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
                                   cwd=out_path)
       java_retcode = java_run.wait()
       java_out = java_run.stdout.read()
-      self.assertEquals(java_retcode, 0)
+      self.assertEqual(java_retcode, 0)
       self.assertIn('Element{symbol=Hg, name=Mercury, atomic_number=80, '
                     'melting_point=Temperature{unit=celsius, number=-39}, '
                     'boiling_point=Temperature{unit=celsius, number=357}}', java_out)

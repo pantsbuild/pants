@@ -166,7 +166,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
     print(bold(cyan('\ncompleted in {} seconds'.format(elapsed))))
 
     runs_created = self._run_count(workdir) - run_count
-    self.assertEquals(
+    self.assertEqual(
         runs_created,
         expected_runs,
         'Expected {} RunTracker run to be created per pantsd run: was {}'.format(
@@ -392,7 +392,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         )
         checker.assert_running()
 
-      self.assertEquals(EXPECTED_VALUE, ''.join(result.stdout_data).strip())
+      self.assertEqual(EXPECTED_VALUE, ''.join(result.stdout_data).strip())
 
   def test_pantsd_launch_env_var_is_not_inherited_by_pantsd_runner_children(self):
     with self.pantsd_test_context() as (workdir, pantsd_config, checker):

@@ -15,12 +15,12 @@ class IvySubsystemTest(unittest.TestCase):
 
   def test_parse_proxy_string(self):
     ivy_subsystem = global_subsystem_instance(IvySubsystem)
-    self.assertEquals(('example.com', 1234),
+    self.assertEqual(('example.com', 1234),
                       ivy_subsystem._parse_proxy_string('http://example.com:1234'))
-    self.assertEquals(('secure-example.com', 999),
+    self.assertEqual(('secure-example.com', 999),
                       ivy_subsystem._parse_proxy_string('http://secure-example.com:999'))
     # trailing slash is ok
-    self.assertEquals(('example.com', 1234),
+    self.assertEqual(('example.com', 1234),
                       ivy_subsystem._parse_proxy_string('http://example.com:1234/'))
 
   def test_proxy_from_env(self):
@@ -30,10 +30,10 @@ class IvySubsystemTest(unittest.TestCase):
 
     with environment_as(HTTP_PROXY='http://proxy.example.com:456',
                         HTTPS_PROXY='https://secure-proxy.example.com:789'):
-      self.assertEquals('http://proxy.example.com:456', ivy_subsystem.http_proxy())
-      self.assertEquals('https://secure-proxy.example.com:789', ivy_subsystem.https_proxy())
+      self.assertEqual('http://proxy.example.com:456', ivy_subsystem.http_proxy())
+      self.assertEqual('https://secure-proxy.example.com:789', ivy_subsystem.https_proxy())
 
-      self.assertEquals([
+      self.assertEqual([
         '-Dhttp.proxyHost=proxy.example.com',
         '-Dhttp.proxyPort=456',
         '-Dhttps.proxyHost=secure-proxy.example.com',

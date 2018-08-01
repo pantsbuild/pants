@@ -35,26 +35,26 @@ class TestRecvBufferedSocket(unittest.TestCase):
 
   def test_recv(self):
     self.server_sock.sendall(b'A' * 300)
-    self.assertEquals(self.buf_sock.recv(1), b'A')
-    self.assertEquals(self.buf_sock.recv(200), b'A' * 200)
-    self.assertEquals(self.buf_sock.recv(99), b'A' * 99)
+    self.assertEqual(self.buf_sock.recv(1), b'A')
+    self.assertEqual(self.buf_sock.recv(200), b'A' * 200)
+    self.assertEqual(self.buf_sock.recv(99), b'A' * 99)
 
   def test_recv_max_larger_than_buf(self):
     double_chunk = self.chunk_size * 2
     self.server_sock.sendall(b'A' * double_chunk)
-    self.assertEquals(self.buf_sock.recv(double_chunk), b'A' * double_chunk)
+    self.assertEqual(self.buf_sock.recv(double_chunk), b'A' * double_chunk)
 
   @mock.patch('pants.util.socket.select.select', **PATCH_OPTS)
   def test_recv_check_calls(self, mock_select):
     mock_select.return_value = ([1], [], [])
     self.mock_socket.recv.side_effect = [b'A' * self.chunk_size, b'B' * self.chunk_size]
 
-    self.assertEquals(self.mocked_buf_sock.recv(128), b'A' * 128)
+    self.assertEqual(self.mocked_buf_sock.recv(128), b'A' * 128)
     self.mock_socket.recv.assert_called_once_with(self.chunk_size)
-    self.assertEquals(self.mocked_buf_sock.recv(128), b'A' * 128)
-    self.assertEquals(self.mocked_buf_sock.recv(128), b'A' * 128)
-    self.assertEquals(self.mocked_buf_sock.recv(128), b'A' * 128)
-    self.assertEquals(self.mock_socket.recv.call_count, 1)
+    self.assertEqual(self.mocked_buf_sock.recv(128), b'A' * 128)
+    self.assertEqual(self.mocked_buf_sock.recv(128), b'A' * 128)
+    self.assertEqual(self.mocked_buf_sock.recv(128), b'A' * 128)
+    self.assertEqual(self.mock_socket.recv.call_count, 1)
 
-    self.assertEquals(self.mocked_buf_sock.recv(self.chunk_size), b'B' * self.chunk_size)
-    self.assertEquals(self.mock_socket.recv.call_count, 2)
+    self.assertEqual(self.mocked_buf_sock.recv(self.chunk_size), b'B' * self.chunk_size)
+    self.assertEqual(self.mock_socket.recv.call_count, 2)

@@ -64,8 +64,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
     scala_lib = self.make_target('//:b', JavaLibrary, sources=[])
     # Confirm that the deps were added to the appropriate targets.
     compile_classpath = self.resolve([jar_lib, scala_lib])
-    self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
-    self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib)))
+    self.assertEqual(1, len(compile_classpath.get_for_target(jar_lib)))
+    self.assertEqual(0, len(compile_classpath.get_for_target(scala_lib)))
 
   @ensure_cached(IvyResolve, expected_num_artifacts=0)
   def test_resolve_conflicted(self):
@@ -136,8 +136,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
     compile_classpath = context.products.get_data('compile_classpath', None)
     losing_cp = compile_classpath.get_for_target(losing_lib)
     winning_cp = compile_classpath.get_for_target(winning_lib)
-    self.assertEquals(losing_cp, winning_cp)
-    self.assertEquals(OrderedSet([(u'default', artifact_path(u'bogus0')),
+    self.assertEqual(losing_cp, winning_cp)
+    self.assertEqual(OrderedSet([(u'default', artifact_path(u'bogus0')),
                                   (u'default', artifact_path(u'bogus1'))]),
                       winning_cp)
 
@@ -183,8 +183,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
     junit_jar_cp = compile_classpath.get_for_target(junit_jar_lib)
     excluding_cp = compile_classpath.get_for_target(excluding_target)
 
-    self.assertEquals(0, len(junit_jar_cp))
-    self.assertEquals(0, len(excluding_cp))
+    self.assertEqual(0, len(junit_jar_cp))
+    self.assertEqual(0, len(excluding_cp))
 
   @ensure_cached(IvyResolve, expected_num_artifacts=0)
   def test_resolve_no_deps(self):
@@ -211,7 +211,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
         jar_lib = self.make_target('//:a', JarLibrary, jars=[dep])
         # Confirm that the deps were added to the appropriate targets.
         compile_classpath = self.resolve([jar_lib])
-        self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
+        self.assertEqual(1, len(compile_classpath.get_for_target(jar_lib)))
 
   @ensure_cached(IvyResolve, expected_num_artifacts=1)
   def test_ivy_classpath(self):
@@ -222,7 +222,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     task = self.prepare_execute(self.context())
     classpath = task.ivy_classpath([junit_jar_lib])
 
-    self.assertEquals(2, len(classpath))
+    self.assertEqual(2, len(classpath))
 
   def test_second_resolve_reuses_existing_resolution_files(self):
     junit_jar_lib = self._make_junit_target()

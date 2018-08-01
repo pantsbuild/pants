@@ -87,7 +87,7 @@ class JaxbGenJavaTest(NailgunTaskTestBase):
       for filename in filenames:
         if filename.endswith('.java'):
           files.append(os.path.join(dirpath, filename))
-    self.assertEquals(sorted(['ObjectFactory.java', 'Vegetable.java']),
+    self.assertEqual(sorted(['ObjectFactory.java', 'Vegetable.java']),
                       sorted([os.path.basename(f) for f in files]))
 
     # Make sure there is no header with a timestamp in the generated file

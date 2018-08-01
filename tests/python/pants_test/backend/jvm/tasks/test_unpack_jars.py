@@ -137,7 +137,7 @@ class UnpackJarsTest(TaskTestBase):
         actual = {k: [set(v[0]), v[1]]
                   for k, v in context.products.get_data('unpacked_archives', dict).items()}
 
-        self.assertEquals(
+        self.assertEqual(
           {unpacked_jar_tgt:
              [expected_files,
               '.pants.d/pants_backend_jvm_tasks_unpack_jars_UnpackJars/unpack.foo']},

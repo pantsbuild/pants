@@ -99,7 +99,7 @@ class TestArtifactCache(unittest.TestCase):
       # Check that it was recovered correctly.
       with open(path, 'r') as infile:
         content = infile.read()
-      self.assertEquals(content, TEST_CONTENT1)
+      self.assertEqual(content, TEST_CONTENT1)
 
       # Delete it.
       artifact_cache.delete(key)

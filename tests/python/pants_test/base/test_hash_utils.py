@@ -58,8 +58,8 @@ class TestHashUtils(unittest.TestCase):
   def test_sharder(self):
     def check(spec, expected_shard, expected_nshards):
       sharder = Sharder(spec)
-      self.assertEquals(expected_shard, sharder.shard)
-      self.assertEquals(expected_nshards, sharder.nshards)
+      self.assertEqual(expected_shard, sharder.shard)
+      self.assertEqual(expected_nshards, sharder.nshards)
 
     def check_bad_spec(spec):
       self.assertRaises(Sharder.InvalidShardSpec, lambda: Sharder(spec))

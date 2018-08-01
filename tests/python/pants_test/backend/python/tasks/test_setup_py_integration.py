@@ -45,7 +45,7 @@ class SetupPyIntegrationTest(PantsRequirementIntegrationTestBase):
     with tarfile.open(sdist_path, 'r') as sdist:
       infos = sdist.getmembers()
       entries = [(info.name.rstrip('/') + '/' if info.isdir() else info.name) for info in infos]
-      self.assertEquals(sorted(expected_entries), sorted(entries),
+      self.assertEqual(sorted(expected_entries), sorted(entries),
                         '\nExpected entries:\n{}\n\nActual entries:\n{}'.format(
                           '\n'.join(sorted(expected_entries)),
                           '\n'.join(sorted(entries))))

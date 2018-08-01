@@ -19,9 +19,9 @@ class TestResponseParser(unittest.TestCase):
 
   def testParse(self):
     response_parser = ResponseParser()
-    self.assertEquals(['url1', 'url2'], response_parser.parse('{"hostlist": ["url1", "url2"]}'))
+    self.assertEqual(['url1', 'url2'], response_parser.parse('{"hostlist": ["url1", "url2"]}'))
 
-    self.assertEquals([], response_parser.parse('{"hostlist": []}'))
+    self.assertEqual([], response_parser.parse('{"hostlist": []}'))
 
     with self.assertRaises(ResponseParser.ResponseParserError):
       response_parser.parse('{"hostlist": "not a list"}')
@@ -63,7 +63,7 @@ class TestRESTfulResolver(unittest.TestCase):
   def testResolveSuccess(self):
     with patch.object(requests.Session, 'get', **PATCH_OPTS) as mock_get:
       mock_get.return_value = self.mock_response(requests.codes.ok, urls=self.URLS)
-      self.assertEquals(self.URLS, self.resolver.resolve(self.TEST_RESOLVED_FROM))
+      self.assertEqual(self.URLS, self.resolver.resolve(self.TEST_RESOLVED_FROM))
 
   def testResolveErrorEmptyReturn(self):
     with patch.object(requests.Session, 'get', **PATCH_OPTS) as mock_get:

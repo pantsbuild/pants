@@ -46,7 +46,7 @@ class TestPailgunServer(unittest.TestCase):
     mock_sock.getsockname.return_value = ('0.0.0.0', 31337)
     self.server.socket = mock_sock
     self.server.server_bind()
-    self.assertEquals(self.server.server_port, 31337)
+    self.assertEqual(self.server.server_port, 31337)
     self.assertIs(mock_tcpserver_bind.called, True)
 
   @mock.patch.object(PailgunServer, 'close_request', **PATCH_OPTS)
@@ -80,8 +80,8 @@ class TestPailgunHandler(unittest.TestCase):
   def test_handle_error(self):
     self.handler.handle_error()
     last_chunk_type, last_payload = list(NailgunProtocol.iter_chunks(self.client_sock))[-1]
-    self.assertEquals(last_chunk_type, ChunkType.EXIT)
-    self.assertEquals(last_payload, '1')
+    self.assertEqual(last_chunk_type, ChunkType.EXIT)
+    self.assertEqual(last_payload, '1')
 
   @mock.patch.object(PailgunHandler, '_run_pants', **PATCH_OPTS)
   def test_handle_request(self, mock_run_pants):

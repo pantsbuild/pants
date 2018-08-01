@@ -137,7 +137,7 @@ class TaskTest(TaskTestBase):
 
   def assertContent(self, vt, content):
     with open(os.path.join(vt.current_results_dir, self._filename), 'r') as f:
-      self.assertEquals(f.read(), content)
+      self.assertEqual(f.read(), content)
 
   def _toggle_cache(self, enable_artifact_cache):
     cache_dir = self.create_dir(self._cachedir)

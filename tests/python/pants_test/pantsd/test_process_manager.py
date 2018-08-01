@@ -162,7 +162,7 @@ class TestProcessMetadataManager(TestBase):
          mock.patch('pants.pantsd.process_manager.get_buildroot', return_value=tmpdir):
       self.pmm.write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
 
-      self.assertEquals(
+      self.assertEqual(
         self.pmm.await_metadata_by_name(self.NAME, self.TEST_KEY, .1),
         self.TEST_VALUE
       )
