@@ -90,7 +90,7 @@ class WatchmanLauncher(object):
       self._logger.debug('launching watchman')
       try:
         self.watchman.launch()
-      except (self.watchman.ExecutionError, self.watchman.InvalidCommandOutput) as e:
+      except (Watchman.ExecutionError, Watchman.InvalidCommandOutput) as e:
         self._logger.fatal('failed to launch watchman: {!r})'.format(e))
         raise
 

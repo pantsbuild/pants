@@ -140,7 +140,7 @@ class TestProcessMetadataManager(TestBase):
       )
 
   def test_deadline_until(self):
-    with self.assertRaises(self.pmm.Timeout):
+    with self.assertRaises(ProcessMetadataManager.Timeout):
       with self.captured_logging(logging.INFO) as captured:
         self.pmm._deadline_until(lambda: False, 'the impossible', timeout=.5, info_interval=.1)
     self.assertTrue(4 <= len(captured.infos()) <= 6,
@@ -149,12 +149,12 @@ class TestProcessMetadataManager(TestBase):
   def test_wait_for_file(self):
     with temporary_dir() as td:
       test_filename = os.path.join(td, 'test.out')
-      safe_file_dump(test_filename, 'test')
+      safe_file_dump(test_filename, 'test', binary_mode=False)
       self.pmm._wait_for_file(test_filename, timeout=.1)
 
   def test_wait_for_file_timeout(self):
     with temporary_dir() as td:
-      with self.assertRaises(self.pmm.Timeout):
+      with self.assertRaises(ProcessMetadataManager.Timeout):
         self.pmm._wait_for_file(os.path.join(td, 'non_existent_file'), timeout=.1)
 
   def test_await_metadata_by_name(self):
@@ -175,7 +175,7 @@ class TestProcessMetadataManager(TestBase):
   def test_purge_metadata_error(self):
     with mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm:
       mock_rm.side_effect = OSError(errno.EACCES, os.strerror(errno.EACCES))
-      with self.assertRaises(ProcessManager.MetadataError):
+      with self.assertRaises(ProcessMetadataManager.MetadataError):
         self.pmm.purge_metadata_by_name(self.NAME)
     self.assertGreater(mock_rm.call_count, 0)
 
@@ -223,11 +223,11 @@ class TestProcessManager(TestBase):
     self.assertEqual(self.pm.get_subprocess_output(cmd, stderr=subprocess.STDOUT), '939393')
 
   def test_get_subprocess_output_oserror_exception(self):
-    with self.assertRaises(self.pm.ExecutionError):
+    with self.assertRaises(ProcessManager.ExecutionError):
       self.pm.get_subprocess_output(['i_do_not_exist'])
 
   def test_get_subprocess_output_failure_exception(self):
-    with self.assertRaises(self.pm.ExecutionError):
+    with self.assertRaises(ProcessManager.ExecutionError):
       self.pm.get_subprocess_output(['false'])
 
   def test_await_pid(self):
@@ -315,7 +315,7 @@ class TestProcessManager(TestBase):
 
   def test_purge_metadata_aborts(self):
     with mock.patch.object(ProcessManager, 'is_alive', return_value=True):
-      with self.assertRaises(self.pm.MetadataError):
+      with self.assertRaises(ProcessManager.MetadataError):
         self.pm.purge_metadata()
 
   def test_purge_metadata_alive_but_forced(self):
@@ -369,7 +369,7 @@ class TestProcessManager(TestBase):
   def test_terminate_no_kill(self):
     with self.setup_terminate() as (mock_kill, mock_alive, mock_purge):
       mock_alive.return_value = True
-      with self.assertRaises(self.pm.NonResponsiveProcess):
+      with self.assertRaises(ProcessManager.NonResponsiveProcess):
         self.pm.terminate(kill_wait=.1, purge=True)
       self.assertEqual(mock_kill.call_count, len(ProcessManager.KILL_CHAIN))
       self.assertEqual(mock_purge.call_count, 0)

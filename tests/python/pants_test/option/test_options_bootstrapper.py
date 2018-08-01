@@ -29,7 +29,7 @@ class BootstrapOptionsTest(unittest.TestCase):
       return ["--pants-config-files=['{}']".format(path)]
 
   def _test_bootstrap_options(self, config, env, args, **expected_entries):
-    with temporary_file() as fp:
+    with temporary_file(binary_mode=False) as fp:
       fp.write('[DEFAULT]\n')
       if config:
         for k, v in config.items():
@@ -105,7 +105,7 @@ class BootstrapOptionsTest(unittest.TestCase):
   def test_create_bootstrapped_options(self):
     # Check that we can set a bootstrap option from a cmd-line flag and have that interpolate
     # correctly into regular config.
-    with temporary_file() as fp:
+    with temporary_file(binary_mode=False) as fp:
       fp.write(dedent("""
       [foo]
       bar: %(pants_workdir)s/baz
@@ -136,7 +136,7 @@ class BootstrapOptionsTest(unittest.TestCase):
   def do_test_create_bootstrapped_multiple_config(self, create_options_bootstrapper):
     # check with multiple config files, the latest values always get taken
     # in this case worker_count will be overwritten, while fruit stays the same
-    with temporary_file() as fp:
+    with temporary_file(binary_mode=False) as fp:
       fp.write(dedent("""
       [compile.apt]
       worker_count: 1
@@ -163,7 +163,7 @@ class BootstrapOptionsTest(unittest.TestCase):
       self.assertEqual('1', opts_single_config.for_scope('compile.apt').worker_count)
       self.assertEqual('red', opts_single_config.for_scope('fruit').apple)
 
-      with temporary_file() as fp2:
+      with temporary_file(binary_mode=False) as fp2:
         fp2.write(dedent("""
         [compile.apt]
         worker_count: 2
@@ -280,9 +280,9 @@ class BootstrapOptionsTest(unittest.TestCase):
       config1 = os.path.join(tmpdir, 'config1')
       config2 = os.path.join(tmpdir, 'config2')
       with open(config1, 'w') as out1:
-        out1.write(b"[DEFAULT]\npants_config_files: ['{}']\nlogdir: logdir1\n".format(config2))
+        out1.write("[DEFAULT]\npants_config_files: ['{}']\nlogdir: logdir1\n".format(config2))
       with open(config2, 'w') as out2:
-        out2.write(b'[DEFAULT]\nlogdir: logdir2\n')
+        out2.write('[DEFAULT]\nlogdir: logdir2\n')
 
       ob = OptionsBootstrapper(env={}, args=["--pants-config-files=['{}']".format(config1)])
       logdir = ob.get_bootstrap_options().for_global_scope().logdir

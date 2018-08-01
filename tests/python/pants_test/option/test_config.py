@@ -53,11 +53,11 @@ class ConfigTest(unittest.TestCase):
       """
     )
 
-    with temporary_file() as ini1:
+    with temporary_file(binary_mode=False) as ini1:
       ini1.write(self.ini1_content)
       ini1.close()
 
-      with temporary_file() as ini2:
+      with temporary_file(binary_mode=False) as ini2:
         ini2.write(self.ini2_content)
         ini2.close()
         self.config = Config.load(config_paths=[ini1.name, ini2.name])

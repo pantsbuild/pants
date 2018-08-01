@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import io
 import os
 import shlex
-import tempfile
 import unittest
 import warnings
 from builtins import str
@@ -686,7 +685,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(4, options.for_scope('compile.java').c)
 
   def test_file_spec_args(self):
-    with tempfile.NamedTemporaryFile() as tmp:
+    with temporary_file(binary_mode=False) as tmp:
       tmp.write(dedent(
         """
         foo
@@ -814,7 +813,7 @@ class OptionsTest(unittest.TestCase):
   def assertWarning(self, w, option_string):
     self.assertEqual(1, len(w))
     self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
-    warning_message = str(w[-1].message)
+    warning_message = str(w[-1].message.args)
     self.assertIn("will be removed in version",
                   warning_message)
     self.assertIn(option_string, warning_message)
@@ -1116,7 +1115,7 @@ class OptionsTest(unittest.TestCase):
 
   def assert_fromfile(self, parse_func, expected_append=None, append_contents=None):
     def _do_assert_fromfile(dest, expected, contents):
-      with temporary_file() as fp:
+      with temporary_file(binary_mode=False) as fp:
         fp.write(contents)
         fp.close()
         options = parse_func(dest, fp.name)
@@ -1292,7 +1291,7 @@ class OptionsTest(unittest.TestCase):
     # Check that we got a warning, but not for the inherited option.
     self.assertEqual(1, len(w))
     self.assertTrue(isinstance(w[0].message, DeprecationWarning))
-    self.assertNotIn('inherited', w[0].message)
+    self.assertNotIn('inherited', w[0].message.args)
 
     # Check values.
     # Deprecated scope takes precedence at equal rank.
@@ -1307,7 +1306,7 @@ class OptionsTest(unittest.TestCase):
     # Check that we got a warning.
     self.assertEqual(1, len(w))
     self.assertTrue(isinstance(w[0].message, DeprecationWarning))
-    self.assertNotIn('inherited', w[0].message)
+    self.assertNotIn('inherited', w[0].message.args)
 
     # Check values.
     self.assertEqual('uu', vals2.qux)

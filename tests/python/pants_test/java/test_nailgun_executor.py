@@ -35,7 +35,7 @@ class NailgunExecutorTest(TestBase):
         name='java',
         pid=3,
         status=psutil.STATUS_IDLE,
-        cmdline=['java', '-arg', NailgunExecutor._PANTS_NG_BUILDROOT_ARG]
+        cmdline=[b'java', b'-arg', NailgunExecutor._PANTS_NG_BUILDROOT_ARG]
       )
       self.assertTrue(self.executor.is_alive())
       mock_as_process.assert_called_with(self.executor)
@@ -46,7 +46,7 @@ class NailgunExecutorTest(TestBase):
         name='java',
         pid=3,
         status=psutil.STATUS_IDLE,
-        cmdline=['java', '-arg', '-arg2']
+        cmdline=[b'java', b'-arg', b'-arg2']
       )
       self.assertFalse(self.executor.is_alive())
       mock_as_process.assert_called_with(self.executor)

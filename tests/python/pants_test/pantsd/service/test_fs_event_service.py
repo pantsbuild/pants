@@ -68,7 +68,7 @@ class TestFSEventService(TestBase):
 
   def test_run_raise_on_failure_isalive(self):
     self.mock_watchman.is_alive.return_value = False
-    with self.mocked_run(False), self.assertRaises(self.service.ServiceError):
+    with self.mocked_run(False), self.assertRaises(FSEventService.ServiceError):
       self.service.run()
 
   def test_run(self):

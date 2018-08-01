@@ -21,7 +21,7 @@ class TestManifest(unittest.TestCase):
     manifest = Manifest()
     manifest.addentry('Header', 'value')
     self.assertEqual(
-      'Header: value\n', manifest.contents())
+      b'Header: value\n', manifest.contents())
 
   def test_too_long_entry(self):
     manifest = Manifest()

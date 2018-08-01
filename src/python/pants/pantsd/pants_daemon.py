@@ -326,9 +326,9 @@ class PantsDaemon(FingerprintedProcessManager):
       self._logger.info('starting service {}'.format(service))
       try:
         service_thread.start()
-      except (RuntimeError, service.ServiceError):
+      except (RuntimeError, FSEventService.ServiceError):
         self.shutdown(service_thread_map)
-        raise self.StartupFailure('service {} failed to start, shutting down!'.format(service))
+        raise PantsDaemon.StartupFailure('service {} failed to start, shutting down!'.format(service))
 
     # Once all services are started, write our pid.
     self.write_pid()
@@ -339,7 +339,7 @@ class PantsDaemon(FingerprintedProcessManager):
       for service, service_thread in service_thread_map.items():
         if not service_thread.is_alive():
           self.shutdown(service_thread_map)
-          raise self.RuntimeFailure('service failure for {}, shutting down!'.format(service))
+          raise PantsDaemon.RuntimeFailure('service failure for {}, shutting down!'.format(service))
         else:
           # Avoid excessive CPU utilization.
           service_thread.join(self.JOIN_TIMEOUT_SECONDS)

@@ -126,8 +126,9 @@ class SafeClasspathTest(unittest.TestCase):
     self.assertEqual(synthetic_jar_dir, os.path.dirname(safe_jar))
 
     with open_zip(safe_jar) as synthetic_jar:
-      self.assertListEqual([Manifest.PATH], synthetic_jar.namelist())
+      self.assertEqual([Manifest.PATH], synthetic_jar.namelist())
       # manifest should contain the relative path of both jar and resource directory
-      self.assertEqual('{}: ../{}/{} ../{}/{}/\n'.format(Manifest.CLASS_PATH, LIB_DIR, JAR_FILE,
-                                                          LIB_DIR, RESOURCES),
-                        synthetic_jar.read(Manifest.PATH).replace('\n ', ''))
+      expected = ('{}: ../{}/{} ../{}/{}/\n'
+                  .format(Manifest.CLASS_PATH, LIB_DIR, JAR_FILE, LIB_DIR, RESOURCES)
+                  .encode('utf-8'))
+      self.assertEqual(expected, synthetic_jar.read(Manifest.PATH).replace(b'\n ', b''))

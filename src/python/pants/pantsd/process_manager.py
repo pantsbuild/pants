@@ -176,7 +176,8 @@ class ProcessMetadataManager(object):
     """
     file_path = self._metadata_file_path(name, metadata_key)
     try:
-      return self._maybe_cast(read_file(file_path).strip(), caster)
+      metadata = read_file(file_path, binary_mode=False).strip()
+      return self._maybe_cast(metadata, caster)
     except (IOError, OSError):
       return None
 
@@ -189,7 +190,7 @@ class ProcessMetadataManager(object):
     """
     self._maybe_init_metadata_dir_by_name(name)
     file_path = self._metadata_file_path(name, metadata_key)
-    safe_file_dump(file_path, metadata_value)
+    safe_file_dump(file_path, metadata_value, binary_mode=False)
 
   def await_metadata_by_name(self, name, metadata_key, timeout, caster=None):
     """Block up to a timeout for process metadata to arrive on disk.
@@ -215,7 +216,7 @@ class ProcessMetadataManager(object):
     try:
       rm_rf(meta_dir)
     except OSError as e:
-      raise self.MetadataError('failed to purge metadata directory {}: {!r}'.format(meta_dir, e))
+      raise ProcessMetadataManager.MetadataError('failed to purge metadata directory {}: {!r}'.format(meta_dir, e))
 
 
 class ProcessManager(ProcessMetadataManager):
@@ -319,7 +320,7 @@ class ProcessManager(ProcessMetadataManager):
       kwargs.setdefault('stderr', subprocess.STDOUT)
 
     try:
-      return subprocess.check_output(command, **kwargs)
+      return subprocess.check_output(command, **kwargs).decode('utf-8').strip()
     except (OSError, subprocess.CalledProcessError) as e:
       subprocess_output = getattr(e, 'output', '').strip()
       raise cls.ExecutionError(str(e), subprocess_output)
@@ -400,7 +401,7 @@ class ProcessManager(ProcessMetadataManager):
     :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
     """
     if not force and self.is_alive():
-      raise self.MetadataError('cannot purge metadata for a running process!')
+      raise ProcessMetadataManager.MetadataError('cannot purge metadata for a running process!')
 
     super(ProcessManager, self).purge_metadata_by_name(self._name)
 
@@ -434,7 +435,7 @@ class ProcessManager(ProcessMetadataManager):
           pass
 
     if alive:
-      raise self.NonResponsiveProcess('failed to kill pid {pid} with signals {chain}'
+      raise ProcessManager.NonResponsiveProcess('failed to kill pid {pid} with signals {chain}'
                                       .format(pid=self.pid, chain=signal_chain))
 
     if purge:
