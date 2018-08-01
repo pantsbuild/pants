@@ -13,6 +13,8 @@ import sys
 import traceback
 from builtins import object, str
 
+from future.utils import PY2
+
 from pants.util.dirutil import safe_open
 
 
@@ -70,6 +72,8 @@ class Exiter(object):
     :param out: The file descriptor to emit `msg` to. (Optional)
     """
     if msg:
+      if PY2:
+        msg = msg.encode('utf-8')  # sys.stderr expects bytes in Py2, unicode in Py3
       print(msg, file=out or sys.stderr)
     self._exit(result)
 
