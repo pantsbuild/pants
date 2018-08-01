@@ -181,7 +181,7 @@ class NodeResolveTest(TaskTestBase):
     self.assertIn('type of bool is: boolean', lines)
 
   def test_resolve_preserves_package_json(self):
-    self.create_file('src/node/util/package.json', contents=dedent("""
+    self.create_file('src/node/util/package.json', mode='w', contents=dedent("""
       {
         "name": "util",
         "version": "0.0.1"
@@ -192,7 +192,7 @@ class NodeResolveTest(TaskTestBase):
                             sources=['package.json'],
                             dependencies=[])
 
-    self.create_file('src/node/scripts_project/package.json', contents=dedent("""
+    self.create_file('src/node/scripts_project/package.json', mode='w', contents=dedent("""
       {
         "name": "scripts_project",
         "version": "1.2.3",
@@ -239,18 +239,18 @@ class NodeResolveTest(TaskTestBase):
 
   def _test_resolve_optional_install_helper(
       self, install_optional, package_manager, expected_params):
-    self.create_file('src/node/util/package.json', contents=dedent("""
+    self.create_file('src/node/util/package.json', mode='w', contents=dedent("""
       {
         "name": "util",
         "version": "0.0.1"
       }
     """))
-    self.create_file('src/node/util/util.js', contents=dedent("""
+    self.create_file('src/node/util/util.js', mode='w', contents=dedent("""
       var typ = require('typ');
       console.log("type of boolean is: " + typ.BOOLEAN);
     """))
     # yarn execution path requires yarn.lock
-    self.create_file('src/node/util/yarn.lock', contents='')
+    self.create_file('src/node/util/yarn.lock')
     target = self.make_target(spec='src/node/util',
                               target_type=NodeModule,
                               sources=['util.js', 'package.json', 'yarn.lock'],

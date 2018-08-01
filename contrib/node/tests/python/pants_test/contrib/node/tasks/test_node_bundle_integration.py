@@ -136,7 +136,7 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
   def _extract_archive(self, archive_path):
     with temporary_dir() as temp_dir:
       _, extension = os.path.splitext(archive_path)
-      print (extension)
+      print(extension)
       if extension == '.jar':
         extraction_archiver = create_archiver('zip')
       else:

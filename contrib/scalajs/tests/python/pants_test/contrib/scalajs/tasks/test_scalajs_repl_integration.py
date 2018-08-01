@@ -22,7 +22,7 @@ class ScalaJSReplIntegrationTest(PantsRunIntegrationTest):
         var _ = require('factfinder');
         var tenFactorial = org.pantsbuild.scalajs.example.factfinder.Factfinder().fact(10);
         console.log(tenFactorial)
-      """)
+      """).encode('utf-8')
     pants_run = self.run_pants(command=command, stdin_data=program)
 
     self.assert_success(pants_run)

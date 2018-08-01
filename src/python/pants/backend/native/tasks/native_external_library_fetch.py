@@ -179,9 +179,7 @@ class NativeExternalLibraryFetch(Task):
     # and replace it with Pants-controlled remotes.
     remove_conan_center_remote_cmdline = self._remove_conan_center_remote_cmdline(conan_binary)
     try:
-      # Slice the command line because subprocess errors when the first element in the
-      # list of command strings is the setting of an environment variable.
-      stdout = subprocess.check_output(remove_conan_center_remote_cmdline.split()[1:])
+      stdout = subprocess.check_output(remove_conan_center_remote_cmdline)
       self.context.log.debug(stdout)
     except subprocess.CalledProcessError as e:
       if not "'conan-center' not found in remotes" in e.output:
@@ -197,7 +195,7 @@ class NativeExternalLibraryFetch(Task):
                                                                             index_num,
                                                                             remote_url)
       try:
-        stdout = subprocess.check_output(add_pants_conan_remote_cmdline.split()[1:])
+        stdout = subprocess.check_output(add_pants_conan_remote_cmdline)
         self.context.log.debug(stdout)
       except subprocess.CalledProcessError as e:
         if not "already exists in remotes" in e.output:
@@ -252,7 +250,7 @@ class NativeExternalLibraryFetch(Task):
 
         # Invoke conan to pull package from remote.
         try:
-          stdout = subprocess.check_output(cmdline.split()[1:])
+          stdout = subprocess.check_output(cmdline)
         except subprocess.CalledProcessError as e:
           raise self.NativeExternalLibraryFetchError(
             "Error invoking conan for fetch task: {}\n".format(e.output)

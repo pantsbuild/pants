@@ -102,6 +102,7 @@ class TestNodeBuild(TaskTestBase):
   def test_run_build_script(self):
     package_json_file = self.create_file(
       'src/node/build_test/package.json',
+      mode='w',
       contents=dedent("""
         {
           "scripts": {
@@ -131,7 +132,7 @@ class TestNodeBuild(TaskTestBase):
 
   def test_run_non_existing_script(self):
     package_json_file = self.create_file(
-      'src/node/build_test/package.json', contents='{}')
+      'src/node/build_test/package.json', mode='w', contents='{}')
     build_script = 'my_non_existing_build_scirpt'
     target = self.make_target(
       spec='src/node/build_test',
@@ -144,6 +145,7 @@ class TestNodeBuild(TaskTestBase):
   def test_run_no_output_dir(self):
     package_json_file = self.create_file(
       'src/node/build_test/package.json',
+      mode='w',
       contents=dedent("""
         {
           "scripts": {
