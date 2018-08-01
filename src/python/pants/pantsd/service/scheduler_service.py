@@ -182,6 +182,7 @@ class SchedulerService(PantsService):
       return session, self._prefork_body(session, options)
 
   def _prefork_loop(self, session, options):
+    # TODO: See https://github.com/pantsbuild/pants/issues/6288 regarding Ctrl+C handling.
     iterations = options.for_global_scope().loop_max
     target_roots = None
     while iterations and not self.is_killed:
