@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import time
-from builtins import bytes, object, str, zip
+from builtins import object, open, str, zip
 from collections import defaultdict
 from types import GeneratorType
 
@@ -159,8 +159,8 @@ class Scheduler(object):
 
   def graph_trace(self, execution_request):
     with temporary_file_path() as path:
-      self._native.lib.graph_trace(self._scheduler, execution_request, bytes(path, 'utf-8'))
-      with open(path) as fd:
+      self._native.lib.graph_trace(self._scheduler, execution_request, path.encode('utf-8'))
+      with open(path, 'r') as fd:
         for line in fd.readlines():
           yield line.rstrip()
 
@@ -250,14 +250,14 @@ class Scheduler(object):
     self._native.lib.tasks_task_end(self._tasks)
 
   def visualize_graph_to_file(self, session, filename):
-    res = self._native.lib.graph_visualize(self._scheduler, session, bytes(filename, 'utf-8'))
+    res = self._native.lib.graph_visualize(self._scheduler, session, filename.encode('utf-8'))
     self._raise_or_return(res)
 
   def visualize_rule_graph_to_file(self, filename):
     self._native.lib.rule_graph_visualize(
       self._scheduler,
       self._root_type_ids(),
-      bytes(filename, 'utf-8'))
+      filename.encode('utf-8'))
 
   def rule_graph_visualization(self):
     with temporary_file_path() as path:
@@ -275,8 +275,8 @@ class Scheduler(object):
         self._scheduler,
         root_type_id,
         product_type_id,
-        bytes(path, 'utf-8'))
-      with open(path) as fd:
+        path.encode('utf-8'))
+      with open(path, 'r') as fd:
         for line in fd.readlines():
           yield line.rstrip()
 
@@ -286,7 +286,7 @@ class Scheduler(object):
     filenames = set(direct_filenames)
     filenames.update(os.path.dirname(f) for f in direct_filenames)
     filenames_buf = self._native.context.utf8_buf_buf(filenames)
-    invalidated =  self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
+    invalidated = self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
     logger.info('invalidated %d nodes for: %s', invalidated, filenames)
     return invalidated
 

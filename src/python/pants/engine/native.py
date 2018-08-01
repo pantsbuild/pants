@@ -10,7 +10,7 @@ import os
 import sys
 import sysconfig
 import traceback
-from builtins import bytes, object, str
+from builtins import bytes, object, open, str
 from contextlib import closing
 
 import cffi
@@ -645,8 +645,8 @@ class Native(object):
     with closing(pkg_resources.resource_stream(__name__, lib_name)) as input_fp:
       # NB: The header stripping code here must be coordinated with header insertion code in
       #     build-support/bin/native/bootstrap_code.sh
-      engine_version = input_fp.readline().strip()
-      repo_version = input_fp.readline().strip()
+      engine_version = input_fp.readline().decode('utf-8').strip()
+      repo_version = input_fp.readline().decode('utf-8').strip()
       logger.debug('using {} built at {}'.format(engine_version, repo_version))
       with open(lib_path, 'wb') as output_fp:
         output_fp.write(input_fp.read())
