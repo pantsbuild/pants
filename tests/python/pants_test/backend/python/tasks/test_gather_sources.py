@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from builtins import str
+from builtins import open, str
 
 from pex.interpreter import PythonInterpreter
 
@@ -75,7 +75,7 @@ class GatherSourcesTest(TaskTestBase):
     pex_path = pex.path()
     for path in files:
       expected_content = self.filemap[to_filemap_key(path)]
-      with open(os.path.join(pex_path, path)) as infile:
+      with open(os.path.join(pex_path, path), 'r') as infile:
         content = infile.read()
       self.assertEqual(expected_content, content)
 

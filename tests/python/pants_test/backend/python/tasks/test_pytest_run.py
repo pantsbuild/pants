@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import functools
 import os
+from builtins import open
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -133,8 +134,8 @@ class PytestTestFailedPexRun(PytestTestBase):
 
   def test_failed_pex_run_does_not_see_prior_failures(self):
     # Setup a prior failure.
-    with open(self.AlwaysFailingPexRunPytestRun.junitxml_path, mode='wb') as fp:
-      fp.write(b"""
+    with open(self.AlwaysFailingPexRunPytestRun.junitxml_path, mode='w') as fp:
+      fp.write("""
           <testsuite errors="0" failures="1" name="pytest" skips="0" tests="1" time="0.001">
             <testcase classname="tests.test_green.GreenTest"
                       file=".pants.d/gs/8...6-DefaultFingerprintStrategy_e88d80fa140b/test_green.py"

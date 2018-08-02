@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 from textwrap import dedent
 
 from pants.backend.python.tasks.gather_sources import GatherSources
@@ -83,6 +84,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
     self.create_library('src/things', 'files', 'things', sources=['loose_file'])
     self.create_file('src/things/loose_file', 'data!')
     self.create_python_library('src/python/lib', 'lib', {'lib.py': dedent("""
+    import io
     import os
     import sys
 
@@ -90,7 +92,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
     def main():
       here = os.path.dirname(__file__)
       loose_file = os.path.join(here, '../src/things/loose_file')
-      with open(os.path.realpath(loose_file)) as fp:
+      with io.open(os.path.realpath(loose_file), 'r') as fp:
         sys.stdout.write(fp.read())
     """)})
 
