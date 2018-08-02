@@ -79,20 +79,21 @@ class PythonInterpreterCache(object):
     filters = set()
 
     if self._python_setup.get_options().is_flagged('interpreter_constraints'):
-      # Reverse to prioritize flagged option over default value
-      filters.update(reversed(self._python_setup.get_options().interpreter_constraints))
+      # Add the last option passed down in the option constraints.
+      filters.add(self._python_setup.get_options().interpreter_constraints[-1])
     else:
       for target in targets:
         if isinstance(target, PythonTarget) and target.compatibility:
-          tgts_with_compatibilities.append(target)
-          filters.update(target.compatibility)
+          c = self._python_setup.compatibility_or_constraints(target)
+          tgts_by_compatibilities[c].append(target)
+          filters.update(c)
 
     allowed_interpreters = set(self.setup(filters=filters))
 
     if not self._python_setup.get_options().is_flagged('interpreter_constraints'):
       # Constrain allowed_interpreters based on each target's compatibility requirements.
-      for target in tgts_with_compatibilities:
-        compatible_with_target = set(self._matching(allowed_interpreters, target.compatibility))
+      for compatibility in tgts_by_compatibilities:
+        compatible_with_target = set(self._matching(allowed_interpreters, compatibility))
         allowed_interpreters &= compatible_with_target
 
     if not allowed_interpreters:
