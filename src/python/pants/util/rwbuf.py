@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import threading
-from builtins import bytes, object
+from builtins import bytes, object, open
 
 from six import StringIO
 
@@ -75,7 +75,7 @@ class FileBackedRWBuf(_RWBuf):
   when you want to poll the output of long-running subprocesses in a separate thread."""
 
   def __init__(self, backing_file):
-    _RWBuf.__init__(self, open(backing_file, 'a+'))
+    _RWBuf.__init__(self, open(backing_file, 'a+b'))
     self.fileno = self._io.fileno
 
   def do_write(self, s):

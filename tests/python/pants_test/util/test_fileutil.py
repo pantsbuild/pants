@@ -9,6 +9,7 @@ import os
 import random
 import stat
 import unittest
+from builtins import open
 
 from mock import mock
 
@@ -24,7 +25,7 @@ class FileutilTest(unittest.TestCase):
       with temporary_file() as dst:
         atomic_copy(src.name, dst.name)
         dst.close()
-        with open(dst.name) as new_dst:
+        with open(dst.name, 'r') as new_dst:
           self.assertEqual(src.name, new_dst.read())
         self.assertEqual(os.stat(src.name).st_mode, os.stat(dst.name).st_mode)
 

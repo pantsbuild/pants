@@ -13,7 +13,7 @@ import tempfile
 import time
 import uuid
 import zipfile
-from builtins import object
+from builtins import object, open
 from contextlib import closing, contextmanager
 
 from colors import green
