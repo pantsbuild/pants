@@ -8,6 +8,7 @@ import logging
 import os
 import queue
 import threading
+from builtins import open
 
 from twitter.common.dirutil import Fileset
 
