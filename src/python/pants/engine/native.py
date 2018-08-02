@@ -19,7 +19,7 @@ from future.utils import PY2, binary_type, text_type
 
 from pants.engine.selectors import Get, constraint_for
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_mkdtemp
+from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 
@@ -275,6 +275,50 @@ extern "Python" {
 }
 '''
 
+# NB: This is a "patch" applied to CFFI's generated sources to remove the ifdefs that would
+# usually cause only one of the two module definition functions to be defined. Instead, we define
+# both. Since `patch` is not available in all relevant environments (notably, many docker images),
+# this is accomplished using string replacement. To (re)-generate this patch, fiddle with the
+# unmodified output of `ffibuilder.emit_c_code`.
+CFFI_C_PATCH_BEFORE = '''
+#  ifdef _MSC_VER
+     PyMODINIT_FUNC
+#  if PY_MAJOR_VERSION >= 3
+     PyInit_native_engine(void) { return NULL; }
+#  else
+     initnative_engine(void) { }
+#  endif
+#  endif
+#elif PY_MAJOR_VERSION >= 3
+PyMODINIT_FUNC
+PyInit_native_engine(void)
+{
+  return _cffi_init("native_engine", 0x2601, &_cffi_type_context);
+}
+#else
+PyMODINIT_FUNC
+initnative_engine(void)
+{
+  _cffi_init("native_engine", 0x2601, &_cffi_type_context);
+}
+#endif
+'''
+CFFI_C_PATCH_AFTER = '''
+#endif
+
+PyObject* // PyMODINIT_FUNC for PY3
+wrapped_PyInit_native_engine(void)
+{
+  return _cffi_init("native_engine", 0x2601, &_cffi_type_context);
+}
+
+void // PyMODINIT_FUNC for PY2
+wrapped_initnative_engine(void)
+{
+  _cffi_init("native_engine", 0x2601, &_cffi_type_context);
+}
+'''
+
 
 def get_build_cflags():
   """Synthesize a CFLAGS env var from the current python env for building of C modules."""
@@ -314,14 +358,15 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
     # (it kept the binary working) but inconvenient (it was relying on unspecified behavior, it meant
     # our binaries couldn't be stripped which inflated them by 2~3x, and it reduced the amount of LTO
     # we could use, which led to unmeasured performance hits).
-    def rename_symbol_in_file(f):
-      with open(f, 'r') as fh:
-        for line in fh:
-          if line.startswith('init{}'.format(module_name)) or line.startswith('PyInit_{}'.format(module_name)):
-            yield 'wrapped_' + line
-          else:
-            yield line
-    file_content = ''.join(rename_symbol_in_file(temp_c_file))
+    #
+    # We additionally remove the ifdefs that apply conditional `init` logic for Py2 vs Py3, in order
+    # to define a module that is loadable by either 2 or 3.
+    # TODO: Because PyPy uses the same `init` function name regardless of the python version, this
+    # trick does not work there: we leave its conditional in place.
+    file_content = read_file(temp_c_file).decode('utf-8')
+    if CFFI_C_PATCH_BEFORE not in file_content:
+      raise Exception('The patch for the CFFI generated code will not apply cleanly.')
+    file_content = file_content.replace(CFFI_C_PATCH_BEFORE, CFFI_C_PATCH_AFTER)
 
   _replace_file(c_file, file_content)
 
