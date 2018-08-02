@@ -15,6 +15,8 @@ Runs commons tests for local or hosted CI.
 
 Usage: $0 (-h|-fxbkmsrjlpuyncia)
  -h           print out this help message
+ -3           After pants is bootstrapped, set --python-setup-interpreter-constraints such that any
+              python tests run with Python 3.
  -f           skip python code formatting checks
  -x           skip bootstrap clean-all (assume bootstrapping from a
               fresh clone)
@@ -60,10 +62,12 @@ bootstrap_compile_args=(
 python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
+python_three="false"
 
-while getopts "hfxbkmrjlpeu:ny:ci:tz" opt; do
+while getopts "h3fxbkmrjlpeu:ny:ci:tz" opt; do
   case ${opt} in
     h) usage ;;
+    3) python_three="true" ;;
     f) skip_pre_commit_checks="true" ;;
     x) skip_bootstrap_clean="true" ;;
     b) skip_bootstrap="true" ;;
@@ -118,6 +122,16 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
     ./pants.pex -V
   ) || die "Failed to bootstrap pants."
   end_travis_section
+fi
+
+# NB: Ordering matters here. We (currently) always bootstrap a Python 2 pex.
+if [[ "${python_three:-false}" == "true" ]]; then
+  # The 3.4 end of this constraint is necessary to jive with the travis ubuntu trusty image.
+  banner "Setting interpreter constraints for 3!"
+  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.4,<4"]'
+  # FIXME: Clear interpreters, otherwise this constraint does not end up applying due to a cache
+  # bug between the `./pants binary` and further runs.
+  ./pants.pex clean-all
 fi
 
 if [[ "${skip_sanity_checks:-false}" == "false" ]]; then

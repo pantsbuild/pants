@@ -156,17 +156,15 @@ matrix:
 
     - <<: *default_test_config
       env:
-        - SHARD="Unit tests for pants and pants-plugins - Python 2"
-        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=2.7,<3"]'
+        - SHARD="Py2 - Unit tests in for pants and pants-plugins"
       script:
         - ./build-support/bin/ci.sh -x -efkmrjcnt "${SHARD}"
 
     - <<: *default_test_config
       env:
-        - SHARD="Unit tests for pants and pants-plugins - Python 3"
-        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.4,<4"]'
+        - SHARD="Py3 - Unit tests for pants and pants-plugins"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjcnt "${SHARD}"
+        - ./build-support/bin/ci.sh -x -3efkmrjcnt "${SHARD}"
 
     - <<: *default_test_config
       env:
