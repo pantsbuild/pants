@@ -57,6 +57,7 @@ python_tests(
   name = 'caching_dereference_symlinks',
   sources = ['test_caching_tarball_deference.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/task:task',
     'src/python/pants/cache:cache',
     'src/python/pants/util:dirutil',

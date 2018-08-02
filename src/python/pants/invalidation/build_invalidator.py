@@ -8,7 +8,7 @@ import errno
 import hashlib
 import os
 from abc import abstractmethod
-from builtins import object
+from builtins import object, open
 from collections import namedtuple
 
 from pants.base.hash_utils import hash_all
@@ -214,7 +214,7 @@ class BuildInvalidator(object):
     return os.path.join(self._root, safe_filename(id, extension='.hash'))
 
   def _write_sha(self, cache_key):
-    with open(self._sha_file(cache_key), 'w') as fd:
+    with open(self._sha_file(cache_key), 'wb') as fd:
       fd.write(cache_key.hash)
 
   def _read_sha(self, cache_key):
@@ -222,7 +222,7 @@ class BuildInvalidator(object):
 
   def _read_sha_by_id(self, id):
     try:
-      with open(self._sha_file_by_id(id), 'r') as fd:
+      with open(self._sha_file_by_id(id), 'rb') as fd:
         return fd.read().strip()
     except IOError as e:
       if e.errno != errno.ENOENT:

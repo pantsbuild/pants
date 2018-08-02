@@ -8,7 +8,7 @@ import copy
 import os
 import re
 import traceback
-from builtins import next, object
+from builtins import next, object, open
 from collections import defaultdict
 
 import six
@@ -452,7 +452,7 @@ class Parser(object):
         else:
           fromfile = val_str[1:]
           try:
-            with open(fromfile) as fp:
+            with open(fromfile, 'r') as fp:
               return fp.read().strip()
           except IOError as e:
             raise self.FromfileError('Failed to read {} in {} from file {}: {}'.format(

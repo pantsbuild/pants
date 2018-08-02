@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import os
-from builtins import object, str
+from builtins import object, open, str
 
 import mock
 from future.utils import PY2, PY3
@@ -255,8 +255,6 @@ class BinaryUtilTest(TestBase):
       "resolve binaries for the current host. Update --binaries-path-by-id to find binaries for "
       "the current host platform ({unicode_literal}\'darwin\', {unicode_literal}\'999\').\\n--binaries-path-by-id was:"
     ).format(unicode_literal='u' if PY2 else '')
-    # expected_msg_postfix = ".\\n--binaries-path-by-id was:"
-    # expected_msg = (expected_msg_prefix + () + expected_msg_postfix)
     self.assertIn(expected_msg, the_raised_exception_message)
 
   def test_select_script_missing_version(self):

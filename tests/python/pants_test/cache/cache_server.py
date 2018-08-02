@@ -8,7 +8,7 @@ import http.server
 import os
 import re
 import socketserver
-from builtins import object
+from builtins import object, open
 from contextlib import contextmanager
 from multiprocessing import Process, Queue
 
@@ -95,7 +95,7 @@ class TestCacheServer(object):
       # Truncate the file.
       abspath = os.path.join(self._cache_root, f)
       artifact_size = os.path.getsize(abspath)
-      with open(abspath, 'r+w') as outfile:
+      with open(abspath, 'r+') as outfile:
         outfile.truncate(artifact_size // 2)
 
       count += 1

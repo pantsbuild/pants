@@ -12,9 +12,11 @@ import sys
 import threading
 import time
 import uuid
+from builtins import open
 from contextlib import contextmanager
 
 import requests
+from future.utils import PY2
 
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.run_info import RunInfo
@@ -330,6 +332,8 @@ class RunTracker(Subsystem):
     :return: True if successfully written, False otherwise.
     """
     params = json.dumps(stats)
+    if PY2:
+      params = params.decode('utf-8')
     try:
       with open(file_name, 'w') as f:
         f.write(params)

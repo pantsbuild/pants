@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import unittest
-from builtins import str
+from builtins import open, str
 from contextlib import contextmanager
 
 from pants.cache.artifact_cache import (NonfatalArtifactCacheError, call_insert,
@@ -90,14 +90,14 @@ class TestArtifactCache(unittest.TestCase):
       self.assertTrue(artifact_cache.has(key))
 
       # Stomp it.
-      with open(path, 'w') as outfile:
+      with open(path, 'wb') as outfile:
         outfile.write(TEST_CONTENT2)
 
       # Recover it from the cache.
       self.assertTrue(bool(artifact_cache.use_cached_files(key)))
 
       # Check that it was recovered correctly.
-      with open(path, 'r') as infile:
+      with open(path, 'rb') as infile:
         content = infile.read()
       self.assertEqual(content, TEST_CONTENT1)
 
@@ -247,7 +247,7 @@ class TestArtifactCache(unittest.TestCase):
         self.assertTrue(artifact_cache.use_cached_files(key))
         self.assertTrue(os.path.exists(tarfile))
 
-        with open(tarfile, 'w') as outfile:
+        with open(tarfile, 'wb') as outfile:
           outfile.write(b'not a valid tgz any more')
 
         self.assertFalse(artifact_cache.use_cached_files(key))

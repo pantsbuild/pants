@@ -8,7 +8,7 @@ import logging
 import os
 import tarfile
 import unittest
-from builtins import object, str
+from builtins import object, open, str
 from contextlib import contextmanager
 
 from future.utils import text_type
@@ -374,7 +374,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       scheduler.materialize_directories((DirectoryToMaterialize(text_type(dir_path), digest),))
 
       created_file = os.path.join(dir_path, "roland")
-      with open(created_file) as f:
+      with open(created_file, 'r') as f:
         content = f.read()
         self.assertEqual(content, "European Burmese")
 

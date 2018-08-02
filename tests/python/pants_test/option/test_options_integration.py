@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import json
 import os
+from builtins import open
 from textwrap import dedent
 
 from pants.util.contextutil import temporary_dir

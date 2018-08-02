@@ -30,6 +30,7 @@ python_tests(
   name = 'build_file_address_mapper',
   sources = ['test_build_file_address_mapper.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',

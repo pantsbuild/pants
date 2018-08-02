@@ -10,7 +10,7 @@ import os
 import signal
 import threading
 import time
-from builtins import range, zip
+from builtins import open, range, zip
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 
@@ -59,7 +59,7 @@ def banner(s):
 
 def read_pantsd_log(workdir):
   # Surface the pantsd log for easy viewing via pytest's `-s` (don't capture stdio) option.
-  with open('{}/pantsd/pantsd.log'.format(workdir)) as f:
+  with open('{}/pantsd/pantsd.log'.format(workdir), 'r') as f:
     for line in f:
       yield line.strip()
 
@@ -297,11 +297,11 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       ]
       for config_file in config_files:
         print('writing {}'.format(config_file))
-        with open(config_file, 'wb') as fh:
+        with open(config_file, 'w') as fh:
           fh.write('[GLOBAL]\npants_distdir: {}\n'.format(os.path.join(dist_dir_root, 'v1')))
 
       invalidating_config = os.path.join(config_dir, 'pants.ini.invalidates')
-      with open(invalidating_config, 'wb') as fh:
+      with open(invalidating_config, 'w') as fh:
         fh.write('[GLOBAL]\npants_distdir: {}\n'.format(os.path.join(dist_dir_root, 'v2')))
 
       with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):

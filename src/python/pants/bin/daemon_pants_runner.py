@@ -10,7 +10,7 @@ import signal
 import sys
 import termios
 import time
-from builtins import str, zip
+from builtins import open, str, zip
 from contextlib import contextmanager
 
 from future.utils import raise_with_traceback
@@ -161,7 +161,7 @@ class DaemonPantsRunner(ProcessManager):
       'please file a bug at http://github.com/pantsbuild/pants'
       .format([stdin_ttyname, stdout_ttyname, stderr_ttyname])
     )
-    with open(stdin_ttyname, 'rb+wb', 0) as tty:
+    with open(stdin_ttyname, 'rb+', 0) as tty:
       tty_fileno = tty.fileno()
       with stdio_as(stdin_fd=tty_fileno, stdout_fd=tty_fileno, stderr_fd=tty_fileno):
         def finalizer():

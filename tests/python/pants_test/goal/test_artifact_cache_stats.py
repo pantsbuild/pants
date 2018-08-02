@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from builtins import str
+from builtins import open, str
 from contextlib import contextmanager
 
 import requests
@@ -84,5 +84,5 @@ class ArtifactCacheStatsTest(TestBase):
       self.assertEqual(sorted(list(expected_hit_or_miss_files.keys())),
                         sorted(os.listdir(tmp_dir)))
       for hit_or_miss_file in expected_hit_or_miss_files.keys():
-        with open(os.path.join(tmp_dir, hit_or_miss_file)) as hit_or_miss_saved:
+        with open(os.path.join(tmp_dir, hit_or_miss_file), 'r') as hit_or_miss_saved:
           self.assertEqual(expected_hit_or_miss_files[hit_or_miss_file], hit_or_miss_saved.read())

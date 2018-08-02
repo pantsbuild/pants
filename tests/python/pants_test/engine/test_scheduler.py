@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import unittest
-from builtins import object, str
+from builtins import object, open, str
 from textwrap import dedent
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -233,7 +233,7 @@ class SchedulerTest(unittest.TestCase):
     with temporary_dir() as td:
       output_path = os.path.join(td, 'output.dot')
       self.scheduler.visualize_graph_to_file(output_path)
-      with open(output_path, 'rb') as fh:
+      with open(output_path, 'r') as fh:
         graphviz_output = fh.read().strip()
 
     self.assertIn('digraph', graphviz_output)
