@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import open
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TaskError
@@ -122,7 +123,7 @@ class BuildozerTest(TaskTestBase):
 
   @staticmethod
   def _build_file_dependencies(build_file):
-    with open(build_file) as f:
+    with open(build_file, 'r') as f:
       source = f.read()
 
     dependencies = re.compile('dependencies+.?=+.?\[([^]]*)').findall(source)
