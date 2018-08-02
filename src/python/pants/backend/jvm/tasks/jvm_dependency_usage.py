@@ -7,8 +7,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 import os
 import sys
-from builtins import next, object
+from builtins import next, object, open
 from collections import defaultdict, namedtuple
+
+from future.utils import PY3
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
@@ -91,7 +93,7 @@ class JvmDependencyUsage(Task):
       with open(output_file, 'w') as fh:
         self._render(graph, fh)
     else:
-      sys.stdout.write(b'\n')
+      sys.stdout.write('\n')
       self._render(graph, sys.stdout)
 
   @classmethod
@@ -170,7 +172,8 @@ class JvmDependencyUsage(Task):
                                         targets_by_file,
                                         transitive_deps)
       vt = target_to_vts[target]
-      with open(self.nodes_json(vt.results_dir), mode='w') as fp:
+      mode = 'wb' if PY3 else 'w'
+      with open(self.nodes_json(vt.results_dir), mode=mode) as fp:
         json.dump(node.to_cacheable_dict(), fp, indent=2, sort_keys=True)
       vt.update()
       return node
@@ -184,7 +187,7 @@ class JvmDependencyUsage(Task):
       vt = target_to_vts[target]
       if vt.valid and os.path.exists(self.nodes_json(vt.results_dir)):
         try:
-          with open(self.nodes_json(vt.results_dir)) as fp:
+          with open(self.nodes_json(vt.results_dir), 'r') as fp:
             return Node.from_cacheable_dict(json.load(fp),
                                             lambda spec: next(self.context.resolve(spec).__iter__()))
         except Exception:

@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import textwrap
+from builtins import open
 from collections import defaultdict
 from contextlib import closing
 from hashlib import sha1
@@ -356,7 +357,7 @@ class BaseZincCompile(JvmCompile):
     with open(ctx.zinc_args_file, 'w') as fp:
       for arg in zinc_args:
         fp.write(arg)
-        fp.write(b'\n')
+        fp.write('\n')
 
     if self.runjava(classpath=[self._zinc.zinc],
                     main=Zinc.ZINC_COMPILE_MAIN,
@@ -486,7 +487,7 @@ class BaseZincCompile(JvmCompile):
 
     if os.path.isdir(classpath_element):
       try:
-        with open(os.path.join(classpath_element, _SCALAC_PLUGIN_INFO_FILE)) as plugin_info_file:
+        with open(os.path.join(classpath_element, _SCALAC_PLUGIN_INFO_FILE), 'r') as plugin_info_file:
           return process_info_file(classpath_element, plugin_info_file)
       except IOError as e:
         if e.errno != errno.ENOENT:

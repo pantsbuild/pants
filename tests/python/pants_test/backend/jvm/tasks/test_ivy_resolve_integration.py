@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import open
 
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -65,7 +66,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
       self.assertIsNotNone(html_report_file,
                       msg="Couldn't find ivy report in {report_dir} containing files {listdir}"
                       .format(report_dir=ivy_report_dir, listdir=listdir))
-      with open(os.path.join(ivy_report_dir, html_report_file)) as file:
+      with open(os.path.join(ivy_report_dir, html_report_file), 'r') as file:
         self.assertIn('info.cukes', file.read())
 
   def test_ivy_args(self):
@@ -160,7 +161,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
                         msg="Couldn't find ivy report in {report_dir} containing files {listdir}"
                         .format(report_dir=ivy_report_dir, listdir=listdir))
 
-        with open(os.path.join(ivy_report_dir, html_report_file)) as file:
+        with open(os.path.join(ivy_report_dir, html_report_file), 'r') as file:
           self.assertIn('junit', file.read())
 
       run_pants(['clean-all'])
@@ -176,7 +177,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
                         msg="Couldn't find ivy report in {report_dir} containing files {listdir}"
                         .format(report_dir=ivy_report_dir, listdir=listdir))
 
-        with open(os.path.join(ivy_report_dir, html_report_file)) as file:
+        with open(os.path.join(ivy_report_dir, html_report_file), 'r') as file:
           self.assertIn('junit', file.read())
 
   def _find_html_report(self, ivy_report_dir):

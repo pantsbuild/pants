@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import open
 from contextlib import contextmanager
 
 from pants.backend.jvm.subsystems.jvm import JVM
@@ -39,7 +40,7 @@ class JvmRunTest(JvmTaskTestBase):
         self.assertFalse(os.path.exists(cmdline_file))
         jvm_run.execute()
         self.assertTrue(os.path.exists(cmdline_file))
-        with open(cmdline_file) as fp:
+        with open(cmdline_file, 'r') as fp:
           contents = fp.read()
           yield contents
 

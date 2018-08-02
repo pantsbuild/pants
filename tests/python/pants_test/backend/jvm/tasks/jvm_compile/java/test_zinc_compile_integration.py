@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 from unittest import skipIf
 
 from pants.build_graph.address import Address
@@ -73,7 +74,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
       processor_service_file = list(processor_service_files)[0]
       self.assertTrue(processor_service_file.endswith(
           'META-INF/services/javax.annotation.processing.Processor'))
-      with open(processor_service_file) as fp:
+      with open(processor_service_file, 'r') as fp:
         self.assertEqual('org.pantsbuild.testproject.annotation.processor.ResourceMappingProcessor',
                           fp.read().strip())
 
@@ -89,7 +90,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
       # This is the proof that the ResourceMappingProcessor annotation processor was compiled in a
       # round and then the Main was compiled in a later round with the annotation processor and its
       # service info file from on its compile classpath.
-      with open(self.get_only(found, 'deprecation_report.txt')) as fp:
+      with open(self.get_only(found, 'deprecation_report.txt'), 'r') as fp:
         self.assertIn('org.pantsbuild.testproject.annotation.main.Main', fp.read().splitlines())
 
   def test_stale_apt_with_deps(self):

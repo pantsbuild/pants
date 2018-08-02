@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import shutil
 import time
+from builtins import open
 from textwrap import dedent
 
 from pants.backend.jvm.ivy_utils import IvyUtils

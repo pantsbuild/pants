@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import shutil
+from builtins import open
 
 from pants.base.build_environment import get_buildroot
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -41,8 +42,8 @@ class DepExportsIntegrationTest(PantsRunIntegrationTest):
         pants_run = self.run_pants_with_workdir(command=cmd, workdir=workdir)
         self.assert_success(pants_run)
 
-        with open(os.path.join(src_dir, modify_file), 'ab') as fh:
-          fh.write(b'\n')
+        with open(os.path.join(src_dir, modify_file), 'a') as fh:
+          fh.write('\n')
 
         pants_run = self.run_pants_with_workdir(command=cmd, workdir=workdir)
         self.assert_success(pants_run)

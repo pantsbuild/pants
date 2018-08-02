@@ -11,11 +11,12 @@ import pkgutil
 import threading
 import xml.etree.ElementTree as ET
 from abc import abstractmethod
-from builtins import object, str
+from builtins import object, open, str
 from collections import OrderedDict, defaultdict, namedtuple
 from functools import total_ordering
 
 import six
+from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
@@ -333,7 +334,7 @@ class FrozenResolution(object):
     if not os.path.exists(filename):
       return None
 
-    with open(filename) as f:
+    with open(filename, 'r') as f:
       # Using OrderedDict here to maintain insertion order of dict entries.
       from_file = json.load(f, object_pairs_hook=OrderedDict)
     result = {}
@@ -369,7 +370,8 @@ class FrozenResolution(object):
       ])
 
     with safe_concurrent_creation(filename) as tmp_filename:
-      with open(tmp_filename, 'wb') as f:
+      mode = 'w' if PY3 else 'wb'
+      with open(tmp_filename, mode) as f:
         json.dump(res, f)
 
 

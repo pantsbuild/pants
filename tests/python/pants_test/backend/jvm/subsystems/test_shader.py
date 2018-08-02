@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import tempfile
 import unittest
+from builtins import open
 
 from pants.backend.jvm.subsystems.shader import RelocateRule, Shader, Shading
 from pants.java.distribution.distribution import DistributionLocator
@@ -96,7 +97,7 @@ class ShaderTest(unittest.TestCase):
 
       rules_file = command.pop(0)
       self.assertTrue(os.path.exists(rules_file))
-      with open(rules_file) as fp:
+      with open(rules_file, 'r') as fp:
         lines = fp.read().splitlines()
         self.assertEqual('rule log4j.** log4j.@1', lines[0])  # The custom rule.
         self.assertEqual('rule * @1', lines[1])  # Exclude main's package.
