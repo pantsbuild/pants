@@ -70,6 +70,7 @@ python_tests(
   name = 'export_integration',
   sources = ['test_export_integration.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':resolve_jars_test_mixin',
     'src/python/pants/base:build_environment',

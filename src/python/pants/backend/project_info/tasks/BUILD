@@ -79,6 +79,7 @@ python_library(
   name = 'idea_plugin_gen',
   sources = ['idea_plugin_gen.py'],
   dependencies = [
+    '3rdparty/python:future',
     ':idea_resources',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/python/targets:python',

@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 import os
 import re
+from builtins import open
 
 from twitter.common.collections import maybe_list
 
@@ -46,7 +47,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     self.assertTrue(os.path.exists(export_out_file),
                     msg='Could not find export output file in {out_file}'
                         .format(out_file=export_out_file))
-    with open(export_out_file) as json_file:
+    with open(export_out_file, 'r') as json_file:
       json_data = json.load(json_file)
       if not load_libs:
         self.assertIsNone(json_data.get('libraries'))
@@ -226,7 +227,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       p.communicate()
       self.assertEqual(p.returncode, 0)
 
-      with open(exported_file) as data_file:
+      with open(exported_file, 'r') as data_file:
         json_data = json.load(data_file)
 
       python_setup = json_data['python_setup']
