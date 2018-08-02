@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os.path
 import re
 import unittest
+from builtins import open
 
 from parameterized import parameterized
 
@@ -33,7 +34,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       self.assert_success(pants_run)
       output = os.path.join(workdir, _REPORT_LOCATION)
       self.assertTrue(os.path.exists(output))
-      with open(output) as f:
+      with open(output, 'r') as f:
         self.assertEqual(_HEADER, f.readline())
         for line in f.readlines():
           self.assertTrue(_ENTRY.match(line))
