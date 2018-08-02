@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import getpass
 import logging
 import mimetypes
-from builtins import object, str
+from builtins import object, open, str
 from os.path import basename
 from xmlrpc.client import Binary
 from xmlrpc.client import Error as XMLRPCError
