@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import unittest
+from builtins import open
 from contextlib import contextmanager
 from textwrap import dedent
 from unittest import skipIf
@@ -272,7 +273,7 @@ class GitTest(unittest.TestCase):
         self.init_repo('origin', self.origin)
         subprocess.check_call(['git', 'pull', '--tags', 'origin', 'master:master'])
 
-        with open(os.path.realpath('README')) as readme:
+        with open(os.path.realpath('README'), 'r') as readme:
           self.assertEqual('--More data.', readme.read())
 
         git = Git()
