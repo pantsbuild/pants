@@ -12,7 +12,7 @@ from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.objects import Collection, datatype
 
 
-class FileContent(datatype(['path', ('content', binary_type)])):
+class FileContent(datatype([('path', text_type), ('content', binary_type)])):
   """The content of a file."""
 
   def __repr__(self):
