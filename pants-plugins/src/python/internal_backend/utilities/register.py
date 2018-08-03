@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from twitter.common.collections import OrderedSet
 
@@ -18,7 +19,7 @@ from pants.version import PANTS_SEMVER, VERSION
 
 
 def _read_contents(path):
-  with open(os.path.join(get_buildroot(), path), 'rb') as fp:
+  with open(os.path.join(get_buildroot(), path), 'r') as fp:
     return fp.read()
 
 
