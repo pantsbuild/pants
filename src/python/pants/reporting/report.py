@@ -128,7 +128,7 @@ class Report(object):
     # Assumes self._lock is held by the caller.
     for workunit in self._workunits.values():
       for label, output in workunit.outputs().items():
-        s = output.read()
+        s = output.read().decode('utf-8')
         if len(s) > 0:
           for reporter in self._reporters.values():
             reporter.handle_output(workunit, label, s)

@@ -9,6 +9,7 @@ from collections import namedtuple
 
 import six
 from colors import cyan, green, red, yellow
+from future.utils import PY2
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.reporting.plaintext_reporter_base import PlainTextReporterBase
@@ -152,7 +153,7 @@ class PlainTextReporter(PlainTextReporterBase):
         self._emit_indented_workunit_label(workunit)
       for name, outbuf in workunit.outputs().items():
         self.emit(self._prefix(workunit, '\n==== {} ====\n'.format(name)))
-        self.emit(self._prefix(workunit, outbuf.read_from(0)))
+        self.emit(self._prefix(workunit, outbuf.read_from(0).decode('utf-8')))
         self.flush()
 
   def do_handle_log(self, workunit, level, *msg_elements):
@@ -182,6 +183,12 @@ class PlainTextReporter(PlainTextReporterBase):
     self.flush()
 
   def emit(self, s, dest=ReporterDestination.OUT):
+    # In Py2, sys.stdout tries to coerce into ASCII, and will fail in coercing Unicode. So,
+    # we encode prematurely to handle unicode.
+    # In Py3, sys.stdout takes unicode by default, so will work normally.
+    # io.StringIO works with unicode always, so we only modify the std streams.
+    if PY2 and isinstance(self.settings.outfile, file):
+      s = s.encode('utf-8')
     if dest == ReporterDestination.OUT:
       self.settings.outfile.write(s)
     elif dest == ReporterDestination.ERR:
