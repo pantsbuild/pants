@@ -5,6 +5,7 @@ python_binary(
   name='compare_config',
   source='compare_config.py',
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/option',
   ]
 )
@@ -15,6 +16,7 @@ python_binary(
   source='migrate_config.py',
   dependencies=[
     '3rdparty/python:ansicolors',
+    '3rdparty/python:future',
     'src/python/pants/option',
   ]
 )
