@@ -172,7 +172,7 @@ class JvmDependencyUsage(Task):
                                         targets_by_file,
                                         transitive_deps)
       vt = target_to_vts[target]
-      mode = 'wb' if PY3 else 'w'
+      mode = 'w' if PY3 else 'wb'
       with open(self.nodes_json(vt.results_dir), mode=mode) as fp:
         json.dump(node.to_cacheable_dict(), fp, indent=2, sort_keys=True)
       vt.update()
