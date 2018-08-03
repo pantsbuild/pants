@@ -185,9 +185,11 @@ class PlainTextReporter(PlainTextReporterBase):
   def emit(self, s, dest=ReporterDestination.OUT):
     # In Py2, sys.stdout tries to coerce into ASCII, and will fail in coercing Unicode. So,
     # we encode prematurely to handle unicode.
-    # In Py3, sys.stdout takes unicode by default, so will work normally.
-    # io.StringIO works with unicode always, so we only modify the std streams.
-    if PY2 and isinstance(self.settings.outfile, file):
+    # In Py3, sys.stdout takes unicode, so will work normally.
+    #
+    # `self.settings.outfile` can also be `io.StringIO` instead of an std stream, in which case it only
+    # accepts unicode, so `s` does not need to be modified.
+    if PY2 and 'std' in str(self.settings.outfile):
       s = s.encode('utf-8')
     if dest == ReporterDestination.OUT:
       self.settings.outfile.write(s)
