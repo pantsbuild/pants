@@ -77,7 +77,7 @@ class ConfluencePublish(Task):
       basedir, htmls = list(html_info.items())[0]
       if len(htmls) != 1:
         raise TaskError('Unexpected resources for {}: {}'.format(page, htmls))
-      with safe_open(os.path.join(basedir, htmls[0])) as contents:
+      with safe_open(os.path.join(basedir, htmls[0]), 'r') as contents:
         url = self.publish_page(
           page.address,
           wiki_artifact.config['space'],
