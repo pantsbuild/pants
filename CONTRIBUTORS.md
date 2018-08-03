@@ -60,6 +60,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Gabriel Gonzalez
 + Garrett Malmquist
 + Gary M. Josack
++ Guy Marom
 + Harley Cooper
 + Hwasung Lee
 + Ian Tabolt
@@ -144,6 +145,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Peiyu Wang
 + Peter Seibel
 + Qicheng Ma
++ Robert Stapenhurst
 + Roger Jiang
 + Ryan Williams
 + Sameer Brenn
