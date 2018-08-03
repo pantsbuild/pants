@@ -3,19 +3,17 @@ extern crate tempfile;
 
 use boxfuture::{BoxFuture, Boxable};
 use fs::{self, GlobMatching, PathGlobs, PathStatGetter, Snapshot, StrictGlobMatching};
-use futures::{future, Future, Stream};
+use futures::{future, Future};
 use std::collections::BTreeSet;
+use std::ops::Neg;
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 
-use tokio_codec::{Decoder, FramedRead};
-use tokio_process::{Child, CommandExt};
+use tokio_process::CommandExt;
 
 use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
-
-use bytes::{Bytes, BytesMut};
 
 pub struct CommandRunner {
   store: fs::Store,
@@ -37,27 +35,6 @@ impl CommandRunner {
       work_dir,
       cleanup_local_dirs,
     }
-  }
-
-  fn outputs_stream_for_child(
-    mut child: Child,
-  ) -> impl Stream<Item = ChildOutput, Error = String> + Send {
-    // TODO: This assumes that the Child was launched with stdout/stderr `Stdio::piped`.
-    let stdout_stream = FramedRead::new(child.stdout().take().unwrap(), IdentityDecoder)
-      .map(|bytes| ChildOutput::Stdout(bytes.into()));
-    let stderr_stream = FramedRead::new(child.stderr().take().unwrap(), IdentityDecoder)
-      .map(|bytes| ChildOutput::Stderr(bytes.into()));
-    let exit_stream = child.into_stream().map(|exit_status| {
-      ChildOutput::Exit(
-        exit_status
-          .code()
-          .or_else(|| exit_status.signal().map(|signal| -signal)),
-      )
-    });
-    stdout_stream
-      .select(stderr_stream)
-      .chain(exit_stream)
-      .map_err(|e| format!("Failed to consume process outputs: {:?}", e))
   }
 
   fn construct_output_snapshot(
@@ -147,29 +124,10 @@ impl super::CommandRunner for CommandRunner {
                   .stdin(Stdio::null())
                   .stdout(Stdio::piped())
                   .stderr(Stdio::piped())
-                  .spawn_async()
+                  .output_async()
                   .map_err(|e| format!("Error launching process: {:?}", e))
       })
-      .and_then(|child| {
-        // Consume the stream of ChildOutputs incrementally.
-        let init = (
-          BytesMut::with_capacity(8192),
-          BytesMut::with_capacity(8192),
-          None,
-        );
-        Self::outputs_stream_for_child(child).fold(
-          init,
-          |(mut stdout, mut stderr, mut exit_code), child_output| {
-            match child_output {
-              ChildOutput::Stdout(bytes) => stdout.extend_from_slice(&bytes),
-              ChildOutput::Stderr(bytes) => stderr.extend_from_slice(&bytes),
-              ChildOutput::Exit(code) => exit_code = code,
-            };
-            Ok((stdout, stderr, exit_code)) as Result<_, String>
-          },
-        )
-      })
-      .and_then(move |(stdout, stderr, exit_code)| {
+      .and_then(|output| {
         let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
           future::ok(fs::Snapshot::empty()).to_boxed()
         } else {
@@ -192,12 +150,15 @@ impl super::CommandRunner for CommandRunner {
             })
             .to_boxed()
         };
-
+        let status = output.status;
         output_snapshot
           .map(move |snapshot| FallibleExecuteProcessResult {
-            stdout: stdout.freeze(),
-            stderr: stderr.freeze(),
-            exit_code: exit_code.unwrap_or(-1),
+            stdout: output.stdout.into(),
+            stderr: output.stderr.into(),
+            exit_code: status
+              .code()
+              .or(status.signal().map(Neg::neg))
+              .expect("Process exit should have been either a code or a signal"),
             output_directory: snapshot.digest,
           })
           .to_boxed()
@@ -222,34 +183,6 @@ impl super::CommandRunner for CommandRunner {
     self.store.reset_prefork();
     self.fs_pool.reset();
   }
-}
-
-///
-/// A Decoder that emits bytes immediately for any non-empty buffer.
-///
-struct IdentityDecoder;
-
-impl Decoder for IdentityDecoder {
-  type Item = Bytes;
-  type Error = ::std::io::Error;
-
-  fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-    if buf.len() == 0 {
-      Ok(None)
-    } else {
-      Ok(Some(buf.take().freeze()))
-    }
-  }
-}
-
-///
-/// An enum of the possible outputs from a child process.
-///
-#[derive(Debug)]
-enum ChildOutput {
-  Stdout(Bytes),
-  Stderr(Bytes),
-  Exit(Option<i32>),
 }
 
 #[cfg(test)]
