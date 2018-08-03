@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import hashlib
 import os
 import pkgutil
-from builtins import str
+from builtins import open, str
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_repos import PythonRepos
