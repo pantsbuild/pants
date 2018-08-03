@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from future.utils import text_type
 
@@ -47,7 +48,7 @@ class CountLinesOfCode(ConsoleTask):
       with open(list_file, 'w') as list_file_out:
         for input_file in sorted(input_files):
           list_file_out.write(input_file)
-          list_file_out.write(b'\n')
+          list_file_out.write('\n')
       list_file_snapshot = self.context._scheduler.capture_snapshots((
         PathGlobsAndRoot(
           PathGlobs(('input_files_list',)),
