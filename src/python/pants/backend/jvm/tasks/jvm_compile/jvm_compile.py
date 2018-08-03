@@ -30,6 +30,7 @@ from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (Compi
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
@@ -835,7 +836,11 @@ class JvmCompile(NailgunTaskBase):
         for jar in self.extra_compile_time_classpath_elements():
           if isinstance(jar, string_types):
             # Backwards compatibility
-            # TODO: Deprecation warning if this code is hit.
+            deprecated_conditional(
+              lambda: True,
+              "1.12.0.dev0",
+              "Extra compile classpath auto-promotion from string to ClasspathEntry",
+            )
             jar = ClasspathEntry(jar)
           yield (conf, jar)
 
