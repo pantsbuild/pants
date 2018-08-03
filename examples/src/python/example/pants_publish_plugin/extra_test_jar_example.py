@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from io import open
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_task import JarTask
@@ -43,7 +44,7 @@ class ExtraTestJarExample(JarTask):
 
       # A sample file to stuff into the jar.
       example_file_name = os.path.join(self.workdir, "example.txt")
-      with open(example_file_name, 'wb') as f:
+      with open(example_file_name, 'w') as f:
         f.write("This is an example test file.\n")
 
       # Create a jar file to be published along with other artifacts for this target.
