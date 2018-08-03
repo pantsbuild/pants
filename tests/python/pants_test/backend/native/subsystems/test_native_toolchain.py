@@ -109,7 +109,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
       scheduler = self._sched(work_dir=tmpdir)
 
       source_file_path = os.path.join(tmpdir, file_name)
-      with safe_open(source_file_path, mode='wb') as fp:
+      with safe_open(source_file_path, mode='w') as fp:
         fp.write(contents)
 
       toolchain = self.execute_expecting_one_result(scheduler, toolchain_type, self.toolchain).value
