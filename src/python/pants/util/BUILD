@@ -47,6 +47,7 @@ python_library(
   sources = ['dirutil.py'],
   dependencies = [
     ':strutil',
+    '3rdparty/python:future',
   ],
 )
 
