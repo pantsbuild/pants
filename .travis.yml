@@ -107,6 +107,7 @@ matrix:
       env:
         - SHARD="Linux Native Engine Binary Builder"
         - PREPARE_DEPLOY=1
+        - MODE=debug
       before_script:
         - ulimit -c unlimited
       script:
