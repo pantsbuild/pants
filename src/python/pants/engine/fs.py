@@ -22,7 +22,7 @@ class FileContent(datatype(['path', 'content'])):
     return repr(self)
 
 
-class Path(datatype(['path', 'stat'])):
+class Path(datatype([('path', text_type), 'stat'])):
   """A filesystem path, holding both its symbolic path name, and underlying canonical Stat.
 
   Both values are relative to the ProjectTree's buildroot.
