@@ -13,6 +13,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import re
 import sys
+from io import open
 
 EXPECTED_HEADER="""# coding=utf-8
 # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
