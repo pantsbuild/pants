@@ -6,8 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import threading
 from builtins import bytes, object, open
-
-from six import StringIO
+from io import BytesIO
 
 
 class _RWBuf(object):
@@ -58,7 +57,7 @@ class InMemoryRWBuf(_RWBuf):
   situations that require a real file (e.g., redirecting stdout/stderr of subprocess.Popen())."""
 
   def __init__(self):
-    super(InMemoryRWBuf, self).__init__(StringIO())
+    super(InMemoryRWBuf, self).__init__(BytesIO())
     self._writepos = 0
 
   def do_write(self, s):
