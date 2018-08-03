@@ -20,6 +20,7 @@ python_library(
     'src/python/pants/base:specs',
     'src/python/pants/base:target_roots',
     'src/python/pants/base:validation',
+    'src/python/pants/fs',
     'src/python/pants/option',
     'src/python/pants/source',
     'src/python/pants/source:payload_fields',
