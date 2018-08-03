@@ -3,7 +3,7 @@ extern crate tempfile;
 
 use boxfuture::{BoxFuture, Boxable};
 use fs::{self, GlobMatching, PathGlobs, PathStatGetter, Snapshot, StrictGlobMatching};
-use futures::{future, Future};
+use futures::{future, Future, Stream};
 use std::collections::BTreeSet;
 use std::ops::Neg;
 use std::os::unix::process::ExitStatusExt;
@@ -11,9 +11,12 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 
-use tokio_process::CommandExt;
+use tokio_codec::{BytesCodec, FramedRead};
+use tokio_process::{Child, CommandExt};
 
 use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
+
+use bytes::{Bytes, BytesMut};
 
 pub struct CommandRunner {
   store: fs::Store,
@@ -35,6 +38,28 @@ impl CommandRunner {
       work_dir,
       cleanup_local_dirs,
     }
+  }
+
+  fn outputs_stream_for_child(
+    mut child: Child,
+  ) -> impl Stream<Item = ChildOutput, Error = String> + Send {
+    // TODO: This assumes that the Child was launched with stdout/stderr `Stdio::piped`.
+    let stdout_stream = FramedRead::new(child.stdout().take().unwrap(), BytesCodec::new())
+      .map(|bytes| ChildOutput::Stdout(bytes.into()));
+    let stderr_stream = FramedRead::new(child.stderr().take().unwrap(), BytesCodec::new())
+      .map(|bytes| ChildOutput::Stderr(bytes.into()));
+    let exit_stream = child.into_stream().map(|exit_status| {
+      ChildOutput::Exit(
+        exit_status
+          .code()
+          .or(exit_status.signal().map(Neg::neg))
+          .expect("Child process should exit via returned code or signal."),
+      )
+    });
+    stdout_stream
+      .select(stderr_stream)
+      .select(exit_stream)
+      .map_err(|e| format!("Failed to consume process outputs: {:?}", e))
   }
 
   fn construct_output_snapshot(
@@ -124,10 +149,34 @@ impl super::CommandRunner for CommandRunner {
                   .stdin(Stdio::null())
                   .stdout(Stdio::piped())
                   .stderr(Stdio::piped())
-                  .output_async()
+                  .spawn_async()
                   .map_err(|e| format!("Error launching process: {:?}", e))
       })
-      .and_then(|output| {
+      .and_then(|child| {
+        // Consume the stream of ChildOutputs incrementally.
+        // NB: We fully buffer up all this incrementalism into final result below and so could
+        // instead be using Command::output_async above to avoid this code. The idea though is
+        // we eventually want to pass incremental results on down the line for streaming process
+        // results to console logs, etc. as tracked by:
+        //   https://github.com/pantsbuild/pants/issues/6089
+        let init = (
+          BytesMut::with_capacity(8192),
+          BytesMut::with_capacity(8192),
+          0,
+        );
+        Self::outputs_stream_for_child(child).fold(
+          init,
+          |(mut stdout, mut stderr, mut exit_code), child_output| {
+            match child_output {
+              ChildOutput::Stdout(bytes) => stdout.extend_from_slice(&bytes),
+              ChildOutput::Stderr(bytes) => stderr.extend_from_slice(&bytes),
+              ChildOutput::Exit(code) => exit_code = code,
+            };
+            Ok((stdout, stderr, exit_code)) as Result<_, String>
+          },
+        )
+      })
+      .and_then(move |(stdout, stderr, exit_code)| {
         let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
           future::ok(fs::Snapshot::empty()).to_boxed()
         } else {
@@ -150,15 +199,12 @@ impl super::CommandRunner for CommandRunner {
             })
             .to_boxed()
         };
-        let status = output.status;
+
         output_snapshot
           .map(move |snapshot| FallibleExecuteProcessResult {
-            stdout: output.stdout.into(),
-            stderr: output.stderr.into(),
-            exit_code: status
-              .code()
-              .or(status.signal().map(Neg::neg))
-              .expect("Process exit should have been either a code or a signal"),
+            stdout: stdout.freeze(),
+            stderr: stderr.freeze(),
+            exit_code,
             output_directory: snapshot.digest,
           })
           .to_boxed()
@@ -183,6 +229,16 @@ impl super::CommandRunner for CommandRunner {
     self.store.reset_prefork();
     self.fs_pool.reset();
   }
+}
+
+///
+/// An enum of the possible outputs from a child process.
+///
+#[derive(Debug)]
+enum ChildOutput {
+  Stdout(Bytes),
+  Stderr(Bytes),
+  Exit(i32),
 }
 
 #[cfg(test)]
