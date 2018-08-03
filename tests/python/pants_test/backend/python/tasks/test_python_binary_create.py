@@ -57,13 +57,13 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
     self.assertTrue(os.path.isfile(pex_copy))
 
     # Check that the pex runs.
-    output = subprocess.check_output(pex_copy)
+    output = subprocess.check_output(pex_copy).decode('utf-8')
     if expected_output:
       self.assertEqual(expected_output, output)
 
     # Check that the pex has the expected shebang.
     if expected_shebang:
-      with open(pex_copy, 'r') as pex:
+      with open(pex_copy, 'rb') as pex:
         line = pex.readline()
         self.assertEqual(expected_shebang, line)
 
@@ -110,4 +110,4 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
                                        shebang='/usr/bin/env python2',
                                        dependencies=['src/python/lib'])
 
-    self._assert_pex(binary, expected_output='Hello World!\n', expected_shebang='#!/usr/bin/env python2\n')
+    self._assert_pex(binary, expected_output='Hello World!\n', expected_shebang=b'#!/usr/bin/env python2\n')
