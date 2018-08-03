@@ -33,7 +33,7 @@ class ParseAddressFamilyTest(unittest.TestCase):
     address_mapper = AddressMapper(JsonParser(TestTable()))
     af = run_rule(parse_address_family, address_mapper, Dir('/dev/null'), {
         (Snapshot, PathGlobs): lambda _: Snapshot(DirectoryDigest('abc', 10), (File('/dev/null/BUILD'),)),
-        (FilesContent, DirectoryDigest): lambda _: FilesContent([FileContent('/dev/null/BUILD', '')]),
+        (FilesContent, DirectoryDigest): lambda _: FilesContent([FileContent('/dev/null/BUILD', b'')]),
       })
     self.assertEqual(len(af.objects_by_name), 0)
 

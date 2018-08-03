@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from future.utils import text_type
+from future.utils import binary_type, text_type
 
 from pants.base.project_tree import Dir, File
 from pants.engine.rules import RootRule
@@ -12,7 +12,7 @@ from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.objects import Collection, datatype
 
 
-class FileContent(datatype(['path', 'content'])):
+class FileContent(datatype(['path', ('content', binary_type)])):
   """The content of a file."""
 
   def __repr__(self):

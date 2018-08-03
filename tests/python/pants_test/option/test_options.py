@@ -1348,7 +1348,7 @@ class OptionsTestStringPayloads(OptionsTest):
   """Runs the same tests as OptionsTest, but backed with `Config.loads` vs `Config.load`."""
 
   def _create_config_from_strings(self, config):
-    with io.StringIO('') as fp:
+    with io.BytesIO('') as fp:
       self._write_config_to_file(fp, config)
       fp.seek(0)
       payload = fp.read()
