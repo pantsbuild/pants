@@ -4,6 +4,69 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.10.0dev1 (08/03/2018)
+-----------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add --output-dir flag to ScalaFmt task (#6134)
+  `PR #6134 <https://github.com/pantsbuild/pants/pull/6134>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix a deadlock in local process execution. (#6292)
+  `PR #6292 <https://github.com/pantsbuild/pants/pull/6292>`_
+
+* When python target compatibility is not set, use interpreter constraints. (#6284)
+  `PR #6284 <https://github.com/pantsbuild/pants/pull/6284>`_
+
+* Bound pytest below 3.7 to avoid a ZipImportError (#6285)
+  `PR #6285 <https://github.com/pantsbuild/pants/pull/6285>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Kill WrappedPEX. (#6280)
+  `PR #6280 <https://github.com/pantsbuild/pants/pull/6280>`_
+
+* Add copy() method to datatype (#6269)
+  `PR #6269 <https://github.com/pantsbuild/pants/pull/6269>`_
+
+* Upgrade to pex 1.4.5. (#6267)
+  `PR #6267 <https://github.com/pantsbuild/pants/pull/6267>`_
+
+* Hard link or copy ivy and coursier cache (#6246)
+  `PR #6246 <https://github.com/pantsbuild/pants/pull/6246>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Modify the `alias` page to actually reference the `alias` target (#6277)
+  `PR #6277 <https://github.com/pantsbuild/pants/pull/6277>`_
+
+Migration to Python3 compatibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Python 3 fixes - add open() backport stage 1 (#6290)
+  `PR #6290 <https://github.com/pantsbuild/pants/pull/6290>`_
+
+* Python 3 fixes - fix issues with binaries, option, pantsd, java, and build graph (#6287)
+  `PR #6287 <https://github.com/pantsbuild/pants/pull/6287>`_
+
+* Python 3 fixes - fix issues with engine (#6279)
+  `PR #6279 <https://github.com/pantsbuild/pants/pull/6279>`_
+
+* Rename deprecated assertions (#6286)
+  `PR #6286 <https://github.com/pantsbuild/pants/pull/6286>`_
+
+* Python 3 fixes - fix contrib folders problems (#6272)
+  `PR #6272 <https://github.com/pantsbuild/pants/pull/6272>`_
+
+* Python 3 fixes - fix contrib/python checkstyle (#6274)
+  `PR #6274 <https://github.com/pantsbuild/pants/pull/6274>`_
+
 1.10.0dev0 (07/27/2018)
 -----------------------
 
