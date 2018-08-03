@@ -325,7 +325,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTestWithParser):
                  make_lib("com.foo.test", "does_not_exists", "1.0")
                  path_util("baz")
                """)
-    self.create_file('3rdparty/BUILD', contents, mode='w')
+    self.create_file('3rdparty/BUILD', contents)
 
     build_file = BuildFile(FileSystemProjectTree(self.build_root), '3rdparty/BUILD')
     address_map = self.build_file_parser.parse_build_file(build_file)

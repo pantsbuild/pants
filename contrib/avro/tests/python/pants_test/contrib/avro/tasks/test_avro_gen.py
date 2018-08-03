@@ -58,7 +58,7 @@ class AvroJavaGenTest(NailgunTaskTestBase):
       )
     '''))
 
-    self.create_file(relpath='avro-build/src/avro/schema.avsc', mode='w', contents=dedent('''
+    self.create_file(relpath='avro-build/src/avro/schema.avsc', contents=dedent('''
       {
         "namespace": "",
         "type": "record",
@@ -70,7 +70,7 @@ class AvroJavaGenTest(NailgunTaskTestBase):
       }
     '''))
 
-    self.create_file(relpath='avro-build/src/avro/record.avdl', mode='w', contents=dedent('''
+    self.create_file(relpath='avro-build/src/avro/record.avdl', contents=dedent('''
       protocol Test {
         void test();
       }
