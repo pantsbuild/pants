@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import sys
-from builtins import object
+from builtins import object, str
 from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
@@ -149,7 +149,7 @@ class ArgSplitter(object):
     passthru = []
     passthru_owner = None
 
-    self._unconsumed_args = list(reversed(sys.argv if args is None else args))
+    self._unconsumed_args = list(str(a) for a in reversed(sys.argv if args is None else args))
     # In regular use the first token is the binary name, so skip it. However tests may
     # pass just a list of flags, so don't skip it in that case.
     if not self._at_flag() and self._unconsumed_args:

@@ -8,6 +8,8 @@ import errno
 import os
 from contextlib import contextmanager
 
+from future.utils import PY2
+
 from pants.base.exceptions import TaskError
 from pants.task.task import QuietTaskMixin, Task
 from pants.util.dirutil import safe_open
@@ -29,7 +31,8 @@ class ConsoleTask(QuietTaskMixin, Task):
 
   def __init__(self, *args, **kwargs):
     super(ConsoleTask, self).__init__(*args, **kwargs)
-    self._console_separator = self.get_options().sep.decode('unicode_escape')
+    encoding = 'string-escape' if PY2 else 'unicode-escape'
+    self._console_separator = self.get_options().sep.encode('utf-8').decode(encoding)
     if self.get_options().output_file:
       try:
         self._outstream = safe_open(os.path.abspath(self.get_options().output_file), 'wb')

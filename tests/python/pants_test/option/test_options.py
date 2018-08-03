@@ -602,6 +602,14 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants --implicit-valuey=explicit')
     self.assertEqual('explicit', options.for_global_scope().implicit_valuey)
 
+  def test_string_lift(self):
+    options = self._parse('./pants')
+    self.assertEqual(str, type(options.for_global_scope().implicit_valuey))
+    options = self._parse('./pants --implicit-valuey')
+    self.assertEqual(str, type(options.for_global_scope().implicit_valuey))
+    options = self._parse('./pants --implicit-valuey=explicit')
+    self.assertEqual(str, type(options.for_global_scope().implicit_valuey))
+
   def test_shadowing(self):
     options = Options.create(env={},
                              config=self._create_config({}),

@@ -8,10 +8,10 @@ import copy
 import os
 import re
 import traceback
-from builtins import next, object, open
+from builtins import next, object, open, str
 from collections import defaultdict
 
-import six
+from future.utils import string_types
 
 from pants.base.deprecated import validate_removal_semver, warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
@@ -54,7 +54,7 @@ class Parser(object):
 
   @staticmethod
   def _ensure_bool(s):
-    if isinstance(s, six.string_types):
+    if isinstance(s, string_types):
       if s.lower() == 'true':
         return True
       elif s.lower() == 'false':
@@ -420,6 +420,8 @@ class Parser(object):
       return list_option
     elif t == dict:
       return dict_option
+    elif t in string_types:
+      return str
     else:
       return t
 
