@@ -50,6 +50,9 @@ python_library(
 python_library(
   name='thrift_util',
   sources=['thrift_util.py'],
+  dependencies = [
+    '3rdparty/python:future',
+  ],
 )
 
 python_library(

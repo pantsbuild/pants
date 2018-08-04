@@ -11,7 +11,7 @@ import re
 import textwrap
 import tokenize
 from abc import abstractmethod
-from builtins import object
+from builtins import object, open
 from collections import Sequence
 from io import StringIO
 

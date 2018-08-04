@@ -7,9 +7,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 import os
 import string
-from builtins import zip
+from builtins import open, zip
 from textwrap import dedent
 
+from future.utils import PY3
 from pants.build_graph.target import Target
 from pants.util.contextutil import pushd, temporary_dir
 from pants_test.task_test_base import TaskTestBase
@@ -97,7 +98,7 @@ class NodeTaskTest(TaskTestBase):
 
       self.assertEqual(0, returncode)
       self.assertTrue(os.path.exists(proof))
-      with open(proof) as fp:
+      with open(proof, 'r') as fp:
         self.assertEqual('Hello World!', fp.read().strip())
 
   def test_execute_npm(self):
@@ -112,7 +113,8 @@ class NodeTaskTest(TaskTestBase):
           'proof': 'echo "42" > {}'.format(proof)
         }
       }
-      with open(os.path.join(chroot, 'package.json'), 'wb') as fp:
+      mode = 'w' if PY3 else 'wb'
+      with open(os.path.join(chroot, 'package.json'), mode) as fp:
         json.dump(package, fp)
       with pushd(chroot):
         returncode, _ = task.run_script(
@@ -122,7 +124,7 @@ class NodeTaskTest(TaskTestBase):
 
       self.assertEqual(0, returncode)
       self.assertTrue(os.path.exists(proof))
-      with open(proof) as fp:
+      with open(proof, 'r') as fp:
         self.assertEqual('42', fp.read().strip())
 
   def test_execute_yarnpkg(self):
@@ -137,7 +139,8 @@ class NodeTaskTest(TaskTestBase):
           'proof': 'echo "42" > {}'.format(proof)
         }
       }
-      with open(os.path.join(chroot, 'package.json'), 'wb') as fp:
+      mode = 'w' if PY3 else 'wb'
+      with open(os.path.join(chroot, 'package.json'), mode) as fp:
         json.dump(package, fp)
       with pushd(chroot):
         returncode, _ = task.run_script(

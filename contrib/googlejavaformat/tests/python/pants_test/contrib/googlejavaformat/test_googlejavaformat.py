@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import open
 from textwrap import dedent
 
 from pants.backend.jvm.register import build_file_aliases as register_jvm
@@ -62,7 +63,7 @@ class GoogleJavaFormatTests(TestBase):
     )
     context = self.context(target_roots=[target])
     self.execute(context)
-    with open(javafile) as fh:
+    with open(javafile, 'r') as fh:
       actual = fh.read()
     self.assertEqual(actual, self._GOODFORMAT)
 

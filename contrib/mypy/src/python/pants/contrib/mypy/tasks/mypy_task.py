@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from builtins import filter, str
+from builtins import filter, open, str
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_repos import PythonRepos
@@ -118,7 +118,7 @@ class MypyTask(ResolveRequirementsTaskBase):
     with temporary_file_path() as sources_list_path:
       with open(sources_list_path, 'w') as f:
         for source in sources:
-          f.write(b'{}\n'.format(source))
+          f.write('{}\n'.format(source))
 
       # Construct the mypy command line.
       cmd = ['--python-version={}'.format(interpreter_for_targets.identity.python)]
