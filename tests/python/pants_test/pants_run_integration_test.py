@@ -130,7 +130,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     try:
       py_path = subprocess.check_output(['python%s' % version,
                                          '-c',
-                                         'import sys; print(sys.executable)']).strip()
+                                         'import sys; print(sys.executable)']).decode('utf-8').strip()
       return os.path.realpath(py_path)
     except OSError:
       return None
