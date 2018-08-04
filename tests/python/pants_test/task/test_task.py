@@ -7,6 +7,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 from builtins import open, str
 
+from future.utils import PY2
+
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
@@ -185,7 +187,9 @@ class TaskTest(TaskTestBase):
     """Generate a synthesized subtype of `cls`."""
     if scope is None:
       scope = cls.options_scope
-    subclass_name = b'test_{0}_{1}_{2}'.format(cls.__name__, scope, name)
+    subclass_name = 'test_{0}_{1}_{2}'.format(cls.__name__, scope, name)
+    if PY2:
+      subclass_name = subclass_name.encode('utf-8')
     kwargs['options_scope'] = scope
     return type(subclass_name, (cls,), kwargs)
 
