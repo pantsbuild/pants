@@ -79,7 +79,7 @@ class Repro(object):
         if relpath not in self._ignore:
           tarout.add(os.path.join(self._buildroot, relpath), relpath)
 
-      with temporary_file() as tmpfile:
+      with temporary_file(binary_mode=False) as tmpfile:
         tmpfile.write('# Pants repro captured for the following build:\n')
         for k, v in sorted(run_info_dict.items()):
           tmpfile.write('#  {}: {}\n'.format(k, v))
