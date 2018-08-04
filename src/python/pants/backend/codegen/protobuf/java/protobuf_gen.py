@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 from collections import OrderedDict
 from hashlib import sha1
 
@@ -177,7 +178,8 @@ class ProtobufGen(SimpleCodegenTask):
   def _extract_jar(self, coordinate, jar_path):
     """Extracts the jar to a subfolder of workdir/extracted and returns the path to it."""
     with open(jar_path, 'rb') as f:
-      outdir = os.path.join(self.workdir, 'extracted', sha1(f.read()).hexdigest())
+      sha = sha1(f.read()).hexdigest()
+      outdir = os.path.join(self.workdir, 'extracted', sha)
     if not os.path.exists(outdir):
       ZIP.extract(jar_path, outdir)
       self.context.log.debug('Extracting jar {jar} at {jar_path}.'

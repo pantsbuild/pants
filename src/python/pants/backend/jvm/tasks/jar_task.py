@@ -8,7 +8,7 @@ import os
 import shutil
 import tempfile
 from abc import abstractmethod
-from builtins import object
+from builtins import object, open
 from contextlib import contextmanager
 
 import six

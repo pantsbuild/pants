@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -94,7 +95,7 @@ class PrepareResourcesTest(TaskTestBase):
         for f in files:
           abs_path = os.path.join(root, f)
           rel_path = os.path.relpath(abs_path, chroot)
-          with open(abs_path) as fp:
+          with open(abs_path, 'r') as fp:
             self.assertEqual(rel_path, fp.read())
           resource_files.append(rel_path)
       self.assertEqual(sorted(['a/b.txt', 'c.txt']), sorted(resource_files))

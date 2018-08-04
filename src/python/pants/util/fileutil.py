@@ -8,6 +8,7 @@ import errno
 import os
 import random
 import shutil
+from builtins import open
 from uuid import uuid4
 
 from pants.util.contextutil import temporary_file

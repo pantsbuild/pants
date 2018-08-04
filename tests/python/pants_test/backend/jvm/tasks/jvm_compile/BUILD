@@ -48,6 +48,7 @@ python_tests(
   name='dep_exports_integration',
   sources=['test_dep_exports_integration.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'tests/python/pants_test:int-test',
   ],

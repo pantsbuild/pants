@@ -8,7 +8,7 @@ import errno
 import os
 import time
 import unittest
-from builtins import str
+from builtins import open, str
 from contextlib import contextmanager
 
 import mock
@@ -153,7 +153,7 @@ class DirutilTest(unittest.TestCase):
 
     @classmethod
     def read(cls, root, relpath):
-      with open(os.path.join(root, relpath)) as fp:
+      with open(os.path.join(root, relpath), 'r') as fp:
         return cls(relpath, fp.read())
 
   class Symlink(datatype(['path'])):
@@ -522,7 +522,7 @@ class AbsoluteSymlinkTest(unittest.TestCase):
     self._create_and_check_link(self.source, self.link)
 
     # The link should have been deleted (over-written), not the file it pointed to.
-    with open(self.source) as fp:
+    with open(self.source, 'r') as fp:
       self.assertEqual('evidence', fp.read())
 
   def test_overwrite_link_dir(self):

@@ -8,7 +8,7 @@ import itertools
 import logging
 import os
 import unittest
-from builtins import object
+from builtins import object, open
 from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
@@ -454,7 +454,7 @@ class BaseTest(unittest.TestCase):
     :API: public
     """
 
-    with open(file_path) as f:
+    with open(file_path, 'r') as f:
       content = f.read()
       self.assertIn(string, content, '"{}" is not in the file {}:\n{}'.format(string, f.name, content))
 

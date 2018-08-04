@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from builtins import str
+from builtins import open, str
 from textwrap import dedent
 
 from pants.base.payload import Payload

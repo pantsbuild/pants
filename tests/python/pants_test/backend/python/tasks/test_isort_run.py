@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 from textwrap import dedent
 
 from pytest import fail
@@ -113,7 +114,7 @@ class PythonIsortTest(PythonTaskTestBase):
   def test_isort_check_only(self):
     isort_task = self._create_task(target_roots=[self.a_library], passthru_args=['--check-only'])
     with temporary_dir() as output_dir:
-      with open(os.path.join(output_dir, 'stdout'), 'w+b') as stdout:
+      with open(os.path.join(output_dir, 'stdout'), 'w+') as stdout:
         with stdio_as(stdout_fd=stdout.fileno(), stderr_fd=stdout.fileno(), stdin_fd=-1):
           try:
             isort_task.execute()
@@ -127,16 +128,16 @@ class PythonIsortTest(PythonTaskTestBase):
             fail("--check-only test for {} is supposed to fail, but passed.".format(self.a_library))
 
   def assertSortedWithConfigA(self, path):
-    with open(path) as f:
+    with open(path, 'r') as f:
       self.assertEqual(self.RESULT_A, f.read(),
                        '{} should be sorted with CONFIG_A, but is not.'.format(path))
 
   def assertSortedWithConfigB(self, path):
-    with open(path) as f:
+    with open(path, 'r') as f:
       self.assertEqual(self.RESULT_B, f.read(),
                        '{} should be sorted with CONFIG_B, but is not.'.format(path))
 
   def assertNotSorted(self, path):
-    with open(path) as f:
+    with open(path, 'r') as f:
       self.assertEqual(self.BAD_IMPORT_ORDER, f.read(),
                        '{} should not be sorted, but is.'.format(path))

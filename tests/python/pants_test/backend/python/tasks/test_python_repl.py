@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -75,7 +76,7 @@ class PythonReplTest(PythonTaskTestBase):
       stderr = os.path.join(iodir, 'stderr')
       with open(stdin, 'w') as fp:
         fp.write(stdin_data)
-      with open(stdin, 'rb') as inp, open(stdout, 'wb') as out, open(stderr, 'wb') as err:
+      with open(stdin, 'r') as inp, open(stdout, 'w') as out, open(stderr, 'w') as err:
         with stdio_as(stdin_fd=inp.fileno(), stdout_fd=out.fileno(), stderr_fd=err.fileno()):
           yield (stdin, stdout, stderr)
 
@@ -113,7 +114,7 @@ class PythonReplTest(PythonTaskTestBase):
 
     with self.new_io('\n'.join(code)) as (inp, out, err):
       python_repl.execute()
-      with open(out) as fp:
+      with open(out, 'r') as fp:
         lines = fp.read()
         if not expected:
           self.assertEqual('', lines)
@@ -172,7 +173,7 @@ class PythonReplTest(PythonTaskTestBase):
   def test_ipython(self):
     # IPython supports shelling out with a leading !, so indirectly test its presence by reading
     # the head of this very file.
-    with open(__file__) as fp:
+    with open(__file__, 'r') as fp:
       me = fp.readline()
       self.do_test_repl(code=['!head -1 {}'.format(__file__)],
                         expected=[me],

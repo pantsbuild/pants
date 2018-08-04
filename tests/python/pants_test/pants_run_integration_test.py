@@ -9,6 +9,7 @@ import glob
 import os
 import shutil
 import unittest
+from builtins import open
 from collections import namedtuple
 from contextlib import contextmanager
 from operator import eq, ne
@@ -473,7 +474,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       def write_file(file_path, contents):
         full_file_path = os.path.join(tmp_dir, *file_path.split(os.pathsep))
         safe_mkdir_for(full_file_path)
-        with open(full_file_path, 'wb') as fh:
+        with open(full_file_path, 'w') as fh:
           fh.write(contents)
 
       @contextmanager

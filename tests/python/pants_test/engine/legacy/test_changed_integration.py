@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import shutil
-from builtins import str
+from builtins import open, str
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -39,7 +39,7 @@ def mutated_working_copy(files_to_mutate, to_append='\n '):
   assert to_append, 'to_append may not be empty'
 
   for f in files_to_mutate:
-    with open(f, 'ab') as fh:
+    with open(f, 'a') as fh:
       fh.write(to_append)
   try:
     yield

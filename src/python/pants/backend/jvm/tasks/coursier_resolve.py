@@ -8,10 +8,11 @@ import hashlib
 import itertools
 import json
 import os
-from builtins import str, zip
+from builtins import open, str, zip
 from collections import defaultdict
 
 from future.moves.urllib import parse
+from future.utils import PY3
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
@@ -353,7 +354,7 @@ class CoursierMixin(NailgunTask):
     if return_code:
       raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
 
-    with open(output_fn) as f:
+    with open(output_fn, 'r') as f:
       return json.loads(f.read())
 
   @staticmethod
@@ -406,7 +407,7 @@ class CoursierMixin(NailgunTask):
       with temporary_file(coursier_workdir, cleanup=False) as f:
         exclude_file = f.name
         with open(exclude_file, 'w') as ex_f:
-          ex_f.write('\n'.join(local_exclude_args).encode('utf8'))
+          ex_f.write('\n'.join(local_exclude_args))
 
         cmd_args.append('--local-exclude-file')
         cmd_args.append(exclude_file)
@@ -480,7 +481,8 @@ class CoursierMixin(NailgunTask):
               compile_classpath.add_jars_for_targets([t], conf, transitive_resolved_jars)
 
   def _populate_results_dir(self, vts_results_dir, results):
-    with open(os.path.join(vts_results_dir, self.RESULT_FILENAME), 'w') as f:
+    mode = 'w' if PY3 else 'wb'
+    with open(os.path.join(vts_results_dir, self.RESULT_FILENAME), mode) as f:
       json.dump(results, f)
 
   def _load_from_results_dir(self, compile_classpath, vts_results_dir,

@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.backend.codegen.jaxb.jaxb_gen import JaxbGen
 from pants.backend.codegen.jaxb.jaxb_library import JaxbLibrary
@@ -92,6 +93,6 @@ class JaxbGenJavaTest(NailgunTaskTestBase):
 
     # Make sure there is no header with a timestamp in the generated file
     for f in files:
-      with open(f) as jaxb_file:
+      with open(f, 'r') as jaxb_file:
         contents = jaxb_file.read()
         self.assertNotIn('// Generated on:', contents)

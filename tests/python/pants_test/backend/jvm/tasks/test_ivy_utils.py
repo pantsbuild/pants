@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 import os
 import xml.etree.ElementTree as ET
-from builtins import str
+from builtins import open, str
 from collections import namedtuple
 from textwrap import dedent
 
@@ -538,7 +538,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
                                   ('default',),
                                   'some-name')
 
-      with open(ivyxml) as f:
+      with open(ivyxml, 'r') as f:
         self.assertIn('an-url', f.read())
 
   def test_fetch_requests_classifiers(self):
@@ -549,7 +549,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
                                   ('default',),
                                   'some-name')
 
-      with open(ivyxml) as f:
+      with open(ivyxml, 'r') as f:
         self.assertIn('a-classifier', f.read())
 
   def test_fetch_applies_mutable(self):
@@ -560,7 +560,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
                                   ('default',),
                                   'some-name')
 
-      with open(ivyxml) as f:
+      with open(ivyxml, 'r') as f:
         self.assertIn('changing="true"', f.read())
 
   def test_resolve_ivy_xml_requests_classifiers(self):
@@ -576,7 +576,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
         resolve_hash_name='some-name',
         jar_dep_manager=namedtuple('stub_jar_dep_manager', ['resolve_version_conflict'])(lambda x: x))
 
-      with open(ivyxml) as f:
+      with open(ivyxml, 'r') as f:
         self.assertIn('classifier="a-classifier', f.read())
 
   def test_ivy_resolve_report_copying_fails_when_report_is_missing(self):

@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_delete
@@ -46,7 +47,7 @@ class JvmPrepCommandIntegration(PantsRunIntegrationTest):
     self.assertTrue(os.path.exists('/tmp/running-in-goal-compile.jar'))
     self.assertFalse(os.path.exists('/tmp/running-in-goal-binary'))
 
-    with open('/tmp/running-in-goal-test') as f:
+    with open('/tmp/running-in-goal-test', 'r') as f:
       prep_output = f.read()
 
     expected = """Running: org.pantsbuild.testproject.jvmprepcommand.ExampleJvmPrepCommand
@@ -65,7 +66,7 @@ org.pantsbuild properties: "org.pantsbuild.jvm_prep_command=WORKS-IN-TEST"
     self.assertTrue(os.path.exists('/tmp/running-in-goal-compile.jar'))
     self.assertFalse(os.path.exists('/tmp/running-in-goal-test'))
 
-    with open('/tmp/running-in-goal-binary') as f:
+    with open('/tmp/running-in-goal-binary', 'r') as f:
       prep_output = f.read()
 
     expected = """Running: org.pantsbuild.testproject.jvmprepcommand.ExampleJvmPrepCommand

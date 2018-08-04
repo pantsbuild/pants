@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import glob
 import os
 import re
+from builtins import open
 
 from pants.backend.native.config.environment import Platform
 from pants.base.build_environment import get_buildroot

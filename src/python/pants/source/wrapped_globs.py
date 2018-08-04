@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from abc import abstractmethod, abstractproperty
+from builtins import open
 from hashlib import sha1
 
 from six import string_types

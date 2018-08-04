@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from builtins import range
+from builtins import open, range
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -129,7 +129,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                       '-dependency', 'junit', 'junit-dep', '4.10'],
                 executor=SubprocessExecutor(distribution=distribution))
 
-    with open(classpath_file_abs_path) as fp:
+    with open(classpath_file_abs_path, 'r') as fp:
       classpath = fp.read()
 
     # Now directly invoke javac to compile the test java code into classfiles that we can later

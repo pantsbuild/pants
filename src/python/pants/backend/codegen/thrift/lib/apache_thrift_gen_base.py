@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import re
 import shutil
+from builtins import open
 
 from twitter.common.collections import OrderedSet
 
@@ -108,7 +109,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
   SERVICE_PARSER = re.compile(r'^\s*service\s+(?:[^\s{]+)')
 
   def _declares_service(self, source):
-    with open(source) as thrift:
+    with open(source, 'r') as thrift:
       return any(line for line in thrift if self.SERVICE_PARSER.search(line))
 
   @memoized_property

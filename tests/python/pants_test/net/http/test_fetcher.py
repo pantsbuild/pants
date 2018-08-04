@@ -9,7 +9,7 @@ import http.server
 import os
 import socketserver
 import unittest
-from builtins import str
+from builtins import open, str
 from contextlib import closing, contextmanager
 from functools import reduce
 from io import BytesIO

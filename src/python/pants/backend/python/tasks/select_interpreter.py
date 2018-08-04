@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import hashlib
 import os
+from builtins import open
 
 from pex.interpreter import PythonInterpreter
 
@@ -88,10 +89,10 @@ class SelectInterpreter(Task):
     interpreter = interpreter_cache.select_interpreter_for_targets(targets)
     safe_mkdir_for(interpreter_path_file)
     with open(interpreter_path_file, 'w') as outfile:
-      outfile.write(b'{}\n'.format(interpreter.binary))
+      outfile.write('{}\n'.format(interpreter.binary))
       for dist, location in interpreter.extras.items():
         dist_name, dist_version = dist
-        outfile.write(b'{}\t{}\t{}\n'.format(dist_name, dist_version, location))
+        outfile.write('{}\t{}\t{}\n'.format(dist_name, dist_version, location))
 
   def _interpreter_path_file(self, target_set_id):
     return os.path.join(self.workdir, target_set_id, 'interpreter.info')
