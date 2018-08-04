@@ -23,13 +23,13 @@ class JvmRunTest(JvmTaskTestBase):
     return JvmRun
 
   @contextmanager
-  def setup_cmdline_run(self, **options):
+  def setup_cmdline_run(self, extra_jvm_options=None, **options):
     """Run the JvmRun task in command line only mode  with the specified extra options.
     :returns: the command line string
     """
     self.set_options(only_write_cmd_line='a', **options)
     jvm_binary = self.make_target('src/java/org/pantsbuild:binary', JvmBinary,
-                                  main='org.pantsbuild.Binary')
+      main='org.pantsbuild.Binary', extra_jvm_options=extra_jvm_options)
     context = self.context(target_roots=[jvm_binary])
     jvm_run = self.create_task(context)
     self._cmdline_classpath = [os.path.join(self.pants_workdir, c) for c in ['bob', 'fred']]
@@ -53,6 +53,13 @@ class JvmRunTest(JvmTaskTestBase):
     main_entry = 'org.pantsbuild.OptMain'
     with self.setup_cmdline_run(main=main_entry) as cmdline:
       self.assertTrue(self._match_cmdline_regex(cmdline, main_entry))
+
+  def test_extra_jvm_option(self):
+    options = ['-Dexample.property1=1', '-Dexample.property2=1']
+    with self.setup_cmdline_run(extra_jvm_options=options) as cmdline:
+      for option in options:
+        self.assertTrue(option in cmdline)
+
 
   def _match_cmdline_regex(self, cmdline, main):
     # Original classpath is embedded in the manifest file of a synthetic jar, just verify
