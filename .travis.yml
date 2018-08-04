@@ -163,8 +163,11 @@ matrix:
     - <<: *default_test_config
       env:
         - SHARD="Py3 - Unit tests for pants and pants-plugins"
+        # Use less verbose logs, in order to not hit the log-length limit.
+        - PYTEST_PASSTHRU_ARGS="--tb=line"
       script:
-        - ./build-support/bin/ci.sh -x -3efkmrjcnt "${SHARD}"
+        # Allowed to fail.
+        - ./build-support/bin/ci.sh -x -3efkmrjcnt "${SHARD}" || exit 0
 
     - <<: *default_test_config
       env:
