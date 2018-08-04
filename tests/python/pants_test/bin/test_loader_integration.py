@@ -4,15 +4,21 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from pants.bin.pants_loader import PantsLoader
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class LoaderIntegrationTest(PantsRunIntegrationTest):
   def test_invalid_locale(self):
+    bypass_env = PantsLoader.ENCODING_IGNORE_ENV_VAR
     pants_run = self.run_pants(command=['help'], extra_env={'LC_ALL': 'iNvALiD-lOcALe'})
     self.assert_failure(pants_run)
-    self.assertIn('Could not get a valid locale.', pants_run.stderr_data)
-    self.assertIn('iNvALiD-lOcALe', pants_run.stderr_data)
+    self.assertIn('System preferred encoding is', pants_run.stderr_data)
+    self.assertIn(bypass_env, pants_run.stderr_data)
+
+    pants_run = self.run_pants(command=['help'], extra_env={'LC_ALL': 'iNvALiD-lOcALe',
+                                                            bypass_env: '1'})
+    self.assert_success(pants_run)
 
   def test_alternate_entrypoint(self):
     pants_run = self.run_pants(
