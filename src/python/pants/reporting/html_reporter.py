@@ -9,7 +9,7 @@ import os
 import re
 import time
 import uuid
-from builtins import range, str
+from builtins import open, range, str
 from collections import defaultdict, namedtuple
 from textwrap import dedent
 
@@ -317,7 +317,7 @@ class HtmlReporter(Reporter):
         output_files[path] = f
       else:
         f = output_files[path]
-      f.write(self._htmlify_text(s).encode('utf-8'))
+      f.write(self._htmlify_text(s))
       # We must flush in the same thread as the write.
       f.flush()
 
@@ -454,7 +454,7 @@ class HtmlReporter(Reporter):
 
   def _htmlify_text(self, s):
     """Make text HTML-friendly."""
-    colored = self._handle_ansi_color_codes(cgi.escape(s.decode('utf-8', 'replace')))
+    colored = self._handle_ansi_color_codes(cgi.escape(s))
     return linkify(self._buildroot, colored, self._linkify_memo).replace('\n', '</br>')
 
   _ANSI_COLOR_CODE_RE = re.compile(r'\033\[((?:\d|;)*)m')

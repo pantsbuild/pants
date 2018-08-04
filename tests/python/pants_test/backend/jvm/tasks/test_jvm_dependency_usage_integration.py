@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import json
 import os
+from builtins import open
 
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -33,7 +34,7 @@ class TestJvmDependencyUsageIntegration(PantsRunIntegrationTest):
 
       # Run, and then parse the report from json.
       self.assert_success(self.run_pants_with_workdir(args, workdir, config))
-      with open(outfile) as f:
+      with open(outfile, 'r') as f:
         return json.load(f)
 
   def _assert_non_zero_usage(self, dep_usage_json):

@@ -132,6 +132,7 @@ python_tests(
   name = 'checkstyle_integration',
   sources = ['test_checkstyle_integration.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
@@ -247,6 +248,7 @@ python_tests(
   name = 'ivy_outdated_integration',
   sources = ['test_ivy_outdated_integration.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
@@ -257,6 +259,7 @@ python_tests(
   name = 'ivy_resolve',
   sources = ['test_ivy_resolve.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/java/jar',
@@ -312,6 +315,7 @@ python_tests(
   name = 'ivy_resolve_integration',
   sources = ['test_ivy_resolve_integration.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
@@ -380,6 +384,7 @@ python_tests(
   name = 'jar_publish_integration',
   sources = ['test_jar_publish_integration.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -504,6 +509,7 @@ python_tests(
   name = 'jvm_dependency_usage_integration',
   sources = ['test_jvm_dependency_usage_integration.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
@@ -551,6 +557,7 @@ python_tests(
   name = 'jvm_prep_command_integration',
   sources = ['test_jvm_prep_command_integration.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
@@ -573,6 +580,7 @@ python_tests(
   name = 'jvm_run',
   sources = ['test_jvm_run.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/backend/jvm/subsystems:jvm',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_run',
@@ -627,6 +635,7 @@ python_tests(
   name = 'prepare_resources',
   sources = ['test_prepare_resources.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:prepare_resources',
@@ -640,6 +649,7 @@ python_tests(
   name = 'prepare_services',
   sources = ['test_prepare_services.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -653,6 +663,7 @@ python_tests(
   name = 'properties',
   sources = ['test_properties.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/backend/jvm/tasks:properties',
   ]
 )
@@ -661,6 +672,7 @@ python_tests(
   name = 'scalafmt',
   sources = ['test_scalafmt.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
@@ -677,6 +689,7 @@ python_tests(
   name = 'scalafix',
   sources = ['test_scalafix.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/backend/jvm/tasks:scalafix',
     'tests/python/pants_test:int-test',
   ],
@@ -725,6 +738,7 @@ python_tests(
   name = 'scope_runtime_integration',
   sources = ['test_scope_runtime_integration.py'],
   dependencies = [
+    '3rdparty/python:future',
     'tests/python/pants_test:int-test',
   ],
   timeout=300,

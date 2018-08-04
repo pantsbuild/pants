@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import tarfile
 import unittest
+from builtins import open
 
 from pants.util.dirutil import safe_delete, safe_mkdtemp, safe_rmtree, touch
 from pants.util.tarutil import TarFile

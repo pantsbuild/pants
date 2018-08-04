@@ -5,8 +5,10 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 from contextlib import contextmanager
 
+from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef, IvyResolveResult
@@ -253,13 +255,13 @@ class IvyResolveTest(JvmToolTaskTestBase):
       ivy_resolve_workdir = self._find_resolve_workdir(workdir)
       raw_classpath_path = os.path.join(ivy_resolve_workdir, 'classpath.raw')
       with open(raw_classpath_path, 'a') as raw_f:
-        raw_f.write(os.pathsep)
+        raw_f.write(os.pathsep if PY3 else os.pathsep.decode('utf-8'))
         raw_f.write(os.path.join('non-existent-file'))
 
       self.resolve([jar_lib])
 
       # The raw_classpath should be re-created because the previous resolve became invalid.
-      with open(raw_classpath_path) as f:
+      with open(raw_classpath_path, 'r') as f:
         self.assertNotIn('non-existent-file', f.read())
 
   def test_fetch_has_same_resolved_jars_as_resolve(self):
@@ -361,8 +363,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
         self._assertIsFile(report_path)
 
         _unused_conf, lib_symlink = fetch_classpath.get_for_target(jar_lib)[0]
-        with open(jarfile) as jarfile_f:
-          with open(lib_symlink) as symlink_f:
+        with open(jarfile, 'r') as jarfile_f:
+          with open(lib_symlink, 'r') as symlink_f:
             self.assertTrue(jarfile_f.read() == symlink_f.read(),
                             'Expected linked jar and original to match.')
 
@@ -400,13 +402,13 @@ class IvyResolveTest(JvmToolTaskTestBase):
         ivy_resolve_workdir = self._find_resolve_workdir(workdir)
         raw_classpath_path = os.path.join(ivy_resolve_workdir, 'classpath.raw')
         with open(raw_classpath_path, 'a') as raw_f:
-          raw_f.write(os.pathsep)
+          raw_f.write(os.pathsep if PY3 else os.pathsep.decode('utf-8'))
           raw_f.write(os.path.join('non-existent-file'))
 
         self.resolve([jar_lib])
 
         # The raw_classpath should be re-created because the previous resolve became invalid.
-        with open(raw_classpath_path) as f:
+        with open(raw_classpath_path, 'r') as f:
           self.assertNotIn('non-existent-file', f.read())
 
   def _make_junit_target(self):

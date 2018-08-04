@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import open
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import open_zip, temporary_dir

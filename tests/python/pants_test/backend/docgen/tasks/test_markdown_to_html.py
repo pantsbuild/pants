@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import unittest
+from builtins import open
 from textwrap import dedent
 
 import bs4
@@ -159,7 +160,7 @@ class MarkdownToHtmlTest(TaskTestBase):
     self.assertIn('bad.rst', args[0])
 
     # But we still should have gotten (badly) rendered content.
-    with open(self.get_rendered_page(context, bad_rst, 'bad.html')) as fp:
+    with open(self.get_rendered_page(context, bad_rst, 'bad.html'), 'r') as fp:
       html = fp.read()
       self.assertIn('A bad link:', html)
 
@@ -175,7 +176,7 @@ class MarkdownToHtmlTest(TaskTestBase):
     task = self.create_task(context)
     task.execute()
 
-    with open(self.get_rendered_page(context, good_rst, 'good.html')) as fp:
+    with open(self.get_rendered_page(context, good_rst, 'good.html'), 'r') as fp:
       html = fp.read()
 
       soup = bs4.BeautifulSoup(markup=html)

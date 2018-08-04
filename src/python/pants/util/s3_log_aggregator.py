@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import sys
-from builtins import object
+from builtins import object, open
 from collections import defaultdict
 
 from s3logparse.s3logparse import parse_log_lines
@@ -47,7 +47,7 @@ class S3LogAccumulator(object):
 
   def accumulate(self, logdir):
     for filename in os.listdir(logdir):
-      with open(os.path.join(logdir, filename)) as fp:
+      with open(os.path.join(logdir, filename), 'r') as fp:
         for log_entry in parse_log_lines(fp.readlines()):
           m = Measure(1, log_entry.bytes_sent)
           self._path_to_measure[log_entry.s3_key] += m

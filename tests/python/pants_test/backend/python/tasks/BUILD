@@ -115,6 +115,7 @@ python_tests(
   name='isort_run',
   sources=['test_isort_run.py'],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',
     'src/python/pants/util:process_handler',

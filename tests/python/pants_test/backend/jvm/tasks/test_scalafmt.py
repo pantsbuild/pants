@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -53,7 +54,7 @@ class ScalaFmtTestBase(NailgunTaskTestBase):
     )
 
     self.test_file_contents = dedent(
-      b"""
+      """
       package org.pantsbuild.badscalastyle
 
       /**
@@ -75,7 +76,8 @@ class ScalaFmtTestBase(NailgunTaskTestBase):
     )
     self.test_file = self.create_file(
       relpath='src/scala/org/pantsbuild/badscalastyle/BadScalaStyle.scala',
-      contents=self.test_file_contents
+      contents=self.test_file_contents,
+      mode='w'
     )
     self.library = self.make_target(spec='src/scala/org/pantsbuild/badscalastyle',
                                     sources=['BadScalaStyle.scala'],
@@ -138,7 +140,7 @@ class ScalaFmtFormatTest(ScalaFmtTestBase):
     context = self.context(for_task_types=[check_fmt_task_type], target_roots=self.library)
     self.execute(context)
 
-    with open(self.test_file, 'rb') as fp:
+    with open(self.test_file, 'r') as fp:
       self.assertNotEqual(self.test_file_contents, fp.read())
 
     # verify that the lint check passes.
@@ -161,9 +163,9 @@ class ScalaFmtFormatTest(ScalaFmtTestBase):
       )
       self.execute(context)
 
-      with open(self.test_file, 'rb') as fp:
+      with open(self.test_file, 'r') as fp:
         self.assertEqual(self.test_file_contents, fp.read())
 
       relative_test_file = fast_relpath(self.test_file, self.build_root)
-      with open(os.path.join(output_dir, relative_test_file), 'rb') as fp:
+      with open(os.path.join(output_dir, relative_test_file), 'r') as fp:
         self.assertNotEqual(self.test_file_contents, fp.read())

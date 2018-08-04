@@ -9,6 +9,7 @@ from collections import namedtuple
 
 import six
 from colors import cyan, green, red, yellow
+from future.utils import PY2
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.reporting.plaintext_reporter_base import PlainTextReporterBase
@@ -133,11 +134,11 @@ class PlainTextReporter(PlainTextReporterBase):
       # Start output on a new line.
       tool_output_format = self._get_tool_output_format(workunit)
       if tool_output_format == ToolOutputFormat.INDENT:
-        self.emit(self._prefix(workunit, b'\n'))
+        self.emit(self._prefix(workunit, '\n'))
       elif tool_output_format == ToolOutputFormat.UNINDENTED:
-        self.emit(b'\n')
+        self.emit('\n')
     elif label_format == LabelFormat.DOT:
-      self.emit(b'.')
+      self.emit('.')
 
     self.flush()
 
@@ -151,8 +152,8 @@ class PlainTextReporter(PlainTextReporterBase):
       if self._get_label_format(workunit) != LabelFormat.FULL:
         self._emit_indented_workunit_label(workunit)
       for name, outbuf in workunit.outputs().items():
-        self.emit(self._prefix(workunit, b'\n==== {} ====\n'.format(name)))
-        self.emit(self._prefix(workunit, outbuf.read_from(0)))
+        self.emit(self._prefix(workunit, '\n==== {} ====\n'.format(name)))
+        self.emit(self._prefix(workunit, outbuf.read_from(0).decode('utf-8')))
         self.flush()
 
   def do_handle_log(self, workunit, level, *msg_elements):
@@ -163,7 +164,7 @@ class PlainTextReporter(PlainTextReporterBase):
     # If the element is a (msg, detail) pair, we ignore the detail. There's no
     # useful way to display it on the console.
     elements = [e if isinstance(e, six.string_types) else e[0] for e in msg_elements]
-    msg = b'\n' + b''.join(elements)
+    msg = '\n' + ''.join(elements)
     if self.use_color_for_workunit(workunit, self.settings.color):
       msg = self._COLOR_BY_LEVEL.get(level, lambda x: x)(msg)
 
@@ -182,6 +183,14 @@ class PlainTextReporter(PlainTextReporterBase):
     self.flush()
 
   def emit(self, s, dest=ReporterDestination.OUT):
+    # In Py2, sys.stdout tries to coerce into ASCII, and will fail in coercing Unicode. So,
+    # we encode prematurely to handle unicode.
+    # In Py3, sys.stdout takes unicode, so will work normally.
+    #
+    # `self.settings.outfile` can also be `io.StringIO` instead of an std stream, in which case it only
+    # accepts unicode, so `s` does not need to be modified.
+    if PY2 and 'std' in str(self.settings.outfile):
+      s = s.encode('utf-8')
     if dest == ReporterDestination.OUT:
       self.settings.outfile.write(s)
     elif dest == ReporterDestination.ERR:
@@ -216,7 +225,7 @@ class PlainTextReporter(PlainTextReporterBase):
     return ToolOutputFormat.SUPPRESS
 
   def _emit_indented_workunit_label(self, workunit):
-    self.emit(b'\n{} {} {}[{}]'.format(
+    self.emit('\n{} {} {}[{}]'.format(
       workunit.start_time_string,
       workunit.start_delta_string,
       self._indent(workunit),
@@ -229,23 +238,23 @@ class PlainTextReporter(PlainTextReporterBase):
     return not tool_output_format == ToolOutputFormat.SUPPRESS
 
   def _format_aggregated_timings(self, aggregated_timings):
-    return b'\n'.join([b'{timing:.3f} {label}'.format(**x) for x in aggregated_timings.get_all()])
+    return '\n'.join(['{timing:.3f} {label}'.format(**x) for x in aggregated_timings.get_all()])
 
   def _format_artifact_cache_stats(self, artifact_cache_stats):
     stats = artifact_cache_stats.get_all()
-    return b'No artifact cache reads.' if not stats else \
-    b'\n'.join([b'{cache_name} - Hits: {num_hits} Misses: {num_misses}'.format(**x)
+    return 'No artifact cache reads.' if not stats else \
+    '\n'.join(['{cache_name} - Hits: {num_hits} Misses: {num_misses}'.format(**x)
                 for x in stats])
 
   def _indent(self, workunit):
-    return b'  ' * (len(workunit.ancestors()) - 1)
+    return '  ' * (len(workunit.ancestors()) - 1)
 
-  _time_string_filler = b' ' * len('HH:MM:SS mm:ss ')
+  _time_string_filler = ' ' * len('HH:MM:SS mm:ss ')
 
   def _prefix(self, workunit, s):
     if self.settings.indent:
       def replace(x, c):
         return x.replace(c, c + PlainTextReporter._time_string_filler + self._indent(workunit))
-      return replace(replace(s, b'\r'), b'\n')
+      return replace(replace(s, '\r'), '\n')
     else:
       return PlainTextReporter._time_string_filler + s

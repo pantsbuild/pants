@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from builtins import object
+from builtins import object, open
 
 
 class PythonRequirements(object):
@@ -41,7 +41,7 @@ class PythonRequirements(object):
     repository = None
 
     requirements_path = os.path.join(self._parse_context.rel_path, requirements_relpath)
-    with open(requirements_path) as fp:
+    with open(requirements_path, 'r') as fp:
       for line in fp:
         line = line.strip()
         if line and not line.startswith('#'):

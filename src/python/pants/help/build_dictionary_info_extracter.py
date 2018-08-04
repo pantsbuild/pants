@@ -167,7 +167,10 @@ class BuildDictionaryInfoExtracter(object):
     arg_descriptions = cls.get_arg_descriptions_from_docstring(func)
     argspec = inspect.getargspec(func)
     arg_names = argspec.args
-    if inspect.ismethod(func) or func.__name__ == '__new__':
+    # Python2 treats __init__ as a method. Python3 doesn't.
+    # Neither treat __new__ as a method.
+    # Always treat __init__ and __new__ as methods, to drop self from their args.
+    if inspect.ismethod(func) or func.__name__ == '__new__' or func.__name__ == '__init__':
       arg_names = arg_names[1:]
     num_defaulted_args = len(argspec.defaults) if argspec.defaults is not None else 0
     first_defaulted_arg = len(arg_names) - num_defaulted_args
