@@ -189,6 +189,8 @@ class PlainTextReporter(PlainTextReporterBase):
     #
     # `self.settings.outfile` can also be `io.StringIO` instead of an std stream, in which case it only
     # accepts unicode, so `s` does not need to be modified.
+    # TODO(python3port): Figure out if there's a better way to do this, like opening `sys.stderr` in different mode.
+    # Part of https://github.com/pantsbuild/pants/issues/6071.
     if PY2 and 'std' in str(self.settings.outfile):
       s = s.encode('utf-8')
     if dest == ReporterDestination.OUT:
