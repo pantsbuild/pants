@@ -19,18 +19,18 @@ class TestResponseParser(unittest.TestCase):
 
   def testParse(self):
     response_parser = ResponseParser()
-    self.assertEqual(['url1', 'url2'], response_parser.parse('{"hostlist": ["url1", "url2"]}'))
+    self.assertEqual(['url1', 'url2'], response_parser.parse(b'{"hostlist": ["url1", "url2"]}'))
 
-    self.assertEqual([], response_parser.parse('{"hostlist": []}'))
-
-    with self.assertRaises(ResponseParser.ResponseParserError):
-      response_parser.parse('{"hostlist": "not a list"}')
+    self.assertEqual([], response_parser.parse(b'{"hostlist": []}'))
 
     with self.assertRaises(ResponseParser.ResponseParserError):
-      response_parser.parse('a garbage response')
+      response_parser.parse(b'{"hostlist": "not a list"}')
 
     with self.assertRaises(ResponseParser.ResponseParserError):
-      response_parser.parse('{"mismatched-index": ["url1", "url2"]}')
+      response_parser.parse(b'a garbage response')
+
+    with self.assertRaises(ResponseParser.ResponseParserError):
+      response_parser.parse(b'{"mismatched-index": ["url1", "url2"]}')
 
     with self.assertRaises(ResponseParser.ResponseParserError):
       # a mismatched encoding also fails
