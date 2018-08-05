@@ -153,21 +153,21 @@ class JarTaskTest(BaseJarTaskTest):
 
   def test_custom_manifest_file(self):
     with self._test_custom_manifest() as (jar, manifest_contents):
-      with safe_open(os.path.join(safe_mkdtemp(), 'any_source_file'), 'w') as fp:
+      with safe_open(os.path.join(safe_mkdtemp(), 'any_source_file'), 'wb') as fp:
         fp.write(manifest_contents)
       jar.write(fp.name, dest='META-INF/MANIFEST.MF')
 
   def test_custom_manifest_dir(self):
     with self._test_custom_manifest() as (jar, manifest_contents):
       basedir = safe_mkdtemp()
-      with safe_open(os.path.join(basedir, 'META-INF/MANIFEST.MF'), 'w') as fp:
+      with safe_open(os.path.join(basedir, 'META-INF/MANIFEST.MF'), 'wb') as fp:
         fp.write(manifest_contents)
       jar.write(basedir)
 
   def test_custom_manifest_dir_custom_dest(self):
     with self._test_custom_manifest() as (jar, manifest_contents):
       basedir = safe_mkdtemp()
-      with safe_open(os.path.join(basedir, 'MANIFEST.MF'), 'w') as fp:
+      with safe_open(os.path.join(basedir, 'MANIFEST.MF'), 'wb') as fp:
         fp.write(manifest_contents)
       jar.write(basedir, dest='META-INF')
 
