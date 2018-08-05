@@ -63,7 +63,7 @@ a=prop
 
   def test_stream(self):
     with NamedTemporaryFile() as props_out:
-      props_out.write('''
+      props_out.write(b'''
       it's a = file
       ''')
       props_out.flush()
