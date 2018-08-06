@@ -74,7 +74,7 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
     if source_contents_map:
       self.create_file(relpath=os.path.join(relpath, '__init__.py'))
       for source, contents in source_contents_map.items():
-        self.create_file(relpath=os.path.join(relpath, source), mode='w', contents=contents)
+        self.create_file(relpath=os.path.join(relpath, source), contents=contents)
     return self.target(Address(relpath, name).spec)
 
   def create_python_binary(self, relpath, name, entry_point, dependencies=(), provides=None, shebang=None):

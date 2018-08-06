@@ -19,7 +19,7 @@ class MarkdownIntegrationTest(PantsRunIntegrationTest):
     out_path = os.path.join(get_buildroot(), 'dist', 'markdown/html',
                             'testprojects/src/java/org/pantsbuild/testproject/page',
                             'README.html')
-    with safe_open(out_path) as outfile:
+    with safe_open(out_path, 'r') as outfile:
       page_html = outfile.read()
       self.assertIn('../../../../../../../examples/src/java/org/pantsbuild/'
                     'example/hello/main/README.html',
@@ -33,7 +33,7 @@ class MarkdownIntegrationTest(PantsRunIntegrationTest):
     out_path = os.path.join(get_buildroot(), 'dist', 'markdown/html',
                             'testprojects/src/java/org/pantsbuild/testproject/page',
                             'sense.html')
-    with safe_open(out_path) as outfile:
+    with safe_open(out_path, 'r') as outfile:
       page_html = outfile.read()
       # should get Sense and Sensibility in title (or TITLE, sheesh):
       self.assertRegexpMatches(page_html,

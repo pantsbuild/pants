@@ -273,8 +273,8 @@ class ClasspathProducts(object):
 
         if save_classpath_file:
           classpath = [entry.path for entry in classpath_entries_for_target]
-          with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'wb') as classpath_file:
-            classpath_file.write(os.pathsep.join(classpath).encode('utf-8'))
+          with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'w') as classpath_file:
+            classpath_file.write(os.pathsep.join(classpath))
             classpath_file.write('\n')
 
     return canonical_classpath

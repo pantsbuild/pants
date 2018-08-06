@@ -35,7 +35,7 @@ class PythonCheckStyleTaskTest(PythonTaskTestBase):
     self.assertEqual(None, task.execute())
 
   def test_pass(self):
-    self.create_file('a/python/pass.py', mode='w', contents=dedent("""
+    self.create_file('a/python/pass.py', contents=dedent("""
                        print('Print is a function')
                      """))
     target = self.make_target('a/python:pass', PythonLibrary, sources=['pass.py'])
@@ -44,7 +44,7 @@ class PythonCheckStyleTaskTest(PythonTaskTestBase):
     self.assertEqual(0, task.execute())
 
   def test_failure(self):
-    self.create_file('a/python/fail.py', mode='w', contents=dedent("""
+    self.create_file('a/python/fail.py', contents=dedent("""
                          print 'Print should not be used as a statement'
                        """))
     target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
@@ -55,10 +55,10 @@ class PythonCheckStyleTaskTest(PythonTaskTestBase):
     self.assertIn('1 Python Style issues found', str(task_error.exception))
 
   def test_suppressed_file_passes(self):
-    self.create_file('a/python/fail.py', mode='w', contents=dedent("""
+    self.create_file('a/python/fail.py', contents=dedent("""
                          print 'Print should not be used as a statement'
                        """))
-    suppression_file = self.create_file('suppress.txt', mode='w', contents=dedent("""
+    suppression_file = self.create_file('suppress.txt', contents=dedent("""
     a/python/fail\.py::print-statements"""))
     target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
     self.set_options(suppress=suppression_file)
@@ -68,7 +68,7 @@ class PythonCheckStyleTaskTest(PythonTaskTestBase):
     self.assertEqual(0, task.execute())
 
   def test_failure_fail_false(self):
-    self.create_file('a/python/fail.py', mode='w', contents=dedent("""
+    self.create_file('a/python/fail.py', contents=dedent("""
                        print 'Print should not be used as a statement'
                      """))
     target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
@@ -78,7 +78,7 @@ class PythonCheckStyleTaskTest(PythonTaskTestBase):
     self.assertEqual(1, task.execute())
 
   def test_syntax_error(self):
-    self.create_file('a/python/error.py', mode='w', contents=dedent("""
+    self.create_file('a/python/error.py', contents=dedent("""
                          invalid python
                        """))
     target = self.make_target('a/python:error', PythonLibrary, sources=['error.py'])
@@ -89,7 +89,7 @@ class PythonCheckStyleTaskTest(PythonTaskTestBase):
     self.assertEqual(1, task.execute())
 
   def test_failure_print_nit(self):
-    self.create_file('a/python/fail.py', mode='w', contents=dedent("""
+    self.create_file('a/python/fail.py', contents=dedent("""
                          print 'Print should not be used as a statement'
                        """))
     target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
@@ -105,7 +105,7 @@ class PythonCheckStyleTaskTest(PythonTaskTestBase):
       str(nits[0]))
 
   def test_syntax_error_nit(self):
-    self.create_file('a/python/error.py', mode='w', contents=dedent("""
+    self.create_file('a/python/error.py', contents=dedent("""
                          invalid python
                        """))
     target = self.make_target('a/python:error', PythonLibrary, sources=['error.py'])
@@ -123,7 +123,7 @@ class PythonCheckStyleTaskTest(PythonTaskTestBase):
                      str(nits[0]))
 
   def test_multiline_nit_printed_only_once(self):
-    self.create_file('a/python/fail.py', mode='w', contents=dedent("""
+    self.create_file('a/python/fail.py', contents=dedent("""
                          print ('Multi'
                                 'line') + 'expression'
                        """))

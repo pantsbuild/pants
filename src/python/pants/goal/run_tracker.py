@@ -16,7 +16,7 @@ from builtins import open
 from contextlib import contextmanager
 
 import requests
-from future.utils import PY2
+from future.utils import PY2, PY3
 
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.run_info import RunInfo
@@ -363,7 +363,8 @@ class RunTracker(Subsystem):
     # TODO(benjy): Do we really need these, once the statsdb is mature?
     stats_file = os.path.join(get_pants_cachedir(), 'stats',
                               '{}.json'.format(self.run_info.get_info('id')))
-    safe_file_dump(stats_file, json.dumps(stats), binary_mode=False)
+    binary_mode = False if PY3 else True
+    safe_file_dump(stats_file, json.dumps(stats), binary_mode=binary_mode)
 
     # Add to local stats db.
     StatsDBFactory.global_instance().get_db().insert_stats(stats)

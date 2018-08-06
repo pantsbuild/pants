@@ -125,10 +125,7 @@ class RemotePantsRunner(object):
         # Ensure a newline.
         logger.fatal('')
         logger.fatal('lost active connection to pantsd!')
-        raise_with_traceback(
-          self.Terminated,
-          'abruptly lost active connection to pantsd runner: {!r}'.format(e)
-        )
+        raise_with_traceback(self.Terminated('abruptly lost active connection to pantsd runner: {!r}'.format(e)))
 
   def _connect_and_execute(self, port):
     # Merge the nailgun TTY capability environment variables with the passed environment dict.

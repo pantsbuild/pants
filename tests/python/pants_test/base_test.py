@@ -114,7 +114,7 @@ class BaseTest(unittest.TestCase):
     safe_mkdir(path)
     return path
 
-  def create_file(self, relpath, contents='', mode='wb'):
+  def create_file(self, relpath, contents='', mode='w'):
     """Writes to a file under the buildroot.
 
     :API: public
@@ -128,7 +128,7 @@ class BaseTest(unittest.TestCase):
       fp.write(contents)
     return path
 
-  def create_workdir_file(self, relpath, contents='', mode='wb'):
+  def create_workdir_file(self, relpath, contents='', mode='w'):
     """Writes to a file under the work directory.
 
     :API: public
