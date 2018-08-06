@@ -15,6 +15,9 @@ python_library(
   sources = [
     'file_test_util.py',
   ],
+  dependencies = [
+    '3rdparty/python:future',
+  ],
 )
 
 python_library(
@@ -46,6 +49,7 @@ python_library(
     'pexrc_util.py',
   ],
   dependencies = [
+    '3rdparty/python:future',
     ':git_util'
   ,]
 )

@@ -9,7 +9,7 @@ import io
 import logging
 import os
 import traceback
-from builtins import bytes, object
+from builtins import bytes, object, open
 from contextlib import contextmanager
 
 from pants.scm.scm import Scm

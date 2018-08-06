@@ -9,6 +9,7 @@ import glob
 import os
 import shutil
 import unittest
+from builtins import open
 from collections import namedtuple
 from contextlib import contextmanager
 from operator import eq, ne
@@ -254,6 +255,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # Only whitelisted entries will be included in the environment if hermetic=True.
     if self.hermetic():
       env = dict()
+      # With an empty environment, we would generally get the true underlying system default
+      # encoding, which is unlikely to be what we want (it's generally ASCII, still). So we
+      # explicitly set an encoding here.
+      env['LC_ALL'] = 'en_US.UTF-8'
       for h in self.hermetic_env_whitelist():
         value = os.getenv(h)
         if value is not None:
@@ -473,7 +478,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       def write_file(file_path, contents):
         full_file_path = os.path.join(tmp_dir, *file_path.split(os.pathsep))
         safe_mkdir_for(full_file_path)
-        with open(full_file_path, 'wb') as fh:
+        with open(full_file_path, 'w') as fh:
           fh.write(contents)
 
       @contextmanager

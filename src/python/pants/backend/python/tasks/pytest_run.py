@@ -12,7 +12,7 @@ import shutil
 import time
 import traceback
 import uuid
-from builtins import str
+from builtins import open, str
 from collections import OrderedDict
 from contextlib import contextmanager
 from io import StringIO
@@ -450,7 +450,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     """.format(sources_map=dict(sources_map), rootdir_comm_path=rootdir_comm_path))
     # Add in the sharding conftest, if any.
     shard_conftest_content = self._get_shard_conftest_content()
-    return (console_output_conftest_content + shard_conftest_content).encode('utf8')
+    return console_output_conftest_content + shard_conftest_content
 
   @contextmanager
   def _conftest(self, sources_map):

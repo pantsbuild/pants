@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from builtins import map, object
+from builtins import map, object, open
 from contextlib import contextmanager
 from textwrap import dedent
 

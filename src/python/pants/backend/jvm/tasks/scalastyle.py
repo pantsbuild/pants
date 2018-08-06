@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
-from builtins import object, str
+from builtins import object, open, str
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
@@ -25,7 +25,7 @@ class FileExcluder(object):
     if excludes_path:
       if not os.path.exists(excludes_path):
         raise TaskError('Excludes file does not exist: {0}'.format(excludes_path))
-      with open(excludes_path) as fh:
+      with open(excludes_path, 'r') as fh:
         for line in fh.readlines():
           pattern = line.strip()
           if pattern and not pattern.startswith('#'):

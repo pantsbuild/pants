@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.fs.archive import archiver_for_path
 from pants.util.contextutil import temporary_dir
@@ -131,7 +132,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
                           'Expected exactly one {} file; got: {}'.format(report_file_name,
                                                                          all_files))
 
-        with open(reports[0]) as fp:
+        with open(reports[0], 'r') as fp:
           annotated_classes = [line.rstrip() for line in fp.read().splitlines()]
           self.assertEqual(
             {'org.pantsbuild.testproject.annotation.main.Main',

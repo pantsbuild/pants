@@ -53,6 +53,7 @@ python_library(
   name = 'analysis_extraction',
   sources = ['analysis_extraction.py'],
   dependencies = [
+    '3rdparty/python:future',
     ':nailgun_task',
     'src/python/pants/backend/jvm/subsystems:dependency_context',
     'src/python/pants/backend/jvm/subsystems:zinc',
@@ -220,6 +221,7 @@ python_library(
   name = 'ivy_resolve',
   sources = ['ivy_resolve.py'],
   dependencies = [
+    '3rdparty/python:future',
     ':classpath_products',
     ':ivy_task_mixin',
     ':nailgun_task',
@@ -364,6 +366,7 @@ python_library(
   name = 'javadoc_gen',
   sources = ['javadoc_gen.py'],
   dependencies = [
+    '3rdparty/python:future',
     ':jvmdoc_gen',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/java/distribution',

@@ -11,7 +11,7 @@ import os
 import pkgutil
 import shutil
 import sys
-from builtins import input, next, object, str
+from builtins import input, next, object, open, str
 from collections import OrderedDict, defaultdict, namedtuple
 from copy import copy
 

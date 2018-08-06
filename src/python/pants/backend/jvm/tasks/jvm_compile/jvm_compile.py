@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import functools
 import os
-from builtins import object, str
+from builtins import object, open, str
 from multiprocessing import cpu_count
 
 from twitter.common.collections import OrderedSet
@@ -455,7 +455,7 @@ class JvmCompile(NailgunTaskBase):
       path = os.path.join(outdir, 'compile_classpath', '{}.txt'.format(target.id))
       safe_mkdir(os.path.dirname(path), clean=False)
       with open(path, 'w') as f:
-        f.write(text.encode('utf-8'))
+        f.write(text)
 
   def _compile_vts(self, vts, ctx, upstream_analysis, classpath, progress_message, settings, 
                    compiler_option_sets, zinc_file_manager, counter):

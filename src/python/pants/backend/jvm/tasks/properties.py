@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
-from builtins import next, object, str
+from builtins import next, object, open, str
 from collections import OrderedDict
 
 import six
@@ -112,7 +112,7 @@ class Properties(object):
     if hasattr(output, 'write') and callable(output.write):
       write(output)
     elif isinstance(output, six.string_types):
-      with open(output, 'w+a') as out:
+      with open(output, 'w+') as out:
         write(out)
     else:
       raise TypeError('Can only dump data to a path or a writable object, given: %s' % output)

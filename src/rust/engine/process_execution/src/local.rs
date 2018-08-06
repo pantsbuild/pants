@@ -5,12 +5,13 @@ use boxfuture::{BoxFuture, Boxable};
 use fs::{self, GlobMatching, PathGlobs, PathStatGetter, Snapshot, StrictGlobMatching};
 use futures::{future, Future, Stream};
 use std::collections::BTreeSet;
+use std::ops::Neg;
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 
-use tokio_codec::{Decoder, FramedRead};
+use tokio_codec::{BytesCodec, FramedRead};
 use tokio_process::{Child, CommandExt};
 
 use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
@@ -43,20 +44,21 @@ impl CommandRunner {
     mut child: Child,
   ) -> impl Stream<Item = ChildOutput, Error = String> + Send {
     // TODO: This assumes that the Child was launched with stdout/stderr `Stdio::piped`.
-    let stdout_stream = FramedRead::new(child.stdout().take().unwrap(), IdentityDecoder)
+    let stdout_stream = FramedRead::new(child.stdout().take().unwrap(), BytesCodec::new())
       .map(|bytes| ChildOutput::Stdout(bytes.into()));
-    let stderr_stream = FramedRead::new(child.stderr().take().unwrap(), IdentityDecoder)
+    let stderr_stream = FramedRead::new(child.stderr().take().unwrap(), BytesCodec::new())
       .map(|bytes| ChildOutput::Stderr(bytes.into()));
     let exit_stream = child.into_stream().map(|exit_status| {
       ChildOutput::Exit(
         exit_status
           .code()
-          .or_else(|| exit_status.signal().map(|signal| -signal)),
+          .or(exit_status.signal().map(Neg::neg))
+          .expect("Child process should exit via returned code or signal."),
       )
     });
     stdout_stream
       .select(stderr_stream)
-      .chain(exit_stream)
+      .select(exit_stream)
       .map_err(|e| format!("Failed to consume process outputs: {:?}", e))
   }
 
@@ -152,10 +154,15 @@ impl super::CommandRunner for CommandRunner {
       })
       .and_then(|child| {
         // Consume the stream of ChildOutputs incrementally.
+        // NB: We fully buffer up all this incrementalism into final result below and so could
+        // instead be using Command::output_async above to avoid this code. The idea though is
+        // we eventually want to pass incremental results on down the line for streaming process
+        // results to console logs, etc. as tracked by:
+        //   https://github.com/pantsbuild/pants/issues/6089
         let init = (
           BytesMut::with_capacity(8192),
           BytesMut::with_capacity(8192),
-          None,
+          0,
         );
         Self::outputs_stream_for_child(child).fold(
           init,
@@ -197,7 +204,7 @@ impl super::CommandRunner for CommandRunner {
           .map(move |snapshot| FallibleExecuteProcessResult {
             stdout: stdout.freeze(),
             stderr: stderr.freeze(),
-            exit_code: exit_code.unwrap_or(-1),
+            exit_code,
             output_directory: snapshot.digest,
           })
           .to_boxed()
@@ -225,31 +232,13 @@ impl super::CommandRunner for CommandRunner {
 }
 
 ///
-/// A Decoder that emits bytes immediately for any non-empty buffer.
-///
-struct IdentityDecoder;
-
-impl Decoder for IdentityDecoder {
-  type Item = Bytes;
-  type Error = ::std::io::Error;
-
-  fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-    if buf.len() == 0 {
-      Ok(None)
-    } else {
-      Ok(Some(buf.take().freeze()))
-    }
-  }
-}
-
-///
 /// An enum of the possible outputs from a child process.
 ///
 #[derive(Debug)]
 enum ChildOutput {
   Stdout(Bytes),
   Stderr(Bytes),
-  Exit(Option<i32>),
+  Exit(i32),
 }
 
 #[cfg(test)]

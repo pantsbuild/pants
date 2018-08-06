@@ -10,6 +10,7 @@ import os
 import pkgutil
 import re
 import shutil
+from builtins import open
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.python.targets.python_target import PythonTarget
@@ -176,7 +177,7 @@ class IdeaPluginGen(ConsoleTask):
     if ide_file and self.get_options().open:
       open_with = self.get_options().open_with
       if open_with:
-        null = open(os.devnull, 'w')
+        null = open(os.devnull, 'wb')
         subprocess.Popen([open_with, ide_file], stdout=null, stderr=null)
       else:
         try:
