@@ -18,12 +18,6 @@ class PantsLoader(object):
   DEFAULT_ENTRYPOINT = 'pants.bin.pants_exe:main'
 
   ENCODING_IGNORE_ENV_VAR = 'PANTS_IGNORE_UNRECOGNIZED_ENCODING'
-  BLACKLISTED_ENCODINGS = (
-      # Many sources.
-      'us-ascii',
-      # From an Ubuntu Trusty docker image: see #6295.
-      'ansi_x3.4-1968',
-    )
 
   class InvalidLocaleError(Exception):
     """Raised when a valid locale can't be found."""
@@ -42,9 +36,9 @@ class PantsLoader(object):
     # This check is done early to give good feedback to user on how to fix the problem. Other
     # libraries called by Pants may fail with more obscure errors.
     encoding = locale.getpreferredencoding()
-    if encoding.lower() in cls.BLACKLISTED_ENCODINGS and os.environ.get(cls.ENCODING_IGNORE_ENV_VAR, None) is None:
+    if encoding.lower() != 'utf-8' and os.environ.get(cls.ENCODING_IGNORE_ENV_VAR, None) is None:
       raise cls.InvalidLocaleError(
-        'System preferred encoding is `{}`, which is not likely to be what you want.\n'
+        'System preferred encoding is `{}`, but `UTF-8` is required.\n'
         'Check and set the LC_* and LANG environment settings. Example:\n'
         '  LC_ALL=en_US.UTF-8\n'
         '  LANG=en_US.UTF-8\n'
