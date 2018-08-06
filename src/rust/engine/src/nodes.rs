@@ -702,8 +702,7 @@ impl Snapshot {
   }
 
   fn store_path(item: &Path) -> Value {
-    // TODO(illicitonion): see https://github.com/pantsbuild/pants/issues/6302
-    externs::store_utf8(&item.to_string_lossy())
+    externs::store_utf8_osstr(item.as_os_str())
   }
 
   fn store_dir(core: &Arc<Core>, item: &Dir) -> Value {
