@@ -15,6 +15,8 @@ from contextlib import closing
 from hashlib import sha1
 from xml.etree import ElementTree
 
+from future.utils import PY3
+
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -68,7 +70,8 @@ class BaseZincCompile(JvmCompile):
   def _write_javac_plugin_info(resources_dir, javac_plugin_target):
     javac_plugin_info_file = os.path.join(resources_dir, _JAVAC_PLUGIN_INFO_FILE)
     with safe_open(javac_plugin_info_file, 'w') as f:
-      f.write(javac_plugin_target.classname)
+      classname = javac_plugin_target.classname if PY3 else javac_plugin_target.classname.decode('utf-8')
+      f.write(classname)
 
   @staticmethod
   def validate_arguments(log, whitelisted_args, args):
