@@ -80,7 +80,9 @@ class JvmRun(JvmTask):
     else:
       binary = target
 
-    extra_jvm_options = target.payload.extra_jvm_options
+    # Some targets will not have extra_jvm_options in their payload,
+    # so we can't access it with target.payload.extra_jvm_options
+    extra_jvm_options = target.payload.get_field_value("extra_jvm_options")
 
     # We can't throw if binary isn't a JvmBinary, because perhaps we were called on a
     # python_binary, in which case we have to no-op and let python_run do its thing.
