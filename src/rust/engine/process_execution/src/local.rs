@@ -111,10 +111,7 @@ impl StreamedHermeticCommand {
         .env_clear()
         // It would be really nice not to have to manually set PATH but this is sadly the only way
         // to stop automatic PATH searching.
-        .env("PATH", "")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .env("PATH", "");
     StreamedHermeticCommand { inner }
   }
 
@@ -145,6 +142,9 @@ impl StreamedHermeticCommand {
   fn stream(&mut self) -> Result<impl Stream<Item = ChildOutput, Error = String> + Send, String> {
     self
       .inner
+      .stdin(Stdio::null())
+      .stdout(Stdio::piped())
+      .stderr(Stdio::piped())
       .spawn_async()
       .map_err(|e| format!("Error launching process: {:?}", e))
       .and_then(|mut child| {
@@ -181,16 +181,9 @@ struct ChildResults {
 }
 
 impl ChildResults {
-  fn collect_from<S, E>(stream: S) -> impl Future<Item = ChildResults, Error = E>
-  where
-    S: Stream<Item = ChildOutput, Error = E> + Send,
-  {
-    // Consume the stream of ChildOutputs incrementally.
-    // NB: We fully buffer up all this incrementalism into final result below and so could
-    // instead be using Command::output_async above to avoid this code. The idea though is
-    // we eventually want to pass incremental results on down the line for streaming process
-    // results to console logs, etc. as tracked by:
-    //   https://github.com/pantsbuild/pants/issues/6089
+  fn collect_from<E>(
+    stream: impl Stream<Item = ChildOutput, Error = E> + Send,
+  ) -> impl Future<Item = ChildResults, Error = E> {
     let init = (
       BytesMut::with_capacity(8192),
       BytesMut::with_capacity(8192),
@@ -252,6 +245,11 @@ impl super::CommandRunner for CommandRunner {
           .envs(env)
           .stream()
       })
+      // NB: We fully buffer up the `Stream` above into final `ChildResults` below and so could
+      // instead be using `CommandExt::output_async` above to avoid the `ChildResults::collect_from`
+      // code. The idea going forward though is we eventually want to pass incremental results on
+      // down the line for streaming process results to console logs, etc. as tracked by:
+      //   https://github.com/pantsbuild/pants/issues/6089
       .and_then(ChildResults::collect_from)
       .and_then(move |child_results| {
         let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
