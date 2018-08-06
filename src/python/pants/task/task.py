@@ -172,10 +172,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
     self._force_invalidated = False
 
-  @memoized_method
-  def _build_invalidator(self, root=False):
-    build_task = None if root else self.fingerprint
-    return BuildInvalidator.Factory.create(build_task=build_task)
+  @memoized_property
+  def _build_invalidator(self):
+    return BuildInvalidator.Factory.create(build_task=self.fingerprint)
 
   def get_options(self):
     """Returns the option values for this task's scope.
@@ -285,7 +284,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   def invalidate(self):
     """Invalidates all targets for this task."""
-    self._build_invalidator().force_invalidate_all()
+    self._build_invalidator.force_invalidate_all()
 
   @property
   def create_target_dirs(self):
@@ -462,7 +461,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     cache_manager = InvalidationCacheManager(self.workdir,
                                              cache_key_generator,
-                                             self._build_invalidator(),
+                                             self._build_invalidator,
                                              invalidate_dependents,
                                              fingerprint_strategy=fingerprint_strategy,
                                              invalidation_report=self.context.invalidation_report,
