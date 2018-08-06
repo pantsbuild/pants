@@ -29,10 +29,10 @@ class ConsoleTask(QuietTaskMixin, Task):
 
   def __init__(self, *args, **kwargs):
     super(ConsoleTask, self).__init__(*args, **kwargs)
-    self._console_separator = self.get_options().sep.decode('string-escape')
+    self._console_separator = self.get_options().sep.decode('unicode_escape')
     if self.get_options().output_file:
       try:
-        self._outstream = safe_open(os.path.abspath(self.get_options().output_file), 'w')
+        self._outstream = safe_open(os.path.abspath(self.get_options().output_file), 'wb')
       except IOError as e:
         raise TaskError('Error opening stream {out_file} due to'
                         ' {error_str}'.format(out_file=self.get_options().output_file, error_str=e))
