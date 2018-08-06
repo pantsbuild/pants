@@ -4,3 +4,9 @@ jvm_binary(
     main = 'opts.Main',
     sources = ['Main.java']
 )
+
+jvm_binary(
+    name = 'no-opts',
+    main = 'opts.Main',
+    sources = ['Main.java']
+)
