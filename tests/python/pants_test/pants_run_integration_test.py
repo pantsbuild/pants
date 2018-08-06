@@ -254,6 +254,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # Only whitelisted entries will be included in the environment if hermetic=True.
     if self.hermetic():
       env = dict()
+      # With an empty environment, we would generally get the true underlying system default
+      # encoding, which is unlikely to be what we want (it's generally ASCII, still). So we
+      # explicitly set an encoding here.
+      env['LC_ALL'] = 'en_US.UTF-8'
       for h in self.hermetic_env_whitelist():
         value = os.getenv(h)
         if value is not None:

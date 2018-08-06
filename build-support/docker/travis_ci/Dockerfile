@@ -21,4 +21,7 @@ USER ${TRAVIS_USER}:${TRAVIS_GROUP}
 # Ensure Pants runs under the 2.7.13 interpreter.
 ENV PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==2.7.13']"
 
+# Our newly created user is unlikely to have a sane environment: set a locale at least.
+ENV LC_ALL="en_US.UTF-8"
+
 WORKDIR /travis/workdir
