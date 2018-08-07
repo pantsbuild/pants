@@ -17,5 +17,3 @@ def say_something():
   else:
     ret = 'Python3'
   return ret
-
-print('hello!')
