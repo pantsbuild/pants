@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 from builtins import str
 
+from future.utils import PY2
 from pex.fetcher import Fetcher
 from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
@@ -69,6 +70,10 @@ def dump_sources(builder, tgt, log):
   log.debug('  Dumping sources: {}'.format(tgt))
   for relpath in tgt.sources_relative_to_buildroot():
     try:
+      # Necessary to avoid py_compile from trying to decode non-ascii source code into unicode.
+      # Python 3's py_compile can safely handle unicode in source files, meanwhile.
+      if PY2:
+        relpath = relpath.encode('utf-8')
       dump_source(relpath)
     except OSError:
       log.error('Failed to copy {} for target {}'.format(relpath, tgt.address.spec))

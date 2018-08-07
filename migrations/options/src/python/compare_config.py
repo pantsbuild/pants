@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import itertools
 import sys
+from builtins import open
 from collections import OrderedDict
 
 from pants.option.config import Config

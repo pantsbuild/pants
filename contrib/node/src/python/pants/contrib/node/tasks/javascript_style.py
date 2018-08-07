@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -110,7 +111,7 @@ class JavascriptStyleBase(NodeTask):
     for source in target.sources_relative_to_buildroot():
       if os.path.basename(source) == target.style_ignore_path:
         root_dir = os.path.join('**', os.path.dirname(source))
-        with open(source) as f:
+        with open(source, 'r') as f:
           return [os.path.join(root_dir, p.strip()) for p in f]
 
   def _run_javascriptstyle(self, target, bootstrap_dir, files, config=None, ignore_path=None,

@@ -147,7 +147,7 @@ class OptionsBootstrapper(object):
   def construct_and_set_bootstrap_options(self):
     """Populates the internal bootstrap_options cache."""
     def filecontent_for(path):
-      with open(path, 'r') as fh:
+      with open(path, 'rb') as fh:
         return FileContent(path, fh.read())
 
     # N.B. This adaptor is meant to simulate how we would co-operatively invoke options bootstrap

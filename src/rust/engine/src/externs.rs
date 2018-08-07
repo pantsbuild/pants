@@ -1,10 +1,11 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::mem;
 use std::os::raw;
-use std::os::unix::ffi::OsStringExt;
+use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
@@ -80,6 +81,15 @@ pub fn store_bytes(bytes: &[u8]) -> Value {
 ///
 pub fn store_utf8(utf8: &str) -> Value {
   with_externs(|e| (e.store_utf8)(e.context, utf8.as_ptr(), utf8.len() as u64).into())
+}
+
+///
+/// Store a buffer of utf8 bytes to pass to Python. This will end up as a Python `unicode`.
+///
+#[cfg(unix)]
+pub fn store_utf8_osstr(utf8: &OsStr) -> Value {
+  let bytes = utf8.as_bytes();
+  with_externs(|e| (e.store_utf8)(e.context, bytes.as_ptr(), bytes.len() as u64).into())
 }
 
 pub fn store_i64(val: i64) -> Value {
