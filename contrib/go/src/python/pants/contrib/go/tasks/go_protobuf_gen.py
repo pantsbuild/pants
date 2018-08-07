@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import open
 
 from pants.backend.codegen.protobuf.subsystems.protoc import Protoc
 from pants.base.build_environment import get_buildroot
@@ -102,7 +103,7 @@ class GoProtobufGen(SimpleCodegenTask):
 
   @classmethod
   def _get_go_namespace(cls, source):
-    with open(source) as fh:
+    with open(source, 'r') as fh:
       data = fh.read()
     namespace = cls._NAMESPACE_PARSER.search(data)
     if not namespace:

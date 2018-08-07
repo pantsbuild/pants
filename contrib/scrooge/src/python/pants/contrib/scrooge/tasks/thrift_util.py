@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import open
 
 
 INCLUDE_PARSER = re.compile(r'^\s*include\s+"([^"]+)"\s*([\/\/|\#].*)*$')
