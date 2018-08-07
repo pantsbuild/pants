@@ -47,9 +47,9 @@ class PrepareServices(ResourcesTask):
         service_provider_configuration_file = os.path.join(chroot, self.service_info_path(service))
         # NB: provider configuration files must be UTF-8 encoded, see the mini-spec:
         # https://docs.oracle.com/javase/6/docs/api/java/util/ServiceLoader.html
-        with safe_open(service_provider_configuration_file, 'wb') as fp:
+        with safe_open(service_provider_configuration_file, 'w') as fp:
           def write_line(line):
-            fp.write((line + '\n').encode('utf-8'))
+            fp.write((line + '\n'))
           write_line('# Generated from pants target {}'.format(target.address.spec))
           for impl in impls:
             write_line(impl)

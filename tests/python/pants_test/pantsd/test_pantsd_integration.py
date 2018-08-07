@@ -490,17 +490,17 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         pantsd_run(['help'])
         checker.assert_started()
 
-        safe_file_dump(test_build_file, "python_library(sources=globs('some_non_existent_file.py'))")
+        safe_file_dump(test_build_file, "python_library(sources=globs('some_non_existent_file.py'))", binary_mode=False)
         result = pantsd_run(export_cmd)
         checker.assert_running()
         self.assertNotRegexpMatches(result.stdout_data, has_source_root_regex)
 
-        safe_file_dump(test_build_file, "python_library(sources=globs('*.py'))")
+        safe_file_dump(test_build_file, "python_library(sources=globs('*.py'))", binary_mode=False)
         result = pantsd_run(export_cmd)
         checker.assert_running()
         self.assertNotRegexpMatches(result.stdout_data, has_source_root_regex)
 
-        safe_file_dump(test_src_file, 'import this\n')
+        safe_file_dump(test_src_file, 'import this\n', binary_mode=False)
         result = pantsd_run(export_cmd)
         checker.assert_running()
         self.assertRegexpMatches(result.stdout_data, has_source_root_regex)

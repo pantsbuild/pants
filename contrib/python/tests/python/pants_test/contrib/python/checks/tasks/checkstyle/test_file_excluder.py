@@ -33,7 +33,6 @@ class TestExcluder(TestBase):
   def _create_scalastyle_excludes_file(self, exclude_patterns=None):
     return self.create_file(
       relpath='scalastyle_excludes.txt',
-      mode='w',
       contents='\n'.join(exclude_patterns) if exclude_patterns else '')
 
   def test_excludes_cpp_any(self):

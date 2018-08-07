@@ -18,7 +18,6 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.target import Target
-from pants.util.strutil import ensure_binary
 from pants_test.base_test import BaseTest
 
 
@@ -99,29 +98,27 @@ class BuildFileParserBasicsTest(BaseTestWithParser):
 
   def test_invalid_unicode_in_build_file(self):
     """Demonstrate that unicode characters causing parse errors raise real parse errors."""
-    # TODO(python3port): remove ensure_binary once safe_open() uses backport. This test fails on Py3.
-    self.add_to_build_file('BUILD', ensure_binary(dedent(
+    self.add_to_build_file('BUILD', dedent(
       """
       jvm_binary(name = ‘hello’,  # Parse error due to smart quotes (non ascii characters)
         source = 'HelloWorld.java'
         main = 'foo.HelloWorld',
       )
       """
-    )))
+    ))
     build_file = self.create_buildfile('BUILD')
     self.assert_parser_error(build_file, 'invalid character' if PY3 else 'invalid syntax')
 
   def test_unicode_string_in_build_file(self):
     """Demonstrates that a string containing unicode should work in a BUILD file."""
-    # TODO(python3port): remove ensure_binary once safe_open() uses backport. This test fails on Py3.
-    self.add_to_build_file('BUILD', ensure_binary(dedent(
+    self.add_to_build_file('BUILD', dedent(
         """
         java_library(
           name='foo',
           sources=['א.java']
         )
         """
-    )))
+    ))
     build_file = self.create_buildfile('BUILD')
     self.build_file_parser.parse_build_file(build_file)
 
@@ -325,7 +322,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTestWithParser):
                  make_lib("com.foo.test", "does_not_exists", "1.0")
                  path_util("baz")
                """)
-    self.create_file('3rdparty/BUILD', contents, mode='w')
+    self.create_file('3rdparty/BUILD', contents)
 
     build_file = BuildFile(FileSystemProjectTree(self.build_root), '3rdparty/BUILD')
     address_map = self.build_file_parser.parse_build_file(build_file)

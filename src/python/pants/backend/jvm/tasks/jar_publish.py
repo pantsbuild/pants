@@ -626,8 +626,8 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
         if self.publish_changelog:
           changelog_path = self.artifact_path(jar, version, suffix='-CHANGELOG', extension='txt')
-          with safe_open(changelog_path, 'wb') as changelog_file:
-            changelog_file.write(changelog.encode('utf-8'))
+          with safe_open(changelog_path, 'w') as changelog_file:
+            changelog_file.write(changelog)
           publications.add(self.Publication(name=jar.name, classifier='CHANGELOG', ext='txt'))
 
       # Process any extra jars that might have been previously generated for this target, or a

@@ -77,7 +77,6 @@ class ScalaFmtTestBase(NailgunTaskTestBase):
     self.test_file = self.create_file(
       relpath='src/scala/org/pantsbuild/badscalastyle/BadScalaStyle.scala',
       contents=self.test_file_contents,
-      mode='w'
     )
     self.library = self.make_target(spec='src/scala/org/pantsbuild/badscalastyle',
                                     sources=['BadScalaStyle.scala'],

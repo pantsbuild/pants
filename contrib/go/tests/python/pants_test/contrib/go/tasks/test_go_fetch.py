@@ -27,7 +27,7 @@ class GoFetchTest(TaskTestBase):
 
   def test_get_remote_import_paths(self):
     go_fetch = self.create_task(self.context())
-    self.create_file('src/github.com/u/a/a.go', mode='w', contents="""
+    self.create_file('src/github.com/u/a/a.go', contents="""
       package a
 
       import (
@@ -77,7 +77,7 @@ class GoFetchTest(TaskTestBase):
     """Creates a Go package inside dirpath named 'name' importing deps."""
     imports = ['import "localzip/{}"'.format(d) for d in deps]
     f = os.path.join(dirpath, '{name}/{name}.go'.format(name=name))
-    self.create_file(f, mode='w', contents=
+    self.create_file(f, contents=
       """package {name}
         {imports}
       """.format(name=name, imports='\n'.join(imports)))
@@ -192,7 +192,7 @@ class GoFetchTest(TaskTestBase):
 
   def test_issues_2616(self):
     go_fetch = self.create_task(self.context())
-    self.create_file('src/github.com/u/a/a.go', mode='w', contents="""
+    self.create_file('src/github.com/u/a/a.go', contents="""
       package a
 
       import (
@@ -203,7 +203,7 @@ class GoFetchTest(TaskTestBase):
         "bitbucket.org/u/b"
       )
     """)
-    self.create_file('src/github.com/u/a/b.go', mode='w', contents="""
+    self.create_file('src/github.com/u/a/b.go', contents="""
       package a
 
       /*
