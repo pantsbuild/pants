@@ -10,7 +10,6 @@ import os
 import shutil
 import unittest
 from builtins import open
-from collections import namedtuple
 from contextlib import contextmanager
 from operator import eq, ne
 from threading import Lock
@@ -23,13 +22,26 @@ from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_open
+from pants.util.objects import datatype
 from pants.util.process_handler import SubprocessProcessHandler, subprocess
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
 
-PantsResult = namedtuple(
-  'PantsResult',
-  ['command', 'returncode', 'stdout_data', 'stderr_data', 'workdir'])
+class PantsResult(datatype(['command', 'returncode', 'stdout_data', 'stderr_data', 'workdir'])):
+  pass
+
+
+class PantsJoinHandle(datatype(['command', 'process', 'workdir'])):
+  def join(self, stdin_data=None, tee_output=False):
+    """Wait for the pants process to complete, and return a PantsResult for it."""
+
+    communicate_fn = self.process.communicate
+    if tee_output:
+      communicate_fn = SubprocessProcessHandler(self.process).communicate_teeing_stdout_and_stderr
+    (stdout_data, stderr_data) = communicate_fn(stdin_data)
+
+    return PantsResult(self.command, self.process.returncode, stdout_data.decode("utf-8"),
+                       stderr_data.decode("utf-8"), self.workdir)
 
 
 def ensure_cached(expected_num_artifacts=None):
@@ -281,21 +293,24 @@ class PantsRunIntegrationTest(unittest.TestCase):
       with open('{}.cmd'.format(prof), 'w') as fp:
         fp.write(' '.join(pants_command))
 
-    return pants_command, subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
-      stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+    return PantsJoinHandle(
+        pants_command,
+        subprocess.Popen(
+          pants_command,
+          env=env,
+          stdin=subprocess.PIPE,
+          stdout=subprocess.PIPE,
+          stderr=subprocess.PIPE,
+          **kwargs
+        ),
+        workdir
+      )
 
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, tee_output=False, **kwargs):
     if config:
       kwargs["config"] = config
-    pants_command, proc = self.run_pants_with_workdir_without_waiting(command, workdir, **kwargs)
-
-    communicate_fn = proc.communicate
-    if tee_output:
-      communicate_fn = SubprocessProcessHandler(proc).communicate_teeing_stdout_and_stderr
-    (stdout_data, stderr_data) = communicate_fn(stdin_data)
-
-    return PantsResult(pants_command, proc.returncode, stdout_data.decode("utf-8"),
-                       stderr_data.decode("utf-8"), workdir)
+    handle = self.run_pants_with_workdir_without_waiting(command, workdir, **kwargs)
+    return handle.join(stdin_data=stdin_data, tee_output=tee_output)
 
   def run_pants(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
     """Runs pants in a subprocess.
@@ -451,7 +466,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
   @contextmanager
   def mock_buildroot(self, dirs_to_copy=None):
     """Construct a mock buildroot and return a helper object for interacting with it."""
-    Manager = namedtuple('Manager', 'write_file pushd new_buildroot')
+    class Manager(datatype(['write_file', 'pushd', 'new_buildroot'])): pass
     # N.B. BUILD.tools, contrib, 3rdparty needs to be copied vs symlinked to avoid
     # symlink prefix check error in v1 and v2 engine.
     files_to_copy = ('BUILD.tools',)

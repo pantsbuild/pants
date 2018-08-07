@@ -69,7 +69,7 @@ python_tests(
   name = 'console_rule_integration',
   sources = [ 'test_console_rule_integration.py' ],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'tests/python/pants_test/pantsd:pantsd_integration_test_base',
   ],
   tags = {'integration'},
   timeout = 300,
