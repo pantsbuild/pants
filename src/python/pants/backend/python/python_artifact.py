@@ -75,7 +75,7 @@ class PythonArtifact(PayloadField):
                                   ensure_ascii=True,
                                   allow_nan=False,
                                   sort_keys=True)).hexdigest()
-    return fingerprint if PY3 else fingerprint.encode('utf-8')
+    return fingerprint if PY3 else fingerprint.decode('utf-8')
 
   def with_binaries(self, *args, **kw):
     """Add binaries tagged to this artifact.
