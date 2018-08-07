@@ -400,7 +400,7 @@ class Shader(object):
 
   @contextmanager
   def temporary_rules_file(self, rules):
-    with temporary_file() as fp:
+    with temporary_file(binary_mode=False) as fp:
       for rule in rules:
         fp.write(rule.render())
       fp.close()

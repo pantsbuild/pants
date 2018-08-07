@@ -8,6 +8,7 @@ import json
 import unittest
 
 import bs4
+from future.utils import PY3
 
 from internal_backend.sitegen.tasks import sitegen
 
@@ -204,7 +205,13 @@ class AllTheThingsTestCase(unittest.TestCase):
                                    {{/site_toc}}
                                    """)
     self.assertIn("DEPTH=1 LINK=None HEADING=non_collapse", rendered)
-    self.assertIn(u"DEPTH=1 LINK=[{'text': u'Page 2: Electric Boogaloo', 'link': u'subdir/page2.html', 'here': False}, {'text': u'Pants Build System', 'link': u'index.html', 'here': True}] HEADING=collapse", rendered)
+    # Py2 and Py3 order the elements differently and Py3 doesn't render 'u' in unicode literals. Both are valid.
+    rendered_expected = ("DEPTH=1 LINK=[{'link': 'subdir/page2.html', 'text': 'Page 2: Electric Boogaloo', 'here': False}, "
+                         "{'link': 'index.html', 'text': 'Pants Build System', 'here': True}] HEADING=collapse"
+                         if PY3 else
+                         "DEPTH=1 LINK=[{'text': u'Page 2: Electric Boogaloo', 'link': u'subdir/page2.html', 'here': False}, "
+                         "{'text': u'Pants Build System', 'link': u'index.html', 'here': True}] HEADING=collapse")
+    self.assertIn(rendered_expected, rendered)
 
   def test_transform_fixes_up_internal_links(self):
     sitegen.transform_soups(self.config, self.soups, self.precomputed)

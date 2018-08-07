@@ -77,7 +77,7 @@ class RagelGenTest(TaskTestBase):
     self.assertEqual(['com/example/atoi/Parser.java'], generated_files)
 
   def test_smoke(self):
-    with temporary_file() as fp:
+    with temporary_file(binary_mode=False) as fp:
       fp.write(ragel_file_contents)
       fp.flush()
       self.assertEqual(calculate_genfile(fp.name), 'com/example/atoi/Parser.java')

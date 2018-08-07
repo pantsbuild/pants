@@ -58,7 +58,7 @@ class TestInterpreterCache(TestBase):
     self._do_test([self._make_bad_requirement(self._interpreter.identity.requirement)], [], [])
 
   def test_cache_setup_with_no_filters_uses_repo_default(self):
-    self._do_test((b'',), [], [self._interpreter])
+    self._do_test(('',), [], [self._interpreter])
 
   def test_cache_setup_with_filter_overrides_repo_default(self):
     self._do_test([self._make_bad_requirement(self._interpreter.identity.requirement)],
