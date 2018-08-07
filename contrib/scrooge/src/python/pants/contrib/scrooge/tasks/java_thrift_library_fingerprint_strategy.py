@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
+from builtins import str
 
 from future.utils import PY3
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
@@ -30,18 +31,18 @@ class JavaThriftLibraryFingerprintStrategy(FingerprintStrategy):
     hasher = hashlib.sha1()
     hasher.update(fp)
     hasher.update(self._thrift_defaults.language(target))
-    hasher.update(self._thrift_defaults.compiler_args(target))
+    hasher.update(str(self._thrift_defaults.compiler_args(target)).encode('utf-8'))
 
     namespace_map = self._thrift_defaults.namespace_map(target)
     if namespace_map:
-      hasher.update(sorted(namespace_map.items()))
+      hasher.update(str(sorted(namespace_map.items())).encode('utf-8'))
 
     default_java_namespace = self._thrift_defaults.default_java_namespace(target)
     if default_java_namespace:
       hasher.update(default_java_namespace)
 
     if target.include_paths:
-      hasher.update(target.include_paths)
+      hasher.update(str(target.include_paths).encode('utf-8'))
 
     return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
