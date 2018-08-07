@@ -7,6 +7,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import hashlib
 from builtins import str
 
+from future.utils import PY3
+
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
@@ -84,7 +86,7 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
       return None
 
     hasher = hashlib.sha1()
-    hasher.update(target.payload.fingerprint())
+    hasher.update(target.payload.fingerprint().encode('utf-8'))
     if isinstance(target, JarLibrary):
       # NB: Collects only the jars for the current jar_library, and hashes them to ensure that both
       # the resolved coordinates, and the requested coordinates are used. This ensures that if a
@@ -95,7 +97,7 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
         [target])
       for _, entry in classpath_entries:
         hasher.update(str(entry.coordinate))
-    return hasher.hexdigest()
+    return hasher.hexdigest() if PY3 else hasher.hexdigest().decoee('utf-8')
 
   def direct(self, target):
     return self._dep_context.defaulted_property(target, lambda x: x.strict_deps)

@@ -13,6 +13,8 @@ from builtins import map
 from collections import defaultdict
 from textwrap import dedent
 
+from future.utils import PY3
+
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -45,7 +47,7 @@ class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
       return None
 
     hasher.update('version=2')
-    hasher.update(base_fingerprint)
+    hasher.update(base_fingerprint.encode('utf-8'))
 
     # NB: this series of updates must always cover the same fields that populate `_tuple`'s slots
     # to ensure proper invalidation.
@@ -54,7 +56,7 @@ class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
       for rule in self._custom_rules:
         hasher.update(rule.render())
 
-    return hasher.hexdigest()
+    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def _tuple(self):
     # NB: this tuple's slots - used for `==/hash()` - must be kept in agreement with the hashed

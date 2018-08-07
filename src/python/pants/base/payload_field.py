@@ -8,6 +8,7 @@ from abc import abstractmethod
 from builtins import object
 from hashlib import sha1
 
+from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.base.deprecated import deprecated
@@ -22,7 +23,7 @@ def combine_hashes(hashes):
   for h in sorted(hashes):
     h = ensure_binary(h)
     hasher.update(h)
-  return hasher.hexdigest()
+  return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
 
 class PayloadField(AbstractClass):
@@ -35,7 +36,7 @@ class PayloadField(AbstractClass):
   def fingerprint(self):
     """A memoized sha1 hexdigest hashing the contents of this PayloadField
 
-    The fingerprint returns either a bytestring or None.  If the return is None, consumers of the
+    The fingerprint returns either a string or None.  If the return is None, consumers of the
     fingerprint may choose to elide this PayloadField from their combined hash computation.
 
     :API: public

@@ -7,6 +7,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from builtins import object
 from hashlib import sha1
 
+from future.utils import PY3
+
 from pants.util.strutil import ensure_binary
 
 
@@ -129,7 +131,7 @@ class Payload(object):
     if empty_hash:
       return None
     else:
-      return hasher.hexdigest()
+      return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def mark_dirty(self):
     """Invalidates memoized fingerprints for this payload.

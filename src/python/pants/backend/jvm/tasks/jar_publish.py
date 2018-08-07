@@ -15,6 +15,7 @@ from builtins import input, next, object, open, str
 from collections import OrderedDict, defaultdict, namedtuple
 from copy import copy
 
+from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ossrh_publication_metadata import OSSRHPublicationMetadata
@@ -893,7 +894,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
       fingerprint = fingerprint_internal(internal_target)
       sha.update(fingerprint)
 
-    return sha.hexdigest()
+    return sha.hexdigest() if PY3 else sha.hexdigest().decode('utf-8')
 
   def changelog(self, target, sha):
     # Filter synthetic files.

@@ -12,6 +12,8 @@ from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
 
+from future.utils import PY3
+
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
@@ -255,7 +257,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       include_passthru=self.supports_passthru_args(),
     )
     options_hasher.update(options_fp)
-    return options_hasher.hexdigest()
+    return options_hasher.hexdigest() if PY3 else options_hasher.hexdigest().decode('utf-8')
 
   @memoized_property
   def fingerprint(self):
@@ -274,7 +276,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     # TODO: this is not recursive, but should be: see #2739
     for dep in self.subsystem_dependencies_iter():
       hasher.update(self._options_fingerprint(dep.options_scope()))
-    return str(hasher.hexdigest())
+    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def artifact_cache_reads_enabled(self):
     return self._cache_factory.read_cache_available()

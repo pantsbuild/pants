@@ -6,6 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from hashlib import sha1
 
+from future.utils import PY3
+
 from pants.base.payload_field import PayloadField
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.source.filespec import matches_filespec
@@ -85,4 +87,4 @@ class SourcesField(PayloadField):
     hasher = sha1()
     hasher.update(self.rel_path)
     hasher.update(self.sources.files_hash)
-    return hasher.hexdigest()
+    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
