@@ -12,6 +12,7 @@ from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
+from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.base.build_environment import get_buildroot
 from pants.java.jar.jar_dependency import JarDependency
@@ -174,7 +175,7 @@ class Zinc(object):
       return instance.tool_classpath_from_products(self._products, toolname, scope=scope)
     classpaths = (cp(java_options_src, 'javac-plugin-dep') +
                   cp(scala_options_src, 'scalac-plugin-dep'))
-    return [(conf, jar) for conf in self.DEFAULT_CONFS for jar in classpaths]
+    return [(conf, ClasspathEntry(jar)) for conf in self.DEFAULT_CONFS for jar in classpaths]
 
   @memoized_property
   def extractor(self):
@@ -182,10 +183,8 @@ class Zinc(object):
                                                            self.ZINC_EXTRACTOR_TOOL_NAME,
                                                            scope=self._zinc_factory.options_scope)
 
-  def compile_classpath(self, classpath_product_key, target, extra_cp_entries=None):
-    """Compute the compile classpath for the given target."""
+  def compile_classpath_entries(self, classpath_product_key, target, extra_cp_entries=None):
     classpath_product = self._products.get_data(classpath_product_key)
-
     if DependencyContext.global_instance().defaulted_property(target, lambda x: x.strict_deps):
       dependencies = target.strict_dependencies(DependencyContext.global_instance())
     else:
@@ -200,7 +199,15 @@ class Zinc(object):
     # expects to receive a list, but had been receiving an iterator. In the context of an
     # iterator, `excludes` are not applied
     # in ClasspathProducts.get_product_target_mappings_for_targets.
-    return ClasspathUtil.compute_classpath(iter(dependencies),
-                                           classpath_product,
-                                           all_extra_cp_entries,
-                                           self.DEFAULT_CONFS)
+    return ClasspathUtil.compute_classpath_entries(iter(dependencies),
+      classpath_product,
+      all_extra_cp_entries,
+      self.DEFAULT_CONFS,
+    )
+
+  def compile_classpath(self, classpath_product_key, target, extra_cp_entries=None):
+    """Compute the compile classpath for the given target."""
+    return list(
+      entry.path
+      for entry in self.compile_classpath_entries(classpath_product_key, target, extra_cp_entries)
+    )

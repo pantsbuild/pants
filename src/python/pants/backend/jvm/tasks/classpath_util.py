@@ -10,6 +10,7 @@ from collections import OrderedDict
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_walk
 from pants.util.strutil import ensure_text
@@ -18,26 +19,50 @@ from pants.util.strutil import ensure_text
 class ClasspathUtil(object):
 
   @classmethod
-  def compute_classpath(cls, targets, classpath_products, extra_classpath_tuples, confs):
+  def compute_classpath_entries(cls, targets, classpath_products, extra_classpath_tuples, confs):
     """Return the list of classpath entries for a classpath covering the passed targets.
 
     Filters and adds paths from extra_classpath_tuples to the end of the resulting list.
 
     :param targets: The targets to generate a classpath for.
     :param ClasspathProducts classpath_products: Product containing classpath elements.
-    :param extra_classpath_tuples: Additional classpath entries.
+    :param extra_classpath_tuples: Additional classpath entries as tuples of
+      (string, ClasspathEntry).
     :param confs: The list of confs for use by this classpath.
-    :returns: The classpath as a list of path elements.
-    :rtype: list of string
+    :returns: The classpath entries as a list of path elements.
+    :rtype: list of ClasspathEntry
     """
-    classpath_iter = cls._classpath_iter(targets, classpath_products, confs=confs)
+    classpath_iter = cls._classpath_iter(
+      classpath_products.get_classpath_entries_for_targets(targets),
+      confs=confs,
+    )
     total_classpath = OrderedSet(classpath_iter)
 
-    filtered_extra_classpath_iter = cls._filtered_classpath_by_confs_iter(extra_classpath_tuples,
-                                                                          confs)
+    filtered_extra_classpath_iter = cls._filtered_classpath_by_confs_iter(
+      extra_classpath_tuples,
+      confs,
+    )
     extra_classpath_iter = cls._entries_iter(filtered_extra_classpath_iter)
     total_classpath.update(extra_classpath_iter)
     return list(total_classpath)
+
+  @classmethod
+  def compute_classpath(cls, targets, classpath_products, extra_classpath_tuples, confs):
+    """Return the list of classpath entries for a classpath covering the passed targets.
+
+    Filters and adds paths from extra_classpath_tuples to the end of the resulting list.
+
+    As compute_classpath_entries but expects and returns strings, not ClasspathEntries.
+    """
+    return list(
+      entry.path for entry in
+      cls.compute_classpath_entries(
+        targets,
+        classpath_products,
+        ((scope, ClasspathEntry(path)) for scope, path in extra_classpath_tuples),
+        confs
+      )
+    )
 
   @classmethod
   def classpath(cls, targets, classpath_products, confs=('default',)):
@@ -49,13 +74,15 @@ class ClasspathUtil(object):
     :returns: The classpath as a list of path elements.
     :rtype: list of string
     """
-    classpath_iter = cls._classpath_iter(targets, classpath_products, confs=confs)
+    classpath_iter = cls._classpath_iter(classpath_products.get_for_targets(targets), confs=confs)
     return list(classpath_iter)
 
   @classmethod
-  def _classpath_iter(cls, targets, classpath_products, confs=('default',)):
-    classpath_tuples = classpath_products.get_for_targets(targets)
-    filtered_tuples_iter = cls._filtered_classpath_by_confs_iter(classpath_tuples, confs)
+  def _classpath_iter(cls, classpath_entries_for_targets, confs=('default',)):
+    filtered_tuples_iter = cls._filtered_classpath_by_confs_iter(
+      classpath_entries_for_targets,
+      confs,
+    )
     return cls._entries_iter(filtered_tuples_iter)
 
   @classmethod
@@ -127,7 +154,10 @@ class ClasspathUtil(object):
               path per iteration step.
     :rtype: :class:`collections.Iterator` of string
     """
-    classpath_iter = cls._classpath_iter(targets, classpath_products, confs=confs)
+    classpath_iter = cls._classpath_iter(
+      classpath_products.get_for_targets(targets),
+      confs=confs,
+    )
     for f in cls.classpath_entries_contents(classpath_iter):
       yield f
 
