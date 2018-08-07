@@ -727,9 +727,9 @@ class CoursierResolveFingerprintStrategy(FingerprintStrategy):
       hasher.update(element.encode('utf-8'))
 
     # Just in case so we do not collide with ivy cache
-    hasher.update('coursier')
+    hasher.update(b'coursier')
 
-    return hasher.hexdigest() if PY3 else hasher.hexdigest.decode('utf-8')
+    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def __hash__(self):
     return hash((type(self), '-'.join(self._confs)))
