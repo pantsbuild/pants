@@ -727,6 +727,7 @@ python_library(
   name = 'unpack_jars',
   sources = ['unpack_jars.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_import_products',

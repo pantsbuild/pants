@@ -8,6 +8,7 @@ import hashlib
 import os
 from builtins import open
 
+from future.utils import PY3
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
@@ -34,7 +35,7 @@ class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, Finge
     hasher = hashlib.sha1()
     for element in hash_elements_for_target:
       hasher.update(element)
-    return hasher.hexdigest()
+    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
 
 class SelectInterpreter(Task):

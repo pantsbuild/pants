@@ -13,7 +13,7 @@ import threading
 import time
 from contextlib import closing
 
-from six import string_types
+from future.utils import PY3, string_types
 from twitter.common.collections import maybe_list
 
 from pants.base.build_environment import get_buildroot
@@ -122,7 +122,7 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
     [digest.update(item) for item in (b''.join(sorted(jvm_options)),
                                       b''.join(sorted(classpath)),
                                       repr(java_version).encode('utf-8'))]
-    return digest.hexdigest()
+    return digest.hexdigest() if PY3 else digest.hexdigest().decode('utf-8')
 
   def _runner(self, classpath, main, jvm_options, args, cwd=None):
     """Runner factory. Called via Executor.execute()."""
