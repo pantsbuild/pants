@@ -24,7 +24,7 @@ class PayloadTest(TestBase):
     self.assertEqual(empty_fp, empty.fingerprint())
     normal = ExcludesField([Exclude('com', 'foozle'), Exclude('org')])
     normal_fp = normal.fingerprint()
-    self.assertEqual(normal_fp, normal.fingperprint())
+    self.assertEqual(normal_fp, normal.fingerprint())
     normal_dup = ExcludesField([Exclude('com', 'foozle'), Exclude('org')])
     self.assertEqual(normal_fp, normal_dup.fingerprint())
     self.assertNotEqual(empty_fp, normal_fp)
