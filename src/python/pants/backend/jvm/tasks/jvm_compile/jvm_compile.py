@@ -9,7 +9,7 @@ import os
 from builtins import object, str
 from multiprocessing import cpu_count
 
-from six import string_types
+from future.utils import string_types
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
