@@ -34,7 +34,12 @@ class _RuleVisitor(ast.NodeVisitor):
     self.gets.append(Get.extract_constraints(node))
 
 
-class GoalProduct(object):
+class _GoalProduct(object):
+  """GoalProduct is a factory for anonymous singleton types representing the execution of goals.
+
+  The created types are returned by `@console_rule` instances, which may not have any outputs
+  of their own.
+  """
   PRODUCT_MAP = {}
 
   @staticmethod
@@ -89,7 +94,9 @@ def _make_rule(output_type, input_selectors, for_goal=None):
     # For @console_rule, redefine the function to avoid needing a literal return of the output type.
     if for_goal:
       def goal_and_return(*args, **kwargs):
-        func(*args, **kwargs)
+        res = func(*args, **kwargs)
+        if res is not None:
+          raise Exception('A @console_rule should not have a return value.')
         return output_type()
       functools.update_wrapper(goal_and_return, func)
       wrapped_func = goal_and_return
@@ -109,7 +116,7 @@ def rule(output_type, input_selectors):
 
 
 def console_rule(goal_name, input_selectors):
-  output_type = GoalProduct.for_name(goal_name)
+  output_type = _GoalProduct.for_name(goal_name)
   return _make_rule(output_type, input_selectors, goal_name)
 
 
