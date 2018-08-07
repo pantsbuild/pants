@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{BTreeMap, HashMap};
-use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -703,7 +702,7 @@ impl Snapshot {
   }
 
   fn store_path(item: &Path) -> Value {
-    externs::store_bytes(item.as_os_str().as_bytes())
+    externs::store_utf8_osstr(item.as_os_str())
   }
 
   fn store_dir(core: &Arc<Core>, item: &Dir) -> Value {
