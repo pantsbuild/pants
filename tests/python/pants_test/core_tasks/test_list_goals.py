@@ -99,9 +99,8 @@ class ListGoalsTest(ConsoleTaskTestBase):
     with self.assertRaises(GoalError) as ctx:
       goal.install(TaskRegistrar(task_name, OtherNoopTask))
 
-    exception_message = ' '.join(ctx.exception.args)
-    self.assertIn('foo', exception_message)
-    self.assertIn(self._LIST_GOALS_NAME, exception_message)
+    self.assertIn('foo', str(ctx.exception))
+    self.assertIn(self._LIST_GOALS_NAME, str(ctx.exception))
 
   def test_register_duplicate_task_name_is_not_error_when_replacing(self):
     Goal.clear()
