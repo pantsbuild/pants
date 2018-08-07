@@ -97,7 +97,7 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
         [target])
       for _, entry in classpath_entries:
         hasher.update(str(entry.coordinate))
-    return hasher.hexdigest() if PY3 else hasher.hexdigest().decoee('utf-8')
+    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def direct(self, target):
     return self._dep_context.defaulted_property(target, lambda x: x.strict_deps)
