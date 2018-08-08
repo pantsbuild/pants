@@ -31,8 +31,8 @@ before_cache:
   # While the bin directory and rust toolchains are relatively large, they're also very quick to
   # restore/install: prune them to keep the total cache size down.
   #   see https://docs.travis-ci.com/user/caching/#Things-not-to-cache
-  # NB: We do _not_ prune the cargo cache, since that holds compiled tools, package indexes and
-  # individually resolved crates.
+  # NB: We do _not_ prune the cargo cache, since that holds compiled tools and outputs, and
+  # individually resolved artifacts.
   - rm -rf ${HOME}/.cache/pants/bin
   - rm -rf ${HOME}/.cache/pants/rust/rustup
   - rm -rf ${HOME}/.cache/pants/lmdb_store
@@ -48,8 +48,8 @@ cache:
     # using its own isolated cache:
     #   https://github.com/pantsbuild/pants/issues/2485
     - ${HOME}/.npm
+    - build-support/isort.venv
     - build-support/pants_dev_deps.venv
-    - src/rust/engine/target
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
