@@ -215,4 +215,8 @@ class SetupPyExecutionEnvironment(datatype([
         cpp_linker.path_entries)
       ret['PATH'] = create_path_env_var(all_path_entries)
 
+      # GCC will output smart quotes in a variety of situations (leading to decoding errors
+      # downstream) unless we set this environment variable.
+      ret['LC_ALL'] = 'C'
+
     return ret
