@@ -33,7 +33,7 @@ from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import safe_open
+from pants.util.dirutil import fast_relpath, safe_open
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -287,20 +287,38 @@ class BaseZincCompile(JvmCompile):
     self._verify_zinc_classpath(classpath)
     self._verify_zinc_classpath(list(upstream_analysis.keys()))
 
+    def relative_to_exec_root(path):
+      return fast_relpath(path, get_buildroot())
+
+    scala_path = self.scalac_classpath()
+    compiler_interface = self._zinc.compiler_interface
+    compiler_bridge = self._zinc.compiler_bridge
+    classes_dir = ctx.classes_dir
+    analysis_cache = ctx.analysis_file
+
+    scala_path = tuple(relative_to_exec_root(c) for c in scala_path)
+    compiler_interface = relative_to_exec_root(compiler_interface)
+    compiler_bridge = relative_to_exec_root(compiler_bridge)
+    analysis_cache = relative_to_exec_root(analysis_cache)
+    classes_dir = relative_to_exec_root(classes_dir)
+    # TODO: Have these produced correctly, rather than having to relativize them here
+    classpath = tuple(relative_to_exec_root(c) for c in classpath)
+
     zinc_args = []
     zinc_args.extend([
       '-log-level', self.get_options().level,
-      '-analysis-cache', ctx.analysis_file,
+      '-analysis-cache', analysis_cache,
       '-classpath', ':'.join(classpath),
-      '-d', ctx.classes_dir
+      '-d', classes_dir,
     ])
     if not self.get_options().colors:
       zinc_args.append('-no-color')
 
-    zinc_args.extend(['-compiler-interface', self._zinc.compiler_interface])
-    zinc_args.extend(['-compiler-bridge', self._zinc.compiler_bridge])
+    zinc_args.extend(['-compiler-interface', compiler_interface])
+    zinc_args.extend(['-compiler-bridge', compiler_bridge])
+    # TODO: Move this to live inside the workdir: https://github.com/pantsbuild/pants/issues/6155
     zinc_args.extend(['-zinc-cache-dir', self._zinc_cache_dir])
-    zinc_args.extend(['-scala-path', ':'.join(self.scalac_classpath())])
+    zinc_args.extend(['-scala-path', ':'.join(scala_path)])
 
     zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
     # Search for scalac plugins on the classpath.
@@ -319,7 +337,10 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(self._scalac_plugin_args(scalac_plugin_map, scalac_plugin_search_classpath))
     if upstream_analysis:
       zinc_args.extend(['-analysis-map',
-                        ','.join('{}:{}'.format(*kv) for kv in upstream_analysis.items())])
+                        ','.join('{}:{}'.format(
+                          relative_to_exec_root(k),
+                          relative_to_exec_root(v)
+                        ) for k, v in upstream_analysis.items())])
 
     zinc_args.extend(self._zinc.rebase_map_args)
 
