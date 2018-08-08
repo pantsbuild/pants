@@ -18,8 +18,6 @@ from pants_test.backend.python.tasks.util.build_local_dists_test_base import \
 
 class TestBuildLocalDistsNativeSources(BuildLocalPythonDistributionsTestBase):
 
-  _extra_relevant_task_types = []
-
   _dist_specs = OrderedDict([
 
     ('src/python/dist:universal_dist', {

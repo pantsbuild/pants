@@ -12,7 +12,8 @@ import shutil
 from pex import pep425tags
 from pex.interpreter import PythonInterpreter
 
-from pants.backend.native.config.environment import LLVMCppToolchain, LLVMCToolchain, Platform
+from pants.backend.native.config.environment import (GCCCppToolchain, GCCCToolchain,
+                                                     LLVMCppToolchain, LLVMCToolchain, Platform)
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
 from pants.backend.python.python_requirement import PythonRequirement
@@ -60,6 +61,24 @@ class BuildLocalPythonDistributions(Task):
     round_manager.require_data(PythonInterpreter)
     round_manager.require(SharedLibrary)
 
+  default_platform_toolchains = {
+    'darwin': 'llvm',
+    'linux': 'gcc',
+  }
+
+  @classmethod
+  def register_options(cls, register):
+    super(BuildLocalPythonDistributions, cls).register_options(register)
+
+    register('--platform-toolchains', type=dict, default=cls.default_platform_toolchains,
+             advanced=True,
+             help='TODO:???/Which toolchain to use for different host platforms pants runs on.')
+
+  @memoized_property
+  def _toolchain_type(self):
+    all_toolchains = self.get_options().platform_toolchains
+    return all_toolchains[self._platform.normalized_os_name]
+
   @classmethod
   def implementation_version(cls):
     return super(BuildLocalPythonDistributions, cls).implementation_version() + [('BuildLocalPythonDistributions', 3)]
@@ -88,15 +107,17 @@ class BuildLocalPythonDistributions(Task):
 
   @memoized_property
   def _c_toolchain(self):
-    llvm_c_toolchain = self._request_single(
-      LLVMCToolchain, self._python_native_code_settings.native_toolchain)
-    return llvm_c_toolchain.c_toolchain
+    c_toolchain_type = LLVMCToolchain if self._toolchain_type == 'llvm' else GCCCToolchain
+    c_toolchain_wrapper = self._request_single(
+      c_toolchain_type, self._python_native_code_settings.native_toolchain)
+    return c_toolchain_wrapper.c_toolchain
 
   @memoized_property
   def _cpp_toolchain(self):
-    llvm_cpp_toolchain = self._request_single(
-      LLVMCppToolchain, self._python_native_code_settings.native_toolchain)
-    return llvm_cpp_toolchain.cpp_toolchain
+    cpp_toolchain_type = LLVMCppToolchain if self._toolchain_type == 'llvm' else GCCCppToolchain
+    cpp_toolchain_wrapper = self._request_single(
+      cpp_toolchain_type, self._python_native_code_settings.native_toolchain)
+    return cpp_toolchain_wrapper.cpp_toolchain
 
   # TODO: This should probably be made into an @classproperty (see PR #5901).
   @property
@@ -229,11 +250,17 @@ class BuildLocalPythonDistributions(Task):
                              'Installing setup requirements: {}\n\n'
                              .format([req.key for req in setup_reqs_to_resolve]))
 
-    setup_requires_site_dir = ensure_setup_requires_site_dir(
-      setup_reqs_to_resolve, interpreter, setup_requires_dir, platforms=['current'])
-    if setup_requires_site_dir:
-      self.context.log.debug('Setting PYTHONPATH with setup_requires site directory: {}'
-                             .format(setup_requires_site_dir))
+    setup_reqs_pex_path = os.path.join(
+      setup_requires_dir,
+      'setup-requires-{}.pex'.format(versioned_target_fingerprint))
+    setup_requires_pex = self._build_setup_requires_pex_settings.bootstrap(
+      interpreter, setup_reqs_pex_path,
+      # FIXME: remove this obvious hack!
+      extra_reqs=(list(setup_reqs_to_resolve or []) + [
+        PythonRequirement('setuptools==33.1.1'),
+      ]))
+    self.context.log.debug('Using pex file as setup.py interpreter: {}'
+                           .format(setup_requires_pex))
 
     setup_py_execution_environment = SetupPyExecutionEnvironment(
       setup_requires_site_dir=setup_requires_site_dir,
