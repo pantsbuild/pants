@@ -16,7 +16,7 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.base.build_environment import get_buildroot
-from pants.util.contextutil import temporary_file
+from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.process_handler import subprocess
 from pants_test.task_test_base import TaskTestBase
 
@@ -114,23 +114,26 @@ class ResolveRequirementsTest(TaskTestBase):
                             requirements=requirements)
 
   def _resolve_requirements(self, target_roots, options=None):
-    context = self.context(target_roots=target_roots, options=options,
-                           for_subsystems=[PythonSetup, PythonRepos])
+    with temporary_dir() as cache_dir:
+      options = options or {}
+      options.setdefault(PythonSetup.options_scope, {})['interpreter_cache_dir'] = cache_dir
+      context = self.context(target_roots=target_roots, options=options,
+                             for_subsystems=[PythonSetup, PythonRepos])
 
-    # We must get an interpreter via the cache, instead of using PythonInterpreter.get() directly,
-    # to ensure that the interpreter has setuptools and wheel support.
-    interpreter = PythonInterpreter.get()
-    interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
-                                               PythonRepos.global_instance(),
-                                               logger=context.log.debug)
-    interpreters = interpreter_cache.setup(paths=[os.path.dirname(interpreter.binary)],
-                                           filters=[str(interpreter.identity.requirement)])
-    context.products.get_data(PythonInterpreter, lambda: interpreters[0])
+      # We must get an interpreter via the cache, instead of using PythonInterpreter.get() directly,
+      # to ensure that the interpreter has setuptools and wheel support.
+      interpreter = PythonInterpreter.get()
+      interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
+                                                PythonRepos.global_instance(),
+                                                logger=context.log.debug)
+      interpreters = interpreter_cache.setup(paths=[os.path.dirname(interpreter.binary)],
+                                            filters=[str(interpreter.identity.requirement)])
+      context.products.get_data(PythonInterpreter, lambda: interpreters[0])
 
-    task = self.create_task(context)
-    task.execute()
+      task = self.create_task(context)
+      task.execute()
 
-    return context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)
+      return context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)
 
   def _exercise_module(self, pex, expected_module):
     with temporary_file() as f:
