@@ -13,7 +13,7 @@ function usage() {
   cat <<EOF
 Runs commons tests for local or hosted CI.
 
-Usage: $0 (-h|-fxbkmsrjlpuyncia)
+Usage: $0 (-h|-3fxbkmsrjlpuyncia)
  -h           print out this help message
  -3           After pants is bootstrapped, set --python-setup-interpreter-constraints such that any
               python tests run with Python 3.

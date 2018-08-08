@@ -156,7 +156,7 @@ matrix:
 
     - <<: *default_test_config
       env:
-        - SHARD="Py2 - Unit tests in for pants and pants-plugins"
+        - SHARD="Py2 - Unit tests for pants and pants-plugins"
       script:
         - ./build-support/bin/ci.sh -x -efkmrjcnt "${SHARD}"
 
