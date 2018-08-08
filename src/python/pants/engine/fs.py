@@ -83,7 +83,7 @@ class DirectoryDigest(datatype([('fingerprint', text_type), ('serialized_bytes_l
 
   def __repr__(self):
     return '''DirectoryDigest(fingerprint={}, serialized_bytes_length={})'''.format(
-      self.fingerprint[:8],
+      self.fingerprint,
       self.serialized_bytes_length
     )
 
