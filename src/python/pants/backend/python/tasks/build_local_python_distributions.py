@@ -229,11 +229,17 @@ class BuildLocalPythonDistributions(Task):
                              'Installing setup requirements: {}\n\n'
                              .format([req.key for req in setup_reqs_to_resolve]))
 
-    setup_requires_site_dir = ensure_setup_requires_site_dir(
-      setup_reqs_to_resolve, interpreter, setup_requires_dir, platforms=['current'])
-    if setup_requires_site_dir:
-      self.context.log.debug('Setting PYTHONPATH with setup_requires site directory: {}'
-                             .format(setup_requires_site_dir))
+    setup_reqs_pex_path = os.path.join(
+      setup_requires_dir,
+      'setup-requires-{}.pex'.format(versioned_target_fingerprint))
+    setup_requires_pex = self._build_setup_requires_pex_settings.bootstrap(
+      interpreter, setup_reqs_pex_path,
+      # FIXME: remove this obvious hack!
+      extra_reqs=(list(setup_reqs_to_resolve or []) + [
+        PythonRequirement('setuptools==33.1.1'),
+      ]))
+    self.context.log.debug('Using pex file as setup.py interpreter: {}'
+                           .format(setup_requires_pex))
 
     setup_py_execution_environment = SetupPyExecutionEnvironment(
       setup_requires_site_dir=setup_requires_site_dir,
