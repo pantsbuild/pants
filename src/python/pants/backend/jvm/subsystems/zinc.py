@@ -15,8 +15,10 @@ from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.base.build_environment import get_buildroot
+from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
+from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -118,6 +120,7 @@ class Zinc(object):
   def __init__(self, zinc_factory, products):
     self._zinc_factory = zinc_factory
     self._products = products
+    self._snapshot = None
 
   @memoized_property
   def zinc(self):
@@ -151,6 +154,23 @@ class Zinc(object):
     """
     return self._zinc_factory._compiler_interface(self._products)
 
+  def snapshot(self, scheduler):
+    if self._snapshot is None:
+      buildroot = get_buildroot()
+      self._snapshot = scheduler.capture_snapshots((
+        PathGlobsAndRoot(
+          PathGlobs(
+            tuple(
+              fast_relpath(a, buildroot)
+              for a in (self.zinc, self.compiler_bridge, self.compiler_interface)
+            )
+          ),
+          buildroot,
+        ),
+      ))[0]
+    return self._snapshot
+
+  # TODO: Relativise (and sort)
   @memoized_property
   def rebase_map_args(self):
     """We rebase known stable paths in zinc analysis to make it portable across machines."""
