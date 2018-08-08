@@ -215,37 +215,4 @@ class SetupPyExecutionEnvironment(datatype([
         cpp_linker.path_entries)
       ret['PATH'] = create_path_env_var(all_path_entries)
 
-      all_library_dirs = (
-        c_compiler.library_dirs +
-        c_linker.library_dirs +
-        cpp_compiler.library_dirs +
-        cpp_linker.library_dirs)
-      joined_library_dirs = create_path_env_var(all_library_dirs)
-      dynamic_lib_env_var = plat.resolve_platform_specific({
-        'darwin': lambda: 'DYLD_LIBRARY_PATH',
-        'linux': lambda: 'LD_LIBRARY_PATH',
-      })
-      ret[dynamic_lib_env_var] = joined_library_dirs
-
-      all_linking_library_dirs = (c_linker.linking_library_dirs + cpp_linker.linking_library_dirs)
-      ret['LIBRARY_PATH'] = create_path_env_var(all_linking_library_dirs)
-
-      all_include_dirs = cpp_compiler.include_dirs + c_compiler.include_dirs
-      ret['CPATH'] = create_path_env_var(all_include_dirs)
-
-      shared_compile_flags = safe_shlex_join(plat.resolve_platform_specific({
-        'darwin': lambda: [MIN_OSX_VERSION_ARG],
-        'linux': lambda: [],
-      }))
-      ret['CFLAGS'] = shared_compile_flags
-      ret['CXXFLAGS'] = shared_compile_flags
-
-      ret['CC'] = c_compiler.exe_filename
-      ret['CXX'] = cpp_compiler.exe_filename
-      ret['LDSHARED'] = cpp_linker.exe_filename
-
-      all_new_ldflags = cpp_linker.extra_args + plat.resolve_platform_specific(
-        self._SHARED_CMDLINE_ARGS)
-      ret['LDFLAGS'] = safe_shlex_join(all_new_ldflags)
-
     return ret

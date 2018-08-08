@@ -41,6 +41,8 @@ class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, Finge
 class SelectInterpreter(Task):
   """Select an Python interpreter that matches the constraints of all targets in the working set."""
 
+  options_scope = 'select-python-interpreter'
+
   @classmethod
   def implementation_version(cls):
     # TODO(John Sirois): Fixup this task to use VTS results_dirs. Right now version bumps aren't
