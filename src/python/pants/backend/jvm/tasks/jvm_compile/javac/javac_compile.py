@@ -117,7 +117,7 @@ class JavacCompile(JvmCompile):
     if JvmPlatform.global_instance().get_options().compiler == 'javac':
       return super(JavacCompile, self).execute()
 
-  def compile(self, ctx, args, classpath, upstream_analysis,
+  def compile(self, ctx, args, dependency_classpath, upstream_analysis,
               settings, fatal_warnings, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     try:
@@ -128,7 +128,7 @@ class JavacCompile(JvmCompile):
     javac_cmd = ['{}/bin/javac'.format(distribution.real_home)]
 
     javac_cmd.extend([
-      '-classpath', ':'.join(classpath),
+      '-classpath', ':'.join((ctx.classes_dir,) + tuple(ce.path for ce in dependency_classpath)),
     ])
 
     if settings.args:

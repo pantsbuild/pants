@@ -237,7 +237,7 @@ class JvmCompile(NailgunTaskBase):
   def select_source(self, source_file_path):
     raise NotImplementedError()
 
-  def compile(self, ctx, args, classpath, upstream_analysis,
+  def compile(self, ctx, args, dependency_classpath, upstream_analysis,
               settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     """Invoke the compiler.
@@ -246,7 +246,8 @@ class JvmCompile(NailgunTaskBase):
 
     :param CompileContext ctx: A CompileContext for the target to compile.
     :param list args: Arguments to the compiler (such as javac or zinc).
-    :param list classpath: List of classpath entries.
+    :param list dependency_classpath: List of classpath entries of type ClasspathEntry for
+      dependencies.
     :param upstream_analysis: A map from classpath entry to analysis file for dependencies.
     :param JvmPlatformSettings settings: platform settings determining the -source, -target, etc for
       javac to use.
@@ -457,7 +458,7 @@ class JvmCompile(NailgunTaskBase):
       raise TaskError("Compilation failure: {}".format(e))
 
   def _record_compile_classpath(self, classpath, targets, outdir):
-    relative_classpaths = [fast_relpath(path, self.get_options().pants_workdir) for path in classpath]
+    relative_classpaths = [fast_relpath(entry.path, self.get_options().pants_workdir) for entry in classpath]
     text = '\n'.join(relative_classpaths)
     for target in targets:
       path = os.path.join(outdir, 'compile_classpath', '{}.txt'.format(target.id))
@@ -465,13 +466,13 @@ class JvmCompile(NailgunTaskBase):
       with open(path, 'w') as f:
         f.write(text)
 
-  def _compile_vts(self, vts, ctx, upstream_analysis, classpath, progress_message, settings, 
+  def _compile_vts(self, vts, ctx, upstream_analysis, dependency_classpath, progress_message, settings,
                    compiler_option_sets, zinc_file_manager, counter):
     """Compiles sources for the given vts into the given output dir.
 
     :param vts: VersionedTargetSet with one entry for the target.
     :param ctx: - A CompileContext instance for the target.
-    :param classpath: A list of classpath entries
+    :param dependency_classpath: A list of classpath entries of type ClasspathEntry for dependencies
 
     May be invoked concurrently on independent target sets.
 
@@ -496,13 +497,13 @@ class JvmCompile(NailgunTaskBase):
         ').')
       with self.context.new_workunit('compile', labels=[WorkUnitLabel.COMPILER]) as compile_workunit:
         if self.get_options().capture_classpath:
-          self._record_compile_classpath(classpath, vts.targets, ctx.classes_dir)
+          self._record_compile_classpath(dependency_classpath, vts.targets, ctx.classes_dir)
 
         try:
           self.compile(
             ctx,
             self._args,
-            classpath,
+            dependency_classpath,
             upstream_analysis,
             settings,
             compiler_option_sets,
@@ -632,10 +633,11 @@ class JvmCompile(NailgunTaskBase):
       compile_contexts_by_directory[compile_context.classes_dir] = compile_context
     # If we have a compile context for the target, include it.
     for entry in classpath_entries:
-      if not entry.endswith('.jar'):
-        compile_context = compile_contexts_by_directory.get(entry)
+      path = entry.path
+      if not path.endswith('.jar'):
+        compile_context = compile_contexts_by_directory.get(path)
         if not compile_context:
-          self.context.log.debug('Missing upstream analysis for {}'.format(entry))
+          self.context.log.debug('Missing upstream analysis for {}'.format(path))
         else:
           yield compile_context.classes_dir, compile_context.analysis_file
 
@@ -680,9 +682,13 @@ class JvmCompile(NailgunTaskBase):
 
       if not hit_cache:
         # Compute the compile classpath for this target.
-        cp_entries = self._cp_entries_for_ctx(ctx, 'runtime_classpath')
+        dependency_cp_entries = self._zinc.compile_classpath_entries(
+          'runtime_classpath',
+          ctx.target,
+          extra_cp_entries=self._extra_compile_time_classpath,
+        )
 
-        upstream_analysis = dict(self._upstream_analysis(all_compile_contexts, cp_entries))
+        upstream_analysis = dict(self._upstream_analysis(all_compile_contexts, dependency_cp_entries))
 
         is_incremental = self.should_compile_incrementally(vts, ctx)
         if not is_incremental:
@@ -699,14 +705,14 @@ class JvmCompile(NailgunTaskBase):
           self._compile_vts(vts,
                             ctx,
                             upstream_analysis,
-                            cp_entries,
+                            dependency_cp_entries,
                             progress_message,
                             tgt.platform,
                             compiler_option_sets,
                             zinc_file_manager,
                             counter)
         self._record_target_stats(tgt,
-                                  len(cp_entries),
+                                  len(dependency_cp_entries),
                                   len(ctx.sources),
                                   timer.elapsed,
                                   is_incremental,
@@ -767,13 +773,6 @@ class JvmCompile(NailgunTaskBase):
     if not self._clear_invalid_analysis:
       return True
     return os.path.exists(ctx.analysis_file)
-
-  def _cp_entries_for_ctx(self, ctx, classpath_product_key):
-    cp_entries = [ctx.classes_dir]
-    cp_entries.extend(self._zinc.compile_classpath(classpath_product_key,
-      ctx.target,
-      extra_cp_entries=self._extra_compile_time_classpath))
-    return cp_entries
 
   def _record_target_stats(self, target, classpath_len, sources_len, compiletime, is_incremental,
     stats_key):
