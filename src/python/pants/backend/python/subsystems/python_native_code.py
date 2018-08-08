@@ -10,7 +10,7 @@ from collections import defaultdict
 
 from wheel.install import WheelFile
 
-from pants.backend.native.config.environment import CppToolchain, CToolchain, Platform
+from pants.backend.native.config.environment import CppToolchain, CToolchain
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.subsystems.xcode_cli_tools import MIN_OSX_VERSION_ARG
 from pants.backend.native.targets.native_library import NativeLibrary
@@ -22,7 +22,7 @@ from pants.base.exceptions import IncompatiblePlatformsError
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.objects import SubclassesOf, datatype
-from pants.util.strutil import create_path_env_var, safe_shlex_join
+from pants.util.strutil import create_path_env_var
 
 
 class PythonNativeCode(Subsystem):
@@ -141,7 +141,6 @@ class PythonNativeCode(Subsystem):
 class SetupPyNativeTools(datatype([
     ('c_toolchain', CToolchain),
     ('cpp_toolchain', CppToolchain),
-    ('platform', Platform),
 ])):
   """The native tools needed for a setup.py invocation.
 
@@ -211,7 +210,6 @@ class SetupPyExecutionEnvironment(datatype([
       # An as_tuple() method for datatypes could make this destructuring cleaner!  Alternatively,
       # constructing this environment could be done more compositionally instead of requiring all of
       # these disparate fields together at once.
-      plat = native_tools.platform
       c_toolchain = native_tools.c_toolchain
       c_compiler = c_toolchain.c_compiler
       c_linker = c_toolchain.c_linker
@@ -225,39 +223,13 @@ class SetupPyExecutionEnvironment(datatype([
         c_linker.path_entries +
         cpp_compiler.path_entries +
         cpp_linker.path_entries)
-      ret['PATH'] = create_path_env_var(all_path_entries)
+      # NB: We need to be able to access the python interpreter, so we need the rest of the PATH
+      # entries (after the ones from our native toolchain). This alone is not sufficient to force
+      # setup.py to use only our tools.
+      ret['PATH'] = create_path_env_var(all_path_entries, env=os.environ.copy(), prepend=True)
 
-      all_library_dirs = (
-        c_compiler.library_dirs +
-        c_linker.library_dirs +
-        cpp_compiler.library_dirs +
-        cpp_linker.library_dirs)
-      joined_library_dirs = create_path_env_var(all_library_dirs)
-      dynamic_lib_env_var = plat.resolve_platform_specific({
-        'darwin': lambda: 'DYLD_LIBRARY_PATH',
-        'linux': lambda: 'LD_LIBRARY_PATH',
-      })
-      ret[dynamic_lib_env_var] = joined_library_dirs
-
-      all_linking_library_dirs = (c_linker.linking_library_dirs + cpp_linker.linking_library_dirs)
-      ret['LIBRARY_PATH'] = create_path_env_var(all_linking_library_dirs)
-
-      all_include_dirs = cpp_compiler.include_dirs + c_compiler.include_dirs
-      ret['CPATH'] = create_path_env_var(all_include_dirs)
-
-      shared_compile_flags = safe_shlex_join(plat.resolve_platform_specific({
-        'darwin': lambda: [MIN_OSX_VERSION_ARG],
-        'linux': lambda: [],
-      }))
-      ret['CFLAGS'] = shared_compile_flags
-      ret['CXXFLAGS'] = shared_compile_flags
-
-      ret['CC'] = c_compiler.exe_filename
-      ret['CXX'] = cpp_compiler.exe_filename
-      ret['LDSHARED'] = cpp_linker.exe_filename
-
-      all_new_ldflags = cpp_linker.extra_args + plat.resolve_platform_specific(
-        self._SHARED_CMDLINE_ARGS)
-      ret['LDFLAGS'] = safe_shlex_join(all_new_ldflags)
+      # GCC will output smart quotes in a variety of situations (leading to decoding errors
+      # downstream) unless we set this environment variable.
+      ret['LC_ALL'] = 'C'
 
     return ret
