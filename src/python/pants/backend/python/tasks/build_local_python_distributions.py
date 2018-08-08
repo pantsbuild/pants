@@ -264,7 +264,8 @@ class BuildLocalPythonDistributions(Task):
       'setup-requires-{}.pex'.format(versioned_target_fingerprint))
     setup_requires_pex = self._build_setup_requires_pex_settings.bootstrap(
       interpreter, setup_reqs_pex_path,
-      # FIXME: remove this obvious hack!
+      # FIXME: remove this obvious hack! Without this building the dist will fail complaining that
+      # it can't find the py31compat module?
       extra_reqs=(list(setup_reqs_to_resolve or []) + [
         PythonRequirement('setuptools==33.1.1'),
       ]))
