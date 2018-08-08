@@ -69,6 +69,7 @@ default_test_config: &default_test_config
         - lib32z1-dev
         - gcc-multilib
         - python-dev
+        - python3
         - openssl
         - libssl-dev
   stage: Test Pants
@@ -149,21 +150,24 @@ matrix:
 
     - <<: *default_test_config
       env:
-        - SHARD="Various pants self checks and lint"
+        - SHARD="Self checks, lint, and JVM tests"
       script:
-        - ./build-support/bin/ci.sh -x -cejlpn 'Various pants self checks and lint'
+        - ./build-support/bin/ci.sh -x -celpn "${SHARD}"
 
     - <<: *default_test_config
       env:
-        - SHARD="Unit tests for pants and pants-plugins - shard 1"
+        - SHARD="Py2 - Unit tests for pants and pants-plugins"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcnt -u 0/2 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrjcnt "${SHARD}"
 
     - <<: *default_test_config
       env:
-        - SHARD="Unit tests for pants and pants-plugins - shard 2"
+        - SHARD="Py3 - Unit tests for pants and pants-plugins"
+        # Use less verbose logs, in order to not hit the log-length limit.
+        - PYTEST_PASSTHRU_ARGS="--tb=line"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcnt -u 1/2 "${SHARD}"
+        # Allowed to fail.
+        - ./build-support/bin/ci.sh -x -3efkmrjcnt "${SHARD}" || exit 0
 
     - <<: *default_test_config
       env:
