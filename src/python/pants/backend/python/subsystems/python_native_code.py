@@ -213,6 +213,9 @@ class SetupPyExecutionEnvironment(datatype([
         c_linker.path_entries +
         cpp_compiler.path_entries +
         cpp_linker.path_entries)
+      # NB: We need to be able to access the python interpreter, so we need the rest of the PATH
+      # entries (after the ones from our native toolchain). This alone is not sufficient to force
+      # setup.py to use only our tools.
       ret['PATH'] = create_path_env_var(all_path_entries, env=os.environ.copy(), prepend=True)
 
       # GCC will output smart quotes in a variety of situations (leading to decoding errors
