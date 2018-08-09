@@ -209,7 +209,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
     self.assert_walk_dirs(['*', '**'], ['a', 'c.ln', 'd.ln', 'a/b', 'd.ln/b'])
 
   def test_files_content_literal(self):
-    self.assert_content(['4.txt', 'a/4.txt.ln'], {'4.txt': 'four\n', 'a/4.txt.ln': 'four\n'})
+    self.assert_content(['4.txt', 'a/4.txt.ln'], {'4.txt': b'four\n', 'a/4.txt.ln': b'four\n'})
 
   def test_files_content_directory(self):
     with self.assertRaises(Exception):
@@ -218,7 +218,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       self.assert_content(['a/b'], {'a/b': 'nope\n'})
 
   def test_files_content_symlink(self):
-    self.assert_content(['c.ln/../3.txt'], {'c.ln/../3.txt': 'three\n'})
+    self.assert_content(['c.ln/../3.txt'], {'c.ln/../3.txt': b'three\n'})
 
   def test_files_digest_literal(self):
     self.assert_digest(['a/3.txt', '4.txt'], ['a/3.txt', '4.txt'])
