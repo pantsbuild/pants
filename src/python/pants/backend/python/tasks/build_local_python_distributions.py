@@ -12,8 +12,7 @@ import shutil
 from pex import pep425tags
 from pex.interpreter import PythonInterpreter
 
-from pants.backend.native.config.environment import (GCCCppToolchain, GCCCToolchain,
-                                                     LLVMCppToolchain, LLVMCToolchain, Platform)
+from pants.backend.native.config.environment import LLVMCppToolchain, LLVMCToolchain, Platform
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
 from pants.backend.python.python_requirement import PythonRequirement
@@ -63,24 +62,6 @@ class BuildLocalPythonDistributions(Task):
     round_manager.require_data(PythonInterpreter)
     round_manager.optional_product(SharedLibrary)
 
-  default_platform_toolchains = {
-    'darwin': 'llvm',
-    'linux': 'gcc',
-  }
-
-  @classmethod
-  def register_options(cls, register):
-    super(BuildLocalPythonDistributions, cls).register_options(register)
-
-    register('--platform-toolchains', type=dict, default=cls.default_platform_toolchains,
-             advanced=True,
-             help='TODO:???/Which toolchain to use for different host platforms pants runs on.')
-
-  @memoized_property
-  def _toolchain_type(self):
-    all_toolchains = self.get_options().platform_toolchains
-    return all_toolchains[self._platform.normalized_os_name]
-
   @classmethod
   def implementation_version(cls):
     return super(BuildLocalPythonDistributions, cls).implementation_version() + [('BuildLocalPythonDistributions', 3)]
@@ -114,17 +95,15 @@ class BuildLocalPythonDistributions(Task):
 
   @memoized_property
   def _c_toolchain(self):
-    c_toolchain_type = LLVMCToolchain if self._toolchain_type == 'llvm' else GCCCToolchain
-    c_toolchain_wrapper = self._request_single(
-      c_toolchain_type, self._python_native_code_settings.native_toolchain)
-    return c_toolchain_wrapper.c_toolchain
+    llvm_c_toolchain = self._request_single(
+      LLVMCToolchain, self._python_native_code_settings.native_toolchain)
+    return llvm_c_toolchain.c_toolchain
 
   @memoized_property
   def _cpp_toolchain(self):
-    cpp_toolchain_type = LLVMCppToolchain if self._toolchain_type == 'llvm' else GCCCppToolchain
-    cpp_toolchain_wrapper = self._request_single(
-      cpp_toolchain_type, self._python_native_code_settings.native_toolchain)
-    return cpp_toolchain_wrapper.cpp_toolchain
+    llvm_cpp_toolchain = self._request_single(
+      LLVMCppToolchain, self._python_native_code_settings.native_toolchain)
+    return llvm_cpp_toolchain.cpp_toolchain
 
   # TODO: This should probably be made into an @classproperty (see PR #5901).
   @property
