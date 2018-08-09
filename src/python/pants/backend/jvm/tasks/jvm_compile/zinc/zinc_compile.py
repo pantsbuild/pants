@@ -279,12 +279,12 @@ class BaseZincCompile(JvmCompile):
   def compile(self, ctx, args, dependency_classpath, upstream_analysis,
               settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
-    classpath = (ctx.classes_dir,) + tuple(ce.path for ce in dependency_classpath)
+    absolute_classpath = (ctx.classes_dir,) + tuple(ce.path for ce in dependency_classpath)
 
     if self.get_options().capture_classpath:
-      self._record_compile_classpath(classpath, ctx.target, ctx.classes_dir)
+      self._record_compile_classpath(absolute_classpath, ctx.target, ctx.classes_dir)
 
-    self._verify_zinc_classpath(classpath)
+    self._verify_zinc_classpath(absolute_classpath)
     self._verify_zinc_classpath(list(upstream_analysis.keys()))
 
     def relative_to_exec_root(path):
@@ -302,13 +302,13 @@ class BaseZincCompile(JvmCompile):
     analysis_cache = relative_to_exec_root(analysis_cache)
     classes_dir = relative_to_exec_root(classes_dir)
     # TODO: Have these produced correctly, rather than having to relativize them here
-    classpath = tuple(relative_to_exec_root(c) for c in classpath)
+    relative_classpath = tuple(relative_to_exec_root(c) for c in absolute_classpath)
 
     zinc_args = []
     zinc_args.extend([
       '-log-level', self.get_options().level,
       '-analysis-cache', analysis_cache,
-      '-classpath', ':'.join(classpath),
+      '-classpath', ':'.join(relative_classpath),
       '-d', classes_dir,
     ])
     if not self.get_options().colors:
@@ -331,7 +331,7 @@ class BaseZincCompile(JvmCompile):
     #   memoized (which in practice will only happen if this plugin uses some other plugin, thus
     #   triggering the plugin search mechanism, which does the memoizing).
     scalac_plugin_search_classpath = (
-      (set(classpath) | set(self.scalac_plugin_classpath_elements())) -
+      (set(absolute_classpath) | set(self.scalac_plugin_classpath_elements())) -
       {ctx.classes_dir, ctx.jar_file}
     )
     zinc_args.extend(self._scalac_plugin_args(scalac_plugin_map, scalac_plugin_search_classpath))
