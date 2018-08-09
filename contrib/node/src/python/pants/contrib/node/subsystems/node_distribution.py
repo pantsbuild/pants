@@ -34,7 +34,7 @@ class NodeDistribution(NativeTool):
 
   options_scope = 'node-distribution'
   name = 'node'
-  default_version = 'v6.9.1'
+  default_version = 'v10.7.1'
   archive_type = 'tgz'
 
   @classmethod
