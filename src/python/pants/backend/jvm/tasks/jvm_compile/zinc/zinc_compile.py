@@ -276,9 +276,14 @@ class BaseZincCompile(JvmCompile):
     key = hasher.hexdigest()[:12]
     return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
 
-  def compile(self, ctx, args, classpath, upstream_analysis,
+  def compile(self, ctx, args, dependency_classpath, upstream_analysis,
               settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
+    classpath = (ctx.classes_dir,) + tuple(ce.path for ce in dependency_classpath)
+
+    if self.get_options().capture_classpath:
+      self._record_compile_classpath(classpath, ctx.target, ctx.classes_dir)
+
     self._verify_zinc_classpath(classpath)
     self._verify_zinc_classpath(list(upstream_analysis.keys()))
 
