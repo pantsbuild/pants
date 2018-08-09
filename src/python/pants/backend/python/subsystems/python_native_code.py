@@ -22,7 +22,7 @@ from pants.base.exceptions import IncompatiblePlatformsError
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.objects import SubclassesOf, datatype
-from pants.util.strutil import create_path_env_var
+from pants.util.strutil import create_path_env_var, safe_shlex_join
 
 
 class PythonNativeCode(Subsystem):
@@ -211,6 +211,7 @@ class SetupPyExecutionEnvironment(datatype([
       # An as_tuple() method for datatypes could make this destructuring cleaner!  Alternatively,
       # constructing this environment could be done more compositionally instead of requiring all of
       # these disparate fields together at once.
+      plat = native_tools.platform
       c_toolchain = native_tools.c_toolchain
       c_compiler = c_toolchain.c_compiler
       c_linker = c_toolchain.c_linker
@@ -225,6 +226,11 @@ class SetupPyExecutionEnvironment(datatype([
         cpp_compiler.path_entries +
         cpp_linker.path_entries)
       ret['PATH'] = create_path_env_var(all_path_entries)
+
+      ret['CC'] = c_compiler.exe_filename
+      ret['CXX'] = cpp_compiler.exe_filename
+      ret['LDSHARED'] = cpp_linker.exe_filename
+      ret['LDFLAGS'] = safe_shlex_join(plat.resolve_platform_specific(self._SHARED_CMDLINE_ARGS))
 
       ret['LC_ALL'] = 'C'
 
