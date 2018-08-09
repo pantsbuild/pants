@@ -457,14 +457,13 @@ class JvmCompile(NailgunTaskBase):
     except ExecutionFailure as e:
       raise TaskError("Compilation failure: {}".format(e))
 
-  def _record_compile_classpath(self, classpath, targets, outdir):
-    relative_classpaths = [fast_relpath(entry.path, self.get_options().pants_workdir) for entry in classpath]
+  def _record_compile_classpath(self, classpath, target, outdir):
+    relative_classpaths = [fast_relpath(path, self.get_options().pants_workdir) for path in classpath]
     text = '\n'.join(relative_classpaths)
-    for target in targets:
-      path = os.path.join(outdir, 'compile_classpath', '{}.txt'.format(target.id))
-      safe_mkdir(os.path.dirname(path), clean=False)
-      with open(path, 'w') as f:
-        f.write(text)
+    path = os.path.join(outdir, 'compile_classpath', '{}.txt'.format(target.id))
+    safe_mkdir(os.path.dirname(path), clean=False)
+    with open(path, 'w') as f:
+      f.write(text)
 
   def _compile_vts(self, vts, ctx, upstream_analysis, dependency_classpath, progress_message, settings,
                    compiler_option_sets, zinc_file_manager, counter):
@@ -496,9 +495,6 @@ class JvmCompile(NailgunTaskBase):
         progress_message,
         ').')
       with self.context.new_workunit('compile', labels=[WorkUnitLabel.COMPILER]) as compile_workunit:
-        if self.get_options().capture_classpath:
-          self._record_compile_classpath(dependency_classpath, vts.targets, ctx.classes_dir)
-
         try:
           self.compile(
             ctx,

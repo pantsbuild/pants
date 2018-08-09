@@ -281,6 +281,9 @@ class BaseZincCompile(JvmCompile):
               javac_plugin_map, scalac_plugin_map):
     classpath = (ctx.classes_dir,) + tuple(ce.path for ce in dependency_classpath)
 
+    if self.get_options().capture_classpath:
+      self._record_compile_classpath(classpath, ctx.target, ctx.classes_dir)
+
     self._verify_zinc_classpath(classpath)
     self._verify_zinc_classpath(list(upstream_analysis.keys()))
 
