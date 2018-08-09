@@ -479,7 +479,7 @@ def _initialize_externs(ffi):
   def extern_store_utf8(context_handle, utf8_ptr, utf8_len):
     """Given a context and UTF8 bytes, return a new Handle to represent the content."""
     c = ffi.from_handle(context_handle)
-    return c.to_value(text_type(ffi.buffer(utf8_ptr, utf8_len)))
+    return c.to_value(ffi.string(utf8_ptr, utf8_len).decode('utf-8'))
 
   @ffi.def_extern()
   def extern_store_i64(context_handle, i64):
