@@ -132,9 +132,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
     will be kept, and the rest will be purged.
     """
 
-    with temporary_dir() as tmp_dir:
-      workdir = os.path.join(tmp_dir, '.pants.d')
-
+    with self.temporary_workdir() as workdir:
       self.assert_success(self.run_pants_with_workdir([
         'compile',
         'export-classpath',
