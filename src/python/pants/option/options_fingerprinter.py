@@ -52,6 +52,9 @@ class OptionsFingerprinter(object):
     for (option_type, option_value) in pairs:
       fingerprint = fingerprinter.fingerprint(option_type, option_value)
       if fingerprint is None:
+        # This isn't necessarily a good value to be using here, but it preserves behavior from
+        # before the commit which added it. I suspect that using the empty string would be
+        # reasonable too, but haven't done any archaeology to check.
         fingerprint = 'None'
       hasher.update(fingerprint.encode('utf-8'))
     return hasher.hexdigest()
