@@ -58,8 +58,7 @@ class JvmRunTest(JvmTaskTestBase):
     options = ['-Dexample.property1=1', '-Dexample.property2=1']
     with self.setup_cmdline_run(extra_jvm_options=options) as cmdline:
       for option in options:
-        self.assertTrue(option in cmdline)
-
+        self.assertIn(option, cmdline)
 
   def _match_cmdline_regex(self, cmdline, main):
     # Original classpath is embedded in the manifest file of a synthetic jar, just verify
