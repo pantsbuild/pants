@@ -5,6 +5,8 @@ env:
   global:
     - PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.ini"
     - PYTEST_PASSTHRU_ARGS="-v --duration=3"
+    - LC_ALL="en_US.UTF-8"
+
 
 before_cache:
   # Ensure permissions to do the below removals, which happen with or without caching enabled.
@@ -163,11 +165,8 @@ matrix:
     - <<: *default_test_config
       env:
         - SHARD="Py3 - Unit tests for pants and pants-plugins"
-        # Use less verbose logs, in order to not hit the log-length limit.
-        - PYTEST_PASSTHRU_ARGS="--tb=line"
       script:
-        # Allowed to fail.
-        - ./build-support/bin/ci.sh -x -3efkmrjcnt "${SHARD}" || exit 0
+        - ./build-support/bin/ci.sh -x -3efkmrjcnt "${SHARD}"
 
     - <<: *default_test_config
       env:
