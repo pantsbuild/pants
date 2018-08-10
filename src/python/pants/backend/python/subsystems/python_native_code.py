@@ -227,6 +227,19 @@ class SetupPyExecutionEnvironment(datatype([
         cpp_linker.path_entries)
       ret['PATH'] = create_path_env_var(all_path_entries)
 
+      all_library_dirs = (
+        c_compiler.library_dirs +
+        c_linker.library_dirs +
+        cpp_compiler.library_dirs +
+        cpp_linker.library_dirs)
+      joined_library_dirs = create_path_env_var(all_library_dirs)
+      dynamic_lib_env_var = plat.resolve_platform_specific({
+        'darwin': lambda: 'DYLD_LIBRARY_PATH',
+        'linux': lambda: 'LD_LIBRARY_PATH',
+      })
+      # Clang needs GCC's libstdc++.so.6 to run on Linux
+      ret[dynamic_lib_env_var] = joined_library_dirs
+
       ret['CC'] = c_compiler.exe_filename
       ret['CXX'] = cpp_compiler.exe_filename
       ret['LDSHARED'] = cpp_linker.exe_filename
