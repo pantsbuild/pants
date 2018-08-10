@@ -53,7 +53,6 @@ tests/python/pants_test/backend/python:interpreter_cache
 tests/python/pants_test/binaries:binaries
 tests/python/pants_test/build_graph:build_file_parser
 tests/python/pants_test/build_graph:build_graph
-tests/python/pants_test/build_graph:scopes
 tests/python/pants_test/build_graph:target
 tests/python/pants_test/cache:artifact_cache
 tests/python/pants_test/cache:cache_setup

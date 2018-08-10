@@ -48,9 +48,13 @@ class Scope(frozenset):
     :rtype: bool
     """
     if include_scopes is not None and not isinstance(include_scopes, Scope):
-      raise ValueError('include_scopes must be a Scope instance.')
+      raise ValueError('include_scopes must be a Scope instance but was {}.'.format(
+        type(include_scopes)
+      ))
     if exclude_scopes is not None and not isinstance(exclude_scopes, Scope):
-      raise ValueError('exclude_scopes must be a Scope instance.')
+      raise ValueError('exclude_scopes must be a Scope instance but was {}.'.format(
+        type(exclude_scopes)
+      ))
     if exclude_scopes and any(s in exclude_scopes for s in self):
       return False
     if include_scopes and not any(s in include_scopes for s in self):
@@ -58,7 +62,10 @@ class Scope(frozenset):
     return True
 
   def __add__(self, other):
-    return self | other
+    return Scope(super(Scope, self).__or__(other))
+
+  def __or__(self, other):
+    return Scope(super(Scope, self).__or__(other))
 
   def __str__(self):
     return ' '.join(sorted(self))
