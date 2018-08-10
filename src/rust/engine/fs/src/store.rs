@@ -198,40 +198,6 @@ impl Store {
   }
 
   ///
-  /// Loads a file proto from the local store, back-filling from remote if necessary.
-  ///
-  pub fn load_file(
-    &self,
-    file_digest: Digest,
-  ) -> BoxFuture<Option<bazel_protos::remote_execution::FileNode>, String> {
-    self.load_bytes_with(
-      EntryType::File,
-      file_digest,
-      move |bytes: Bytes| {
-        let mut file = bazel_protos::remote_execution::FileNode::new();
-        file.merge_from_bytes(&bytes).map_err(|e| {
-          format!(
-            "LMDB corruption: FileNode bytes for {:?} were not valid: {:?}",
-            file_digest, e
-          )
-        })?;
-
-        Ok(file)
-      },
-      move |bytes: Bytes| {
-        let mut file = bazel_protos::remote_execution::FileNode::new();
-        file.merge_from_bytes(&bytes).map_err(|e| {
-          format!(
-            "CAS returned FileNode proto for {:?} which was not valid: {:?}",
-            file_digest, e
-          )
-        });
-        Ok(file)
-      }
-    )
-  }
-
-  ///
   /// Loads bytes from remote cas. Takes two functions f_local and f_remote. These functions are
   /// any validation or transformations you want to perform on the bytes received from the
   /// local and remote cas.
@@ -362,7 +328,7 @@ impl Store {
   }
 
   ///
-  /// Download a directory from remote store recursively to the local one. Called only with the
+  /// Download a directory from Remote ByteStore recursively to the local one. Called only with the
   /// Digest of a Directory.
   ///
   pub fn ensure_local_has_recursive_directory(
@@ -373,7 +339,6 @@ impl Store {
     self
       .load_directory(dir_digest)
       .and_then(move |directory_opt| {
-        println!("loading parent digest: {:?}", dir_digest);
         directory_opt.ok_or_else(|| format!("Could not read dir with digest {:?}", dir_digest))
       })
       .and_then(move |directory| {
@@ -383,10 +348,7 @@ impl Store {
               .iter()
               .map(|file_node| {
                 let file_digest = try_future!(file_node.get_digest().into());
-                println!("1 loading file digest: {:?}", file_digest);
-                let filed = store.load_file(file_digest);
-                println!("6 Created local file with digest: {:?}", file_digest);
-                filed
+                store.load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
               })
               .collect::<Vec<_>>();
 
@@ -396,7 +358,6 @@ impl Store {
             .iter()
             .map (move |child_dir| {
               let child_digest = try_future!(child_dir.get_digest().into());
-              println!("loading child dir digest: {:?}", child_digest);
               store.ensure_local_has_recursive_directory(child_digest)
             })
             .collect::<Vec<_>>();
@@ -2301,31 +2262,14 @@ mod tests {
     let catnip = TestData::catnip();
     let testdir = TestDirectory::containing_roland();
     let recursive_testdir = TestDirectory::recursive();
-    println!("Created recursive_testdir  with digest: {:?}", recursive_testdir.digest());
-    println!("Created testdir with digest: {:?}", testdir.digest());
-    println!("Created catnip file with digest: {:?}", catnip.digest());
-    println!("Created roland file with digest: {:?}", roland.digest());
 
-    let cas = StubCAS::with_content(
-      1024,
-      vec![TestData::roland(), TestData::catnip()],
-      vec![TestDirectory::recursive(), TestDirectory::containing_roland()]
-    );
+    let cas = StubCAS::with_content(1024, vec![roland, catnip], vec![testdir, recursive_testdir]);
     new_store(dir.path(), cas.address())
       .ensure_local_has_recursive_directory(recursive_testdir.digest())
       .wait()
       .expect("Successfully downloaded recursive dir");
 
-//      let downloaded = download_recursive(
-//        &new_store(dir.path(), cas.address()), recursive_testdir.digest());
-//      let want: HashMap<Digest, EntryType> = vec![
-//        (recursive_testdir.digest(), EntryType::Directory),
-//        (testdir.digest(), EntryType::Directory),
-//        (roland.digest(), EntryType::File),
-//        (catnip.digest(), EntryType::File),
-//      ].into_iter()
-//          .collect();
-//      assert_eq!(downloaded, want);
+    // TODO(ity): Add check for individual directory/file bytes
   }
 
 
