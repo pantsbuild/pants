@@ -198,6 +198,40 @@ impl Store {
   }
 
   ///
+  /// Loads a file proto from the local store, back-filling from remote if necessary.
+  ///
+  pub fn load_file(
+    &self,
+    file_digest: Digest,
+  ) -> BoxFuture<Option<bazel_protos::remote_execution::FileNode>, String> {
+    self.load_bytes_with(
+      EntryType::File,
+      file_digest,
+      move |bytes: Bytes| {
+        let mut file = bazel_protos::remote_execution::FileNode::new();
+        file.merge_from_bytes(&bytes).map_err(|e| {
+          format!(
+            "LMDB corruption: FileNode bytes for {:?} were not valid: {:?}",
+            file_digest, e
+          )
+        })?;
+
+        Ok(file)
+      },
+      move |bytes: Bytes| {
+        let mut file = bazel_protos::remote_execution::FileNode::new();
+        file.merge_from_bytes(&bytes).map_err(|e| {
+          format!(
+            "CAS returned FileNode proto for {:?} which was not valid: {:?}",
+            file_digest, e
+          )
+        });
+        Ok(file)
+      }
+    )
+  }
+
+  ///
   /// Loads bytes from remote cas. Takes two functions f_local and f_remote. These functions are
   /// any validation or transformations you want to perform on the bytes received from the
   /// local and remote cas.
@@ -328,55 +362,49 @@ impl Store {
   }
 
   ///
-  /// Download a directory from remote CAS recursively to the local one. Called only with the
+  /// Download a directory from remote store recursively to the local one. Called only with the
   /// Digest of a Directory.
   ///
-  pub fn ensure_local_has_recursive_directory(&self, digest: Digest) -> BoxFuture<(), String> {
-    let local = self.local.clone();
-    let remote = match self.remote {
-      Some(ref remote) => remote,
-      None => {
-        return future::err(format!(
-          "Cannot ensure local has blobs from remote without a remote"
-        )).to_boxed()
-      }
-    };
+  pub fn ensure_local_has_recursive_directory(
+    &self,
+    dir_digest: Digest
+  ) -> BoxFuture<(), String> {
+    let store = self.clone();
+    self
+      .load_directory(dir_digest)
+      .and_then(move |directory_opt| {
+        println!("loading parent digest: {:?}", dir_digest);
+        directory_opt.ok_or_else(|| format!("Could not read dir with digest {:?}", dir_digest))
+      })
+      .and_then(move |directory| {
+          // Traverse the files within directory
+          let file_futures = directory
+              .get_files()
+              .iter()
+              .map(|file_node| {
+                let file_digest = try_future!(file_node.get_digest().into());
+                println!("1 loading file digest: {:?}", file_digest);
+                let filed = store.load_file(file_digest);
+                println!("6 Created local file with digest: {:?}", file_digest);
+                filed
+              })
+              .collect::<Vec<_>>();
 
-    self.load_directory(digest)    // backfills from remote if necessary
-      .and_then(|maybe_dir| match maybe_dir {
-        Some(directory) => {
-          // Traverse the files in the Digest Directory
-          for file in directory.get_files().into_iter() {
-            let file_digest = file.get_digest();
-            self.load_bytes_with(
-              EntryType::File,
-              file_digest,
-              move |bytes: Bytes| local.store_bytes(EntryType::File, bytes, false).unwrap(),
-              move |bytes: Bytes| {
-                let mut directory = bazel_protos::remote_execution::Directory::new();
-                directory.merge_from_bytes(&bytes).map_err(|e| {
-                  format!(
-                    "CAS returned Directory proto for {:?} which was not valid: {:?}",
-                    digest, e
-                  )
-                })?;
-                bazel_protos::verify_directory_canonical(&directory)?;
-                Ok(directory)}
-            ).and_then(move |maybe_future| match maybe_future {
-              Some(future) => Ok(future),
-              None => Err(format!("Failed to download digest {:?}: Not found", file_digest)),
-            });
-          }
-          // Recursively call subdirectories within Digest Directory
-          for sub_dir in directory.get_directories().into_iter() {
-            self.ensure_local_has_recursive_directory(sub_dir.get_digest().into());
-          }
-        }
-        None => {
-          return future::err(
-            format!("Could not read directory: {:?}", digest)).to_boxed() as BoxFuture<_,_>
-        }
-      }).to_boxed()
+          // Recursively call with sub-directories
+          let directory_futures = directory
+            .get_directories()
+            .iter()
+            .map (move |child_dir| {
+              let child_digest = try_future!(child_dir.get_digest().into());
+              println!("loading child dir digest: {:?}", child_digest);
+              store.ensure_local_has_recursive_directory(child_digest)
+            })
+            .collect::<Vec<_>>();
+          future::join_all(file_futures)
+              .join(future::join_all(directory_futures))
+              .map(|_| ())
+      })
+      .to_boxed()
   }
 
   pub fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(&self, digests: Ds) -> Result<(), String> {
@@ -2264,6 +2292,42 @@ mod tests {
       Ok(Some(testdir.bytes()))
     );
   }
+
+  #[test]
+  fn load_recursive_directory() {
+    let dir = TempDir::new().unwrap();
+
+    let roland = TestData::roland();
+    let catnip = TestData::catnip();
+    let testdir = TestDirectory::containing_roland();
+    let recursive_testdir = TestDirectory::recursive();
+    println!("Created recursive_testdir  with digest: {:?}", recursive_testdir.digest());
+    println!("Created testdir with digest: {:?}", testdir.digest());
+    println!("Created catnip file with digest: {:?}", catnip.digest());
+    println!("Created roland file with digest: {:?}", roland.digest());
+
+    let cas = StubCAS::with_content(
+      1024,
+      vec![TestData::roland(), TestData::catnip()],
+      vec![TestDirectory::recursive(), TestDirectory::containing_roland()]
+    );
+    new_store(dir.path(), cas.address())
+      .ensure_local_has_recursive_directory(recursive_testdir.digest())
+      .wait()
+      .expect("Successfully downloaded recursive dir");
+
+//      let downloaded = download_recursive(
+//        &new_store(dir.path(), cas.address()), recursive_testdir.digest());
+//      let want: HashMap<Digest, EntryType> = vec![
+//        (recursive_testdir.digest(), EntryType::Directory),
+//        (testdir.digest(), EntryType::Directory),
+//        (roland.digest(), EntryType::File),
+//        (catnip.digest(), EntryType::File),
+//      ].into_iter()
+//          .collect();
+//      assert_eq!(downloaded, want);
+  }
+
 
   #[test]
   fn load_file_missing_is_none() {
