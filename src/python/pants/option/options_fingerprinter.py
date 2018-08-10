@@ -10,8 +10,6 @@ import os
 from builtins import object, open, str
 from hashlib import sha1
 
-import six
-
 from pants.base.build_environment import get_buildroot
 from pants.base.hash_utils import stable_json_hash
 from pants.option.custom_types import (UnsetBool, dict_with_files_option, dir_option, file_option,
@@ -52,13 +50,10 @@ class OptionsFingerprinter(object):
     hasher = sha1()
     pairs = options.get_fingerprintable_for_scope(scope, **kwargs)
     for (option_type, option_value) in pairs:
-      hasher.update(
-        # N.B. `OptionsFingerprinter.fingerprint()` can return `None`,
-        # so we always cast to bytes here.
-        six.binary_type(
-          fingerprinter.fingerprint(option_type, option_value)
-        )
-      )
+      fingerprint = fingerprinter.fingerprint(option_type, option_value)
+      if fingerprint is None:
+        fingerprint = 'None'
+      hasher.update(fingerprint.encode('utf-8'))
     return hasher.hexdigest()
 
   def __init__(self, build_graph=None):
@@ -101,7 +96,7 @@ class OptionsFingerprinter(object):
         # Not all targets have hashes; in particular, `Dependencies` targets don't.
         h = target.compute_invalidation_hash()
         if h:
-          hasher.update(h)
+          hasher.update(h.encode('utf-8'))
     return hasher.hexdigest()
 
   def _assert_in_buildroot(self, filepath):
@@ -150,7 +145,7 @@ class OptionsFingerprinter(object):
     # Note that we don't sort the filepaths, as their order may have meaning.
     for filepath in filepaths:
       filepath = self._assert_in_buildroot(filepath)
-      hasher.update(os.path.relpath(filepath, get_buildroot()))
+      hasher.update(os.path.relpath(filepath, get_buildroot()).encode('utf-8'))
       with open(filepath, 'rb') as f:
         hasher.update(f.read())
     return hasher.hexdigest()
