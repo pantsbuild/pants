@@ -4,8 +4,8 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
-1.10.0dev2 (08/10/2018)
------------------------
+1.10.0.dev2 (08/10/2018)
+------------------------
 
 New features
 ~~~~~~~~~~~~
@@ -96,8 +96,8 @@ Migration to Python3 compatibility
 * drop self from __init__ and __new__ (#6299)
   `PR #6299 <https://github.com/pantsbuild/pants/pull/6299>`_
 
-1.10.0dev1 (08/03/2018)
------------------------
+1.10.0.dev1 (08/03/2018)
+------------------------
 
 New features
 ~~~~~~~~~~~~
@@ -159,8 +159,8 @@ Migration to Python3 compatibility
 * Python 3 fixes - fix contrib/python checkstyle (#6274)
   `PR #6274 <https://github.com/pantsbuild/pants/pull/6274>`_
 
-1.10.0dev0 (07/27/2018)
------------------------
+1.10.0.dev0 (07/27/2018)
+------------------------
 
 * Remove 1.10.x deprecations (#6268)
   `PR #6268 <https://github.com/pantsbuild/pants/pull/6268>`_
