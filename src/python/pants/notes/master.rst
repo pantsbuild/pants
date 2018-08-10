@@ -55,6 +55,9 @@ Refactoring, Improvements, and Tooling
 Documentation Updates
 ~~~~~~~~~~~~~~~~~~~~~
 
+* Document Pants features for Organizations (#5673)
+  `PR #5673 <https://github.com/pantsbuild/pants/pull/5673>`_
+
 * Add Sigma to "Powered by Pants" page (#6314)
   `PR #6314 <https://github.com/pantsbuild/pants/pull/6314>`_
 
@@ -63,6 +66,9 @@ Documentation Updates
 
 Migration to Python3 compatibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Skip known to fail tests in py3 (#6323)
+  `PR #6323 <https://github.com/pantsbuild/pants/pull/6323>`_
 
 * Strings are correctly returned from rust code (#6325)
   `PR #6325 <https://github.com/pantsbuild/pants/pull/6325>`_
