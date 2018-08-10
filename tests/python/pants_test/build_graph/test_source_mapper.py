@@ -53,8 +53,8 @@ class SourceMapperTest(object):
     )
     '''))
 
-    self.assertEqual(['path:target', 'path:buildholder'],
-                      list(a.spec for a in self.get_mapper().target_addresses_for_source('path/BUILD')))
+    self.assertEqual({'path:target', 'path:buildholder'},
+                      set(a.spec for a in self.get_mapper().target_addresses_for_source('path/BUILD')))
 
   def test_joint_ownership(self):
     # A simple target with two sources.

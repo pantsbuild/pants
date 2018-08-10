@@ -349,7 +349,7 @@ class InvalidationCacheManager(object):
     return os.path.join(
       self._results_dir_prefix,
       key.id,
-      self._STABLE_DIR_NAME if stable else sha1(key.hash).hexdigest()[:12]
+      self._STABLE_DIR_NAME if stable else sha1(key.hash.encode('utf-8')).hexdigest()[:12]
     )
 
   def wrap_targets(self, targets, topological_order=False):

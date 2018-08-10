@@ -450,7 +450,7 @@ class Target(AbstractTarget):
 
       dep_hashes = sorted(list(dep_hash_iter()))
       for dep_hash in dep_hashes:
-        hasher.update(dep_hash)
+        hasher.update(dep_hash.encode('utf-8'))
       target_hash = self.invalidation_hash(fingerprint_strategy)
       if target_hash is None and not dep_hashes:
         return None

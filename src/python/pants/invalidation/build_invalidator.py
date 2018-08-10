@@ -94,7 +94,7 @@ class CacheKeyGenerator(CacheKeyGeneratorInterface):
     hasher = hashlib.sha1()
     hasher.update(GLOBAL_CACHE_KEY_GEN_VERSION.encode('utf-8'))
     for base_fingerprint_input in base_fingerprint_inputs:
-      hasher.update(base_fingerprint_input)
+      hasher.update(base_fingerprint_input.encode('utf-8'))
     self._base_hasher = hasher
 
   def key_for_target(self, target, transitive=False, fingerprint_strategy=None):
@@ -215,7 +215,7 @@ class BuildInvalidator(object):
 
   def _write_sha(self, cache_key):
     with open(self._sha_file(cache_key), 'wb') as fd:
-      fd.write(cache_key.hash)
+      fd.write(cache_key.hash.encode('utf-8'))
 
   def _read_sha(self, cache_key):
     return self._read_sha_by_id(cache_key.id)
