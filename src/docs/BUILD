@@ -111,6 +111,11 @@ page(
 )
 
 page(
+  name='orgs',
+  source='orgs.md',
+)
+
+page(
     name='options',
     source='options.md',
 )

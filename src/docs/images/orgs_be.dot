@@ -1,0 +1,17 @@
+digraph G {
+  common [label="org.pantsbuild.common", color="red"];
+  fe_common [label="org.pantsbuild.fe.common"];
+  be_common [label="org.pantsbuild.be.common", color="red"];
+
+  fe_common -> common;
+  be_common -> common;
+
+  service_common [label="org.pantsbuild.common.service", color="red"];
+  fe_service [label="org.pantsbuild.fe.service"];
+  be_service [label="org.pantsbuild.be.service", color="red"];
+
+  fe_service -> service_common;
+  fe_service -> fe_common;
+  be_service -> service_common;
+  be_service -> be_common;
+}
