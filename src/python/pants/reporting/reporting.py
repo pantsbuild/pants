@@ -2,13 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import sys
-
-from six import StringIO
+from builtins import open
+from io import StringIO
 
 from pants.base.workunit import WorkUnitLabel
 from pants.reporting.html_reporter import HtmlReporter
@@ -39,12 +38,12 @@ class Reporting(Subsystem):
              default=PlainTextReporter.LABEL_FORMATTING,
              help='Controls the printing of workunit labels to the console.  Workunit types are '
                   '{workunits}.  Possible formatting values are {formats}'.format(
-               workunits=WorkUnitLabel.keys(), formats=LabelFormat.keys()))
+               workunits=list(WorkUnitLabel.keys()), formats=list(LabelFormat.keys())))
     register('--console-tool-output-format', advanced=True, type=dict,
              default=PlainTextReporter.TOOL_OUTPUT_FORMATTING,
              help='Controls the printing of workunit tool output to the console. Workunit types are '
                   '{workunits}.  Possible formatting values are {formats}'.format(
-               workunits=WorkUnitLabel.keys(), formats=ToolOutputFormat.keys()))
+               workunits=list(WorkUnitLabel.keys()), formats=list(ToolOutputFormat.keys())))
 
   def initialize(self, run_tracker, start_time=None):
     """Initialize with the given RunTracker.

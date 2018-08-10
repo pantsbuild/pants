@@ -2,20 +2,25 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import glob
 import os
 from contextlib import closing, contextmanager
-from StringIO import StringIO
+from io import BytesIO
 
+from future.utils import PY2
+
+from pants.base.deprecated import deprecated_module
 from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_dir
 from pants.util.process_handler import subprocess
 from pants_test.base_test import BaseTest
+
+
+deprecated_module('1.12.0.dev0', 'Use pants_test.TaskTestBase instead')
 
 
 # TODO: Find a better home for this?
@@ -104,7 +109,9 @@ class TaskTestBase(BaseTest):
     :param options_scope: The scope to give options on the generated task type.
     :return: A pair (type, options_scope)
     """
-    subclass_name = b'test_{0}_{1}'.format(task_type.__name__, options_scope)
+    subclass_name = 'test_{0}_{1}'.format(task_type.__name__, options_scope)
+    if PY2:
+      subclass_name = subclass_name.encode('utf-8')
     return type(subclass_name, (task_type,), {'_stable_name': task_type._compute_stable_name(),
                                               'options_scope': options_scope})
 
@@ -190,7 +197,7 @@ class ConsoleTaskTestBase(TaskTestBase):
     Returns the text output of the task.
     """
     options = options or {}
-    with closing(StringIO()) as output:
+    with closing(BytesIO()) as output:
       self.set_options(**options)
       context = self.context(target_roots=targets, console_outstream=output)
       task = self.create_task(context)
@@ -198,7 +205,7 @@ class ConsoleTaskTestBase(TaskTestBase):
       return output.getvalue()
 
   def execute_console_task(self, targets=None, extra_targets=None, options=None,
-                           passthru_args=None, workspace=None):
+                           passthru_args=None, workspace=None, scheduler=None):
     """Creates a new task and executes it with the given config, command line args and targets.
 
     :API: public
@@ -214,7 +221,12 @@ class ConsoleTaskTestBase(TaskTestBase):
     """
     options = options or {}
     self.set_options(**options)
-    context = self.context(target_roots=targets, passthru_args=passthru_args, workspace=workspace)
+    context = self.context(
+      target_roots=targets,
+      passthru_args=passthru_args,
+      workspace=workspace,
+      scheduler=scheduler
+    )
     return self.execute_console_task_given_context(context, extra_targets=extra_targets)
 
   def execute_console_task_given_context(self, context, extra_targets=None):

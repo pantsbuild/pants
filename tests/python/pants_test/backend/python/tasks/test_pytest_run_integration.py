@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import sys
@@ -59,7 +58,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
                                 '--timeout-terminate-wait=2',
-                                '--timeout-default=1',
+                                '--timeout-default=5',
                                 '--coverage=auto',
                                 '--cache-ignore',
                                 'testprojects/tests/python/pants/timeout:ignores_terminate'])
@@ -73,11 +72,28 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     self.assertIn("No .coverage file was found! Skipping coverage reporting", pants_run.stdout_data)
 
     # Ensure that the timeout message triggered.
-    self.assertIn("FAILURE: Timeout of 1 seconds reached.", pants_run.stdout_data)
+    self.assertIn("FAILURE: Timeout of 5 seconds reached.", pants_run.stdout_data)
 
     # Ensure that the warning about killing triggered.
-    self.assertIn("WARN] Timed out test did not terminate gracefully after 2 seconds, "
-                  "killing...", pants_run.stderr_data)
+    self.assertIn("Timed out test did not terminate gracefully after 2 seconds, "
+                  "killing...", pants_run.stdout_data)
+
+  def test_pytest_run_killed_by_signal(self):
+    start = time.time()
+    pants_run = self.run_pants(['clean-all',
+                                'test.pytest',
+                                '--timeout-terminate-wait=2',
+                                '--timeout-default=5',
+                                '--cache-ignore',
+                                'testprojects/tests/python/pants/timeout:terminates_self'])
+    end = time.time()
+    self.assert_failure(pants_run)
+
+    # Ensure that the failure took less than 100 seconds to run to allow for test overhead.
+    self.assertLess(end - start, 100)
+
+    # Ensure that we get a message indicating the abnormal exit.
+    self.assertIn("FAILURE: Test was killed by signal", pants_run.stdout_data)
 
   def test_pytest_explicit_coverage(self):
     with temporary_dir(cleanup=False) as coverage_dir:

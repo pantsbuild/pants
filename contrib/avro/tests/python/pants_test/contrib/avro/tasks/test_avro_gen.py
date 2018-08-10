@@ -2,8 +2,7 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -30,9 +29,9 @@ class AvroJavaGenTest(NailgunTaskTestBase):
   def task_type(cls):
     return MockAvroJavaGenTest
 
-  @property
-  def alias_groups(self):
-    return super(AvroJavaGenTest, self).alias_groups.merge(
+  @classmethod
+  def alias_groups(cls):
+    return super(AvroJavaGenTest, cls).alias_groups().merge(
       BuildFileAliases(targets={'java_avro_library': JavaAvroLibrary}))
 
   def _test_avro(self, target_spec):
@@ -78,11 +77,11 @@ class AvroJavaGenTest(NailgunTaskTestBase):
     '''))
 
     task = self._test_avro('avro-build:avro-schema')
-    self.assertEquals(len(task._test_cmd_log), 1)
-    self.assertEquals(task._test_cmd_log[0][:-1], ['compile', 'schema', 'avro-build/src/avro/schema.avsc'])
+    self.assertEqual(len(task._test_cmd_log), 1)
+    self.assertEqual(task._test_cmd_log[0][:-1], ['compile', 'schema', 'avro-build/src/avro/schema.avsc'])
 
     task = self._test_avro('avro-build:avro-idl')
-    self.assertEquals(len(task._test_cmd_log), 2)
-    self.assertEquals(task._test_cmd_log[0][:-1], ['idl', 'avro-build/src/avro/record.avdl'])
+    self.assertEqual(len(task._test_cmd_log), 2)
+    self.assertEqual(task._test_cmd_log[0][:-1], ['idl', 'avro-build/src/avro/record.avdl'])
     generated_protocol_json_file = task._test_cmd_log[0][-1]
-    self.assertEquals(task._test_cmd_log[1][:-1], ['compile', 'protocol', generated_protocol_json_file])
+    self.assertEqual(task._test_cmd_log[1][:-1], ['compile', 'protocol', generated_protocol_json_file])

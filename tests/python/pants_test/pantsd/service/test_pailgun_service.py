@@ -2,10 +2,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
+from builtins import object
 
 import mock
 
@@ -26,9 +26,7 @@ class TestPailgunService(unittest.TestCase):
     self.mock_scheduler_service = mock.Mock(side_effect=Exception('should not be called'))
     self.mock_target_roots_calculator = mock.Mock(side_effect=Exception('should not be called'))
     self.service = PailgunService(bind_addr=(None, None),
-                                  exiter_class=self.mock_exiter_class,
                                   runner_class=self.mock_runner_class,
-                                  target_roots_calculator=self.mock_target_roots_calculator,
                                   scheduler_service=self.mock_scheduler_service)
 
   @mock.patch.object(PailgunService, '_setup_pailgun', **PATCH_OPTS)

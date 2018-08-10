@@ -3,6 +3,8 @@
 
 python_library(
   dependencies=[
+    '3rdparty/python:configparser',
+    '3rdparty/python:future',
     '3rdparty/python:ansicolors',
     '3rdparty/python:setuptools',
     '3rdparty/python:six',
@@ -13,6 +15,7 @@ python_library(
     'src/python/pants/util:eval',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
+    'src/python/pants/util:objects',
     'src/python/pants/util:strutil',
   ]
 )

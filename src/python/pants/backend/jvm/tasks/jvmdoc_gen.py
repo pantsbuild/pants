@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import collections
 import contextlib
@@ -13,6 +12,7 @@ import re
 
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
+from pants.build_graph.target_scopes import Scopes
 from pants.task.target_restriction_mixins import (HasSkipAndTransitiveOptionsMixin,
                                                   SkipAndTransitiveOptionsRegistrar)
 from pants.util import desktop
@@ -134,7 +134,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
   def _generate_combined(self, targets, create_jvmdoc_command):
     gendir = os.path.join(self.workdir, 'combined')
     if targets:
-      classpath = self.classpath(targets)
+      classpath = self.classpath(targets, include_scopes=Scopes.JVM_COMPILE_SCOPES)
       safe_mkdir(gendir, clean=True)
       command = create_jvmdoc_command(classpath, gendir, *targets)
       if command:
@@ -151,7 +151,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
     jobs = {}
     for target in targets:
       gendir = self._gendir(target)
-      classpath = self.classpath([target])
+      classpath = self.classpath([target], include_scopes=Scopes.JVM_COMPILE_SCOPES)
       command = create_jvmdoc_command(classpath, gendir, target)
       if command:
         jobs[gendir] = (target, command)
@@ -189,7 +189,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
 
   def _handle_create_jvmdoc_result(self, targets, result, command):
     if result != 0:
-      targetlist = ", ".join(map(lambda target: target.address.spec, targets))
+      targetlist = ", ".join(target.address.spec for target in targets)
       message = 'Failed to process {} for {} [{}]: {}'.format(
                 self.jvmdoc().tool_name, targetlist, result, " ".join(command))
       if self.ignore_failure:

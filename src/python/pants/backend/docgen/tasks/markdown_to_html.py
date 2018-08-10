@@ -2,12 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import codecs
 import os
 import re
+from builtins import str
 
 from pkg_resources import resource_string
 from pygments.formatters.html import HtmlFormatter
@@ -51,9 +51,12 @@ class MarkdownToHtml(Task):
              fingerprint=True,
              help='Do not consider rendering errors to be build errors.')
 
+  MARKDOWN_HTML_PRODUCT = 'markdown_html'
+  WIKI_HTML_PRODUCT = 'wiki_html'
+
   @classmethod
   def product_types(cls):
-    return ['markdown_html', 'wiki_html']
+    return [cls.MARKDOWN_HTML_PRODUCT, cls.WIKI_HTML_PRODUCT]
 
   def __init__(self, *args, **kwargs):
     super(MarkdownToHtml, self).__init__(*args, **kwargs)
@@ -88,8 +91,8 @@ class MarkdownToHtml(Task):
           roots.add(page)
 
     with self.context.new_workunit(name='render', labels=[WorkUnitLabel.MULTITOOL]):
-      plaingenmap = self.context.products.get('markdown_html')
-      wikigenmap = self.context.products.get('wiki_html')
+      plaingenmap = self.context.products.get(self.MARKDOWN_HTML_PRODUCT)
+      wikigenmap = self.context.products.get(self.WIKI_HTML_PRODUCT)
       show = []
       for page in self.context.targets(is_page):
         def process_page(key, outdir, url_builder, genmap, fragment=False):

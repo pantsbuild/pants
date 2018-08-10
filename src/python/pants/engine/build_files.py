@@ -2,10 +2,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import collections
+import functools
+import logging
+from builtins import next, str
 from os.path import dirname, join
 
 import six
@@ -15,15 +17,19 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
                               SingleAddress, Specs)
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.engine.addressable import AddressableDescriptor, BuildFileAddresses, TypeConstraintError
-from pants.engine.fs import FilesContent, PathGlobs, Snapshot
+from pants.engine.addressable import AddressableDescriptor, BuildFileAddresses
+from pants.engine.fs import DirectoryDigest, FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
-from pants.engine.selectors import Get, Select, SelectDependencies
+from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
-from pants.util.dirutil import fast_relpath_optional
-from pants.util.objects import datatype
+from pants.util.dirutil import fast_relpath_optional, recursive_dirname
+from pants.util.filtering import create_filters, wrap_filters
+from pants.util.objects import TypeConstraintError, datatype
+
+
+logger = logging.getLogger(__name__)
 
 
 class ResolvedTypeMismatchError(ResolveError):
@@ -42,13 +48,13 @@ def parse_address_family(address_mapper, directory):
   The AddressFamily may be empty, but it will not be None.
   """
   patterns = tuple(join(directory.path, p) for p in address_mapper.build_patterns)
-  path_globs = PathGlobs.create('',
-                                include=patterns,
-                                exclude=address_mapper.build_ignore_patterns)
-  files_content = yield Get(FilesContent, PathGlobs, path_globs)
+  path_globs = PathGlobs(include=patterns,
+                         exclude=address_mapper.build_ignore_patterns)
+  snapshot = yield Get(Snapshot, PathGlobs, path_globs)
+  files_content = yield Get(FilesContent, DirectoryDigest, snapshot.directory_digest)
 
   if not files_content:
-    raise ResolveError('Directory "{}" does not contain build files.'.format(directory.path))
+    raise ResolveError('Directory "{}" does not contain any BUILD files.'.format(directory.path))
   address_maps = []
   for filecontent_product in files_content.dependencies:
     address_maps.append(AddressMap.parse(filecontent_product.path,
@@ -57,7 +63,7 @@ def parse_address_family(address_mapper, directory):
   yield AddressFamily.create(directory.path, address_maps)
 
 
-class UnhydratedStruct(datatype('UnhydratedStruct', ['address', 'struct', 'dependencies'])):
+class UnhydratedStruct(datatype(['address', 'struct', 'dependencies'])):
   """A product type that holds a Struct which has not yet been hydrated.
 
   A Struct counts as "hydrated" when all of its members (which are not themselves dependencies
@@ -65,14 +71,6 @@ class UnhydratedStruct(datatype('UnhydratedStruct', ['address', 'struct', 'depen
   of inline addressable fields, but lazy in terms of the complete graph walk represented by
   the `dependencies` field of StructWithDeps.
   """
-
-  def __eq__(self, other):
-    if type(self) != type(other):
-      return NotImplemented
-    return self.struct == other.struct
-
-  def __ne__(self, other):
-    return not (self == other)
 
   def __hash__(self):
     return hash(self.struct)
@@ -127,15 +125,18 @@ def resolve_unhydrated_struct(address_mapper, address):
   collect_dependencies(struct)
 
   yield UnhydratedStruct(
-    filter(lambda build_address: build_address == address, addresses)[0], struct, dependencies)
+    next(build_address for build_address in addresses if build_address == address),
+    struct,
+    dependencies)
 
 
-def hydrate_struct(address_mapper, unhydrated_struct, dependencies):
+def hydrate_struct(symbol_table_constraint, address_mapper, unhydrated_struct):
   """Hydrates a Struct from an UnhydratedStruct and its satisfied embedded addressable deps.
 
   Note that this relies on the guarantee that DependenciesNode provides dependencies in the
   order they were requested.
   """
+  dependencies = yield [Get(symbol_table_constraint, Address, a) for a in unhydrated_struct.dependencies]
   address = unhydrated_struct.address
   struct = unhydrated_struct.struct
 
@@ -176,7 +177,7 @@ def hydrate_struct(address_mapper, unhydrated_struct, dependencies):
         hydrated_args[key] = maybe_consume(key, value)
     return _hydrate(type(item), address.spec_path, **hydrated_args)
 
-  return consume_dependencies(struct, args={'address': address})
+  yield consume_dependencies(struct, args={'address': address})
 
 
 def _hydrate(item_type, spec_path, **kwargs):
@@ -221,25 +222,30 @@ def addresses_from_address_families(address_mapper, specs):
   by_directory.cached = None
 
   def raise_empty_address_family(spec):
-    raise ResolveError('Path "{}" contains no BUILD files.'.format(spec.directory))
+    raise ResolveError('Path "{}" does not contain any BUILD files.'.format(spec.directory))
 
-  def exclude_address(address):
-    if address_mapper.exclude_patterns:
-      address_str = address.spec
-      return any(p.search(address_str) is not None for p in address_mapper.exclude_patterns)
+  def exclude_address(spec):
+    if specs.exclude_patterns:
+      return any(p.search(spec) is not None for p in specs.exclude_patterns_memo())
     return False
+
+  def filter_for_tag(tag):
+    return lambda t: tag in [str(t_tag) for t_tag in t.kwargs().get("tags", [])]
+
+  include_target = wrap_filters(create_filters(specs.tags if specs.tags else '', filter_for_tag))
 
   addresses = []
   included = set()
   def include(address_families, predicate=None):
     matched = False
     for af in address_families:
-      for a in af.addressables.keys():
-        if not exclude_address(a) and (predicate is None or predicate(a)):
-          matched = True
-          if a not in included:
-            addresses.append(a)
-            included.add(a)
+      for (a, t) in af.addressables.items():
+        if (predicate is None or predicate(a)):
+          if include_target(t) and (not exclude_address(a.spec)):
+            matched = True
+            if a not in included:
+              addresses.append(a)
+              included.add(a)
     return matched
 
   for spec in specs.dependencies:
@@ -261,8 +267,11 @@ def addresses_from_address_families(address_mapper, specs):
       address_family = by_directory().get(spec.directory)
       if not address_family:
         raise_empty_address_family(spec)
+      # spec.name here is generally the root node specified on commandline. equality here implies
+      # a root node i.e. node specified on commandline.
       if not include([address_family], predicate=lambda a: a.target_name == spec.name):
-        _raise_did_you_mean(address_family, spec.name)
+        if len(addresses) == 0:
+          _raise_did_you_mean(address_family, spec.name)
     elif type(spec) is AscendantAddresses:
       include(
         af
@@ -271,7 +280,6 @@ def addresses_from_address_families(address_mapper, specs):
       )
     else:
       raise ValueError('Unrecognized Spec type: {}'.format(spec))
-
   yield BuildFileAddresses(addresses)
 
 
@@ -288,25 +296,10 @@ def _spec_to_globs(address_mapper, specs):
     elif type(spec) is AscendantAddresses:
       patterns.update(join(f, pattern)
                       for pattern in address_mapper.build_patterns
-                      for f in _recursive_dirname(spec.directory))
+                      for f in recursive_dirname(spec.directory))
     else:
       raise ValueError('Unrecognized Spec type: {}'.format(spec))
-  return PathGlobs.create('', include=patterns, exclude=address_mapper.build_ignore_patterns)
-
-
-def _recursive_dirname(f):
-  """Given a relative path like 'a/b/c/d', yield all ascending path components like:
-
-        'a/b/c/d'
-        'a/b/c'
-        'a/b'
-        'a'
-        ''
-  """
-  while f:
-    yield f
-    f = dirname(f)
-  yield ''
+  return PathGlobs(include=patterns, exclude=address_mapper.build_ignore_patterns)
 
 
 def create_graph_rules(address_mapper, symbol_table):
@@ -316,6 +309,10 @@ def create_graph_rules(address_mapper, symbol_table):
   :param symbol_table: A SymbolTable instance to provide symbols for Address lookups.
   """
   symbol_table_constraint = symbol_table.constraint()
+
+  partial_hydrate_struct = functools.partial(hydrate_struct, symbol_table_constraint)
+  partial_hydrate_struct.__name__ = 'hydrate_struct'
+
   return [
     # A singleton to provide the AddressMapper.
     SingletonRule(AddressMapper, address_mapper),
@@ -323,9 +320,9 @@ def create_graph_rules(address_mapper, symbol_table):
     TaskRule(
       symbol_table_constraint,
       [Select(AddressMapper),
-       Select(UnhydratedStruct),
-       SelectDependencies(symbol_table_constraint, UnhydratedStruct, field_types=(Address,))],
-      hydrate_struct
+       Select(UnhydratedStruct)],
+      partial_hydrate_struct,
+      input_gets=[Get(symbol_table_constraint, Address)],
     ),
     resolve_unhydrated_struct,
     # BUILD file parsing.

@@ -2,13 +2,13 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.util.contextutil import temporary_file
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.tasks.go_go import GoEnv, GoGo, GoInteropTask
@@ -67,7 +67,7 @@ class GoEnvTest(TaskTestBase):
     with temporary_file() as stdout:
       task.execute(stdout=stdout)
       stdout.close()
-      with open(stdout.name) as output:
+      with open(stdout.name, 'r') as output:
         self.assertEqual(output.read().strip(),
                          os.pathsep.join([task.get_gopath(bob_binary),
                                           task.get_gopath(jane_binary)]))
@@ -88,7 +88,7 @@ class GoGoTest(TaskTestBase):
     with temporary_file() as stdout:
       task.execute(stdout=stdout)
       stdout.close()
-      with open(stdout.name) as output:
+      with open(stdout.name, 'r') as output:
         self.assertEqual(output.read().strip(),
                          os.pathsep.join([task.get_gopath(bob_binary),
                                           task.get_gopath(jane_binary)]))

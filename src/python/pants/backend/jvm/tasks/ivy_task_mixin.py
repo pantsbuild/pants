@@ -2,12 +2,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import logging
 import os
+from builtins import str
+
+from future.utils import PY3
 
 from pants.backend.jvm.ivy_utils import NO_RESOLVE_RUN_RESULT, IvyFetchStep, IvyResolveStep
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
@@ -49,7 +51,7 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
       return None
 
     hasher = hashlib.sha1()
-    hasher.update(target.payload.fingerprint())
+    hasher.update(target.payload.fingerprint().encode('utf-8'))
 
     for conf in self._confs:
       hasher.update(conf)
@@ -57,7 +59,7 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
     for element in hash_elements_for_target:
       hasher.update(element)
 
-    return hasher.hexdigest()
+    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def __hash__(self):
     return hash((type(self), '-'.join(self._confs)))
@@ -101,15 +103,12 @@ class IvyTaskMixin(TaskBase):
     return super(IvyTaskMixin, cls).implementation_version() + [('IvyTaskMixin', 4)]
 
   @memoized_property
-  def ivy_cache_dir(self):
-    """The path of the ivy cache dir used for resolves.
+  def ivy_repository_cache_dir(self):
+    return IvySubsystem.global_instance().repository_cache_dir()
 
-    :API: public
-
-    :rtype: string
-    """
-    # TODO(John Sirois): Fixup the IvySubsystem to encapsulate its properties.
-    return IvySubsystem.global_instance().get_options().cache_dir
+  @memoized_property
+  def ivy_resolution_cache_dir(self):
+    return IvySubsystem.global_instance().resolution_cache_dir()
 
   def resolve(self, executor, targets, classpath_products, confs=None, extra_args=None,
               invalidate_dependents=False):
@@ -237,13 +236,15 @@ class IvyTaskMixin(TaskBase):
                            resolve_hash_name,
                            pinned_artifacts,
                            self.get_options().soft_excludes,
-                           self.ivy_cache_dir,
+                           self.ivy_resolution_cache_dir,
+                           self.ivy_repository_cache_dir,
                            global_ivy_workdir)
       resolve = IvyResolveStep(confs,
                                resolve_hash_name,
                                pinned_artifacts,
                                self.get_options().soft_excludes,
-                               self.ivy_cache_dir,
+                               self.ivy_resolution_cache_dir,
+                               self.ivy_repository_cache_dir,
                                global_ivy_workdir)
 
       return self._perform_resolution(fetch, resolve, executor, extra_args, invalidation_check,

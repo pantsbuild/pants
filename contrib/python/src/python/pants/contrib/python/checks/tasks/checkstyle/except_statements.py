@@ -2,10 +2,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
+
+from future.utils import PY3
 
 from pants.contrib.python.checks.tasks.checkstyle.common import CheckstylePlugin
 
@@ -22,7 +23,7 @@ class ExceptStatements(CheckstylePlugin):
   @classmethod
   def iter_excepts(cls, tree):
     for ast_node in ast.walk(tree):
-      if isinstance(ast_node, ast.TryExcept):
+      if isinstance(ast_node, ast.Try if PY3 else ast.TryExcept):
         yield ast_node
 
   def nits(self):

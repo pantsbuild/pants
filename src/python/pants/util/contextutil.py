@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
@@ -14,10 +13,11 @@ import tempfile
 import time
 import uuid
 import zipfile
+from builtins import object, open
 from contextlib import closing, contextmanager
 
 from colors import green
-from six import string_types
+from future.utils import PY3, string_types
 
 from pants.util.dirutil import safe_delete
 from pants.util.tarutil import TarFile
@@ -27,25 +27,14 @@ class InvalidZipPath(ValueError):
   """Indicates a bad zip file path."""
 
 
-def get_joined_path(new_entries, env=None, env_var='PATH', delimiter=':', prepend=False):
-  """Join path entries, combining with an environment variable if specified."""
-  if env is None:
-    env = {}
+def _os_encode(u, enc=sys.getfilesystemencoding()):
+  """Turns a `unicode` into `bytes` via encoding."""
+  return u.encode(enc, 'strict')
 
-  prev_path = env.get(env_var, None)
-  if prev_path is None:
-    path_dirs = list()
-  else:
-    path_dirs = list(prev_path.split(delimiter))
 
-  new_entries_list = list(new_entries)
-
-  if prepend:
-    path_dirs = new_entries_list + path_dirs
-  else:
-    path_dirs += new_entries_list
-
-  return delimiter.join(path_dirs)
+def _os_decode(b, enc=sys.getfilesystemencoding()):
+  """Turns a `bytes` into `unicode` via decoding."""
+  return b.decode(enc, 'strict')
 
 
 @contextmanager
@@ -61,7 +50,7 @@ def environment_as(**kwargs):
 
   def setenv(key, val):
     if val is not None:
-      os.environ[key] = val
+      os.environ[key] = val if PY3 else _os_encode(val)
     else:
       if key in os.environ:
         del os.environ[key]
@@ -76,15 +65,35 @@ def environment_as(**kwargs):
       setenv(key, val)
 
 
+def _copy_and_decode_env(env):
+  return {k: _os_decode(v) for k, v in env.items()}
+
+
+def _purge_env():
+  # N.B. Without the use of `del` here (which calls `os.unsetenv` under the hood), subprocess32
+  # invokes or other things that may access the environment at the C level may not see the
+  # correct env vars (i.e. we can't just replace os.environ with an empty dict).
+  # See https://docs.python.org/2/library/os.html#os.unsetenv for more info.
+  for k in os.environ.keys():
+    del os.environ[k]
+
+
+def _restore_env(env):
+  for k, v in env.items():
+    os.environ[k] = v if PY3 else _os_encode(v)
+
+
 @contextmanager
 def hermetic_environment_as(**kwargs):
   """Set the environment to the supplied values from an empty state."""
-  old_environment, os.environ = os.environ, {}
+  old_environment = os.environ.copy() if PY3 else _copy_and_decode_env(os.environ)
+  _purge_env()
   try:
     with environment_as(**kwargs):
       yield
   finally:
-    os.environ = old_environment
+    _purge_env()
+    _restore_env(old_environment)
 
 
 @contextmanager
@@ -124,10 +133,12 @@ def stdio_as(stdout_fd, stderr_fd, stdin_fd):
   possible that the OS has repurposed fds `0, 1, 2` to represent other files or sockets. It's
   impossible for this method to locate all python objects which refer to those fds, so it's up
   to the caller to guarantee that `0, 1, 2` are safe to replace.
+
+  In Python3, the streams expect unicode. To write and read bytes, access their buffer, e.g. `stdin.buffer.read()`.
   """
-  with _stdio_stream_as(stdin_fd,  0, 'stdin',  'rb'),\
-       _stdio_stream_as(stdout_fd, 1, 'stdout', 'wb'),\
-       _stdio_stream_as(stderr_fd, 2, 'stderr', 'wb'):
+  with _stdio_stream_as(stdin_fd,  0, 'stdin',  'r'),\
+       _stdio_stream_as(stdout_fd, 1, 'stdout', 'w'),\
+       _stdio_stream_as(stderr_fd, 2, 'stderr', 'w'):
     yield
 
 
@@ -146,7 +157,7 @@ def signal_handler_as(sig, handler):
 
 
 @contextmanager
-def temporary_dir(root_dir=None, cleanup=True, suffix=str(), permissions=None, prefix=tempfile.template):
+def temporary_dir(root_dir=None, cleanup=True, suffix='', permissions=None, prefix=tempfile.template):
   """
     A with-context that creates a temporary directory.
 
@@ -185,7 +196,7 @@ def temporary_file_path(root_dir=None, cleanup=True, suffix='', permissions=None
 
 
 @contextmanager
-def temporary_file(root_dir=None, cleanup=True, suffix='', permissions=None):
+def temporary_file(root_dir=None, cleanup=True, suffix='', permissions=None, binary_mode=True):
   """
     A with-context that creates a temporary file and returns a writeable file descriptor to it.
 
@@ -198,8 +209,10 @@ def temporary_file(root_dir=None, cleanup=True, suffix='', permissions=None):
                        if you need one, put it at the beginning of suffix.
                        See :py:class:`tempfile.NamedTemporaryFile`.
     :param int permissions: If provided, sets the file to use these permissions.
+    :param bool binary_mode: Whether file opens in binary or text mode.
   """
-  with tempfile.NamedTemporaryFile(suffix=suffix, dir=root_dir, delete=False) as fd:
+  mode = 'w+b' if binary_mode else 'w+'  # tempfile's default is 'w+b'
+  with tempfile.NamedTemporaryFile(suffix=suffix, dir=root_dir, delete=False, mode=mode) as fd:
     try:
       if permissions is not None:
         os.chmod(fd.name, permissions)
@@ -282,7 +295,8 @@ def open_tar(path_or_file, *args, **kwargs):
     If path_or_file is a file, caller must close it separately.
   """
   (path, fileobj) = ((path_or_file, None) if isinstance(path_or_file, string_types)
-                     else (None, path_or_file))
+                     else (None, path_or_file))  # TODO(python3port): stop using six.string_types
+                                                 # This should only accept python3 `str`, not byte strings.
   with closing(TarFile.open(path, *args, fileobj=fileobj, **kwargs)) as tar:
     yield tar
 

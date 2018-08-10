@@ -1,6 +1,7 @@
-extern crate bazel_protos;
+#[macro_use]
 extern crate boxfuture;
 extern crate bytes;
+#[macro_use(value_t)]
 extern crate clap;
 extern crate env_logger;
 extern crate fs;
@@ -11,15 +12,14 @@ extern crate protobuf;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{App, Arg, SubCommand};
-use fs::{ResettablePool, Snapshot, Store, StoreFileByDigest, VFS};
+use fs::{GlobMatching, ResettablePool, Snapshot, Store, StoreFileByDigest};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use protobuf::Message;
-use std::error::Error;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -29,7 +29,7 @@ enum ExitCode {
 }
 
 #[derive(Debug)]
-struct ExitError(pub String, pub ExitCode);
+struct ExitError(String, ExitCode);
 
 impl From<String> for ExitError {
   fn from(s: String) -> Self {
@@ -41,7 +41,7 @@ fn main() {
   env_logger::init();
 
   match execute(
-    App::new("fs_util")
+    &App::new("fs_util")
       .subcommand(
         SubCommand::with_name("file")
           .subcommand(
@@ -113,7 +113,7 @@ to this directory.",
                   .long("output-format")
                   .takes_value(true)
                   .default_value("binary")
-                  .possible_values(&["binary", "text"]),
+                  .possible_values(&["binary", "recursive-file-list", "text"]),
               )
               .arg(Arg::with_name("fingerprint").required(true).takes_value(
                 true,
@@ -147,6 +147,14 @@ to this directory.",
               .long("server-address")
               .required(false)
         )
+        .arg(
+          Arg::with_name("chunk-bytes")
+              .help("Number of bytes to include per-chunk when uploading bytes. grpc imposes a hard message-size limit of around 4MB.")
+              .takes_value(true)
+              .long("chunk-bytes")
+              .required(false)
+              .default_value(&format!("{}", 3 * 1024 * 1024))
+        )
       .get_matches(),
   ) {
     Ok(_) => {}
@@ -157,22 +165,26 @@ to this directory.",
   };
 }
 
-fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
+fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
   let store_dir = top_match.value_of("local-store-path").unwrap();
   let pool = Arc::new(ResettablePool::new("fsutil-pool-".to_string()));
   let (store, store_has_remote) = {
     let (store_result, store_has_remote) = match top_match.value_of("server-address") {
-      Some(cas_address) => (
-        Store::with_remote(
-          store_dir,
-          pool.clone(),
-          cas_address,
-          1,
-          10 * 1024 * 1024,
-          Duration::from_secs(30),
-        ),
-        true,
-      ),
+      Some(cas_address) => {
+        let chunk_size =
+          value_t!(top_match.value_of("chunk-bytes"), usize).expect("Bad chunk-bytes flag");
+        (
+          Store::with_remote(
+            store_dir,
+            pool.clone(),
+            cas_address.to_owned(),
+            1,
+            chunk_size,
+            Duration::from_secs(30),
+          ),
+          true,
+        )
+      }
       None => (Store::local_only(store_dir, pool.clone()), false),
     };
     let store = store_result.map_err(|e| {
@@ -211,7 +223,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
           let posix_fs = make_posix_fs(
             path
               .canonicalize()
-              .map_err(|e| format!("Error canonicalizing path {:?}: {}", path, e.description()))?
+              .map_err(|e| format!("Error canonicalizing path {:?}: {:?}", path, e))?
               .parent()
               .ok_or_else(|| format!("File being saved must have parent but {:?} did not", path))?,
             pool,
@@ -221,16 +233,15 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
             .unwrap();
           match file {
             fs::Stat::File(f) => {
-              let digest = FileSaver {
-                store: store.clone(),
-                posix_fs: Arc::new(posix_fs),
-              }.store_by_digest(&f)
+              let digest = fs::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs))
+                .store_by_digest(f)
                 .wait()
                 .unwrap();
               if store_has_remote {
                 store.ensure_remote_has_recursive(vec![digest]).wait()?;
               }
-              Ok(println!("{} {}", digest.0, digest.1))
+              println!("{} {}", digest.0, digest.1);
+              Ok(())
             }
             o => Err(
               format!(
@@ -275,15 +286,15 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
               .map(|s| s.to_string())
               .collect::<Vec<String>>(),
             &[],
+            // By using `Ignore`, we assume all elements of the globs will definitely expand to
+            // something here, or we don't care. Is that a valid assumption?
+            fs::StrictGlobMatching::Ignore,
           )?)
-          .map_err(|e| format!("Error expanding globs: {}", e.description()))
+          .map_err(|e| format!("Error expanding globs: {:?}", e))
           .and_then(move |paths| {
             Snapshot::from_path_stats(
               store_copy.clone(),
-              FileSaver {
-                store: store_copy,
-                posix_fs: posix_fs,
-              },
+              fs::OneOffStoreFileByDigest::new(store_copy, posix_fs),
               paths,
             )
           })
@@ -292,7 +303,8 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         if store_has_remote {
           store.ensure_remote_has_recursive(vec![digest]).wait()?;
         }
-        Ok(println!("{} {}", digest.0, digest.1))
+        println!("{} {}", digest.0, digest.1);
+        Ok(())
       }
       ("cat-proto", Some(args)) => {
         let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
@@ -311,6 +323,16 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
             .load_directory(digest)
             .wait()
             .map(|maybe_p| maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())),
+          "recursive-file-list" => expand_files(store, digest).map(|maybe_v| {
+            maybe_v
+              .map(|v| {
+                v.into_iter()
+                  .map(|f| format!("{}\n", f))
+                  .collect::<Vec<String>>()
+                  .join("")
+              })
+              .map(|s| s.into_bytes())
+          }),
           format => Err(format!(
             "Unexpected value of --output-format arg: {}",
             format
@@ -318,7 +340,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         }?;
         match proto_bytes {
           Some(bytes) => {
-            io::stdout().write(&bytes).unwrap();
+            io::stdout().write_all(&bytes).unwrap();
             Ok(())
           }
           None => Err(ExitError(
@@ -354,7 +376,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
       };
       match v {
         Some(bytes) => {
-          io::stdout().write(&bytes).unwrap();
+          io::stdout().write_all(&bytes).unwrap();
           Ok(())
         }
         None => Err(ExitError(
@@ -368,25 +390,57 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
   }
 }
 
-fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::PosixFS {
-  fs::PosixFS::new(&root, pool, vec![]).unwrap()
+fn expand_files(store: Store, digest: Digest) -> Result<Option<Vec<String>>, String> {
+  let files = Arc::new(Mutex::new(Vec::new()));
+  expand_files_helper(store, digest, String::new(), files.clone())
+    .wait()
+    .map(|maybe| {
+      maybe.map(|()| {
+        let mut v = Arc::try_unwrap(files).unwrap().into_inner().unwrap();
+        v.sort();
+        v
+      })
+    })
 }
 
-#[derive(Clone)]
-struct FileSaver {
+fn expand_files_helper(
   store: Store,
-  posix_fs: Arc<fs::PosixFS>,
+  digest: Digest,
+  prefix: String,
+  files: Arc<Mutex<Vec<String>>>,
+) -> BoxFuture<Option<()>, String> {
+  store
+    .load_directory(digest)
+    .and_then(|maybe_dir| match maybe_dir {
+      Some(dir) => {
+        {
+          let mut files_unlocked = files.lock().unwrap();
+          for file in dir.get_files() {
+            files_unlocked.push(format!("{}{}", prefix, file.name));
+          }
+        }
+        futures::future::join_all(
+          dir
+            .get_directories()
+            .into_iter()
+            .map(move |dir| {
+              let digest: Result<Digest, String> = dir.get_digest().into();
+              expand_files_helper(
+                store.clone(),
+                try_future!(digest),
+                format!("{}{}/", prefix, dir.name),
+                files.clone(),
+              )
+            })
+            .collect::<Vec<_>>(),
+        ).map(|_| Some(()))
+          .to_boxed()
+      }
+      None => futures::future::ok(None).to_boxed(),
+    })
+    .to_boxed()
 }
 
-impl StoreFileByDigest<String> for FileSaver {
-  fn store_by_digest(&self, file: &fs::File) -> BoxFuture<Digest, String> {
-    let file_copy = file.clone();
-    let store = self.store.clone();
-    self
-      .posix_fs
-      .read_file(&file)
-      .map_err(move |err| format!("Error reading file {:?}: {}", file_copy, err.description()))
-      .and_then(move |content| store.store_file_bytes(content.content, true))
-      .to_boxed()
-  }
+fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::PosixFS {
+  fs::PosixFS::new(&root, pool, &[]).unwrap()
 }

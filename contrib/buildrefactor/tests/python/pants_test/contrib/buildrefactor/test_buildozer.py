@@ -2,17 +2,17 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
+from builtins import open
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.contrib.buildrefactor.buildozer_util import prepare_dependencies
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.buildrefactor.buildozer import Buildozer
 
@@ -20,8 +20,8 @@ from pants.contrib.buildrefactor.buildozer import Buildozer
 class BuildozerTest(TaskTestBase):
   """Test the buildozer tool"""
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(targets={ 'java_library': JavaLibrary })
 
   @classmethod
@@ -123,7 +123,7 @@ class BuildozerTest(TaskTestBase):
 
   @staticmethod
   def _build_file_dependencies(build_file):
-    with open(build_file) as f:
+    with open(build_file, 'r') as f:
       source = f.read()
 
     dependencies = re.compile('dependencies+.?=+.?\[([^]]*)').findall(source)

@@ -2,15 +2,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import threading
-import urlparse
+from builtins import object, range, str
 from collections import namedtuple
 
-from six.moves import range
+from future.moves.urllib.parse import urlparse
 
 from pants.base.build_environment import get_buildroot
 from pants.cache.artifact_cache import ArtifactCacheError
@@ -74,6 +73,10 @@ class CacheSetup(Subsystem):
                   'a RESTful cache, a path of a filesystem cache, or a pipe-separated list of '
                   'alternate caches to choose from. This list is also used as input to '
                   'the resolver. When resolver is \'none\' list is used as is.')
+    register('--read-timeout', advanced=True, type=float, default=4.0,
+             help='The read timeout for any remote caches in use, in seconds.')
+    register('--write-timeout', advanced=True, type=float, default=4.0,
+             help='The write timeout for any remote caches in use, in seconds.')
     register('--compression-level', advanced=True, type=int, default=5,
              help='The gzip compression level (0-9) for created artifacts.')
     register('--dereference-symlinks', type=bool, default=True, fingerprint=True,
@@ -239,13 +242,13 @@ class CacheFactory(object):
     return string_spec.startswith('http://') or string_spec.startswith('https://')
 
   def _baseurl(self, url):
-    parsed_url = urlparse.urlparse(url)
+    parsed_url = urlparse(url)
     return '{scheme}://{netloc}'.format(scheme=parsed_url.scheme, netloc=parsed_url.netloc)
 
   def get_available_urls(self, urls):
     """Return reachable urls sorted by their ping times."""
     baseurl_to_urls = {self._baseurl(url): url for url in urls}
-    pingtimes = self._pinger.pings(baseurl_to_urls.keys())  # List of pairs (host, time in ms).
+    pingtimes = self._pinger.pings(list(baseurl_to_urls.keys()))  # List of pairs (host, time in ms).
     self._log.debug('Artifact cache server ping times: {}'
                     .format(', '.join(['{}: {:.6f} secs'.format(*p) for p in pingtimes])))
 
@@ -288,7 +291,13 @@ class CacheFactory(object):
           ['{}/{}'.format(url.rstrip('/'), self._cache_dirname) for url in urls]
         )
         local_cache = local_cache or TempLocalArtifactCache(artifact_root, compression)
-        return RESTfulArtifactCache(artifact_root, best_url_selector, local_cache)
+        return RESTfulArtifactCache(
+          artifact_root,
+          best_url_selector,
+          local_cache,
+          read_timeout=self._options.read_timeout,
+          write_timeout=self._options.write_timeout,
+        )
 
     local_cache = create_local_cache(spec.local) if spec.local else None
     remote_cache = create_remote_cache(spec.remote, local_cache) if spec.remote else None

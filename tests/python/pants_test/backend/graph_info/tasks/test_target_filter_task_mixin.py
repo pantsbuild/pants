@@ -2,13 +2,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.graph_info.tasks.target_filter_task_mixin import TargetFilterTaskMixin
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class TargetFilterTaskMixinTest(TaskTestBase):
@@ -29,10 +28,13 @@ class TargetFilterTaskMixinTest(TaskTestBase):
   class GreenTarget(Target):
     pass
 
-  @property
-  def alias_groups(self):
-    purple_macro = TargetMacro.Factory.wrap(lambda ctx: None, self.RedTarget, self.BlueTarget)
-    return BuildFileAliases(targets={'green': self.GreenTarget, 'purple': purple_macro},
+  class PurpleTarget(Target):
+    pass
+
+  @classmethod
+  def alias_groups(cls):
+    purple_macro = TargetMacro.Factory.wrap(lambda ctx: None, cls.PurpleTarget)
+    return BuildFileAliases(targets={'green': cls.GreenTarget, 'purple': purple_macro},
                             objects={'red': object()},
                             context_aware_object_factories={'blue': lambda ctx: None})
 
@@ -46,7 +48,7 @@ class TargetFilterTaskMixinTest(TaskTestBase):
 
   def test_macro_alias(self):
     purple_targets = self.task.target_types_for_alias('purple')
-    self.assertEqual({self.RedTarget, self.BlueTarget}, purple_targets)
+    self.assertEqual({self.PurpleTarget}, purple_targets)
 
   def test_alias_miss(self):
     with self.assertRaises(self.task.InvalidTargetType):

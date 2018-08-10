@@ -135,7 +135,7 @@ lives somewhere outside the workspace.
 ### Depending on a Jar
 
 The test example depends on a jar, `junit`. Instead of compiling from
-source, Pants invokes ivy to fetch such jars. To reduce the danger of
+source, Pants invokes the resolver to fetch such jars. To reduce the danger of
 version conflicts, we use the 3rdparty idiom: we keep references to
 these "third-party" jars together in `BUILD` files under the `3rdparty/`
 directory. Thus, the test has a `3rdparty` dependency:
@@ -208,12 +208,95 @@ contents a directory tree, a giant jar, or something else.
 Toolchain
 ---------
 
+### Ivy
+
 Pants uses [Ivy](http://ant.apache.org/ivy/) to resolve `jar` dependencies. To change how Pants
 resolves these, configure `resolve.ivy`.
+
+### Coursier
+
+Starting at release `1.4.0.dev26`, Pants added an option to pick [coursier](https://github.com/coursier/coursier)
+as the JVM 3rdparty resolver, with performance improvement being the main motivation. The goal is to retire ivy
+eventually.
+
+#### Limitation
+
+* Currently coursier only supports maven style repo resolves. [Resolving with ivy settings is still not mature](https://github.com/coursier/coursier/issues/created_by/benjyw).
+* Coursier does not do publishing.
+
+#### Example config to use coursier
+
+##### For Pants >= 1.7.x
+
+    :::ini
+    # This will turn on coursier and turn off ivy.
+    [resolver]
+    resolver: coursier
+
+    [resolve.coursier]
+    # jvm option in case of large resolves
+    jvm_options: ['-Xmx4g', '-XX:MaxMetaspaceSize=256m']
+
+    [export]
+    # Same if needed for large resolves
+    jvm_options: ['-Xmx4g', '-XX:MaxMetaspaceSize=256m']
+
+    [coursier]
+    repos: ['https://repo1.maven.org/maven2', 'https://dl.google.com/dl/android/maven2/']
+
+    # Change the following if you choose to [build coursier jar from scratch](https://github.com/coursier/coursier/blob/master/DEVELOPMENT.md#build-with-pants)
+    # or to fetch from different location.
+    bootstrap_jar_url: <url>
+    version: <version>
+
+* To inspect the resolve result, specify `--resolver-coursier-report`
+* To show coursier command line invocation, use `-ldebug`
+
+        :::bash
+        ./pants --resolver-resolver=coursier resolve.coursier --report examples/tests/scala/org/pantsbuild/example/hello/welcome -ldebug
+
+##### For Pants <= 1.6.x
+
+    :::ini
+    # This will turn on coursier and turn off ivy.
+    [resolver]
+    resolver: coursier
+
+    [export]
+    # Same if needed for large resolves
+    jvm_options: ['-Xmx4g', '-XX:MaxMetaspaceSize=256m']
+
+    [coursier]
+    # Change the following if you choose to [build coursier jar from scratch](https://github.com/coursier/coursier/blob/master/DEVELOPMENT.md#build-with-pants)
+    # or to fetch from different location.
+    bootstrap_jar_url: <url>
+    version: <version>
+
+    fetch_options: [
+        # Specify maven repos
+        '-r', 'https://repo1.maven.org/maven2/',
+        '-r', 'https://dl.google.com/dl/android/maven2/',
+
+        # Quiet mode
+        '-q',
+
+        # Do not use default public maven repo.
+        '--no-default',
+
+        # Concurrent workers
+        '-n', '10',
+
+        # Specify the type of artifacts to fetch
+        '-A', 'jar,bundle,test-jar,maven-plugin,src,doc,aar'
+      ]
+
+### Nailgun
 
 Pants uses [Nailgun](https://github.com/martylamb/nailgun) to speed up compiles. Nailgun is a
 JVM daemon that runs in the background. This means you don't need to start up a JVM and load
 classes for each JVM-based operation. Things go faster.
+
+### Zinc
 
 Pants uses Zinc, a dependency tracking compiler facade that supports sub-target incremental
 compilation for Java and Scala.

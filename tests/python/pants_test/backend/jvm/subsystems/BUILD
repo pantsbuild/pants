@@ -5,6 +5,7 @@ python_tests(
   name='shader',
   sources=['test_shader.py'],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
@@ -23,7 +24,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:scalastyle',
-    'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',
+    'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
@@ -45,6 +46,7 @@ python_tests(
   name='shader_integration',
   sources=['test_shader_integration.py'],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/fs',
     'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',
@@ -64,7 +66,7 @@ python_tests(
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )

@@ -2,13 +2,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import object, range
 from collections import namedtuple
-
-from six.moves import range
 
 from pants.base.project_tree_factory import get_project_tree
 from pants.subsystem.subsystem import Subsystem
@@ -208,35 +206,36 @@ class SourceRootConfig(Subsystem):
   def register_options(cls, register):
     super(SourceRootConfig, cls).register_options(register)
     register('--unmatched', choices=['create', 'fail'], default='create', advanced=True,
+             fingerprint=True,
              help='Configures the behavior when sources are defined outside of any configured '
                   'source root. `create` will cause a source root to be implicitly created at '
                   'the definition location of the sources; `fail` will trigger an error.')
-    register('--lang-canonicalizations', metavar='<map>', type=dict,
+    register('--lang-canonicalizations', metavar='<map>', type=dict, fingerprint=True,
              default=cls._DEFAULT_LANG_CANONICALIZATIONS, advanced=True,
              help='Map of language aliases to their canonical names.')
 
     pattern_help_fmt = ('A list of source root patterns for {} code. Use a "*" wildcard path '
                         'segment to match the language name, which will be canonicalized.')
-    register('--source-root-patterns', metavar='<list>', type=list,
+    register('--source-root-patterns', metavar='<list>', type=list, fingerprint=True,
              default=cls._DEFAULT_SOURCE_ROOT_PATTERNS, advanced=True,
              help=pattern_help_fmt.format('source'))
-    register('--test-root-patterns', metavar='<list>', type=list,
+    register('--test-root-patterns', metavar='<list>', type=list, fingerprint=True,
              default=cls._DEFAULT_TEST_ROOT_PATTERNS, advanced=True,
              help=pattern_help_fmt.format('test'))
-    register('--thirdparty-root-patterns', metavar='<list>', type=list,
+    register('--thirdparty-root-patterns', metavar='<list>', type=list, fingerprint=True,
              default=cls._DEFAULT_THIRDPARTY_ROOT_PATTERNS, advanced=True,
              help=pattern_help_fmt.format('third-party'))
 
     fixed_help_fmt = ('A map of source roots for {} code to list of languages. '
                       'Useful when you want to enumerate fixed source roots explicitly, '
                       'instead of relying on patterns.')
-    register('--source-roots', metavar='<map>', type=dict,
+    register('--source-roots', metavar='<map>', type=dict, fingerprint=True,
              default=cls._DEFAULT_SOURCE_ROOTS, advanced=True,
              help=fixed_help_fmt.format('source'))
-    register('--test-roots', metavar='<map>', type=dict,
+    register('--test-roots', metavar='<map>', type=dict, fingerprint=True,
              default=cls._DEFAULT_TEST_ROOTS, advanced=True,
              help=fixed_help_fmt.format('test'))
-    register('--thirdparty-roots', metavar='<map>', type=dict,
+    register('--thirdparty-roots', metavar='<map>', type=dict, fingerprint=True,
              default=cls._DEFAULT_THIRDPARTY_ROOTS, advanced=True,
              help=fixed_help_fmt.format('third-party'))
 

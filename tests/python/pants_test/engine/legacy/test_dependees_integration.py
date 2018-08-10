@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -24,12 +23,13 @@ class DependeesIntegrationTest(PantsRunIntegrationTest):
 
   def test_dependees_basic(self):
     pants_stdout = self.run_dependees()
-    self.assertEqual(
-      {'examples/src/scala/org/pantsbuild/example:jvm-run-example-lib',
-       'examples/src/scala/org/pantsbuild/example/hello/exe:exe',
-       'examples/tests/scala/org/pantsbuild/example/hello/welcome:welcome'},
-      set(pants_stdout.split())
-    )
+    expected = {
+      'examples/src/scala/org/pantsbuild/example:jvm-run-example-lib',
+      'examples/src/scala/org/pantsbuild/example/hello/exe:exe',
+      'examples/tests/scala/org/pantsbuild/example/hello/welcome:welcome'
+    }
+    actual = set(pants_stdout.split())
+    self.assertEqual(expected, actual)
 
   def test_dependees_transitive(self):
     pants_stdout = self.run_dependees('--dependees-transitive')

@@ -2,24 +2,24 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import sys
 import threading
+from builtins import object
 from contextlib import contextmanager
 
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import Exiter
-from pants.bin.daemon_pants_runner import DaemonExiter, DaemonPantsRunner
-from pants.bin.engine_initializer import EngineInitializer
+from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.native import Native
-from pants.init.target_roots_calculator import TargetRootsCalculator
-from pants.logging.setup import setup_logging
+from pants.init.engine_initializer import EngineInitializer
+from pants.init.logging import setup_logging
+from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionsFingerprinter
@@ -93,6 +93,19 @@ class PantsDaemon(FingerprintedProcessManager):
           return stub_pantsd.read_named_socket('pailgun', int)
 
     @classmethod
+    def restart(cls, bootstrap_options=None):
+      """Restarts a running daemon instance.
+
+      :param Options bootstrap_options: The bootstrap options, if available.
+      :returns: The pailgun port number of the new pantsd instance.
+      :rtype: int
+      """
+      pantsd = cls.create(bootstrap_options)
+      with pantsd.lifecycle_lock:
+        # N.B. This will call `pantsd.terminate()` before starting.
+        return pantsd.launch()
+
+    @classmethod
     def create(cls, bootstrap_options=None, full_init=True):
       """
       :param Options bootstrap_options: The bootstrap options, if available.
@@ -115,11 +128,15 @@ class PantsDaemon(FingerprintedProcessManager):
       if full_init:
         build_root = get_buildroot()
         native = Native.create(bootstrap_options_values)
-        legacy_graph_helper = cls._setup_legacy_graph_helper(native, bootstrap_options_values)
+        options_bootstrapper = OptionsBootstrapper()
+        build_config = BuildConfigInitializer.get(options_bootstrapper)
+        legacy_graph_scheduler = EngineInitializer.setup_legacy_graph(native,
+                                                                      bootstrap_options_values,
+                                                                      build_config)
         services, port_map = cls._setup_services(
           build_root,
           bootstrap_options_values,
-          legacy_graph_helper,
+          legacy_graph_scheduler,
           watchman
         )
 
@@ -139,20 +156,7 @@ class PantsDaemon(FingerprintedProcessManager):
       return OptionsBootstrapper().get_bootstrap_options()
 
     @staticmethod
-    def _setup_legacy_graph_helper(native, bootstrap_options):
-      """Initializes a `LegacyGraphHelper` instance."""
-      return EngineInitializer.setup_legacy_graph(
-        bootstrap_options.pants_ignore,
-        bootstrap_options.pants_workdir,
-        bootstrap_options.build_file_imports,
-        native=native,
-        build_ignore_patterns=bootstrap_options.build_ignore,
-        exclude_target_regexps=bootstrap_options.exclude_target_regexp,
-        subproject_roots=bootstrap_options.subproject_roots,
-      )
-
-    @staticmethod
-    def _setup_services(build_root, bootstrap_options, legacy_graph_helper, watchman):
+    def _setup_services(build_root, bootstrap_options, legacy_graph_scheduler, watchman):
       """Initialize pantsd services.
 
       :returns: A tuple of (`tuple` service_instances, `dict` port_map).
@@ -163,22 +167,32 @@ class PantsDaemon(FingerprintedProcessManager):
         bootstrap_options.pantsd_fs_event_workers
       )
 
+      pidfile_absolute = PantsDaemon.metadata_file_path('pantsd', 'pid', bootstrap_options.pants_subprocessdir)
+      if pidfile_absolute.startswith(build_root):
+        pidfile = os.path.relpath(pidfile_absolute, build_root)
+      else:
+        pidfile = None
+        logging.getLogger(__name__).warning(
+          'Not watching pantsd pidfile because subprocessdir is outside of buildroot. Having '
+          'subprocessdir be a child of buildroot (as it is by default) may help avoid stray '
+          'pantsd processes.'
+        )
+
       scheduler_service = SchedulerService(
         fs_event_service,
-        legacy_graph_helper,
+        legacy_graph_scheduler,
         build_root,
-        bootstrap_options.pantsd_invalidation_globs
+        bootstrap_options.pantsd_invalidation_globs,
+        pidfile,
       )
 
       pailgun_service = PailgunService(
-        bind_addr=(bootstrap_options.pantsd_pailgun_host, bootstrap_options.pantsd_pailgun_port),
-        exiter_class=DaemonExiter,
-        runner_class=DaemonPantsRunner,
-        target_roots_calculator=TargetRootsCalculator,
-        scheduler_service=scheduler_service
+        (bootstrap_options.pantsd_pailgun_host, bootstrap_options.pantsd_pailgun_port),
+        DaemonPantsRunner,
+        scheduler_service
       )
 
-      store_gc_service = StoreGCService(legacy_graph_helper.scheduler)
+      store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)
 
       return (
         # Services.
@@ -312,20 +326,20 @@ class PantsDaemon(FingerprintedProcessManager):
       self._logger.info('starting service {}'.format(service))
       try:
         service_thread.start()
-      except (RuntimeError, service.ServiceError):
+      except (RuntimeError, FSEventService.ServiceError):
         self.shutdown(service_thread_map)
-        raise self.StartupFailure('service {} failed to start, shutting down!'.format(service))
+        raise PantsDaemon.StartupFailure('service {} failed to start, shutting down!'.format(service))
 
     # Once all services are started, write our pid.
     self.write_pid()
-    self.write_metadata_by_name('pantsd', self.FINGERPRINT_KEY, self.options_fingerprint)
+    self.write_metadata_by_name('pantsd', self.FINGERPRINT_KEY, self.options_fingerprint.decode('utf-8'))
 
     # Monitor services.
     while not self.is_killed:
       for service, service_thread in service_thread_map.items():
         if not service_thread.is_alive():
           self.shutdown(service_thread_map)
-          raise self.RuntimeFailure('service failure for {}, shutting down!'.format(service))
+          raise PantsDaemon.RuntimeFailure('service failure for {}, shutting down!'.format(service))
         else:
           # Avoid excessive CPU utilization.
           service_thread.join(self.JOIN_TIMEOUT_SECONDS)
@@ -398,11 +412,13 @@ class PantsDaemon(FingerprintedProcessManager):
     return listening_port
 
   def terminate(self, include_watchman=True):
-    """Terminates pantsd and watchman."""
-    with self.lifecycle_lock:
-      super(PantsDaemon, self).terminate()
-      if include_watchman:
-        self.watchman_launcher.terminate()
+    """Terminates pantsd and watchman.
+
+    N.B. This should always be called under care of `self.lifecycle_lock`.
+    """
+    super(PantsDaemon, self).terminate()
+    if include_watchman:
+      self.watchman_launcher.terminate()
 
 
 def launch():

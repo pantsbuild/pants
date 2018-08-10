@@ -2,14 +2,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from mock import Mock, patch
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.scrooge.tasks.thrift_linter import ThriftLinter
 
@@ -20,8 +19,8 @@ class ThriftLinterTest(TaskTestBase):
     task.tool_classpath = Mock(return_value='foo_classpath')
     task.runjava = self._run_java_mock
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'java_thrift_library': JavaThriftLibrary,

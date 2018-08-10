@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from textwrap import dedent
@@ -13,7 +12,7 @@ from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
-from pants_test.tasks.task_test_base import ensure_cached
+from pants_test.task_test_base import ensure_cached
 
 
 class CheckstyleTest(NailgunTaskTestBase):

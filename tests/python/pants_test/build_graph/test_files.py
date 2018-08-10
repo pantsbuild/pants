@@ -2,15 +2,14 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.build_graph.files import Files
 from pants.source.wrapped_globs import Globs
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class FilesTest(BaseTest):
+class FilesTest(TestBase):
   @staticmethod
   def sources(rel_path, *globs):
     return Globs.create_fileset_with_spec(rel_path, *globs)

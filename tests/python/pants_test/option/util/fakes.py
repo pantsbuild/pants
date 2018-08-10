@@ -2,17 +2,17 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import object
 from collections import defaultdict
 
-from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_util import is_list_option
 from pants.option.parser import Parser
 from pants.option.parser_hierarchy import enclosing_scope
 from pants.option.ranked_value import RankedValue
+from pants.option.scope import GLOBAL_SCOPE
 
 
 class _FakeOptionValues(object):
@@ -54,20 +54,20 @@ def _options_registration_function(defaults, fingerprintables):
   def register(*args, **kwargs):
     option_name = Parser.parse_dest(*args, **kwargs)
 
-    default = kwargs.get(b'default')
+    default = kwargs.get('default')
     if default is None:
-      if kwargs.get(b'type') == bool:
+      if kwargs.get('type') == bool:
         default = False
-      if kwargs.get(b'type') == list:
+      if kwargs.get('type') == list:
         default = []
     defaults[option_name] = RankedValue(RankedValue.HARDCODED, default)
 
-    fingerprint = kwargs.get(b'fingerprint', False)
+    fingerprint = kwargs.get('fingerprint', False)
     if fingerprint:
       if is_list_option(kwargs):
-        val_type = kwargs.get(b'member_type', str)
+        val_type = kwargs.get('member_type', str)
       else:
-        val_type = kwargs.get(b'type', str)
+        val_type = kwargs.get('type', str)
       fingerprintables[option_name] = val_type
 
   return register
@@ -105,13 +105,13 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
       return _FakeOptionValues(scoped_options)
 
     def for_global_scope(self):
-      return self.for_scope('')
+      return self.for_scope(GLOBAL_SCOPE)
 
     def passthru_args_for_scope(self, scope):
       return passthru_args or []
 
     def items(self):
-      return options.items()
+      return list(options.items())
 
     @property
     def scope_to_flags(self):

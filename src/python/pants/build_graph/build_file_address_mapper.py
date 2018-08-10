@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
@@ -102,7 +101,7 @@ class BuildFileAddressMapper(AddressMapper):
 
   def addresses_in_spec_path(self, spec_path):
     """Returns only the addresses gathered by `address_map_from_spec_path`, with no values."""
-    return self._address_map_from_spec_path(spec_path).keys()
+    return list(self._address_map_from_spec_path(spec_path).keys())
 
   def spec_to_address(self, spec, relative_to=''):
     """A helper method for mapping a spec to the correct build file address.
@@ -253,7 +252,7 @@ class BuildFileAddressMapper(AddressMapper):
 
     if not addresses:
       raise self.EmptyBuildFileError(
-        '{was_not_found_message}, because that directory contains no BUILD files defining addressable entities.'
+        '{was_not_found_message}, because that directory does not contain any BUILD files defining addressable entities.'
           .format(was_not_found_message=was_not_found_message))
     # Print BUILD file extensions if there's more than one BUILD file with targets only.
     if (any(not hasattr(address, 'rel_path') for address in addresses) or

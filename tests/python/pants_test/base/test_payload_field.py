@@ -2,20 +2,21 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from hashlib import sha1
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.payload_field import (ExcludesField, FingerprintedField, FingerprintedMixin,
-                                      JarsField, PrimitiveField, PythonRequirementsField)
+                                      JarsField, PrimitiveField, PrimitivesSetField,
+                                      PythonRequirementsField)
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.base_test import BaseTest
+from pants.util.strutil import ensure_binary
+from pants_test.test_base import TestBase
 
 
-class PayloadTest(BaseTest):
+class PayloadTest(TestBase):
 
   def test_excludes_field(self):
     empty = ExcludesField()
@@ -72,7 +73,7 @@ class PayloadTest(BaseTest):
     )
     self.assertEqual(
       PrimitiveField('foo').fingerprint(),
-      PrimitiveField(b'foo').fingerprint(),
+      PrimitiveField('foo').fingerprint(),
     )
     self.assertNotEqual(
       PrimitiveField('foo').fingerprint(),
@@ -105,20 +106,48 @@ class PayloadTest(BaseTest):
 
       def fingerprint(self):
         hasher = sha1()
+        self.test_value = ensure_binary(self.test_value)
         hasher.update(self.test_value)
         return hasher.hexdigest()
 
     field1 = TestValue('field1')
     field1_same = TestValue('field1')
     field2 = TestValue('field2')
-    self.assertEquals(field1.fingerprint(), field1_same.fingerprint())
-    self.assertNotEquals(field1.fingerprint(), field2.fingerprint())
+    self.assertEqual(field1.fingerprint(), field1_same.fingerprint())
+    self.assertNotEqual(field1.fingerprint(), field2.fingerprint())
 
     fingerprinted_field1 = FingerprintedField(field1)
     fingerprinted_field1_same = FingerprintedField(field1_same)
     fingerprinted_field2 = FingerprintedField(field2)
-    self.assertEquals(fingerprinted_field1.fingerprint(), fingerprinted_field1_same.fingerprint())
-    self.assertNotEquals(fingerprinted_field1.fingerprint(), fingerprinted_field2.fingerprint())
+    self.assertEqual(fingerprinted_field1.fingerprint(), fingerprinted_field1_same.fingerprint())
+    self.assertNotEqual(fingerprinted_field1.fingerprint(), fingerprinted_field2.fingerprint())
+
+  def test_set_of_primitives_field(self):
+    # Should preserve `None` values.
+    self.assertEqual(PrimitivesSetField(None).value, None)
+
+    def sopf(underlying):
+      return PrimitivesSetField(underlying).fingerprint()
+    self.assertEqual(
+      sopf({'one', 'two'}),
+      sopf({'two', 'one'}),
+    )
+    self.assertEqual(
+      sopf(['one', 'two']),
+      sopf(['two', 'one']),
+    )
+    self.assertEqual(
+      sopf(None),
+      sopf(None),
+    )
+    self.assertNotEqual(
+      sopf(None),
+      sopf(['one']),
+    )
+    self.assertNotEqual(
+      sopf(None),
+      sopf([]),
+    )
 
   def test_unimplemented_fingerprinted_field(self):
     class TestUnimplementedValue(FingerprintedMixin):

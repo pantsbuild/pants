@@ -2,13 +2,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
+import sys
 import unittest
 
 import bs4
+import pytest
+from future.utils import PY3
 
 from internal_backend.sitegen.tasks import sitegen
 
@@ -29,8 +31,13 @@ CONFIG_JSON = """
   "tree": [
     { "page": "index",
       "children": [
-        { "page": "subdir/page1" },
-        { "page": "subdir/page2" }
+        {"heading": "non_collapse"},
+        { "pages": ["subdir/page1"] },
+        {"collapsible_heading" : "collapse",
+          "pages": ["subdir/page2",
+                    "index"
+                  ]
+        }
       ]
     }
   ],
@@ -186,6 +193,7 @@ class AllTheThingsTestCase(unittest.TestCase):
     self.assertIn('DEPTH=1 LINK=one TEXT=Section One', rendered)
     self.assertIn('DEPTH=1 LINK=two TEXT=Section Two', rendered)
 
+  @pytest.mark.skipif(sys.version_info >= (3,0), reason="TODO: See #6062.")
   def test_site_toc(self):
     # Our "site" has a simple outline.
     # Do we get the correct info from that to generate
@@ -196,11 +204,17 @@ class AllTheThingsTestCase(unittest.TestCase):
                                    self.precomputed,
                                    """
                                    {{#site_toc}}
-                                   DEPTH={{depth}} LINK={{link}} TEXT={{text}}
+                                   DEPTH={{depth}} LINK={{links}} HEADING={{heading}} 
                                    {{/site_toc}}
                                    """)
-    self.assertIn(u'DEPTH=1 LINK=subdir/page1.html TEXT=東京 is Tokyo', rendered)
-    self.assertIn('DEPTH=1 LINK=subdir/page2.html TEXT=Page 2: Electric Boogaloo', rendered)
+    self.assertIn("DEPTH=1 LINK=None HEADING=non_collapse", rendered)
+    # Py2 and Py3 order the elements differently and Py3 doesn't render 'u' in unicode literals. Both are valid.
+    rendered_expected = ("DEPTH=1 LINK=[{'link': 'subdir/page2.html', 'text': 'Page 2: Electric Boogaloo', 'here': False}, "
+                         "{'link': 'index.html', 'text': 'Pants Build System', 'here': True}] HEADING=collapse"
+                         if PY3 else
+                         "DEPTH=1 LINK=[{'text': u'Page 2: Electric Boogaloo', 'link': u'subdir/page2.html', 'here': False}, "
+                         "{'text': u'Pants Build System', 'link': u'index.html', 'here': True}] HEADING=collapse")
+    self.assertIn(rendered_expected, rendered)
 
   def test_transform_fixes_up_internal_links(self):
     sitegen.transform_soups(self.config, self.soups, self.precomputed)

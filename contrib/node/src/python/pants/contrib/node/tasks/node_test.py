@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
@@ -38,7 +37,7 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
   def _run_node_distribution_command(self, command, workunit):
     """Overrides NodeTask._run_node_distribution_command.
 
-    This is what execute_npm ultimately uses to run the NodeDistribution.Command.
+    This is what is ultimately used to run the Command.
     It must return the return code of the process. The base implementation just calls
     command.run immediately. We override here to invoke TestRunnerTaskMixin._spawn_and_wait,
     which ultimately invokes _spawn, which finally calls command.run.
@@ -63,38 +62,22 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
     node_paths = self.context.products.get_data(NodePaths)
 
     for target in targets:
-      node_path = node_paths.node_path(target.dependencies[0])
-
+      node_module = target.dependencies[0]
       self.context.log.debug(
-        'Testing node module (first dependency): {}'.format(target.dependencies[0]))
-
-      package_manager = self.get_package_manager_for_target(target=target.dependencies[0])
-      if package_manager == self.node_distribution.PACKAGE_MANAGER_NPM:
-        args = ['run-script', target.script_name, '--'] + self.get_passthru_args()
-
-        with pushd(node_path):
-          self._currently_executing_test_targets = [target]
-          result, npm_test_command = self.execute_npm(
-            args,
-            node_paths=node_paths.all_node_paths,
-            workunit_name=target.address.reference(),
-            workunit_labels=[WorkUnitLabel.TEST])
-          if result != 0:
-            raise TaskError('npm test script failed:\n'
-                            '\t{} failed with exit code {}'.format(npm_test_command, result))
-      elif package_manager == self.node_distribution.PACKAGE_MANAGER_YARNPKG:
-        args = ['run', target.script_name, '--'] + self.get_passthru_args()
-        with pushd(node_path):
-          self._currently_executing_test_targets = [target]
-          result, npm_test_command = self.execute_yarnpkg(
-            args=args,
-            node_paths=node_paths.all_node_paths,
-            workunit_name=target.address.reference(),
-            workunit_labels=[WorkUnitLabel.TEST])
-          if result != 0:
-            raise TaskError('npm test script failed:\n'
-                            '\t{} failed with exit code {}'.format(npm_test_command, result))
-
+        'Testing node module (first dependency): {}'.format(node_module))
+      with pushd(node_paths.node_path(node_module)):
+        self._currently_executing_test_targets = [target]
+        result, test_command = self.run_script(
+          target.script_name,
+          package_manager=self.get_package_manager(target=node_module),
+          target=target,
+          script_args=self.get_passthru_args(),
+          node_paths=node_paths.all_node_paths,
+          workunit_name=target.address.reference(),
+          workunit_labels=[WorkUnitLabel.TEST])
+        if result != 0:
+          raise TaskError('test script failed:\n'
+                          '\t{} failed with exit code {}'.format(test_command, result))
     self._currently_executing_test_targets = []
 
   def _spawn(self, command, workunit):

@@ -2,10 +2,9 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
-import logging
+import multiprocessing
 import os
 import sys
 
@@ -13,9 +12,90 @@ from pants.base.build_environment import (get_buildroot, get_default_pants_confi
                                           get_pants_cachedir, get_pants_configdir, pants_version)
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import dir_option
+from pants.option.errors import OptionsError
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
+from pants.util.memo import memoized_classproperty
+from pants.util.objects import datatype
+
+
+class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
+  """Describe the action to perform when matching globs in BUILD files to source files.
+
+  NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
+  be aware of any changes to this object's definition.
+  """
+
+  IGNORE = 'ignore'
+  WARN = 'warn'
+  ERROR = 'error'
+
+  allowed_values = [IGNORE, WARN, ERROR]
+
+  default_value = IGNORE
+
+  default_option_value = WARN
+
+  @memoized_classproperty
+  def _singletons(cls):
+    return { behavior: cls(behavior) for behavior in cls.allowed_values }
+
+  @classmethod
+  def create(cls, value=None):
+    if isinstance(value, cls):
+      return value
+    if not value:
+      value = cls.default_value
+    return cls._singletons[value]
+
+  def __new__(cls, *args, **kwargs):
+    this_object = super(GlobMatchErrorBehavior, cls).__new__(cls, *args, **kwargs)
+
+    if this_object.failure_behavior not in cls.allowed_values:
+      raise cls.make_type_error("Value {!r} for failure_behavior must be one of: {!r}."
+                                .format(this_object.failure_behavior, cls.allowed_values))
+
+    return this_object
+
+
+class ExecutionOptions(datatype([
+  'remote_store_server',
+  'remote_store_thread_count',
+  'remote_execution_server',
+  'remote_store_chunk_bytes',
+  'remote_store_chunk_upload_timeout_seconds',
+  'process_execution_parallelism',
+  'process_execution_cleanup_local_dirs',
+])):
+  """A collection of all options related to (remote) execution of processes.
+
+  TODO: These options should move to a Subsystem once we add support for "bootstrap" Subsystems (ie,
+  allowing Subsystems to be consumed before the Scheduler has been created).
+  """
+
+  @classmethod
+  def from_bootstrap_options(cls, bootstrap_options):
+    return cls(
+      remote_store_server=bootstrap_options.remote_store_server,
+      remote_execution_server=bootstrap_options.remote_execution_server,
+      remote_store_thread_count=bootstrap_options.remote_store_thread_count,
+      remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
+      remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
+      process_execution_parallelism=bootstrap_options.process_execution_parallelism,
+      process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
+    )
+
+
+DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
+    remote_store_server=None,
+    remote_store_thread_count=1,
+    remote_execution_server=None,
+    remote_store_chunk_bytes=1024*1024,
+    remote_store_chunk_upload_timeout_seconds=60,
+    process_execution_parallelism=multiprocessing.cpu_count()*2,
+    process_execution_cleanup_local_dirs=True,
+  )
 
 
 class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
@@ -41,15 +121,12 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     default_distdir = os.path.join(buildroot, default_distdir_name)
     default_rel_distdir = '/{}/'.format(default_distdir_name)
 
-    # Although logging supports the WARN level, its not documented and could conceivably be yanked.
-    # Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
-    # setup a 'WARN' logging level name that maps to 'WARNING'.
-    logging.addLevelName(logging.WARNING, 'WARN')
-    register('-l', '--level', choices=['debug', 'info', 'warn'], default='info', recursive=True,
-             help='Set the logging level.')
+    register('-l', '--level', choices=['trace', 'debug', 'info', 'warn'], default='info',
+             recursive=True, help='Set the logging level.')
     register('-q', '--quiet', type=bool, recursive=True, daemon=False,
              help='Squelches most console output. NOTE: Some tasks default to behaving quietly: '
                   'inverting this option supports making them noisier than they would be otherwise.')
+
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
     register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True, daemon=False,
@@ -71,6 +148,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              default=['pants.backend.graph_info',
                       'pants.backend.python',
                       'pants.backend.jvm',
+                      'pants.backend.native',
                       'pants.backend.codegen.antlr.java',
                       'pants.backend.codegen.antlr.python',
                       'pants.backend.codegen.jaxb',
@@ -117,7 +195,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--target-spec-file', type=list, dest='target_spec_files', daemon=False,
              help='Read additional specs from this file, one per line')
     register('--verify-config', type=bool, default=True, daemon=False,
+             advanced=True,
              help='Verify that all config file values correspond to known options.')
+
     register('--build-ignore', advanced=True, type=list, fromfile=True,
              default=['.*/', default_rel_distdir, 'bower_components/',
                       'node_modules/', '*.egg-info/'],
@@ -129,11 +209,23 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Paths to ignore for all filesystem operations performed by pants '
                   '(e.g. BUILD file scanning, glob matching, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore).')
+    register('--glob-expansion-failure', type=str,
+             choices=GlobMatchErrorBehavior.allowed_values,
+             default=GlobMatchErrorBehavior.default_option_value,
+             advanced=True,
+             help="Raise an exception if any targets declaring source files "
+                  "fail to match any glob provided in the 'sources' argument.")
+
     register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,
              metavar='<regexp>', help='Exclude target roots that match these regexes.')
     register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
              help='Paths that correspond with build roots for any subproject that this '
                   'project depends on.')
+    register('--owner-of', type=list, default=[], daemon=False, fromfile=True, metavar='<path>',
+             help='Select the targets that own these files. '
+                  'This is the third target calculation strategy along with the --changed '
+                  'options and specifying the targets directly. These three types of target '
+                  'selection are mutually exclusive.')
 
     # These logging options are registered in the bootstrap phase so that plugins can log during
     # registration and not so that their values can be interpolated in configs.
@@ -150,6 +242,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option, daemon=False,
              help='A directory to write execution and rule graphs to as `dot` files. The contents '
                   'of the directory will be overwritten if any filenames collide.')
+    register('--print-exception-stacktrace', advanced=True, type=bool,
+             help='Print to console the full exception stack trace if encountered.')
 
     # BinaryUtil options.
     register('--binaries-baseurls', type=list, advanced=True,
@@ -160,9 +254,14 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Timeout in seconds for URL reads when fetching binary tools from the '
                   'repos specified by --baseurls.')
     register('--binaries-path-by-id', type=dict, advanced=True,
-             help=('Maps output of uname for a machine to a binary search path. e.g. '
-                   '{("darwin", "15"): ["mac", "10.11"]), ("linux", "arm32"): ["linux"'
-                   ', "arm32"]}'))
+             help=("Maps output of uname for a machine to a binary search path: "
+                   "(sysname, id) -> (os, arch), e.g. {('darwin', '15'): ('mac', '10.11'), "
+                   "('linux', 'arm32'): ('linux', 'arm32')}."))
+    register('--allow-external-binary-tool-downloads', type=bool, default=True, advanced=True,
+             help="If False, require BinaryTool subclasses to download their contents from urls "
+                  "generated from --binaries-baseurls, even if the tool has an external url "
+                  "generator. This can be necessary if using Pants in an environment which cannot "
+                  "contact the wider Internet.")
 
     # Pants Daemon options.
     register('--pantsd-pailgun-host', advanced=True, default='127.0.0.1',
@@ -180,7 +279,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--watchman-version', advanced=True, default='4.9.0-pants1', help='Watchman version.')
     register('--watchman-supportdir', advanced=True, default='bin/watchman',
              help='Find watchman binaries under this dir. Used as part of the path to lookup '
-                  'the binary with --binary-util-baseurls and --pants-bootstrapdir.')
+                  'the binary with --binaries-baseurls and --pants-bootstrapdir.')
     register('--watchman-startup-timeout', type=float, advanced=True, default=30.0,
              help='The watchman socket timeout (in seconds) for the initial `watch-project` command. '
                   'This may need to be set higher for larger repos due to watchman startup cost.')
@@ -193,7 +292,31 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # This option changes the parser behavior in a fundamental way (which currently invalidates
     # all caches), and needs to be parsed out early, so we make it a bootstrap option.
     register('--build-file-imports', choices=['allow', 'warn', 'error'], default='warn',
-      help='Whether to allow import statements in BUILD files')
+             advanced=True,
+             help='Whether to allow import statements in BUILD files')
+
+    register('--remote-store-server', advanced=True,
+             help='host:port of grpc server to use as remote execution file store.')
+    register('--remote-store-thread-count', type=int, advanced=True,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_store_thread_count,
+             help='Thread count to use for the pool that interacts with the remote file store.')
+    register('--remote-execution-server', advanced=True,
+             help='host:port of grpc server to use as remote execution scheduler.')
+    register('--remote-store-chunk-bytes', type=int, advanced=True,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_bytes,
+             help='Size in bytes of chunks transferred to/from the remote file store.')
+    register('--remote-store-chunk-upload-timeout-seconds', type=int, advanced=True,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_upload_timeout_seconds,
+             help='Timeout (in seconds) for uploads of individual chunks to the remote file store.')
+
+    # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
+    # lookups via CacheSetup in TaskBase.
+    register('--process-execution-parallelism', type=int, default=multiprocessing.cpu_count(),
+             advanced=True,
+             help='Number of concurrent processes that may be executed either locally and remotely.')
+    register('--process-execution-cleanup-local-dirs', type=bool, default=True,
+             help='Whether or not to cleanup directories used for local process execution '
+                  '(primarily useful for e.g. debugging).')
 
   @classmethod
   def register_options(cls, register):
@@ -212,6 +335,19 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   "tags ('-' prefix).  Useful with ::, to find subsets of targets "
                   "(e.g., integration tests.)")
 
+    # Toggles v1/v2 `Task` vs `@rule` pipelines on/off.
+    register('--v1', advanced=True, type=bool, default=True,
+             help='Enables execution of v1 Tasks.')
+    register('--v2', advanced=True, type=bool, default=False,
+             help='Enables execution of v2 @console_rules.')
+
+    loop_flag = '--loop'
+    register(loop_flag, type=bool,
+             help='Run v2 @console_rules continuously as file changes are detected. Requires '
+                  '`--v2`, and is best utilized with `--v2 --no-v1`.')
+    register('--loop-max', type=int, default=2**32, advanced=True,
+             help='The maximum number of times to loop when `{}` is specified.'.format(loop_flag))
+
     register('-t', '--timeout', advanced=True, type=int, metavar='<seconds>',
              help='Number of seconds to wait for http connections.')
     # TODO: After moving to the new options system these abstraction leaks can go away.
@@ -228,8 +364,22 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,
              help='Used to limit the number of arguments passed to some subprocesses by breaking '
              'the command up into multiple invocations.')
-    register('--print-exception-stacktrace', advanced=True, type=bool,
-             help='Print to console the full exception stack trace if encountered.')
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
+
+  @classmethod
+  def validate_instance(cls, opts):
+    """Validates an instance of global options for cases that are not prohibited via registration.
+
+    For example: mutually exclusive options may be registered by passing a `mutually_exclusive_group`,
+    but when multiple flags must be specified together, it can be necessary to specify post-parse
+    checks.
+
+    Raises pants.option.errors.OptionsError on validation failure.
+    """
+    if opts.loop and (not opts.v2 or opts.v1):
+      raise OptionsError('The --loop option only works with @console_rules, and thus requires '
+                         '`--v2 --no-v1` to function as expected.')
+    if opts.loop and not opts.enable_pantsd:
+      raise OptionsError('The --loop option requires `--enable-pantsd`, in order to watch files.')

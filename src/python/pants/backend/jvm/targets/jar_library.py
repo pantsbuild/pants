@@ -2,10 +2,9 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
-import six
+from future.utils import string_types
 from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import TargetDefinitionException
@@ -99,7 +98,7 @@ class JarLibrary(Target):
     """
     jar_deps = OrderedSet()
     for spec in jar_library_specs:
-      if not isinstance(spec, six.string_types):
+      if not isinstance(spec, string_types):
         raise JarLibrary.ExpectedAddressError(
           "{address}: expected imports to contain string addresses, got {found_class}."
           .format(address=relative_to.spec,

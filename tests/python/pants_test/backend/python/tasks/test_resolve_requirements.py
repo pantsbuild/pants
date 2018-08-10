@@ -2,23 +2,23 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import str
 
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
+from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.base.build_environment import get_buildroot
-from pants.python.python_repos import PythonRepos
-from pants.util.contextutil import temporary_file
+from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.process_handler import subprocess
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class ResolveRequirementsTest(TaskTestBase):
@@ -39,7 +39,7 @@ class ResolveRequirementsTest(TaskTestBase):
     # Check that the module is available if specified as a requirement.
     stdout_data, stderr_data = self._exercise_module(self._resolve_requirements([ansicolors_tgt]),
                                                      'colors')
-    self.assertEquals('', stderr_data.strip())
+    self.assertEqual('', stderr_data.strip())
 
     path = stdout_data.strip()
     # Check that the requirement resolved to what we expect.
@@ -59,7 +59,7 @@ class ResolveRequirementsTest(TaskTestBase):
       }
     })
     stdout_data, stderr_data = self._exercise_module(pex, 'cffi')
-    self.assertEquals('', stderr_data.strip())
+    self.assertEqual('', stderr_data.strip())
 
     path = stdout_data.strip()
     wheel_dir = os.path.join(path[0:path.find('{sep}.deps{sep}'.format(sep=os.sep))], '.deps')
@@ -114,23 +114,26 @@ class ResolveRequirementsTest(TaskTestBase):
                             requirements=requirements)
 
   def _resolve_requirements(self, target_roots, options=None):
-    context = self.context(target_roots=target_roots, options=options,
-                           for_subsystems=[PythonSetup, PythonRepos])
+    with temporary_dir() as cache_dir:
+      options = options or {}
+      options.setdefault(PythonSetup.options_scope, {})['interpreter_cache_dir'] = cache_dir
+      context = self.context(target_roots=target_roots, options=options,
+                             for_subsystems=[PythonSetup, PythonRepos])
 
-    # We must get an interpreter via the cache, instead of using PythonInterpreter.get() directly,
-    # to ensure that the interpreter has setuptools and wheel support.
-    interpreter = PythonInterpreter.get()
-    interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
-                                               PythonRepos.global_instance(),
-                                               logger=context.log.debug)
-    interpreters = interpreter_cache.setup(paths=[os.path.dirname(interpreter.binary)],
-                                           filters=[str(interpreter.identity.requirement)])
-    context.products.get_data(PythonInterpreter, lambda: interpreters[0])
+      # We must get an interpreter via the cache, instead of using PythonInterpreter.get() directly,
+      # to ensure that the interpreter has setuptools and wheel support.
+      interpreter = PythonInterpreter.get()
+      interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
+                                                PythonRepos.global_instance(),
+                                                logger=context.log.debug)
+      interpreters = interpreter_cache.setup(paths=[os.path.dirname(interpreter.binary)],
+                                            filters=[str(interpreter.identity.requirement)])
+      context.products.get_data(PythonInterpreter, lambda: interpreters[0])
 
-    task = self.create_task(context)
-    task.execute()
+      task = self.create_task(context)
+      task.execute()
 
-    return context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)
+      return context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)
 
   def _exercise_module(self, pex, expected_module):
     with temporary_file() as f:

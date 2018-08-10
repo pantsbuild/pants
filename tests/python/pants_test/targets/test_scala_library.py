@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -13,12 +12,12 @@ from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class ScalaLibraryTest(BaseTest):
-  @property
-  def alias_groups(self):
+class ScalaLibraryTest(TestBase):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'scala_library': ScalaLibrary,
@@ -34,7 +33,7 @@ class ScalaLibraryTest(BaseTest):
   def setUp(self):
     super(ScalaLibraryTest, self).setUp()
     self.context(options={
-      'scala-platform': {
+      'scala': {
         'version': '2.11'
       }
     })

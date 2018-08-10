@@ -12,11 +12,10 @@ python_library(
   name='sitegen',
   sources=['sitegen.py'],
   dependencies=[
-    '3rdparty/python:six',
+    '3rdparty/python:future',
     'pants-plugins/3rdparty/python:beautifulsoup4',
     'src/python/pants/base:exceptions',
     'src/python/pants/task',
-    'src/python/pants/backend/python/subsystems',
-    'src/python/pants/backend/python/tasks'
+    'src/python/pants/backend/docgen/tasks'
   ]
 )

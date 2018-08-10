@@ -2,11 +2,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
+from builtins import open
 
 from pants.backend.codegen.ragel.java.java_ragel_library import JavaRagelLibrary
 from pants.backend.codegen.ragel.subsystems.ragel import Ragel
@@ -20,24 +20,12 @@ from pants.util.process_handler import subprocess
 
 
 class RagelGen(SimpleCodegenTask):
+
+  sources_globs = ('**/*',)
+
   @classmethod
   def subsystem_dependencies(cls):
     return super(RagelGen, cls).subsystem_dependencies() + (Ragel.scoped(cls),)
-
-  @classmethod
-  def register_options(cls, register):
-    super(RagelGen, cls).register_options(register)
-    register('--supportdir', default='bin/ragel', advanced=True,
-             removal_version='1.7.0.dev0', removal_hint='No longer in use.',
-             help='The path to find the ragel binary.  Used as part of the path to lookup the'
-                  'tool with --pants-support-baseurls and --pants_bootstrapdir.')
-
-    # We take the cautious approach here and assume a version bump will always correspond to
-    # changes in ragel codegen products.
-    register('--version', default='6.9', advanced=True, fingerprint=True,
-             removal_version='1.7.0.dev0', removal_hint='Use --version in scope ragel.',
-             help='The version of ragel to use.  Used as part of the path to lookup the'
-                  'tool with --pants-support-baseurls and --pants-bootstrapdir')
 
   def __init__(self, *args, **kwargs):
     super(RagelGen, self).__init__(*args, **kwargs)

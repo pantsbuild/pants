@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import unittest
@@ -116,15 +115,15 @@ class ParseSpecTest(unittest.TestCase):
 
     # Ensure that a spec in subprojectA is determined correctly.
     subprojectA_spec = parse('src/python/alib', 'subprojectA/src/python')
-    self.assertEquals(subprojectA_spec, 'subprojectA/src/python/alib')
+    self.assertEqual(subprojectA_spec, 'subprojectA/src/python/alib')
 
     # Ensure that a spec in subprojectB, which is more complex, is correct.
     subprojectB_spec = parse('src/python/blib', 'path/to/subprojectB/src/python')
-    self.assertEquals(subprojectB_spec, 'path/to/subprojectB/src/python/blib')
+    self.assertEqual(subprojectB_spec, 'path/to/subprojectB/src/python/blib')
 
     # Ensure that a spec in the parent project is not mapped.
     parent_spec = parse('src/python/parent', 'src/python')
-    self.assertEquals(parent_spec, 'src/python/parent')
+    self.assertEqual(parent_spec, 'src/python/parent')
 
 
 class BaseAddressTest(unittest.TestCase):

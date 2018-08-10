@@ -2,15 +2,16 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import object
 
 import pkg_resources
 from pex.pex_info import PexInfo
 
 from pants.backend.python.subsystems.pytest import PyTest
+from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_execution_task_base import PythonExecutionTaskBase
 
 
@@ -70,6 +71,8 @@ class PytestPrep(PythonExecutionTaskBase):
                          content=pkg_resources.resource_string(__name__, 'coverage/plugin.py'))
 
   def execute(self):
+    if not self.context.targets(lambda t: isinstance(t, PythonTests)):
+      return
     pex_info = PexInfo.default()
     pex_info.entry_point = 'pytest'
     pytest_binary = self.create_pex(pex_info)

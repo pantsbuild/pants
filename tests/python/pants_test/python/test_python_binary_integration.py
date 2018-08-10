@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import os
@@ -33,7 +32,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
   def assert_pex_attribute(self, pex, attr, value):
     self.assertTrue(os.path.exists(pex))
     pex_info = PexInfo.from_pex(pex)
-    self.assertEquals(getattr(pex_info, attr), value)
+    self.assertEqual(getattr(pex_info, attr), value)
 
   def test_zipsafe_caching(self):
     test_project = 'testprojects/src/python/cache_fields'
@@ -46,9 +45,9 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       build = functools.partial(
         self.run_pants_with_workdir,
         command=['binary', test_project],
-        workdir=os.path.join(buildroot.dir, '.pants.d'),
+        workdir=os.path.join(buildroot.new_buildroot, '.pants.d'),
         config=config,
-        build_root=buildroot.dir
+        build_root=buildroot.new_buildroot
       )
 
       buildroot.write_file(test_src, '')

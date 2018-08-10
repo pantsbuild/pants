@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -15,16 +14,22 @@ from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
 from pants.task.task import Task, TaskBase
+from pants.util.memo import memoized_property
 
 
 class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   ID_PREFIX = 'ng'
+  # Possible execution strategies:
+  NAILGUN = 'nailgun'
+  SUBPROCESS = 'subprocess'
+  HERMETIC = 'hermetic'
 
   @classmethod
   def register_options(cls, register):
     super(NailgunTaskBase, cls).register_options(register)
-    register('--use-nailgun', type=bool, default=True,
-             help='Use nailgun to make repeated invocations of this task quicker.')
+    register('--execution-strategy', choices=[cls.NAILGUN, cls.SUBPROCESS, cls.HERMETIC], default=cls.NAILGUN,
+             help='If set to nailgun, nailgun will be enabled and repeated invocations of this '
+                  'task will be quicker. If set to subprocess, then the task will be run without nailgun.')
     register('--nailgun-timeout-seconds', advanced=True, default=10, type=float,
              help='Timeout (secs) for nailgun startup.')
     register('--nailgun-connect-attempts', advanced=True, default=5, type=int,
@@ -53,38 +58,43 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     self._executor_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
                                           *id_tuple)
 
-  def create_java_executor(self):
+  @memoized_property
+  def execution_strategy(self):
+    return self.get_options().execution_strategy
+
+  def create_java_executor(self, dist=None):
     """Create java executor that uses this task's ng daemon, if allowed.
 
     Call only in execute() or later. TODO: Enforce this.
     """
-    if self.get_options().use_nailgun:
+    dist = dist or self.dist
+    if self.execution_strategy == self.NAILGUN:
       classpath = os.pathsep.join(self.tool_classpath('nailgun-server'))
       return NailgunExecutor(self._identity,
                              self._executor_workdir,
                              classpath,
-                             self.dist,
+                             dist,
                              connect_timeout=self.get_options().nailgun_timeout_seconds,
                              connect_attempts=self.get_options().nailgun_connect_attempts)
     else:
-      return SubprocessExecutor(self.dist)
+      return SubprocessExecutor(dist)
 
   def runjava(self, classpath, main, jvm_options=None, args=None, workunit_name=None,
-              workunit_labels=None, workunit_log_config=None):
+              workunit_labels=None, workunit_log_config=None, dist=None):
     """Runs the java main using the given classpath and args.
 
-    If --no-use-nailgun is specified then the java main is run in a freshly spawned subprocess,
-    otherwise a persistent nailgun server dedicated to this Task subclass is used to speed up
-    amortized run times.
+    If --execution-strategy=subprocess is specified then the java main is run in a freshly spawned
+    subprocess, otherwise a persistent nailgun server dedicated to this Task subclass is used to
+    speed up amortized run times.
 
     :API: public
     """
-    executor = self.create_java_executor()
+    executor = self.create_java_executor(dist=dist)
 
     # Creating synthetic jar to work around system arg length limit is not necessary
     # when `NailgunExecutor` is used because args are passed through socket, therefore turning off
     # creating synthetic jar if nailgun is used.
-    create_synthetic_jar = not self.get_options().use_nailgun
+    create_synthetic_jar = self.execution_strategy != self.NAILGUN
     try:
       return util.execute_java(classpath=classpath,
                                main=main,

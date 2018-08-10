@@ -2,23 +2,20 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import object
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.build_graph import sort_targets
-from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
-from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.memo import memoized_method, memoized_property
 
@@ -30,10 +27,9 @@ class JvmDependencyAnalyzer(object):
   determining which targets correspond to the actual source dependencies of any given target.
   """
 
-  def __init__(self, buildroot, runtime_classpath, product_deps_by_src):
+  def __init__(self, buildroot, runtime_classpath):
     self.buildroot = buildroot
     self.runtime_classpath = runtime_classpath
-    self.product_deps_by_src = product_deps_by_src
 
   @memoized_method
   def files_for_target(self, target):
@@ -132,7 +128,7 @@ class JvmDependencyAnalyzer(object):
       ret = []
       for d in dirs:
         if os.path.isdir(d):
-          ret.extend(filter(lambda s: s.endswith('.jar'), os.listdir(d)))
+          ret.extend(s for s in os.listdir(d) if s.endswith('.jar'))
       return ret
 
     # Note: assumes HotSpot, or some JVM that supports sun.boot.class.path.
@@ -146,7 +142,8 @@ class JvmDependencyAnalyzer(object):
     extension_jars = find_jars_in_dirs(get_path('java.ext.dirs'))
 
     # Note that this order matters: it reflects the classloading order.
-    bootstrap_jars = filter(os.path.isfile, override_jars + boot_classpath + extension_jars)
+    bootstrap_jars = [jar for jar in override_jars + boot_classpath + extension_jars
+                      if os.path.isfile(jar)]
     return bootstrap_jars  # Technically, may include loose class dirs from boot_classpath.
 
   def compute_transitive_deps_by_target(self, targets):
@@ -192,63 +189,3 @@ class JvmDependencyAnalyzer(object):
           yield r, declared
       else:
         yield declared, None
-
-  def compute_unused_deps(self, target):
-    """Computes unused deps for the given Target.
-
-    :returns: A set of directly declared but unused targets, and a set of suggested replacements.
-    """
-
-    # Flatten the product deps of this target.
-    product_deps = set()
-    for dep_entries in self.product_deps_by_src.get(target, {}).values():
-      product_deps.update(dep_entries)
-
-    # Determine which of the DEFAULT deps in the declared set of this target were used.
-    used = set()
-    unused = set()
-    for dep, _ in self.resolve_aliases(target, scope=Scopes.DEFAULT):
-      if dep in used or dep in unused:
-        continue
-      # TODO: What's a better way to accomplish this check? Filtering by `has_sources` would
-      # incorrectly skip "empty" `*_library` targets, which could then be used as a loophole.
-      if isinstance(dep, (Resources, UnpackedJars)):
-        continue
-      # If any of the target's jars or classfiles were used, consider it used.
-      if product_deps.isdisjoint(self.files_for_target(dep)):
-        unused.add(dep)
-      else:
-        used.add(dep)
-
-    # If there were no unused deps, break.
-    if not unused:
-      return {}
-
-    # For any deps that were used, count their derived-from targets used as well.
-    # TODO: Refactor to do some of this above once tests are in place.
-    for dep in list(used):
-      for derived_from in dep.derived_from_chain:
-        if derived_from in unused:
-          unused.remove(derived_from)
-          used.add(derived_from)
-
-    # Prune derived targets that would be in the set twice.
-    for dep in list(unused):
-      if set(dep.derived_from_chain) & unused:
-        unused.remove(dep)
-
-    if not unused:
-      return {}
-
-    # For any deps that were not used, determine whether their transitive deps were used, and
-    # recommend those as replacements.
-    replacements = {}
-    for dep in unused:
-      replacements[dep] = set()
-      for t in dep.closure():
-        if t in used or t in unused:
-          continue
-        if not product_deps.isdisjoint(self.files_for_target(t)):
-          replacements[dep].add(t.concrete_derived_from)
-
-    return replacements

@@ -2,11 +2,11 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import textwrap
+from builtins import open
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
@@ -42,7 +42,7 @@ class TestGoalOptionsMixinIntegration(PantsRunIntegrationTest):
           if not os.path.exists(path):
             return None
           else:
-            with open(path) as fp:
+            with open(path, 'r') as fp:
               return [os.path.basename(x.strip()) for x in fp.readlines()]
         self.assertEqual(expected_one, get_echo('one'))
         self.assertEqual(expected_two, get_echo('two'))

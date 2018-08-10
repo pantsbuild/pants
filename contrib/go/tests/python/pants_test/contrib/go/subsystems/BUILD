@@ -7,7 +7,7 @@ python_tests(
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/subsystems',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
 
@@ -15,6 +15,7 @@ python_tests(
   name='go_distribution',
   sources=['test_go_distribution.py'],
   dependencies=[
+    '3rdparty/python:future',
     'contrib/go/src/python/pants/contrib/go/subsystems',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
@@ -28,4 +29,15 @@ python_tests(
     dependencies=[
       'contrib/go/src/python/pants/contrib/go/subsystems',
     ]
+)
+
+python_tests(
+  name='integration',
+  sources = globs('test_*_integration.py'),
+  dependencies=[
+    'contrib/go/src/python/pants/contrib/go/subsystems',
+    'tests/python/pants_test:int-test',
+  ],
+  tags={'integration'},
+  timeout=180,
 )

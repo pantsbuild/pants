@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
 from collections import OrderedDict
@@ -26,7 +25,7 @@ class DuplicateNameError(MappingError):
   """Indicates more than one top-level object was found with the same name."""
 
 
-class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
+class AddressMap(datatype(['path', 'objects_by_name'])):
   """Maps addressable Serializable objects from a byte source.
 
   To construct an AddressMap, use `parse`.
@@ -75,7 +74,7 @@ class DifferingFamiliesError(MappingError):
   """Indicates an attempt was made to merge address maps from different families together."""
 
 
-class AddressFamily(datatype('AddressFamily', ['namespace', 'objects_by_name'])):
+class AddressFamily(datatype(['namespace', 'objects_by_name'])):
   """Represents the family of addressed objects in a namespace.
 
   To create an AddressFamily, use `create`.
@@ -139,35 +138,33 @@ class AddressFamily(datatype('AddressFamily', ['namespace', 'objects_by_name']))
       for name, (path, obj) in self.objects_by_name.items()
     }
 
-  def __eq__(self, other):
-    if not type(other) == type(self):
-      return NotImplemented
-    return self.namespace == other.namespace
-
-  def __ne__(self, other):
-    return not (self == other)
-
   def __hash__(self):
     return hash(self.namespace)
 
   def __repr__(self):
     return 'AddressFamily(namespace={!r}, objects_by_name={!r})'.format(
-        self.namespace, self.objects_by_name.keys())
+        self.namespace, list(self.objects_by_name.keys()))
 
 
 class ResolveError(MappingError):
   """Indicates an error resolving targets."""
 
 
-class AddressMapper(object):
+class AddressMapper(datatype([
+  'parser',
+  'build_patterns',
+  'build_ignore_patterns',
+  'exclude_target_regexps',
+  'subproject_roots',
+])):
   """Configuration to parse build files matching a filename pattern."""
 
-  def __init__(self,
-               parser,
-               build_patterns=None,
-               build_ignore_patterns=None,
-               exclude_target_regexps=None,
-               subproject_roots=None):
+  def __new__(cls,
+              parser,
+              build_patterns=None,
+              build_ignore_patterns=None,
+              exclude_target_regexps=None,
+              subproject_roots=None):
     """Create an AddressMapper.
 
     Both the set of files that define a mappable BUILD files and the parser used to parse those
@@ -180,27 +177,22 @@ class AddressMapper(object):
     :param list build_ignore_patterns: A list of path ignore patterns used when searching for BUILD files.
     :param list exclude_target_regexps: A list of regular expressions for excluding targets.
     """
-    self.parser = parser
-    self.build_patterns = tuple(build_patterns or [b'BUILD', b'BUILD.*'])
-    self.build_ignore_patterns = tuple(build_ignore_patterns or [])
-    self._exclude_target_regexps = exclude_target_regexps or []
-    self.exclude_patterns = [re.compile(pattern) for pattern in self._exclude_target_regexps]
-    self.subproject_roots = subproject_roots or []
+    build_patterns = tuple(build_patterns or ['BUILD', 'BUILD.*'])
+    build_ignore_patterns = tuple(build_ignore_patterns or [])
+    exclude_target_regexps = tuple(exclude_target_regexps or [])
+    subproject_roots = tuple(subproject_roots or [])
+    return super(AddressMapper, cls).__new__(
+        cls,
+        parser,
+        build_patterns,
+        build_ignore_patterns,
+        exclude_target_regexps,
+        subproject_roots
+      )
 
-  def __eq__(self, other):
-    if self is other:
-      return True
-    if type(other) != type(self):
-      return NotImplemented
-    return (other.build_patterns == self.build_patterns and
-            other.parser == self.parser)
-
-  def __ne__(self, other):
-    return not (self == other)
-
-  def __hash__(self):
-    # Compiled regexes are not hashable.
-    return hash(self.parser)
+  @memoized_property
+  def exclude_patterns(self):
+    return tuple(re.compile(pattern) for pattern in self.exclude_target_regexps)
 
   def __repr__(self):
     return 'AddressMapper(parser={}, build_patterns={})'.format(self.parser, self.build_patterns)

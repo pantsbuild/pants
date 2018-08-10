@@ -2,10 +2,10 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+from builtins import map, next, object
 from collections import defaultdict
 from textwrap import dedent
 
@@ -255,7 +255,7 @@ class PinnedJarArtifactSet(object):
   def __len__(self):
     return len(self._artifacts_to_versions)
 
-  def __nonzero__(self):
+  def __bool__(self):
     return len(self) > 0
 
   def __contains__(self, artifact):

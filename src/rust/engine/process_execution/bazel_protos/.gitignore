@@ -1,3 +1,0 @@
-src/*.rs
-!src/lib.rs
-!src/verification.rs

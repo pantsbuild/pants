@@ -7,25 +7,34 @@
 # If the file ends in ".tar.gz", untars the file and outputs the directory to which the files were untar'd.
 # Otherwise, makes the file executable.
 
-if [[ $# -ne 3 && $# -ne 4 ]]; then
-  echo >&2 "Usage: $0 host util_name version [filename]"
-  echo >&2 "Example: $0 binaries.pantsbuild.org go 1.7.3 go.tar.gz"
-  exit 1
+REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../.. && pwd -P)
+
+# Defines:
+# + CACHE_ROOT: The pants cache directory, ie: ~/.cache/pants.
+source "${REPO_ROOT}/build-support/common.sh"
+
+if (( $# != 3 && $# != 4 )); then
+  die "$(cat << USAGE
+Usage: $0 host util_name version [filename]
+Example: $0 binaries.pantsbuild.org go 1.7.3 go.tar.gz
+USAGE
+)"
 fi
-host="$1"
-util_name="$2"
-version="$3"
-filename="${4:-${util_name}}"
+readonly host="$1"
+readonly util_name="$2"
+readonly version="$3"
+readonly filename="${4:-${util_name}}"
 
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-path="bin/${util_name}/$("${SCRIPT_DIR}/get_os.sh")/${version}/${filename}"
-cache_path="${HOME}/.cache/pants/${path}"
+os=$("${REPO_ROOT}/build-support/bin/get_os.sh")
+readonly path="bin/${util_name}/${os}/${version}/${filename}"
+readonly cache_path="${CACHE_ROOT}/${path}"
 
 if [[ ! -f "${cache_path}" ]]; then
   mkdir -p "$(dirname "${cache_path}")"
-  curl --fail "https://${host}/${path}" > "${cache_path}".tmp
+
+  readonly binary_url="https://${host}/${path}"
+  echo >&2 "Downloading ${binary_url} ..."
+  curl --fail "${binary_url}" > "${cache_path}".tmp
   mv "${cache_path}"{.tmp,}
   if [[ "${filename}" == *tar.gz ]]; then
     tar -C "$(dirname "${cache_path}")" -xzf "${cache_path}"

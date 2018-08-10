@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 from contextlib import contextmanager
@@ -11,7 +10,7 @@ from contextlib import contextmanager
 from pants.build_graph.target import Target
 from pants.task.mutex_task_mixin import MutexTaskMixin
 from pants.util.contextutil import temporary_dir
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 class LogViewerTaskMixin(MutexTaskMixin):
@@ -68,7 +67,7 @@ class GreenLogViewer(LogViewerTaskMixin):
     return isinstance(target, GreenTarget)
 
 
-class MutexTaskMixinTest(BaseTest):
+class MutexTaskMixinTest(TestBase):
 
   def tearDown(self):
     super(MutexTaskMixinTest, self).tearDown()

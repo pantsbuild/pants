@@ -2,12 +2,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
 
-import six
+from future.utils import string_types
 
 from pants.util.eval import parse_expression
 
@@ -15,7 +14,7 @@ from pants.util.eval import parse_expression
 class ParseLiteralTest(unittest.TestCase):
 
   def test_success_simple(self):
-    literal = parse_expression("'42'", acceptable_types=six.string_types)
+    literal = parse_expression("'42'", acceptable_types=string_types)
     self.assertEqual('42', literal)
 
   def test_success_mixed(self):

@@ -2,10 +2,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+from builtins import object, str
+from functools import total_ordering
 
 from pants.base.exceptions import TaskError
 from pants.base.revision import Revision
@@ -26,6 +27,8 @@ class JvmPlatform(Subsystem):
   # java releases, they can simply be omitted from this list and they will be parsed
   # strictly (eg, if Java 10 != 1.10, simply leave it out).
   SUPPORTED_CONVERSION_VERSIONS = (6, 7, 8,)
+
+  _COMPILER_CHOICES = ['zinc', 'javac']
 
   class IllegalDefaultPlatform(TaskError):
     """The --default-platform option was set, but isn't defined in --platforms."""
@@ -51,12 +54,25 @@ class JvmPlatform(Subsystem):
   options_scope = 'jvm-platform'
 
   @classmethod
+  def add_compiler_choice(cls, name):
+    """This allows plugins to register additional jvm compilers by name.
+
+    They can then follow the pattern used by zinc_compile and javac_compile to switch themselves on
+    or off.
+
+    We'd prefer that folks upstream their implementations rather than using this hook though, as
+    it's not likely to be the final API."""
+    cls._COMPILER_CHOICES.append(name)
+
+  @classmethod
   def register_options(cls, register):
     super(JvmPlatform, cls).register_options(register)
     register('--platforms', advanced=True, type=dict, default={}, fingerprint=True,
              help='Compile settings that can be referred to by name in jvm_targets.')
     register('--default-platform', advanced=True, type=str, default=None, fingerprint=True,
              help='Name of the default platform to use if none are specified.')
+    register('--compiler', advanced=True, choices=cls._COMPILER_CHOICES, default='zinc', fingerprint=True,
+             help='Java compiler implementation to use.')
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -170,6 +186,7 @@ class JvmPlatform(Subsystem):
     return Revision(*version.components[:2])
 
 
+@total_ordering
 class JvmPlatformSettings(object):
   """Simple information holder to keep track of common arguments to java compilers."""
 
@@ -216,14 +233,12 @@ class JvmPlatformSettings(object):
   def __eq__(self, other):
     return tuple(self) == tuple(other)
 
-  def __ne__(self, other):
-    return not self.__eq__(other)
+  # TODO(python3port): decide if this should raise NotImplemented on invalid comparisons
+  def __lt__(self, other):
+    return tuple(self) < tuple(other)
 
   def __hash__(self):
     return hash(tuple(self))
-
-  def __cmp__(self, other):
-    return cmp(tuple(self), tuple(other))
 
   def __str__(self):
     return 'source={source},target={target},args=({args})'.format(

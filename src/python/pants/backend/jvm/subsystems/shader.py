@@ -2,12 +2,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import re
+from builtins import object
 from collections import namedtuple
 from contextlib import contextmanager
 
@@ -18,7 +18,6 @@ from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem, SubsystemError
 from pants.util.contextutil import temporary_file
-from pants.util.memo import memoized_method
 
 
 logger = logging.getLogger(__name__)
@@ -239,6 +238,11 @@ class Shader(object):
     @classmethod
     def register_options(cls, register):
       super(Shader.Factory, cls).register_options(register)
+
+      register('--binary-package-excludes', type=list, fingerprint=True,
+               default=['com.oracle', 'com.sun', 'java', 'javax', 'jdk', 'oracle', 'sun'],
+               help='Packages that the shader will exclude for binaries')
+
       cls.register_jvm_tool(register,
                             'jarjar',
                             classpath=[
@@ -255,7 +259,7 @@ class Shader(object):
         executor = SubprocessExecutor(DistributionLocator.cached())
       classpath = cls.global_instance().tool_classpath_from_products(context.products, 'jarjar',
                                                                      cls.options_scope)
-      return Shader(classpath, executor)
+      return Shader(classpath, executor, cls.global_instance().get_options().binary_package_excludes)
 
   @classmethod
   def exclude_package(cls, package_name=None, recursive=False):
@@ -315,16 +319,6 @@ class Shader(object):
     return (path.endswith('.class') or path.endswith('.java')) and '-' not in path
 
   @classmethod
-  def _iter_dir_packages(cls, path):
-    paths = set()
-    for root, dirs, files in os.walk(path):
-      for filename in files:
-        if cls._potential_package_path(filename):
-          package_path = os.path.dirname(os.path.join(root, filename))
-          paths.add(os.path.relpath(package_path, path))
-    return cls._iter_packages(paths)
-
-  @classmethod
   def _iter_jar_packages(cls, path):
     paths = set()
     for pathname in ClasspathUtil.classpath_entries_contents([path]):
@@ -337,7 +331,7 @@ class Shader(object):
           paths.add(package)
     return cls._iter_packages(paths)
 
-  def __init__(self, jarjar_classpath, executor):
+  def __init__(self, jarjar_classpath, executor, binary_package_excludes):
     """Creates a `Shader` the will use the given `jarjar` jar to create shaded jars.
 
     :param jarjar_classpath: The jarjar classpath.
@@ -346,19 +340,7 @@ class Shader(object):
     """
     self._jarjar_classpath = jarjar_classpath
     self._executor = executor
-
-  @classmethod
-  @memoized_method
-  def _system_packages(cls, distribution):
-    system_packages = set()
-    boot_classpath = distribution.system_properties['sun.boot.class.path']
-    for path in boot_classpath.split(os.pathsep):
-      if os.path.exists(path):
-        if os.path.isdir(path):
-          system_packages.update(cls._iter_dir_packages(path))
-        else:
-          system_packages.update(cls._iter_jar_packages(path))
-    return sorted(system_packages)
+    self._binary_package_excludes = binary_package_excludes
 
   def assemble_binary_rules(self, main, jar, custom_rules=None):
     """Creates an ordered list of rules suitable for fully shading the given binary.
@@ -395,8 +377,8 @@ class Shader(object):
       main_package = None
     rules.append(self.exclude_package(main_package))
 
-    rules.extend(self.exclude_package(system_pkg)
-                 for system_pkg in self._system_packages(self._executor.distribution))
+    rules.extend(self.exclude_package(system_pkg, recursive=True)
+                 for system_pkg in self._binary_package_excludes)
 
     # Shade everything else.
     #
@@ -418,7 +400,7 @@ class Shader(object):
 
   @contextmanager
   def temporary_rules_file(self, rules):
-    with temporary_file() as fp:
+    with temporary_file(binary_mode=False) as fp:
       for rule in rules:
         fp.write(rule.render())
       fp.close()

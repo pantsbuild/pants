@@ -2,11 +2,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import unittest
+from builtins import range
 
 from pants.engine.nodes import Return
 
@@ -47,49 +47,49 @@ class GraphTest(unittest.TestCase):
 
   def test_dependency_edges(self):
     self.pg.add_dependencies('A', ['B', 'C'])
-    self.assertEquals({'B', 'C'}, set(self.pg.dependencies_of('A')))
-    self.assertEquals({'A'}, set(self.pg.dependents_of('B')))
-    self.assertEquals({'A'}, set(self.pg.dependents_of('C')))
+    self.assertEqual({'B', 'C'}, set(self.pg.dependencies_of('A')))
+    self.assertEqual({'A'}, set(self.pg.dependents_of('B')))
+    self.assertEqual({'A'}, set(self.pg.dependents_of('C')))
 
   def test_cycle_simple(self):
     self.pg.add_dependencies('A', ['B'])
     self.pg.add_dependencies('B', ['A'])
     # NB: Order matters: the second insertion is the one tracked as a cycle.
-    self.assertEquals({'B'}, set(self.pg.dependencies_of('A')))
-    self.assertEquals(set(), set(self.pg.dependencies_of('B')))
-    self.assertEquals(set(), set(self.pg.cyclic_dependencies_of('A')))
-    self.assertEquals({'A'}, set(self.pg.cyclic_dependencies_of('B')))
+    self.assertEqual({'B'}, set(self.pg.dependencies_of('A')))
+    self.assertEqual(set(), set(self.pg.dependencies_of('B')))
+    self.assertEqual(set(), set(self.pg.cyclic_dependencies_of('A')))
+    self.assertEqual({'A'}, set(self.pg.cyclic_dependencies_of('B')))
 
   def test_cycle_indirect(self):
     self.pg.add_dependencies('A', ['B'])
     self.pg.add_dependencies('B', ['C'])
     self.pg.add_dependencies('C', ['A'])
 
-    self.assertEquals({'B'}, set(self.pg.dependencies_of('A')))
-    self.assertEquals({'C'}, set(self.pg.dependencies_of('B')))
-    self.assertEquals(set(), set(self.pg.dependencies_of('C')))
-    self.assertEquals(set(), set(self.pg.cyclic_dependencies_of('A')))
-    self.assertEquals(set(), set(self.pg.cyclic_dependencies_of('B')))
-    self.assertEquals({'A'}, set(self.pg.cyclic_dependencies_of('C')))
+    self.assertEqual({'B'}, set(self.pg.dependencies_of('A')))
+    self.assertEqual({'C'}, set(self.pg.dependencies_of('B')))
+    self.assertEqual(set(), set(self.pg.dependencies_of('C')))
+    self.assertEqual(set(), set(self.pg.cyclic_dependencies_of('A')))
+    self.assertEqual(set(), set(self.pg.cyclic_dependencies_of('B')))
+    self.assertEqual({'A'}, set(self.pg.cyclic_dependencies_of('C')))
 
   def test_cycle_long(self):
     # Creating a long chain is allowed.
     nodes = list(range(0, 100))
     self._mk_chain(self.pg, nodes, states=(_WAITING,))
     walked_nodes = [node for node, _ in self.pg.walk([nodes[0]])]
-    self.assertEquals(nodes, walked_nodes)
+    self.assertEqual(nodes, walked_nodes)
 
     # Closing the chain is not.
     begin, end = nodes[0], nodes[-1]
     self.pg.add_dependencies(end, [begin])
-    self.assertEquals(set(), set(self.pg.dependencies_of(end)))
-    self.assertEquals({begin}, set(self.pg.cyclic_dependencies_of(end)))
+    self.assertEqual(set(), set(self.pg.dependencies_of(end)))
+    self.assertEqual({begin}, set(self.pg.cyclic_dependencies_of(end)))
 
   def test_walk(self):
     nodes = list('ABCDEF')
     self._mk_chain(self.pg, nodes)
     walked_nodes = list((node for node, _ in self.pg.walk(nodes[0])))
-    self.assertEquals(nodes, walked_nodes)
+    self.assertEqual(nodes, walked_nodes)
 
   def test_invalidate_all(self):
     chain_list = list('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
@@ -128,12 +128,12 @@ class GraphTest(unittest.TestCase):
     # Ensure the final structure of the primary graph matches the comparison graph.
     pg_structure = {n: e.structure() for n, e in self.pg._nodes.items()}
     comparison_structure = {n: e.structure() for n, e in comparison_pg._nodes.items()}
-    self.assertEquals(pg_structure, comparison_structure)
+    self.assertEqual(pg_structure, comparison_structure)
 
   def test_invalidate_count(self):
     self._mk_chain(self.pg, list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
     invalidated_count = self.pg.invalidate(lambda node, _: node == 'I')
-    self.assertEquals(invalidated_count, 9)
+    self.assertEqual(invalidated_count, 9)
 
   def test_invalidate_partial_identity_check(self):
     # Create a graph with a chain from A..Z.

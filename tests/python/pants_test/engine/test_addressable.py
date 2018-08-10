@@ -2,116 +2,15 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
-import unittest
+from builtins import object
 
-from pants.engine.addressable import (Exactly, MutationError, NotSerializableError, SubclassesOf,
-                                      SuperclassesOf, TypeConstraintError, addressable,
+from pants.engine.addressable import (MutationError, NotSerializableError, addressable,
                                       addressable_dict, addressable_list)
 from pants.engine.objects import Resolvable, Serializable
-
-
-class TypeConstraintTestBase(unittest.TestCase):
-  class A(object):
-    pass
-
-  class B(A):
-    pass
-
-  class C(B):
-    pass
-
-  class BPrime(A):
-    pass
-
-
-class SuperclassesOfTest(TypeConstraintTestBase):
-  def test_none(self):
-    with self.assertRaises(ValueError):
-      SubclassesOf()
-
-  def test_single(self):
-    superclasses_of_b = SuperclassesOf(self.B)
-    self.assertEqual((self.B,), superclasses_of_b.types)
-    self.assertTrue(superclasses_of_b.satisfied_by(self.A()))
-    self.assertTrue(superclasses_of_b.satisfied_by(self.B()))
-    self.assertFalse(superclasses_of_b.satisfied_by(self.BPrime()))
-    self.assertFalse(superclasses_of_b.satisfied_by(self.C()))
-
-  def test_multiple(self):
-    superclasses_of_a_or_b = SuperclassesOf(self.A, self.B)
-    self.assertEqual((self.A, self.B), superclasses_of_a_or_b.types)
-    self.assertTrue(superclasses_of_a_or_b.satisfied_by(self.A()))
-    self.assertTrue(superclasses_of_a_or_b.satisfied_by(self.B()))
-    self.assertFalse(superclasses_of_a_or_b.satisfied_by(self.BPrime()))
-    self.assertFalse(superclasses_of_a_or_b.satisfied_by(self.C()))
-
-
-class ExactlyTest(TypeConstraintTestBase):
-  def test_none(self):
-    with self.assertRaises(ValueError):
-      Exactly()
-
-  def test_single(self):
-    exactly_b = Exactly(self.B)
-    self.assertEqual((self.B,), exactly_b.types)
-    self.assertFalse(exactly_b.satisfied_by(self.A()))
-    self.assertTrue(exactly_b.satisfied_by(self.B()))
-    self.assertFalse(exactly_b.satisfied_by(self.BPrime()))
-    self.assertFalse(exactly_b.satisfied_by(self.C()))
-
-  def test_multiple(self):
-    exactly_a_or_b = Exactly(self.A, self.B)
-    self.assertEqual((self.A, self.B), exactly_a_or_b.types)
-    self.assertTrue(exactly_a_or_b.satisfied_by(self.A()))
-    self.assertTrue(exactly_a_or_b.satisfied_by(self.B()))
-    self.assertFalse(exactly_a_or_b.satisfied_by(self.BPrime()))
-    self.assertFalse(exactly_a_or_b.satisfied_by(self.C()))
-
-  def test_disallows_unsplatted_lists(self):
-    with self.assertRaises(TypeError):
-      Exactly([1])
-
-  def test_str_and_repr(self):
-    exactly_b_types = Exactly(self.B, description='B types')
-    self.assertEquals("=(B types)", str(exactly_b_types))
-    self.assertEquals("Exactly(B types)", repr(exactly_b_types))
-
-    exactly_b = Exactly(self.B)
-    self.assertEquals("=B", str(exactly_b))
-    self.assertEquals("Exactly(B)", repr(exactly_b))
-
-    exactly_multiple = Exactly(self.A, self.B)
-    self.assertEquals("=(A, B)", str(exactly_multiple))
-    self.assertEquals("Exactly(A, B)", repr(exactly_multiple))
-
-  def test_checking_via_bare_type(self):
-    self.assertTrue(Exactly(self.B).satisfied_by_type(self.B))
-    self.assertFalse(Exactly(self.B).satisfied_by_type(self.C))
-
-
-class SubclassesOfTest(TypeConstraintTestBase):
-  def test_none(self):
-    with self.assertRaises(ValueError):
-      SubclassesOf()
-
-  def test_single(self):
-    subclasses_of_b = SubclassesOf(self.B)
-    self.assertEqual((self.B,), subclasses_of_b.types)
-    self.assertFalse(subclasses_of_b.satisfied_by(self.A()))
-    self.assertTrue(subclasses_of_b.satisfied_by(self.B()))
-    self.assertFalse(subclasses_of_b.satisfied_by(self.BPrime()))
-    self.assertTrue(subclasses_of_b.satisfied_by(self.C()))
-
-  def test_multiple(self):
-    subclasses_of_b_or_c = SubclassesOf(self.B, self.C)
-    self.assertEqual((self.B, self.C), subclasses_of_b_or_c.types)
-    self.assertTrue(subclasses_of_b_or_c.satisfied_by(self.B()))
-    self.assertTrue(subclasses_of_b_or_c.satisfied_by(self.C()))
-    self.assertFalse(subclasses_of_b_or_c.satisfied_by(self.BPrime()))
-    self.assertFalse(subclasses_of_b_or_c.satisfied_by(self.A()))
+from pants.util.objects import Exactly, TypeConstraintError
+from pants_test.base_test import BaseTest
 
 
 class SimpleSerializable(Serializable):
@@ -143,7 +42,7 @@ class CountingResolvable(Resolvable):
     return self._resolutions
 
 
-class AddressableDescriptorTest(unittest.TestCase):
+class AddressableDescriptorTest(BaseTest):
   def test_inappropriate_application(self):
     class NotSerializable(object):
       def __init__(self, count):
@@ -158,7 +57,7 @@ class AddressableDescriptorTest(unittest.TestCase):
       NotSerializable(42)
 
 
-class AddressableTest(unittest.TestCase):
+class AddressableTest(BaseTest):
   class Person(SimpleSerializable):
     def __init__(self, age):
       super(AddressableTest.Person, self).__init__()
@@ -215,7 +114,7 @@ class AddressableTest(unittest.TestCase):
       person.age = 37
 
 
-class AddressableListTest(unittest.TestCase):
+class AddressableListTest(BaseTest):
   class Series(SimpleSerializable):
     def __init__(self, values):
       super(AddressableListTest.Series, self).__init__()
@@ -286,7 +185,7 @@ class AddressableListTest(unittest.TestCase):
       series.values = [37]
 
 
-class AddressableDictTest(unittest.TestCase):
+class AddressableDictTest(BaseTest):
   class Varz(SimpleSerializable):
     def __init__(self, varz):
       super(AddressableDictTest.Varz, self).__init__()

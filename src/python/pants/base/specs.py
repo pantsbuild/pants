@@ -2,13 +2,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+import re
 from abc import abstractmethod
 
 from pants.util.meta import AbstractClass
-from pants.util.objects import Collection, datatype
+from pants.util.objects import datatype
 
 
 class Spec(AbstractClass):
@@ -26,7 +26,7 @@ class Spec(AbstractClass):
     """Returns the normalized string representation of this spec."""
 
 
-class SingleAddress(datatype('SingleAddress', ['directory', 'name']), Spec):
+class SingleAddress(datatype(['directory', 'name']), Spec):
   """A Spec for a single address."""
 
   def __new__(cls, directory, name):
@@ -39,26 +39,32 @@ class SingleAddress(datatype('SingleAddress', ['directory', 'name']), Spec):
     return '{}:{}'.format(self.directory, self.name)
 
 
-class SiblingAddresses(datatype('SiblingAddresses', ['directory']), Spec):
+class SiblingAddresses(datatype(['directory']), Spec):
   """A Spec representing all addresses located directly within the given directory."""
 
   def to_spec_string(self):
     return '{}:'.format(self.directory)
 
 
-class DescendantAddresses(datatype('DescendantAddresses', ['directory']), Spec):
+class DescendantAddresses(datatype(['directory']), Spec):
   """A Spec representing all addresses located recursively under the given directory."""
 
   def to_spec_string(self):
     return '{}::'.format(self.directory)
 
 
-class AscendantAddresses(datatype('AscendantAddresses', ['directory']), Spec):
+class AscendantAddresses(datatype(['directory']), Spec):
   """A Spec representing all addresses located recursively _above_ the given directory."""
 
   def to_spec_string(self):
     return '{}^'.format(self.directory)
 
 
-class Specs(Collection.of(Spec)):
-  """A collection of Spec subclasses."""
+class Specs(datatype(['dependencies', 'tags', ('exclude_patterns', tuple)])):
+  """A collection of Specs representing Spec subclasses, tags and regex filters."""
+
+  def __new__(cls, dependencies, tags=tuple(), exclude_patterns=tuple()):
+    return super(Specs, cls).__new__(cls, dependencies, tags, exclude_patterns)
+
+  def exclude_patterns_memo(self):
+    return [re.compile(pattern) for pattern in set(self.exclude_patterns or [])]

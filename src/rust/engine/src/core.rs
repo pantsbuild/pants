@@ -4,11 +4,12 @@
 use fnv::FnvHasher;
 
 use std::collections::HashMap;
+use std::ops::Deref;
+use std::sync::Arc;
 use std::{fmt, hash};
-use std::ops::Drop;
 
 use externs;
-use handles::{enqueue_drop_handle, Handle};
+use handles::Handle;
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
@@ -37,7 +38,7 @@ impl Variants {
     Variants(result)
   }
 
-  pub fn find(&self, key: &String) -> Option<&str> {
+  pub fn find(&self, key: &str) -> Option<&str> {
     self
       .0
       .iter()
@@ -47,9 +48,6 @@ impl Variants {
 }
 
 pub type Id = u64;
-
-// The name of a field.
-pub type Field = String;
 
 // The type of a python object (which itself has a type, but which is not represented
 // by a Key, because that would result in a infinitely recursive structure.)
@@ -109,43 +107,22 @@ impl Key {
 }
 
 ///
-/// Represents a handle to a python object, explicitly without equality or hashing. Whenever
-/// the equality/identity of a Value matters, a Key should be computed for it and used instead.
+/// A wrapper around a handle: soon to contain an Arc.
 ///
-/// Value implements Clone by calling out to a python extern `clone_val` which clones the
-/// underlying CFFI handle.
-///
-#[repr(C)]
-pub struct Value(Handle);
-
-// By default, Values would not be marked Send because of the raw pointer they hold.
-// Because the handle is opaque and can't be cloned, we can safely implement Send.
-unsafe impl Send for Value {}
-unsafe impl Sync for Value {}
-
-impl Drop for Value {
-  fn drop(&mut self) {
-    enqueue_drop_handle(self.0);
-  }
-}
+#[derive(Clone, Eq, PartialEq)]
+pub struct Value(Arc<Handle>);
 
 impl Value {
-  ///
-  /// An escape hatch to allow for cloning a Value without cloning its handle. You should generally
-  /// not do this unless you are certain the input Value has been mem::forgotten (otherwise it
-  /// will be `Drop`ed twice).
-  ///
-  pub unsafe fn clone_without_handle(&self) -> Value {
-    Value(self.0)
+  pub fn new(handle: Handle) -> Value {
+    Value(Arc::new(handle))
   }
 }
 
-///
-/// Implemented by calling back to python to clone the underlying Handle.
-///
-impl Clone for Value {
-  fn clone(&self) -> Value {
-    externs::clone_val(self)
+impl Deref for Value {
+  type Target = Handle;
+
+  fn deref(&self) -> &Handle {
+    &self.0
   }
 }
 
@@ -155,7 +132,26 @@ impl fmt::Debug for Value {
   }
 }
 
-#[derive(Debug, Clone)]
+///
+/// Creates a Handle (which represents exclusive access) from a Value (which might be shared),
+/// cloning if necessary.
+///
+impl From<Value> for Handle {
+  fn from(value: Value) -> Self {
+    match Arc::try_unwrap(value.0) {
+      Ok(handle) => handle,
+      Err(arc_handle) => externs::clone_val(&arc_handle),
+    }
+  }
+}
+
+impl From<Handle> for Value {
+  fn from(handle: Handle) -> Self {
+    Value::new(handle)
+  }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Failure {
   /// A Node failed because a filesystem change invalidated it or its inputs.
   /// A root requestor should usually immediately retry their request.
@@ -168,7 +164,7 @@ pub enum Failure {
 
 // NB: enum members are listed in ascending priority order based on how likely they are
 // to be useful to users.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Noop {
   NoTask,
   NoVariant,

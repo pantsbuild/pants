@@ -5,6 +5,7 @@ python_library(
   name='address_mapper',
   sources=['address_mapper.py'],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/base:build_file',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
@@ -21,6 +22,7 @@ python_library(
   name='parser',
   sources=['parser.py'],
   dependencies=[
+    '3rdparty/python:future',
     ':structs',
     'src/python/pants/base:build_file_target_factory',
     'src/python/pants/base:parse_context',
@@ -32,9 +34,21 @@ python_library(
 )
 
 python_library(
+  name='options_parsing',
+  sources=['options_parsing.py'],
+  dependencies=[
+    'src/python/pants/build_graph',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:objects',
+    'src/python/pants/option',
+  ],
+)
+
+python_library(
   name='structs',
   sources=['structs.py'],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/base:deprecated',
     'src/python/pants/build_graph',
     'src/python/pants/engine:fs',
@@ -52,9 +66,9 @@ python_library(
   name='graph',
   sources=['graph.py'],
   dependencies=[
+    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':structs',
-    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:parse_context',
     'src/python/pants/build_graph',
@@ -62,6 +76,7 @@ python_library(
     'src/python/pants/engine:mapper',
     'src/python/pants/engine:parser',
     'src/python/pants/engine:selectors',
+    'src/python/pants/option',
     'src/python/pants/source',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:objects',

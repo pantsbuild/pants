@@ -2,10 +2,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open, str
 from contextlib import contextmanager
 
 import requests
@@ -14,10 +14,10 @@ from pants.cache.artifact import ArtifactError
 from pants.cache.artifact_cache import NonfatalArtifactCacheError, UnreadableArtifact
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.util.contextutil import temporary_dir
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class ArtifactCacheStatsTest(BaseTest):
+class ArtifactCacheStatsTest(TestBase):
   TEST_CACHE_NAME_1 = 'ZincCompile'
   TEST_CACHE_NAME_2 = 'Checkstyle_test_checkstyle'
   TEST_LOCAL_ERROR = UnreadableArtifact('foo', ArtifactError('CRC check failed'))
@@ -79,10 +79,10 @@ class ArtifactCacheStatsTest(BaseTest):
     with temporary_dir() as tmp_dir:
       artifact_cache_stats = ArtifactCacheStats(tmp_dir)
       yield artifact_cache_stats
-      self.assertEquals(expected_stats, artifact_cache_stats.get_all())
+      self.assertEqual(expected_stats, artifact_cache_stats.get_all())
 
-      self.assertEquals(sorted(list(expected_hit_or_miss_files.keys())),
+      self.assertEqual(sorted(list(expected_hit_or_miss_files.keys())),
                         sorted(os.listdir(tmp_dir)))
       for hit_or_miss_file in expected_hit_or_miss_files.keys():
-        with open(os.path.join(tmp_dir, hit_or_miss_file)) as hit_or_miss_saved:
-          self.assertEquals(expected_hit_or_miss_files[hit_or_miss_file], hit_or_miss_saved.read())
+        with open(os.path.join(tmp_dir, hit_or_miss_file), 'r') as hit_or_miss_saved:
+          self.assertEqual(expected_hit_or_miss_files[hit_or_miss_file], hit_or_miss_saved.read())

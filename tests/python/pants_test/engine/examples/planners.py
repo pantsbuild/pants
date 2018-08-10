@@ -2,12 +2,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import re
 from abc import abstractmethod
+from builtins import str
 from os import sep as os_sep
 from os.path import join as os_path_join
 
@@ -15,17 +15,18 @@ from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.project_tree import Dir
 from pants.build_graph.address import Address
-from pants.engine.addressable import BuildFileAddresses, SubclassesOf, addressable_list
+from pants.engine.addressable import addressable_list
 from pants.engine.build_files import create_graph_rules
-from pants.engine.fs import FilesContent, PathGlobs, Snapshot, create_fs_rules
+from pants.engine.fs import DirectoryDigest, FilesContent, PathGlobs, Snapshot, create_fs_rules
 from pants.engine.mapper import AddressFamily, AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import SingletonRule, TaskRule, rule
-from pants.engine.scheduler import LocalScheduler
-from pants.engine.selectors import Get, Select, SelectDependencies, SelectVariant
+from pants.engine.scheduler import Scheduler
+from pants.engine.selectors import Get, Select, SelectVariant
 from pants.engine.struct import HasProducts, Struct, StructWithDeps, Variants
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
+from pants.util.objects import SubclassesOf, datatype
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.sources import Sources
 
@@ -92,21 +93,20 @@ class ScalaInferredDepsSources(Sources):
   extensions = ('.scala',)
 
 
-class JVMPackageName(datatype('JVMPackageName', ['name'])):
+class JVMPackageName(datatype(['name'])):
   """A typedef to represent a fully qualified JVM package name."""
   pass
 
 
-class SourceRoots(datatype('SourceRoots', ['srcroots'])):
+class SourceRoots(datatype(['srcroots'])):
   """Placeholder for the SourceRoot subsystem."""
 
 
 @printing_func
-@rule(Address,
-      [Select(JVMPackageName),
-       SelectDependencies(AddressFamily, Snapshot, field='dir_stats', field_types=(Dir,))])
-def select_package_address(jvm_package_name, address_families):
+@rule(Address, [Select(JVMPackageName), Select(Snapshot)])
+def select_package_address(jvm_package_name, snapshot):
   """Return the Address from the given AddressFamilies which provides the given package."""
+  address_families = yield [Get(AddressFamily, Dir, ds) for ds in snapshot.dir_stats]
   addresses = [address for address_family in address_families
                        for address in address_family.addressables.keys()]
   if len(addresses) == 0:
@@ -115,7 +115,7 @@ def select_package_address(jvm_package_name, address_families):
   elif len(addresses) > 1:
     raise ValueError('Multiple targets might be able to provide {}:\n  {}'.format(
       jvm_package_name, '\n  '.join(str(a) for a in addresses)))
-  return addresses[0].to_address()
+  yield addresses[0].to_address()
 
 
 @printing_func
@@ -124,14 +124,15 @@ def calculate_package_search_path(jvm_package_name, source_roots):
   """Return PathGlobs to match directories where the given JVMPackageName might exist."""
   rel_package_dir = jvm_package_name.name.replace('.', os_sep)
   specs = [os_path_join(srcroot, rel_package_dir) for srcroot in source_roots.srcroots]
-  return PathGlobs.create('', include=specs)
+  return PathGlobs(include=specs)
 
 
 @printing_func
 @rule(ScalaSources, [Select(ScalaInferredDepsSources)])
 def reify_scala_sources(sources):
   """Given a ScalaInferredDepsSources object, create ScalaSources."""
-  source_files_content = yield Get(FilesContent, PathGlobs, sources.path_globs)
+  snapshot = yield Get(Snapshot, PathGlobs, sources.path_globs)
+  source_files_content = yield Get(FilesContent, DirectoryDigest, snapshot.directory_digest)
   packages = set()
   import_re = re.compile(r'^import ([^;]*);?$')
   for filecontent in source_files_content.dependencies:
@@ -283,7 +284,7 @@ def write_name_file(name):
   return Classpath(creator='write_name_file')
 
 
-class Scrooge(datatype('Scrooge', ['tool_address'])):
+class Scrooge(datatype(['tool_address'])):
   """Placeholder for a Scrooge subsystem."""
 
 
@@ -329,19 +330,21 @@ def gen_scrooge_thrift(sources, config, scrooge_classpath):
 
 
 @printing_func
-@rule(Classpath,
-      [Select(JavaSources),
-       SelectDependencies(Classpath, JavaSources, field_types=(Address, Jar))])
-def javac(sources, classpath):
-  return Classpath(creator='javac')
+@rule(Classpath, [Select(JavaSources)])
+def javac(sources):
+  classpath = yield [(Get(Classpath, Address, d) if type(d) is Address else Get(Classpath, Jar, d))
+                     for d in sources.dependencies]
+  print('compiling {} with {}'.format(sources, classpath))
+  yield Classpath(creator='javac')
 
 
 @printing_func
-@rule(Classpath,
-      [Select(ScalaSources),
-       SelectDependencies(Classpath, ScalaSources, field_types=(Address, Jar))])
-def scalac(sources, classpath):
-  return Classpath(creator='scalac')
+@rule(Classpath, [Select(ScalaSources)])
+def scalac(sources):
+  classpath = yield [(Get(Classpath, Address, d) if type(d) is Address else Get(Classpath, Jar, d))
+                     for d in sources.dependencies]
+  print('compiling {} with {}'.format(sources, classpath))
+  yield Classpath(creator='scalac')
 
 
 class Goal(AbstractClass):
@@ -425,29 +428,19 @@ class ExampleTable(SymbolTable):
 def setup_json_scheduler(build_root, native):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
-  :rtype :class:`pants.engine.scheduler.LocalScheduler`
+  :rtype :class:`pants.engine.scheduler.SchedulerSession`
   """
 
   symbol_table = ExampleTable()
 
-  # Register "literal" subjects required for these tasks.
-  # TODO: Replace with `Subsystems`.
+  # Register "literal" subjects required for these rules.
   address_mapper = AddressMapper(build_patterns=('BLD.json',),
                                  parser=JsonParser(symbol_table))
 
   work_dir = os_path_join(build_root, '.pants.d')
   project_tree = FileSystemProjectTree(build_root)
 
-  goals = {
-      'compile': Classpath,
-      # TODO: to allow for running resolve alone, should split out a distinct 'IvyReport' product.
-      'resolve': Classpath,
-      'list': BuildFileAddresses,
-      GenGoal.name(): GenGoal,
-      'ls': Snapshot,
-      'cat': FilesContent,
-    }
-  tasks = [
+  rules = [
       # Codegen
       GenGoal.rule(),
       gen_apache_java_thrift,
@@ -477,8 +470,11 @@ def setup_json_scheduler(build_root, native):
       create_fs_rules()
     )
 
-  return LocalScheduler(work_dir,
-                        goals,
-                        tasks,
+  scheduler = Scheduler(native,
                         project_tree,
-                        native)
+                        work_dir,
+                        rules,
+                        DEFAULT_EXECUTION_OPTIONS,
+                        None,
+                        None)
+  return scheduler.new_session()

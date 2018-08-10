@@ -2,17 +2,16 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import mock
 
 from pants.pantsd.watchman import Watchman
 from pants.pantsd.watchman_launcher import WatchmanLauncher
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class TestWatchmanLauncher(BaseTest):
+class TestWatchmanLauncher(TestBase):
   def watchman_launcher(self, cli_options=()):
     bootstrap_options = self.get_bootstrap_options(cli_options)
     return WatchmanLauncher.create(bootstrap_options)
@@ -63,4 +62,4 @@ class TestWatchmanLauncher(BaseTest):
     expected_path = '/a/shorter/path'
     options = ['--watchman-socket-path={}'.format(expected_path)]
     wl = self.watchman_launcher(options)
-    self.assertEquals(wl.watchman._sock_file, expected_path)
+    self.assertEqual(wl.watchman._sock_file, expected_path)

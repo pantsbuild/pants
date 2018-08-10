@@ -2,13 +2,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from abc import abstractmethod
 
-from pants.engine.addressable import Exactly
 from pants.util.meta import AbstractClass
+from pants.util.objects import Exactly
 
 
 class ParseError(Exception):
@@ -25,7 +24,7 @@ class SymbolTable(AbstractClass):
   def constraint(self):
     """Returns the typeconstraint for the symbol table"""
     # NB Sort types so that multiple calls get the same tuples.
-    symbol_table_types = sorted(set(self.table().values()))
+    symbol_table_types = sorted(set(self.table().values()), key=repr)
     return Exactly(*symbol_table_types, description='symbol table types')
 
 

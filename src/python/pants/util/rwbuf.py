@@ -2,12 +2,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import threading
-
-from six import StringIO
+from builtins import bytes, object, open
+from io import BytesIO
 
 
 class _RWBuf(object):
@@ -34,8 +33,10 @@ class _RWBuf(object):
       return self._io.read() if size == -1 else self._io.read(size)
 
   def write(self, s):
+    if not isinstance(s, bytes):
+      raise ValueError('Expected bytes, not {}, for argument {}'.format(type(s), s))
     with self._lock:
-      self.do_write(str(s))
+      self.do_write(s)
       self._io.flush()
 
   def flush(self):
@@ -56,7 +57,7 @@ class InMemoryRWBuf(_RWBuf):
   situations that require a real file (e.g., redirecting stdout/stderr of subprocess.Popen())."""
 
   def __init__(self):
-    super(InMemoryRWBuf, self).__init__(StringIO())
+    super(InMemoryRWBuf, self).__init__(BytesIO())
     self._writepos = 0
 
   def do_write(self, s):
@@ -73,7 +74,7 @@ class FileBackedRWBuf(_RWBuf):
   when you want to poll the output of long-running subprocesses in a separate thread."""
 
   def __init__(self, backing_file):
-    _RWBuf.__init__(self, open(backing_file, 'a+'))
+    _RWBuf.__init__(self, open(backing_file, 'a+b'))
     self.fileno = self._io.fileno
 
   def do_write(self, s):

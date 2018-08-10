@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import errno
 import logging
@@ -19,7 +18,7 @@ from pants.pantsd.process_manager import (ProcessGroup, ProcessManager, ProcessM
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump
 from pants.util.process_handler import subprocess
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -31,7 +30,7 @@ def fake_process(**kwargs):
   return proc
 
 
-class TestProcessGroup(BaseTest):
+class TestProcessGroup(TestBase):
   def setUp(self):
     super(TestProcessGroup, self).setUp()
     self.pg = ProcessGroup('test', metadata_base_dir=self.subprocess_dir)
@@ -100,7 +99,7 @@ class TestProcessGroup(BaseTest):
         self.assertTrue('_test' in item.name)
 
 
-class TestProcessMetadataManager(BaseTest):
+class TestProcessMetadataManager(TestBase):
   NAME = '_test_'
   TEST_KEY = 'TEST'
   TEST_VALUE = '300'
@@ -118,14 +117,14 @@ class TestProcessMetadataManager(BaseTest):
 
   def test_get_metadata_dir_by_name(self):
     self.pmm = ProcessMetadataManager(metadata_base_dir=self.BUILDROOT)
-    self.assertEqual(self.pmm._get_metadata_dir_by_name(self.NAME),
+    self.assertEqual(self.pmm._get_metadata_dir_by_name(self.NAME, self.BUILDROOT),
                      os.path.join(self.BUILDROOT, self.NAME))
 
   def test_maybe_init_metadata_dir_by_name(self):
     with mock.patch('pants.pantsd.process_manager.safe_mkdir', **PATCH_OPTS) as mock_mkdir:
       self.pmm._maybe_init_metadata_dir_by_name(self.NAME)
       mock_mkdir.assert_called_once_with(
-        self.pmm._get_metadata_dir_by_name(self.NAME))
+        self.pmm._get_metadata_dir_by_name(self.NAME, self.subprocess_dir))
 
   def test_readwrite_metadata_by_name(self):
     with temporary_dir() as tmpdir, \
@@ -141,7 +140,7 @@ class TestProcessMetadataManager(BaseTest):
       )
 
   def test_deadline_until(self):
-    with self.assertRaises(self.pmm.Timeout):
+    with self.assertRaises(ProcessMetadataManager.Timeout):
       with self.captured_logging(logging.INFO) as captured:
         self.pmm._deadline_until(lambda: False, 'the impossible', timeout=.5, info_interval=.1)
     self.assertTrue(4 <= len(captured.infos()) <= 6,
@@ -150,12 +149,12 @@ class TestProcessMetadataManager(BaseTest):
   def test_wait_for_file(self):
     with temporary_dir() as td:
       test_filename = os.path.join(td, 'test.out')
-      safe_file_dump(test_filename, 'test')
+      safe_file_dump(test_filename, 'test', binary_mode=False)
       self.pmm._wait_for_file(test_filename, timeout=.1)
 
   def test_wait_for_file_timeout(self):
     with temporary_dir() as td:
-      with self.assertRaises(self.pmm.Timeout):
+      with self.assertRaises(ProcessMetadataManager.Timeout):
         self.pmm._wait_for_file(os.path.join(td, 'non_existent_file'), timeout=.1)
 
   def test_await_metadata_by_name(self):
@@ -163,7 +162,7 @@ class TestProcessMetadataManager(BaseTest):
          mock.patch('pants.pantsd.process_manager.get_buildroot', return_value=tmpdir):
       self.pmm.write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
 
-      self.assertEquals(
+      self.assertEqual(
         self.pmm.await_metadata_by_name(self.NAME, self.TEST_KEY, .1),
         self.TEST_VALUE
       )
@@ -176,12 +175,12 @@ class TestProcessMetadataManager(BaseTest):
   def test_purge_metadata_error(self):
     with mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm:
       mock_rm.side_effect = OSError(errno.EACCES, os.strerror(errno.EACCES))
-      with self.assertRaises(ProcessManager.MetadataError):
+      with self.assertRaises(ProcessMetadataManager.MetadataError):
         self.pmm.purge_metadata_by_name(self.NAME)
     self.assertGreater(mock_rm.call_count, 0)
 
 
-class TestProcessManager(BaseTest):
+class TestProcessManager(TestBase):
   def setUp(self):
     super(TestProcessManager, self).setUp()
     # N.B. We pass in `metadata_base_dir` here because ProcessManager (itself a non-task/non-
@@ -224,11 +223,11 @@ class TestProcessManager(BaseTest):
     self.assertEqual(self.pm.get_subprocess_output(cmd, stderr=subprocess.STDOUT), '939393')
 
   def test_get_subprocess_output_oserror_exception(self):
-    with self.assertRaises(self.pm.ExecutionError):
+    with self.assertRaises(ProcessManager.ExecutionError):
       self.pm.get_subprocess_output(['i_do_not_exist'])
 
   def test_get_subprocess_output_failure_exception(self):
-    with self.assertRaises(self.pm.ExecutionError):
+    with self.assertRaises(ProcessManager.ExecutionError):
       self.pm.get_subprocess_output(['false'])
 
   def test_await_pid(self):
@@ -316,7 +315,7 @@ class TestProcessManager(BaseTest):
 
   def test_purge_metadata_aborts(self):
     with mock.patch.object(ProcessManager, 'is_alive', return_value=True):
-      with self.assertRaises(self.pm.MetadataError):
+      with self.assertRaises(ProcessManager.MetadataError):
         self.pm.purge_metadata()
 
   def test_purge_metadata_alive_but_forced(self):
@@ -370,7 +369,7 @@ class TestProcessManager(BaseTest):
   def test_terminate_no_kill(self):
     with self.setup_terminate() as (mock_kill, mock_alive, mock_purge):
       mock_alive.return_value = True
-      with self.assertRaises(self.pm.NonResponsiveProcess):
+      with self.assertRaises(ProcessManager.NonResponsiveProcess):
         self.pm.terminate(kill_wait=.1, purge=True)
       self.assertEqual(mock_kill.call_count, len(ProcessManager.KILL_CHAIN))
       self.assertEqual(mock_purge.call_count, 0)

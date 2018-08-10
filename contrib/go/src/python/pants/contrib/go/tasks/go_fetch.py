@@ -2,11 +2,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import shutil
+from builtins import open
 from collections import defaultdict
 
 from pants.base.exceptions import TaskError
@@ -105,14 +105,14 @@ class GoFetch(GoTask):
     remote_import_paths_cache = os.path.join(os.path.dirname(gopath), 'remote_import_paths.txt')
     if os.path.exists(remote_import_paths_cache):
       with open(remote_import_paths_cache, 'r') as fp:
-        remote_import_paths = [line.decode('utf8').strip() for line in fp.readlines()]
+        remote_import_paths = [line.strip() for line in fp.readlines()]
     else:
       remote_import_paths = self._get_remote_import_paths(go_remote_lib.import_path,
                                                           gopath=gopath)
       with safe_concurrent_creation(remote_import_paths_cache) as safe_path:
         with open(safe_path, 'w') as fp:
           for path in remote_import_paths:
-            fp.write('{}\n'.format(path).encode('utf8'))
+            fp.write('{}\n'.format(path))
 
     for remote_import_path in remote_import_paths:
       remote_root = import_root_map.get(remote_import_path)
@@ -271,7 +271,7 @@ class GoFetch(GoTask):
     if os.path.exists(path):
       with open(path, 'r') as fp:
         return dict({import_path: root for import_path, root in
-                     (x.decode('utf8').strip().split('\t') for x in fp.readlines())})
+                     (x.strip().split('\t') for x in fp.readlines())})
     else:
       return {}
 
@@ -281,4 +281,4 @@ class GoFetch(GoTask):
     with safe_concurrent_creation(path) as safe_path:
       with open(safe_path, 'w') as fp:
         for import_path, root in sorted(import_root_map.items()):
-          fp.write('{}\t{}\n'.format(import_path, root).encode('utf8'))
+          fp.write('{}\t{}\n'.format(import_path, root))

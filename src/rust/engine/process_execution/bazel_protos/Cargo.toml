@@ -2,9 +2,16 @@
 version = "0.0.1"
 name = "bazel_protos"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
 
 [dependencies]
 bytes = "0.4.5"
-futures = "0.1.16"
-grpcio = { version = "0.2.0", features = ["secure"] }
-protobuf = { version = "1.4.1", features = ["with-bytes"] }
+futures = "^0.1.16"
+grpcio = { version = "0.3", features = ["secure"] }
+hashing = { path = "../../hashing" }
+protobuf = { version = "2.0.4", features = ["with-bytes"] }
+
+[build-dependencies]
+build_utils = { path = "../../build_utils" }
+grpcio-compiler = "0.3"
+protoc-grpcio = "0.2"

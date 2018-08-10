@@ -2,9 +2,9 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+import configparser
 import itertools
 import json
 import os
@@ -12,12 +12,11 @@ import shutil
 import time
 import traceback
 import uuid
+from builtins import open, str
 from collections import OrderedDict
 from contextlib import contextmanager
+from io import StringIO
 from textwrap import dedent
-
-from six import StringIO
-from six.moves import configparser
 
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
@@ -35,10 +34,11 @@ from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
 from pants.util.process_handler import SubprocessProcessHandler
+from pants.util.strutil import safe_shlex_split
 from pants.util.xml_parser import XmlParser
 
 
-class _Workdirs(datatype('_Workdirs', ['root_dir', 'partition'])):
+class _Workdirs(datatype(['root_dir', 'partition'])):
   @classmethod
   def for_partition(cls, work_dir, partition):
     root_dir = os.path.join(work_dir, Target.maybe_readable_identify(partition))
@@ -109,14 +109,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
                   "emitted to that file (prefix). Note that tests may run in a different cwd, so "
                   "it's best to use an absolute path to make it easy to find the subprocess "
                   "profiles later.")
-
     register('--options', type=list, fingerprint=True,
-             removal_version='1.7.0.dev0',
-             removal_hint='You can supply py.test options using the generic pass through the args '
-                          'facility. At the end of the pants command line, add `-- <py.test pass'
-                          'through args>`.',
-             help='Pass these options to pytest.')
-
+             help='Pass these options to pytest. You can also use pass-through args.')
     register('--coverage', fingerprint=True,
              help='Emit coverage information for specified packages or directories (absolute or '
                   'relative to the build root).  The special value "auto" indicates that Pants '
@@ -131,6 +125,10 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     register('--test-shard', fingerprint=True,
              help='Subset of tests to run, in the form M/N, 0 <= M < N. For example, 1/3 means '
                   'run tests number 2, 5, 8, 11, ...')
+
+    register('--extra-pythonpath', type=list, fingerprint=True, advanced=True,
+             help='Add these entries to the PYTHONPATH when running the tests. '
+                  'Useful for attaching to debuggers in test code.')
 
   @classmethod
   def supports_passthru_args(cls):
@@ -153,7 +151,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
   class InvalidShardSpecification(TaskError):
     """Indicates an invalid `--test-shard` option."""
 
-  DEFAULT_COVERAGE_CONFIG = dedent(b"""
+  DEFAULT_COVERAGE_CONFIG = dedent("""
     [run]
     branch = True
     timid = False
@@ -200,8 +198,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     cp.set(plugin_module, 'src_to_target_base', json.dumps(src_to_target_base))
 
   def _generate_coverage_config(self, src_to_target_base):
-    cp = configparser.SafeConfigParser()
-    cp.readfp(StringIO(self.DEFAULT_COVERAGE_CONFIG))
+    cp = configparser.ConfigParser()
+    cp.read_file(StringIO(self.DEFAULT_COVERAGE_CONFIG))
 
     self._add_plugin_config(cp, self._source_chroot_path, src_to_target_base)
 
@@ -452,7 +450,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     """.format(sources_map=dict(sources_map), rootdir_comm_path=rootdir_comm_path))
     # Add in the sharding conftest, if any.
     shard_conftest_content = self._get_shard_conftest_content()
-    return (console_output_conftest_content + shard_conftest_content).encode('utf8')
+    return console_output_conftest_content + shard_conftest_content
 
   @contextmanager
   def _conftest(self, sources_map):
@@ -493,6 +491,11 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       pythonpath = env.pop('PYTHONPATH', None)
       if pythonpath:
         self.context.log.warn('scrubbed PYTHONPATH={} from py.test environment'.format(pythonpath))
+      # But allow this back door for users who do want to force something onto the test pythonpath,
+      # e.g., modules required during a debugging session.
+      extra_pythonpath = self.get_options().extra_pythonpath
+      if extra_pythonpath:
+        env['PYTHONPATH'] = os.pathsep.join(extra_pythonpath)
 
       # The pytest runner we use accepts a --pdb argument that will launch an interactive pdb
       # session on any test failure.  In order to support use of this pass-through flag we must
@@ -512,7 +515,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         env['PEX_PROFILE_FILENAME'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
 
       with self.context.new_workunit(name='run',
-                                     cmd=pex.cmdline(args),
+                                     cmd=' '.join(pex.cmdline(args)),
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
         rc = self._spawn_and_wait(pex, workunit=workunit, args=args, setsid=True, env=env)
         return PytestResult.rc(rc)
@@ -681,7 +684,9 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       if self.get_options().colors:
         args.extend(['--color', 'yes'])
 
-      args.extend(self.get_options().options)
+      if self.get_options().options:
+        for opt in self.get_options().options:
+          args.extend(safe_shlex_split(opt))
       args.extend(self.get_passthru_args())
 
       args.extend(test_args)
@@ -724,7 +729,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
   def _pex_run(self, pex, workunit_name, args, env):
     with self.context.new_workunit(name=workunit_name,
-                                   cmd=pex.cmdline(args),
+                                   cmd=' '.join(pex.cmdline(args)),
                                    labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
       process = self._spawn(pex, workunit, args, setsid=False, env=env)
       return process.wait()

@@ -2,13 +2,13 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import shutil
 import tempfile
 import unittest
+from builtins import open, str
 from multiprocessing import Manager, Process
 from threading import Thread
 
@@ -55,7 +55,7 @@ class TestOwnerPrintingInterProcessFileLock(unittest.TestCase):
     self.lock_process.start()
     self.lock_held.wait()
     self.assertTrue(os.path.exists(self.lock.message_path))
-    with open(self.lock.message_path, 'rb') as f:
+    with open(self.lock.message_path, 'r') as f:
       message_content = f.read()
     self.assertIn(str(self.lock_process.pid), message_content)
 

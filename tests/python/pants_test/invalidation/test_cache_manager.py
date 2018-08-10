@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import shutil
@@ -12,10 +11,10 @@ import tempfile
 from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.invalidation.cache_manager import InvalidationCacheManager, VersionedTargetSet
 from pants.util.dirutil import safe_mkdir, safe_rmtree
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class InvalidationCacheManagerTest(BaseTest):
+class InvalidationCacheManagerTest(TestBase):
 
   @staticmethod
   def is_empty(dir_name):
@@ -68,15 +67,15 @@ class InvalidationCacheManagerTest(BaseTest):
     symlink = os.path.join(parent, 'current')
 
     self.assertTrue(os.path.islink(symlink))
-    self.assertEquals(unstable_dir_name, os.readlink(symlink))
-    self.assertEquals(symlink, vt.results_dir)
+    self.assertEqual(unstable_dir_name, os.readlink(symlink))
+    self.assertEqual(symlink, vt.results_dir)
     # Repoint the symlink, but keep the vt valid (simulates the case where the underlying target's
     # version has changed, so the symlink is pointed to that version, but now the version has
     # reverted, so we must point it back).
     os.unlink(symlink)
     os.symlink(unstable_dir_name + '.other', symlink)
     vt.create_results_dir()
-    self.assertEquals(unstable_dir_name, os.readlink(symlink))
+    self.assertEqual(unstable_dir_name, os.readlink(symlink))
 
   def test_creates_stable_results_dir_prefix_symlink(self):
     parent, unstable_dir_name = os.path.split(self.cache_manager._results_dir_prefix)
@@ -99,10 +98,10 @@ class InvalidationCacheManagerTest(BaseTest):
     all_vts = ic.all_vts
     invalid_vts = ic.invalid_vts
 
-    self.assertEquals(5, len(invalid_vts))
-    self.assertEquals(5, len(all_vts))
+    self.assertEqual(5, len(invalid_vts))
+    self.assertEqual(5, len(all_vts))
     vts_targets = [vt.targets[0] for vt in all_vts]
-    self.assertEquals(set(targets), set(vts_targets))
+    self.assertEqual(set(targets), set(vts_targets))
 
   def test_force_invalidate(self):
     vt = self.make_vt()

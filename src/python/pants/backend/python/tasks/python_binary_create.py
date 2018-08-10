@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -11,10 +10,10 @@ from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
+from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.pex_build_util import (build_for_current_platform_only_check,
-                                                       dump_requirement_libs, dump_sources,
+from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_sources,
                                                        has_python_requirements, has_python_sources,
                                                        has_resources, is_python_target)
 from pants.base.build_environment import get_buildroot
@@ -24,10 +23,19 @@ from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.fileutil import atomic_copy
+from pants.util.memo import memoized_property
 
 
 class PythonBinaryCreate(Task):
   """Create an executable .pex file."""
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(PythonBinaryCreate, cls).subsystem_dependencies() + (PythonNativeCode.scoped(cls),)
+
+  @memoized_property
+  def _python_native_code_settings(self):
+    return PythonNativeCode.scoped_instance(self)
 
   @classmethod
   def product_types(cls):
@@ -131,8 +139,9 @@ class PythonBinaryCreate(Task):
         dump_sources(builder, tgt, self.context.log)
       # We need to ensure that we are resolving for only the current platform if we are
       # including local python dist targets that have native extensions.
-      build_for_current_platform_only_check(self.context.targets())
-      dump_requirement_libs(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
+      self._python_native_code_settings.check_build_for_current_platform_only(self.context.targets())
+      dump_requirement_libs(builder, interpreter, req_tgts, self.context.log,
+                            platforms=binary_tgt.platforms)
 
       # Build the .pex file.
       pex_path = os.path.join(results_dir, '{}.pex'.format(binary_tgt.name))

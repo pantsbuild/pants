@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -68,6 +67,18 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
       expected_output='Hello World!  Version: 4.5.6',
     )
 
+  def test_agent_dependency(self):
+    directory = "testprojects/src/java/org/pantsbuild/testproject/manifest"
+    target = "{}:manifest-with-agent".format(directory)
+    with self.temporary_workdir() as workdir:
+      pants_run = self.run_pants_with_workdir(["binary", target], workdir=workdir)
+      self.assert_success(pants_run)
+      jar = "dist/manifest-with-agent.jar"
+      with open_zip(jar, mode='r') as j:
+        with j.open("META-INF/MANIFEST.MF") as jar_entry:
+          entries = {tuple(line.strip().split(": ", 2)) for line in jar_entry.readlines() if line.strip()}
+          self.assertIn(('Agent-Class', 'org.pantsbuild.testproject.manifest.Agent'), entries)
+
   def test_deploy_excludes(self):
     jar_filename = os.path.join('dist', 'deployexcludes.jar')
     safe_delete(jar_filename)
@@ -80,7 +91,7 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       # The resulting binary should not contain any guava classes
       with open_zip(jar_filename) as jar_file:
-        self.assertEquals({'META-INF/',
+        self.assertEqual({'META-INF/',
                            'META-INF/MANIFEST.MF',
                            'org/',
                            'org/pantsbuild/',
@@ -120,7 +131,7 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
                                cwd=cwd)
     stdout, stderr = process.communicate()
 
-    self.assertEquals(expected_returncode, process.returncode,
+    self.assertEqual(expected_returncode, process.returncode,
                       ('Expected exit code {} from command `{}` but got {}:\n'
                        'stdout:\n{}\n'
                        'stderr:\n{}'

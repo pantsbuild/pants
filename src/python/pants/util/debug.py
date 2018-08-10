@@ -2,11 +2,11 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import threading
+from builtins import open
 from collections import namedtuple
 
 
@@ -15,7 +15,7 @@ DEFAULT_LOG_PATH = '/tmp/pants_debug.log'
 
 def dlog(msg, log_path=DEFAULT_LOG_PATH):
   """A handy log utility for debugging multi-process, multi-threaded activities."""
-  with open(log_path, 'ab') as f:
+  with open(log_path, 'a') as f:
     f.write('\n{}@{}: {}'.format(os.getpid(), threading.current_thread().name, msg))
 
 

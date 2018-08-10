@@ -2,12 +2,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import tempfile
 import unittest
+from builtins import open
 
 from pants.backend.jvm.subsystems.shader import RelocateRule, Shader, Shading
 from pants.java.distribution.distribution import DistributionLocator
@@ -22,7 +22,7 @@ class ShaderTest(unittest.TestCase):
     self.jarjar = '/not/really/jarjar.jar'
     init_subsystem(DistributionLocator)
     executor = SubprocessExecutor(DistributionLocator.cached())
-    self.shader = Shader(jarjar_classpath=[self.jarjar], executor=executor)
+    self.shader = Shader(jarjar_classpath=[self.jarjar], executor=executor, binary_package_excludes=['javax'])
     self.output_jar = '/not/really/shaded.jar'
 
   def populate_input_jar(self, *entries):
@@ -41,7 +41,7 @@ class ShaderTest(unittest.TestCase):
     rules = self.shader.assemble_binary_rules('org.pantsbuild.tools.fake.Main', input_jar)
 
     self.assertEqual(Shader.exclude_package('org.pantsbuild.tools.fake'), rules[0])
-    self.assertIn(Shader.exclude_package('javax.annotation'), rules[1:-1])
+    self.assertIn(Shader.exclude_package('javax', recursive=True), rules[1:-1])
     self.assertEqual(Shader.shade_package('com.google.common.base'), rules[-1])
 
   def test_assemble_default_rules_default_package(self):
@@ -50,7 +50,7 @@ class ShaderTest(unittest.TestCase):
     rules = self.shader.assemble_binary_rules('main', input_jar)
 
     self.assertEqual(Shader.exclude_package(), rules[0])
-    self.assertIn(Shader.exclude_package('javax.annotation'), rules[1:-1])
+    self.assertIn(Shader.exclude_package('javax', recursive=True), rules[1:-1])
     self.assertEqual(Shader.shade_package('com.google.common.base'), rules[-1])
 
   def test_assemble_custom_rules(self):
@@ -63,7 +63,7 @@ class ShaderTest(unittest.TestCase):
     self.assertEqual(Shader.shade_class('bob'), rules[0])
     self.assertEqual(Shader.exclude_class('fred'), rules[1])
     self.assertEqual(Shader.exclude_package(), rules[2])
-    self.assertIn(Shader.exclude_package('javax.annotation'), rules[3:])
+    self.assertIn(Shader.exclude_package('javax', recursive=True), rules[3:])
 
   def test_assemble_classes_in_meta_inf(self):
     input_jar = self.populate_input_jar('org/pantsbuild/tools/fake/Main.class',
@@ -72,7 +72,7 @@ class ShaderTest(unittest.TestCase):
     rules = self.shader.assemble_binary_rules('org.pantsbuild.tools.fake.Main', input_jar)
 
     self.assertEqual(Shader.exclude_package('org.pantsbuild.tools.fake'), rules[0])
-    self.assertIn(Shader.exclude_package('javax.annotation'), rules[1:])
+    self.assertIn(Shader.exclude_package('javax', recursive=True), rules[1:])
     self.assertNotIn(Shading.create_relocate('META-INF.versions.9.javax.xml.bind.*'), rules[1:])
 
   def test_runner_command(self):
@@ -97,11 +97,11 @@ class ShaderTest(unittest.TestCase):
 
       rules_file = command.pop(0)
       self.assertTrue(os.path.exists(rules_file))
-      with open(rules_file) as fp:
+      with open(rules_file, 'r') as fp:
         lines = fp.read().splitlines()
         self.assertEqual('rule log4j.** log4j.@1', lines[0])  # The custom rule.
         self.assertEqual('rule * @1', lines[1])  # Exclude main's package.
-        self.assertIn('rule javax.annotation.* javax.annotation.@1', lines)  # Exclude system.
+        self.assertIn('rule javax.** javax.@1', lines)  # Exclude system.
         self.assertEqual('rule com.google.common.base.* {}com.google.common.base.@1'
                          .format(Shading.SHADE_PREFIX), lines[-1])  # Shade the rest.
 

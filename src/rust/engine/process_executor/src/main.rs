@@ -1,18 +1,16 @@
-extern crate boxfuture;
 extern crate clap;
 extern crate env_logger;
 extern crate fs;
 extern crate futures;
 extern crate hashing;
 extern crate process_execution;
-extern crate tempdir;
 
 use clap::{App, AppSettings, Arg};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
-use tempdir::TempDir;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::iter::Iterator;
+use std::path::PathBuf;
 use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
@@ -28,6 +26,12 @@ fn main() {
   env_logger::init();
 
   let args = App::new("process_executor")
+    .arg(
+      Arg::with_name("work-dir")
+        .long("work-dir")
+        .takes_value(true)
+        .help("Path to workdir"),
+    )
     .arg(
       Arg::with_name("local-store-path")
         .long("local-store-path")
@@ -88,7 +92,7 @@ fn main() {
   let env: BTreeMap<String, String> = match args.values_of("env") {
     Some(values) => values
       .map(|v| {
-        let mut parts = v.splitn(2, "=");
+        let mut parts = v.splitn(2, '=');
         (
           parts.next().unwrap().to_string(),
           parts.next().unwrap_or_default().to_string(),
@@ -97,6 +101,10 @@ fn main() {
       .collect(),
     None => BTreeMap::new(),
   };
+  let work_dir = args
+    .value_of("work-dir")
+    .map(PathBuf::from)
+    .unwrap_or_else(std::env::temp_dir);
   let local_store_path = args.value_of("local-store-path").unwrap();
   let pool = Arc::new(fs::ResettablePool::new("process-executor-".to_owned()));
   let server_arg = args.value_of("server");
@@ -104,7 +112,7 @@ fn main() {
     (Some(_server), Some(cas_server)) => fs::Store::with_remote(
       local_store_path,
       pool.clone(),
-      cas_server,
+      cas_server.to_owned(),
       1,
       10 * 1024 * 1024,
       Duration::from_secs(30),
@@ -128,24 +136,26 @@ fn main() {
     argv,
     env,
     input_files,
+    output_files: BTreeSet::new(),
+    output_directories: BTreeSet::new(),
+    timeout: Duration::new(15 * 60, 0),
+    description: "process_executor".to_string(),
   };
 
-  let result = match server_arg {
-    Some(address) => process_execution::remote::CommandRunner::new(address, 1, store)
-      .run_command_remote(request)
-      .wait()
-      .expect("Error executing remotely"),
-    None => {
-      let dir = TempDir::new("process-execution").expect("Error making temporary directory");
-      store
-        .materialize_directory(dir.path().to_owned(), request.input_files)
-        .wait()
-        .expect("Error materializing directory");
-      process_execution::local::run_command_locally(request, dir.path())
-        .expect("Error executing locally")
-    }
+  let runner: Box<process_execution::CommandRunner> = match server_arg {
+    Some(address) => Box::new(process_execution::remote::CommandRunner::new(
+      address.to_owned(),
+      1,
+      store,
+    )),
+    None => Box::new(process_execution::local::CommandRunner::new(
+      store, pool, work_dir, true,
+    )),
   };
-  print!("{}", String::from_utf8(result.stdout).unwrap());
-  eprint!("{}", String::from_utf8(result.stderr).unwrap());
+
+  let result = runner.run(request).wait().expect("Error executing");
+
+  print!("{}", String::from_utf8(result.stdout.to_vec()).unwrap());
+  eprint!("{}", String::from_utf8(result.stderr.to_vec()).unwrap());
   exit(result.exit_code);
 }

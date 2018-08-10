@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -12,13 +11,13 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class JavaProtobufLibraryTest(BaseTest):
+class JavaProtobufLibraryTest(TestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
         targets={
           'java_protobuf_library': JavaProtobufLibrary,
@@ -52,7 +51,7 @@ class JavaProtobufLibraryTest(BaseTest):
     '''))
     target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
-    self.assertEquals(1, len(target.imported_jars))
+    self.assertEqual(1, len(target.imported_jars))
     import_jar_dep = target.imported_jars[0]
     self.assertIsInstance(import_jar_dep, JarDependency)
 

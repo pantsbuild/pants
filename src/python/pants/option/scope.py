@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from collections import namedtuple
 
@@ -12,6 +11,7 @@ GLOBAL_SCOPE = ''
 GLOBAL_SCOPE_CONFIG_SECTION = 'GLOBAL'
 
 
+# FIXME: convert this to a datatype?
 class ScopeInfo(namedtuple('_ScopeInfo', ['scope', 'category', 'optionable_cls'])):
   """Information about a scope."""
 

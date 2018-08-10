@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
 from pants.backend.codegen.wire.java.register import build_file_aliases as register_codegen
@@ -11,7 +10,7 @@ from pants.backend.codegen.wire.java.wire_gen import WireGen
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class WireGenTest(TaskTestBase):
@@ -23,8 +22,8 @@ class WireGenTest(TaskTestBase):
   def task_type(cls):
     return WireGen
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return register_core().merge(register_codegen())
 
   def _create_fake_wire_tool(self, version='1.8.0'):
@@ -38,7 +37,7 @@ class WireGenTest(TaskTestBase):
                                           sources=['foo.proto'])
     context = self.context(target_roots=[simple_wire_target])
     task = self.create_task(context)
-    self.assertEquals([
+    self.assertEqual([
       '--java_out={}'.format(self.TARGET_WORKDIR),
       '--proto_path={}/src/wire'.format(self.build_root),
       'foo.proto'],
@@ -51,7 +50,7 @@ class WireGenTest(TaskTestBase):
                                      service_writer='org.pantsbuild.DummyServiceWriter',
                                      service_writer_options=['opt1', 'opt2'])
     task = self.create_task(self.context(target_roots=[wire_targetv1]))
-    self.assertEquals([
+    self.assertEqual([
       '--java_out={}'.format(self.TARGET_WORKDIR),
       '--service_writer=org.pantsbuild.DummyServiceWriter',
       '--service_writer_opt', 'opt1',
@@ -70,7 +69,7 @@ class WireGenTest(TaskTestBase):
                                     roots=['root1', 'root2', 'root3'],
                                     enum_options=['enum1', 'enum2', 'enum3'],)
     task = self.create_task(self.context(target_roots=[kitchen_sink]))
-    self.assertEquals([
+    self.assertEqual([
       '--java_out={}'.format(self.TARGET_WORKDIR),
       '--no_options',
       '--service_writer=org.pantsbuild.DummyServiceWriter',
@@ -91,7 +90,7 @@ class WireGenTest(TaskTestBase):
                                           sources=['foo.proto'], dependencies=[parent_target])
     context = self.context(target_roots=[parent_target, simple_wire_target])
     task = self.create_task(context)
-    self.assertEquals([
+    self.assertEqual([
       '--java_out={}'.format(self.TARGET_WORKDIR),
       '--proto_path={}/src/wire'.format(self.build_root),
       'foo.proto'],

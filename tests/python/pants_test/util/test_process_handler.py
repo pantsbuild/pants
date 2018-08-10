@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
 
@@ -14,12 +13,12 @@ class TestSubprocessProcessHandler(unittest.TestCase):
   def test_exit_1(self):
     process = subprocess.Popen(["/bin/sh", "-c", "exit 1"])
     process_handler = SubprocessProcessHandler(process)
-    self.assertEquals(process_handler.wait(), 1)
+    self.assertEqual(process_handler.wait(), 1)
 
   def test_exit_0(self):
     process = subprocess.Popen(["/bin/sh", "-c", "exit 0"])
     process_handler = SubprocessProcessHandler(process)
-    self.assertEquals(process_handler.wait(), 0)
+    self.assertEqual(process_handler.wait(), 0)
 
   def test_communicate_teeing_retrieves_stdout_and_stderr(self):
     process = subprocess.Popen(["/bin/bash", "-c",
@@ -37,11 +36,11 @@ class TestSubprocessProcessHandler(unittest.TestCase):
 exit 1
 """], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     process_handler = SubprocessProcessHandler(process)
-    self.assertEquals(process_handler.communicate_teeing_stdout_and_stderr(), (
-"""1out
+    self.assertEqual(process_handler.communicate_teeing_stdout_and_stderr(), (
+b"""1out
 2out
 3out
-""", """1err
+""", b"""1err
 2err
 3err
 """))

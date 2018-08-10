@@ -8,16 +8,18 @@
 #
 # usage: check_header_helper.py dir1 [ dir2 [ ... ] ]
 
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import os
 import re
 import sys
+from io import open
 
 EXPECTED_HEADER="""# coding=utf-8
 # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 """
 
@@ -27,7 +29,7 @@ def check_header(filename):
   try:
     with open(filename, 'r') as pyfile:
       buf = ""
-      for lineno in range(1,8):
+      for lineno in range(1,7):
         line = pyfile.readline()
         # Skip shebang line
         if lineno == 1 and line.startswith('#!'):
@@ -42,6 +44,7 @@ def check_header(filename):
       return buf == EXPECTED_HEADER
   except IOError:
     return False
+
 
 def check_dir(directory):
   """Returns list of files that fail the check."""
@@ -61,13 +64,14 @@ def main():
   for directory in dirs:
     failed_files.extend(check_dir(directory))
   if failed_files:
-    print 'ERROR: All .py files other than __init__.py should start with the following header:'
-    print
-    print EXPECTED_HEADER
-    print '---'
-    print 'The following {} file(s) do not conform:'.format(len(failed_files))
-    print '  {}'.format('\n  '.join(failed_files))
+    print('ERROR: All .py files other than __init__.py should start with the following header:')
+    print()
+    print(EXPECTED_HEADER)
+    print('---')
+    print('The following {} file(s) do not conform:'.format(len(failed_files)))
+    print('  {}'.format('\n  '.join(failed_files)))
     sys.exit(1)
+
 
 if __name__ == '__main__':
   main()

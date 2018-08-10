@@ -2,16 +2,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 
 from pants.util.osutil import OS_ALIASES, known_os_names, normalize_os_name
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class OsutilTest(BaseTest):
+class OsutilTest(TestBase):
 
   def test_alias_normalization(self):
     for normal_os, aliases in OS_ALIASES.items():

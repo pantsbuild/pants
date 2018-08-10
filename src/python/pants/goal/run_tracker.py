@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
 import json
@@ -13,9 +12,11 @@ import sys
 import threading
 import time
 import uuid
+from builtins import open
 from contextlib import contextmanager
 
 import requests
+from future.utils import PY2, PY3
 
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.run_info import RunInfo
@@ -331,6 +332,8 @@ class RunTracker(Subsystem):
     :return: True if successfully written, False otherwise.
     """
     params = json.dumps(stats)
+    if PY2:
+      params = params.decode('utf-8')
     try:
       with open(file_name, 'w') as f:
         f.write(params)
@@ -360,7 +363,8 @@ class RunTracker(Subsystem):
     # TODO(benjy): Do we really need these, once the statsdb is mature?
     stats_file = os.path.join(get_pants_cachedir(), 'stats',
                               '{}.json'.format(self.run_info.get_info('id')))
-    safe_file_dump(stats_file, json.dumps(stats))
+    binary_mode = False if PY3 else True
+    safe_file_dump(stats_file, json.dumps(stats), binary_mode=binary_mode)
 
     # Add to local stats db.
     StatsDBFactory.global_instance().get_db().insert_stats(stats)

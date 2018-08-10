@@ -2,8 +2,7 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import argparse
 import base64
@@ -13,6 +12,7 @@ import hashlib
 import json
 import os
 import zipfile
+from builtins import open, str
 
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import read_file, safe_file_dump
@@ -86,7 +86,7 @@ def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
       output_line = line
     output_records.append(output_line)
 
-  safe_file_dump(os.path.join(workspace, dst_record_file), '\r\n'.join(output_records) + '\r\n')
+  safe_file_dump(os.path.join(workspace, dst_record_file), '\r\n'.join(output_records) + '\r\n', binary_mode=False)
 
 
 def reversion(args):

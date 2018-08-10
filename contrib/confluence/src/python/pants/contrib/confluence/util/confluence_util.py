@@ -2,14 +2,18 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import getpass
 import logging
 import mimetypes
-import urllib
+from builtins import object, open, str
 from os.path import basename
+from xmlrpc.client import Binary
+from xmlrpc.client import Error as XMLRPCError
+from xmlrpc.client import ServerProxy
+
+from future.moves.urllib.parse import quote_plus
 
 
 log = logging.getLogger(__name__)
@@ -20,10 +24,6 @@ log = logging.getLogger(__name__)
 
 """Code to ease publishing text to Confluence wikis."""
 
-try:
-  from xmlrpclib import ServerProxy, Error as XMLRPCError, Binary
-except ImportError:
-  from xmlrpc.client import ServerProxy, Error as XMLRPCError, Binary
 
 mimetypes.init()
 
@@ -77,7 +77,7 @@ class Confluence(object):
   def get_url(server_url, wiki_space, page_title):
     """ return the url for a confluence page in a given space and with a given
     title. """
-    return '%s/display/%s/%s' % (server_url, wiki_space, urllib.quote_plus(page_title))
+    return '%s/display/%s/%s' % (server_url, wiki_space, quote_plus(page_title))
 
   def logout(self):
     """Terminates the session and connection to the server.

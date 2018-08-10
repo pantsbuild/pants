@@ -2,11 +2,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import unittest
+from builtins import object
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -18,8 +18,8 @@ from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
                                  DuplicateNameError, UnaddressableObjectError)
 from pants.engine.parser import SymbolTable
-from pants.engine.rules import TaskRule
-from pants.engine.selectors import SelectDependencies
+from pants.engine.rules import rule
+from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
 from pants.util.dirutil import safe_open
 from pants.util.objects import Collection
@@ -119,7 +119,7 @@ class AddressFamilyTest(unittest.TestCase):
   def test_create_empty(self):
     # Case where directory exists but is empty.
     address_family = AddressFamily.create('name/space', [])
-    self.assertEquals(dict(), address_family.addressables)
+    self.assertEqual(dict(), address_family.addressables)
 
   def test_mismatching_paths(self):
     with self.assertRaises(DifferingFamiliesError):
@@ -139,22 +139,23 @@ class AddressFamilyTest(unittest.TestCase):
 UnhydratedStructs = Collection.of(UnhydratedStruct)
 
 
+@rule(UnhydratedStructs, [Select(BuildFileAddresses)])
+def unhydrated_structs(build_file_addresses):
+  uhs = yield [Get(UnhydratedStruct, Address, a) for a in build_file_addresses.addresses]
+  yield UnhydratedStructs(uhs)
+
+
 class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
   def setUp(self):
     # Set up a scheduler that supports address mapping.
     symbol_table = TargetTable()
     address_mapper = AddressMapper(parser=JsonParser(symbol_table),
                                    build_patterns=('*.BUILD.json',))
-    rules = create_fs_rules() + create_graph_rules(address_mapper, symbol_table)
-    # TODO handle updating the rule graph when passed unexpected root selectors.
-    # Adding the following task allows us to get around the fact that SelectDependencies
-    # requests are not currently supported.
-    rules.append(TaskRule(UnhydratedStructs,
-                          [SelectDependencies(UnhydratedStruct,
-                                              BuildFileAddresses,
-                                              field_types=(Address,),
-                                              field='addresses')],
-                          UnhydratedStructs))
+
+    # We add the `unhydrated_structs` rule because it is otherwise not used in the core engine.
+    rules = [
+        unhydrated_structs
+      ] + create_fs_rules() + create_graph_rules(address_mapper, symbol_table)
 
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'))
     self.build_root = project_tree.build_root

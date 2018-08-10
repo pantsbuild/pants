@@ -2,17 +2,16 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+import http.server
+import socketserver
 import threading
 import time
 
-from six.moves import SimpleHTTPServer, socketserver
-
 
 def get_delayed_handler(delay):
-  class DelayResponseHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+  class DelayResponseHandler(http.server.SimpleHTTPRequestHandler):
     def do_HEAD(self):
       time.sleep(delay)
       self.send_response(200)

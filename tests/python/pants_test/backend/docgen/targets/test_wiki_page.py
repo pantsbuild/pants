@@ -2,22 +2,22 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
 from pants.backend.docgen.targets.doc import Page, Wiki, WikiArtifact
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.address import Address
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class WikiPageTest(BaseTest):
+class WikiPageTest(TestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'page': Page,
@@ -47,7 +47,7 @@ class WikiPageTest(BaseTest):
         )
 
         page(name='readme2',
-          source='README2.md',
+          sources=['README2.md'],
           links=[':readme'],
           provides=[
             wiki_artifact(
@@ -85,14 +85,14 @@ This is the second readme file! Isn't it exciting?
     self.assertTrue(isinstance(p, Page), "%s isn't an instance of Page" % p)
     self.assertTrue(isinstance(p.provides[0], WikiArtifact), "%s isn't an instance of WikiArtifact" % p)
     self.assertTrue(isinstance(p.provides[0].wiki, Wiki), "%s isn't an instance of Wiki" % p)
-    self.assertEquals("~areitz", p.provides[0].config['space'])
-    self.assertEquals("test_page", p.provides[0].config['title'])
+    self.assertEqual("~areitz", p.provides[0].config['space'])
+    self.assertEqual("test_page", p.provides[0].config['title'])
     self.assertFalse('parent' in p.provides[0].config)
 
     # Check to make sure the 'readme2' target has been loaded into the build graph (via parsing of
     # the 'README.md' page)
     address = Address.parse('src/docs:readme2', relative_to=get_buildroot())
-    self.assertEquals(p._build_graph.get_target(address), self.target('src/docs:readme2'))
+    self.assertEqual(p._build_graph.get_target(address), self.target('src/docs:readme2'))
 
   def test_wiki_page_fingerprinting(self):
     def create_page_target(space):
@@ -115,3 +115,26 @@ This is the second readme file! Isn't it exciting?
     fingerprint_before = create_page_target('space1').payload.fingerprint()
     self.assertEqual(fingerprint_before, create_page_target('space1').payload.fingerprint())
     self.assertNotEqual(fingerprint_before, create_page_target('space2').payload.fingerprint())
+
+  def test_no_sources(self):
+    self.add_to_build_file('', "page(name='page', sources=['does-not-exist.md'])")
+    with self.assertRaisesRegexp(AddressLookupError, r'//:page.*exactly 1 source, but found 0'):
+      self.target(':page')
+
+  def test_multiple_sources(self):
+    self.create_files('', ['exists.md', 'also-exists.md'])
+    self.add_to_build_file('', "page(name='page', sources=['exists.md', 'also-exists.md'])")
+    with self.assertRaisesRegexp(AddressLookupError, r'//:page.*exactly 1 source, but found 2'):
+      self.target(':page')
+
+  def test_source_and_sources(self):
+    self.create_files('', ['exists.md', 'also-exists.md'])
+    self.add_to_build_file(
+      '',
+      "page(name='page', source=['exists.md'], sources=['also-exists.md'])",
+    )
+    with self.assertRaisesRegexp(
+      AddressLookupError,
+      r'//:page: Cannot specify both source and sources attribute'
+    ):
+      self.target(':page')

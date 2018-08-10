@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -23,7 +22,7 @@ class ScalaJSReplIntegrationTest(PantsRunIntegrationTest):
         var _ = require('factfinder');
         var tenFactorial = org.pantsbuild.scalajs.example.factfinder.Factfinder().fact(10);
         console.log(tenFactorial)
-      """)
+      """).encode('utf-8')
     pants_run = self.run_pants(command=command, stdin_data=program)
 
     self.assert_success(pants_run)

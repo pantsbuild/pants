@@ -2,15 +2,16 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import sys
 import types
 import unittest
 import uuid
+from builtins import object
 from contextlib import contextmanager
 
+from future.utils import PY2
 from pkg_resources import (Distribution, EmptyProvider, VersionConflict, WorkingSet, working_set,
                            yield_lines)
 
@@ -18,12 +19,15 @@ from pants.base.exceptions import BuildConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
+from pants.engine.rules import RootRule, rule
+from pants.engine.selectors import Select
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
 from pants.init.extension_loader import (PluginLoadOrderError, PluginNotFound, load_backend,
                                          load_backends_and_plugins, load_plugins)
 from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
+from pants.util.objects import datatype
 
 
 class MockMetadata(EmptyProvider):
@@ -80,6 +84,19 @@ class DummyTask(Task):
   def execute(self): return 42
 
 
+class RootType(datatype(['value'])):
+  pass
+
+
+class WrapperType(datatype(['value'])):
+  pass
+
+
+@rule(WrapperType, [Select(RootType)])
+def example_rule(root_type):
+  yield WrapperType(root_type.value)
+
+
 class LoaderTest(unittest.TestCase):
 
   def setUp(self):
@@ -93,15 +110,19 @@ class LoaderTest(unittest.TestCase):
 
   @contextmanager
   def create_register(self, build_file_aliases=None, register_goals=None, global_subsystems=None,
-                      module_name='register'):
+                      rules=None, module_name='register'):
 
-    package_name = b'__test_package_{0}'.format(uuid.uuid4().hex)
+    package_name = '__test_package_{0}'.format(uuid.uuid4().hex)
+    if PY2:
+      package_name = package_name.encode('utf-8')
     self.assertFalse(package_name in sys.modules)
 
     package_module = types.ModuleType(package_name)
     sys.modules[package_name] = package_module
     try:
-      register_module_fqn = b'{0}.{1}'.format(package_name, module_name)
+      register_module_fqn = '{0}.{1}'.format(package_name, module_name)
+      if PY2:
+        register_module_fqn = register_module_fqn.encode('utf-8')
       register_module = types.ModuleType(register_module_fqn)
       setattr(package_module, module_name, register_module)
       sys.modules[register_module_fqn] = register_module
@@ -113,6 +134,7 @@ class LoaderTest(unittest.TestCase):
       register_entrypoint('build_file_aliases', build_file_aliases)
       register_entrypoint('global_subsystems', global_subsystems)
       register_entrypoint('register_goals', register_goals)
+      register_entrypoint('rules', rules)
 
       yield package_name
     finally:
@@ -125,6 +147,7 @@ class LoaderTest(unittest.TestCase):
     self.assertEqual(0, len(registered_aliases.objects))
     self.assertEqual(0, len(registered_aliases.context_aware_object_factories))
     self.assertEqual(self.build_configuration.subsystems(), set())
+    self.assertEqual(0, len(self.build_configuration.rules()))
 
   def test_load_valid_empty(self):
     with self.create_register() as backend_package:
@@ -196,10 +219,14 @@ class LoaderTest(unittest.TestCase):
     :param callable after: Optional callable for load_after list entry point
     """
 
-    plugin_pkg = b'demoplugin{0}'.format(uuid.uuid4().hex)
+    plugin_pkg = 'demoplugin{0}'.format(uuid.uuid4().hex)
+    if PY2:
+      plugin_pkg = plugin_pkg.encode('utf-8')
     pkg = types.ModuleType(plugin_pkg)
     sys.modules[plugin_pkg] = pkg
-    module_name = b'{0}.{1}'.format(plugin_pkg, 'demo')
+    module_name = '{0}.{1}'.format(plugin_pkg, 'demo')
+    if PY2:
+      module_name = module_name.encode('utf-8')
     plugin = types.ModuleType(module_name)
     setattr(pkg, 'demo', plugin)
     sys.modules[module_name] = plugin
@@ -291,6 +318,14 @@ class LoaderTest(unittest.TestCase):
       load_backend(self.build_configuration, backend_package)
       self.assertEqual(self.build_configuration.subsystems(),
                        {DummySubsystem1, DummySubsystem2})
+
+  def test_rules(self):
+    def rules():
+      return [example_rule, RootRule(RootType)]
+    with self.create_register(rules=rules) as backend_package:
+      load_backend(self.build_configuration, backend_package)
+      self.assertEqual(self.build_configuration.rules(),
+                       [example_rule, RootRule(RootType)])
 
   def test_backend_plugin_ordering(self):
     def reg_alias():

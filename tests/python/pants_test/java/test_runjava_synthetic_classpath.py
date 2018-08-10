@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -28,7 +27,7 @@ class SyntheticClasspathTest(JvmToolTaskTestBase):
 
   def setUp(self):
     super(SyntheticClasspathTest, self).setUp()
-    self.set_options(use_nailgun=False)
+    self.set_options(execution_strategy='subprocess')
 
   def test_execute_java_no_error_weird_path(self):
     """
@@ -48,7 +47,7 @@ class SyntheticClasspathTest(JvmToolTaskTestBase):
       executor = task.create_java_executor()
 
       # Executing the jar as is should work.
-      self.assertEquals(0, util.execute_java(
+      self.assertEqual(0, util.execute_java(
         executor=executor,
         classpath=[temp_path.name],
         main='coursier.echo.Echo',
@@ -60,7 +59,7 @@ class SyntheticClasspathTest(JvmToolTaskTestBase):
       safe_concurrent_rename(temp_path.name, new_path)
 
       # Executing the new path should work.
-      self.assertEquals(0, util.execute_java(
+      self.assertEqual(0, util.execute_java(
         executor=executor,
         classpath=[new_path],
         main='coursier.echo.Echo',

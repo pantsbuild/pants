@@ -2,12 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import re
+from builtins import open
 
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -38,6 +38,8 @@ _DEFAULT_ANTLR_DEPS = {
 class AntlrJavaGen(SimpleCodegenTask, NailgunTask):
   """Generate .java source code from ANTLR grammar files."""
   gentarget_type = JavaAntlrLibrary
+
+  sources_globs = ('**/*.java',)
 
   class AmbiguousPackageError(TaskError):
     """Raised when a java package cannot be unambiguously determined for a JavaAntlrLibrary."""
@@ -158,7 +160,7 @@ class AntlrJavaGen(SimpleCodegenTask, NailgunTask):
       for filename in filenames:
         source = os.path.join(root, filename)
 
-        with open(source) as f:
+        with open(source, 'r') as f:
           lines = f.readlines()
         if len(lines) < 1:
           return

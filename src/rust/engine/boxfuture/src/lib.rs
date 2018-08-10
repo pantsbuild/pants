@@ -8,18 +8,35 @@ use futures::future::Future;
 
 pub type BoxFuture<T, E> = Box<Future<Item = T, Error = E> + Send>;
 
-pub trait Boxable {
-  fn to_boxed(self) -> Box<Self>;
+pub trait Boxable<T, E> {
+  fn to_boxed(self) -> BoxFuture<T, E>;
 }
 
-impl<F, T, E> Boxable for F
+impl<F, T, E> Boxable<T, E> for F
 where
-  F: Future<Item = T, Error = E> + Send,
+  F: Future<Item = T, Error = E> + Send + 'static,
 {
-  fn to_boxed(self) -> Box<Self>
+  fn to_boxed(self) -> BoxFuture<T, E>
   where
     Self: Sized,
   {
     Box::new(self)
   }
+}
+
+///
+/// Just like try! (or the ? operator) but which early-returns a Box<FutureResult<Err>> instead of
+/// an Err.
+///
+#[macro_export]
+macro_rules! try_future {
+  ($x:expr) => {{
+    match $x {
+      Ok(value) => value,
+      Err(error) => {
+        use futures::future::err;
+        return err(error).to_boxed();
+      }
+    }
+  }};
 }

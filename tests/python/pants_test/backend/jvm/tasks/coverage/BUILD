@@ -2,7 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  dependencies=[
+  dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks/coverage',
     'src/python/pants/java/jar',

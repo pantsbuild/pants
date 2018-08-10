@@ -2,14 +2,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import range
 from collections import defaultdict
 from contextlib import contextmanager
-
-import six
 
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -38,7 +36,7 @@ class BaseCompileIT(PantsRunIntegrationTest):
 
     with workdir_generator as workdir:
       with self.temporary_cachedir() as cachedir:
-        for i in six.moves.xrange(0, iterations):
+        for i in range(0, iterations):
           pants_run = self.run_test_compile(workdir, cachedir, target,
                                             clean_all=(i == 0),
                                             extra_args=extra_args)
@@ -73,7 +71,7 @@ class BaseCompileIT(PantsRunIntegrationTest):
       },
     }
     task = 'test' if test else 'compile'
-    args = self._EXTRA_TASK_ARGS + [task, target] + (extra_args if extra_args else [])
+    args = self._EXTRA_TASK_ARGS + [task] + (extra_args if extra_args else []) + [target]
     # Clean-all on the first iteration.
     if clean_all:
       args.insert(0, 'clean-all')

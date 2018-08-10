@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunProcessGroup
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
@@ -19,7 +18,7 @@ class NailgunTaskTestBase(JvmToolTaskTestBase):
     :API: public
     """
     super(NailgunTaskTestBase, self).setUp()
-    self.set_options(use_nailgun=True)
+    self.set_options(execution_strategy='nailgun')
 
   def tearDown(self):
     """

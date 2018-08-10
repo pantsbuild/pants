@@ -2,14 +2,13 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import logging
 import os
 
-from pants.base.build_environment import get_buildroot
+from pants.base.build_environment import get_buildroot, get_pants_cachedir
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
 from pants.net.http.fetcher import Fetcher
@@ -33,8 +32,26 @@ class CoursierSubsystem(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(CoursierSubsystem, cls).register_options(register)
+    register('--cache-dir', type=str, fingerprint=True,
+             default=os.path.join(get_pants_cachedir(), 'coursier'),
+             help='Version paired with --bootstrap-jar-url, in order to invalidate and fetch the new version.')
+    register('--repos', type=list, fingerprint=True,
+             help='Maven style repos', default=['https://repo1.maven.org/maven2'])
     register('--fetch-options', type=list, fingerprint=True,
+             default=[
+               # Quiet mode, so coursier does not show resolve progress,
+               # but still prints results if --report is specified.
+               '-q',
+               # Do not use default public maven repo.
+               '--no-default',
+               # Concurrent workers
+               '-n', '8',
+             ],
              help='Additional options to pass to coursier fetch. See `coursier fetch --help`')
+    register('--artifact-types', type=list, fingerprint=True,
+             default=['jar', 'bundle', 'test-jar', 'maven-plugin', 'src', 'doc', 'aar'],
+             help='Specify the type of artifacts to fetch. See `packaging` at https://maven.apache.org/pom.html#Maven_Coordinates, '
+                  'except `src` and `doc` being coursier specific terms for sources and javadoc.')
     register('--bootstrap-jar-url', fingerprint=True,
              default='https://dl.dropboxusercontent.com/s/zwh074l9kxhqlwp/coursier-cli-1.1.0.cf365ea27a710d5f09db1f0a6feee129aa1fc417.jar?dl=0',
              help='Location to download a bootstrap version of Coursier.')

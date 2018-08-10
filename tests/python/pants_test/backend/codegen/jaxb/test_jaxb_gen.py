@@ -2,10 +2,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.backend.codegen.jaxb.jaxb_gen import JaxbGen
 from pants.backend.codegen.jaxb.jaxb_library import JaxbLibrary
@@ -19,8 +19,8 @@ class JaxbGenJavaTest(NailgunTaskTestBase):
   def task_type(cls):
     return JaxbGen
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return register_core().merge(register_codegen())
 
   def create_schema(self, *component_names):
@@ -88,11 +88,11 @@ class JaxbGenJavaTest(NailgunTaskTestBase):
       for filename in filenames:
         if filename.endswith('.java'):
           files.append(os.path.join(dirpath, filename))
-    self.assertEquals(sorted(['ObjectFactory.java', 'Vegetable.java']),
+    self.assertEqual(sorted(['ObjectFactory.java', 'Vegetable.java']),
                       sorted([os.path.basename(f) for f in files]))
 
     # Make sure there is no header with a timestamp in the generated file
     for f in files:
-      with open(f) as jaxb_file:
+      with open(f, 'r') as jaxb_file:
         contents = jaxb_file.read()
         self.assertNotIn('// Generated on:', contents)

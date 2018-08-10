@@ -2,11 +2,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import unittest
+from builtins import object
 
 from pants.fs.fs import safe_filename
 
@@ -33,6 +33,10 @@ class SafeFilenameTest(unittest.TestCase):
   def test_shorten(self):
     self.assertEqual('**.jill',
                      safe_filename('jack', '.jill', digest=self.FixedDigest(2), max_length=8))
+
+  def test_shorten_readable(self):
+    self.assertEqual('j.**.e.jill',
+                     safe_filename('jackalope', '.jill', digest=self.FixedDigest(2), max_length=11))
 
   def test_shorten_fail(self):
     with self.assertRaises(ValueError):

@@ -2,26 +2,25 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import os
 import pkgutil
+from builtins import open, str
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
+from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_sources,
                                                        has_python_requirements, has_python_sources)
-from pants.backend.python.tasks.python_execution_task_base import WrappedPEX
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.python.python_repos import PythonRepos
 from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
 from pants.util.memo import memoized_property
@@ -35,8 +34,8 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     """A richer failure exception type useful for tests."""
 
     def __init__(self, *args, **kwargs):
-      compiled = kwargs.pop('compiled')
-      failed = kwargs.pop('failed')
+      compiled = kwargs.pop(b'compiled')
+      failed = kwargs.pop(b'failed')
       super(PythonEval.Error, self).__init__(*args, **kwargs)
       self.compiled = compiled
       self.failed = failed
@@ -62,26 +61,9 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     super(PythonEval, cls).register_options(register)
     register('--fail-slow', type=bool,
              help='Compile all targets and present the full list of errors.')
-    register('--closure', type=bool,
-             removal_version='1.7.0.dev0', removal_hint='Use --transitive instead.',
-             help='Eval all targets in the closure individually instead of just the targets '
-                  'specified on the command line.')
 
   def execute(self):
-    # The default for --closure is False, while the default for --transitive is True, so we
-    # can't just OR the two values, and have to explicitly detect when --transitive is not
-    # explicitly specified.
-    if self.get_options().is_default('transitive'):
-      if self.get_options().skip:
-        targets = []
-      else:
-        targets = (self.context.targets(self._is_evalable) if self.get_options().closure
-                   else filter(self._is_evalable, self.context.target_roots))
-    else:
-      # TODO(benjy): After removing --closure, targets should always be set to this, and the
-      # entire other branch of this if statement (and the if statement itself) should be removed.
-      targets = self.get_targets(self._is_evalable)
-    with self.invalidated(targets,
+    with self.invalidated(self.get_targets(self._is_evalable),
                           invalidate_dependents=True,
                           topological_order=True) as invalidation_check:
       compiled = self._compile_targets(invalidation_check.invalid_vts)
@@ -155,7 +137,10 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
       # Create the executable pex.
       exec_pex_parent = os.path.join(self.workdir, 'executable_pex')
       executable_file_content = self._get_executable_file_content(exec_pex_parent, modules)
+
       hasher = hashlib.sha1()
+      hasher.update(reqs_pex.path())
+      hasher.update(srcs_pex.path())
       hasher.update(executable_file_content)
       exec_file_hash = hasher.hexdigest()
       exec_pex_path = os.path.realpath(os.path.join(exec_pex_parent, exec_file_hash))
@@ -170,17 +155,16 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
           # executable_file_content does what the user intends (including, probably, calling that
           # underlying entry point).
           pex_info.entry_point = self._EXEC_NAME
+          pex_info.pex_path = ':'.join(pex.path() for pex in (reqs_pex, srcs_pex) if pex)
           builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
           builder.freeze()
 
-      exec_pex = PEX(exec_pex_path, interpreter)
-      extra_pex_paths = [pex.path() for pex in filter(None, [reqs_pex, srcs_pex])]
-      pex = WrappedPEX(exec_pex, interpreter, extra_pex_paths)
+      pex = PEX(exec_pex_path, interpreter)
 
       with self.context.new_workunit(name='eval',
                                      labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.RUN,
                                              WorkUnitLabel.TOOL],
-                                     cmd=' '.join(exec_pex.cmdline())) as workunit:
+                                     cmd=' '.join(pex.cmdline())) as workunit:
         returncode = pex.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
         workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
         if returncode != 0:
@@ -198,9 +182,9 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
           target.entry_point, target.address.spec))
       module = components[0]
       if len(components) == 2:
-        function = components[1]
+        func = components[1]
         data = TemplateData(source=source,
-                            import_statement='from {} import {}'.format(module, function))
+                            import_statement='from {} import {}'.format(module, func))
       else:
         data = TemplateData(source=source, import_statement='import {}'.format(module))
       modules.append(data)
@@ -231,7 +215,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     reqs_pex_path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity),
                                                   vt.cache_key.hash))
     if not os.path.isdir(reqs_pex_path):
-      req_libs = filter(has_python_requirements, vt.target.closure())
+      req_libs =  [t for t in vt.target.closure() if has_python_requirements(t)]
       with safe_concurrent_creation(reqs_pex_path) as safe_path:
         builder = PEXBuilder(safe_path, interpreter=interpreter, copy=True)
         dump_requirement_libs(builder, interpreter, req_libs, self.context.log)

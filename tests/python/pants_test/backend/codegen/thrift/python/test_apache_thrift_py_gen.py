@@ -2,10 +2,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 from textwrap import dedent
 
 import six
@@ -15,13 +15,13 @@ from pants.backend.codegen.thrift.lib.thrift import Thrift
 from pants.backend.codegen.thrift.python.apache_thrift_py_gen import ApacheThriftPyGen
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
+from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_environment import get_buildroot
-from pants.python.python_repos import PythonRepos
 from pants.util.process_handler import subprocess
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class ApacheThriftPyGenTest(TaskTestBase):
@@ -51,8 +51,8 @@ class ApacheThriftPyGenTest(TaskTestBase):
     return os.path.join(self.build_root, target.target_base, package_rel_dir, '__init__.py')
 
   def assert_ns_package(self, target, package_rel_dir):
-    with open(self.init_py_path(target, package_rel_dir)) as fp:
-      self.assertEqual(b"__import__('pkg_resources').declare_namespace(__name__)",
+    with open(self.init_py_path(target, package_rel_dir), 'r') as fp:
+      self.assertEqual("__import__('pkg_resources').declare_namespace(__name__)",
                        fp.read().strip())
 
   def assert_leaf_package(self, target, package_rel_dir, *services):
@@ -149,7 +149,13 @@ class ApacheThriftPyGenTest(TaskTestBase):
     interpreter_cache = PythonInterpreterCache(python_setup, python_repos)
     interpreter = interpreter_cache.select_interpreter_for_targets(targets)
 
-    pythonpath = [os.path.join(get_buildroot(), t.target_base) for t in targets]
+    # We need setuptools to import namespace packages (via pkg_resources), so we prime the
+    # PYTHONPATH with interpreter extras, which Pants always populates with setuptools and wheel.
+    # TODO(John Sirois): We really should be emitting setuptools in a
+    # `synthetic_target_extra_dependencies` override in `ApacheThriftPyGen`:
+    #   https://github.com/pantsbuild/pants/issues/5975
+    pythonpath = interpreter.extras.values()
+    pythonpath.extend(os.path.join(get_buildroot(), t.target_base) for t in targets)
     for dist in resolve(['thrift=={}'.format(self.get_thrift_version(apache_thrift_gen))],
                         interpreter=interpreter,
                         context=python_repos.get_network_context(),

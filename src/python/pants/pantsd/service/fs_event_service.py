@@ -2,13 +2,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import traceback
-
 from concurrent.futures import ThreadPoolExecutor
 
 from pants.pantsd.service.pants_service import PantsService
@@ -24,6 +22,8 @@ class FSEventService(PantsService):
   """
 
   ZERO_DEPTH = ['depth', 'eq', 0]
+
+  PANTS_PID_SUBSCRIPTION_NAME = 'pantsd_pid'
 
   def __init__(self, watchman, build_root, worker_count):
     """
@@ -80,6 +80,26 @@ class FSEventService(PantsService):
       callback
     )
 
+  def register_pidfile_handler(self, pidfile_path, callback):
+    """
+
+    :param pidfile_path: Path to the pidfile, relative to the build root
+    :param callback:
+    :return:
+    """
+    self.register_handler(
+      self.PANTS_PID_SUBSCRIPTION_NAME,
+      dict(
+        fields=['name'],
+        expression=[
+          'allof',
+          ['dirname', os.path.dirname(pidfile_path)],
+          ['name', os.path.basename(pidfile_path)],
+        ],
+      ),
+      callback,
+    )
+
   def register_handler(self, name, metadata, callback):
     """Register subscriptions and their event handlers.
 
@@ -103,14 +123,14 @@ class FSEventService(PantsService):
     """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""
 
     if not (self._watchman and self._watchman.is_alive()):
-      raise self.ServiceError('watchman is not running, bailing!')
+      raise PantsService.ServiceError('watchman is not running, bailing!')
 
     # Enable watchman for the build root.
     self._watchman.watch_project(self._build_root)
 
     futures = {}
     id_counter = 0
-    subscriptions = self._handlers.values()
+    subscriptions = list(self._handlers.values())
 
     # Setup subscriptions and begin the main event firing loop.
     for handler_name, event_data in self._watchman.subscribed(self._build_root, subscriptions):

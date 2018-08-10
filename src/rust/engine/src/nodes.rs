@@ -1,29 +1,28 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-extern crate bazel_protos;
-extern crate tempdir;
-
-use std::error::Error;
-use std::collections::BTreeMap;
-use std::fmt;
-use std::os::unix::ffi::OsStrExt;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures::future::{self, Future};
-use tempdir::TempDir;
 
 use boxfuture::{BoxFuture, Boxable};
-use context::Context;
+use context::{Context, Core};
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
-use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDigest, VFS};
-use process_execution as process_executor;
+use fs::{
+  self, Dir, DirectoryListing, File, FileContent, GlobMatching, Link, PathGlobs, PathStat,
+  StoreFileByDigest, StrictGlobMatching, VFS,
+};
 use hashing;
+use process_execution::{self, CommandRunner};
 use rule_graph;
-use selectors::{self, Selector};
-use tasks;
+use selectors;
+use tasks::{self, Intrinsic, IntrinsicKind};
+
+use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -46,17 +45,13 @@ fn was_required(failure: Failure) -> Failure {
   }
 }
 
-pub trait GetNode {
-  fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output>;
-}
-
 impl VFS<Failure> for Context {
-  fn read_link(&self, link: Link) -> NodeFuture<PathBuf> {
-    self.get(ReadLink(link)).map(|res| res.0).to_boxed()
+  fn read_link(&self, link: &Link) -> NodeFuture<PathBuf> {
+    self.get(ReadLink(link.clone())).map(|res| res.0).to_boxed()
   }
 
-  fn scandir(&self, dir: Dir) -> NodeFuture<Vec<fs::Stat>> {
-    self.get(Scandir(dir)).map(|res| res.0).to_boxed()
+  fn scandir(&self, dir: Dir) -> NodeFuture<Arc<DirectoryListing>> {
+    self.get(Scandir(dir))
   }
 
   fn is_ignored(&self, stat: &fs::Stat) -> bool {
@@ -72,24 +67,25 @@ impl VFS<Failure> for Context {
 }
 
 impl StoreFileByDigest<Failure> for Context {
-  fn store_by_digest(&self, file: &File) -> BoxFuture<hashing::Digest, Failure> {
+  fn store_by_digest(&self, file: File) -> BoxFuture<hashing::Digest, Failure> {
     self.get(DigestFile(file.clone()))
   }
 }
 
 ///
-/// Defines executing a cacheable/memoizable step for the given context.
+/// A simplified implementation of graph::Node for members of the NodeKey enum to implement.
+/// NodeKey's impl of graph::Node handles the rest.
 ///
-/// The Output type of a Node is bounded to values that can be stored and retrieved from
-/// the NodeResult enum. Due to the semantics of memoization, retrieving the typed result
+/// The Item type of a WrappedNode is bounded to values that can be stored and retrieved
+/// from the NodeResult enum. Due to the semantics of memoization, retrieving the typed result
 /// stored inside the NodeResult requires an implementation of TryFrom<NodeResult>. But the
 /// combination of bounds at usage sites should mean that a failure to unwrap the result is
 /// exceedingly rare.
 ///
-pub trait Node: Into<NodeKey> {
-  type Output: Clone + fmt::Debug + Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
+pub trait WrappedNode: Into<NodeKey> {
+  type Item: TryFrom<NodeResult>;
 
-  fn run(self, context: Context) -> NodeFuture<Self::Output>;
+  fn run(self, context: Context) -> BoxFuture<Self::Item, Failure>;
 }
 
 ///
@@ -171,13 +167,13 @@ impl Select {
     if !externs::satisfied_by(&self.selector.product, candidate) {
       return false;
     }
-    return match variant_value {
+    match variant_value {
       &Some(ref vv) if externs::project_str(candidate, "name") != *vv =>
         // There is a variant value, and it doesn't match.
         false,
       _ =>
         true,
-    };
+    }
   }
 
   ///
@@ -214,7 +210,7 @@ impl Select {
   ///
   fn choose_task_result(
     &self,
-    context: Context,
+    context: &Context,
     results: Vec<Result<Value, Failure>>,
     variant_value: &Option<String>,
   ) -> Result<Value, Failure> {
@@ -260,26 +256,52 @@ impl Select {
     }
   }
 
-  ///
-  /// Gets a Snapshot for the current subject.
-  ///
-  fn get_snapshot(&self, context: &Context) -> NodeFuture<fs::Snapshot> {
-    // TODO: Hacky... should have an intermediate Node to Select PathGlobs for the subject
-    // before executing, and then treat this as an intrinsic. Otherwise, Snapshots for
-    // different subjects but identical PathGlobs will cause redundant work.
-    if self.entries.len() > 1 {
-      // TODO do something better than this.
-      panic!("we're supposed to get a snapshot, but there's more than one entry!");
-    } else if self.entries.is_empty() {
-      panic!("we're supposed to get a snapshot, but there are no matching rule entries!");
-    }
+  fn snapshot(
+    &self,
+    context: &Context,
+    entry: &rule_graph::Entry,
+  ) -> NodeFuture<Arc<fs::Snapshot>> {
+    let edges = context
+      .core
+      .rule_graph
+      .edges_for_inner(entry)
+      .expect("Expected edges to exist for Snapshot intrinsic.");
+    // Compute PathGlobs for the subject.
+    let context = context.clone();
+    Select::new(
+      context.core.types.path_globs.clone(),
+      self.subject,
+      self.variants.clone(),
+      &edges,
+    ).run(context.clone())
+      .and_then(move |path_globs_val| context.get(Snapshot(externs::key_for(path_globs_val))))
+      .to_boxed()
+  }
 
-    context.get(Snapshot {
-      subject: self.subject.clone(),
-      product: self.product().clone(),
-      variants: self.variants.clone(),
-      entry: self.entries[0].clone(),
-    })
+  fn execute_process(
+    &self,
+    context: &Context,
+    entry: &rule_graph::Entry,
+  ) -> NodeFuture<ProcessResult> {
+    let edges = &context
+      .core
+      .rule_graph
+      .edges_for_inner(entry)
+      .expect("Expected edges to exist for ExecuteProcess intrinsic.");
+    // Compute an ExecuteProcessRequest for the subject.
+    let context = context.clone();
+    Select::new(
+      context.core.types.process_request,
+      self.subject,
+      self.variants.clone(),
+      edges,
+    ).run(context.clone())
+      .and_then(|process_request_val| {
+        ExecuteProcess::lift(&process_request_val)
+          .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))
+      })
+      .and_then(move |process_request| context.get(process_request))
+      .to_boxed()
   }
 
   ///
@@ -287,103 +309,102 @@ impl Select {
   /// given subject and variants.
   ///
   fn gen_nodes(&self, context: &Context) -> Vec<NodeFuture<Value>> {
-    // TODO: These `product==` hooks are hacky.
-    if self.product() == &context.core.types.snapshot {
-      // If the requested product is a Snapshot, execute a Snapshot Node and then lower to a Value
-      // for this caller.
-      let context = context.clone();
-      vec![
-        self
-          .get_snapshot(&context)
-          .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
-          .to_boxed(),
-      ]
-    } else if self.product() == &context.core.types.files_content {
-      // If the requested product is FilesContent, request a Snapshot and lower it as FilesContent.
-      let context = context.clone();
-      vec![
-        self
-          .get_snapshot(&context)
-          .and_then(move |snapshot|
-            // Request the file contents of the Snapshot, and then store them.
-            snapshot.contents(context.core.store.clone()).map_err(|e| throw(&e))
-              .map(move |files_content| Snapshot::store_files_content(&context, &files_content)))
-          .to_boxed(),
-      ]
-    } else if self.product() == &context.core.types.process_result {
-      let value = externs::val_for(&self.subject);
+    if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
+      return vec![future::ok(value.clone()).to_boxed()];
+    }
 
-      let mut env: BTreeMap<String, String> = BTreeMap::new();
-      let env_var_parts = externs::project_multi_strs(&value, "env");
-      // TODO: Error if env_var_parts.len() % 2 != 0
-      for i in 0..(env_var_parts.len() / 2) {
-        env.insert(
-          env_var_parts[2 * i].clone(),
-          env_var_parts[2 * i + 1].clone(),
-        );
-      }
-
-      // TODO: Make this much less unwrap-happy with https://github.com/pantsbuild/pants/issues/5502
-
-      let fingerprint = externs::project_str(&value, "input_files_digest");
-      let digest_length = externs::project_str(&value, "digest_length");
-      let digest_length_as_usize = digest_length.parse::<usize>().unwrap();
-      let digest = hashing::Digest(
-        hashing::Fingerprint::from_hex_string(&fingerprint).unwrap(),
-        digest_length_as_usize,
-      );
-
-      let request = process_executor::ExecuteProcessRequest {
-        argv: externs::project_multi_strs(&value, "argv"),
-        env: env,
-        input_files: digest,
-      };
-      let tmpdir = TempDir::new("process-execution").unwrap();
-
-      context
-        .core
-        .store
-        .materialize_directory(tmpdir.path().to_owned(), digest)
-        .wait()
-        .unwrap();
-      // TODO: this should run off-thread, and asynchronously
-      // TODO: request the Node that invokes the process, rather than invoke directly
-      let result = process_executor::local::run_command_locally(request, tmpdir.path()).unwrap();
-      vec![
-        future::ok(externs::unsafe_call(
-          &context.core.types.construct_process_result,
-          &[
-            externs::store_bytes(&result.stdout),
-            externs::store_bytes(&result.stderr),
-            externs::store_i32(result.exit_code),
-          ],
-        )).to_boxed(),
-      ]
-    } else if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
-      vec![future::ok(value.clone()).to_boxed()]
-    } else {
-      self
-        .entries
-        .iter()
-        .map(|entry| {
-          let task = context.core.rule_graph.task_for_inner(entry);
-          context.get(Task {
-            subject: self.subject.clone(),
+    self
+      .entries
+      .iter()
+      .map(
+        |entry| match context.core.rule_graph.rule_for_inner(entry) {
+          &rule_graph::Rule::Task(ref task) => context.get(Task {
+            subject: self.subject,
             product: self.product().clone(),
             variants: self.variants.clone(),
-            task: task,
+            task: task.clone(),
             entry: Arc::new(entry.clone()),
-          })
-        })
-        .collect::<Vec<NodeFuture<Value>>>()
-    }
+          }),
+          &rule_graph::Rule::Intrinsic(Intrinsic {
+            kind: IntrinsicKind::Snapshot,
+            ..
+          }) => {
+            let context = context.clone();
+            self
+              .snapshot(&context, &entry)
+              .map(move |snapshot| Snapshot::store_snapshot(&context.core, &snapshot))
+              .to_boxed()
+          }
+          &rule_graph::Rule::Intrinsic(Intrinsic {
+            kind: IntrinsicKind::FilesContent,
+            ..
+          }) => {
+            let edges = &context
+              .core
+              .rule_graph
+              .edges_for_inner(entry)
+              .expect("Expected edges to exist for FilesContent intrinsic.");
+            let context = context.clone();
+            Select::new(
+              context.core.types.directory_digest,
+              self.subject,
+              self.variants.clone(),
+              edges,
+            ).run(context.clone())
+              .and_then(|directory_digest_val| {
+                lift_digest(&directory_digest_val).map_err(|str| throw(&str))
+              })
+              .and_then(move |digest| {
+                let store = context.core.store.clone();
+                context
+                  .core
+                  .store
+                  .load_directory(digest)
+                  .map_err(|str| throw(&str))
+                  .and_then(move |maybe_directory| {
+                    maybe_directory
+                      .ok_or_else(|| format!("Could not find directory with digest {:?}", digest))
+                      .map_err(|str| throw(&str))
+                  })
+                  .and_then(move |directory| {
+                    store
+                      .contents_for_directory(&directory)
+                      .map_err(|str| throw(&str))
+                  })
+                  .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
+              })
+              .to_boxed()
+          }
+          &rule_graph::Rule::Intrinsic(Intrinsic {
+            kind: IntrinsicKind::ProcessExecution,
+            ..
+          }) => {
+            let context = context.clone();
+            self
+              .execute_process(&context, &entry)
+              .map(move |result| {
+                externs::unsafe_call(
+                  &context.core.types.construct_process_result,
+                  &[
+                    externs::store_bytes(&result.0.stdout),
+                    externs::store_bytes(&result.0.stderr),
+                    externs::store_i64(result.0.exit_code.into()),
+                    Snapshot::store_directory(&context.core, &result.0.output_directory),
+                  ],
+                )
+              })
+              .to_boxed()
+          }
+        },
+      )
+      .collect::<Vec<NodeFuture<Value>>>()
   }
 }
 
 // TODO: This is a Node only because it is used as a root in the graph, but it should never be
 // requested using context.get
-impl Node for Select {
-  type Output = Value;
+impl WrappedNode for Select {
+  type Item = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
     // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
@@ -414,7 +435,7 @@ impl Node for Select {
         .into_iter()
         .map(|node_future| {
           // Don't fail the join if one fails.
-          node_future.then(|r| future::ok(r))
+          node_future.then(future::ok)
         })
         .collect::<Vec<_>>(),
     );
@@ -422,7 +443,7 @@ impl Node for Select {
     let variant_value = variant_value.map(|s| s.to_string());
     deps_future
       .and_then(move |dep_results| {
-        future::result(self.choose_task_result(context, dep_results, &variant_value))
+        future::result(self.choose_task_result(&context, dep_results, &variant_value))
       })
       .to_boxed()
   }
@@ -434,136 +455,88 @@ impl From<Select> for NodeKey {
   }
 }
 
-///
-/// A Node that selects the given Product for each of the items in `field` on `dep_product`.
-///
-/// Begins by selecting the `dep_product` for the subject, and then selects a product for each
-/// member of a collection named `field` on the dep_product.
-///
-/// The value produced by this Node guarantees that the order of the provided values matches the
-/// order of declaration in the list `field` of the `dep_product`.
-///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectDependencies {
-  pub subject: Key,
-  pub variants: Variants,
-  pub selector: selectors::SelectDependencies,
-  pub dep_product_entries: rule_graph::Entries,
-  pub product_entries: rule_graph::Entries,
-}
-
-impl SelectDependencies {
-  pub fn new(
-    selector: selectors::SelectDependencies,
-    subject: Key,
-    variants: Variants,
-    edges: &rule_graph::RuleEdges,
-  ) -> SelectDependencies {
-    // filters entries by whether the subject type is the right subject type
-    let dep_p_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
-      Selector::SelectDependencies(selector.clone()),
-      selectors::Select::without_variant(selector.clone().dep_product),
-    ));
-    let p_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedMultipleNestedSelect(
-      Selector::SelectDependencies(selector.clone()),
-      selector.field_types.clone(),
-      selectors::Select::without_variant(selector.product.clone()),
-    ));
-    SelectDependencies {
-      subject: subject,
-      variants: variants,
-      selector: selector.clone(),
-      dep_product_entries: dep_p_entries,
-      product_entries: p_entries,
-    }
-  }
-
-  fn get_dep(&self, context: &Context, dep_subject: Value) -> NodeFuture<Value> {
-    // TODO: This method needs to consider whether the `dep_subject` is an Address,
-    // and if so, attempt to parse Variants there. See:
-    //   https://github.com/pantsbuild/pants/issues/4020
-
-    let dep_subject_key = externs::key_for(dep_subject);
-    Select {
-      selector: selectors::Select::without_variant(self.selector.product),
-      subject: dep_subject_key,
-      variants: self.variants.clone(),
-      // NB: We're filtering out all of the entries for field types other than
-      //    dep_subject's since none of them will match.
-      entries: self
-        .product_entries
-        .clone()
-        .into_iter()
-        .filter(|e| e.matches_subject_type(dep_subject_key.type_id().clone()))
-        .collect(),
-    }.run(context.clone())
-  }
-}
-
-impl SelectDependencies {
-  fn run(self, context: Context) -> NodeFuture<Value> {
-    // Select the product holding the dependency list.
-    Select {
-      selector: selectors::Select::without_variant(self.selector.dep_product),
-      subject: self.subject.clone(),
-      variants: self.variants.clone(),
-      entries: self.dep_product_entries.clone(),
-    }.run(context.clone())
-      .then(move |dep_product_res| {
-        match dep_product_res {
-          Ok(dep_product) => {
-            // The product and its dependency list are available: project them.
-            let deps = future::join_all(
-              externs::project_multi(&dep_product, &self.selector.field)
-                .into_iter()
-                .map(|dep_subject| self.get_dep(&context, dep_subject))
-                .collect::<Vec<_>>(),
-            );
-            deps
-              .then(move |dep_values_res| {
-                // Finally, store the resulting values.
-                match dep_values_res {
-                  Ok(dep_values) => Ok(externs::store_list(dep_values.iter().collect(), false)),
-                  Err(failure) => Err(was_required(failure)),
-                }
-              })
-              .to_boxed()
-          }
-          Err(failure) => err(failure),
-        }
-      })
-      .to_boxed()
-  }
+pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
+  let fingerprint = externs::project_str(&digest, "fingerprint");
+  let digest_length = externs::project_str(&digest, "serialized_bytes_length");
+  let digest_length_as_usize = digest_length
+    .parse::<usize>()
+    .map_err(|err| format!("Length was not a usize: {:?}", err))?;
+  Ok(hashing::Digest(
+    hashing::Fingerprint::from_hex_string(&fingerprint)?,
+    digest_length_as_usize,
+  ))
 }
 
 ///
 /// A Node that represents executing a process.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ExecuteProcess(process_executor::ExecuteProcessRequest);
+pub struct ExecuteProcess(process_execution::ExecuteProcessRequest);
 
-#[derive(Clone, Debug)]
-pub struct ProcessResult(process_executor::ExecuteProcessResult);
+impl ExecuteProcess {
+  ///
+  /// Lifts a Key representing a python ExecuteProcessRequest value into a ExecuteProcess Node.
+  ///
+  fn lift(value: &Value) -> Result<ExecuteProcess, String> {
+    let mut env: BTreeMap<String, String> = BTreeMap::new();
+    let env_var_parts = externs::project_multi_strs(&value, "env");
+    if env_var_parts.len() % 2 != 0 {
+      return Err("Error parsing env: odd number of parts".to_owned());
+    }
+    for i in 0..(env_var_parts.len() / 2) {
+      env.insert(
+        env_var_parts[2 * i].clone(),
+        env_var_parts[2 * i + 1].clone(),
+      );
+    }
+    let digest = lift_digest(&externs::project_ignoring_type(&value, "input_files"))
+      .map_err(|err| format!("Error parsing digest {}", err))?;
 
-impl Node for ExecuteProcess {
-  type Output = ProcessResult;
+    let output_files = externs::project_multi_strs(&value, "output_files")
+      .into_iter()
+      .map(PathBuf::from)
+      .collect();
+
+    let output_directories = externs::project_multi_strs(&value, "output_directories")
+      .into_iter()
+      .map(PathBuf::from)
+      .collect();
+
+    let timeout_str = externs::project_str(&value, "timeout_seconds");
+    let timeout_in_seconds = timeout_str
+      .parse::<f64>()
+      .map_err(|err| format!("Timeout was not a float: {:?}", err))?;
+
+    let description = externs::project_str(&value, "description");
+
+    Ok(ExecuteProcess(process_execution::ExecuteProcessRequest {
+      argv: externs::project_multi_strs(&value, "argv"),
+      env: env,
+      input_files: digest,
+      output_files: output_files,
+      output_directories: output_directories,
+      timeout: Duration::from_millis((timeout_in_seconds * 1000.0) as u64),
+      description: description,
+    }))
+  }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProcessResult(process_execution::FallibleExecuteProcessResult);
+
+impl WrappedNode for ExecuteProcess {
+  type Item = ProcessResult;
 
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
-    let request = self.0.clone();
+    let request = self.0;
 
-    // TODO: Make this much less unwrap-happy with https://github.com/pantsbuild/pants/issues/5502
-
-    let tmpdir = TempDir::new("process-execution").unwrap();
     context
       .core
-      .store
-      .materialize_directory(tmpdir.path().to_owned(), request.input_files)
-      .wait()
-      .unwrap();
-    // TODO: this should run off-thread, and asynchronously
-    future::ok(ProcessResult(
-      process_executor::local::run_command_locally(request, tmpdir.path()).unwrap(),
-    )).to_boxed()
+      .command_runner
+      .run(request)
+      .map(ProcessResult)
+      .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
+      .to_boxed()
   }
 }
 
@@ -579,11 +552,11 @@ impl From<ExecuteProcess> for NodeKey {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ReadLink(Link);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LinkDest(PathBuf);
 
-impl Node for ReadLink {
-  type Output = LinkDest;
+impl WrappedNode for ReadLink {
+  type Item = LinkDest;
 
   fn run(self, context: Context) -> NodeFuture<LinkDest> {
     let link = self.0.clone();
@@ -591,7 +564,7 @@ impl Node for ReadLink {
       .core
       .vfs
       .read_link(&self.0)
-      .map(|dest_path| LinkDest(dest_path))
+      .map(LinkDest)
       .map_err(move |e| throw(&format!("Failed to read_link for {:?}: {:?}", link, e)))
       .to_boxed()
   }
@@ -609,8 +582,8 @@ impl From<ReadLink> for NodeKey {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DigestFile(pub File);
 
-impl Node for DigestFile {
-  type Output = hashing::Digest;
+impl WrappedNode for DigestFile {
+  type Item = hashing::Digest;
 
   fn run(self, context: Context) -> NodeFuture<hashing::Digest> {
     let file = self.0.clone();
@@ -618,13 +591,7 @@ impl Node for DigestFile {
       .core
       .vfs
       .read_file(&self.0)
-      .map_err(move |e| {
-        throw(&format!(
-          "Error reading file {:?}: {}",
-          file,
-          e.description()
-        ))
-      })
+      .map_err(move |e| throw(&format!("Error reading file {:?}: {:?}", file, e,)))
       .and_then(move |c| {
         context
           .core
@@ -649,20 +616,17 @@ impl From<DigestFile> for NodeKey {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Scandir(Dir);
 
-#[derive(Clone, Debug)]
-pub struct DirectoryListing(Vec<fs::Stat>);
+impl WrappedNode for Scandir {
+  type Item = Arc<DirectoryListing>;
 
-impl Node for Scandir {
-  type Output = DirectoryListing;
-
-  fn run(self, context: Context) -> NodeFuture<DirectoryListing> {
+  fn run(self, context: Context) -> NodeFuture<Arc<DirectoryListing>> {
     let dir = self.0.clone();
     context
       .core
       .vfs
       .scandir(&self.0)
       .then(move |listing_res| match listing_res {
-        Ok(listing) => Ok(DirectoryListing(listing)),
+        Ok(listing) => Ok(Arc::new(listing)),
         Err(e) => Err(throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
       })
       .to_boxed()
@@ -676,18 +640,10 @@ impl From<Scandir> for NodeKey {
 }
 
 ///
-/// A Node that captures an fs::Snapshot for the given subject.
+/// A Node that captures an fs::Snapshot for a PathGlobs subject.
 ///
-/// Begins by selecting PathGlobs for the subject, and then computes a Snapshot for the
-/// PathStats matched by the PathGlobs.
-///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Snapshot {
-  subject: Key,
-  product: TypeConstraint,
-  variants: Variants,
-  entry: rule_graph::Entry,
-}
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct Snapshot(Key);
 
 impl Snapshot {
   fn create(context: Context, path_globs: PathGlobs) -> NodeFuture<fs::Snapshot> {
@@ -696,7 +652,7 @@ impl Snapshot {
     // and fs::Snapshot::from_path_stats tracking dependencies for file digests.
     context
       .expand(path_globs)
-      .map_err(|e| format!("PlatGlobs expansion failed: {:?}", e))
+      .map_err(|e| format!("PathGlobs expansion failed: {:?}", e))
       .and_then(move |path_stats| {
         fs::Snapshot::from_path_stats(context.core.store.clone(), context.clone(), path_stats)
           .map_err(move |e| format!("Snapshot failed: {}", e))
@@ -705,10 +661,14 @@ impl Snapshot {
       .to_boxed()
   }
 
-  fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
+  pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
     let include = externs::project_multi_strs(item, "include");
     let exclude = externs::project_multi_strs(item, "exclude");
-    PathGlobs::create(&include, &exclude).map_err(|e| {
+    let glob_match_error_behavior =
+      externs::project_ignoring_type(item, "glob_match_error_behavior");
+    let failure_behavior = externs::project_str(&glob_match_error_behavior, "failure_behavior");
+    let strict_glob_matching = StrictGlobMatching::create(failure_behavior.as_str())?;
+    PathGlobs::create(&include, &exclude, strict_glob_matching).map_err(|e| {
       format!(
         "Failed to parse PathGlobs for include({:?}), exclude({:?}): {}",
         include, exclude, e
@@ -716,46 +676,55 @@ impl Snapshot {
     })
   }
 
-  fn store_snapshot(context: &Context, item: &fs::Snapshot) -> Value {
+  pub fn store_directory(core: &Arc<Core>, item: &hashing::Digest) -> Value {
+    externs::unsafe_call(
+      &core.types.construct_directory_digest,
+      &[
+        externs::store_utf8(&item.0.to_hex()),
+        externs::store_i64(item.1 as i64),
+      ],
+    )
+  }
+
+  pub fn store_snapshot(core: &Arc<Core>, item: &fs::Snapshot) -> Value {
     let path_stats: Vec<_> = item
       .path_stats
       .iter()
-      .map(|ps| Self::store_path_stat(context, ps))
+      .map(|ps| Self::store_path_stat(core, ps))
       .collect();
     externs::unsafe_call(
-      &context.core.types.construct_snapshot,
+      &core.types.construct_snapshot,
       &[
-        externs::store_bytes(&(item.digest.0).to_hex().as_bytes()),
-        externs::store_i32((item.digest.1 as i32)),
-        externs::store_list(path_stats.iter().collect(), false),
+        Self::store_directory(core, &item.digest),
+        externs::store_tuple(&path_stats),
       ],
     )
   }
 
   fn store_path(item: &Path) -> Value {
-    externs::store_bytes(item.as_os_str().as_bytes())
+    externs::store_utf8_osstr(item.as_os_str())
   }
 
-  fn store_dir(context: &Context, item: &Dir) -> Value {
+  fn store_dir(core: &Arc<Core>, item: &Dir) -> Value {
     let args = [Self::store_path(item.0.as_path())];
-    externs::unsafe_call(&context.core.types.construct_dir, &args)
+    externs::unsafe_call(&core.types.construct_dir, &args)
   }
 
-  fn store_file(context: &Context, item: &File) -> Value {
+  fn store_file(core: &Arc<Core>, item: &File) -> Value {
     let args = [Self::store_path(item.path.as_path())];
-    externs::unsafe_call(&context.core.types.construct_file, &args)
+    externs::unsafe_call(&core.types.construct_file, &args)
   }
 
-  fn store_path_stat(context: &Context, item: &PathStat) -> Value {
+  fn store_path_stat(core: &Arc<Core>, item: &PathStat) -> Value {
     let args = match item {
       &PathStat::Dir { ref path, ref stat } => {
-        vec![Self::store_path(path), Self::store_dir(context, stat)]
+        vec![Self::store_path(path), Self::store_dir(core, stat)]
       }
       &PathStat::File { ref path, ref stat } => {
-        vec![Self::store_path(path), Self::store_file(context, stat)]
+        vec![Self::store_path(path), Self::store_file(core, stat)]
       }
     };
-    externs::unsafe_call(&context.core.types.construct_path_stat, &args)
+    externs::unsafe_call(&core.types.construct_path_stat, &args)
   }
 
   fn store_file_content(context: &Context, item: &FileContent) -> Value {
@@ -768,41 +737,27 @@ impl Snapshot {
     )
   }
 
-  fn store_files_content(context: &Context, item: &Vec<FileContent>) -> Value {
+  fn store_files_content(context: &Context, item: &[FileContent]) -> Value {
     let entries: Vec<_> = item
       .iter()
       .map(|e| Self::store_file_content(context, e))
       .collect();
     externs::unsafe_call(
       &context.core.types.construct_files_content,
-      &[externs::store_list(entries.iter().collect(), false)],
+      &[externs::store_tuple(&entries)],
     )
   }
 }
 
-impl Node for Snapshot {
-  type Output = fs::Snapshot;
+impl WrappedNode for Snapshot {
+  type Item = Arc<fs::Snapshot>;
 
-  fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
-    let ref edges = context
-      .core
-      .rule_graph
-      .edges_for_inner(&self.entry)
-      .expect("edges for snapshot exist.");
-    // Compute and parse PathGlobs for the subject.
-    Select::new(
-      context.core.types.path_globs.clone(),
-      self.subject.clone(),
-      self.variants.clone(),
-      edges,
-    ).run(context.clone())
-      .then(move |path_globs_res| match path_globs_res {
-        Ok(path_globs_val) => match Self::lift_path_globs(&path_globs_val) {
-          Ok(pgs) => Snapshot::create(context, pgs),
-          Err(e) => err(throw(&format!("Failed to parse PathGlobs: {}", e))),
-        },
-        Err(failure) => err(failure),
-      })
+  fn run(self, context: Context) -> NodeFuture<Arc<fs::Snapshot>> {
+    let lifted_path_globs = Self::lift_path_globs(&externs::val_for(&self.0));
+    future::result(lifted_path_globs)
+      .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))
+      .and_then(move |path_globs| Self::create(context, path_globs))
+      .map(Arc::new)
       .to_boxed()
   }
 }
@@ -823,24 +778,6 @@ pub struct Task {
 }
 
 impl Task {
-  fn get(&self, context: &Context, selector: Selector) -> NodeFuture<Value> {
-    let ref edges = context
-      .core
-      .rule_graph
-      .edges_for_inner(&self.entry)
-      .expect("edges for task exist.");
-    match selector {
-      Selector::Select(s) => {
-        Select::new_with_selector(s, self.subject.clone(), self.variants.clone(), edges)
-          .run(context.clone())
-      }
-      Selector::SelectDependencies(s) => {
-        SelectDependencies::new(s, self.subject.clone(), self.variants.clone(), edges)
-          .run(context.clone())
-      }
-    }
-  }
-
   fn gen_get(
     context: &Context,
     entry: Arc<rule_graph::Entry>,
@@ -859,9 +796,9 @@ impl Task {
             product: product,
             subject: subject.type_id().clone(),
           }));
-        Select::new_with_entries(product, subject, Default::default(), entries)
+        Select::new_with_entries(product, subject, Variants::default(), entries)
           .run(context.clone())
-          .map_err(|e| was_required(e))
+          .map_err(was_required)
       })
       .collect::<Vec<_>>();
     future::join_all(get_futures).to_boxed()
@@ -883,34 +820,43 @@ impl Task {
         match response {
           externs::GeneratorResponse::Get(get) => Self::gen_get(&context, entry, vec![get])
             .map(|vs| future::Loop::Continue(vs.into_iter().next().unwrap()))
-            .to_boxed() as BoxFuture<_, _>,
+            .to_boxed(),
           externs::GeneratorResponse::GetMulti(gets) => Self::gen_get(&context, entry, gets)
-            .map(|vs| future::Loop::Continue(externs::store_list(vs.iter().collect(), false)))
-            .to_boxed() as BoxFuture<_, _>,
-          externs::GeneratorResponse::Break(val) => {
-            future::ok(future::Loop::Break(val)).to_boxed() as BoxFuture<_, _>
-          }
+            .map(|vs| future::Loop::Continue(externs::store_tuple(&vs)))
+            .to_boxed(),
+          externs::GeneratorResponse::Break(val) => future::ok(future::Loop::Break(val)).to_boxed(),
         }
       })
     }).to_boxed()
   }
 }
 
-impl Node for Task {
-  type Output = Value;
+impl WrappedNode for Task {
+  type Item = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
-    let deps = future::join_all(
-      self
-        .task
-        .clause
-        .iter()
-        .map(|selector| self.get(&context, selector.clone()))
-        .collect::<Vec<_>>(),
-    );
+    let deps = {
+      let edges = &context
+        .core
+        .rule_graph
+        .edges_for_inner(&self.entry)
+        .expect("edges for task exist.");
+      let subject = self.subject;
+      let variants = self.variants;
+      future::join_all(
+        self
+          .task
+          .clause
+          .into_iter()
+          .map(|s| {
+            Select::new_with_selector(s, subject, variants.clone(), edges).run(context.clone())
+          })
+          .collect::<Vec<_>>(),
+      )
+    };
 
-    let func = self.task.func.clone();
-    let entry = self.entry.clone();
+    let func = self.task.func;
+    let entry = self.entry;
     deps
       .then(move |deps_result| match deps_result {
         Ok(deps) => externs::call(&externs::val_for(&func.0), &deps),
@@ -936,6 +882,71 @@ impl From<Task> for NodeKey {
   }
 }
 
+#[derive(Default)]
+pub struct Visualizer {
+  viz_colors: HashMap<String, String>,
+}
+
+impl NodeVisualizer<NodeKey> for Visualizer {
+  fn color_scheme(&self) -> &str {
+    "set312"
+  }
+
+  fn color(&mut self, entry: &Entry<NodeKey>) -> String {
+    let max_colors = 12;
+    match entry.peek() {
+      None | Some(Err(Failure::Noop(_))) => "white".to_string(),
+      Some(Err(Failure::Throw(..))) => "4".to_string(),
+      Some(Err(Failure::Invalidated)) => "12".to_string(),
+      Some(Ok(_)) => {
+        let viz_colors_len = self.viz_colors.len();
+        self
+          .viz_colors
+          .entry(entry.node().product_str())
+          .or_insert_with(|| format!("{}", viz_colors_len % max_colors + 1))
+          .clone()
+      }
+    }
+  }
+}
+
+pub struct Tracer;
+
+impl NodeTracer<NodeKey> for Tracer {
+  fn is_bottom(result: Option<Result<NodeResult, Failure>>) -> bool {
+    match result {
+      Some(Err(Failure::Invalidated)) => false,
+      Some(Err(Failure::Noop(..))) => true,
+      Some(Err(Failure::Throw(..))) => false,
+      Some(Ok(_)) => true,
+      None => {
+        // A Node with no state is either still running, or effectively cancelled
+        // because a dependent failed. In either case, it's not useful to render
+        // them, as we don't know whether they would have succeeded or failed.
+        true
+      }
+    }
+  }
+
+  fn state_str(indent: &str, result: Option<Result<NodeResult, Failure>>) -> String {
+    match result {
+      None => "<None>".to_string(),
+      Some(Ok(ref x)) => format!("{:?}", x),
+      Some(Err(Failure::Throw(ref x, ref traceback))) => format!(
+        "Throw({})\n{}",
+        externs::val_to_str(x),
+        traceback
+          .split('\n')
+          .map(|l| format!("{}    {}", indent, l))
+          .collect::<Vec<_>>()
+          .join("\n")
+      ),
+      Some(Err(Failure::Noop(ref x))) => format!("Noop({:?})", x),
+      Some(Err(Failure::Invalidated)) => "Invalidated".to_string(),
+    }
+  }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum NodeKey {
   DigestFile(DigestFile),
@@ -948,34 +959,7 @@ pub enum NodeKey {
 }
 
 impl NodeKey {
-  pub fn format(&self) -> String {
-    fn keystr(key: &Key) -> String {
-      externs::key_to_str(&key)
-    }
-    fn typstr(tc: &TypeConstraint) -> String {
-      externs::key_to_str(&tc.0)
-    }
-    match self {
-      &NodeKey::DigestFile(ref s) => format!("DigestFile({:?})", s.0),
-      &NodeKey::ExecuteProcess(ref s) => format!("ExecuteProcess({:?}", s.0),
-      &NodeKey::ReadLink(ref s) => format!("ReadLink({:?})", s.0),
-      &NodeKey::Scandir(ref s) => format!("Scandir({:?})", s.0),
-      &NodeKey::Select(ref s) => format!(
-        "Select({}, {})",
-        keystr(&s.subject),
-        typstr(&s.selector.product)
-      ),
-      &NodeKey::Task(ref s) => format!(
-        "Task({}, {}, {})",
-        externs::project_str(&externs::val_for(&s.task.func.0), "__name__"),
-        keystr(&s.subject),
-        typstr(&s.product)
-      ),
-      &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.subject)),
-    }
-  }
-
-  pub fn product_str(&self) -> String {
+  fn product_str(&self) -> String {
     fn typstr(tc: &TypeConstraint) -> String {
       externs::key_to_str(&tc.0)
     }
@@ -990,9 +974,6 @@ impl NodeKey {
     }
   }
 
-  ///
-  /// If this NodeKey represents an FS operation, returns its Path.
-  ///
   pub fn fs_subject(&self) -> Option<&Path> {
     match self {
       &NodeKey::DigestFile(ref s) => Some(s.0.path.as_path()),
@@ -1012,7 +993,10 @@ impl NodeKey {
 }
 
 impl Node for NodeKey {
-  type Output = NodeResult;
+  type Context = Context;
+
+  type Item = NodeResult;
+  type Error = Failure;
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
     match self {
@@ -1025,23 +1009,66 @@ impl Node for NodeKey {
       NodeKey::Task(n) => n.run(context).map(|v| v.into()).to_boxed(),
     }
   }
+
+  fn format(&self) -> String {
+    fn keystr(key: &Key) -> String {
+      externs::key_to_str(&key)
+    }
+    fn typstr(tc: &TypeConstraint) -> String {
+      externs::key_to_str(&tc.0)
+    }
+    // FIXME(cosmicexplorer): these should all be converted to fmt::Debug implementations, and then
+    // this method can go away in favor of the auto-derived Debug for this type.
+    match self {
+      &NodeKey::DigestFile(ref s) => format!("DigestFile({:?})", s.0),
+      &NodeKey::ExecuteProcess(ref s) => format!("ExecuteProcess({:?}", s.0),
+      &NodeKey::ReadLink(ref s) => format!("ReadLink({:?})", s.0),
+      &NodeKey::Scandir(ref s) => format!("Scandir({:?})", s.0),
+      &NodeKey::Select(ref s) => format!(
+        "Select({}, {})",
+        keystr(&s.subject),
+        typstr(&s.selector.product)
+      ),
+      &NodeKey::Task(ref s) => format!(
+        "Task({}, {}, {})",
+        externs::project_str(&externs::val_for(&s.task.func.0), "__name__"),
+        keystr(&s.subject),
+        typstr(&s.product)
+      ),
+      &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.0)),
+    }
+  }
+
+  fn digest(res: NodeResult) -> Option<hashing::Digest> {
+    match res {
+      NodeResult::Digest(d) => Some(d),
+      NodeResult::DirectoryListing(_)
+      | NodeResult::LinkDest(_)
+      | NodeResult::ProcessResult(_)
+      | NodeResult::Snapshot(_)
+      | NodeResult::Value(_) => None,
+    }
+  }
 }
 
-#[derive(Clone, Debug)]
+impl NodeError for Failure {
+  fn invalidated() -> Failure {
+    Failure::Invalidated
+  }
+
+  fn cyclic() -> Failure {
+    Failure::Noop(Noop::Cycle)
+  }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NodeResult {
-  Unit,
   Digest(hashing::Digest),
-  DirectoryListing(DirectoryListing),
+  DirectoryListing(Arc<DirectoryListing>),
   LinkDest(LinkDest),
   ProcessResult(ProcessResult),
-  Snapshot(fs::Snapshot),
+  Snapshot(Arc<fs::Snapshot>),
   Value(Value),
-}
-
-impl From<()> for NodeResult {
-  fn from(_: ()) -> Self {
-    NodeResult::Unit
-  }
 }
 
 impl From<Value> for NodeResult {
@@ -1050,8 +1077,8 @@ impl From<Value> for NodeResult {
   }
 }
 
-impl From<fs::Snapshot> for NodeResult {
-  fn from(v: fs::Snapshot) -> Self {
+impl From<Arc<fs::Snapshot>> for NodeResult {
+  fn from(v: Arc<fs::Snapshot>) -> Self {
     NodeResult::Snapshot(v)
   }
 }
@@ -1074,8 +1101,8 @@ impl From<LinkDest> for NodeResult {
   }
 }
 
-impl From<DirectoryListing> for NodeResult {
-  fn from(v: DirectoryListing) -> Self {
+impl From<Arc<DirectoryListing>> for NodeResult {
+  fn from(v: Arc<DirectoryListing>) -> Self {
     NodeResult::DirectoryListing(v)
   }
 }
@@ -1084,7 +1111,7 @@ impl From<DirectoryListing> for NodeResult {
 //   see https://github.com/rust-lang/rust/issues/33417
 pub trait TryFrom<T>: Sized {
   type Err;
-  fn try_from(T) -> Result<Self, Self::Err>;
+  fn try_from(t: T) -> Result<Self, Self::Err>;
 }
 
 pub trait TryInto<T>: Sized {
@@ -1111,17 +1138,6 @@ impl TryFrom<NodeResult> for NodeResult {
   }
 }
 
-impl TryFrom<NodeResult> for () {
-  type Err = ();
-
-  fn try_from(nr: NodeResult) -> Result<Self, ()> {
-    match nr {
-      NodeResult::Unit => Ok(()),
-      _ => Err(()),
-    }
-  }
-}
-
 impl TryFrom<NodeResult> for Value {
   type Err = ();
 
@@ -1133,7 +1149,7 @@ impl TryFrom<NodeResult> for Value {
   }
 }
 
-impl TryFrom<NodeResult> for fs::Snapshot {
+impl TryFrom<NodeResult> for Arc<fs::Snapshot> {
   type Err = ();
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
@@ -1177,7 +1193,7 @@ impl TryFrom<NodeResult> for LinkDest {
   }
 }
 
-impl TryFrom<NodeResult> for DirectoryListing {
+impl TryFrom<NodeResult> for Arc<DirectoryListing> {
   type Err = ();
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {

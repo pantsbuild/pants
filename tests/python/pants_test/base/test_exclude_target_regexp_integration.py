@@ -2,10 +2,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import object, zip
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
@@ -85,8 +85,8 @@ class ExcludeTargetRegexpIntegrationTest(PantsRunIntegrationTest):
                                       stdout=subprocess.PIPE,
                                       cwd=path)
           java_retcode = java_run.wait()
-          java_out = java_run.stdout.read()
-          self.assertEquals(java_retcode, 0)
+          java_out = java_run.stdout.read().decode('utf-8')
+          self.assertEqual(java_retcode, 0)
           self.assertTrue(expected in java_out, "Expected '{output}' from {jar}, not '{stdout}'."
                                                 .format(output=expected, jar=jar, stdout=java_out))
 

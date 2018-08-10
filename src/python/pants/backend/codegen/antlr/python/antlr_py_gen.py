@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
@@ -32,6 +31,8 @@ _ANTLR3_REV = '3.1.3'
 class AntlrPyGen(SimpleCodegenTask, NailgunTask):
   """Generate Python source code from ANTLR grammar files."""
   gentarget_type = PythonAntlrLibrary
+
+  sources_globs = ('**/*.py',)
 
   @classmethod
   def register_options(cls, register):

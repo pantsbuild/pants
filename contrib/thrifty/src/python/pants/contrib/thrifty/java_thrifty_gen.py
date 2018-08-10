@@ -2,8 +2,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -22,6 +21,8 @@ from pants.contrib.thrifty.java_thrifty_library import JavaThriftyLibrary
 class JavaThriftyGen(NailgunTaskBase, SimpleCodegenTask):
 
   gentarget_type = JavaThriftyLibrary
+
+  sources_globs = ('**/*',)
 
   @classmethod
   def register_options(cls, register):

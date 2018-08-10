@@ -2,20 +2,19 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
-import urlparse
 
+from future.moves.urllib.parse import urlparse
 from requests import RequestException
 
 from pants.cache.pinger import BestUrlSelector, InvalidRESTfulCacheProtoError, Pinger
-from pants_test.base_test import BaseTest
 from pants_test.cache.delay_server import setup_delayed_server
+from pants_test.test_base import TestBase
 
 
-class TestPinger(BaseTest):
+class TestPinger(TestBase):
   # NB(gmalmquist): The tests in this file pass locally, but are decorated with expectedFailure
   # because CI is usually too slow to run them before they timeout.
 
@@ -77,7 +76,7 @@ class TestPinger(BaseTest):
       server.shutdown()
 
 
-class TestBestUrlSelector(BaseTest):
+class TestBestUrlSelector(TestBase):
 
   def setUp(self):
     self.url1 = 'http://host1:123'
@@ -88,7 +87,7 @@ class TestBestUrlSelector(BaseTest):
   def call_url(self, expected_url, with_error=False):
     try:
       with self.best_url_selector.select_best_url() as url:
-        self.assertEquals(urlparse.urlparse(expected_url), url)
+        self.assertEqual(urlparse(expected_url), url)
 
         if with_error:
           raise RequestException('error connecting to {}'.format(url))

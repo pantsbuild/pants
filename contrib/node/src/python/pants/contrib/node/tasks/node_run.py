@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
@@ -31,30 +30,14 @@ class NodeRun(NodeTask):
 
     if self.is_node_module(target):
       node_paths = self.context.products.get_data(NodePaths)
-      node_path = node_paths.node_path(target)
-      package_manager = self.get_package_manager_for_target(target=target)
-      if package_manager == self.node_distribution.PACKAGE_MANAGER_NPM:
-        args = ['run-script', self.get_options().script_name, '--'] + self.get_passthru_args()
-
-        with pushd(node_path):
-          result, npm_run = self.execute_npm(
-            args,
-            node_paths=node_paths.all_node_paths,
-            workunit_name=target.address.reference(),
-            workunit_labels=[WorkUnitLabel.RUN])
-          if result != 0:
-            raise TaskError('npm run script failed:\n'
-                            '\t{} failed with exit code {}'.format(npm_run, result))
-      elif package_manager == self.node_distribution.PACKAGE_MANAGER_YARNPKG:
-        args = ['run', self.get_options().script_name, '--'] + self.get_passthru_args()
-        with pushd(node_path):
-          returncode, yarnpkg_run_command = self.execute_yarnpkg(
-            args=args,
-            node_paths=node_paths.all_node_paths,
-            workunit_name=target.address.reference(),
-            workunit_labels=[WorkUnitLabel.RUN])
-          if returncode != 0:
-            raise TaskError('yarnpkg run script failed:\n'
-                            '\t{} failed with exit code {}'.format(yarnpkg_run_command, returncode))
-      else:
-        raise RuntimeError('Unknown package manager: {}'.format(package_manager))
+      with pushd(node_paths.node_path(target)):
+        result, command = self.run_script(
+          self.get_options().script_name,
+          target=target,
+          script_args=self.get_passthru_args(),
+          node_paths=node_paths.all_node_paths,
+          workunit_name=target.address.reference(),
+          workunit_labels=[WorkUnitLabel.RUN])
+        if result != 0:
+          raise TaskError('Run script failed:\n'
+                          '\t{} failed with exit code {}'.format(command, result))

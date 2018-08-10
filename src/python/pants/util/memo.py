@@ -2,12 +2,13 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import inspect
 from contextlib import contextmanager
+
+from pants.util.meta import classproperty, staticproperty
 
 
 # Used as a sentinel that disambiguates tuples passed in *args from coincidentally matching tuples
@@ -221,6 +222,22 @@ def memoized_property(func=None, key_factory=per_instance, **kwargs):
   """
   getter = memoized_method(func=func, key_factory=key_factory, **kwargs)
   return property(fget=getter, fdel=lambda self: getter.forget(self))
+
+
+def memoized_classmethod(*args, **kwargs):
+  return classmethod(memoized_method(*args, **kwargs))
+
+
+def memoized_classproperty(*args, **kwargs):
+  return classproperty(memoized_classmethod(*args, **kwargs))
+
+
+def memoized_staticmethod(*args, **kwargs):
+  return staticmethod(memoized(*args, **kwargs))
+
+
+def memoized_staticproperty(*args, **kwargs):
+  return staticproperty(memoized_staticmethod(*args, **kwargs))
 
 
 def testable_memoized_property(func=None, key_factory=per_instance, **kwargs):

@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -13,17 +12,17 @@ from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 jar1 = JarDependency(org='testOrg1', name='testName1', rev='123')
 jar2 = JarDependency(org='testOrg2', name='testName2', rev='456')
 
 
-class JarLibraryTest(BaseTest):
+class JarLibraryTest(TestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(targets={'jar_library': JarLibrary},
                             objects={'jar': JarDependency})
 
@@ -38,7 +37,7 @@ class JarLibraryTest(BaseTest):
     lib = JarLibrary(name='foo', address=Address.parse('//:foo'),
                      build_graph=self.build_graph,
                      jars=[jar1, jar2])
-    self.assertEquals((jar1, jar2), lib.jar_dependencies)
+    self.assertEqual((jar1, jar2), lib.jar_dependencies)
 
   def test_empty_jar_dependencies(self):
     def example():
@@ -49,14 +48,14 @@ class JarLibraryTest(BaseTest):
     # TODO(Eric Ayers) There doesn't seem to be any way to set this field at the moment.
     lib = JarLibrary(name='foo', address=Address.parse('//:foo'),
                      build_graph=self.build_graph, jars=[jar1])
-    self.assertEquals([], lib.excludes)
+    self.assertEqual([], lib.excludes)
 
   def test_to_jar_dependencies(self):
     def assert_dep(dep, org, name, rev):
       self.assertTrue(isinstance(dep, JarDependency))
-      self.assertEquals(org, dep.org)
-      self.assertEquals(name, dep.name)
-      self.assertEquals(rev, dep.rev)
+      self.assertEqual(org, dep.org)
+      self.assertEqual(name, dep.name)
+      self.assertEqual(rev, dep.rev)
 
     self.add_to_build_file('BUILD', dedent('''
     jar_library(name='lib1',
@@ -73,19 +72,19 @@ class JarLibraryTest(BaseTest):
     '''))
     lib1 = self.target('//:lib1')
     self.assertIsInstance(lib1, JarLibrary)
-    self.assertEquals(1, len(lib1.jar_dependencies))
+    self.assertEqual(1, len(lib1.jar_dependencies))
     assert_dep(lib1.jar_dependencies[0], 'testOrg1', 'testName1', '123')
 
     lib2 = self.target('//:lib2')
     self.assertIsInstance(lib2, JarLibrary)
-    self.assertEquals(2, len(lib2.jar_dependencies))
+    self.assertEqual(2, len(lib2.jar_dependencies))
     assert_dep(lib2.jar_dependencies[0], 'testOrg2', 'testName2', '456')
     assert_dep(lib2.jar_dependencies[1], 'testOrg3', 'testName3', '789')
 
     deps = JarLibrary.to_jar_dependencies(lib1.address,
                                           [':lib1', ':lib2'],
                                           self.build_graph)
-    self.assertEquals(3, len(deps))
+    self.assertEqual(3, len(deps))
     assert_dep(lib1.jar_dependencies[0], 'testOrg1', 'testName1', '123')
     assert_dep(lib2.jar_dependencies[0], 'testOrg2', 'testName2', '456')
     assert_dep(lib2.jar_dependencies[1], 'testOrg3', 'testName3', '789')

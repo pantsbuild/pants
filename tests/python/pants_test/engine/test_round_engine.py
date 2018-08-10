@@ -2,19 +2,18 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import itertools
 
 from pants.engine.round_engine import RoundEngine
 from pants.goal.goal import Goal
 from pants.task.task import Task
-from pants_test.base_test import BaseTest
 from pants_test.engine.base_engine_test import EngineTestBase
+from pants_test.test_base import TestBase
 
 
-class RoundEngineTest(EngineTestBase, BaseTest):
+class RoundEngineTest(EngineTestBase, TestBase):
   def setUp(self):
     super(RoundEngineTest, self).setUp()
 
@@ -229,15 +228,15 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     task1_pre, = install()
     Goal.clear()
     task1_post, = install()
-    self.assertEquals(task1_pre, task1_post)
+    self.assertEqual(task1_pre, task1_post)
 
   def test_replace_target_roots(self):
     task1 = self.install_task('task1', goal='goal1')
     task2 = self.install_task('task2', goal='goal2', alternate_target_roots=[42])
     self.create_context(for_task_types=task1+task2)
-    self.assertEquals([], self._context.target_roots)
+    self.assertEqual([], self._context.target_roots)
     self.engine.attempt(self._context, self.as_goals('goal1', 'goal2'))
-    self.assertEquals([42], self._context.target_roots)
+    self.assertEqual([42], self._context.target_roots)
 
   def test_replace_target_roots_conflict(self):
     task1 = self.install_task('task1', goal='goal1', alternate_target_roots=[42])
@@ -254,4 +253,4 @@ class RoundEngineTest(EngineTestBase, BaseTest):
 
     self.engine.attempt(self._context, self.as_goals('goal1', 'goal2'))
 
-    self.assertEquals([], self._context.target_roots)
+    self.assertEqual([], self._context.target_roots)

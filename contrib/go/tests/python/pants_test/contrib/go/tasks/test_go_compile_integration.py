@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -42,7 +41,23 @@ class GoCompileIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)
 
-  def test_go_compile_fully_static(self):
-    args = ['compile', 'contrib/go/examples/src/go/server', '--compile-go-build-flags="--ldflags \'-extldflags \"-static\"\'"']
+  def test_go_compile_double_quoted_build_flags(self):
+    args = ['compile',
+            'contrib/go/examples/src/go/server',
+            '--compile-go-build-flags="--ldflags \'-extldflags \"-static\"\'"']
+    pants_run = self.run_pants(args)
+    self.assert_success(pants_run)
+
+  def test_go_compile_single_quoted_build_flags(self):
+    args = ['compile',
+            'contrib/go/examples/src/go/server',
+            '--compile-go-build-flags=\'--ldflags \'-extldflags "-static"\'\'']
+    pants_run = self.run_pants(args)
+    self.assert_success(pants_run)
+
+  def test_go_compile_adjacent_single_double_quotes_build_flags(self):
+    args = ['compile',
+            'contrib/go/examples/src/go/server',
+            '--compile-go-build-flags=\'-v -tags "netgo"\'']
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)

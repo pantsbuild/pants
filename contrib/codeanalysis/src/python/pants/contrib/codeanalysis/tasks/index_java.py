@@ -2,8 +2,7 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -79,4 +78,4 @@ class IndexJava(NailgunTask):
                           workunit_labels=[WorkUnitLabel.COMPILER])
     if result != 0:
       raise TaskError('java {main} ... exited non-zero ({result})'.format(
-        main=self._KYTHE_INDEXER_MAIN, result=result))
+        main=self._KYTHE_JAVA_INDEXER_MAIN, result=result))

@@ -2,14 +2,17 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
+import itertools
 import json
 import os
-import urllib
+from builtins import open, str, zip
 from collections import defaultdict
+
+from future.moves.urllib import parse
+from future.utils import PY3
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
@@ -22,11 +25,12 @@ from pants.backend.jvm.tasks.coursier.coursier_subsystem import CoursierSubsyste
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
-from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.base.workunit import WorkUnitLabel
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir
+from pants.util.fileutil import safe_hardlink_or_copy
 
 
 class CoursierResultNotFound(Exception):
@@ -45,7 +49,7 @@ class CoursierMixin(NailgunTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(CoursierMixin, cls).implementation_version() + [('CoursierMixin', 1)]
+    return super(CoursierMixin, cls).implementation_version() + [('CoursierMixin', 2)]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -56,6 +60,8 @@ class CoursierMixin(NailgunTask):
     super(CoursierMixin, cls).register_options(register)
     register('--allow-global-excludes', type=bool, advanced=False, fingerprint=True, default=True,
              help='Whether global excludes are allowed.')
+    register('--report', type=bool, advanced=False, default=False,
+             help='Show the resolve output. This would also force a resolve even if the resolve task is validated.')
 
   @staticmethod
   def _compute_jars_to_resolve_and_pin(raw_jars, artifact_set, manager):
@@ -140,13 +146,14 @@ class CoursierMixin(NailgunTask):
         resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
 
         vt_set_results_dir = self._prepare_vts_results_dir(pants_workdir, resolve_vts)
-        coursier_cache_dir, pants_jar_base_dir = self._prepare_workdir(pants_workdir)
+        pants_jar_base_dir = self._prepare_workdir(pants_workdir)
+        coursier_cache_dir = CoursierSubsystem.global_instance().get_options().cache_dir
 
-        # Check each individual target without context first
-        if not invalidation_check.invalid_vts:
-
+        # If a report is requested, do not proceed with loading validated result.
+        if not self.get_options().report:
+          # Check each individual target without context first
           # If the individuals are valid, check them as a VersionedTargetSet
-          if resolve_vts.valid:
+          if not invalidation_check.invalid_vts and resolve_vts.valid:
             # Load up from the results dir
             success = self._load_from_results_dir(compile_classpath, vt_set_results_dir,
                                                   coursier_cache_dir, invalidation_check, pants_jar_base_dir)
@@ -186,16 +193,12 @@ class CoursierMixin(NailgunTask):
 
   def _prepare_workdir(self, pants_workdir):
     """
-    Given pants workdir, prepare the location in pants workdir to store all the symlinks
-    and coursier cache dir.
+    Given pants workdir, prepare the location in pants workdir to store all the hardlinks
+    to coursier cache dir.
     """
-    coursier_cache_dir = os.path.join(self.get_options().pants_bootstrapdir, 'coursier')
     pants_jar_base_dir = os.path.join(pants_workdir, 'coursier', 'cache')
-
-    # Only pants_jar_path_base needs to be touched whereas coursier_cache_path will
-    # be managed by coursier
     safe_mkdir(pants_jar_base_dir)
-    return coursier_cache_dir, pants_jar_base_dir
+    return pants_jar_base_dir
 
   def _get_result_from_coursier(self, jars_to_resolve, global_excludes, pinned_coords, pants_workdir,
                                 coursier_cache_path, sources, javadoc):
@@ -249,11 +252,16 @@ class CoursierMixin(NailgunTask):
     coursier_subsystem_instance = CoursierSubsystem.global_instance()
     coursier_jar = coursier_subsystem_instance.bootstrap_coursier(self.context.new_workunit)
 
+    repos = coursier_subsystem_instance.get_options().repos
+    # make [repoX, repoY] -> ['-r', repoX, '-r', repoY]
+    repo_args = list(itertools.chain(*list(zip(['-r'] * len(repos), repos))))
+    artifact_types_arg = ['-A', ','.join(coursier_subsystem_instance.get_options().artifact_types)]
+    advanced_options = coursier_subsystem_instance.get_options().fetch_options
     common_args = ['fetch',
                    # Print the resolution tree
                    '-t',
                    '--cache', coursier_cache_path
-                   ] + coursier_subsystem_instance.get_options().fetch_options
+                   ] + repo_args + artifact_types_arg + advanced_options
 
     coursier_work_temp_dir = os.path.join(pants_workdir, 'tmp')
     safe_mkdir(coursier_work_temp_dir)
@@ -332,22 +340,22 @@ class CoursierMixin(NailgunTask):
 
   def _call_coursier(self, cmd_args, coursier_jar, output_fn):
 
-    with self.context.new_workunit(name='coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
-      return_code = self.runjava(
-        classpath=[coursier_jar],
-        main='coursier.cli.Coursier',
-        args=cmd_args,
-        jvm_options=self.get_options().jvm_options,
-        # to let stdout/err through, but don't print tool's label.
-        workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL])
+    labels = [WorkUnitLabel.COMPILER] if self.get_options().report else [WorkUnitLabel.TOOL]
 
-      workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
+    return_code = self.runjava(
+      classpath=[coursier_jar],
+      main='coursier.cli.Coursier',
+      args=cmd_args,
+      jvm_options=self.get_options().jvm_options,
+      workunit_name='coursier',
+      workunit_labels=labels,
+    )
 
-      if return_code:
-        raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
+    if return_code:
+      raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
 
-      with open(output_fn) as f:
-        return json.loads(f.read())
+    with open(output_fn, 'r') as f:
+      return json.loads(f.read())
 
   @staticmethod
   def _construct_cmd_args(jars, common_args, global_excludes,
@@ -369,7 +377,7 @@ class CoursierMixin(NailgunTask):
 
       if j.get_url():
         jar_url = j.get_url()
-        module += ',url={}'.format(urllib.quote_plus(jar_url))
+        module += ',url={}'.format(parse.quote_plus(jar_url))
         
       if j.intransitive:
         cmd_args.append('--intransitive')
@@ -399,7 +407,7 @@ class CoursierMixin(NailgunTask):
       with temporary_file(coursier_workdir, cleanup=False) as f:
         exclude_file = f.name
         with open(exclude_file, 'w') as ex_f:
-          ex_f.write('\n'.join(local_exclude_args).encode('utf8'))
+          ex_f.write('\n'.join(local_exclude_args))
 
         cmd_args.append('--local-exclude-file')
         cmd_args.append(exclude_file)
@@ -418,7 +426,7 @@ class CoursierMixin(NailgunTask):
     :param compile_classpath: `ClasspathProducts` that will be modified
     :param coursier_cache_path: cache location that is managed by coursier
     :param invalidation_check: InvalidationCheck
-    :param pants_jar_path_base: location under pants workdir that contains all the symlinks to coursier cache
+    :param pants_jar_path_base: location under pants workdir that contains all the hardlinks to coursier cache
     :param result: result dict converted from the json produced by one coursier run
     :return: n/a
     """
@@ -473,7 +481,8 @@ class CoursierMixin(NailgunTask):
               compile_classpath.add_jars_for_targets([t], conf, transitive_resolved_jars)
 
   def _populate_results_dir(self, vts_results_dir, results):
-    with open(os.path.join(vts_results_dir, self.RESULT_FILENAME), 'w') as f:
+    mode = 'w' if PY3 else 'wb'
+    with open(os.path.join(vts_results_dir, self.RESULT_FILENAME), mode) as f:
       json.dump(results, f)
 
   def _load_from_results_dir(self, compile_classpath, vts_results_dir,
@@ -586,7 +595,7 @@ class CoursierMixin(NailgunTask):
 
     :param result: coursier json output
     :param coursier_cache_path: coursier cache location
-    :param pants_jar_path_base: location under pants workdir to store the symlink to the coursier cache
+    :param pants_jar_path_base: location under pants workdir to store the hardlink to the coursier cache
     :return: a map from maven coordinate to a resolved jar.
     """
 
@@ -607,7 +616,7 @@ class CoursierMixin(NailgunTask):
 
       if not os.path.exists(pants_path):
         safe_mkdir(os.path.dirname(pants_path))
-        os.symlink(jar_path, pants_path)
+        safe_hardlink_or_copy(jar_path, pants_path)
 
       coord = cls.to_m2_coord(coord)
       resolved_jar = ResolvedJar(coord,
@@ -626,7 +635,7 @@ class CoursierMixin(NailgunTask):
     Create the path to the jar that will live in .pants.d
     
     :param coursier_cache_path: coursier cache location
-    :param pants_jar_path_base: location under pants workdir to store the symlink to the coursier cache
+    :param pants_jar_path_base: location under pants workdir to store the hardlink to the coursier cache
     :param jar_path: path of the jar
     :return:
     """
@@ -709,18 +718,18 @@ class CoursierResolveFingerprintStrategy(FingerprintStrategy):
       return None
 
     hasher = hashlib.sha1()
-    hasher.update(target.payload.fingerprint())
+    hasher.update(target.payload.fingerprint().encode('utf-8'))
 
     for conf in self._confs:
       hasher.update(conf)
 
     for element in hash_elements_for_target:
-      hasher.update(element)
+      hasher.update(element.encode('utf-8'))
 
     # Just in case so we do not collide with ivy cache
-    hasher.update('coursier')
+    hasher.update(b'coursier')
 
-    return hasher.hexdigest()
+    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def __hash__(self):
     return hash((type(self), '-'.join(self._confs)))

@@ -5,7 +5,7 @@ python_tests(
   name='cache_compile_integration',
   sources=['test_cache_compile_integration.py'],
   dependencies=[
-    'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',
+    'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'src/python/pants/base:build_environment',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
@@ -13,12 +13,14 @@ python_tests(
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
   tags = {'integration'},
+  timeout=240,
 )
 
 python_tests(
   name='zinc_compile_integration',
   sources=['test_zinc_compile_integration.py'],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/build_graph',
     'tests/python/pants_test/backend/jvm/tasks:missing_jvm_check',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
@@ -31,7 +33,8 @@ python_tests(
   name='java_compile_integration',
   sources=['test_java_compile_integration.py'],
   dependencies=[
-    'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',
+    '3rdparty/python:future',
+    'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -64,24 +67,26 @@ python_tests(
 )
 
 python_tests(
-  name='java_compile_settings_partitioning',
-  sources=['test_java_compile_settings_partitioning.py'],
-  dependencies=[
-    'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',
+  name = 'java_compile_settings_partitioning',
+  sources = ['test_java_compile_settings_partitioning.py'],
+  dependencies = [
+    '3rdparty/python:future',
+    'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'src/python/pants/fs',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/java/distribution',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
 )
 
 python_library(
-  name='jvm_platform_integration_mixin',
-  sources=['jvm_platform_integration_mixin.py'],
-  dependencies=[
+  name = 'jvm_platform_integration_mixin',
+  sources = ['jvm_platform_integration_mixin.py'],
+  dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

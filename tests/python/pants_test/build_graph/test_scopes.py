@@ -2,21 +2,20 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from twitter.common.collections import OrderedSet
 
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scope, Scopes
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class ScopesTest(BaseTest):
+class ScopesTest(TestBase):
 
   def test_mixed_case(self):
-    self.assertEquals(Scope('RUNTIME'), Scope('runtime'))
-    self.assertNotEquals(Scope('RUNTIME'), Scope('COMPILE'))
+    self.assertEqual(Scope('RUNTIME'), Scope('runtime'))
+    self.assertNotEqual(Scope('RUNTIME'), Scope('COMPILE'))
 
   def test_default_parsing(self):
     equivalent_defaults = [
@@ -26,7 +25,7 @@ class ScopesTest(BaseTest):
     expected = Scope(Scopes.DEFAULT)
     for i, scope in enumerate(equivalent_defaults):
       received = Scope(scope)
-      self.assertEquals(expected, received, 'Expected scope {i}. {received} == {expected}'.format(
+      self.assertEqual(expected, received, 'Expected scope {i}. {received} == {expected}'.format(
         i=i,
         received=received,
         expected=expected,
@@ -51,7 +50,7 @@ class ScopesTest(BaseTest):
                                              exclude_scopes=Scopes.RUNTIME))
 
   def test_scope_equality(self):
-    self.assertEquals(Scope('a b'), Scope('b') + Scope('a'))
+    self.assertEqual(Scope('a b'), Scope('b') + Scope('a'))
 
   def test_invalid_in_scope_params(self):
     bad_values = ['', (), [], {}, set(), OrderedSet(), 'default', 'runtime', ('compile',)]
@@ -62,7 +61,7 @@ class ScopesTest(BaseTest):
         Scope('').in_scope(include_scopes=bad_value)
 
 
-class ScopedClosureTest(BaseTest):
+class ScopedClosureTest(TestBase):
 
   def assert_closure(self, expected_targets, roots, include_scopes=None, exclude_scopes=None,
                      respect_intransitive=True):
@@ -83,7 +82,7 @@ class ScopedClosureTest(BaseTest):
       respect_intransitive=respect_intransitive,
       bfs=True
     ))
-    self.assertEquals(set_type(expected_targets), bfs_result)
+    self.assertEqual(set_type(expected_targets), bfs_result)
 
   def assert_closure_dfs(self, expected_targets, roots, include_scopes=None, exclude_scopes=None,
                      respect_intransitive=True, ordered=False, postorder=None):
@@ -95,7 +94,7 @@ class ScopedClosureTest(BaseTest):
       respect_intransitive=respect_intransitive,
       postorder=postorder
     ))
-    self.assertEquals(set_type(expected_targets), result)
+    self.assertEqual(set_type(expected_targets), result)
 
   def test_find_normal_dependencies(self):
     a = self.make_target('a')

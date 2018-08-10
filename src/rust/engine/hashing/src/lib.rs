@@ -1,7 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-extern crate bazel_protos;
 extern crate digest;
 extern crate hex;
 extern crate sha2;
@@ -9,7 +8,6 @@ extern crate sha2;
 use digest::{Digest as DigestTrait, FixedOutput};
 use sha2::Sha256;
 
-use std::error::Error;
 use std::fmt;
 use std::io::{self, Write};
 
@@ -34,8 +32,8 @@ impl Fingerprint {
 
   pub fn from_hex_string(hex_string: &str) -> Result<Fingerprint, String> {
     <[u8; FINGERPRINT_SIZE] as hex::FromHex>::from_hex(hex_string)
-      .map(|v| Fingerprint(v))
-      .map_err(|e| e.description().to_string())
+      .map(Fingerprint)
+      .map_err(|e| format!("{:?}", e))
   }
 
   pub fn as_bytes(&self) -> &[u8; FINGERPRINT_SIZE] {
@@ -44,7 +42,7 @@ impl Fingerprint {
 
   pub fn to_hex(&self) -> String {
     let mut s = String::new();
-    for &byte in self.0.iter() {
+    for &byte in &self.0 {
       fmt::Write::write_fmt(&mut s, format_args!("{:02x}", byte)).unwrap();
     }
     s
@@ -78,24 +76,6 @@ impl AsRef<[u8]> for Fingerprint {
 ///
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Digest(pub Fingerprint, pub usize);
-
-impl<'a> From<&'a Digest> for bazel_protos::remote_execution::Digest {
-  fn from(d: &Digest) -> Self {
-    let mut digest = bazel_protos::remote_execution::Digest::new();
-    digest.set_hash(d.0.to_hex());
-    digest.set_size_bytes(d.1 as i64);
-    digest
-  }
-}
-
-impl<'a> From<&'a bazel_protos::remote_execution::Digest> for Digest {
-  fn from(d: &bazel_protos::remote_execution::Digest) -> Self {
-    Digest(
-      Fingerprint::from_hex_string(d.get_hash()).expect("Bad fingerprint in Digest"),
-      d.get_size_bytes() as usize,
-    )
-  }
-}
 
 ///
 /// A Write instance that fingerprints all data that passes through it.
@@ -136,7 +116,7 @@ impl<W: Write> Write for WriterHasher<W> {
 
 #[cfg(test)]
 mod fingerprint_tests {
-  use super::{bazel_protos, Digest, Fingerprint};
+  use super::Fingerprint;
 
   #[test]
   fn from_bytes_unsafe() {
@@ -203,36 +183,5 @@ mod fingerprint_tests {
       Fingerprint::from_hex_string(hex).unwrap().to_hex(),
       hex.to_lowercase()
     )
-  }
-
-  #[test]
-  fn from_our_digest() {
-    let our_digest = &Digest(
-      Fingerprint::from_hex_string(
-        "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
-      ).unwrap(),
-      10,
-    );
-    let converted: bazel_protos::remote_execution::Digest = our_digest.into();
-    let mut want = bazel_protos::remote_execution::Digest::new();
-    want.set_hash("0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff".to_owned());
-    want.set_size_bytes(10);
-    assert_eq!(converted, want);
-  }
-
-  #[test]
-  fn from_bazel_digest() {
-    let mut bazel_digest = bazel_protos::remote_execution::Digest::new();
-    bazel_digest
-      .set_hash("0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff".to_owned());
-    bazel_digest.set_size_bytes(10);
-    let converted: Digest = (&bazel_digest).into();
-    let want = Digest(
-      Fingerprint::from_hex_string(
-        "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
-      ).unwrap(),
-      10,
-    );
-    assert_eq!(converted, want);
   }
 }

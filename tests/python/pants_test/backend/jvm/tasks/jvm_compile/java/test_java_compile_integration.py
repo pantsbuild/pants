@@ -2,12 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
-from pants.fs.archive import TarArchiver
+from pants.fs.archive import archiver_for_path
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_walk
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
@@ -114,9 +114,11 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       self.assertTrue(os.path.exists(artifact_dir))
       artifacts = os.listdir(artifact_dir)
       self.assertEqual(len(artifacts), 1)
+      single_artifact = artifacts[0]
 
       with temporary_dir() as extract_dir:
-        TarArchiver.extract(os.path.join(artifact_dir, artifacts[0]), extract_dir)
+        artifact_path = os.path.join(artifact_dir, single_artifact)
+        archiver_for_path(artifact_path).extract(artifact_path, extract_dir)
         all_files = set()
         for dirpath, dirs, files in safe_walk(extract_dir):
           for name in files:
@@ -126,13 +128,13 @@ class JavaCompileIntegrationTest(BaseCompileIT):
         # Locate the report file on the classpath.
         report_file_name = 'deprecation_report.txt'
         reports = [f for f in all_files if f.endswith(report_file_name)]
-        self.assertEquals(1, len(reports),
+        self.assertEqual(1, len(reports),
                           'Expected exactly one {} file; got: {}'.format(report_file_name,
                                                                          all_files))
 
-        with open(reports[0]) as fp:
+        with open(reports[0], 'r') as fp:
           annotated_classes = [line.rstrip() for line in fp.read().splitlines()]
-          self.assertEquals(
+          self.assertEqual(
             {'org.pantsbuild.testproject.annotation.main.Main',
              'org.pantsbuild.testproject.annotation.main.Main$TestInnerClass'},
             set(annotated_classes))

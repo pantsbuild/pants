@@ -2,30 +2,30 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+from builtins import str, zip
 from collections import deque
 from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.base.specs import SingleAddress, Specs
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.build_graph.app_base import AppBase, Bundle
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.rules import TaskRule, rule
-from pants.engine.selectors import Get, Select, SelectDependencies
+from pants.engine.selectors import Get, Select
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
-from pants.util.dirutil import fast_relpath
 from pants.util.objects import Collection, datatype
 
 
@@ -42,7 +42,7 @@ def target_types_from_symbol_table(symbol_table):
   return target_types
 
 
-class _DestWrapper(datatype('DestWrapper', ['target_types'])):
+class _DestWrapper(datatype(['target_types'])):
   """A wrapper for dest field of RemoteSources target.
 
   This is only used when instantiating RemoteSources target.
@@ -152,8 +152,8 @@ class LegacyBuildGraph(BuildGraph):
       kwargs.pop('dependencies')
 
       # Instantiate.
-      if target_cls is JvmApp:
-        return self._instantiate_jvm_app(kwargs)
+      if issubclass(target_cls, AppBase):
+        return self._instantiate_app(target_cls, kwargs)
       elif target_cls is RemoteSources:
         return self._instantiate_remote_sources(kwargs)
       return target_cls(build_graph=self, **kwargs)
@@ -164,8 +164,8 @@ class LegacyBuildGraph(BuildGraph):
           target_adaptor.address,
           'Failed to instantiate Target with type {}: {}'.format(target_cls, e))
 
-  def _instantiate_jvm_app(self, kwargs):
-    """For JvmApp target, convert BundleAdaptor to BundleProps."""
+  def _instantiate_app(self, target_cls, kwargs):
+    """For App targets, convert BundleAdaptor to BundleProps."""
     parse_context = ParseContext(kwargs['address'].spec_path, dict())
     bundleprops_factory = Bundle(parse_context)
     kwargs['bundles'] = [
@@ -173,7 +173,7 @@ class LegacyBuildGraph(BuildGraph):
       for bundle in kwargs['bundles']
     ]
 
-    return JvmApp(build_graph=self, **kwargs)
+    return target_cls(build_graph=self, **kwargs)
 
   def _instantiate_remote_sources(self, kwargs):
     """For RemoteSources target, convert "dest" field to its real target type."""
@@ -202,7 +202,9 @@ class LegacyBuildGraph(BuildGraph):
     addresses = set(addresses) - set(self._target_by_address.keys())
     if not addresses:
       return
-    for _ in self._inject_specs([SingleAddress(a.spec_path, a.target_name) for a in addresses]):
+    dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in addresses)
+    specs = [Specs(dependencies=tuple(dependencies))]
+    for _ in self._inject_specs(specs):
       pass
 
   def inject_roots_closure(self, target_roots, fail_fast=None):
@@ -210,6 +212,7 @@ class LegacyBuildGraph(BuildGraph):
       yield address
 
   def inject_specs_closure(self, specs, fail_fast=None):
+    specs = [Specs(dependencies=tuple(specs))]
     # Request loading of these specs.
     for address in self._inject_specs(specs):
       yield address
@@ -252,11 +255,13 @@ class LegacyBuildGraph(BuildGraph):
 
     Yields the resulting addresses.
     """
+    if not subjects:
+      return
+
     logger.debug('Injecting specs to %s: %s', self, subjects)
     with self._resolve_context():
-      specs = tuple(subjects)
       thts, = self._scheduler.product_request(TransitiveHydratedTargets,
-                                              [Specs(specs)])
+                                              subjects)
 
     self._index(thts.closure)
 
@@ -264,7 +269,7 @@ class LegacyBuildGraph(BuildGraph):
       yield hydrated_target.address
 
 
-class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependencies'])):
+class HydratedTarget(datatype(['address', 'adaptor', 'dependencies'])):
   """A wrapper for a fully hydrated TargetAdaptor object.
 
   Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge amount
@@ -275,23 +280,15 @@ class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependen
   def addresses(self):
     return self.dependencies
 
-  def __eq__(self, other):
-    if type(self) != type(other):
-      return False
-    return self.address == other.address
-
-  def __ne__(self, other):
-    return not (self == other)
-
   def __hash__(self):
     return hash(self.address)
 
 
-class TransitiveHydratedTarget(datatype('TransitiveHydratedTarget', ['root', 'dependencies'])):
+class TransitiveHydratedTarget(datatype(['root', 'dependencies'])):
   """A recursive structure wrapping a HydratedTarget root and TransitiveHydratedTarget deps."""
 
 
-class TransitiveHydratedTargets(datatype('TransitiveHydratedTargets', ['roots', 'closure'])):
+class TransitiveHydratedTargets(datatype(['roots', 'closure'])):
   """A set of HydratedTarget roots, and their transitive, flattened, de-duped closure."""
 
 
@@ -338,63 +335,77 @@ def hydrated_targets(build_file_addresses):
   yield HydratedTargets(targets)
 
 
-class HydratedField(datatype('HydratedField', ['name', 'value'])):
+class HydratedField(datatype(['name', 'value'])):
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
 
 
-def hydrate_target(target_adaptor, hydrated_fields):
+def hydrate_target(target_adaptor):
   """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
   # Hydrate the fields of the adaptor and re-construct it.
+  hydrated_fields = yield [(Get(HydratedField, BundlesField, fa)
+                            if type(fa) is BundlesField
+                            else Get(HydratedField, SourcesField, fa))
+                           for fa in target_adaptor.field_adaptors]
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
     kwargs[field.name] = field.value
-  return HydratedTarget(target_adaptor.address,
+  yield HydratedTarget(target_adaptor.address,
                         TargetAdaptor(**kwargs),
                         tuple(target_adaptor.dependencies))
 
 
 def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
-  fds = snapshot.path_stats if include_dirs else snapshot.files
-  files = tuple(fast_relpath(fd.path, spec_path) for fd in fds)
+  rel_include_globs = filespec['globs']
 
-  relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(filespec['globs'], spec_path)
-  if filespec.has_key('exclude'):
+  relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(rel_include_globs, spec_path)
+  if 'exclude' in filespec:
     relpath_adjusted_filespec['exclude'] = [FilesetRelPathWrapper.to_filespec(e['globs'], spec_path)
                                             for e in filespec['exclude']]
 
   return EagerFilesetWithSpec(spec_path,
                               relpath_adjusted_filespec,
-                              files=files,
-                              files_hash=snapshot.fingerprint)
+                              snapshot,
+                              include_dirs=include_dirs)
 
 
-@rule(HydratedField, [Select(SourcesField)])
-def hydrate_sources(sources_field):
-  """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec."""
-
-  snapshot = yield Get(Snapshot, PathGlobs, sources_field.path_globs)
-  fileset_with_spec = _eager_fileset_with_spec(sources_field.address.spec_path,
-                                               sources_field.filespecs,
-                                               snapshot)
+@rule(HydratedField, [Select(SourcesField), Select(GlobMatchErrorBehavior)])
+def hydrate_sources(sources_field, glob_match_error_behavior):
+  """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
+  """
+  # TODO(#5864): merge the target's selection of --glob-expansion-failure (which doesn't exist yet)
+  # with the global default!
+  path_globs = sources_field.path_globs.with_match_error_behavior(glob_match_error_behavior)
+  snapshot = yield Get(Snapshot, PathGlobs, path_globs)
+  fileset_with_spec = _eager_fileset_with_spec(
+    sources_field.address.spec_path,
+    sources_field.filespecs,
+    snapshot)
+  sources_field.validate_fn(fileset_with_spec)
   yield HydratedField(sources_field.arg, fileset_with_spec)
 
 
-@rule(HydratedField, [Select(BundlesField)])
-def hydrate_bundles(bundles_field):
+@rule(HydratedField, [Select(BundlesField), Select(GlobMatchErrorBehavior)])
+def hydrate_bundles(bundles_field, glob_match_error_behavior):
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
-  snapshot_list = yield [Get(Snapshot, PathGlobs, pg) for pg in bundles_field.path_globs_list]
+  path_globs_with_match_errors = [
+    pg.with_match_error_behavior(glob_match_error_behavior)
+    for pg in bundles_field.path_globs_list
+  ]
+  snapshot_list = yield [Get(Snapshot, PathGlobs, pg) for pg in path_globs_with_match_errors]
+
+  spec_path = bundles_field.address.spec_path
 
   bundles = []
   zipped = zip(bundles_field.bundles,
                bundles_field.filespecs_list,
                snapshot_list)
   for bundle, filespecs, snapshot in zipped:
-    spec_path = bundles_field.address.spec_path
+    rel_spec_path = getattr(bundle, 'rel_path', spec_path)
     kwargs = bundle.kwargs()
     # NB: We `include_dirs=True` because bundle filesets frequently specify directories in order
     # to trigger a (deprecated) default inclusion of their recursive contents. See the related
     # deprecation in `pants.backend.jvm.tasks.bundle_create`.
-    kwargs['fileset'] = _eager_fileset_with_spec(getattr(bundle, 'rel_path', spec_path),
+    kwargs['fileset'] = _eager_fileset_with_spec(rel_spec_path,
                                                  filespecs,
                                                  snapshot,
                                                  include_dirs=True)
@@ -405,18 +416,19 @@ def hydrate_bundles(bundles_field):
 def create_legacy_graph_tasks(symbol_table):
   """Create tasks to recursively parse the legacy graph."""
   symbol_table_constraint = symbol_table.constraint()
+
   return [
     transitive_hydrated_targets,
     transitive_hydrated_target,
     hydrated_targets,
     TaskRule(
       HydratedTarget,
-      [Select(symbol_table_constraint),
-       SelectDependencies(HydratedField,
-                          symbol_table_constraint,
-                          'field_adaptors',
-                          field_types=(SourcesField, BundlesField,))],
-      hydrate_target
+      [Select(symbol_table_constraint)],
+      hydrate_target,
+      input_gets=[
+        Get(HydratedField, SourcesField),
+        Get(HydratedField, BundlesField),
+      ]
     ),
     hydrate_sources,
     hydrate_bundles,

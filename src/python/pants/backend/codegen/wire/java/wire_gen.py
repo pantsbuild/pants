@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
@@ -24,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 
 class WireGen(NailgunTaskBase, SimpleCodegenTask):
+
+  sources_globs = ('**/*',)
 
   @classmethod
   def register_options(cls, register):
@@ -114,30 +115,3 @@ class WireGen(NailgunTaskBase, SimpleCodegenTask):
                             workunit_labels=[WorkUnitLabel.TOOL])
       if result != 0:
         raise TaskError('Wire compiler exited non-zero ({0})'.format(result))
-
-  class WireCompilerVersionError(TaskError):
-    """Indicates the wire compiler version could not be determined."""
-
-  def _calculate_proto_paths(self, target):
-    """Computes the set of paths that wire uses to lookup imported protos.
-
-    The protos under these paths are not compiled, but they are required to compile the protos that
-    imported.
-    :param target: the JavaWireLibrary target to compile.
-    :return: an ordered set of directories to pass along to wire.
-    """
-    proto_paths = OrderedSet()
-    proto_paths.add(os.path.join(get_buildroot(), self.context.source_roots.find(target).path))
-
-    def collect_proto_paths(dep):
-      if not dep.has_sources():
-        return
-      for source in dep.sources_relative_to_buildroot():
-        if source.endswith('.proto'):
-          root = self.context.source_roots.find_by_path(source)
-          if root:
-            proto_paths.add(os.path.join(get_buildroot(), root.path))
-
-    collect_proto_paths(target)
-    target.walk(collect_proto_paths)
-    return proto_paths

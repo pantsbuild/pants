@@ -2,13 +2,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import struct
-
-import six
+from builtins import bytes, object, str, zip
 
 
 STDIO_DESCRIPTORS = (0, 1, 2)
@@ -86,7 +84,10 @@ class NailgunProtocol(object):
   @classmethod
   def _decode_unicode_seq(cls, seq):
     for item in seq:
-      yield item.decode('utf-8')
+      if isinstance(item, bytes):
+        yield item.decode('utf-8')
+      else:
+        yield item
 
   @classmethod
   def send_request(cls, sock, working_dir, command, *arguments, **environment):
@@ -143,9 +144,9 @@ class NailgunProtocol(object):
   @classmethod
   def construct_chunk(cls, chunk_type, payload, encoding='utf-8'):
     """Construct and return a single chunk."""
-    if isinstance(payload, six.text_type):
+    if isinstance(payload, str):
       payload = payload.encode(encoding)
-    elif not isinstance(payload, six.binary_type):
+    elif not isinstance(payload, bytes):
       raise TypeError('cannot encode type: {}'.format(type(payload)))
 
     header = struct.pack(cls.HEADER_FMT, len(payload), chunk_type)
@@ -224,7 +225,7 @@ class NailgunProtocol(object):
     cls.write_chunk(sock, ChunkType.STDERR, payload)
 
   @classmethod
-  def send_exit(cls, sock, payload=''):
+  def send_exit(cls, sock, payload=b''):
     """Send the Exit chunk over the specified socket."""
     cls.write_chunk(sock, ChunkType.EXIT, payload)
 
@@ -245,9 +246,9 @@ class NailgunProtocol(object):
     def gen_env_vars():
       for fd_id, fd in zip(STDIO_DESCRIPTORS, (stdin, stdout, stderr)):
         is_atty = fd.isatty()
-        yield (cls.TTY_ENV_TMPL.format(fd_id), bytes(int(is_atty)))
+        yield (cls.TTY_ENV_TMPL.format(fd_id), str(int(is_atty)).encode('utf-8'))
         if is_atty:
-          yield (cls.TTY_PATH_ENV.format(fd_id), os.ttyname(fd.fileno()) or '')
+          yield (cls.TTY_PATH_ENV.format(fd_id), os.ttyname(fd.fileno()) or b'')
     return dict(gen_env_vars())
 
   @classmethod

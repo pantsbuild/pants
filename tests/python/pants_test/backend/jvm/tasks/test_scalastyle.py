@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 from textwrap import dedent
@@ -17,7 +16,7 @@ from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.tasks.task_test_base import ensure_cached
+from pants_test.task_test_base import ensure_cached
 
 
 logger = logging.getLogger(__name__)
@@ -140,7 +139,7 @@ class ScalastyleTest(NailgunTaskTestBase):
                                                                  synthetic_scala_target])
 
     # Only the scala target should remain
-    self.assertEquals(1, len(result_targets))
+    self.assertEqual(1, len(result_targets))
     self.assertEqual(scala_target, result_targets[0])
 
   def test_get_non_excluded_scala_sources(self):
@@ -176,7 +175,7 @@ class ScalastyleTest(NailgunTaskTestBase):
       task.get_non_synthetic_scala_targets(context.targets()))
 
     # Only the scala source from target 1 should remain
-    self.assertEquals(1, len(result_sources))
+    self.assertEqual(1, len(result_sources))
     self.assertEqual('a/scala_1/Source1.scala', result_sources[0])
 
   @ensure_cached(Scalastyle, expected_num_artifacts=1)

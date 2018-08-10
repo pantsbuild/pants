@@ -13,4 +13,19 @@ will compile the engine more quickly, but result in a much slower binary:
 
 To run tests for all crates, run:
 
-    ./run-all-tests.sh
+    ./build-support/bin/native/cargo test --manifest-path src/rust/engine/Cargo.toml --all
+
+### Configuring IntelliJ to work with Rust
+
+You will first need to bootstrap Pants' Rust toolchain and `./build-support/bin/native/cargo -V` or
+`./pants -V` is enough to do this.
+
+Now in your IntelliJ Preferences, install the Rust plugin and set Rust's `Toolchain location` to:
+
+    build-support/bin/native
+
+and set the `Standard library` to:
+
+    build-support/bin/native/src
+
+You should now be able to compile and run Rust code and tests using IntelliJ.

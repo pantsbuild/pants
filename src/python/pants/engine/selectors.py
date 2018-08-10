@@ -2,17 +2,16 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
 from abc import abstractproperty
+from builtins import str
 
 import six
 
-from pants.engine.addressable import Exactly
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
+from pants.util.objects import Exactly, datatype
 
 
 def type_or_constraint_repr(constraint):
@@ -33,7 +32,7 @@ def constraint_for(type_or_constraint):
     raise TypeError("Expected a type or constraint: got: {}".format(type_or_constraint))
 
 
-class Get(datatype('Get', ['product', 'subject'])):
+class Get(datatype(['product', 'subject'])):
   """Experimental synchronous generator API.
 
   May be called equivalently as either:
@@ -97,7 +96,7 @@ class Selector(AbstractClass):
     """The product that this selector produces."""
 
 
-class Select(datatype('Select', ['product', 'optional']), Selector):
+class Select(datatype(['product', 'optional']), Selector):
   """Selects the given Product for the Subject provided to the constructor.
 
   If optional=True and no matching product can be produced, will return None.
@@ -113,7 +112,7 @@ class Select(datatype('Select', ['product', 'optional']), Selector):
                              ', optional=True' if self.optional else '')
 
 
-class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
+class SelectVariant(datatype(['product', 'variant_key']), Selector):
   """Selects the matching Product and variant name for the Subject provided to the constructor.
 
   For example: a SelectVariant with a variant_key of "thrift" and a product of type ApacheThrift
@@ -131,46 +130,3 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
     return '{}({}, {})'.format(type(self).__name__,
                                type_or_constraint_repr(self.product),
                                repr(self.variant_key))
-
-
-class SelectDependencies(datatype('Dependencies', ['product', 'dep_product', 'field', 'field_types']),
-                         Selector):
-  """Selects a product for each of the dependencies of a product for the Subject.
-
-  The dependencies declared on `dep_product` (in the optional `field` parameter, which defaults
-  to 'dependencies' when not specified) will be provided to the requesting task in the
-  order they were declared.
-
-  Field types are used to statically declare the types expected to be contained by the
-  `dep_product`.
-  """
-
-  DEFAULT_FIELD = 'dependencies'
-
-  optional = False
-
-  def __new__(cls, product, dep_product, field=DEFAULT_FIELD, field_types=tuple()):
-    return super(SelectDependencies, cls).__new__(cls, product, dep_product, field, field_types)
-
-  @property
-  def input_product_selector(self):
-    return Select(self.dep_product)
-
-  @property
-  def projected_product_selector(self):
-    return Select(self.product)
-
-  def __repr__(self):
-    if self.field_types:
-      field_types_portion = ', field_types=({},)'.format(', '.join(f.__name__ for f in self.field_types))
-    else:
-      field_types_portion = ''
-    if self.field is not self.DEFAULT_FIELD:
-      field_name_portion = ', {}'.format(repr(self.field))
-    else:
-      field_name_portion = ''
-    return '{}({}, {}{}{})'.format(type(self).__name__,
-                                     type_or_constraint_repr(self.product),
-                                     type_or_constraint_repr(self.dep_product),
-                                     field_name_portion,
-                                     field_types_portion)

@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import fnmatch
 import functools
@@ -12,9 +11,9 @@ import os
 import shutil
 import sys
 from abc import abstractmethod
+from builtins import object, range, str
 from contextlib import contextmanager
 
-from six.moves import range
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm import argfile
@@ -138,7 +137,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   def implementation_version(cls):
     return super(JUnitRun, cls).implementation_version() + [('JUnitRun', 3)]
 
-  _BATCH_ALL = sys.maxint
+  _BATCH_ALL = sys.maxsize
 
   @classmethod
   def register_options(cls, register):
@@ -184,11 +183,6 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='If true, generate an html summary report of tests that were run.')
     register('--open', type=bool,
              help='Attempt to open the html summary report in a browser (implies --html-report)')
-    register('--legacy-report-layout', type=bool, default=False, advanced=True,
-             help='Used to link JUnit and coverage reports to the legacy location; now does '
-                  'nothing.',
-             removal_version='1.8.0.dev0',
-             removal_hint='This option is no longer used and can be safely removed.')
 
     # TODO(jtrobec): Remove direct register when coverage steps are moved to their own subsystem.
     CodeCoverage.register_junit_options(register, cls.register_jvm_tool)

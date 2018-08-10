@@ -10,6 +10,7 @@ python_library(
   name='parsers',
   sources=['parsers.py'],
   dependencies=[
+    '3rdparty/python:future',
     '3rdparty/python:six',
     'src/python/pants/build_graph',
     'src/python/pants/engine:objects',
@@ -22,6 +23,7 @@ python_library(
   name='planners',
   sources=['planners.py'],
   dependencies=[
+    '3rdparty/python:future',
     ':parsers',
     ':sources',
     'src/python/pants/base:exceptions',
@@ -46,6 +48,7 @@ python_library(
     'src/python/pants/engine:fs',
     'src/python/pants/engine:struct',
     'src/python/pants/source',
+    'src/python/pants/util:objects',
   ]
 )
 
@@ -55,7 +58,7 @@ python_library(
   dependencies=[
     ':planners',
     'src/python/pants/base:cmd_line_spec_parser',
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/binaries',
     'src/python/pants/build_graph',
     'src/python/pants/engine:scheduler',
     'src/python/pants/util:contextutil',

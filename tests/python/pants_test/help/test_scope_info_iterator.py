@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
 
@@ -69,4 +68,4 @@ class ScopeInfoIteratorTest(unittest.TestCase):
 
     expected_scope_infos = [scope_to_infos[x] for x in expected_scopes]
 
-    self.assertEquals(expected_scope_infos, actual)
+    self.assertEqual(expected_scope_infos, actual)

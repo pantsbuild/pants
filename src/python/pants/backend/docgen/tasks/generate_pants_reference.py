@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -24,6 +23,13 @@ class GeneratePantsReference(Task):
   Specifically, generates two files: a build dictionary detailing all the directive that
   can appear in BUILD files, and a reference listing all available goals and options.
   """
+
+  PANTS_REFERENCE_PRODUCT = 'pants_reference_page'
+  BUILD_DICTIONARY_PRODUCT = 'build_dictionary_page'
+
+  @classmethod
+  def product_types(cls):
+    return [cls.PANTS_REFERENCE_PRODUCT, cls.BUILD_DICTIONARY_PRODUCT]
 
   @classmethod
   def register_options(cls, register):
@@ -71,18 +77,20 @@ class GeneratePantsReference(Task):
         'task_data': get_scope_data(scope)[1:]
       })
 
-    self._do_render(self.get_options().pants_reference_template, {
+    ref_page = self._do_render(self.get_options().pants_reference_template, {
       'global_scope_data': global_scope_data,
       'global_subsystem_data': global_subsystem_data,
       'goal_data': goal_data
     })
+    self.context.products.register_data(self.PANTS_REFERENCE_PRODUCT, ref_page)
 
   def _gen_build_dictionary(self):
     buildfile_aliases = self.context.build_file_parser.registered_aliases()
     extracter = BuildDictionaryInfoExtracter(buildfile_aliases)
     target_type_infos = extracter.get_target_type_info()
     other_infos = sorted(extracter.get_object_info() + extracter.get_object_factory_info())
-    self._do_render(self.get_options().build_dictionary_template, {
+
+    build_dict_page = self._do_render(self.get_options().build_dictionary_template, {
       'target_types': {
         'infos': target_type_infos
       },
@@ -90,6 +98,7 @@ class GeneratePantsReference(Task):
         'infos': other_infos
       }
     })
+    self.context.products.register_data(self.BUILD_DICTIONARY_PRODUCT, build_dict_page)
 
   def _do_render(self, filename, args):
     package_name, _, _ = __name__.rpartition('.')
@@ -98,4 +107,5 @@ class GeneratePantsReference(Task):
     self.context.log.info('Generating {}'.format(output_path))
     html = renderer.render_name(filename, args)
     with safe_open(output_path, 'w') as outfile:
-      outfile.write(html.encode('utf8'))
+      outfile.write(html)
+    return output_path

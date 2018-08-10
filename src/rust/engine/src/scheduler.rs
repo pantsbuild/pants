@@ -1,19 +1,55 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::collections::{HashMap, HashSet};
 use std::io;
-use std::path::Path;
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use futures::future::{self, Future};
+use futures::sync::oneshot;
 
 use boxfuture::{BoxFuture, Boxable};
-use context::{Context, ContextFactory, Core};
-use core::{Failure, Key, TypeConstraint, TypeId, Value};
-use graph::EntryId;
-use nodes::{NodeKey, Select};
+use context::{Context, Core};
+use core::{Failure, Key, TypeConstraint, TypeId, Value, Variants};
+use fs::{self, GlobMatching, PosixFS};
+use graph::{EntryId, Graph, Node, NodeContext};
+use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
 use rule_graph;
 use selectors;
+
+///
+/// A Session represents a related series of requests (generally: one run of the pants CLI) on an
+/// underlying Scheduler, and is a useful scope for metrics.
+///
+/// Both Scheduler and Session are exposed to python and expected to be used by multiple threads, so
+/// they use internal mutability in order to avoid exposing locks to callers.
+///
+pub struct Session {
+  // The total size of the graph at Session-creation time.
+  preceding_graph_size: usize,
+  // The set of roots that have been requested within this session.
+  roots: Mutex<HashSet<Root>>,
+}
+
+impl Session {
+  pub fn new(scheduler: &Scheduler) -> Session {
+    Session {
+      preceding_graph_size: scheduler.core.graph.len(),
+      roots: Mutex::new(HashSet::new()),
+    }
+  }
+
+  fn extend(&self, new_roots: &[Root]) {
+    let mut roots = self.roots.lock().unwrap();
+    roots.extend(new_roots.iter().cloned());
+  }
+
+  fn root_nodes(&self) -> Vec<NodeKey> {
+    let roots = self.roots.lock().unwrap();
+    roots.iter().map(|r| r.clone().into()).collect()
+  }
+}
 
 pub struct ExecutionRequest {
   // Set of roots for an execution, in the order they were declared.
@@ -48,14 +84,18 @@ impl Scheduler {
     }
   }
 
-  pub fn visualize(&self, request: &ExecutionRequest, path: &Path) -> io::Result<()> {
-    self.core.graph.visualize(&request.root_nodes(), path)
+  pub fn visualize(&self, session: &Session, path: &Path) -> io::Result<()> {
+    self
+      .core
+      .graph
+      .visualize(Visualizer::default(), &session.root_nodes(), path)
   }
 
-  pub fn trace(&self, request: &ExecutionRequest, path: &Path) -> io::Result<()> {
-    for root in request.root_nodes() {
-      self.core.graph.trace(&root, path)?;
-    }
+  pub fn trace(&self, request: &ExecutionRequest, path: &Path) -> Result<(), String> {
+    self
+      .core
+      .graph
+      .trace::<Tracer>(&request.root_nodes(), path)?;
     Ok(())
   }
 
@@ -67,30 +107,74 @@ impl Scheduler {
   ) -> Result<(), String> {
     let edges = self.find_root_edges_or_update_rule_graph(
       subject.type_id().clone(),
-      selectors::Selector::Select(selectors::Select::without_variant(product)),
+      &selectors::Select::without_variant(product),
     )?;
     request
       .roots
-      .push(Select::new(product, subject, Default::default(), &edges));
+      .push(Select::new(product, subject, Variants::default(), &edges));
     Ok(())
   }
 
   fn find_root_edges_or_update_rule_graph(
     &self,
     subject_type: TypeId,
-    selector: selectors::Selector,
+    select: &selectors::Select,
   ) -> Result<rule_graph::RuleEdges, String> {
     self
       .core
       .rule_graph
-      .find_root_edges(subject_type.clone(), selector.clone())
+      .find_root_edges(subject_type, select.clone())
       .ok_or_else(|| {
         format!(
           "No installed rules can satisfy {} for a root subject of type {}.",
-          rule_graph::selector_str(&selector),
+          rule_graph::select_str(&select),
           rule_graph::type_str(subject_type)
         )
       })
+  }
+
+  ///
+  /// Invalidate the invalidation roots represented by the given Paths.
+  ///
+  pub fn invalidate(&self, paths: &HashSet<PathBuf>) -> usize {
+    let invalidation_result = self.core.graph.invalidate_from_roots(move |node| {
+      if let Some(fs_subject) = node.fs_subject() {
+        paths.contains(fs_subject)
+      } else {
+        false
+      }
+    });
+    // TODO: Expose.
+    invalidation_result.cleared + invalidation_result.dirtied
+  }
+
+  ///
+  /// Invalidate all filesystem dependencies in the graph.
+  ///
+  pub fn invalidate_all_paths(&self) -> usize {
+    let invalidation_result = self
+      .core
+      .graph
+      .invalidate_from_roots(|node| node.fs_subject().is_some());
+    // TODO: Expose.
+    invalidation_result.cleared + invalidation_result.dirtied
+  }
+
+  ///
+  /// Return Scheduler and per-Session metrics.
+  ///
+  pub fn metrics(&self, session: &Session) -> HashMap<&str, i64> {
+    let mut m = HashMap::new();
+    m.insert(
+      "affected_file_count",
+      self
+        .core
+        .graph
+        .reachable_digest_count(&session.root_nodes()) as i64,
+    );
+    m.insert("preceding_graph_size", session.preceding_graph_size as i64);
+    m.insert("resulting_graph_size", self.core.graph.len() as i64);
+    m
   }
 
   ///
@@ -102,19 +186,21 @@ impl Scheduler {
   /// give up.
   ///
   fn execute_helper(
-    core: Arc<Core>,
+    context: RootContext,
     roots: Vec<Root>,
     count: usize,
   ) -> BoxFuture<Vec<Result<Value, Failure>>, ()> {
+    let executor = context.core.runtime.get().executor();
     // Attempt all roots in parallel, failing fast to retry for `Invalidated`.
     let roots_res = future::join_all(
       roots
         .clone()
         .into_iter()
         .map(|root| {
-          core
+          context
+            .core
             .graph
-            .create(root.clone(), &core)
+            .create(root.clone().into(), &context)
             .then::<_, Result<Result<Value, Failure>, Failure>>(move |r| {
               match r {
                 Err(Failure::Invalidated) if count > 0 => {
@@ -126,7 +212,11 @@ impl Scheduler {
                   // out of retries) recover to complete the join, which will cause the results to
                   // propagate to the user.
                   debug!("Root {} completed.", NodeKey::Select(root).format());
-                  Ok(other)
+                  Ok(other.map(|res| {
+                    res
+                      .try_into()
+                      .unwrap_or_else(|_| panic!("A Node implementation was ambiguous."))
+                  }))
                 }
               }
             })
@@ -136,24 +226,31 @@ impl Scheduler {
 
     // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry
     // the entire set of roots.
-    roots_res
-      .or_else(move |_| Scheduler::execute_helper(core, roots, count - 1))
-      .to_boxed()
+    oneshot::spawn(
+      roots_res.or_else(move |_| Scheduler::execute_helper(context, roots, count - 1)),
+      &executor,
+    ).to_boxed()
   }
 
   ///
   /// Compute the results for roots in the given request.
   ///
   pub fn execute<'e>(
-    &mut self,
+    &self,
     request: &'e ExecutionRequest,
+    session: &Session,
   ) -> Vec<(&'e Key, &'e TypeConstraint, RootResult)> {
     // Bootstrap tasks for the roots, and then wait for all of them.
     debug!("Launching {} roots.", request.roots.len());
 
+    session.extend(&request.roots);
+
     // Wait for all roots to complete. Failure here should be impossible, because each
     // individual Future in the join was (eventually) mapped into success.
-    let results = Scheduler::execute_helper(self.core.clone(), request.roots.clone(), 8)
+    let context = RootContext {
+      core: self.core.clone(),
+    };
+    let results = Scheduler::execute_helper(context, request.roots.clone(), 8)
       .wait()
       .expect("Execution failed.");
 
@@ -164,6 +261,45 @@ impl Scheduler {
       .map(|(s, r)| (&s.subject, &s.selector.product, r))
       .collect()
   }
+
+  pub fn capture_snapshot_from_arbitrary_root<P: AsRef<Path>>(
+    &self,
+    root_path: P,
+    path_globs: fs::PathGlobs,
+  ) -> BoxFuture<fs::Snapshot, String> {
+    // Note that we don't use a Graph here, and don't cache any intermediate steps, we just place
+    // the resultant Snapshot into the store and return it. This is important, because we're reading
+    // things from arbitrary filepaths which we don't want to cache in the graph, as we don't watch
+    // them for changes.
+    // We assume that this Snapshot is of an immutable piece of the filesystem.
+
+    let posix_fs = Arc::new(try_future!(PosixFS::new(
+      root_path,
+      self.core.fs_pool.clone(),
+      &[]
+    )));
+    let store = self.core.store.clone();
+
+    posix_fs
+      .expand(path_globs)
+      .map_err(|err| format!("Error expanding globs: {:?}", err))
+      .and_then(|path_stats| {
+        fs::Snapshot::from_path_stats(
+          store.clone(),
+          fs::OneOffStoreFileByDigest::new(store, posix_fs),
+          path_stats,
+        )
+      })
+      .to_boxed()
+  }
+}
+
+impl Drop for Scheduler {
+  fn drop(&mut self) {
+    // Because Nodes may hold references to the Core in their closure, this is intended to
+    // break cycles between Nodes and the Core.
+    self.core.graph.clear();
+  }
 }
 
 ///
@@ -173,8 +309,31 @@ type Root = Select;
 
 pub type RootResult = Result<Value, Failure>;
 
-impl ContextFactory for Arc<Core> {
-  fn create(&self, entry_id: EntryId) -> Context {
-    Context::new(entry_id, self.clone())
+///
+/// NB: This basic wrapper exists to allow us to implement the `NodeContext` trait (which lives
+/// outside of this crate) for the `Arc` struct (which also lives outside our crate), which is not
+/// possible without the wrapper due to "trait coherence".
+///
+#[derive(Clone)]
+struct RootContext {
+  core: Arc<Core>,
+}
+
+impl NodeContext for RootContext {
+  type Node = NodeKey;
+
+  fn clone_for(&self, entry_id: EntryId) -> Context {
+    Context::new(entry_id, self.core.clone())
+  }
+
+  fn graph(&self) -> &Graph<NodeKey> {
+    &self.core.graph
+  }
+
+  fn spawn<F>(&self, future: F)
+  where
+    F: Future<Item = (), Error = ()> + Send + 'static,
+  {
+    self.core.runtime.get().executor().spawn(future);
   }
 }

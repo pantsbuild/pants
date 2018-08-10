@@ -2,12 +2,17 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+import os
+from builtins import str
 
-from pants.binaries.binary_util import BinaryUtilPrivate
+from future.utils import text_type
+
+from pants.binaries.binary_util import BinaryRequest, BinaryUtil
+from pants.engine.fs import PathGlobs, PathGlobsAndRoot
+from pants.fs.archive import XZCompressedTarArchiver, create_archiver
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
 
@@ -15,6 +20,7 @@ from pants.util.memo import memoized_method, memoized_property
 logger = logging.getLogger(__name__)
 
 
+# TODO(cosmicexplorer): Add integration tests for this file.
 class BinaryToolBase(Subsystem):
   """Base class for subsytems that configure binary tools.
 
@@ -46,7 +52,48 @@ class BinaryToolBase(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtilPrivate.Factory,)
+    sub_deps = super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
+
+    # TODO: if we need to do more conditional subsystem dependencies, do it declaratively with a
+    # dict class field so that we only try to create or access it if we declared a dependency on it.
+    if cls.archive_type == 'txz':
+      sub_deps = sub_deps + (XZ.scoped(cls),)
+
+    return sub_deps
+
+  @memoized_property
+  def _xz(self):
+    if self.archive_type == 'txz':
+      return XZ.scoped_instance(self)
+    return None
+
+  @memoized_method
+  def _get_archiver(self):
+    if not self.archive_type:
+      return None
+
+    # This forces downloading and extracting the `XZ` archive if any BinaryTool with a 'txz'
+    # archive_type is used, but that's fine, because unless the cache is manually changed we won't
+    # do more work than necessary.
+    if self.archive_type == 'txz':
+      return self._xz.tar_xz_extractor
+
+    return create_archiver(self.archive_type)
+
+  def get_external_url_generator(self):
+    """Override and return an instance of BinaryToolUrlGenerator to download from those urls.
+
+    If this method returns None, urls to download the tool will be constructed from
+    --binaries-baseurls. Otherwise, generate_urls() will be invoked on the result with the requested
+    version and host platform.
+
+    If the bootstrap option --allow-external-binary-tool-downloads is False, the result of this
+    method will be ignored. Implementations of BinaryTool must be aware of differences (e.g., in
+    archive structure) between the external and internal versions of the downloaded tool, if any.
+
+    See the :class:`LLVM` subsystem for an example of usage.
+    """
+    return None
 
   @classmethod
   def register_options(cls, register):
@@ -105,24 +152,32 @@ class BinaryToolBase(Subsystem):
 
   @memoized_property
   def _binary_util(self):
-    return BinaryUtilPrivate.Factory.create()
+    return BinaryUtil.Factory.create()
+
+  @classmethod
+  def _get_name(cls):
+    return cls.name or cls.options_scope
 
   @classmethod
   def get_support_dir(cls):
     return 'bin/{}'.format(cls._get_name())
 
-  @memoized_method
-  def _select_for_version(self, version):
-    return self._binary_util.select(
+  @classmethod
+  def _name_to_fetch(cls):
+    return '{}{}'.format(cls._get_name(), cls.suffix)
+
+  def _make_binary_request(self, version):
+    return BinaryRequest(
       supportdir=self.get_support_dir(),
       version=version,
-      name='{}{}'.format(self._get_name(), self.suffix),
+      name=self._name_to_fetch(),
       platform_dependent=self.platform_dependent,
-      archive_type=self.archive_type)
+      external_url_generator=self.get_external_url_generator(),
+      archiver=self._get_archiver())
 
-  @classmethod
-  def _get_name(cls):
-    return cls.name or cls.options_scope
+  def _select_for_version(self, version):
+    binary_request = self._make_binary_request(version)
+    return self._binary_util.select(binary_request)
 
 
 class NativeTool(BinaryToolBase):
@@ -140,14 +195,26 @@ class Script(BinaryToolBase):
   """
   platform_dependent = False
 
+  def hackily_snapshot(self, context):
+    bootstrapdir = self.get_options().pants_bootstrapdir
+    script_relpath = os.path.relpath(self.select(context), bootstrapdir)
+    snapshot = context._scheduler.capture_snapshots((
+      PathGlobsAndRoot(
+        PathGlobs((script_relpath,)),
+        text_type(bootstrapdir),
+      ),
+    ))[0]
+    return (script_relpath, snapshot)
 
-class ExecutablePathProvider(object):
-  """Mixin for subsystems which provide directories containing executables.
 
-  This is useful to abstract over different sources of executables
-  (e.g. BinaryTool archives or files from the host filesystem), or for
-  aggregating multiple such subsystems.
-  """
+class XZ(NativeTool):
+  options_scope = 'xz'
+  default_version = '5.2.4-3'
+  archive_type = 'tgz'
 
-  def path_entries(self):
-    return []
+  @memoized_property
+  def tar_xz_extractor(self):
+    return XZCompressedTarArchiver(self._executable_location())
+
+  def _executable_location(self):
+    return os.path.join(self.select(), 'bin', 'xz')

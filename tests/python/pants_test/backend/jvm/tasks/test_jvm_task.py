@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -33,7 +32,7 @@ class JvmTaskTest(JvmTaskTestBase):
 
     context = self.context(target_roots=[self.t1, self.t2, self.t3])
 
-    self.classpath = [os.path.join(self.pants_workdir, entry) for entry in 'a', 'b']
+    self.classpath = [os.path.join(self.pants_workdir, entry) for entry in ('a', 'b')]
     self.populate_runtime_classpath(context, self.classpath)
 
     self.task = self.create_task(context)

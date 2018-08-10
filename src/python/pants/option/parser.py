@@ -2,13 +2,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
 import os
 import re
 import traceback
+from builtins import next, object, open
 from collections import defaultdict
 
 import six
@@ -452,7 +452,7 @@ class Parser(object):
         else:
           fromfile = val_str[1:]
           try:
-            with open(fromfile) as fp:
+            with open(fromfile, 'r') as fp:
               return fp.read().strip()
           except IOError as e:
             raise self.FromfileError('Failed to read {} in {} from file {}: {}'.format(
@@ -569,13 +569,15 @@ class Parser(object):
           [rv.value for rv in ranked_vals if rv.value is not None]).val
       merged_val = [self._convert_member_type(kwargs.get('member_type', str), x)
                     for x in merged_val]
-      map(check, merged_val)
+      for val in merged_val:
+        check(val)
       ret = RankedValue(merged_rank, merged_val)
     elif is_dict_option(kwargs):
       merged_rank = ranked_vals[-1].rank
       merged_val = DictValueComponent.merge(
           [rv.value for rv in ranked_vals if rv.value is not None]).val
-      map(check, merged_val)
+      for val in merged_val:
+        check(val)
       ret = RankedValue(merged_rank, merged_val)
     else:
       ret = ranked_vals[-1]

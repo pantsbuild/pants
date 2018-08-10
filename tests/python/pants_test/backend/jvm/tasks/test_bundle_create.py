@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -179,9 +178,9 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
   def _check_products(self, products, product_fullname):
     self.assertIsNotNone(products)
     product_data = products.get(self.app_target)
-    product_basedir = product_data.keys()[0]
+    product_basedir = list(product_data.keys())[0]
     self.assertIn(self.pants_workdir, product_basedir)
-    self.assertEquals(product_data[product_basedir], [product_fullname])
+    self.assertEqual(product_data[product_basedir], [product_fullname])
     product_path = os.path.join(product_basedir, product_fullname)
     return product_path
 

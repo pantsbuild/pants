@@ -99,6 +99,18 @@ extends ArgumentOption[Int, Context] {
   }
 }
 
+class LongOption[Context](
+  val options: Seq[String],
+  val argument: String,
+  val description: String,
+  val action: (Context, Long) => Context)
+  extends ArgumentOption[Long, Context] {
+  def parse(arg: String): Option[Long] = {
+    try { Some(arg.toLong) }
+    catch { case _: NumberFormatException => None }
+  }
+}
+
 class DoubleOption[Context](
   val options: Seq[String],
   val argument: String,

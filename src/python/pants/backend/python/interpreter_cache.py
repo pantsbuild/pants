@@ -2,17 +2,19 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import shutil
+from builtins import map, object, str
+from collections import defaultdict
 
-from pex.interpreter import PythonIdentity, PythonInterpreter
+from pex.interpreter import PythonInterpreter
 from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import resolve
 from pex.variables import Variables
 
+from pants.backend.python.pex_util import expand_and_maybe_adjust_platform
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
 from pants.process.lock import OwnerPrintingInterProcessFileLock
@@ -73,40 +75,39 @@ class PythonInterpreterCache(object):
 
   def select_interpreter_for_targets(self, targets):
     """Pick an interpreter compatible with all the specified targets."""
-    tgts_with_compatibilities = []
+    tgts_by_compatibilities = defaultdict(list)
     filters = set()
     for target in targets:
-      if isinstance(target, PythonTarget) and target.compatibility:
-        tgts_with_compatibilities.append(target)
-        filters.update(target.compatibility)
+      if isinstance(target, PythonTarget):
+        c = self._python_setup.compatibility_or_constraints(target)
+        tgts_by_compatibilities[c].append(target)
+        filters.update(c)
 
     allowed_interpreters = set(self.setup(filters=filters))
 
     # Constrain allowed_interpreters based on each target's compatibility requirements.
-    for target in tgts_with_compatibilities:
-      compatible_with_target = set(self._matching(allowed_interpreters, target.compatibility))
+    for compatibility in tgts_by_compatibilities.keys():
+      compatible_with_target = set(self._matching(allowed_interpreters, compatibility))
       allowed_interpreters &= compatible_with_target
 
     if not allowed_interpreters:
       # Create a helpful error message.
-      unique_compatibilities = set(tuple(t.compatibility) for t in tgts_with_compatibilities)
+      unique_compatibilities = set(tuple(c) for c in tgts_by_compatibilities.keys())
       unique_compatibilities_strs = [','.join(x) for x in unique_compatibilities if x]
-      tgts_with_compatibilities_strs = [t.address.spec for t in tgts_with_compatibilities]
+      tgts_by_compatibilities_strs = [t[0].address.spec for t in tgts_by_compatibilities.values()]
       raise self.UnsatisfiableInterpreterConstraintsError(
         'Unable to detect a suitable interpreter for compatibilities: {} '
-        '(Conflicting targets: {})'.format(' && '.join(unique_compatibilities_strs),
-                                           ', '.join(tgts_with_compatibilities_strs)))
+        '(Conflicting targets: {})'.format(' && '.join(sorted(unique_compatibilities_strs)),
+                                           ', '.join(tgts_by_compatibilities_strs)))
     # Return the lowest compatible interpreter.
     return min(allowed_interpreters)
 
   def _interpreter_from_path(self, path, filters):
-    interpreter_dir = os.path.basename(path)
-    identity = PythonIdentity.from_path(interpreter_dir)
     try:
       executable = os.readlink(os.path.join(path, 'python'))
     except OSError:
       return None
-    interpreter = PythonInterpreter(executable, identity)
+    interpreter = PythonInterpreter.from_binary(executable, include_site_extras=False)
     if self._matches(interpreter, filters):
       return self._resolve(interpreter)
     return None
@@ -157,9 +158,12 @@ class PythonInterpreterCache(object):
                    or self.pex_python_paths()
                    or self._python_setup.interpreter_search_paths
                    or os.getenv('PATH').split(os.pathsep))
+    self._logger(
+      'Initializing Python interpreter cache matching filters `{}` from paths `{}`'.format(
+        ':'.join(filters), ':'.join(setup_paths)))
 
     def unsatisfied_filters(interpreters):
-      return filter(lambda f: len(list(self._matching(interpreters, [f]))) == 0, filters)
+      return [f for f in filters if len(list(self._matching(interpreters, [f]))) == 0]
 
     interpreters = []
     with OwnerPrintingInterProcessFileLock(path=os.path.join(self._cache_dir, '.file_lock')):
@@ -174,6 +178,8 @@ class PythonInterpreterCache(object):
     if len(matches) == 0:
       self._logger('Found no valid interpreters!')
 
+    self._logger(
+      'Initialized Python interpreter cache with {}'.format(', '.join([x.binary for x in matches])))
     return matches
 
   def _resolve(self, interpreter, interpreter_dir=None):
@@ -218,6 +224,11 @@ class PythonInterpreterCache(object):
     distributions = resolve(requirements=[requirement],
                             fetchers=self._python_repos.get_fetchers(),
                             interpreter=interpreter,
+                            platform=expand_and_maybe_adjust_platform(
+                              interpreter=interpreter,
+                              # The local interpreter cache is, by definition, composed of
+                              # interpreters for the 'current' platform.
+                              platform='current'),
                             context=self._python_repos.get_network_context(),
                             precedence=precedence)
     if not distributions:

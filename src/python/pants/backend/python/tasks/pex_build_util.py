@@ -2,15 +2,18 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import str
 
+from future.utils import PY2
 from pex.fetcher import Fetcher
 from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
 
+from pants.backend.python.pex_util import expand_and_maybe_adjust_platform
+from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
@@ -18,9 +21,8 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import IncompatiblePlatformsError, TaskError
+from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
-from pants.python.python_repos import PythonRepos
 
 
 def is_python_target(tgt):
@@ -46,59 +48,6 @@ def has_python_requirements(tgt):
   return isinstance(tgt, PythonRequirementLibrary)
 
 
-def is_python_binary(tgt):
-  return isinstance(tgt, PythonBinary)
-
-
-def tgt_closure_has_native_sources(tgts):
-  """Determine if any target in the current target closure has native (c or cpp) sources."""
-  return any(tgt.has_native_sources for tgt in tgts)
-
-
-def tgt_closure_platforms(tgts):
-  """
-  Aggregates a dict that maps a platform string to a list of targets that specify the platform.
-  If no targets have platforms arguments, return a dict containing platforms inherited from
-  the PythonSetup object.
-
-  :param tgts: a list of :class:`Target` objects.
-  :returns: a dict mapping a platform string to a list of targets that specify the platform.
-  """
-  tgts_by_platforms = {}
-  for tgt in tgts:
-    if tgt.platforms:
-      for platform in tgt.platforms:
-        if platform in tgts_by_platforms:
-          tgts_by_platforms[platform].append(tgt)
-        else:
-          tgts_by_platforms[platform] = [tgt]
-  # If no targets specify platforms, inherit the default platforms.
-  if not tgts_by_platforms:
-    for platform in PythonSetup.global_instance().platforms:
-      tgts_by_platforms[platform] = ['(No target) Platform inherited from either the '
-                                     '--platforms option or a pants.ini file.']
-  return tgts_by_platforms
-
-
-def build_for_current_platform_only_check(tgts):
-  """
-  Performs a check of whether the current target closure has native sources and if so, ensures that
-  Pants is only targeting the current platform.
-
-  :param tgts: a list of :class:`Target` objects.
-  :return: a boolean value indicating whether the current target closure has native sources.
-  """
-  if tgt_closure_has_native_sources(filter(is_local_python_dist, tgts)):
-    platforms = tgt_closure_platforms(filter(is_python_binary, tgts))
-    if len(platforms.keys()) > 1 or not 'current' in platforms.keys():
-      raise IncompatiblePlatformsError('The target set contains one or more targets that depend on '
-        'native code. Please ensure that the platform arguments in all relevant targets and build '
-        'options are compatible with the current platform. Found targets for platforms: {}'
-        .format(str(platforms)))
-    return True
-  return False
-
-
 def _create_source_dumper(builder, tgt):
   if type(tgt) == Files:
     # Loose `Files` as opposed to `Resources` or `PythonTarget`s have no (implied) package structure
@@ -121,6 +70,10 @@ def dump_sources(builder, tgt, log):
   log.debug('  Dumping sources: {}'.format(tgt))
   for relpath in tgt.sources_relative_to_buildroot():
     try:
+      # Necessary to avoid py_compile from trying to decode non-ascii source code into unicode.
+      # Python 3's py_compile can safely handle unicode in source files, meanwhile.
+      if PY2:
+        relpath = relpath.encode('utf-8')
       dump_source(relpath)
     except OSError:
       log.error('Failed to copy {} for target {}'.format(relpath, tgt.address.spec))
@@ -145,7 +98,7 @@ def dump_requirement_libs(builder, interpreter, req_libs, log, platforms=None):
                     Defaults to the platforms specified by PythonSetup.
   """
   reqs = [req for req_lib in req_libs for req in req_lib.requirements]
-  dump_requirements(builder, interpreter, reqs, log, platforms)
+  dump_requirements(builder, interpreter, reqs, log, platforms=platforms)
 
 
 def dump_requirements(builder, interpreter, reqs, log, platforms=None):
@@ -160,14 +113,16 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None):
   """
   deduped_reqs = OrderedSet(reqs)
   find_links = OrderedSet()
+  blacklist = PythonSetup.global_instance().resolver_blacklist
   for req in deduped_reqs:
     log.debug('  Dumping requirement: {}'.format(req))
-    builder.add_requirement(req.requirement)
+    if not (req.key in blacklist and interpreter.identity.matches(blacklist[req.key])):
+      builder.add_requirement(req.requirement)
     if req.repository:
       find_links.add(req.repository)
 
   # Resolve the requirements into distributions.
-  distributions = _resolve_multi(interpreter, deduped_reqs, platforms, find_links)
+  distributions = resolve_multi(interpreter, deduped_reqs, platforms, find_links)
   locations = set()
   for platform, dists in distributions.items():
     for dist in dists:
@@ -177,7 +132,7 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None):
       locations.add(dist.location)
 
 
-def _resolve_multi(interpreter, requirements, platforms, find_links):
+def resolve_multi(interpreter, requirements, platforms, find_links):
   """Multi-platform dependency resolution for PEX files.
 
   Returns a list of distributions that must be included in order to satisfy a set of requirements.
@@ -205,10 +160,12 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
       requirements=[req.requirement for req in requirements],
       interpreter=interpreter,
       fetchers=fetchers,
-      platform=None if platform == 'current' else platform,
+      platform=expand_and_maybe_adjust_platform(interpreter=interpreter, platform=platform),
       context=python_repos.get_network_context(),
       cache=requirements_cache_dir,
       cache_ttl=python_setup.resolver_cache_ttl,
-      allow_prereleases=python_setup.resolver_allow_prereleases)
+      allow_prereleases=python_setup.resolver_allow_prereleases,
+      pkg_blacklist=python_setup.resolver_blacklist,
+      use_manylinux=python_setup.use_manylinux)
 
   return distributions

@@ -2,8 +2,7 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -55,7 +54,7 @@ class AvroJavaGenTest(PantsRunIntegrationTest):
 
       output_root = self.get_gen_root(pants_run.workdir, target_spec)
       actual_files = set(os.listdir(os.path.join(output_root, 'org', 'pantsbuild', 'contrib', 'avro')))
-      self.assertEquals(set(['User.java']), actual_files)
+      self.assertEqual(set(['User.java']), actual_files)
 
   def test_idl_gen(self):
     target_spec = self.avro_test_target('simple')
@@ -65,4 +64,4 @@ class AvroJavaGenTest(PantsRunIntegrationTest):
       output_root = self.get_gen_root(pants_run.workdir, target_spec)
       expected_files = set(['Kind.java', 'MD5.java', 'Simple.java', 'TestError.java', 'TestRecord.java'])
       actual_files = set(os.listdir(os.path.join(output_root, 'org', 'pantsbuild', 'contrib', 'avro')))
-      self.assertEquals(expected_files, actual_files)
+      self.assertEqual(expected_files, actual_files)

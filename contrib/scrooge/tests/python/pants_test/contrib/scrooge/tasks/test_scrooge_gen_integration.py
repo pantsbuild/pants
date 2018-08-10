@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -20,7 +19,7 @@ class ScroogeGenTest(PantsRunIntegrationTest):
         'pythonpath': ["%(buildroot)s/contrib/scrooge/src/python"],
         'backend_packages': ["pants.backend.codegen", "pants.backend.jvm", "pants.contrib.scrooge"]
       },
-      'scala-platform': { 'version': '2.11' },
+      'scala': { 'version': '2.11' },
       'gen.scrooge': {
         'service_deps': {
             'java': [

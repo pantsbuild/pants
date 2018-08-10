@@ -2,13 +2,13 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import textwrap
 
 from pants.backend.docgen.targets.doc import Page
+from pants.backend.docgen.tasks.markdown_to_html import MarkdownToHtml
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
 from pants.util import desktop
@@ -39,7 +39,7 @@ class ConfluencePublish(Task):
   
   @classmethod
   def prepare(cls, options, round_manager):
-    round_manager.require('wiki_html')
+    round_manager.require(MarkdownToHtml.WIKI_HTML_PRODUCT)
   
   def __init__(self, *args, **kwargs):
     super(ConfluencePublish, self).__init__(*args, **kwargs)
@@ -69,15 +69,15 @@ class ConfluencePublish(Task):
     
     urls = list()
     
-    genmap = self.context.products.get('wiki_html')
+    genmap = self.context.products.get(MarkdownToHtml.WIKI_HTML_PRODUCT)
     for page, wiki_artifact in pages:
       html_info = genmap.get((wiki_artifact, page))
       if len(html_info) > 1:
         raise TaskError('Unexpected resources for {}: {}'.format(page, html_info))
-      basedir, htmls = html_info.items()[0]
+      basedir, htmls = list(html_info.items())[0]
       if len(htmls) != 1:
         raise TaskError('Unexpected resources for {}: {}'.format(page, htmls))
-      with safe_open(os.path.join(basedir, htmls[0])) as contents:
+      with safe_open(os.path.join(basedir, htmls[0]), 'r') as contents:
         url = self.publish_page(
           page.address,
           wiki_artifact.config['space'],

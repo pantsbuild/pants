@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
@@ -12,11 +11,43 @@ from pants.backend.codegen.jaxb.jaxb_library import JaxbLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnitLabel
+from pants.java.jar.jar_dependency import JarDependency
 from pants.task.simple_codegen_task import SimpleCodegenTask
 
 
 class JaxbGen(SimpleCodegenTask, NailgunTask):
   """Generates java source files from jaxb schema (.xsd)."""
+
+  _XJC_MAIN = 'com.sun.tools.xjc.Driver'
+  _XML_BIND_VERSION = '2.3.0'
+
+  sources_globs = ('**/*',)
+
+  @classmethod
+  def register_options(cls, register):
+    super(JaxbGen, cls).register_options(register)
+    cls.register_jvm_tool(register,
+                          'xjc',
+                          classpath=[
+                            JarDependency(org='com.sun.xml.bind',
+                                          name='jaxb-core',
+                                          rev=cls._XML_BIND_VERSION),
+                            JarDependency(org='com.sun.xml.bind',
+                                          name='jaxb-impl',
+                                          rev=cls._XML_BIND_VERSION),
+                            JarDependency(org='com.sun.xml.bind',
+                                          name='jaxb-xjc',
+                                          rev=cls._XML_BIND_VERSION),
+                            JarDependency(org='com.sun.activation',
+                                          name='javax.activation',
+                                          rev='1.2.0'),
+                            JarDependency(org='javax.xml.bind',
+                                          name='jaxb-api',
+                                          rev=cls._XML_BIND_VERSION),
+                          ],
+                          main=cls._XJC_MAIN,
+                          )
 
   def __init__(self, *args, **kwargs):
     """
@@ -29,11 +60,6 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
     lang = 'java'
     if self.context.products.isrequired(lang):
       self.gen_langs.add(lang)
-
-  def _compile_schema(self, args):
-    classpath = self.dist.find_libs(['tools.jar'])
-    java_main = 'com.sun.tools.internal.xjc.Driver'
-    return self.runjava(classpath=classpath, main=java_main, args=args, workunit_name='xjc')
 
   def synthetic_target_type(self, target):
     return JavaLibrary
@@ -56,8 +82,17 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
 
       # NB(zundel): The -no-header option keeps it from writing a timestamp, making the
       # output non-deterministic.  See https://github.com/pantsbuild/pants/issues/1786
-      args = ['-p', output_package, '-d', target_workdir, '-no-header', path_to_xsd]
-      result = self._compile_schema(args)
+      args = [
+        '-p', output_package,
+        '-d', target_workdir,
+        '-no-header', path_to_xsd
+      ]
+      result = self.runjava(classpath=self.tool_classpath('xjc'),
+                            main=self._XJC_MAIN,
+                            jvm_options=self.get_options().jvm_options,
+                            args=args,
+                            workunit_name='xjc',
+                            workunit_labels=[WorkUnitLabel.TOOL])
 
       if result != 0:
         raise TaskError('xjc ... exited non-zero ({code})'.format(code=result))

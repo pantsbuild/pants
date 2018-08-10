@@ -4,6 +4,7 @@
 python_library(
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:future',
     '3rdparty/python:setproctitle',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:build_environment',
@@ -13,7 +14,7 @@ python_library(
     'src/python/pants/base:project_tree',
     'src/python/pants/base:specs',
     'src/python/pants/base:workunit',
-    'src/python/pants/binaries:binary_util',
+    'src/python/pants/binaries',
     'src/python/pants/build_graph',
     'src/python/pants/core_tasks',
     'src/python/pants/engine/legacy:address_mapper',
@@ -27,6 +28,7 @@ python_library(
     'src/python/pants/engine:native',
     'src/python/pants/engine:parser',
     'src/python/pants/engine:scheduler',
+    'src/python/pants/engine:rules',
     'src/python/pants/goal',
     'src/python/pants/goal:context',
     'src/python/pants/goal:run_tracker',
@@ -35,7 +37,6 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/reporting',
     'src/python/pants/pantsd:pants_daemon',
-    'src/python/pants/scm:change_calculator',
     'src/python/pants/scm/subsystems:changed',
     'src/python/pants/subsystem',
     'src/python/pants/task',

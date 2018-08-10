@@ -2,9 +2,9 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import open
 from textwrap import dedent
 
 from pants.backend.jvm.register import build_file_aliases as register_jvm
@@ -17,7 +17,7 @@ from pants.contrib.googlejavaformat.googlejavaformat import (GoogleJavaFormat,
                                                              GoogleJavaFormatCheckFormat)
 
 
-class BaseTest(NailgunTaskTestBase):
+class TestBase(NailgunTaskTestBase):
 
   _BADFORMAT = dedent("""
     package org.pantsbuild.contrib.googlejavaformat;
@@ -38,14 +38,14 @@ class BaseTest(NailgunTaskTestBase):
     }
   """)
 
-  @property
-  def alias_groups(self):
-    return super(BaseTest, self).alias_groups.merge(
+  @classmethod
+  def alias_groups(cls):
+    return super(TestBase, cls).alias_groups().merge(
       register_core().merge(register_jvm())
     )
 
 
-class GoogleJavaFormatTests(BaseTest):
+class GoogleJavaFormatTests(TestBase):
 
   @classmethod
   def task_type(cls):
@@ -62,12 +62,12 @@ class GoogleJavaFormatTests(BaseTest):
     )
     context = self.context(target_roots=[target])
     self.execute(context)
-    with open(javafile) as fh:
+    with open(javafile, 'r') as fh:
       actual = fh.read()
     self.assertEqual(actual, self._GOODFORMAT)
 
 
-class GoogleJavaFormatCheckFormatTests(BaseTest):
+class GoogleJavaFormatCheckFormatTests(TestBase):
 
   @classmethod
   def task_type(cls):

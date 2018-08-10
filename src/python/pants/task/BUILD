@@ -4,6 +4,7 @@
 
 python_library(
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
@@ -20,6 +21,7 @@ python_library(
     'src/python/pants/reporting',
     'src/python/pants/scm',
     'src/python/pants/scm/subsystems:changed',
+    'src/python/pants/source',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',

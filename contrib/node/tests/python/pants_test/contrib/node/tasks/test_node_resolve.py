@@ -2,16 +2,16 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
+from builtins import open
 from textwrap import dedent
 
 import mock
 from pants.build_graph.target import Target
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver import \
   NodePreinstalledModuleResolver
@@ -167,7 +167,7 @@ class NodeResolveTest(TaskTestBase):
     for root, _, files in os.walk(node_path):
       for f in files:
         if 'package.json' == f:
-          with open(os.path.join(root, f)) as fp:
+          with open(os.path.join(root, f), 'r') as fp:
             package = json.load(fp)
             if 'typ' == package['name']:
               typ_packages.append(os.path.relpath(os.path.join(root, f), node_path))
@@ -221,7 +221,7 @@ class NodeResolveTest(TaskTestBase):
     self.assertIsNotNone(node_paths.node_path(scripts_project))
 
     package_json_path = os.path.join(node_path, 'package.json')
-    with open(package_json_path) as fp:
+    with open(package_json_path, 'r') as fp:
       package = json.load(fp)
       self.assertEqual('scripts_project', package['name'],
                        'Expected to find package name of `scripts_project`, but found: {}'
@@ -251,7 +251,7 @@ class NodeResolveTest(TaskTestBase):
       console.log("type of boolean is: " + typ.BOOLEAN);
     """))
     # yarn execution path requires yarn.lock
-    self.create_file('src/node/util/yarn.lock', contents='')
+    self.create_file('src/node/util/yarn.lock')
     target = self.make_target(spec='src/node/util',
                               target_type=NodeModule,
                               sources=['util.js', 'package.json', 'yarn.lock'],
@@ -263,17 +263,13 @@ class NodeResolveTest(TaskTestBase):
     })
     task = self.create_task(context)
 
-    method_to_mock = {
-      'npm': 'execute_npm',
-      'yarn': 'execute_yarnpkg'
-    }[package_manager]
-    with mock.patch.object(task, method_to_mock) as exec_call:
-      exec_call.return_value = (0, None)
+    package_manager_obj = task.get_package_manager(target=target)
+    with mock.patch.object(package_manager_obj, 'run_command') as exec_call:
+      exec_call.return_value.run.return_value.wait.return_value = 0
       task.execute()
       exec_call.assert_called_once_with(
-        expected_params,
-        workunit_labels=mock.ANY,
-        workunit_name=mock.ANY)
+        args=expected_params,
+        node_paths=None)
 
   def test_resolve_default_no_optional_install_npm(self):
     self._test_resolve_optional_install_helper(
@@ -290,11 +286,11 @@ class NodeResolveTest(TaskTestBase):
   def test_resolve_default_no_optional_install_yarn(self):
     self._test_resolve_optional_install_helper(
       install_optional=False,
-      package_manager='yarn',
-      expected_params=['--ignore-optional'])
+      package_manager='yarnpkg',
+      expected_params=['--non-interactive', '--ignore-optional', '--frozen-lockfile'])
 
   def test_resolve_optional_install_yarn(self):
     self._test_resolve_optional_install_helper(
       install_optional=True,
-      package_manager='yarn',
-      expected_params=[])
+      package_manager='yarnpkg',
+      expected_params=['--non-interactive', '--frozen-lockfile'])

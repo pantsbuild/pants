@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -12,7 +11,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.jvm_dependency_usage import DependencyUsageGraph, JvmDependencyUsage
 from pants.util.dirutil import safe_mkdir, touch
-from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
+from pants_test.task_test_base import TaskTestBase, ensure_cached
 
 
 class TestJvmDependencyUsage(TaskTestBase):
@@ -23,7 +22,7 @@ class TestJvmDependencyUsage(TaskTestBase):
 
   def _setup(self, target_classfiles):
     """Takes a dict mapping targets to lists of classfiles."""
-    context = self.context(target_roots=target_classfiles.keys())
+    context = self.context(target_roots=list(target_classfiles.keys()))
 
     # Create classfiles in a target-specific directory, and add it to the classpath for the target.
     classpath_products = context.products.get_data('runtime_classpath',
@@ -125,9 +124,9 @@ class TestJvmDependencyUsage(TaskTestBase):
     graph = self.create_graph(dep_usage, [a, b, c, alias_a_b, alias_b, nested_alias_b])
     # both `:a` and `:b` are resolved from target aliases, one is used the other is not.
     self.assertTrue(graph._nodes[c].dep_edges[a].is_declared)
-    self.assertEquals({'a.class'}, graph._nodes[c].dep_edges[a].products_used)
+    self.assertEqual({'a.class'}, graph._nodes[c].dep_edges[a].products_used)
     self.assertTrue(graph._nodes[c].dep_edges[b].is_declared)
-    self.assertEquals(set(), graph._nodes[c].dep_edges[b].products_used)
+    self.assertEqual(set(), graph._nodes[c].dep_edges[b].products_used)
 
     # With alias to its resolved targets mapping we can determine which aliases are unused.
     # In this example `nested_alias_b` has none of its resolved dependencies being used.
@@ -163,7 +162,7 @@ class TestJvmDependencyUsage(TaskTestBase):
     classes_by_source = task.context.products.get_data('classes_by_source')
     runtime_classpath = task.context.products.get_data('runtime_classpath')
     product_deps_by_src = task.context.products.get_data('product_deps_by_src')
-    analyzer = JvmDependencyAnalyzer('', runtime_classpath, product_deps_by_src)
+    analyzer = JvmDependencyAnalyzer('', runtime_classpath)
     targets_by_file = analyzer.targets_by_file(targets)
     transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(targets)
 
@@ -171,6 +170,7 @@ class TestJvmDependencyUsage(TaskTestBase):
       transitive_deps = set(transitive_deps_by_target.get(target))
       return task.create_dep_usage_node(target,
                                         analyzer,
+                                        product_deps_by_src,
                                         classes_by_source,
                                         targets_by_file,
                                         transitive_deps)

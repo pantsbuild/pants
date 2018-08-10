@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
 
@@ -34,7 +33,7 @@ class GoImportMetaTagReader(Subsystem):
           \s+
           content=['"](?P<root>[^\s]+)\s+(?P<vcs>[^\s]+)\s+(?P<url>[^\s]+)['"]
           \s*
-      >""", flags=re.VERBOSE)
+      /?>""", flags=re.VERBOSE)
 
   @classmethod
   def find_meta_tags(cls, page_html):

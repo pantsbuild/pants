@@ -2,11 +2,11 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import shutil
+from builtins import open
 
 from pants.base.build_environment import get_buildroot
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -30,7 +30,7 @@ class StrictDepsInvalidationIntegrationTest(PantsRunIntegrationTest):
         pants_run = self.run_pants_with_workdir(command=cmd, workdir=workdir)
         self.assert_success(pants_run)
 
-        with open(os.path.join(src_dir, 'D.java'), 'ab') as fh:
+        with open(os.path.join(src_dir, 'D.java'), 'a') as fh:
           fh.write('\n')
 
         pants_run = self.run_pants_with_workdir(command=cmd, workdir=workdir)

@@ -2,10 +2,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import object
 from hashlib import sha1
+
+from future.utils import PY3
+
+from pants.util.strutil import ensure_binary
 
 
 class PayloadFieldAlreadyDefinedError(Exception): pass
@@ -30,7 +34,7 @@ class Payload(object):
 
   @property
   def fields(self):
-    return self._fields.items()
+    return list(self._fields.items())
 
   def as_dict(self):
     """Return the Payload object as a dict."""
@@ -119,12 +123,15 @@ class Payload(object):
         fp = field.fingerprint()
         if fp is not None:
           empty_hash = False
-          hasher.update(sha1(key).hexdigest())
+          fp = ensure_binary(fp)
+          key = ensure_binary(key)
+          key_sha1 = sha1(key).hexdigest().encode('utf-8')
+          hasher.update(key_sha1)
           hasher.update(fp)
     if empty_hash:
       return None
     else:
-      return hasher.hexdigest()
+      return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def mark_dirty(self):
     """Invalidates memoized fingerprints for this payload.

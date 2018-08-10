@@ -2,14 +2,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import filecmp
 import logging
 import os
 import shutil
-from collections import namedtuple
 
 from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
@@ -17,8 +15,14 @@ from pants.binaries.binary_tool import NativeTool
 from pants.option.custom_types import dir_option, file_option
 from pants.util.dirutil import safe_mkdir, safe_rmtree
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.process_handler import subprocess
 
+from pants.contrib.node.subsystems.command import command_gen
+from pants.contrib.node.subsystems.package_managers import (PACKAGE_MANAGER_NPM,
+                                                            PACKAGE_MANAGER_YARNPKG,
+                                                            PACKAGE_MANAGER_YARNPKG_ALIAS,
+                                                            VALID_PACKAGE_MANAGERS,
+                                                            PackageManagerNpm,
+                                                            PackageManagerYarnpkg)
 from pants.contrib.node.subsystems.yarnpkg_distribution import YarnpkgDistribution
 
 
@@ -43,19 +47,10 @@ class NodeDistribution(NativeTool):
   @classmethod
   def register_options(cls, register):
     super(NodeDistribution, cls).register_options(register)
-    register('--supportdir', advanced=True, default='bin/node',
-             removal_version='1.7.0.dev0', removal_hint='No longer supported.',
-             help='Find the Node distributions under this dir.  Used as part of the path to '
-                  'lookup the distribution with --binary-util-baseurls and --pants-bootstrapdir')
-    register('--yarnpkg-version', advanced=True, default='v0.19.1', fingerprint=True,
-             removal_version='1.7.0.dev0',
-             removal_hint='Use --version in scope yarnpkg-distribution',
-             help='Yarnpkg version to use.')
-
     register('--package-manager', advanced=True, default='npm', fingerprint=True,
-             choices=NodeDistribution.VALID_PACKAGE_MANAGER_LIST.keys(),
+             choices=VALID_PACKAGE_MANAGERS,
              help='Default package manager config for repo. Should be one of {}'.format(
-               NodeDistribution.VALID_PACKAGE_MANAGER_LIST.keys()))
+               VALID_PACKAGE_MANAGERS))
     register('--eslint-setupdir', advanced=True, type=dir_option, fingerprint=True,
              help='Find the package.json and yarn.lock under this dir '
                   'for installing eslint and plugins.')
@@ -66,19 +61,25 @@ class NodeDistribution(NativeTool):
     register('--eslint-version', default='4.15.0', fingerprint=True,
              help='Use this ESLint version.')
 
-  PACKAGE_MANAGER_NPM = 'npm'
-  PACKAGE_MANAGER_YARNPKG = 'yarnpkg'
-  VALID_PACKAGE_MANAGER_LIST = {
-    'npm': PACKAGE_MANAGER_NPM,
-    'yarn': PACKAGE_MANAGER_YARNPKG
-  }
+  @memoized_method
+  def _get_package_managers(self):
+    npm = PackageManagerNpm([self._install_node])
+    yarnpkg = PackageManagerYarnpkg([self._install_node, self._install_yarnpkg])
+    return {
+      PACKAGE_MANAGER_NPM: npm,
+      PACKAGE_MANAGER_YARNPKG: yarnpkg,
+      PACKAGE_MANAGER_YARNPKG_ALIAS: yarnpkg,  # Allow yarn to be used as an alias for yarnpkg
+    }
 
-  @classmethod
-  def validate_package_manager(cls, package_manager):
-    if package_manager not in cls.VALID_PACKAGE_MANAGER_LIST.keys():
-      raise TaskError('Unknown package manager: %s' % package_manager)
-    package_manager = cls.VALID_PACKAGE_MANAGER_LIST[package_manager]
-    return package_manager
+  def get_package_manager(self, package_manager=None):
+    package_manager = package_manager or self.get_options().package_manager
+    package_manager_obj = self._get_package_managers().get(package_manager)
+    if not package_manager_obj:
+      raise TaskError(
+        'Unknown package manager: {}.\nValid values are {}.'.format(
+          package_manager, list(NodeDistribution.VALID_PACKAGE_MANAGER_LIST.keys())
+      ))
+    return package_manager_obj
 
   @memoized_method
   def version(self, context=None):
@@ -115,16 +116,8 @@ class NodeDistribution(NativeTool):
   def eslint_ignore(self):
     return self.get_options().eslint_ignore
 
-  @memoized_property
-  def package_manager(self):
-    return self.validate_package_manager(self.get_options().package_manager)
-
-  @memoized_property
-  def yarnpkg_version(self):
-    return self._normalize_version(self.get_options().yarnpkg_version)
-
   @memoized_method
-  def install_node(self):
+  def _install_node(self):
     """Install the Node distribution from pants support binaries.
 
     :returns: The Node distribution bin path.
@@ -138,90 +131,15 @@ class NodeDistribution(NativeTool):
     return node_bin_path
 
   @memoized_method
-  def install_yarnpkg(self, context=None):
+  def _install_yarnpkg(self):
     """Install the Yarnpkg distribution from pants support binaries.
 
-    :param context: The context for this call. Remove this param in 1.7.0.dev0.
     :returns: The Yarnpkg distribution bin path.
     :rtype: string
     """
-    yarnpkg_package_path = YarnpkgDistribution.scoped_instance(self).select(context=context)
+    yarnpkg_package_path = YarnpkgDistribution.scoped_instance(self).select()
     yarnpkg_bin_path = os.path.join(yarnpkg_package_path, 'dist', 'bin')
     return yarnpkg_bin_path
-
-  class Command(namedtuple('Command', ['executable', 'args', 'extra_paths'])):
-    """Describes a command to be run using a Node distribution."""
-
-    @property
-    def cmd(self):
-      """The command line that will be executed when this command is spawned.
-
-      :returns: The full command line used to spawn this command as a list of strings.
-      :rtype: list
-      """
-      return [self.executable] + (self.args or [])
-
-    def _prepare_env(self, kwargs):
-      """Returns a modifed copy of kwargs['env'], and a copy of kwargs with 'env' removed.
-
-      If there is no 'env' field in the kwargs, os.environ.copy() is used.
-      env['PATH'] is set/modified to contain the Node distribution's bin directory at the front.
-
-      :param kwargs: The original kwargs.
-      :returns: An (env, kwargs) tuple containing the modified env and kwargs copies.
-      :rtype: (dict, dict)
-      """
-      kwargs = kwargs.copy()
-      env = kwargs.pop('env', os.environ).copy()
-      env['PATH'] = os.path.pathsep.join(self.extra_paths + [env.get('PATH', '')])
-      return env, kwargs
-
-    def run(self, **kwargs):
-      """Runs this command.
-
-      :param kwargs: Any extra keyword arguments to pass along to `subprocess.Popen`.
-      :returns: A handle to the running command.
-      :rtype: :class:`subprocess.Popen`
-      """
-      env, kwargs = self._prepare_env(kwargs)
-      logger.debug('Running command {}'.format(self.cmd))
-      return subprocess.Popen(self.cmd, env=env, **kwargs)
-
-    def check_output(self, **kwargs):
-      """Runs this command returning its captured stdout.
-
-      :param kwargs: Any extra keyword arguments to pass along to `subprocess.Popen`.
-      :returns: The captured standard output stream of the command.
-      :rtype: string
-      :raises: :class:`subprocess.CalledProcessError` if the command fails.
-      """
-      env, kwargs = self._prepare_env(kwargs)
-      return subprocess.check_output(self.cmd, env=env, **kwargs)
-
-    def __str__(self):
-      return ' '.join(self.cmd)
-
-  def _command_gen(self, tool_installations, tool_executable, args=None, node_paths=None):
-    """Generate a Command object with requires tools installed and paths setup.
-
-    :param list tool_installations: A list of functions to install required tools.  Those functions
-      should take no parameter and return an installation path to be included in the runtime path.
-    :param tool_executable: Name of the tool to be executed.
-    :param list args: A list of arguments to be passed to the executable
-    :param list node_paths: A list of path to node_modules.  node_modules/.bin will be appended
-      to the run time path.
-    :rtype: class: `NodeDistribution.Command`
-    """
-    node_module_bin_dir = 'node_modules/.bin'
-    extra_paths = []
-    for t in tool_installations:
-      extra_paths.append(t())
-    if node_paths:
-      for node_path in node_paths:
-        if not node_path.endswith(node_module_bin_dir):
-          node_path = os.path.join(node_path, node_module_bin_dir)
-        extra_paths.append(node_path)
-    return self.Command(executable=tool_executable, args=args, extra_paths=extra_paths)
 
   def node_command(self, args=None, node_paths=None):
     """Creates a command that can run `node`, passing the given args to it.
@@ -233,32 +151,7 @@ class NodeDistribution(NativeTool):
     """
     # NB: We explicitly allow no args for the `node` command unlike the `npm` command since running
     # `node` with no arguments is useful, it launches a REPL.
-    return self._command_gen([self.install_node], 'node', args=args, node_paths=node_paths)
-
-  def npm_command(self, args, node_paths=None):
-    """Creates a command that can run `npm`, passing the given args to it.
-
-    :param list args: A list of arguments to pass to `npm`.
-    :param list node_paths: An optional list of paths to node_modules.
-    :returns: An `npm` command that can be run later.
-    :rtype: :class:`NodeDistribution.Command`
-    """
-    return self._command_gen([self.install_node], 'npm', args=args, node_paths=node_paths)
-
-  def yarnpkg_command(self, args, node_paths=None, context=None):
-    """Creates a command that can run `yarnpkg`, passing the given args to it.
-
-    :param list args: A list of arguments to pass to `yarnpkg`.
-    :param list node_paths: An optional list of paths to node_modules.
-    :param context: The context for this call. Remove this param in 1.7.0.dev0.
-    :returns: An `yarnpkg` command that can be run later.
-    :rtype: :class:`NodeDistribution.Command`
-    """
-    # TODO: In 1.7.0.dev0, remove this helper func and use self._install_yarnpkg directly.
-    def install_yarnpkg():
-      return self.install_yarnpkg(context=context)
-    return self._command_gen(
-      [self.install_node, install_yarnpkg], 'yarnpkg', args=args, node_paths=node_paths)
+    return command_gen([self._install_node], 'node', args=args, node_paths=node_paths)
 
   def _configure_eslinter(self, bootstrapped_support_path):
     logger.debug('Copying {setupdir} to bootstrapped dir: {support_path}'

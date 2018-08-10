@@ -5,6 +5,7 @@ python_library(
   name = 'task_test_base',
   sources = ['task_test_base.py'],
   dependencies = [
+    'src/python/pants/base:deprecated',
     'src/python/pants/goal:context',
     'src/python/pants/ivy',
     'src/python/pants/task',
@@ -45,6 +46,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
+  timeout = 120,
 )
 
 python_tests(

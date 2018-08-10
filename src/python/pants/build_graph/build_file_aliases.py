@@ -2,16 +2,17 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import inspect
 from abc import abstractmethod
+from builtins import object
 from collections import defaultdict
 
 import six
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
+from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_property
 
@@ -40,6 +41,13 @@ class TargetMacro(object):
       if not target_types:
         raise ValueError('The given `context_aware_object_factory` {} must expand at least 1 '
                          'produced type; none were registered'.format(context_aware_object_factory))
+      deprecated_conditional(
+        lambda: len(target_types) > 1,
+        '1.12.0.dev0',
+        'TargetMacro.Factory instances that construct more than one type are no longer supported. '
+        'Consider using a `context_aware_object_factory, which can construct any number of '
+        'different objects.'
+      )
 
       class Factory(cls):
         @property

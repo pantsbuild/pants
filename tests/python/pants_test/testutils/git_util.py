@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
 from contextlib import contextmanager
@@ -23,7 +22,7 @@ def git_version():
   (stdout, stderr) = process.communicate()
   assert process.returncode == 0, "Failed to determine git version."
   # stdout is like 'git version 1.9.1.598.g9119e8b\n'  We want '1.9.1.598'
-  matches = re.search(r'\s(\d+(?:\.\d+)*)[\s\.]', stdout)
+  matches = re.search(r'\s(\d+(?:\.\d+)*)[\s\.]', stdout.decode('utf-8'))
   return Revision.lenient(matches.group(1))
 
 

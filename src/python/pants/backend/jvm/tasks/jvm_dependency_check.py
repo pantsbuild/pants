@@ -2,20 +2,26 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import filter, next
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.build_graph.address import Address
+from pants.build_graph.resources import Resources
+from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.task.task import Task
+from pants.util.memo import memoized_property
 
 
 class JvmDependencyCheck(Task):
@@ -24,12 +30,6 @@ class JvmDependencyCheck(Task):
   @classmethod
   def register_options(cls, register):
     super(JvmDependencyCheck, cls).register_options(register)
-    register('--missing-deps', choices=['off', 'warn', 'fatal'], default='off',
-             fingerprint=True,
-             help='Check for missing dependencies in compiled code. Reports actual '
-                  'dependencies A -> B where there is no transitive BUILD file dependency path '
-                  'from A to B. If fatal, missing deps are treated as a build error.')
-
     register('--missing-direct-deps', choices=['off', 'warn', 'fatal'],
              default='off',
              fingerprint=True,
@@ -52,17 +52,22 @@ class JvmDependencyCheck(Task):
                   'legitimately have BUILD dependencies that are unused in practice.')
 
   @classmethod
-  def _skip(cls, options):
+  def subsystem_dependencies(cls):
+    return super(JvmDependencyCheck, cls).subsystem_dependencies() + (DependencyContext,)
+
+  @staticmethod
+  def _skip(options):
     """Return true if the task should be entirely skipped, and thus have no product requirements."""
-    values = [options.missing_deps, options.missing_direct_deps, options.unnecessary_deps]
+    values = [options.missing_direct_deps, options.unnecessary_deps]
     return all(v == 'off' for v in values)
 
   @classmethod
   def prepare(cls, options, round_manager):
     super(JvmDependencyCheck, cls).prepare(options, round_manager)
     if not cls._skip(options):
-      round_manager.require_data('runtime_classpath')
       round_manager.require_data('product_deps_by_src')
+      round_manager.require_data('runtime_classpath')
+      round_manager.require_data('zinc_analysis')
 
   def __init__(self, *args, **kwargs):
     super(JvmDependencyCheck, self).__init__(*args, **kwargs)
@@ -72,19 +77,31 @@ class JvmDependencyCheck(Task):
       flag_value = self.get_options().get(flag, None)
       return None if flag_value == 'off' else flag_value
 
-    self._check_missing_deps = munge_flag('missing_deps')
     self._check_missing_direct_deps = munge_flag('missing_direct_deps')
     self._check_unnecessary_deps = munge_flag('unnecessary_deps')
-    self._target_whitelist = self.get_options().missing_deps_whitelist
+    self._target_whitelist = [Address.parse(s) for s in self.get_options().missing_deps_whitelist]
 
   @property
   def cache_target_dirs(self):
     return True
 
+  @memoized_property
+  def _analyzer(self):
+    return JvmDependencyAnalyzer(get_buildroot(),
+                                 self.context.products.get_data('runtime_classpath'))
+
   def execute(self):
     if self._skip(self.get_options()):
       return
-    with self.invalidated(self.context.targets(),
+
+    classpath_product = self.context.products.get_data('runtime_classpath')
+    fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
+        classpath_product)
+
+    targets = list(self.context.products.get_data('zinc_analysis').keys())
+
+    with self.invalidated(targets,
+                          fingerprint_strategy=fingerprint_strategy,
                           invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.invalid_vts:
         product_deps_by_src = self.context.products.get_data('product_deps_by_src').get(vt.target)
@@ -96,8 +113,8 @@ class JvmDependencyCheck(Task):
 
     See docstring for _compute_missing_deps for details.
     """
-    if self._check_missing_deps or self._check_missing_direct_deps or self._check_unnecessary_deps:
-      missing_file_deps, missing_tgt_deps, missing_direct_tgt_deps = \
+    if self._check_missing_direct_deps or self._check_unnecessary_deps:
+      missing_file_deps, missing_direct_tgt_deps = \
         self._compute_missing_deps(src_tgt, actual_deps)
 
       buildroot = get_buildroot()
@@ -110,24 +127,7 @@ class JvmDependencyCheck(Task):
       def filter_whitelisted(missing_deps):
         # Removing any targets that exist in the whitelist from the list of dependency issues.
         return [(tgt_pair, evidence) for (tgt_pair, evidence) in missing_deps
-                            if tgt_pair[0].address.reference() not in self._target_whitelist]
-
-      missing_tgt_deps = filter_whitelisted(missing_tgt_deps)
-
-      if self._check_missing_deps and (missing_file_deps or missing_tgt_deps):
-        log_fn = (self.context.log.error if self._check_missing_deps == 'fatal'
-                  else self.context.log.warn)
-        for (tgt_pair, evidence) in missing_tgt_deps:
-          evidence_str = '\n'.join(['    {} uses {}'.format(shorten(e[0]), shorten(e[1]))
-                                    for e in evidence])
-          log_fn('Missing BUILD dependency {} -> {} because:\n{}'
-                 .format(tgt_pair[0].address.reference(), tgt_pair[1].address.reference(),
-                         evidence_str))
-        for (src_tgt, dep) in missing_file_deps:
-          log_fn('Missing BUILD dependency {} -> {}'
-                 .format(src_tgt.address.reference(), shorten(dep)))
-        if self._check_missing_deps == 'fatal':
-          raise TaskError('Missing deps.')
+                            if tgt_pair[0].address not in self._target_whitelist]
 
       missing_direct_tgt_deps = filter_whitelisted(missing_direct_tgt_deps)
 
@@ -135,15 +135,19 @@ class JvmDependencyCheck(Task):
         log_fn = (self.context.log.error if self._check_missing_direct_deps == 'fatal'
                   else self.context.log.warn)
         for (tgt_pair, evidence) in missing_direct_tgt_deps:
-          evidence_str = '\n'.join(['    {} uses {}'.format(shorten(e[0]), shorten(e[1]))
+          evidence_str = '\n'.join(['  {} uses {}'.format(shorten(e[0]), shorten(e[1]))
                                     for e in evidence])
           log_fn('Missing direct BUILD dependency {} -> {} because:\n{}'
-                 .format(tgt_pair[0].address, tgt_pair[1].address, evidence_str))
+                 .format(tgt_pair[0].address.spec, tgt_pair[1].address.spec, evidence_str))
         if self._check_missing_direct_deps == 'fatal':
           raise TaskError('Missing direct deps.')
 
       if self._check_unnecessary_deps:
-        raise TaskError('Unnecessary dep warnings not implemented yet.')
+        log_fn = (self.context.log.error if self._check_unnecessary_deps == 'fatal'
+                  else self.context.log.warn)
+        had_unused = self._do_check_unnecessary_deps(src_tgt, actual_deps, log_fn)
+        if had_unused and self._check_unnecessary_deps == 'fatal':
+          raise TaskError('Unnecessary deps.')
 
   def _compute_missing_deps(self, src_tgt, actual_deps):
     """Computes deps that are used by the compiler but not specified in a BUILD file.
@@ -160,23 +164,18 @@ class JvmDependencyCheck(Task):
     - actual_deps: a map src -> list of actual deps (source, class or jar file) as noted by the
       compiler.
 
-    Returns a triple (missing_file_deps, missing_tgt_deps, missing_direct_tgt_deps) where:
+    Returns a tuple (missing_file_deps, missing_direct_tgt_deps) where:
 
     - missing_file_deps: a list of dep_files where src_tgt requires dep_file, and we're unable
       to map to a target (because its target isn't in the total set of targets in play,
       and we don't want to parse every BUILD file in the workspace just to find it).
-
-    - missing_tgt_deps: a list of dep_tgt where src_tgt is missing a necessary transitive
-                        dependency on dep_tgt.
 
     - missing_direct_tgt_deps: a list of dep_tgts where src_tgt is missing a direct dependency
                                on dep_tgt but has a transitive dep on it.
 
     All paths in the input and output are absolute.
     """
-    analyzer = JvmDependencyAnalyzer(get_buildroot(),
-                                     self.context.products.get_data('runtime_classpath'),
-                                     self.context.products.get_data('product_deps_by_src'))
+    analyzer = self._analyzer
     def must_be_explicit_dep(dep):
       # We don't require explicit deps on the java runtime, so we shouldn't consider that
       # a missing dep.
@@ -196,14 +195,8 @@ class JvmDependencyCheck(Task):
       else:
         return False
 
-    # TODO: If recomputing these every time becomes a performance issue, memoize for
-    # already-seen targets and incrementally compute for new targets not seen in a previous
-    # partition, in this or a previous chunk.
-    transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(self.context.targets())
-
     # Find deps that are actual but not specified.
     missing_file_deps = OrderedSet()  # (src, src).
-    missing_tgt_deps_map = defaultdict(list)  # (tgt, tgt) -> a list of (src, src) as evidence.
     missing_direct_tgt_deps_map = defaultdict(list)  # The same, but for direct deps.
 
     targets_by_file = analyzer.targets_by_file(self.context.targets())
@@ -219,13 +212,92 @@ class JvmDependencyCheck(Task):
         elif not target_or_java_dep_in_targets(src_tgt, actual_dep_tgts):
           # Obviously intra-target deps are fine.
           canonical_actual_dep_tgt = next(iter(actual_dep_tgts))
-          if actual_dep_tgts.isdisjoint(transitive_deps_by_target.get(src_tgt, [])):
-            missing_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append((src, actual_dep))
-          elif canonical_actual_dep_tgt not in src_tgt.dependencies:
+          if canonical_actual_dep_tgt not in src_tgt.dependencies:
             # The canonical dep is the only one a direct dependency makes sense on.
             missing_direct_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append(
                 (src, actual_dep))
 
     return (list(missing_file_deps),
-            missing_tgt_deps_map.items(),
-            missing_direct_tgt_deps_map.items())
+            list(missing_direct_tgt_deps_map.items()))
+
+  def _do_check_unnecessary_deps(self, target, actual_deps, log_fn):
+    replacement_deps = self._compute_unnecessary_deps(target, actual_deps)
+    if not replacement_deps:
+      return False
+
+    # Warn or error for unused.
+    def joined_dep_msg(deps):
+      return '\n  '.join('\'{}\','.format(dep.address.spec) for dep in sorted(deps))
+    flat_replacements = set(r for replacements in replacement_deps.values() for r in replacements)
+    replacements_msg = ''
+    if flat_replacements:
+      replacements_msg = 'Suggested replacements:\n  {}\n'.format(joined_dep_msg(flat_replacements))
+    unused_msg = (
+        'unnecessary BUILD dependencies:\n  {}\n{}'
+        '(If you\'re seeing this message in error, you might need to '
+        'change the `scope` of the dependencies.)'.format(
+          joined_dep_msg(list(replacement_deps.keys())),
+          replacements_msg,
+        )
+      )
+    log_fn('Target {} had {}'.format(target.address.spec, unused_msg))
+    return True
+
+  def _compute_unnecessary_deps(self, target, actual_deps):
+    """Computes unused deps for the given Target.
+
+    :returns: A dict of directly declared but unused targets, to sets of suggested replacements.
+    """
+    # Flatten the product deps of this target.
+    product_deps = set()
+    for dep_entries in actual_deps.values():
+      product_deps.update(dep_entries)
+
+    # Determine which of the DEFAULT deps in the declared set of this target were used.
+    used = set()
+    unused = set()
+    for dep, _ in self._analyzer.resolve_aliases(target, scope=Scopes.DEFAULT):
+      if dep in used or dep in unused:
+        continue
+      # TODO: What's a better way to accomplish this check? Filtering by `has_sources` would
+      # incorrectly skip "empty" `*_library` targets, which could then be used as a loophole.
+      if isinstance(dep, (Resources, UnpackedJars)):
+        continue
+      # If any of the target's jars or classfiles were used, consider it used.
+      if product_deps.isdisjoint(self._analyzer.files_for_target(dep)):
+        unused.add(dep)
+      else:
+        used.add(dep)
+
+    # If there were no unused deps, break.
+    if not unused:
+      return {}
+
+    # For any deps that were used, count their derived-from targets used as well.
+    # TODO: Refactor to do some of this above once tests are in place.
+    for dep in list(used):
+      for derived_from in dep.derived_from_chain:
+        if derived_from in unused:
+          unused.remove(derived_from)
+          used.add(derived_from)
+
+    # Prune derived targets that would be in the set twice.
+    for dep in list(unused):
+      if set(dep.derived_from_chain) & unused:
+        unused.remove(dep)
+
+    if not unused:
+      return {}
+
+    # For any deps that were not used, determine whether their transitive deps were used, and
+    # recommend those as replacements.
+    replacements = {}
+    for dep in unused:
+      replacements[dep] = set()
+      for t in dep.closure():
+        if t in used or t in unused:
+          continue
+        if not product_deps.isdisjoint(self._analyzer.files_for_target(t)):
+          replacements[dep].add(t.concrete_derived_from)
+
+    return replacements

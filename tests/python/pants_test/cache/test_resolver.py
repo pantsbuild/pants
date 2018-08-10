@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
 
@@ -20,18 +19,18 @@ class TestResponseParser(unittest.TestCase):
 
   def testParse(self):
     response_parser = ResponseParser()
-    self.assertEquals(['url1', 'url2'], response_parser.parse('{"hostlist": ["url1", "url2"]}'))
+    self.assertEqual(['url1', 'url2'], response_parser.parse(b'{"hostlist": ["url1", "url2"]}'))
 
-    self.assertEquals([], response_parser.parse('{"hostlist": []}'))
-
-    with self.assertRaises(ResponseParser.ResponseParserError):
-      response_parser.parse('{"hostlist": "not a list"}')
+    self.assertEqual([], response_parser.parse(b'{"hostlist": []}'))
 
     with self.assertRaises(ResponseParser.ResponseParserError):
-      response_parser.parse('a garbage response')
+      response_parser.parse(b'{"hostlist": "not a list"}')
 
     with self.assertRaises(ResponseParser.ResponseParserError):
-      response_parser.parse('{"mismatched-index": ["url1", "url2"]}')
+      response_parser.parse(b'a garbage response')
+
+    with self.assertRaises(ResponseParser.ResponseParserError):
+      response_parser.parse(b'{"mismatched-index": ["url1", "url2"]}')
 
     with self.assertRaises(ResponseParser.ResponseParserError):
       # a mismatched encoding also fails
@@ -64,7 +63,7 @@ class TestRESTfulResolver(unittest.TestCase):
   def testResolveSuccess(self):
     with patch.object(requests.Session, 'get', **PATCH_OPTS) as mock_get:
       mock_get.return_value = self.mock_response(requests.codes.ok, urls=self.URLS)
-      self.assertEquals(self.URLS, self.resolver.resolve(self.TEST_RESOLVED_FROM))
+      self.assertEqual(self.URLS, self.resolver.resolve(self.TEST_RESOLVED_FROM))
 
   def testResolveErrorEmptyReturn(self):
     with patch.object(requests.Session, 'get', **PATCH_OPTS) as mock_get:

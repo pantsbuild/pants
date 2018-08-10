@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
 
@@ -33,12 +32,12 @@ class JarDependencyTest(unittest.TestCase):
     base_path = 'a/b'
 
     jar_with_rel_url = self._mkjardep(url=rel_url, base_path=base_path)
-    self.assertEquals(abs_url, jar_with_rel_url.get_url())
-    self.assertEquals(rel_url, jar_with_rel_url.get_url(relative=True))
+    self.assertEqual(abs_url, jar_with_rel_url.get_url())
+    self.assertEqual(rel_url, jar_with_rel_url.get_url(relative=True))
 
     jar_with_abs_url = self._mkjardep(url=abs_url, base_path=base_path)
-    self.assertEquals(abs_url, jar_with_abs_url.get_url())
-    self.assertEquals(rel_url, jar_with_abs_url.get_url(relative=True))
+    self.assertEqual(abs_url, jar_with_abs_url.get_url())
+    self.assertEqual(rel_url, jar_with_abs_url.get_url(relative=True))
 
   def _test_copy(self, original):
     # A no-op clone results in an equal object.

@@ -2,17 +2,18 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import datetime
+import faulthandler
 import logging
 import os
 import signal
 import sys
 import traceback
+from builtins import object, str
 
-import faulthandler
+from future.utils import PY2
 
 from pants.util.dirutil import safe_open
 
@@ -71,6 +72,8 @@ class Exiter(object):
     :param out: The file descriptor to emit `msg` to. (Optional)
     """
     if msg:
+      if PY2:
+        msg = msg.encode('utf-8')  # sys.stderr expects bytes in Py2, unicode in Py3
       print(msg, file=out or sys.stderr)
     self._exit(result)
 
@@ -83,14 +86,14 @@ class Exiter(object):
 
   def handle_unhandled_exception(self, exc_class=None, exc=None, tb=None, add_newline=False):
     """Default sys.excepthook implementation for unhandled exceptions."""
-    exc_class = exc_class or sys.exc_type
-    exc = exc or sys.exc_value
-    tb = tb or sys.exc_traceback
+    exc_class = exc_class or sys.exc_info()[0]
+    exc = exc or sys.exc_info()[1]
+    tb = tb or sys.exc_info()[2]
 
     def format_msg(print_backtrace=True):
       msg = 'Exception caught: ({})\n'.format(type(exc))
       msg += '{}\n'.format(''.join(self._format_tb(tb))) if print_backtrace else '\n'
-      msg += 'Exception message: {}\n'.format(exc if str(exc) else 'none')
+      msg += 'Exception message: {}\n'.format(str(exc) if exc else 'none')
       msg += '\n' if add_newline else ''
       return msg
 

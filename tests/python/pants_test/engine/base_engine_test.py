@@ -2,15 +2,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class EngineTestBase(BaseTest):
+class EngineTestBase(TestBase):
   """
   :API: public
   """
@@ -29,7 +28,7 @@ class EngineTestBase(BaseTest):
 
     :API: public
     """
-    return map(cls.as_goal, goal_names)
+    return [cls.as_goal(goal_name) for goal_name in goal_names]
 
   @classmethod
   def install_task(cls, name, action=None, dependencies=None, goal=None):

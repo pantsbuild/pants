@@ -2,17 +2,20 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import errno
 import logging
 import os
 import re
 import textwrap
+from builtins import open
+from collections import defaultdict
 from contextlib import closing
 from hashlib import sha1
 from xml.etree import ElementTree
+
+from future.utils import PY3
 
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -23,17 +26,14 @@ from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
-from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
-from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis import ZincAnalysis
-from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis_parser import ZincAnalysisParser
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import safe_open
+from pants.util.dirutil import fast_relpath, safe_open
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -70,7 +70,8 @@ class BaseZincCompile(JvmCompile):
   def _write_javac_plugin_info(resources_dir, javac_plugin_target):
     javac_plugin_info_file = os.path.join(resources_dir, _JAVAC_PLUGIN_INFO_FILE)
     with safe_open(javac_plugin_info_file, 'w') as f:
-      f.write(javac_plugin_target.classname)
+      classname = javac_plugin_target.classname if PY3 else javac_plugin_target.classname.decode('utf-8')
+      f.write(classname)
 
   @staticmethod
   def validate_arguments(log, whitelisted_args, args):
@@ -121,11 +122,6 @@ class BaseZincCompile(JvmCompile):
     return super(BaseZincCompile, cls).implementation_version() + [('BaseZincCompile', 7)]
 
   @classmethod
-  def compiler_plugin_types(cls):
-    """A tuple of target types which are compiler plugins."""
-    return (AnnotationProcessor, JavacPlugin, ScalacPlugin)
-
-  @classmethod
   def get_jvm_options_default(cls, bootstrap_option_values):
     return ('-Dfile.encoding=UTF-8', '-Dzinc.analysis.cache.limit=1000',
             '-Djava.awt.headless=true', '-Xmx2g')
@@ -154,7 +150,6 @@ class BaseZincCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(BaseZincCompile, cls).register_options(register)
-    # TODO: Sort out JVM compile config model: https://github.com/pantsbuild/pants/issues/4483.
     register('--whitelisted-args', advanced=True, type=dict,
              default={
                '-S.*': False,
@@ -179,7 +174,7 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BaseZincCompile, cls).subsystem_dependencies() + (Zinc.Factory,)
+    return super(BaseZincCompile, cls).subsystem_dependencies() + (Zinc.Factory, JvmPlatform,)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -206,8 +201,6 @@ class BaseZincCompile(JvmCompile):
 
   def __init__(self, *args, **kwargs):
     super(BaseZincCompile, self).__init__(*args, **kwargs)
-    self.set_distribution(jdk=True)
-
     # A directory to contain per-target subdirectories with apt processor info files.
     self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
 
@@ -221,9 +214,29 @@ class BaseZincCompile(JvmCompile):
   def select_source(self, source_file_path):
     raise NotImplementedError()
 
-  def create_analysis_tools(self):
-    return AnalysisTools(self.dist.real_home, ZincAnalysisParser(), ZincAnalysis,
-                         get_buildroot(), self.get_options().pants_workdir)
+  def register_extra_products_from_contexts(self, targets, compile_contexts):
+    compile_contexts = [self.select_runtime_context(compile_contexts[t]) for t in targets]
+    zinc_analysis = self.context.products.get_data('zinc_analysis')
+    zinc_args = self.context.products.get_data('zinc_args')
+
+    if zinc_analysis is not None:
+      for compile_context in compile_contexts:
+        zinc_analysis[compile_context.target] = (compile_context.classes_dir,
+        compile_context.jar_file,
+        compile_context.analysis_file)
+
+    if zinc_args is not None:
+      for compile_context in compile_contexts:
+        with open(compile_context.zinc_args_file, 'r') as fp:
+          args = fp.read().split()
+        zinc_args[compile_context.target] = args
+
+  def create_empty_extra_products(self):
+    if self.context.products.is_required_data('zinc_analysis'):
+      self.context.products.safe_create_data('zinc_analysis', dict)
+
+    if self.context.products.is_required_data('zinc_args'):
+      self.context.products.safe_create_data('zinc_args', lambda: defaultdict(list))
 
   def javac_classpath(self):
     # Note that if this classpath is empty then Zinc will automatically use the javac from
@@ -258,34 +271,54 @@ class BaseZincCompile(JvmCompile):
     than compiling it.
     """
     hasher = sha1()
-    for jar_path in self._zinc.zinc + [self._zinc.compiler_interface, self._zinc.compiler_bridge]:
-      hasher.update(os.path.relpath(jar_path, self.get_options().pants_workdir))
+    for cp_entry in [self._zinc.zinc, self._zinc.compiler_interface, self._zinc.compiler_bridge]:
+      hasher.update(os.path.relpath(cp_entry, self.get_options().pants_workdir))
     key = hasher.hexdigest()[:12]
     return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
 
-  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, zinc_args_file, settings, fatal_warnings, zinc_file_manager,
+  def compile(self, ctx, args, dependency_classpath, upstream_analysis,
+              settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
-    self._verify_zinc_classpath(classpath)
-    self._verify_zinc_classpath(upstream_analysis.keys())
+    absolute_classpath = (ctx.classes_dir,) + tuple(ce.path for ce in dependency_classpath)
+
+    if self.get_options().capture_classpath:
+      self._record_compile_classpath(absolute_classpath, ctx.target, ctx.classes_dir)
+
+    self._verify_zinc_classpath(absolute_classpath)
+    self._verify_zinc_classpath(list(upstream_analysis.keys()))
+
+    def relative_to_exec_root(path):
+      return fast_relpath(path, get_buildroot())
+
+    scala_path = self.scalac_classpath()
+    compiler_interface = self._zinc.compiler_interface
+    compiler_bridge = self._zinc.compiler_bridge
+    classes_dir = ctx.classes_dir
+    analysis_cache = ctx.analysis_file
+
+    scala_path = tuple(relative_to_exec_root(c) for c in scala_path)
+    compiler_interface = relative_to_exec_root(compiler_interface)
+    compiler_bridge = relative_to_exec_root(compiler_bridge)
+    analysis_cache = relative_to_exec_root(analysis_cache)
+    classes_dir = relative_to_exec_root(classes_dir)
+    # TODO: Have these produced correctly, rather than having to relativize them here
+    relative_classpath = tuple(relative_to_exec_root(c) for c in absolute_classpath)
 
     zinc_args = []
-
     zinc_args.extend([
       '-log-level', self.get_options().level,
-      '-analysis-cache', analysis_file,
-      '-classpath', ':'.join(classpath),
-      '-d', classes_output_dir
+      '-analysis-cache', analysis_cache,
+      '-classpath', ':'.join(relative_classpath),
+      '-d', classes_dir,
     ])
     if not self.get_options().colors:
       zinc_args.append('-no-color')
-    if log_file:
-      zinc_args.extend(['-capture-log', log_file])
 
-    zinc_args.extend(['-compiler-interface', self._zinc.compiler_interface])
-    zinc_args.extend(['-compiler-bridge', self._zinc.compiler_bridge])
+    zinc_args.extend(['-compiler-interface', compiler_interface])
+    zinc_args.extend(['-compiler-bridge', compiler_bridge])
+    # TODO: Move this to live inside the workdir: https://github.com/pantsbuild/pants/issues/6155
     zinc_args.extend(['-zinc-cache-dir', self._zinc_cache_dir])
-    zinc_args.extend(['-scala-path', ':'.join(self.scalac_classpath())])
+    zinc_args.extend(['-scala-path', ':'.join(scala_path)])
 
     zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
     # Search for scalac plugins on the classpath.
@@ -293,27 +326,42 @@ class BaseZincCompile(JvmCompile):
     # - We also search in the extra scalac plugin dependencies, if specified.
     # - In scala 2.11 and up, the plugin's classpath element can be a dir, but for 2.10 it must be
     #   a jar.  So in-repo plugins will only work with 2.10 if --use-classpath-jars is true.
-    # - We exclude our own classes_output_dir, because if we're a plugin ourselves, then our
-    #   classes_output_dir doesn't have scalac-plugin.xml yet, and we don't want that fact to get
+    # - We exclude our own classes_dir/jar_file, because if we're a plugin ourselves, then our
+    #   classes_dir doesn't have scalac-plugin.xml yet, and we don't want that fact to get
     #   memoized (which in practice will only happen if this plugin uses some other plugin, thus
     #   triggering the plugin search mechanism, which does the memoizing).
     scalac_plugin_search_classpath = (
-      (set(classpath) | set(self.scalac_plugin_classpath_elements())) -
-      {classes_output_dir}
+      (set(absolute_classpath) | set(self.scalac_plugin_classpath_elements())) -
+      {ctx.classes_dir, ctx.jar_file}
     )
     zinc_args.extend(self._scalac_plugin_args(scalac_plugin_map, scalac_plugin_search_classpath))
     if upstream_analysis:
       zinc_args.extend(['-analysis-map',
-                        ','.join('{}:{}'.format(*kv) for kv in upstream_analysis.items())])
+                        ','.join('{}:{}'.format(
+                          relative_to_exec_root(k),
+                          relative_to_exec_root(v)
+                        ) for k, v in upstream_analysis.items())])
+
+    zinc_args.extend(self._zinc.rebase_map_args)
 
     zinc_args.extend(args)
     zinc_args.extend(self._get_zinc_arguments(settings))
     zinc_args.append('-transactional')
 
-    if fatal_warnings:
-      zinc_args.extend(self.get_options().fatal_warnings_enabled_args)
-    else:
-      zinc_args.extend(self.get_options().fatal_warnings_disabled_args)
+    for option_set in compiler_option_sets:
+      enabled_args = self.get_options().compiler_option_sets_enabled_args.get(option_set, [])
+      if option_set == 'fatal_warnings':
+        enabled_args = self.get_options().fatal_warnings_enabled_args
+      zinc_args.extend(enabled_args)
+
+    for option_set, disabled_args in self.get_options().compiler_option_sets_disabled_args.items():
+      if option_set not in compiler_option_sets:
+        if option_set == 'fatal_warnings':
+          disabled_args = self.get_options().fatal_warnings_disabled_args
+        zinc_args.extend(disabled_args)
+
+    if not self._clear_invalid_analysis:
+      zinc_args.append('-no-clear-invalid-analysis')
 
     if not zinc_file_manager:
       zinc_args.append('-no-zinc-file-manager')
@@ -332,31 +380,34 @@ class BaseZincCompile(JvmCompile):
 
     jvm_options.extend(self._jvm_options)
 
-    zinc_args.extend(sources)
+    zinc_args.extend(ctx.sources)
 
-    self.log_zinc_file(analysis_file)
-    with open(zinc_args_file, 'w') as fp:
+    self.log_zinc_file(ctx.analysis_file)
+    with open(ctx.zinc_args_file, 'wb') as fp:
       for arg in zinc_args:
         fp.write(arg)
         fp.write(b'\n')
 
-    if self.runjava(classpath=self._zinc.zinc,
+    if self.runjava(classpath=[self._zinc.zinc],
                     main=Zinc.ZINC_COMPILE_MAIN,
                     jvm_options=jvm_options,
                     args=zinc_args,
                     workunit_name=self.name(),
-                    workunit_labels=[WorkUnitLabel.COMPILER]):
+                    workunit_labels=[WorkUnitLabel.COMPILER],
+                    dist=self._zinc.dist):
       raise TaskError('Zinc compile failed.')
 
   def _verify_zinc_classpath(self, classpath):
     def is_outside(path, putative_parent):
       return os.path.relpath(path, putative_parent).startswith(os.pardir)
 
+    dist = self._zinc.dist
     for path in classpath:
       if not os.path.isabs(path):
         raise TaskError('Classpath entries provided to zinc should be absolute. '
                         '{} is not.'.format(path))
-      if is_outside(path, self.get_options().pants_workdir) and is_outside(path, self.dist.home):
+
+      if is_outside(path, self.get_options().pants_workdir) and is_outside(path, dist.home):
         raise TaskError('Classpath entries provided to zinc should be in working directory or '
                         'part of the JDK. {} is not.'.format(path))
       if path != os.path.normpath(path):
@@ -387,7 +438,7 @@ class BaseZincCompile(JvmCompile):
     if not scalac_plugin_map:
       return []
 
-    plugin_jar_map = self._find_scalac_plugins(scalac_plugin_map.keys(), classpath)
+    plugin_jar_map = self._find_scalac_plugins(list(scalac_plugin_map.keys()), classpath)
     ret = []
     for name, cp_entries in plugin_jar_map.items():
       # Note that the first element in cp_entries is the one containing the plugin's metadata,
@@ -465,7 +516,7 @@ class BaseZincCompile(JvmCompile):
 
     if os.path.isdir(classpath_element):
       try:
-        with open(os.path.join(classpath_element, _SCALAC_PLUGIN_INFO_FILE)) as plugin_info_file:
+        with open(os.path.join(classpath_element, _SCALAC_PLUGIN_INFO_FILE), 'r') as plugin_info_file:
           return process_info_file(classpath_element, plugin_info_file)
       except IOError as e:
         if e.errno != errno.ENOENT:
@@ -484,40 +535,8 @@ class ZincCompile(BaseZincCompile):
   """Compile Scala and Java code to classfiles using Zinc."""
 
   @classmethod
-  def register_options(cls, register):
-    super(ZincCompile, cls).register_options(register)
-    register('--javac-plugins', advanced=True, type=list, fingerprint=True,
-             help='Use these javac plugins.')
-    register('--javac-plugin-args', advanced=True, type=dict, default={}, fingerprint=True,
-             help='Map from javac plugin name to list of arguments for that plugin.')
-    cls.register_jvm_tool(register, 'javac-plugin-dep', classpath=[],
-                          help='Search for javac plugins here, as well as in any '
-                               'explicit dependencies.')
-
-    register('--scalac-plugins', advanced=True, type=list, fingerprint=True,
-             help='Use these scalac plugins.')
-    register('--scalac-plugin-args', advanced=True, type=dict, default={}, fingerprint=True,
-             help='Map from scalac plugin name to list of arguments for that plugin.')
-    cls.register_jvm_tool(register, 'scalac-plugin-dep', classpath=[],
-                          help='Search for scalac plugins here, as well as in any '
-                               'explicit dependencies.')
-
-  @classmethod
   def product_types(cls):
-    return ['runtime_classpath', 'classes_by_source', 'product_deps_by_src', 'zinc_args']
-
-  @memoized_method
-  def extra_compile_time_classpath_elements(self):
-    # javac plugins are loaded from the regular class entries containing javac plugins,
-    # so we can provide them here.
-    # Note that, unlike javac, scalac plugins are not loaded from the regular classpath,
-    # so we don't provide them here.
-    return self.tool_classpath('javac-plugin-dep')
-
-  @memoized_method
-  def scalac_plugin_classpath_elements(self):
-    """Classpath entries containing scalac plugins."""
-    return self.tool_classpath('scalac-plugin-dep')
+    return ['runtime_classpath', 'zinc_analysis', 'zinc_args']
 
   def select(self, target):
     # Require that targets are marked for JVM compilation, to differentiate from
@@ -528,3 +547,7 @@ class ZincCompile(BaseZincCompile):
 
   def select_source(self, source_file_path):
     return source_file_path.endswith('.java') or source_file_path.endswith('.scala')
+
+  def execute(self):
+    if JvmPlatform.global_instance().get_options().compiler == 'zinc':
+      return super(ZincCompile, self).execute()

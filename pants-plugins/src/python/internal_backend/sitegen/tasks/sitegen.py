@@ -2,19 +2,21 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+import cgi
 import collections
-import datetime
 import json
 import os
 import re
 import shutil
+from builtins import object, open, range
+from datetime import datetime
 
-import pystache
-from six.moves import range
+from pystache import Renderer
 
+from pants.backend.docgen.tasks.generate_pants_reference import GeneratePantsReference
+from pants.backend.docgen.tasks.markdown_to_html import MarkdownToHtml
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
 
@@ -45,6 +47,15 @@ class SiteGen(Task):
     super(SiteGen, cls).register_options(register)
     register('--config-path', type=list, help='Path to .json file describing site structure.')
 
+  # FIXME(cosmicexplorer): requiring these products ensures that the markdown
+  # and reference tasks run before this one, but we don't use those
+  # products.
+  @classmethod
+  def prepare(cls, options, round_manager):
+    round_manager.require(MarkdownToHtml.MARKDOWN_HTML_PRODUCT)
+    round_manager.require_data(GeneratePantsReference.PANTS_REFERENCE_PRODUCT)
+    round_manager.require_data(GeneratePantsReference.BUILD_DICTIONARY_PRODUCT)
+
   def execute(self):
     if not self.get_options().config_path:
       raise TaskError('The config_path option must be specified, e.g., with the --config-path flag')
@@ -60,8 +71,8 @@ class SiteGen(Task):
 
 def load_config(json_path):
   """Load config info from a .json file and return it."""
-  with open(json_path) as json_file:
-    config = json.loads(json_file.read().decode('utf8'))
+  with open(json_path, 'r') as json_file:
+    config = json.loads(json_file.read())
   # sanity-test the config:
   assert(config['tree'][0]['page'] == 'index')
   return config
@@ -71,8 +82,8 @@ def load_soups(config):
   """Generate BeautifulSoup AST for each page listed in config."""
   soups = {}
   for page, path in config['sources'].items():
-    with open(path, 'rb') as orig_file:
-      soups[page] = beautiful_soup(orig_file.read().decode('utf-8'))
+    with open(path, 'r') as orig_file:
+      soups[page] = beautiful_soup(orig_file.read())
   return soups
 
 
@@ -201,20 +212,24 @@ def ensure_headings_linkable(soups):
   Enables tables of contents.
   """
   for soup in soups.values():
-    # To avoid re-assigning an existing id, note 'em down.
-    # Case-insensitve because distinguishing links #Foo and #foo would be weird.
-    existing_anchors = find_existing_anchors(soup)
-    count = 100
-    for tag in soup.find_all(_heading_re):
-      if not (tag.has_attr('id') or tag.has_attr('name')):
-        snippet = ''.join([c for c in tag.text if c.isalpha()])[:20]
-        while True:
-          count += 1
-          candidate_id = 'heading_{0}_{1}'.format(snippet, count).lower()
-          if not candidate_id in existing_anchors:
-            existing_anchors.add(candidate_id)
-            tag['id'] = candidate_id
-            break
+    ensure_page_headings_linkable(soup)
+
+
+def ensure_page_headings_linkable(soup):
+  # To avoid re-assigning an existing id, note 'em down.
+  # Case-insensitve because distinguishing links #Foo and #foo would be weird.
+  existing_anchors = find_existing_anchors(soup)
+  count = 100
+  for tag in soup.find_all(_heading_re):
+    if not (tag.has_attr('id') or tag.has_attr('name')):
+      snippet = ''.join([c for c in tag.text if c.isalpha()])[:20]
+      while True:
+        count += 1
+        candidate_id = 'heading_{0}_{1}'.format(snippet, count).lower()
+        if not candidate_id in existing_anchors:
+          existing_anchors.add(candidate_id)
+          tag['id'] = candidate_id
+          break
 
 
 def link_pantsrefs(soups, precomputed):
@@ -251,22 +266,36 @@ def generate_site_toc(config, precomputed, here):
 
   def recurse(tree, depth_so_far):
     for node in tree:
+      if 'collapsible_heading' in node and 'pages' in node:
+        heading = node['collapsible_heading']
+        pages = node['pages']
+        links = []
+        collapse_open = False
+        for cur_page in pages:
+          html_filename = '{}.html'.format(cur_page)
+          page_is_here = cur_page == here
+          if page_is_here:
+            link = html_filename
+            collapse_open = True
+          else:
+            link = os.path.relpath(html_filename, os.path.dirname(here))
+          links.append(dict(link=link, text=precomputed.page[cur_page].title, here=page_is_here))
+        site_toc.append(dict(depth=depth_so_far, links=links, dropdown=True, heading=heading, id=heading.replace(' ', '-'), open=collapse_open))
       if 'heading' in node:
         heading = node['heading']
-        site_toc.append(dict(depth=depth_so_far,
-                             link=None,
-                             text=heading,
-                             here=False))
-      if 'page' in node and node['page'] != 'index':
-        dst = node['page']
-        if dst == here:
-          link = here + '.html'
-        else:
-          link = os.path.relpath(dst + '.html', os.path.dirname(here))
-        site_toc.append(dict(depth=depth_so_far,
-                             link=link,
-                             text=precomputed.page[dst].title,
-                             here=(dst == here)))
+        site_toc.append(dict(depth=depth_so_far, links=None, dropdown=False, heading=heading, id=heading.replace(' ', '-')))
+      if 'pages' in node and not 'collapsible_heading' in node:
+        pages = node['pages']
+        links = []
+        for cur_page in pages:
+          html_filename = '{}.html'.format(cur_page)
+          page_is_here = cur_page == here
+          if page_is_here:
+            link = html_filename
+          else:
+            link = os.path.relpath(html_filename, os.path.dirname(here))
+          links.append(dict(link=link, text=precomputed.page[cur_page].title, here=page_is_here))
+        site_toc.append(dict(depth=depth_so_far, links=links, dropdown=False, heading=None, id=heading.replace(' ', '-')))
       if 'children' in node:
         recurse(node['children'], depth_so_far + 1)
   if 'tree' in config:
@@ -320,12 +349,14 @@ def generate_page_toc(soup):
 
 def generate_generated(config, here):
   return('{0} {1}'.format(config['sources'][here],
-                          datetime.datetime.now().isoformat()))
+                          datetime.now().isoformat()))
 
 
 def render_html(dst, config, soups, precomputed, template):
   soup = soups[dst]
-  renderer = pystache.Renderer()
+  renderer = Renderer(escape=cgi.escape)  # TODO(python3port): cgi.escape is deprecated in favor html.escape
+                                          # (the default used by Pystache on Python3). html.escape() escapes single
+                                          # quotes, whereas cgi.escape() does not. This will need to be addressed.
   title = precomputed.page[dst].title
   topdots = ('../' * dst.count('/'))
   if soup.body:
@@ -352,8 +383,8 @@ def write_en_pages(config, soups, precomputed, template):
     dst_dir = os.path.dirname(dst_path)
     if not os.path.isdir(dst_dir):
       os.makedirs(dst_dir)
-    with open(dst_path, 'wb') as f:
-      f.write(html.encode('utf-8'))
+    with open(dst_path, 'w') as f:
+      f.write(html)
 
 
 def copy_extras(config):
@@ -369,6 +400,6 @@ def copy_extras(config):
 
 def load_template(config):
   """Return text of template file specified in config"""
-  with open(config['template'], 'rb') as template_file:
-    template = template_file.read().decode('utf-8')
+  with open(config['template'], 'r') as template_file:
+    template = template_file.read()
   return template

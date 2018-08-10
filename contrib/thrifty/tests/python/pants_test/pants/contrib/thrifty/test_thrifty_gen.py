@@ -2,14 +2,13 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.codegen.wire.java.register import build_file_aliases as register_codegen
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.thrifty.java_thrifty_gen import JavaThriftyGen
 from pants.contrib.thrifty.java_thrifty_library import JavaThriftyLibrary
@@ -22,8 +21,8 @@ class JavaThriftyGenTest(TaskTestBase):
   def task_type(cls):
     return JavaThriftyGen
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return register_core().merge(register_codegen())
 
   def _create_fake_thrifty_tool(self):
@@ -37,7 +36,7 @@ class JavaThriftyGenTest(TaskTestBase):
                               sources=['foo.thrift'])
     context = self.context(target_roots=[target])
     task = self.create_task(context)
-    self.assertEquals([
+    self.assertEqual([
       '--out={}'.format(self.TARGET_WORKDIR),
       '--path={}/src/thrifty'.format(self.build_root),
       'src/thrifty/foo.thrift'],
@@ -51,7 +50,7 @@ class JavaThriftyGenTest(TaskTestBase):
                                   sources=['downstream.thrift'], dependencies=[upstream])
     context = self.context(target_roots=[upstream, downstream])
     task = self.create_task(context)
-    self.assertEquals([
+    self.assertEqual([
       '--out={}'.format(self.TARGET_WORKDIR),
       '--path={}/src/thrifty'.format(self.build_root),
       'src/thrifty/downstream.thrift'],

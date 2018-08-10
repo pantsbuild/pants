@@ -12,6 +12,7 @@ python_library(
   name='npm_resolver',
   sources=['npm_resolver.py'],
   dependencies=[
+    '3rdparty/python:future',
     ':node_resolver_base',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',

@@ -2,14 +2,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import sys
-import urllib
 from zipfile import ZIP_STORED
+
+from future.moves.urllib import parse
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.java.executor import Executor, SubprocessExecutor
@@ -276,7 +276,7 @@ def safe_classpath(classpath, synthetic_jar_dir, custom_name=None):
     synthetic_jar_dir = safe_mkdtemp()
 
   # Quote the paths so that if they contain reserved characters can be safely passed to JVM classloader.
-  bundled_classpath = map(urllib.quote, relativize_classpath(classpath, synthetic_jar_dir))
+  bundled_classpath = [parse.quote(cp) for cp in relativize_classpath(classpath, synthetic_jar_dir)]
 
   manifest = Manifest()
   manifest.addentry(Manifest.CLASS_PATH, ' '.join(bundled_classpath))

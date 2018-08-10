@@ -2,17 +2,18 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
-import six
+from builtins import object
+
+from future.utils import string_types
 
 from pants.backend.jvm.artifact import PublicationMetadata
 from pants.base.validation import assert_list
 
 
 def _validate_maybe_string(name, item):
-  if item and not isinstance(item, six.string_types):
+  if item and not isinstance(item, string_types):
     raise ValueError('{} was expected to be of type {} but given {}'.format(name, type(item), item))
   return item
 

@@ -2,19 +2,18 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 from pants.contrib.go.register import build_file_aliases
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 
 
-class GoRemoteLibraryTest(BaseTest):
+class GoRemoteLibraryTest(TestBase):
   # NB: We use  aliases and BUILD files to test proper registration of anonymous targets and macros.
 
   def setUp(self):
@@ -22,8 +21,8 @@ class GoRemoteLibraryTest(BaseTest):
     # Force setup of SourceRootConfig subsystem, as go targets do computation on source roots.
     self.context()
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return build_file_aliases()
 
   def test_default_package(self):

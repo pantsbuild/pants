@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from collections import defaultdict
@@ -12,10 +11,10 @@ from contextlib import contextmanager
 from pants.goal.products import MultipleRootedProducts, ProductError, Products
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class ProductsTest(BaseTest):
+class ProductsTest(TestBase):
   def setUp(self):
     super(ProductsTest, self).setUp()
     self.products = Products()
@@ -88,7 +87,7 @@ class ProductsTest(BaseTest):
         with safe_open(os.path.join(outdir, product), mode='w') as fp:
           fp.write(product)
         return product
-      product_mapping.add(target, outdir, map(create_product, products))
+      product_mapping.add(target, outdir, [create_product(product) for product in products])
       yield temporary_dir
 
   def test_non_empty_products(self):
@@ -111,7 +110,7 @@ class ProductsTest(BaseTest):
         with safe_open(abspath, mode='w') as fp:
           fp.write(product)
         return abspath
-      data_by_target[target].add_abs_paths(outdir, map(create_product, products))
+      data_by_target[target].add_abs_paths(outdir, [create_product(product) for product in products])
       yield temporary_dir
 
   def test_non_empty_data(self):

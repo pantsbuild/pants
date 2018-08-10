@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import glob
 import os
@@ -25,7 +24,7 @@ class TestIndexJavaIntegration(PantsRunIntegrationTest):
         kindex_glob = os.path.join(
           workdir, 'index/kythe-java-extract/current/{}/current/*.kindex'.format(tgt))
         kindex_files = glob.glob(kindex_glob)
-        self.assertEquals(1, len(kindex_files))
+        self.assertEqual(1, len(kindex_files))
         kindex_file = kindex_files[0]
         self.assertTrue(os.path.isfile(kindex_file))
         self.assertGreater(os.path.getsize(kindex_file), 200)  # Make sure it's not trivial.

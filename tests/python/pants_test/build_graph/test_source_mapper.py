@@ -2,16 +2,16 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import object
 from textwrap import dedent
 
 # TODO: Create a dummy target type in this test and remove this dep.
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.source_mapper import LazySourceMapper, SpecSourceMapper
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 class SourceMapperTest(object):
@@ -22,8 +22,8 @@ class SourceMapperTest(object):
   def get_mapper(self):
     return self._mapper
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'java_library': JavaLibrary,
@@ -53,7 +53,7 @@ class SourceMapperTest(object):
     )
     '''))
 
-    self.assertEquals(['path:target', 'path:buildholder'],
+    self.assertEqual(['path:target', 'path:buildholder'],
                       list(a.spec for a in self.get_mapper().target_addresses_for_source('path/BUILD')))
 
   def test_joint_ownership(self):
@@ -114,11 +114,11 @@ class SourceMapperTest(object):
     self.owner(['//:top'], 'foo.py')
 
 
-class LazySourceMapperTest(SourceMapperTest, BaseTest):
+class LazySourceMapperTest(SourceMapperTest, TestBase):
   def set_mapper(self, fast=False):
     self._mapper = LazySourceMapper(self.address_mapper, self.build_graph, fast)
 
 
-class SpecSourceMapperTest(SourceMapperTest, BaseTest):
+class SpecSourceMapperTest(SourceMapperTest, TestBase):
   def set_mapper(self, fast=False):
     self._mapper = SpecSourceMapper(self.address_mapper, self.build_graph, fast)

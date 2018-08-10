@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import logging
@@ -11,6 +10,7 @@ import os
 import pkgutil
 import re
 import shutil
+from builtins import open
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.python.targets.python_target import PythonTarget
@@ -27,7 +27,7 @@ from pants.util.process_handler import subprocess
 _TEMPLATE_BASEDIR = 'templates/idea'
 
 # Follow `export.py` for versioning strategy.
-IDEA_PLUGIN_VERSION = '0.0.2'
+IDEA_PLUGIN_VERSION = '0.0.3'
 
 
 class IdeaPluginGen(ConsoleTask):
@@ -63,6 +63,9 @@ class IdeaPluginGen(ConsoleTask):
     # scala/java-language level should use what Pants already knows.
     register('--open', type=bool, default=True,
              help='Attempts to open the generated project in IDEA.')
+    register('--incremental-import', type=int, default=None,
+             help='Enable incremental import of targets with the given graph depth. Supported '
+                  'by IntelliJ Pants plugin versions `>= 1.9.2`.')
     register('--java-encoding', default='UTF-8',
              help='Sets the file encoding for java files in this project.')
     register('--open-with', type=str, default=None, recursive=True,
@@ -136,7 +139,8 @@ class IdeaPluginGen(ConsoleTask):
     configured_workspace = TemplateData(
       targets=json.dumps(abs_target_specs),
       project_path=os.path.join(get_buildroot(), abs_target_specs[0].split(':')[0]),
-      idea_plugin_version=IDEA_PLUGIN_VERSION
+      idea_plugin_version=IDEA_PLUGIN_VERSION,
+      incremental_import=self.get_options().incremental_import,
     )
 
     # Generate (without merging in any extra components).
@@ -163,8 +167,8 @@ class IdeaPluginGen(ConsoleTask):
   def execute(self):
     # Heuristics to guess whether user tries to load a python project,
     # in which case intellij project sdk has to be set up manually.
-    jvm_target_num = len(filter(lambda x: isinstance(x, JvmTarget), self.context.target_roots))
-    python_target_num = len(filter(lambda x: isinstance(x, PythonTarget), self.context.target_roots))
+    jvm_target_num = len([x for x in self.context.target_roots if isinstance(x, JvmTarget)])
+    python_target_num = len([x for x in self.context.target_roots if isinstance(x, PythonTarget)])
     if python_target_num > jvm_target_num:
       logging.warn('This is likely a python project. Please make sure to '
                    'select the proper python interpreter as Project SDK in IntelliJ.')
@@ -173,7 +177,7 @@ class IdeaPluginGen(ConsoleTask):
     if ide_file and self.get_options().open:
       open_with = self.get_options().open_with
       if open_with:
-        null = open(os.devnull, 'w')
+        null = open(os.devnull, 'wb')
         subprocess.Popen([open_with, ide_file], stdout=null, stderr=null)
       else:
         try:

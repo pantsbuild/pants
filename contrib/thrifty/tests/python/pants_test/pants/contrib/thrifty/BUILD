@@ -4,7 +4,7 @@
 python_tests(
   dependencies=[
     'contrib/thrifty/src/python/pants/contrib/thrifty',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
   sources=globs('*.py'),
 )

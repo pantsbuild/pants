@@ -2,12 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
 import tempfile
+from builtins import next, open
 from collections import defaultdict, namedtuple
 
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
@@ -37,6 +37,8 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     'include_paths',
     'compiler_args'
   ])
+
+  sources_globs = ('**/*',)
 
   @classmethod
   def register_options(cls, register):
@@ -113,7 +115,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     if language not in self._registered_language_aliases():
       raise TargetDefinitionException(
         target,
-        'language {} not supported: expected one of {}.'.format(language, self._registered_language_aliases().keys()))
+        'language {} not supported: expected one of {}.'.format(language, list(self._registered_language_aliases().keys())))
     return language
 
   @memoized_method
@@ -204,7 +206,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
   @staticmethod
   def _has_declaration(source, regex):
     source_path = os.path.join(get_buildroot(), source)
-    with open(source_path) as thrift:
+    with open(source_path, 'r') as thrift:
       return any(line for line in thrift if regex.search(line))
 
   def parse_gen_file_map(self, gen_file_map_path, outdir):

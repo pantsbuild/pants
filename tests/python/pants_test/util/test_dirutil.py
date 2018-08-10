@@ -2,25 +2,25 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import errno
 import os
 import time
 import unittest
+from builtins import open, str
 from contextlib import contextmanager
 
 import mock
-import six
 
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import (ExistingDirError, ExistingFileError, _mkdtemp_unregister_cleaner,
-                                absolute_symlink, fast_relpath, get_basedir, longest_dir_prefix,
-                                mergetree, read_file, relative_symlink, relativize_paths, rm_rf,
-                                safe_concurrent_creation, safe_file_dump, safe_mkdir, safe_mkdtemp,
-                                safe_open, safe_rm_oldest_items_in_dir, safe_rmtree, touch)
+                                absolute_symlink, check_no_overlapping_paths, fast_relpath,
+                                get_basedir, longest_dir_prefix, mergetree, read_file,
+                                relative_symlink, relativize_paths, rm_rf, safe_concurrent_creation,
+                                safe_file_dump, safe_mkdir, safe_mkdtemp, safe_open,
+                                safe_rm_oldest_items_in_dir, safe_rmtree, touch)
 from pants.util.objects import datatype
 
 
@@ -37,27 +37,27 @@ class DirutilTest(unittest.TestCase):
   def test_longest_dir_prefix(self):
     # Find the longest prefix (standard case).
     prefixes = ['hello', 'hello_world', 'hello/world', 'helloworld']
-    self.assertEquals(longest_dir_prefix('hello/world/pants', prefixes),
+    self.assertEqual(longest_dir_prefix('hello/world/pants', prefixes),
                       'hello/world')
-    self.assertEquals(longest_dir_prefix('hello/', prefixes),
+    self.assertEqual(longest_dir_prefix('hello/', prefixes),
                       'hello')
-    self.assertEquals(longest_dir_prefix('hello', prefixes),
+    self.assertEqual(longest_dir_prefix('hello', prefixes),
                       'hello')
-    self.assertEquals(longest_dir_prefix('scoobydoobydoo', prefixes),
+    self.assertEqual(longest_dir_prefix('scoobydoobydoo', prefixes),
                       None)
 
   def test_longest_dir_prefix_special(self):
     # Ensure that something that is a longest prefix, but not a longest dir
     # prefix, is not tagged.
     prefixes = ['helloworldhowareyou', 'helloworld']
-    self.assertEquals(longest_dir_prefix('helloworldhowareyoufine/', prefixes),
+    self.assertEqual(longest_dir_prefix('helloworldhowareyoufine/', prefixes),
                       None)
-    self.assertEquals(longest_dir_prefix('helloworldhowareyoufine', prefixes),
+    self.assertEqual(longest_dir_prefix('helloworldhowareyoufine', prefixes),
                       None)
 
   def test_fast_relpath(self):
     def assertRelpath(expected, path, start):
-      self.assertEquals(expected, fast_relpath(path, start))
+      self.assertEqual(expected, fast_relpath(path, start))
     assertRelpath('c', '/a/b/c', '/a/b')
     assertRelpath('c', '/a/b/c', '/a/b/')
     assertRelpath('c', 'b/c', 'b')
@@ -97,13 +97,13 @@ class DirutilTest(unittest.TestCase):
     tempfile_mkdtemp.side_effect = (DIR1, DIR2)
     os_getpid.return_value = 'unicorn'
     try:
-      self.assertEquals(DIR1, dirutil.safe_mkdtemp(dir='1', cleaner=faux_cleaner))
-      self.assertEquals(DIR2, dirutil.safe_mkdtemp(dir='2', cleaner=faux_cleaner))
+      self.assertEqual(DIR1, dirutil.safe_mkdtemp(dir='1', cleaner=faux_cleaner))
+      self.assertEqual(DIR2, dirutil.safe_mkdtemp(dir='2', cleaner=faux_cleaner))
       self.assertIn('unicorn', dirutil._MKDTEMP_DIRS)
-      self.assertEquals({DIR1, DIR2}, dirutil._MKDTEMP_DIRS['unicorn'])
+      self.assertEqual({DIR1, DIR2}, dirutil._MKDTEMP_DIRS['unicorn'])
       dirutil._mkdtemp_atexit_cleaner()
       self.assertNotIn('unicorn', dirutil._MKDTEMP_DIRS)
-      self.assertEquals({'yoyo'}, dirutil._MKDTEMP_DIRS['fluffypants'])
+      self.assertEqual({'yoyo'}, dirutil._MKDTEMP_DIRS['fluffypants'])
     finally:
       dirutil._MKDTEMP_DIRS.pop('unicorn', None)
       dirutil._MKDTEMP_DIRS.pop('fluffypants', None)
@@ -120,10 +120,10 @@ class DirutilTest(unittest.TestCase):
     # unicode constructor.
     with temporary_dir() as tmpdir:
       safe_mkdir(os.path.join(tmpdir, '中文'))
-      if isinstance(tmpdir, six.text_type):
+      if isinstance(tmpdir, str):
         tmpdir = tmpdir.encode('utf-8')
       for _, dirs, _ in dirutil.safe_walk(tmpdir):
-        self.assertTrue(all(isinstance(dirname, six.text_type) for dirname in dirs))
+        self.assertTrue(all(isinstance(dirname, str) for dirname in dirs))
 
   @contextmanager
   def tree(self):
@@ -143,20 +143,20 @@ class DirutilTest(unittest.TestCase):
       with temporary_dir() as dst:
         yield root, dst
 
-  class Dir(datatype('Dir', ['path'])):
+  class Dir(datatype(['path'])):
     pass
 
-  class File(datatype('File', ['path', 'contents'])):
+  class File(datatype(['path', 'contents'])):
     @classmethod
     def empty(cls, path):
-      return cls(path, contents=b'')
+      return cls(path, contents='')
 
     @classmethod
     def read(cls, root, relpath):
-      with open(os.path.join(root, relpath)) as fp:
+      with open(os.path.join(root, relpath), 'r') as fp:
         return cls(relpath, fp.read())
 
-  class Symlink(datatype('Symlink', ['path'])):
+  class Symlink(datatype(['path'])):
     pass
 
   def assert_tree(self, root, *expected):
@@ -194,11 +194,11 @@ class DirutilTest(unittest.TestCase):
                        self.Dir('a/b'),
 
                        # Existing overlapping file should be overlayed.
-                       self.File('a/b/1', contents=b'1'),
+                       self.File('a/b/1', contents='1'),
 
                        self.File.empty('a/b/2'),
                        self.Dir('b'),
-                       self.File('b/1', contents=b'1'),
+                       self.File('b/1', contents='1'),
                        self.File.empty('b/2'),
                        self.Dir('c'),
 
@@ -227,10 +227,10 @@ class DirutilTest(unittest.TestCase):
                        self.Dir('a'),
                        self.File.empty('a/2'),
                        self.Dir('a/b'),
-                       self.File('a/b/1', contents=b'1'),
+                       self.File('a/b/1', contents='1'),
                        self.File.empty('a/b/2'),
                        self.Dir('b'),
-                       self.File('b/1', contents=b'1'),
+                       self.File('b/1', contents='1'),
                        self.File.empty('b/2'))
 
   def test_mergetree_ignore_files(self):
@@ -246,7 +246,7 @@ class DirutilTest(unittest.TestCase):
                        self.File.empty('a/2'),
                        self.Dir('a/b'),
                        self.Dir('b'),
-                       self.File('b/1', contents=b'1'),
+                       self.File('b/1', contents='1'),
                        self.File.empty('b/2'))
 
   def test_mergetree_ignore_dirs(self):
@@ -261,7 +261,7 @@ class DirutilTest(unittest.TestCase):
                        self.Dir('a'),
                        self.File.empty('a/2'),
                        self.Dir('b'),
-                       self.File('b/1', contents=b'1'),
+                       self.File('b/1', contents='1'),
                        self.File.empty('b/2'))
 
   def test_mergetree_symlink(self):
@@ -272,7 +272,7 @@ class DirutilTest(unittest.TestCase):
                        self.Dir('a'),
                        self.Symlink('a/2'),
                        self.Dir('a/b'),
-                       self.File('a/b/1', contents=b'1'),
+                       self.File('a/b/1', contents='1'),
                        self.File.empty('a/b/2'),
 
                        # NB: assert_tree does not follow symlinks and so does not descend into the
@@ -285,7 +285,7 @@ class DirutilTest(unittest.TestCase):
     classpath = [os.path.join(build_root, 'foo.jar'), jar_outside_build_root]
     relativized_classpath = relativize_paths(classpath, build_root)
     jar_relpath = os.path.relpath(jar_outside_build_root, build_root)
-    self.assertEquals(['foo.jar', jar_relpath], relativized_classpath)
+    self.assertEqual(['foo.jar', jar_relpath], relativized_classpath)
 
   def test_relative_symlink(self):
     with temporary_dir() as tmpdir_1:  # source and link in same dir
@@ -294,7 +294,7 @@ class DirutilTest(unittest.TestCase):
       rel_path = os.path.relpath(source, os.path.dirname(link))
       relative_symlink(source, link)
       self.assertTrue(os.path.islink(link))
-      self.assertEquals(rel_path, os.readlink(link))
+      self.assertEqual(rel_path, os.readlink(link))
 
   def test_relative_symlink_source_parent(self):
     with temporary_dir() as tmpdir_1:  # source in parent dir of link
@@ -305,7 +305,7 @@ class DirutilTest(unittest.TestCase):
       relative_symlink(source, link)
       rel_path = os.path.relpath(source, os.path.dirname(link))
       self.assertTrue(os.path.islink(link))
-      self.assertEquals(rel_path, os.readlink(link))
+      self.assertEqual(rel_path, os.readlink(link))
 
   def test_relative_symlink_link_parent(self):
     with temporary_dir() as tmpdir_1:  # link in parent dir of source
@@ -315,7 +315,7 @@ class DirutilTest(unittest.TestCase):
       relative_symlink(source, link)
       rel_path = os.path.relpath(source, os.path.dirname(link))
       self.assertTrue(os.path.islink(link))
-      self.assertEquals(rel_path, os.readlink(link))
+      self.assertEqual(rel_path, os.readlink(link))
 
   def test_relative_symlink_same_paths(self):
     with temporary_dir() as tmpdir_1:  # source is link
@@ -356,9 +356,9 @@ class DirutilTest(unittest.TestCase):
         relative_symlink(source, link_path)
 
   def test_get_basedir(self):
-    self.assertEquals(get_basedir('foo/bar/baz'), 'foo')
-    self.assertEquals(get_basedir('/foo/bar/baz'), '')
-    self.assertEquals(get_basedir('foo'), 'foo')
+    self.assertEqual(get_basedir('foo/bar/baz'), 'foo')
+    self.assertEqual(get_basedir('/foo/bar/baz'), '')
+    self.assertEqual(get_basedir('foo'), 'foo')
 
   def test_rm_rf_file(self, file_name='./foo'):
     with temporary_dir() as td, pushd(td):
@@ -396,7 +396,7 @@ class DirutilTest(unittest.TestCase):
   def test_readwrite_file(self):
     with temporary_dir() as td:
       test_filename = os.path.join(td, 'test.out')
-      test_content = '3333'
+      test_content = b'3333'
       safe_file_dump(test_filename, test_content)
       self.assertEqual(read_file(test_filename), test_content)
 
@@ -501,7 +501,7 @@ class AbsoluteSymlinkTest(unittest.TestCase):
   def _create_and_check_link(self, source, link):
     absolute_symlink(source, link)
     self.assertTrue(os.path.islink(link))
-    self.assertEquals(source, os.readlink(link))
+    self.assertEqual(source, os.readlink(link))
 
   def test_link(self):
     # Check if parent dirs will be created for the link
@@ -522,7 +522,7 @@ class AbsoluteSymlinkTest(unittest.TestCase):
     self._create_and_check_link(self.source, self.link)
 
     # The link should have been deleted (over-written), not the file it pointed to.
-    with open(self.source) as fp:
+    with open(self.source, 'r') as fp:
       self.assertEqual('evidence', fp.read())
 
   def test_overwrite_link_dir(self):
@@ -543,3 +543,18 @@ class AbsoluteSymlinkTest(unittest.TestCase):
   def test_overwrite_dir(self):
     os.makedirs(os.path.join(self.link, 'a', 'b', 'c'))
     self._create_and_check_link(self.source, self.link)
+
+  def test_check_no_overlapping_paths_two_same(self):
+    paths = ["/path/to/file", "/path/to/file", "/no/path/to/file"]
+    with self.assertRaises(ValueError):
+      check_no_overlapping_paths(paths)
+
+  def test_check_no_overlapping_paths_prefix(self):
+    paths = ["/path/to", "/path/to/file", "/no/path/to/file"]
+    with self.assertRaises(ValueError):
+      check_no_overlapping_paths(paths)
+
+  def test_check_no_overlapping_paths_unique_paths(self):
+    paths = ["/he/went/to/the/store", "/she/saw/a/movie", "/no/one/knew/where/to/go"]
+    # This test is successful if nothing happens when calling check_no_overlapping_paths(paths)
+    check_no_overlapping_paths(paths)

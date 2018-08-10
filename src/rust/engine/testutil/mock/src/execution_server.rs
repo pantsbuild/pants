@@ -3,8 +3,12 @@ use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
+use std::thread::sleep;
+use std::time::Duration;
+use std::time::Instant;
 
 use bazel_protos;
+use futures::{Future, Sink};
 use grpcio;
 use protobuf;
 
@@ -12,7 +16,8 @@ use protobuf;
 pub struct MockExecution {
   name: String,
   execute_request: bazel_protos::remote_execution::ExecuteRequest,
-  operation_responses: Arc<Mutex<VecDeque<bazel_protos::operations::Operation>>>,
+  operation_responses:
+    Arc<Mutex<VecDeque<(bazel_protos::operations::Operation, Option<Duration>)>>>,
 }
 
 impl MockExecution {
@@ -27,7 +32,7 @@ impl MockExecution {
   pub fn new(
     name: String,
     execute_request: bazel_protos::remote_execution::ExecuteRequest,
-    operation_responses: Vec<bazel_protos::operations::Operation>,
+    operation_responses: Vec<(bazel_protos::operations::Operation, Option<Duration>)>,
   ) -> MockExecution {
     MockExecution {
       name: name,
@@ -42,7 +47,7 @@ impl MockExecution {
 /// responses.
 ///
 pub struct TestServer {
-  mock_responder: MockResponder,
+  pub mock_responder: MockResponder,
   server_transport: grpcio::Server,
 }
 
@@ -111,12 +116,14 @@ impl Drop for TestServer {
           .unwrap()
           .clone(),
       )),
-      MockResponder::display_all(&self
-        .mock_responder
-        .received_messages
-        .deref()
-        .lock()
-        .unwrap())
+      MockResponder::display_all(
+        &self
+          .mock_responder
+          .received_messages
+          .deref()
+          .lock()
+          .unwrap()
+      )
     )
   }
 }
@@ -124,7 +131,7 @@ impl Drop for TestServer {
 #[derive(Clone, Debug)]
 pub struct MockResponder {
   mock_execution: MockExecution,
-  received_messages: Arc<Mutex<Vec<(String, Box<protobuf::Message>)>>>,
+  pub received_messages: Arc<Mutex<Vec<(String, Box<protobuf::Message>, Instant)>>>,
 }
 
 impl MockResponder {
@@ -136,14 +143,14 @@ impl MockResponder {
   }
 
   fn log<T: protobuf::Message + Sized>(&self, message: T) {
-    self
-      .received_messages
-      .lock()
-      .unwrap()
-      .push((message.descriptor().name().to_string(), Box::new(message)));
+    self.received_messages.lock().unwrap().push((
+      message.descriptor().name().to_string(),
+      Box::new(message),
+      Instant::now(),
+    ));
   }
 
-  fn display_all<D: Debug>(items: &Vec<D>) -> String {
+  fn display_all<D: Debug>(items: &[D]) -> String {
     items
       .iter()
       .map(|i| format!("{:?}\n", i))
@@ -151,7 +158,7 @@ impl MockResponder {
       .concat()
   }
 
-  fn send_next_operation(
+  fn send_next_operation_unary(
     &self,
     sink: grpcio::UnarySink<super::bazel_protos::operations::Operation>,
   ) {
@@ -162,37 +169,91 @@ impl MockResponder {
       .unwrap()
       .pop_front()
     {
-      Some(op) => {
+      Some((op, duration)) => {
+        if let Some(d) = duration {
+          sleep(d);
+        }
         sink.success(op.clone());
       }
       None => {
         sink.fail(grpcio::RpcStatus::new(
           grpcio::RpcStatusCode::InvalidArgument,
-          Some("Did not expect this request".to_string()),
+          Some("Did not expect further requests from client.".to_string()),
         ));
       }
+    }
+  }
+
+  fn send_next_operation_stream(
+    &self,
+    ctx: grpcio::RpcContext,
+    sink: grpcio::ServerStreamingSink<super::bazel_protos::operations::Operation>,
+  ) {
+    match self
+      .mock_execution
+      .operation_responses
+      .lock()
+      .unwrap()
+      .pop_front()
+    {
+      Some((op, duration)) => {
+        if let Some(d) = duration {
+          sleep(d);
+        }
+        ctx.spawn(
+          sink
+            .send((op.clone(), grpcio::WriteFlags::default()))
+            .map(|mut stream| stream.close())
+            .map(|_| ())
+            .map_err(|_| ()),
+        )
+      }
+      None => ctx.spawn(
+        sink
+          .fail(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::InvalidArgument,
+            Some("Did not expect further requests from client.".to_string()),
+          ))
+          .map(|_| ())
+          .map_err(|_| ()),
+      ),
     }
   }
 }
 
 impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
+  // We currently only support the one-shot "stream and disconnect" client behavior.
+  // If we start supporting the "stream updates" variant, we will need to do so here.
   fn execute(
     &self,
-    _: grpcio::RpcContext,
+    ctx: grpcio::RpcContext,
     req: bazel_protos::remote_execution::ExecuteRequest,
-    sink: grpcio::UnarySink<super::bazel_protos::operations::Operation>,
+    sink: grpcio::ServerStreamingSink<bazel_protos::operations::Operation>,
   ) {
     self.log(req.clone());
 
     if self.mock_execution.execute_request != req {
-      sink.fail(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::InvalidArgument,
-        Some("Did not expect this request".to_string()),
-      ));
+      ctx.spawn(
+        sink
+          .fail(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::InvalidArgument,
+            Some("Did not expect this request".to_string()),
+          ))
+          .map_err(|_| ()),
+      );
       return;
     }
 
-    self.send_next_operation(sink);
+    self.send_next_operation_stream(ctx, sink);
+  }
+
+  fn wait_execution(
+    &self,
+    _ctx: grpcio::RpcContext,
+    _req: bazel_protos::remote_execution::WaitExecutionRequest,
+    _sink: grpcio::ServerStreamingSink<bazel_protos::operations::Operation>,
+  ) {
+    unimplemented!()
   }
 }
 
@@ -205,7 +266,7 @@ impl bazel_protos::operations_grpc::Operations for MockResponder {
   ) {
     self.log(req.clone());
 
-    self.send_next_operation(sink)
+    self.send_next_operation_unary(sink)
   }
 
   fn list_operations(

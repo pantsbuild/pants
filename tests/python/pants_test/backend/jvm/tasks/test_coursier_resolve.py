@@ -2,10 +2,10 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import str
 from contextlib import contextmanager
 
 from mock import MagicMock
@@ -25,9 +25,10 @@ from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir, temporary_file_path
+from pants.util.dirutil import safe_rmtree
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class CoursierResolveTest(JvmToolTaskTestBase):
@@ -39,7 +40,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
 
   def setUp(self):
     super(CoursierResolveTest, self).setUp()
-    self.set_options(use_nailgun=False)
+    self.set_options(execution_strategy='subprocess')
     self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                read_from=None,
                                write_to=None)
@@ -58,8 +59,8 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     scala_lib = self.make_target('//:b', JavaLibrary, sources=[])
     # Confirm that the deps were added to the appropriate targets.
     compile_classpath = self.resolve([jar_lib, scala_lib])
-    self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
-    self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib)))
+    self.assertEqual(1, len(compile_classpath.get_for_target(jar_lib)))
+    self.assertEqual(0, len(compile_classpath.get_for_target(scala_lib)))
     
   def test_resolve_with_remote_url(self):
     dep_with_url = JarDependency('a', 'b', 'c',
@@ -96,9 +97,9 @@ class CoursierResolveTest(JvmToolTaskTestBase):
       task.resolve([jar_lib, scala_lib], compile_classpath, sources=True, javadoc=True)
 
       # Both javadoc and sources jars are added to the classpath product
-      self.assertEquals(['default', 'src_doc', 'src_doc'],
+      self.assertEqual(['default', 'src_doc', 'src_doc'],
        sorted([c[0] for c in compile_classpath.get_for_target(jar_lib)]))
-      self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib)))
+      self.assertEqual(0, len(compile_classpath.get_for_target(scala_lib)))
 
   def test_resolve_conflicted(self):
     losing_dep = JarDependency('com.google.guava', 'guava', '16.0')
@@ -111,7 +112,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     losing_cp = compile_classpath.get_for_target(losing_lib)
     winning_cp = compile_classpath.get_for_target(winning_lib)
 
-    self.assertEquals(losing_cp, winning_cp)
+    self.assertEqual(losing_cp, winning_cp)
 
     self.assertEqual(1, len(winning_cp))
     conf, path = winning_cp[0]
@@ -176,8 +177,8 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     junit_jar_cp = compile_classpath.get_for_target(junit_jar_lib)
     excluding_cp = compile_classpath.get_for_target(excluding_target)
 
-    self.assertEquals(2, len(junit_jar_cp))
-    self.assertEquals(0, len(excluding_cp))
+    self.assertEqual(2, len(junit_jar_cp))
+    self.assertEqual(0, len(excluding_cp))
 
     def get_coord_in_classpath(cp, targets):
       """
@@ -216,65 +217,41 @@ class CoursierResolveTest(JvmToolTaskTestBase):
       task.execute()
       task.runjava.assert_not_called()
 
-  def test_when_invalid_artifact_symlink_should_trigger_resolve(self):
+  def test_when_invalid_hardlink_and_coursier_cache_should_trigger_resolve(self):
     jar_lib = self._make_junit_target()
     with self._temp_workdir():
+      with temporary_dir() as couriser_cache_dir:
+        self.set_options_for_scope('coursier', cache_dir=couriser_cache_dir)
 
-      context = self.context(target_roots=[jar_lib])
-      task = self.execute(context)
-      compile_classpath = context.products.get_data('compile_classpath')
+        context = self.context(target_roots=[jar_lib])
+        task = self.execute(context)
+        compile_classpath = context.products.get_data('compile_classpath')
 
-      jar_cp = compile_classpath.get_for_target(jar_lib)
+        jar_cp = compile_classpath.get_for_target(jar_lib)
 
-      # └─ junit:junit:4.12
-      #    └─ org.hamcrest:hamcrest-core:1.3
-      self.assertEquals(2, len(jar_cp))
-
-      # Take a sample jar path, remove it, then call the task again, it should invoke coursier again
-      conf, path = jar_cp[0]
-      safe_remove(os.path.realpath(path))
-
-      task.runjava = MagicMock()
-
-      # Ignore any error because runjava may fail due to undefined behavior
-      try:
-        task.execute()
-      except TaskError:
-        pass
-
-      task.runjava.assert_called()
-
-  def test_when_invalid_coursier_cache_should_trigger_resolve(self):
-    jar_lib = self._make_junit_target()
-    with self._temp_workdir():
-
-      context = self.context(target_roots=[jar_lib])
-      task = self.execute(context)
-      compile_classpath = context.products.get_data('compile_classpath')
-
-      jar_cp = compile_classpath.get_for_target(jar_lib)
-
-      # └─ junit:junit:4.12
-      #    └─ org.hamcrest:hamcrest-core:1.3
-      self.assertEquals(2, len(jar_cp))
+        # └─ junit:junit:4.12
+        #    └─ org.hamcrest:hamcrest-core:1.3
+        self.assertEqual(2, len(jar_cp))
 
 
-      # Take a sample jar path, remove it, then call the task again, it should invoke coursier again
-      conf, path = jar_cp[0]
+        # Take a sample jar path, remove it, then call the task again, it should invoke coursier again
+        conf, path = jar_cp[0]
 
-      self.assertTrue(os.path.islink(path))
+        # Remove the hard link under .pants.d/
+        safe_remove(path)
 
-      safe_remove(os.path.realpath(path))
+        # Remove coursier's cache
+        safe_rmtree(couriser_cache_dir)
 
-      task.runjava = MagicMock()
+        task.runjava = MagicMock()
 
-      # Ignore any error because runjava may fail due to undefined behavior
-      try:
-        task.execute()
-      except TaskError:
-        pass
+        # Ignore any error because runjava may fail due to undefined behavior
+        try:
+          task.execute()
+        except TaskError:
+          pass
 
-      task.runjava.assert_called()
+        task.runjava.assert_called()
 
   def test_resolve_jarless_pom(self):
     jar = JarDependency('org.apache.commons', 'commons-weaver-privilizer-parent', '1.3')

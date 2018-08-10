@@ -6,13 +6,14 @@ python_tests(
   name = 'markdown_to_html',
   sources = ['test_markdown_to_html.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:beautifulsoup4',
     '3rdparty/python:mock',
     'src/python/pants/backend/docgen/targets',
     'src/python/pants/backend/docgen/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:task_test_base',
   ],
   coverage = [
     'pants.backend.docgen.tasks.markdown_to_html',

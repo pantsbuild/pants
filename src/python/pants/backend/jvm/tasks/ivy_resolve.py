@@ -2,12 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import shutil
 import time
+from builtins import open
 from textwrap import dedent
 
 from pants.backend.jvm.ivy_utils import IvyUtils
@@ -106,7 +106,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
                                       confs=self.get_options().confs,
                                       extra_args=self._args)
     if self._report:
-      results_with_resolved_artifacts = filter(lambda r: r.has_resolved_artifacts, results)
+      results_with_resolved_artifacts = [r for r in results if r.has_resolved_artifacts]
 
       if not results_with_resolved_artifacts:
         self.context.log.info("Not generating a report. No resolution performed.")
@@ -147,7 +147,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     report = None
     org = IvyUtils.INTERNAL_ORG_NAME
     name = result.resolve_hash_name
-    xsl = os.path.join(self.ivy_cache_dir, 'ivy-report.xsl')
+    xsl = os.path.join(self.ivy_resolution_cache_dir, 'ivy-report.xsl')
 
     # Xalan needs this dir to exist - ensure that, but do no more - we have no clue where this
     # points.
@@ -180,7 +180,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     css = os.path.join(self._outdir, 'ivy-report.css')
     if os.path.exists(css):
       os.unlink(css)
-    shutil.copy(os.path.join(self.ivy_cache_dir, 'ivy-report.css'), self._outdir)
+    shutil.copy(os.path.join(self.ivy_resolution_cache_dir, 'ivy-report.css'), self._outdir)
 
     if self._open and report:
       try:

@@ -2,14 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.graph_info.tasks.cloc import CountLinesOfCode
 from pants.backend.graph_info.tasks.dependees import ReverseDepmap
 from pants.backend.graph_info.tasks.filemap import Filemap
 from pants.backend.graph_info.tasks.filter import Filter
-from pants.backend.graph_info.tasks.list_owners import ListOwners
 from pants.backend.graph_info.tasks.listtargets import ListTargets
 from pants.backend.graph_info.tasks.minimal_cover import MinimalCover
 from pants.backend.graph_info.tasks.paths import Path, Paths
@@ -27,4 +25,3 @@ def register_goals():
   task(name='filter', action=Filter).install()
   task(name='sort', action=SortTargets).install()
   task(name='cloc', action=CountLinesOfCode).install()
-  task(name='list-owners', action=ListOwners).install()

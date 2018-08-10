@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import math
 
@@ -61,12 +60,14 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/python/pants/dummies:failing_target',
       'testprojects/tests/scala/org/pantsbuild/testproject/non_exports:C',
       'testprojects/src/scala/org/pantsbuild/testproject/exclude_direct_dep',
+      'testprojects/tests/python/pants/timeout:terminates_self',
       # These don't pass without special config.
       'testprojects/tests/java/org/pantsbuild/testproject/depman:new-tests',
       'testprojects/tests/java/org/pantsbuild/testproject/depman:old-tests',
       'testprojects/tests/java/org/pantsbuild/testproject/htmlreport:htmlreport',
       'testprojects/tests/java/org/pantsbuild/testproject/parallel.*',
-      'testprojects/src/python/python_distribution/fasthello_with_install_requires.*'
+      'testprojects/src/python/python_distribution/fasthello_with_install_requires.*',
+      'testprojects/src/python/unicode/compilation_failure',
     ]
 
     # May not succeed without java8 installed
@@ -125,7 +126,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
     self.assert_success(pants_run)
 
   def test_self(self):
-    self.assertEquals([t for s in range(0, self._SHARDS)
+    self.assertEqual([t for s in range(0, self._SHARDS)
                        for t in self.targets_for_shard(s)],
                       self.targets)
 

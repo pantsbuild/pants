@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
 
@@ -56,6 +55,16 @@ class Optionable(AbstractClass):
     Specific Optionable subtypes may override to provide information about other optionables.
     """
     yield cls.get_scope_info()
+
+  @classmethod
+  def get_options_scope_equivalent_flag_component(cls):
+    """Return a string representing this optionable's scope as it would be in a command line flag.
+
+    This method can be used to generate error messages with flags e.g. to fix some error with a
+    pants command. These flags will then be as specific as possible, including e.g. all dependent
+    subsystem scopes.
+    """
+    return re.sub(r'\.', '-', cls.options_scope)
 
   @classmethod
   def get_description(cls):

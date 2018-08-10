@@ -2,20 +2,19 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from contextlib import contextmanager
 
 import mock
 
 from pants.pantsd.watchman_client import StreamableWatchmanClient
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class TestWatchmanClient(BaseTest):
+class TestWatchmanClient(TestBase):
   def setUp(self):
-    BaseTest.setUp(self)
+    super(TestWatchmanClient, self).setUp()
     self.swc = StreamableWatchmanClient(sockpath='/tmp/testing', transport='local')
 
   @contextmanager

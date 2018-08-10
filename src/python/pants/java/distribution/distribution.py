@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import itertools
 import logging
@@ -11,9 +10,11 @@ import os
 import pkgutil
 import plistlib
 from abc import abstractproperty
+from builtins import object, open, str
 from collections import namedtuple
 from contextlib import contextmanager
 
+from future.utils import PY3
 from six import string_types
 
 from pants.base.revision import Revision
@@ -182,7 +183,7 @@ class Distribution(object):
     If this distribution has no valid command of the given name raises Distribution.Error.
     If this distribution is a JDK checks both `bin` and `jre/bin` for the binary.
     """
-    if not isinstance(name, string_types):
+    if not isinstance(name, str):
       raise ValueError('name must be a binary name, given {} of type {}'.format(name, type(name)))
     self.validate()
     return self._validated_executable(name)
@@ -234,17 +235,17 @@ class Distribution(object):
   def _get_system_properties(self, java):
     if not self._system_properties:
       with temporary_dir() as classpath:
-        with open(os.path.join(classpath, 'SystemProperties.class'), 'w+') as fp:
+        with open(os.path.join(classpath, 'SystemProperties.class'), 'w+b') as fp:
           fp.write(pkgutil.get_data(__name__, 'SystemProperties.class'))
         cmd = [java, '-cp', classpath, 'SystemProperties']
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
         if process.returncode != 0:
           raise self.Error('Failed to determine java system properties for {} with {} - exit code'
-                           ' {}: {}'.format(java, ' '.join(cmd), process.returncode, stderr))
+                           ' {}: {}'.format(java, ' '.join(cmd), process.returncode, stderr.decode('utf-8')))
 
       props = {}
-      for line in stdout.split(os.linesep):
+      for line in stdout.decode('utf-8').split(os.linesep):
         key, _, val = line.partition('=')
         props[key] = val
       self._system_properties = props
@@ -369,7 +370,8 @@ class _OSXEnvironment(_DistributionEnvironment):
     if os.path.exists(self._osx_java_home_exe):
       try:
         plist = subprocess.check_output([self._osx_java_home_exe, '--failfast', '--xml'])
-        for distribution in plistlib.readPlistFromString(plist):
+        plist_results = plistlib.loads(plist) if PY3 else plistlib.readPlistFromString(plist)
+        for distribution in plist_results:
           home = distribution['JVMHomePath']
           yield self.Location.from_home(home)
       except subprocess.CalledProcessError:

@@ -2,10 +2,14 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+import re
 import unittest
+from builtins import object, str
+from collections import defaultdict
+
+from future.utils import PY3
 
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job, JobExistsError,
@@ -28,12 +32,27 @@ class PrintLogger(object):
     print(msg)
 
 
+class CapturingLogger(object):
+
+  log_entries = defaultdict(list)
+
+  def error(self, msg):
+    self.log_entries['error'].append(msg)
+
+  def debug(self, msg):
+    self.log_entries['debug'].append(msg)
+
+
 def passing_fn():
   pass
 
 
 def raising_fn():
   raise Exception("I'm an error")
+
+
+def raising_wrapper():
+  raising_fn()
 
 
 class ExecutionGraphTest(unittest.TestCase):
@@ -52,7 +71,7 @@ class ExecutionGraphTest(unittest.TestCase):
     return Job(name, recording_fn, dependencies, size, on_success, on_failure)
 
   def test_single_job(self):
-    exec_graph = ExecutionGraph([self.job("A", passing_fn, [])])
+    exec_graph = ExecutionGraph([self.job("A", passing_fn, [])], False)
 
     self.execute(exec_graph)
 
@@ -60,7 +79,7 @@ class ExecutionGraphTest(unittest.TestCase):
 
   def test_single_dependency(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["B"]),
-                                 self.job("B", passing_fn, [])])
+                                 self.job("B", passing_fn, [])], False)
     self.execute(exec_graph)
 
     self.assertEqual(self.jobs_run, ["B", "A"])
@@ -68,7 +87,7 @@ class ExecutionGraphTest(unittest.TestCase):
   def test_simple_binary_tree(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["B", "C"]),
                                  self.job("B", passing_fn, []),
-                                 self.job("C", passing_fn, [])])
+                                 self.job("C", passing_fn, [])], False)
     self.execute(exec_graph)
 
     self.assertEqual(self.jobs_run, ["B", "C", "A"])
@@ -76,7 +95,7 @@ class ExecutionGraphTest(unittest.TestCase):
   def test_simple_linear_dependencies(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["B"]),
                                  self.job("B", passing_fn, ["C"]),
-                                 self.job("C", passing_fn, [])])
+                                 self.job("C", passing_fn, [])], False)
 
     self.execute(exec_graph)
 
@@ -85,7 +104,7 @@ class ExecutionGraphTest(unittest.TestCase):
   def test_simple_unconnected(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, []),
                                  self.job("B", passing_fn, []),
-    ])
+    ], False)
 
     self.execute(exec_graph)
 
@@ -95,7 +114,7 @@ class ExecutionGraphTest(unittest.TestCase):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["B"]),
                                  self.job("B", passing_fn, []),
                                  self.job("C", passing_fn, []),
-    ])
+    ], False)
 
     self.execute(exec_graph)
 
@@ -105,14 +124,14 @@ class ExecutionGraphTest(unittest.TestCase):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["B", "C"]),
                                  self.job("B", passing_fn, ["C"]),
                                  self.job("C", passing_fn, []),
-    ])
+    ], False)
 
     self.execute(exec_graph)
 
     self.assertEqual(["C", "B", "A"], self.jobs_run)
 
   def test_one_failure_raises_exception(self):
-    exec_graph = ExecutionGraph([self.job("A", raising_fn, [])])
+    exec_graph = ExecutionGraph([self.job("A", raising_fn, [])], False)
     with self.assertRaises(ExecutionFailure) as cm:
       self.execute(exec_graph)
 
@@ -120,7 +139,7 @@ class ExecutionGraphTest(unittest.TestCase):
 
   def test_failure_of_dependency_does_not_run_dependents(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["F"]),
-                                 self.job("F", raising_fn, [])])
+                                 self.job("F", raising_fn, [])], False)
     with self.assertRaises(ExecutionFailure) as cm:
       self.execute(exec_graph)
 
@@ -130,7 +149,7 @@ class ExecutionGraphTest(unittest.TestCase):
   def test_failure_of_dependency_does_not_run_second_order_dependents(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, ["B"]),
                                  self.job("B", passing_fn, ["F"]),
-                                 self.job("F", raising_fn, [])])
+                                 self.job("F", raising_fn, [])], False)
     with self.assertRaises(ExecutionFailure) as cm:
       self.execute(exec_graph)
 
@@ -141,7 +160,7 @@ class ExecutionGraphTest(unittest.TestCase):
     # TODO do we want this behavior, or do we want to fail fast on the first failed job?
     exec_graph = ExecutionGraph([self.job("B", passing_fn, []),
                                  self.job("F", raising_fn, ["B"]),
-                                 self.job("A", passing_fn, ["B"])])
+                                 self.job("A", passing_fn, ["B"])], False)
     with self.assertRaises(ExecutionFailure) as cm:
       self.execute(exec_graph)
 
@@ -150,7 +169,7 @@ class ExecutionGraphTest(unittest.TestCase):
 
   def test_failure_of_disconnected_job_does_not_cancel_non_dependents(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, []),
-                                 self.job("F", raising_fn, [])])
+                                 self.job("F", raising_fn, [])], False)
     with self.assertRaises(ExecutionFailure):
       self.execute(exec_graph)
 
@@ -159,7 +178,7 @@ class ExecutionGraphTest(unittest.TestCase):
   def test_cycle_in_graph_causes_failure(self):
     with self.assertRaises(NoRootJobError) as cm:
       ExecutionGraph([self.job("A", passing_fn, ["B"]),
-                      self.job("B", passing_fn, ["A"])])
+                      self.job("B", passing_fn, ["A"])], False)
 
     self.assertEqual(
       "Unexecutable graph: All scheduled jobs have dependencies. "
@@ -169,12 +188,13 @@ class ExecutionGraphTest(unittest.TestCase):
   def test_non_existent_dependency_causes_failure(self):
     with self.assertRaises(UnknownJobError) as cm:
       ExecutionGraph([self.job("A", passing_fn, []),
-                      self.job("B", passing_fn, ["Z"])])
+                      self.job("B", passing_fn, ["Z"])], False)
 
-    self.assertEqual("Unexecutable graph: Undefined dependencies u'Z'", str(cm.exception))
+    self.assertEqual("Unexecutable graph: Undefined dependencies " + ("'Z'" if PY3 else "u'Z'"),
+                     str(cm.exception))
 
   def test_on_success_callback_raises_error(self):
-    exec_graph = ExecutionGraph([self.job("A", passing_fn, [], on_success=raising_fn)])
+    exec_graph = ExecutionGraph([self.job("A", passing_fn, [], on_success=raising_fn)], False)
 
     with self.assertRaises(ExecutionFailure) as cm:
       self.execute(exec_graph)
@@ -182,7 +202,7 @@ class ExecutionGraphTest(unittest.TestCase):
     self.assertEqual("Error in on_success for A: I'm an error", str(cm.exception))
 
   def test_on_failure_callback_raises_error(self):
-    exec_graph = ExecutionGraph([self.job("A", raising_fn, [], on_failure=raising_fn)])
+    exec_graph = ExecutionGraph([self.job("A", raising_fn, [], on_failure=raising_fn)], False)
 
     with self.assertRaises(ExecutionFailure) as cm:
       self.execute(exec_graph)
@@ -192,15 +212,16 @@ class ExecutionGraphTest(unittest.TestCase):
   def test_same_key_scheduled_twice_is_error(self):
     with self.assertRaises(JobExistsError) as cm:
       ExecutionGraph([self.job("Same", passing_fn, []),
-                      self.job("Same", passing_fn, [])])
+                      self.job("Same", passing_fn, [])], False)
 
-    self.assertEqual("Unexecutable graph: Job already scheduled u'Same'", str(cm.exception))
+    self.assertEqual("Unexecutable graph: Job already scheduled " + ("'Same'" if PY3 else "u'Same'"),
+                     str(cm.exception))
 
   def test_priorities_for_chain_of_jobs(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, [], 8),
                                  self.job("B", passing_fn, ["A"], 4),
                                  self.job("C", passing_fn, ["B"], 2),
-                                 self.job("D", passing_fn, ["C"], 1)])
+                                 self.job("D", passing_fn, ["C"], 1)], False)
     self.assertEqual(exec_graph._job_priority, {"A": 15, "B": 7, "C": 3, "D": 1})
     self.execute(exec_graph)
     self.assertEqual(self.jobs_run, ["A", "B", "C", "D"])
@@ -208,7 +229,7 @@ class ExecutionGraphTest(unittest.TestCase):
   def test_priorities_for_fork(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, [], 4),
                                  self.job("B", passing_fn, ["A"], 2),
-                                 self.job("C", passing_fn, ["A"], 1)])
+                                 self.job("C", passing_fn, ["A"], 1)], False)
     self.assertEqual(exec_graph._job_priority, {"A": 6, "B": 2, "C": 1})
     self.execute(exec_graph)
     self.assertEqual(self.jobs_run, ["A", "B", "C"])
@@ -216,7 +237,7 @@ class ExecutionGraphTest(unittest.TestCase):
   def test_priorities_for_mirrored_fork(self):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, [], 4),
                                  self.job("B", passing_fn, ["A"], 1),
-                                 self.job("C", passing_fn, ["A"], 2)])
+                                 self.job("C", passing_fn, ["A"], 2)], False)
     self.assertEqual(exec_graph._job_priority, {"A": 6, "B": 1, "C": 2})
     self.execute(exec_graph)
     self.assertEqual(self.jobs_run, ["A", "C", "B"])
@@ -225,7 +246,7 @@ class ExecutionGraphTest(unittest.TestCase):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, [], 8),
                                  self.job("B", passing_fn, ["A"], 4),
                                  self.job("C", passing_fn, ["A"], 2),
-                                 self.job("D", passing_fn, ["B", "C"], 1)])
+                                 self.job("D", passing_fn, ["B", "C"], 1)], False)
     self.assertEqual(exec_graph._job_priority, {"A": 13, "B": 5, "C": 3, "D": 1})
     self.execute(exec_graph)
     self.assertEqual(self.jobs_run, ["A", "B", "C", "D"])
@@ -234,7 +255,7 @@ class ExecutionGraphTest(unittest.TestCase):
     exec_graph = ExecutionGraph([self.job("A", passing_fn, [], 8),
                                  self.job("B", passing_fn, ["A"], 2),
                                  self.job("C", passing_fn, ["A"], 4),
-                                 self.job("D", passing_fn, ["B", "C"], 1)])
+                                 self.job("D", passing_fn, ["B", "C"], 1)], False)
     self.assertEqual(exec_graph._job_priority, {"A": 13, "B": 3, "C": 5, "D": 1})
     self.execute(exec_graph)
     self.assertEqual(self.jobs_run, ["A", "C", "B", "D"])
@@ -244,7 +265,7 @@ class ExecutionGraphTest(unittest.TestCase):
                                  self.job("B", passing_fn, ["A"], 2),
                                  self.job("C", passing_fn, ["B"], 4),
                                  self.job("D", passing_fn, ["A"], 8),
-                                 self.job("E", passing_fn, ["C", "D"], 16)])
+                                 self.job("E", passing_fn, ["C", "D"], 16)], False)
     self.assertEqual(exec_graph._job_priority, {"A": 25, "B": 22, "C": 20, "D": 24, "E": 16})
     self.execute(exec_graph)
     self.assertEqual(self.jobs_run, ["A", "D", "B", "C", "E"])
@@ -265,10 +286,24 @@ class ExecutionGraphTest(unittest.TestCase):
                                  my_job('B2', passing_fn, ['A']),
                                  my_job('C1', passing_fn, ['B1', 'B2']),
                                  my_job('C2', passing_fn, ['B1', 'B2']),
-                                 my_job('E', passing_fn, ['C2'])])
+                                 my_job('E', passing_fn, ['C2'])], False)
 
     with self.assertRaises(ExecutionFailure):
       self.execute(exec_graph)
 
     self.assertEqual(self.jobs_run, ['A'])
     self.assertEqual(failures, ['A', 'B1', 'B2', 'C1', 'C2', 'E'])
+
+  def test_dumps_stack_trace(self):
+    graph = ExecutionGraph([self.job('A', raising_wrapper, [])], True)
+    capturing_logger = CapturingLogger()
+    with self.assertRaises(ExecutionFailure):
+      graph.execute(ImmediatelyExecutingPool(), capturing_logger)
+    error_logs = capturing_logger.log_entries['error']
+    self.assertEqual(2, len(error_logs), msg='Wanted one error log, got: {}'.format(error_logs))
+    self.assertEqual("A failed: I'm an error", error_logs[0])
+    regex = re.compile(
+      "Traceback:.*in raising_wrapper.*raise Exception\\(\"I'm an error\"\\)",
+      re.DOTALL,
+    )
+    self.assertRegexpMatches(error_logs[1], regex)

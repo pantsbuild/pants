@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -37,7 +36,7 @@ class NodeBundle(NodeTask):
 
     for target in self.context.target_roots:
       if self.is_node_bundle(target):
-        archiver = archive.archiver(target.payload.archive)
+        archiver = archive.create_archiver(target.payload.archive)
         for _, abs_paths in bundleable_js[target.node_module].abs_paths():
           for abs_path in abs_paths:
             # build_dir is a symlink.  Since dereference option for tar is set to False, we need to

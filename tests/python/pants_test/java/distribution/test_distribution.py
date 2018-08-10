@@ -2,12 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import textwrap
 import unittest
+from builtins import object
 from contextlib import contextmanager
 
 from twitter.common.collections import maybe_list
@@ -303,7 +303,7 @@ class DistributionOSXLocationTest(unittest.TestCase):
   def java_home_exe(self):
     with distribution(executables=EXE('bin/java', version='1')) as jdk1_home:
       with distribution(executables=EXE('bin/java', version='2')) as jdk2_home:
-        with temporary_file() as osx_java_home_exe:
+        with temporary_file(binary_mode=False) as osx_java_home_exe:
           osx_java_home_exe.write(textwrap.dedent("""
                 #!/bin/sh
                 echo '<?xml version="1.0" encoding="UTF-8"?>
@@ -378,7 +378,7 @@ def exe_path(name):
   stdout, _ = process.communicate()
   if process.returncode != 0:
     return None
-  path = stdout.strip()
+  path = stdout.decode('utf-8').strip()
   return path if os.path.exists(path) and os.access(path, os.X_OK) else None
 
 

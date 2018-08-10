@@ -2,14 +2,14 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import signal
 import time
 import traceback
+from builtins import object, str
 from contextlib import contextmanager
 
 import psutil
@@ -148,16 +148,24 @@ class ProcessMetadataManager(object):
     action_msg = 'file {} to appear'.format(filename)
     return cls._deadline_until(file_waiter, action_msg, timeout=timeout)
 
-  def _get_metadata_dir_by_name(self, name):
+  @staticmethod
+  def _get_metadata_dir_by_name(name, metadata_base_dir):
     """Retrieve the metadata dir by name.
 
     This should always live outside of the workdir to survive a clean-all.
     """
-    return os.path.join(self._metadata_base_dir, name)
+    return os.path.join(metadata_base_dir, name)
 
   def _maybe_init_metadata_dir_by_name(self, name):
     """Initialize the metadata directory for a named identity if it doesn't exist."""
-    safe_mkdir(self._get_metadata_dir_by_name(name))
+    safe_mkdir(self.__class__._get_metadata_dir_by_name(name, self._metadata_base_dir))
+
+  def _metadata_file_path(self, name, metadata_key):
+    return self.metadata_file_path(name, metadata_key, self._metadata_base_dir)
+
+  @classmethod
+  def metadata_file_path(cls, name, metadata_key, metadata_base_dir):
+    return os.path.join(cls._get_metadata_dir_by_name(name, metadata_base_dir), metadata_key)
 
   def read_metadata_by_name(self, name, metadata_key, caster=None):
     """Read process metadata using a named identity.
@@ -166,9 +174,10 @@ class ProcessMetadataManager(object):
     :param string metadata_key: The metadata key (e.g. 'pid').
     :param func caster: A casting callable to apply to the read value (e.g. `int`).
     """
+    file_path = self._metadata_file_path(name, metadata_key)
     try:
-      file_path = os.path.join(self._get_metadata_dir_by_name(name), metadata_key)
-      return self._maybe_cast(read_file(file_path).strip(), caster)
+      metadata = read_file(file_path, binary_mode=False).strip()
+      return self._maybe_cast(metadata, caster)
     except (IOError, OSError):
       return None
 
@@ -180,8 +189,8 @@ class ProcessMetadataManager(object):
     :param string metadata_value: The metadata value (e.g. '1729').
     """
     self._maybe_init_metadata_dir_by_name(name)
-    file_path = os.path.join(self._get_metadata_dir_by_name(name), metadata_key)
-    safe_file_dump(file_path, metadata_value)
+    file_path = self._metadata_file_path(name, metadata_key)
+    safe_file_dump(file_path, metadata_value, binary_mode=False)
 
   def await_metadata_by_name(self, name, metadata_key, timeout, caster=None):
     """Block up to a timeout for process metadata to arrive on disk.
@@ -193,7 +202,7 @@ class ProcessMetadataManager(object):
     :returns: The value of the metadata key (read from disk post-write).
     :raises: :class:`ProcessMetadataManager.Timeout` on timeout.
     """
-    file_path = os.path.join(self._get_metadata_dir_by_name(name), metadata_key)
+    file_path = self._metadata_file_path(name, metadata_key)
     self._wait_for_file(file_path, timeout=timeout)
     return self.read_metadata_by_name(name, metadata_key, caster)
 
@@ -202,12 +211,12 @@ class ProcessMetadataManager(object):
 
     :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
     """
-    meta_dir = self._get_metadata_dir_by_name(name)
+    meta_dir = self._get_metadata_dir_by_name(name, self._metadata_base_dir)
     logger.debug('purging metadata directory: {}'.format(meta_dir))
     try:
       rm_rf(meta_dir)
     except OSError as e:
-      raise self.MetadataError('failed to purge metadata directory {}: {!r}'.format(meta_dir, e))
+      raise ProcessMetadataManager.MetadataError('failed to purge metadata directory {}: {!r}'.format(meta_dir, e))
 
 
 class ProcessManager(ProcessMetadataManager):
@@ -311,7 +320,7 @@ class ProcessManager(ProcessMetadataManager):
       kwargs.setdefault('stderr', subprocess.STDOUT)
 
     try:
-      return subprocess.check_output(command, **kwargs)
+      return subprocess.check_output(command, **kwargs).decode('utf-8').strip()
     except (OSError, subprocess.CalledProcessError) as e:
       subprocess_output = getattr(e, 'output', '').strip()
       raise cls.ExecutionError(str(e), subprocess_output)
@@ -392,7 +401,7 @@ class ProcessManager(ProcessMetadataManager):
     :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
     """
     if not force and self.is_alive():
-      raise self.MetadataError('cannot purge metadata for a running process!')
+      raise ProcessMetadataManager.MetadataError('cannot purge metadata for a running process!')
 
     super(ProcessManager, self).purge_metadata_by_name(self._name)
 
@@ -426,7 +435,7 @@ class ProcessManager(ProcessMetadataManager):
           pass
 
     if alive:
-      raise self.NonResponsiveProcess('failed to kill pid {pid} with signals {chain}'
+      raise ProcessManager.NonResponsiveProcess('failed to kill pid {pid} with signals {chain}'
                                       .format(pid=self.pid, chain=signal_chain))
 
     if purge:

@@ -2,10 +2,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
-import six
+from builtins import str
+
+from future.utils import text_type
 
 from pants.backend.jvm.tasks.jvm_compile.analysis import Analysis
 from pants.backend.jvm.zinc.zinc_analysis import ZincAnalysis as UnderlyingAnalysis
@@ -48,4 +49,4 @@ class ZincAnalysis(Analysis):
     return str(self.underlying_analysis)
 
   def __unicode__(self):
-    return six.text_type(self.underlying_analysis)
+    return text_type(self.underlying_analysis)

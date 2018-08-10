@@ -2,17 +2,18 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
 import string
+from builtins import open, zip
 from textwrap import dedent
 
+from future.utils import PY3
 from pants.build_graph.target import Target
 from pants.util.contextutil import pushd, temporary_dir
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
@@ -77,10 +78,10 @@ class NodeTaskTest(TaskTestBase):
     target_names = [':' + letter for letter in list(string.ascii_lowercase)]
     types_with_target_names = zip(types, target_names)
 
-    type_check_results = [(type, type_check_function(self.make_target(target_name, type)))
-                          for (type, target_name) in types_with_target_names]
+    type_check_results = {type: type_check_function(self.make_target(target_name, type))
+                          for type, target_name in types_with_target_names}
 
-    return dict(type_check_results)
+    return type_check_results
 
   def test_execute_node(self):
     task = self.create_task(self.context())
@@ -97,7 +98,7 @@ class NodeTaskTest(TaskTestBase):
 
       self.assertEqual(0, returncode)
       self.assertTrue(os.path.exists(proof))
-      with open(proof) as fp:
+      with open(proof, 'r') as fp:
         self.assertEqual('Hello World!', fp.read().strip())
 
   def test_execute_npm(self):
@@ -112,14 +113,18 @@ class NodeTaskTest(TaskTestBase):
           'proof': 'echo "42" > {}'.format(proof)
         }
       }
-      with open(os.path.join(chroot, 'package.json'), 'wb') as fp:
+      mode = 'w' if PY3 else 'wb'
+      with open(os.path.join(chroot, 'package.json'), mode) as fp:
         json.dump(package, fp)
       with pushd(chroot):
-        returncode, _ = task.execute_npm(['run-script', 'proof'], workunit_name='test')
+        returncode, _ = task.run_script(
+          'proof',
+          package_manager=task.node_distribution.get_package_manager(package_manager='npm'),
+          workunit_name='test')
 
       self.assertEqual(0, returncode)
       self.assertTrue(os.path.exists(proof))
-      with open(proof) as fp:
+      with open(proof, 'r') as fp:
         self.assertEqual('42', fp.read().strip())
 
   def test_execute_yarnpkg(self):
@@ -134,10 +139,14 @@ class NodeTaskTest(TaskTestBase):
           'proof': 'echo "42" > {}'.format(proof)
         }
       }
-      with open(os.path.join(chroot, 'package.json'), 'wb') as fp:
+      mode = 'w' if PY3 else 'wb'
+      with open(os.path.join(chroot, 'package.json'), mode) as fp:
         json.dump(package, fp)
       with pushd(chroot):
-        returncode, _ = task.execute_yarnpkg(['run', 'proof'], workunit_name='test')
+        returncode, _ = task.run_script(
+          'proof',
+          package_manager=task.node_distribution.get_package_manager(package_manager='yarnpkg'),
+          workunit_name='test')
 
       self.assertEqual(0, returncode)
       self.assertTrue(os.path.exists(proof))

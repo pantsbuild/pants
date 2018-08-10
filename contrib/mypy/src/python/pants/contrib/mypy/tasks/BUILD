@@ -3,6 +3,7 @@
 
 python_library(
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:pex',
     'src/python/pants/util:process_handler',
     'src/python/pants/backend/python:interpreter_cache',
@@ -12,7 +13,6 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
-    'src/python/pants/python',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',

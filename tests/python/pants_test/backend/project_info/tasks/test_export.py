@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
@@ -37,7 +36,7 @@ from pants.util.dirutil import chmod_plus_x, safe_open
 from pants.util.osutil import get_os_name, normalize_os_name
 from pants_test.backend.python.tasks.interpreter_cache_test_mixin import InterpreterCacheTestMixin
 from pants_test.subsystem.subsystem_util import init_subsystems
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
@@ -45,8 +44,8 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
   def task_type(cls):
     return Export
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return register_core().merge(register_jvm()).merge(register_python())
 
   def setUp(self):
@@ -429,10 +428,10 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
   def test_has_python_requirements(self):
     result = self.execute_export_json('src/python/has_reqs')
     interpreters = result['python_setup']['interpreters']
-    self.assertEquals(1, len(interpreters))
-    chroot = interpreters.values()[0]['chroot']
+    self.assertEqual(1, len(interpreters))
+    chroot = list(interpreters.values())[0]['chroot']
     deps = os.listdir(os.path.join(chroot, '.deps'))
-    self.assertEquals(1, len(deps))
+    self.assertEqual(1, len(deps))
     six_whl = deps[0]
     self.assertTrue(six_whl.startswith('six-1.9.0'))
     self.assertTrue(six_whl.endswith('.whl'))

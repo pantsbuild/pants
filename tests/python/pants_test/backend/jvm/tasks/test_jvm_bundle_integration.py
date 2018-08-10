@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -28,9 +27,8 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
       target = ('testprojects/maven_layout/resource_collision/example_{name}/'
                 'src/main/java/org/pantsbuild/duplicateres/example{name}/'
                 .format(name=name))
-      bundle_name = ('testprojects.maven_layout.resource_collision.example_{name}.'
-                     'src.main.java.org.pantsbuild.duplicateres.example{name}.example{name}'
-                     .format(name=name))
-      bundle_jar_name = 'example{proj}'.format(proj=name)
-      stdout = self.bundle_and_run(target, bundle_name, bundle_jar_name=bundle_jar_name)
-      self.assertEquals(stdout, 'Hello world!: resource from example {name}\n'.format(name=name))
+      bundle_name = 'example{name}'.format(name=name)
+      stdout = self.bundle_and_run(target, bundle_name, bundle_jar_name=bundle_name, bundle_options=[
+          '--bundle-jvm-use-basename-prefix',
+        ])
+      self.assertEqual(stdout, 'Hello world!: resource from example {name}\n'.format(name=name))

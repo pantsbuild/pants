@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from abc import abstractproperty
 
@@ -27,6 +26,7 @@ class ScalaFmt(RewriteBase):
     super(ScalaFmt, cls).register_options(register)
     register('--configuration', advanced=True, type=file_option, fingerprint=True,
               help='Path to scalafmt config file, if not specified default scalafmt config used')
+
     cls.register_jvm_tool(register,
                           'scalafmt',
                           classpath=[
@@ -47,13 +47,13 @@ class ScalaFmt(RewriteBase):
   def implementation_version(cls):
     return super(ScalaFmt, cls).implementation_version() + [('ScalaFmt', 5)]
 
-  def invoke_tool(self, _, target_sources):
+  def invoke_tool(self, absolute_root, target_sources):
     # If no config file is specified use default scalafmt config.
     config_file = self.get_options().configuration
     args = list(self.additional_args)
-    args.extend(['--files', ','.join(source for _, source in target_sources)])
-    if config_file != None:
+    if config_file is not None:
       args.extend(['--config', config_file])
+    args.extend([source for _target, source in target_sources])
 
     return self.runjava(classpath=self.tool_classpath('scalafmt'),
                         main='org.scalafmt.cli.Cli',

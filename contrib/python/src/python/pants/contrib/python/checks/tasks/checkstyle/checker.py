@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
 from collections import namedtuple
@@ -14,6 +13,7 @@ from pants.base.exceptions import TaskError
 from pants.option.custom_types import file_option
 from pants.task.lint_task_mixin import LintTaskMixin
 from pants.task.task import Task
+from pex.interpreter import PythonInterpreter
 
 from pants.contrib.python.checks.tasks.checkstyle.common import CheckSyntaxError, Nit, PythonFile
 from pants.contrib.python.checks.tasks.checkstyle.file_excluder import FileExcluder
@@ -56,6 +56,10 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
     return super(Task, cls).subsystem_dependencies() + cls._subsystems
 
   @classmethod
+  def prepare(cls, options, round_manager):
+    round_manager.require_data(PythonInterpreter)
+
+  @classmethod
   def register_options(cls, register):
     super(PythonCheckStyleTask, cls).register_options(register)
     register('--severity', fingerprint=True, default='COMMENT', type=str,
@@ -63,7 +67,7 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
     register('--strict', fingerprint=True, type=bool,
              help='If enabled, have non-zero exit status for any nit at WARNING or higher.')
     register('--suppress', fingerprint=True, type=file_option, default=None,
-             help='Takes a XML file where specific rules on specific files will be skipped.')
+             help='Takes a text file where specific rules on specific files will be skipped.')
     register('--fail', fingerprint=True, default=True, type=bool,
              help='Prevent test failure but still produce output for problems.')
 
@@ -167,6 +171,19 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
 
   def execute(self):
     """Run Checkstyle on all found non-synthetic source files."""
+
+    # If we are linting for Python 3, skip lint altogether.
+    # Long-term Python 3 linting solution tracked by:
+    # https://github.com/pantsbuild/pants/issues/5764
+    interpreter = self.context.products.get_data(PythonInterpreter)
+    # Check interpreter is not 'None' for test cases that do not
+    # run the python interpreter selection task.
+    if interpreter and interpreter.version >= (3, 0 ,0):
+      self.context.log.info('Linting is currently disabled for Python 3 targets.\n '
+                            'See https://github.com/pantsbuild/pants/issues/5764 for '
+                            'long-term solution tracking.')
+      return
+
     with self.invalidated(self.get_targets(self._is_checked)) as invalidation_check:
       sources = self.calculate_sources([vt.target for vt in invalidation_check.invalid_vts])
       if sources:

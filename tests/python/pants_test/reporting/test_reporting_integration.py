@@ -2,12 +2,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os.path
 import re
 import unittest
+from builtins import open
 
 from parameterized import parameterized
 
@@ -17,10 +17,10 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 _HEADER = 'invocation_id,task_name,targets_hash,target_id,cache_key_id,cache_key_hash,phase,valid\n'
 _REPORT_LOCATION = 'reports/latest/invalidation-report.csv'
 
-_ENTRY = re.compile(ur'^\d+,\S+,(init|pre-check|post-check),(True|False)')
-_INIT = re.compile(ur'^\d+,ZincCompile_compile_zinc,\w+,\S+,init,(True|False)')
-_POST = re.compile(ur'^\d+,ZincCompile_compile_zinc,\w+,\S+,post-check,(True|False)')
-_PRE = re.compile(ur'^\d+,ZincCompile_compile_zinc,\w+,\S+,pre-check,(True|False)')
+_ENTRY = re.compile(r'^\d+,\S+,(init|pre-check|post-check),(True|False)')
+_INIT = re.compile(r'^\d+,ZincCompile_compile_zinc,\w+,\S+,init,(True|False)')
+_POST = re.compile(r'^\d+,ZincCompile_compile_zinc,\w+,\S+,post-check,(True|False)')
+_PRE = re.compile(r'^\d+,ZincCompile_compile_zinc,\w+,\S+,pre-check,(True|False)')
 
 
 class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
@@ -34,7 +34,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       self.assert_success(pants_run)
       output = os.path.join(workdir, _REPORT_LOCATION)
       self.assertTrue(os.path.exists(output))
-      with open(output) as f:
+      with open(output, 'r') as f:
         self.assertEqual(_HEADER, f.readline())
         for line in f.readlines():
           self.assertTrue(_ENTRY.match(line))
@@ -56,7 +56,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       # The 'latest' link has been removed by clean-all but that's not fatal.
       report_dirs = os.listdir(os.path.join(workdir, 'reports'))
-      self.assertEquals(1, len(report_dirs))
+      self.assertEqual(1, len(report_dirs))
 
       output = os.path.join(workdir, 'reports', report_dirs[0], 'invalidation-report.csv')
       self.assertTrue(os.path.exists(output), msg='Missing report file {}'.format(output))

@@ -2,10 +2,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+from builtins import object, str
 from collections import Iterable, namedtuple
 
 from pants.base.parse_context import ParseContext
@@ -33,6 +33,7 @@ class BuildConfiguration(object):
     self._exposed_object_by_alias = {}
     self._exposed_context_aware_object_factory_by_alias = {}
     self._subsystems = set()
+    self._rules = []
 
   def registered_aliases(self):
     """Return the registered aliases exposed in BUILD files.
@@ -49,7 +50,8 @@ class BuildConfiguration(object):
     return BuildFileAliases(
         targets=target_factories_by_alias,
         objects=self._exposed_object_by_alias.copy(),
-        context_aware_object_factories=self._exposed_context_aware_object_factory_by_alias.copy())
+        context_aware_object_factories=self._exposed_context_aware_object_factory_by_alias.copy()
+    )
 
   def register_aliases(self, aliases):
     """Registers the given aliases to be exposed in parsed BUILD files.
@@ -128,6 +130,25 @@ class BuildConfiguration(object):
     :rtype set
     """
     return self._subsystems
+
+  def register_rules(self, rules):
+    """Registers the given rules.
+
+    :param rules: The rules to register.
+    :type rules: :class:`collections.Iterable` containing
+                 :class:`pants.engine.rules.Rule` instances.
+    """
+
+    if not isinstance(rules, Iterable):
+      raise TypeError('The rules must be an iterable, given {!r}'.format(rules))
+    self._rules.extend(rules)
+
+  def rules(self):
+    """Returns the registered rules.
+
+    :rtype list
+    """
+    return self._rules
 
   @memoized_method
   def _get_addressable_factory(self, target_type, alias):

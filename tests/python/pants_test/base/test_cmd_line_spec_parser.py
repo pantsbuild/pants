@@ -2,14 +2,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 def single(directory, name=None):
@@ -25,7 +24,7 @@ def sib(directory):
   return SiblingAddresses(directory)
 
 
-class CmdLineSpecParserTest(BaseTest):
+class CmdLineSpecParserTest(TestBase):
 
   def setUp(self):
     super(CmdLineSpecParserTest, self).setUp()
@@ -75,7 +74,7 @@ class CmdLineSpecParserTest(BaseTest):
     # By adding a double slash, we are insisting that this absolute path is actually
     # relative to the buildroot. Thus, it should parse correctly.
     double_absolute = '/' + os.path.join(self.build_root, 'a')
-    self.assertEquals('//', double_absolute[:2],
+    self.assertEqual('//', double_absolute[:2],
                       'A sanity check we have a leading-// absolute spec')
     self.assert_parsed(double_absolute, single(double_absolute[2:]))
 

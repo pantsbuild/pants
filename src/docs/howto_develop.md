@@ -22,22 +22,8 @@ can run it like so:
 
     :::bash
     (other repo) $ PANTS_PLUGINS="[]" \
-      PANTS_PYTHONPATH="['/path/to/pants/repo/contrib/python/src/python']" \
-      PANTS_BACKEND_PACKAGES="['pants.contrib.python.checks']" \
-      /path/to/pants/repo/pants compile ::
-
-You may hit an error with version mismatch:
-
-    :::bash
-    ...
-    Exception message: Version mismatch: Requested version was 1.1.0, our version is 1.2.0-dev0.
-
-If so, you can add a `PANTS_VERSION` environment variable like so:
-
-    :::bash
-    (other repo) $ PANTS_PLUGINS="[]" \
-      PANTS_PYTHONPATH="['/path/to/pants/repo/contrib/python/src/python']" \
-      PANTS_BACKEND_PACKAGES="['pants.contrib.python.checks']" \
+      PANTS_PYTHONPATH="+['/path/to/pants/repo/contrib/python/src/python']" \
+      PANTS_BACKEND_PACKAGES="+['pants.contrib.python.checks']" \
       PANTS_VERSION=1.2.0-dev0 \
       /path/to/pants/repo/pants compile ::
 
@@ -45,11 +31,14 @@ Here the environment variables are used to make sure any pants plugins your othe
 also be run from pants sources. Explaining each environment variable:
 
 + `PANTS_PLUGINS`: This should always be as-shown, ie: an empty list.
-+ `PANTS_PYTHONPATH`: This is a comma-separated list of PYTHONPATH elements.  The values can be
-  taken from the pants repo pants.ini.  You'll need one path per plugin your other repo uses.
-+ `PANTS_BACKEND_PACKAGES`: This is a comma-separated list of plugin package names.  These values
-  can also be taken from the pants repo pants.ini.  You'll need one package name per plugin your
-  other repo uses.
++ `PANTS_PYTHONPATH`: This is a comma-separated list of PYTHONPATH elements. Note the plus symbol
+  before the list - this indicates the given elements should be appended to the PYTHONPATH.
+  The values can be taken from the pants repo pants.ini. You'll need one path per plugin your other
+  repo uses.
++ `PANTS_BACKEND_PACKAGES`: This is a comma-separated list of plugin package names. Note the plus
+  symbol before the list - this indicates the given elements should be appended to the PYTHONPATH.
+  These values can also be taken from the pants repo pants.ini. You'll need one package name per
+  plugin your other repo uses.
 + `PANTS_VERSION`: The version of pants required by the repo.
 
 If your other repo uses plugins but you don't use this environment variable technique, or you do use
@@ -284,12 +273,12 @@ For debugging, append JVM args to turn on the debugger for the appropriate tool 
 
 Note that most tools run under nailgun by default. The easiest way to
 debug them is to disable nailgun by specifying the command line option
-`--no-use-nailgun` or setting `use_nailgun: False` in the specific tool section or in the
-`[DEFAULT]` section of `pants.ini`.
+`--execution-strategy=subprocess` or setting `execution_strategy: subprocess` in the specific tool
+section or in the `[DEFAULT]` section of `pants.ini`.
 
     :::ini
     [DEFAULT]
-    use_nailgun: False
+    execution_strategy: subprocess
 
 ###JVM Tool Development Tips
 

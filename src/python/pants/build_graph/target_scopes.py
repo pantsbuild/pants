@@ -2,10 +2,11 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
-import six
+from builtins import object, str
+
+from future.utils import string_types
 
 from pants.build_graph.intermediate_target_factory import IntermediateTargetFactoryBase
 
@@ -27,7 +28,7 @@ class Scope(frozenset):
     """
     if not scope:
       return ('default',)
-    if isinstance(scope, six.string_types):
+    if isinstance(scope, string_types):
       scope = scope.split(' ')
     scope = {str(s).lower() for s in scope if s}
     return scope or ('default',)

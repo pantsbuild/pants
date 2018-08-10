@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
@@ -42,10 +41,11 @@ class DeclaredDepsIntegrationTest(BaseCompileIT):
     # Should fail when it is not whitelisted.
     self.do_test_success_and_failure(
       DIR_DEPS_WHITELISTED,
-      ['--compile-jvm-dep-check-missing-deps-whitelist=["{}"]'.format(DIR_DEPS_WHITELISTED)],
+      ['--lint-jvm-dep-check-missing-deps-whitelist=["{}"]'.format(DIR_DEPS_WHITELISTED)],
       [],
       shared_args=[
-        '--compile-jvm-dep-check-missing-direct-deps=fatal',
+        'lint',
+        '--lint-jvm-dep-check-missing-direct-deps=fatal',
         '--no-java-strict-deps',
       ],
     )
@@ -54,10 +54,11 @@ class DeclaredDepsIntegrationTest(BaseCompileIT):
     # Should fail when it is not whitelisted.
     self.do_test_success_and_failure(
       JAR_DEPS_WHITELISTED,
-      ['--compile-jvm-dep-check-missing-deps-whitelist=["{}"]'.format(JAR_DEPS_WHITELISTED)],
+      ['--lint-jvm-dep-check-missing-deps-whitelist=["{}"]'.format(JAR_DEPS_WHITELISTED)],
       [],
       shared_args=[
-        '--compile-jvm-dep-check-missing-direct-deps=fatal',
+        'lint',
+        '--lint-jvm-dep-check-missing-direct-deps=fatal',
         '--no-java-strict-deps',
       ],
     )

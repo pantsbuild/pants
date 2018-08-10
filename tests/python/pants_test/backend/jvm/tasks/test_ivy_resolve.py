@@ -2,12 +2,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 from contextlib import contextmanager
 
+from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef, IvyResolveResult
@@ -27,7 +28,7 @@ from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_delete
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
+from pants_test.task_test_base import TaskTestBase, ensure_cached
 
 
 def strip_workdir(dir, classpath):
@@ -43,7 +44,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
   def setUp(self):
     super(IvyResolveTest, self).setUp()
-    self.set_options(use_nailgun=False)
+    self.set_options(execution_strategy='subprocess')
     self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                read_from=None,
                                write_to=None)
@@ -65,8 +66,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
     scala_lib = self.make_target('//:b', JavaLibrary, sources=[])
     # Confirm that the deps were added to the appropriate targets.
     compile_classpath = self.resolve([jar_lib, scala_lib])
-    self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
-    self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib)))
+    self.assertEqual(1, len(compile_classpath.get_for_target(jar_lib)))
+    self.assertEqual(0, len(compile_classpath.get_for_target(scala_lib)))
 
   @ensure_cached(IvyResolve, expected_num_artifacts=0)
   def test_resolve_conflicted(self):
@@ -137,8 +138,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
     compile_classpath = context.products.get_data('compile_classpath', None)
     losing_cp = compile_classpath.get_for_target(losing_lib)
     winning_cp = compile_classpath.get_for_target(winning_lib)
-    self.assertEquals(losing_cp, winning_cp)
-    self.assertEquals(OrderedSet([(u'default', artifact_path(u'bogus0')),
+    self.assertEqual(losing_cp, winning_cp)
+    self.assertEqual(OrderedSet([(u'default', artifact_path(u'bogus0')),
                                   (u'default', artifact_path(u'bogus1'))]),
                       winning_cp)
 
@@ -184,8 +185,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
     junit_jar_cp = compile_classpath.get_for_target(junit_jar_lib)
     excluding_cp = compile_classpath.get_for_target(excluding_target)
 
-    self.assertEquals(0, len(junit_jar_cp))
-    self.assertEquals(0, len(excluding_cp))
+    self.assertEqual(0, len(junit_jar_cp))
+    self.assertEqual(0, len(excluding_cp))
 
   @ensure_cached(IvyResolve, expected_num_artifacts=0)
   def test_resolve_no_deps(self):
@@ -212,7 +213,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
         jar_lib = self.make_target('//:a', JarLibrary, jars=[dep])
         # Confirm that the deps were added to the appropriate targets.
         compile_classpath = self.resolve([jar_lib])
-        self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
+        self.assertEqual(1, len(compile_classpath.get_for_target(jar_lib)))
 
   @ensure_cached(IvyResolve, expected_num_artifacts=1)
   def test_ivy_classpath(self):
@@ -223,7 +224,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     task = self.prepare_execute(self.context())
     classpath = task.ivy_classpath([junit_jar_lib])
 
-    self.assertEquals(2, len(classpath))
+    self.assertEqual(2, len(classpath))
 
   def test_second_resolve_reuses_existing_resolution_files(self):
     junit_jar_lib = self._make_junit_target()
@@ -254,13 +255,13 @@ class IvyResolveTest(JvmToolTaskTestBase):
       ivy_resolve_workdir = self._find_resolve_workdir(workdir)
       raw_classpath_path = os.path.join(ivy_resolve_workdir, 'classpath.raw')
       with open(raw_classpath_path, 'a') as raw_f:
-        raw_f.write(os.pathsep)
+        raw_f.write(os.pathsep if PY3 else os.pathsep.decode('utf-8'))
         raw_f.write(os.path.join('non-existent-file'))
 
       self.resolve([jar_lib])
 
       # The raw_classpath should be re-created because the previous resolve became invalid.
-      with open(raw_classpath_path) as f:
+      with open(raw_classpath_path, 'r') as f:
         self.assertNotIn('non-existent-file', f.read())
 
   def test_fetch_has_same_resolved_jars_as_resolve(self):
@@ -362,8 +363,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
         self._assertIsFile(report_path)
 
         _unused_conf, lib_symlink = fetch_classpath.get_for_target(jar_lib)[0]
-        with open(jarfile) as jarfile_f:
-          with open(lib_symlink) as symlink_f:
+        with open(jarfile, 'r') as jarfile_f:
+          with open(lib_symlink, 'r') as symlink_f:
             self.assertTrue(jarfile_f.read() == symlink_f.read(),
                             'Expected linked jar and original to match.')
 
@@ -401,13 +402,13 @@ class IvyResolveTest(JvmToolTaskTestBase):
         ivy_resolve_workdir = self._find_resolve_workdir(workdir)
         raw_classpath_path = os.path.join(ivy_resolve_workdir, 'classpath.raw')
         with open(raw_classpath_path, 'a') as raw_f:
-          raw_f.write(os.pathsep)
+          raw_f.write(os.pathsep if PY3 else os.pathsep.decode('utf-8'))
           raw_f.write(os.path.join('non-existent-file'))
 
         self.resolve([jar_lib])
 
         # The raw_classpath should be re-created because the previous resolve became invalid.
-        with open(raw_classpath_path) as f:
+        with open(raw_classpath_path, 'r') as f:
           self.assertNotIn('non-existent-file', f.read())
 
   def _make_junit_target(self):

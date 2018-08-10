@@ -2,10 +2,10 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -20,7 +20,7 @@ class EchoTaskBase(HasSkipAndTransitiveGoalOptionsMixin, Task):
 
   def execute(self):
     with open(os.path.join(self.workdir, 'output'), 'w') as fp:
-      fp.write(b'\n'.join(t.address.spec for t in self.get_targets()))
+      fp.write('\n'.join(t.address.spec for t in self.get_targets()))
 
 
 class EchoOne(EchoTaskBase):

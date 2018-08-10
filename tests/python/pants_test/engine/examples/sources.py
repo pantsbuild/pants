@@ -2,17 +2,17 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from abc import abstractproperty
 
-from pants.engine.addressable import Exactly, addressable
+from pants.engine.addressable import addressable
 from pants.engine.fs import PathGlobs
 from pants.engine.objects import Locatable
 from pants.engine.struct import Struct
 from pants.source import wrapped_globs
+from pants.util.objects import Exactly
 
 
 class Sources(Struct, Locatable):
@@ -62,7 +62,10 @@ class Sources(Struct, Locatable):
 
     This field may be projected to request the content of the files for this Sources object.
     """
-    return PathGlobs.create(self.spec_path, include=self.filespecs, exclude=(self.excludes or []))
+    return PathGlobs(
+      include=tuple(os.path.join(self.spec_path, filespec) for filespec in self.filespecs),
+      exclude=tuple(os.path.join(self.spec_path, exclude) for exclude in self.excludes or ()),
+    )
 
   @abstractproperty
   def extensions(self):

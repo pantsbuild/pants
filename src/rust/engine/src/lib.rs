@@ -5,7 +5,6 @@ pub mod cffi_externs;
 mod context;
 mod core;
 mod externs;
-mod graph;
 mod handles;
 mod interning;
 mod nodes;
@@ -15,21 +14,22 @@ mod selectors;
 mod tasks;
 mod types;
 
+#[macro_use]
 extern crate boxfuture;
 #[macro_use]
 extern crate enum_primitive;
 extern crate fnv;
 extern crate fs;
 extern crate futures;
+extern crate graph;
 extern crate hashing;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
-extern crate ordermap;
-extern crate petgraph;
 extern crate process_execution;
-extern crate tempdir;
+extern crate resettable;
+extern crate tokio;
 
 use std::ffi::CStr;
 use std::fs::File;
@@ -38,17 +38,22 @@ use std::mem;
 use std::os::raw;
 use std::panic;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use context::Core;
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
-use externs::{Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern,
-              DropHandlesExtern, EqualsExtern, EvalExtern, ExternContext, Externs,
-              GeneratorSendExtern, IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern,
-              ProjectMultiExtern, PyResult, SatisfiedByExtern, SatisfiedByTypeExtern,
-              StoreBytesExtern, StoreI32Extern, StoreListExtern, TypeIdBuffer, TypeToStrExtern,
-              ValToStrExtern};
+use externs::{
+  Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
+  EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, IdentifyExtern, LogExtern,
+  ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult, SatisfiedByExtern,
+  SatisfiedByTypeExtern, StoreBytesExtern, StoreI64Extern, StoreTupleExtern, StoreUtf8Extern,
+  TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
+};
+use futures::Future;
+use handles::Handle;
+use hashing::Digest;
 use rule_graph::{GraphMaker, RuleGraph};
-use scheduler::{ExecutionRequest, RootResult, Scheduler};
+use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
 use tasks::Tasks;
 use types::Types;
 
@@ -64,9 +69,9 @@ enum RawStateTag {
 pub struct RawNode {
   subject: Key,
   product: TypeConstraint,
-  // The Value represents a union tagged with RawStateTag.
+  // The Handle represents a union tagged with RawStateTag.
   state_tag: u8,
-  state_value: Value,
+  state_handle: Handle,
 }
 
 impl RawNode {
@@ -88,7 +93,7 @@ impl RawNode {
       subject: subject.clone(),
       product: product.clone(),
       state_tag: state_tag,
-      state_value: state_value,
+      state_handle: state_value.into(),
     }
   }
 }
@@ -134,9 +139,10 @@ pub extern "C" fn externs_set(
   val_to_str: ValToStrExtern,
   satisfied_by: SatisfiedByExtern,
   satisfied_by_type: SatisfiedByTypeExtern,
-  store_list: StoreListExtern,
+  store_tuple: StoreTupleExtern,
   store_bytes: StoreBytesExtern,
-  store_i32: StoreI32Extern,
+  store_utf8: StoreUtf8Extern,
+  store_i64: StoreI64Extern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
@@ -157,9 +163,10 @@ pub extern "C" fn externs_set(
     val_to_str,
     satisfied_by,
     satisfied_by_type,
-    store_list,
+    store_tuple,
     store_bytes,
-    store_i32,
+    store_utf8,
+    store_i64,
     project_ignoring_type,
     project_multi,
     create_exception,
@@ -168,13 +175,13 @@ pub extern "C" fn externs_set(
 }
 
 #[no_mangle]
-pub extern "C" fn externs_key_for(value: Value) -> Key {
-  externs::key_for(value)
+pub extern "C" fn key_for(value: Handle) -> Key {
+  externs::key_for(value.into())
 }
 
 #[no_mangle]
-pub extern "C" fn externs_val_for(key: Key) -> Value {
-  externs::val_for(&key)
+pub extern "C" fn val_for(key: Key) -> Handle {
+  externs::val_for(&key).into()
 }
 
 ///
@@ -186,8 +193,8 @@ pub extern "C" fn externs_val_for(key: Key) -> Value {
 #[no_mangle]
 pub extern "C" fn scheduler_create(
   tasks_ptr: *mut Tasks,
+  construct_directory_digest: Function,
   construct_snapshot: Function,
-  construct_snapshots: Function,
   construct_file_content: Function,
   construct_files_content: Function,
   construct_path_stat: Function,
@@ -199,8 +206,8 @@ pub extern "C" fn scheduler_create(
   type_has_products: TypeConstraint,
   type_has_variants: TypeConstraint,
   type_path_globs: TypeConstraint,
+  type_directory_digest: TypeConstraint,
   type_snapshot: TypeConstraint,
-  type_snapshots: TypeConstraint,
   type_files_content: TypeConstraint,
   type_dir: TypeConstraint,
   type_file: TypeConstraint,
@@ -214,52 +221,124 @@ pub extern "C" fn scheduler_create(
   work_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
   root_type_ids: TypeIdBuffer,
+  remote_store_server: Buffer,
+  remote_execution_server: Buffer,
+  remote_store_thread_count: u64,
+  remote_store_chunk_bytes: u64,
+  remote_store_chunk_upload_timeout_seconds: u64,
+  process_execution_parallelism: u64,
+  process_execution_cleanup_local_dirs: bool,
 ) -> *const Scheduler {
   let root_type_ids = root_type_ids.to_vec();
   let ignore_patterns = ignore_patterns_buf
     .to_strings()
     .unwrap_or_else(|e| panic!("Failed to decode ignore patterns as UTF8: {:?}", e));
-  let tasks = with_tasks(tasks_ptr, |tasks| tasks.clone());
+  let types = Types {
+    construct_directory_digest: construct_directory_digest,
+    construct_snapshot: construct_snapshot,
+    construct_file_content: construct_file_content,
+    construct_files_content: construct_files_content,
+    construct_path_stat: construct_path_stat,
+    construct_dir: construct_dir,
+    construct_file: construct_file,
+    construct_link: construct_link,
+    construct_process_result: construct_process_result,
+    address: type_address,
+    has_products: type_has_products,
+    has_variants: type_has_variants,
+    path_globs: type_path_globs,
+    directory_digest: type_directory_digest,
+    snapshot: type_snapshot,
+    files_content: type_files_content,
+    dir: type_dir,
+    file: type_file,
+    link: type_link,
+    process_request: type_process_request,
+    process_result: type_process_result,
+    generator: type_generator,
+    string: type_string,
+    bytes: type_bytes,
+  };
+  let mut tasks = with_tasks(tasks_ptr, |tasks| tasks.clone());
+  tasks.intrinsics_set(&types);
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
+  let remote_store_server_string = remote_store_server
+    .to_string()
+    .expect("remote_store_server was not valid UTF8");
+  let remote_execution_server_string = remote_execution_server
+    .to_string()
+    .expect("remote_execution_server was not valid UTF8");
   Box::into_raw(Box::new(Scheduler::new(Core::new(
     root_type_ids.clone(),
     tasks,
-    Types {
-      construct_snapshot: construct_snapshot,
-      construct_snapshots: construct_snapshots,
-      construct_file_content: construct_file_content,
-      construct_files_content: construct_files_content,
-      construct_path_stat: construct_path_stat,
-      construct_dir: construct_dir,
-      construct_file: construct_file,
-      construct_link: construct_link,
-      construct_process_result: construct_process_result,
-      address: type_address,
-      has_products: type_has_products,
-      has_variants: type_has_variants,
-      path_globs: type_path_globs,
-      snapshot: type_snapshot,
-      snapshots: type_snapshots,
-      files_content: type_files_content,
-      dir: type_dir,
-      file: type_file,
-      link: type_link,
-      process_request: type_process_request,
-      process_result: type_process_result,
-      generator: type_generator,
-      string: type_string,
-      bytes: type_bytes,
-    },
+    types,
     build_root_buf.to_os_string().as_ref(),
     ignore_patterns,
-    work_dir_buf.to_os_string().as_ref(),
+    PathBuf::from(work_dir_buf.to_os_string()),
+    if remote_store_server_string.is_empty() {
+      None
+    } else {
+      Some(remote_store_server_string)
+    },
+    if remote_execution_server_string.is_empty() {
+      None
+    } else {
+      Some(remote_execution_server_string)
+    },
+    remote_store_thread_count as usize,
+    remote_store_chunk_bytes as usize,
+    Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
+    process_execution_parallelism as usize,
+    process_execution_cleanup_local_dirs as bool,
   ))))
+}
+
+///
+/// Returns a Handle representing a tuple of tuples of metric name string and metric value int.
+///
+#[no_mangle]
+pub extern "C" fn scheduler_metrics(
+  scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
+) -> Handle {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    with_session(session_ptr, |session| {
+      let values = scheduler
+        .metrics(session)
+        .into_iter()
+        .map(|(metric, value)| {
+          externs::store_tuple(&[
+            externs::store_bytes(metric.as_bytes()),
+            externs::store_i64(value),
+          ])
+        })
+        .collect::<Vec<_>>();
+      externs::store_tuple(&values).into()
+    })
+  })
 }
 
 #[no_mangle]
 pub extern "C" fn scheduler_pre_fork(scheduler_ptr: *mut Scheduler) {
   with_scheduler(scheduler_ptr, |scheduler| {
     scheduler.core.pre_fork();
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn scheduler_execute(
+  scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
+  execution_request_ptr: *mut ExecutionRequest,
+) -> *const RawNodes {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    with_execution_request(execution_request_ptr, |execution_request| {
+      with_session(session_ptr, |session| {
+        Box::into_raw(RawNodes::create(
+          scheduler.execute(execution_request, session),
+        ))
+      })
+    })
   })
 }
 
@@ -287,18 +366,6 @@ pub extern "C" fn execution_add_root_select(
 }
 
 #[no_mangle]
-pub extern "C" fn execution_execute(
-  scheduler_ptr: *mut Scheduler,
-  execution_request_ptr: *mut ExecutionRequest,
-) -> *const RawNodes {
-  with_scheduler(scheduler_ptr, |scheduler| {
-    with_execution_request(execution_request_ptr, |execution_request| {
-      Box::into_raw(RawNodes::create(scheduler.execute(execution_request)))
-    })
-  })
-}
-
-#[no_mangle]
 pub extern "C" fn tasks_create() -> *const Tasks {
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(Box::new(Tasks::new()))
@@ -307,11 +374,11 @@ pub extern "C" fn tasks_create() -> *const Tasks {
 #[no_mangle]
 pub extern "C" fn tasks_singleton_add(
   tasks_ptr: *mut Tasks,
-  value: Value,
+  handle: Handle,
   output_constraint: TypeConstraint,
 ) {
   with_tasks(tasks_ptr, |tasks| {
-    tasks.singleton_add(value, output_constraint);
+    tasks.singleton_add(handle.into(), output_constraint);
   })
 }
 
@@ -355,24 +422,6 @@ pub extern "C" fn tasks_add_select_variant(
 }
 
 #[no_mangle]
-pub extern "C" fn tasks_add_select_dependencies(
-  tasks_ptr: *mut Tasks,
-  product: TypeConstraint,
-  dep_product: TypeConstraint,
-  field: Buffer,
-  field_types: TypeIdBuffer,
-) {
-  with_tasks(tasks_ptr, |tasks| {
-    tasks.add_select_dependencies(
-      product,
-      dep_product,
-      field.to_string().expect("field to be a string"),
-      field_types.to_vec(),
-    );
-  })
-}
-
-#[no_mangle]
 pub extern "C" fn tasks_task_end(tasks_ptr: *mut Tasks) {
   with_tasks(tasks_ptr, |tasks| {
     tasks.task_end();
@@ -390,9 +439,16 @@ pub extern "C" fn graph_invalidate(scheduler_ptr: *mut Scheduler, paths_buf: Buf
     let paths = paths_buf
       .to_os_strings()
       .into_iter()
-      .map(|os_str| PathBuf::from(os_str))
+      .map(PathBuf::from)
       .collect();
-    scheduler.core.graph.invalidate(paths) as u64
+    scheduler.invalidate(&paths) as u64
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn graph_invalidate_all_paths(scheduler_ptr: *mut Scheduler) -> u64 {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    scheduler.invalidate_all_paths() as u64
   })
 }
 
@@ -404,20 +460,17 @@ pub extern "C" fn graph_len(scheduler_ptr: *mut Scheduler) -> u64 {
 #[no_mangle]
 pub extern "C" fn graph_visualize(
   scheduler_ptr: *mut Scheduler,
-  execution_request_ptr: *mut ExecutionRequest,
+  session_ptr: *mut Session,
   path_ptr: *const raw::c_char,
-) {
+) -> PyResult {
   with_scheduler(scheduler_ptr, |scheduler| {
-    with_execution_request(execution_request_ptr, |execution_request| {
+    with_session(session_ptr, |session| {
       let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
       let path = PathBuf::from(path_str);
-      // TODO: This should likely return an error condition to python.
-      //   see https://github.com/pantsbuild/pants/issues/4025
       scheduler
-        .visualize(execution_request, path.as_path())
-        .unwrap_or_else(|e| {
-          println!("Failed to visualize to {}: {:?}", path.display(), e);
-        });
+        .visualize(session, path.as_path())
+        .map_err(|e| format!("Failed to visualize to {}: {:?}", path.display(), e))
+        .into()
     })
   })
 }
@@ -447,6 +500,18 @@ pub extern "C" fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
 }
 
 #[no_mangle]
+pub extern "C" fn session_create(scheduler_ptr: *mut Scheduler) -> *const Session {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    Box::into_raw(Box::new(Session::new(scheduler)))
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn session_destroy(ptr: *mut Session) {
+  let _ = unsafe { Box::from_raw(ptr) };
+}
+
+#[no_mangle]
 pub extern "C" fn execution_request_create() -> *const ExecutionRequest {
   Box::into_raw(Box::new(ExecutionRequest::new()))
 }
@@ -457,12 +522,9 @@ pub extern "C" fn execution_request_destroy(ptr: *mut ExecutionRequest) {
 }
 
 #[no_mangle]
-pub extern "C" fn validator_run(scheduler_ptr: *mut Scheduler) -> Value {
+pub extern "C" fn validator_run(scheduler_ptr: *mut Scheduler) -> PyResult {
   with_scheduler(scheduler_ptr, |scheduler| {
-    match scheduler.core.rule_graph.validate() {
-      Result::Ok(_) => externs::store_list(vec![], false),
-      Result::Err(msg) => externs::create_exception(&msg),
-    }
+    scheduler.core.rule_graph.validate().into()
   })
 }
 
@@ -542,18 +604,122 @@ pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler) {
   });
 }
 
-fn graph_full(scheduler: &mut Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
+#[no_mangle]
+pub extern "C" fn capture_snapshots(
+  scheduler_ptr: *mut Scheduler,
+  path_globs_and_root_tuple_wrapper: Handle,
+) -> PyResult {
+  let values = externs::project_multi(&path_globs_and_root_tuple_wrapper.into(), "dependencies");
+  let path_globs_and_roots_result: Result<Vec<(fs::PathGlobs, PathBuf)>, String> = values
+    .iter()
+    .map(|value| {
+      let root = PathBuf::from(externs::project_str(&value, "root"));
+      let path_globs =
+        nodes::Snapshot::lift_path_globs(&externs::project_ignoring_type(&value, "path_globs"));
+      path_globs.map(|path_globs| (path_globs, root))
+    })
+    .collect();
+
+  let path_globs_and_roots = match path_globs_and_roots_result {
+    Ok(v) => v,
+    Err(err) => {
+      let e: Result<Value, String> = Err(err);
+      return e.into();
+    }
+  };
+
+  with_scheduler(scheduler_ptr, |scheduler| {
+    let core = scheduler.core.clone();
+    futures::future::join_all(
+      path_globs_and_roots
+        .into_iter()
+        .map(|(path_globs, root)| {
+          let core = core.clone();
+          scheduler
+            .capture_snapshot_from_arbitrary_root(root, path_globs)
+            .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
+        })
+        .collect::<Vec<_>>(),
+    )
+  }).map(|values| externs::store_tuple(&values))
+    .wait()
+    .into()
+}
+
+#[no_mangle]
+pub extern "C" fn merge_directories(
+  scheduler_ptr: *mut Scheduler,
+  directories_value: Handle,
+) -> PyResult {
+  let digests_result: Result<Vec<hashing::Digest>, String> =
+    externs::project_multi(&directories_value.into(), "dependencies")
+      .iter()
+      .map(|v| nodes::lift_digest(v))
+      .collect();
+  let digests = match digests_result {
+    Ok(d) => d,
+    Err(err) => {
+      let e: Result<Value, String> = Err(err);
+      return e.into();
+    }
+  };
+
+  with_scheduler(scheduler_ptr, |scheduler| {
+    fs::Snapshot::merge_directories(scheduler.core.store.clone(), digests)
+      .wait()
+      .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
+      .into()
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn materialize_directories(
+  scheduler_ptr: *mut Scheduler,
+  directories_paths_and_digests_value: Handle,
+) -> PyResult {
+  let values = externs::project_multi(&directories_paths_and_digests_value.into(), "dependencies");
+  let directories_paths_and_digests_results: Result<Vec<(PathBuf, Digest)>, String> = values
+    .iter()
+    .map(|value| {
+      let dir = PathBuf::from(externs::project_str(&value, "path"));
+      let dir_digest =
+        nodes::lift_digest(&externs::project_ignoring_type(&value, "directory_digest"));
+      dir_digest.map(|dir_digest| (dir, dir_digest))
+    })
+    .collect();
+
+  let dir_and_digests = match directories_paths_and_digests_results {
+    Ok(d) => d,
+    Err(err) => {
+      let e: Result<Value, String> = Err(err);
+      return e.into();
+    }
+  };
+
+  with_scheduler(scheduler_ptr, |scheduler| {
+    futures::future::join_all(
+      dir_and_digests
+        .into_iter()
+        .map(|(dir, digest)| scheduler.core.store.materialize_directory(dir, digest))
+        .collect::<Vec<_>>(),
+    )
+  }).map(|_| ())
+    .wait()
+    .into()
+}
+
+fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
   let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types);
   graph_maker.full_graph()
 }
 
 fn graph_sub(
-  scheduler: &mut Scheduler,
+  scheduler: &Scheduler,
   subject_type: TypeId,
   product_type: TypeConstraint,
 ) -> RuleGraph {
-  let graph_maker = GraphMaker::new(&scheduler.core.tasks, vec![subject_type.clone()]);
-  graph_maker.sub_graph(&subject_type, &product_type)
+  let graph_maker = GraphMaker::new(&scheduler.core.tasks, vec![subject_type]);
+  graph_maker.sub_graph(subject_type, &product_type)
 }
 
 fn write_to_file(path: &Path, graph: &RuleGraph) -> io::Result<()> {
@@ -562,16 +728,37 @@ fn write_to_file(path: &Path, graph: &RuleGraph) -> io::Result<()> {
   graph.visualize(&mut f)
 }
 
+///
+/// Scheduler and Session are intended to be shared between threads, and so their context
+/// methods provide immutable references. The remaining types are not intended to be shared
+/// between threads, so mutable access is provided.
+///
 fn with_scheduler<F, T>(scheduler_ptr: *mut Scheduler, f: F) -> T
 where
-  F: FnOnce(&mut Scheduler) -> T,
+  F: FnOnce(&Scheduler) -> T,
 {
-  let mut scheduler = unsafe { Box::from_raw(scheduler_ptr) };
-  let t = f(&mut scheduler);
+  let scheduler = unsafe { Box::from_raw(scheduler_ptr) };
+  let t = f(&scheduler);
   mem::forget(scheduler);
   t
 }
 
+///
+/// See `with_scheduler`.
+///
+fn with_session<F, T>(session_ptr: *mut Session, f: F) -> T
+where
+  F: FnOnce(&Session) -> T,
+{
+  let session = unsafe { Box::from_raw(session_ptr) };
+  let t = f(&session);
+  mem::forget(session);
+  t
+}
+
+///
+/// See `with_scheduler`.
+///
 fn with_execution_request<F, T>(execution_request_ptr: *mut ExecutionRequest, f: F) -> T
 where
   F: FnOnce(&mut ExecutionRequest) -> T,
@@ -582,6 +769,9 @@ where
   t
 }
 
+///
+/// See `with_scheduler`.
+///
 fn with_tasks<F, T>(tasks_ptr: *mut Tasks, f: F) -> T
 where
   F: FnOnce(&mut Tasks) -> T,

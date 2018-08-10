@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.zinc_language_mixin import ZincLanguageMixin
@@ -38,6 +37,14 @@ class Java(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem):
                           classpath=[],
                           help='Java compiler to use.  If unspecified, we use the compiler '
                                'embedded in the Java distribution we run on.')
+
+    register('--javac-plugins', advanced=True, type=list, fingerprint=True,
+            help='Use these javac plugins.')
+    register('--javac-plugin-args', advanced=True, type=dict, default={}, fingerprint=True,
+            help='Map from javac plugin name to list of arguments for that plugin.')
+    cls.register_jvm_tool(register, 'javac-plugin-dep', classpath=[],
+                        help='Search for javac plugins here, as well as in any '
+                                'explicit dependencies.')
 
   def injectables(self, build_graph):
     tools_jar_address = Address.parse(self._tools_jar_spec)

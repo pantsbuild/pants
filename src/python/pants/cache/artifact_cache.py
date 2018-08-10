@@ -2,12 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import sys
+from builtins import object
 
 
 # Note throughout the distinction between the artifact_root (which is where the artifacts are
@@ -87,7 +87,7 @@ class ArtifactCache(object):
                             These must be under the artifact_root.
     :param bool overwrite: Skip check for existing, insert even if already in cache.
     """
-    missing_files = filter(lambda f: not os.path.exists(f), paths)
+    missing_files = [f for f in paths if not os.path.exists(f)]
     if missing_files:
       raise ArtifactCacheError('Tried to cache nonexistent files {0}'.format(missing_files))
 

@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -23,6 +22,10 @@ class FindBugsTest(PantsRunIntegrationTest):
       'GLOBAL': {
         'pythonpath': ["%(buildroot)s/contrib/findbugs/src/python"],
         'backend_packages': ["pants.backend.codegen", "pants.backend.jvm", "pants.contrib.findbugs"]
+      },
+      'jvm-platform': {
+        'default_platform': 'java8',
+        'platforms': {'java8': {'source': '8', 'target': '8', 'args': [] }}
       }
     }
     if config:
@@ -76,7 +79,7 @@ class FindBugsTest(PantsRunIntegrationTest):
 
   def test_exclude(self):
     cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs::']
-    with temporary_file(root_dir=get_buildroot()) as exclude_file:
+    with temporary_file(root_dir=get_buildroot(), binary_mode=False) as exclude_file:
       exclude_file.write(dedent("""\
         <?xml version="1.0" encoding="UTF-8"?>
         <FindBugsFilter>
@@ -99,7 +102,7 @@ class FindBugsTest(PantsRunIntegrationTest):
 
   def test_error(self):
     cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs:high']
-    with temporary_file(root_dir=get_buildroot()) as exclude_file:
+    with temporary_file(root_dir=get_buildroot(), binary_mode=False) as exclude_file:
       exclude_file.write(dedent("""\
         <?xml version="1.0" encoding="UTF-8"?>
         <FindBugsFilter>

@@ -2,15 +2,17 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import sys
 from abc import abstractmethod
+from builtins import filter, map, object, str, zip
 from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
+
+from future.utils import PY3
 
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
@@ -23,6 +25,7 @@ from pants.option.optionable import Optionable
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
+from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.dirutil import safe_mkdir, safe_rm_oldest_items_in_dir
 from pants.util.memo import memoized_method, memoized_property
@@ -87,8 +90,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(TaskBase, cls).subsystem_dependencies() + (CacheSetup.scoped(cls),
-                                                            BuildInvalidator.Factory)
+    return (super(TaskBase, cls).subsystem_dependencies() +
+            (CacheSetup.scoped(cls), BuildInvalidator.Factory, SourceRootConfig))
 
   @classmethod
   def product_types(cls):
@@ -171,10 +174,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
     self._force_invalidated = False
 
-  @memoized_method
-  def _build_invalidator(self, root=False):
-    build_task = None if root else self.fingerprint
-    return BuildInvalidator.Factory.create(build_task=build_task)
+  @memoized_property
+  def _build_invalidator(self):
+    return BuildInvalidator.Factory.create(build_task=self.fingerprint)
 
   def get_options(self):
     """Returns the option values for this task's scope.
@@ -231,7 +233,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :API: public
     """
     return (self.context.targets(predicate) if self.act_transitively
-            else filter(predicate, self.context.target_roots))
+            else list(filter(predicate, self.context.target_roots)))
 
   @memoized_property
   def workdir(self):
@@ -255,7 +257,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       include_passthru=self.supports_passthru_args(),
     )
     options_hasher.update(options_fp)
-    return options_hasher.hexdigest()
+    return options_hasher.hexdigest() if PY3 else options_hasher.hexdigest().decode('utf-8')
 
   @memoized_property
   def fingerprint(self):
@@ -274,7 +276,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     # TODO: this is not recursive, but should be: see #2739
     for dep in self.subsystem_dependencies_iter():
       hasher.update(self._options_fingerprint(dep.options_scope()))
-    return str(hasher.hexdigest())
+    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def artifact_cache_reads_enabled(self):
     return self._cache_factory.read_cache_available()
@@ -284,7 +286,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   def invalidate(self):
     """Invalidates all targets for this task."""
-    self._build_invalidator().force_invalidate_all()
+    self._build_invalidator.force_invalidate_all()
 
   @property
   def create_target_dirs(self):
@@ -461,7 +463,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     cache_manager = InvalidationCacheManager(self.workdir,
                                              cache_key_generator,
-                                             self._build_invalidator(),
+                                             self._build_invalidator,
                                              invalidate_dependents,
                                              fingerprint_strategy=fingerprint_strategy,
                                              invalidation_report=self.context.invalidation_report,

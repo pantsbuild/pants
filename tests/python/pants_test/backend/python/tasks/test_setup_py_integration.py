@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
 import tarfile
@@ -46,7 +45,7 @@ class SetupPyIntegrationTest(PantsRequirementIntegrationTestBase):
     with tarfile.open(sdist_path, 'r') as sdist:
       infos = sdist.getmembers()
       entries = [(info.name.rstrip('/') + '/' if info.isdir() else info.name) for info in infos]
-      self.assertEquals(sorted(expected_entries), sorted(entries),
+      self.assertEqual(sorted(expected_entries), sorted(entries),
                         '\nExpected entries:\n{}\n\nActual entries:\n{}'.format(
                           '\n'.join(sorted(expected_entries)),
                           '\n'.join(sorted(entries))))

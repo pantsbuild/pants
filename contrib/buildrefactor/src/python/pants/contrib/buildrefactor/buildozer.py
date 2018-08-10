@@ -2,8 +2,7 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 
@@ -43,10 +42,6 @@ class Buildozer(Task):
 
   @classmethod
   def register_options(cls, register):
-    register('--version', type=str, advanced=True,
-             removal_version='1.7.0.dev0',
-             removal_hint='Use --version in scope buildozer-binary instead.',
-             help='Version of buildozer.')
     register('--add-dependencies', type=str, help='The dependency or dependencies to add')
     register('--remove-dependencies', type=str, help='The dependency or dependencies to remove')
     register('--command', type=str, help='A custom buildozer command to execute')

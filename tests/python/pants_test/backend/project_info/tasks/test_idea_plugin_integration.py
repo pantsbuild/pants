@@ -2,11 +2,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
+from builtins import open, str
 from xml.dom import minidom
 
 from pants.backend.project_info.tasks.idea_plugin_gen import IDEA_PLUGIN_VERSION, IdeaPluginGen
@@ -17,7 +17,8 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
-  def _do_check(self, project_dir_path, expected_project_path, expected_targets):
+  def _do_check(self, project_dir_path, expected_project_path, expected_targets,
+                incremental_import=None):
     """Check to see that the project contains the expected source folders."""
 
     iws_file = os.path.join(project_dir_path, '{}.iws'.format(IdeaPluginGen.get_project_name(expected_targets)))
@@ -30,8 +31,15 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     component = project.getElementsByTagName('component')[0]
 
     actual_properties = component.getElementsByTagName('property')
-    # 3 properties: targets, project_path, pants_idea_plugin_version
-    self.assertEqual(3, len(actual_properties))
+    valid_property_names = {
+        'targets',
+        'project_path',
+        'pants_idea_plugin_version',
+        'incremental_import'
+      }
+    self.assertTrue({p.getAttribute('name')
+                     for p in actual_properties}.issubset(valid_property_names))
+    self.assertTrue(len(actual_properties) >= 3)
 
     self.assertEqual('targets', actual_properties[0].getAttribute('name'))
     actual_targets = json.loads(actual_properties[0].getAttribute('value'))
@@ -45,11 +53,20 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     self.assertEqual('pants_idea_plugin_version', actual_properties[2].getAttribute('name'))
     self.assertEqual(IDEA_PLUGIN_VERSION, actual_properties[2].getAttribute('value'))
 
+    incremental_import_props = [p
+                                for p in actual_properties
+                                if p.getAttribute('name') == 'incremental_import']
+    if incremental_import is None:
+      self.assertEqual(incremental_import_props, [])
+    else:
+      self.assertEqual([str(incremental_import)], [p.getAttribute('value')
+                                                    for p in incremental_import_props])
+
   def _get_project_dir(self, output_file):
     with open(output_file, 'r') as result:
       return result.readlines()[0]
 
-  def _run_and_check(self, target_specs):
+  def _run_and_check(self, target_specs, incremental_import=None):
     """
     Invoke idea-plugin goal and check for target specs and project in the
     generated project and workspace file.
@@ -65,13 +82,19 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
 
     with self.temporary_workdir() as workdir:
       with temporary_file(root_dir=workdir, cleanup=True) as output_file:
-        pants_run = self.run_pants_with_workdir(
-          ['idea-plugin', '--output-file={}'.format(output_file.name), '--no-open'] + target_specs, workdir)
+        args = [
+            'idea-plugin',
+            '--output-file={}'.format(output_file.name),
+            '--no-open',
+          ]
+        if incremental_import is not None:
+          args.append('--incremental-import={}'.format(incremental_import))
+        pants_run = self.run_pants_with_workdir(args + target_specs, workdir)
         self.assert_success(pants_run)
 
         project_dir = self._get_project_dir(output_file.name)
         self.assertTrue(os.path.exists(project_dir), "{} does not exist".format(project_dir))
-        self._do_check(project_dir, project_path, target_specs)
+        self._do_check(project_dir, project_path, target_specs, incremental_import=incremental_import)
 
   def test_idea_plugin_single_target(self):
     target = 'examples/src/scala/org/pantsbuild/example/hello:hello'
@@ -82,6 +105,11 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     target = 'testprojects/src/python/antlr::'
 
     self._run_and_check([target])
+
+  def test_idea_plugin_incremental_import(self):
+    target = 'testprojects/src/python/antlr::'
+
+    self._run_and_check([target], incremental_import=1337)
 
   def test_idea_plugin_multiple_targets(self):
     target_a = 'examples/src/scala/org/pantsbuild/example/hello:'

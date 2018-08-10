@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from textwrap import dedent
@@ -12,7 +11,7 @@ from pants.backend.codegen.ragel.java.java_ragel_library import JavaRagelLibrary
 from pants.backend.codegen.ragel.java.ragel_gen import RagelGen, calculate_genfile
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdtemp
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 ragel_file_contents = dedent("""
@@ -78,7 +77,7 @@ class RagelGenTest(TaskTestBase):
     self.assertEqual(['com/example/atoi/Parser.java'], generated_files)
 
   def test_smoke(self):
-    with temporary_file() as fp:
+    with temporary_file(binary_mode=False) as fp:
       fp.write(ragel_file_contents)
       fp.flush()
-      self.assertEquals(calculate_genfile(fp.name), 'com/example/atoi/Parser.java')
+      self.assertEqual(calculate_genfile(fp.name), 'com/example/atoi/Parser.java')

@@ -10,37 +10,42 @@ cd ${REPO_ROOT}
 source build-support/common.sh
 
 function usage() {
-  echo "Runs commons tests for local or hosted CI."
-  echo
-  echo "Usage: $0 (-h|-fxbkmsrjlpuyncia)"
-  echo " -h           print out this help message"
-  echo " -f           skip python code formatting checks"
-  echo " -x           skip bootstrap clean-all (assume bootstrapping from a"
-  echo "              fresh clone)"
-  echo " -b           skip bootstraping pants from local sources"
-  echo " -k           skip bootstrapped pants self compile check"
-  echo " -m           skip sanity checks of bootstrapped pants and repo BUILD"
-  echo "              files"
-  echo " -r           skip doc generation tests"
-  echo " -j           skip core jvm tests"
-  echo " -l           skip internal backends python tests"
-  echo " -p           skip core python tests"
-  echo " -u SHARD_NUMBER/TOTAL_SHARDS"
-  echo "              if running core python tests, divide them into"
-  echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
-  echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
-  echo " -a           skip android targets when running tests"
-  echo " -n           skip contrib python tests"
-  echo " -e           skip rust tests"
-  echo " -y SHARD_NUMBER/TOTAL_SHARDS"
-  echo "              if running contrib python tests, divide them into"
-  echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
-  echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
-  echo " -c           skip pants integration tests (includes examples and testprojects)"
-  echo " -i SHARD_NUMBER/TOTAL_SHARDS"
-  echo "              if running integration tests, divide them into"
-  echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
-  echo "              to run only even tests: '-i 0/2', odd: '-i 1/2'"
+  cat <<EOF
+Runs commons tests for local or hosted CI.
+
+Usage: $0 (-h|-3fxbkmsrjlpuyncia)
+ -h           print out this help message
+ -3           After pants is bootstrapped, set --python-setup-interpreter-constraints such that any
+              python tests run with Python 3.
+ -f           skip python code formatting checks
+ -x           skip bootstrap clean-all (assume bootstrapping from a
+              fresh clone)
+ -b           skip bootstrapping pants from local sources
+ -k           skip bootstrapped pants self compile check
+ -m           skip sanity checks of bootstrapped pants and repo BUILD
+              files
+ -r           skip doc generation tests
+ -j           skip core jvm tests
+ -l           skip internal backends python tests
+ -p           skip core python tests
+ -u SHARD_NUMBER/TOTAL_SHARDS
+              if running core python tests, divide them into
+              TOTAL_SHARDS shards and just run those in SHARD_NUMBER
+              to run only even tests: '-u 0/2', odd: '-u 1/2'
+ -n           skip contrib python tests
+ -e           skip rust tests
+ -y SHARD_NUMBER/TOTAL_SHARDS
+              if running contrib python tests, divide them into
+              TOTAL_SHARDS shards and just run those in SHARD_NUMBER
+              to run only even tests: '-u 0/2', odd: '-u 1/2'
+ -c           skip pants integration tests (includes examples and testprojects)
+ -i SHARD_NUMBER/TOTAL_SHARDS
+              if running integration tests, divide them into
+              TOTAL_SHARDS shards and just run those in SHARD_NUMBER
+              to run only even tests: '-i 0/2', odd: '-i 1/2'
+ -t           skip lint
+ -z           test platform-specific behavior
+EOF
   if (( $# > 0 )); then
     die "$@"
   else
@@ -57,10 +62,12 @@ bootstrap_compile_args=(
 python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
+python_three="false"
 
-while getopts "hfxbkmsrjlpeu:ny:ci:at" opt; do
+while getopts "h3fxbkmrjlpeu:ny:ci:tz" opt; do
   case ${opt} in
     h) usage ;;
+    3) python_three="true" ;;
     f) skip_pre_commit_checks="true" ;;
     x) skip_bootstrap_clean="true" ;;
     b) skip_bootstrap="true" ;;
@@ -76,18 +83,12 @@ while getopts "hfxbkmsrjlpeu:ny:ci:at" opt; do
     y) python_contrib_shard=${OPTARG} ;;
     c) skip_integration="true" ;;
     i) python_intg_shard=${OPTARG} ;;
-    a) skip_android="true" ;;
     t) skip_lint="true" ;;
+    z) test_platform_specific_behavior="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
 shift $((${OPTIND} - 1))
-
-# Android testing requires the SDK to be installed and configured in Pants.
-# Skip if ANDROID_HOME isn't configured in the environment
-if [[ -z "${ANDROID_HOME}"  || "${skip_android:-false}" == "true" ]] ; then
-  export SKIP_ANDROID_PATTERN='contrib/android'
-fi
 
 echo
 if [[ $# > 0 ]]; then
@@ -109,35 +110,28 @@ if [[ "${skip_pre_commit_checks:-false}" == "false" ]]; then
   end_travis_section
 fi
 
-# TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
-# target(s).
-# TODO: This doesn't seem necessary? We set this in pants.ini.
-INTERPRETER_CONSTRAINTS=(
-  "CPython>=2.7,<3"
-)
-for constraint in ${INTERPRETER_CONSTRAINTS[@]}; do
-  INTERPRETER_ARGS=(
-    ${INTERPRETER_ARGS[@]}
-    --python-setup-interpreter-constraints="${constraint}"
-  )
-done
-
-PANTS_ARGS=(
-  "${INTERPRETER_ARGS[@]}"
-)
-
 if [[ "${skip_bootstrap:-false}" == "false" ]]; then
   start_travis_section "Bootstrap" "Bootstrapping pants"
   (
     if [[ "${skip_bootstrap_clean:-false}" == "false" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
     fi
-    ./pants ${PANTS_ARGS[@]} ${bootstrap_compile_args[@]} binary \
+    ./pants ${bootstrap_compile_args[@]} binary \
       src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex pants.pex && \
     ./pants.pex -V
   ) || die "Failed to bootstrap pants."
   end_travis_section
+fi
+
+# NB: Ordering matters here. We (currently) always bootstrap a Python 2 pex.
+if [[ "${python_three:-false}" == "true" ]]; then
+  # The 3.4 end of this constraint is necessary to jive with the travis ubuntu trusty image.
+  banner "Setting interpreter constraints for 3!"
+  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.4,<4"]'
+  # FIXME: Clear interpreters, otherwise this constraint does not end up applying due to a cache
+  # bug between the `./pants binary` and further runs.
+  ./pants.pex clean-all
 fi
 
 if [[ "${skip_sanity_checks:-false}" == "false" ]]; then
@@ -152,7 +146,7 @@ if [[ "${skip_sanity_checks:-false}" == "false" ]]; then
     "targets"
   )
   for cur_test in "${sanity_tests[@]}"; do
-    cmd="./pants.pex ${PANTS_ARGS[@]} ${cur_test}"
+    cmd="./pants.pex ${cur_test}"
     echo "* Executing command '${cmd}' as a sanity test"
     ${cmd} >/dev/null 2>&1 || die "Failed to execute '${cmd}'."
   done
@@ -162,7 +156,7 @@ fi
 if [[ "${skip_lint:-false}" == "false" ]]; then
   start_travis_section "Lint" "Running lint checks"
   (
-    ./pants.pex ${PANTS_ARGS[@]} --tag=-nolint lint contrib:: examples:: src:: tests:: zinc::
+    ./pants.pex --tag=-nolint lint contrib:: examples:: src:: tests:: zinc::
   ) || die "Lint check failure"
   end_travis_section
 fi
@@ -176,7 +170,7 @@ fi
 if [[ "${skip_jvm:-false}" == "false" ]]; then
   start_travis_section "CoreJVM" "Running core jvm tests"
   (
-    ./pants.pex ${PANTS_ARGS[@]} doc test {src,tests}/{java,scala}:: zinc::
+    ./pants.pex doc test {src,tests}/{java,scala}:: zinc::
   ) || die "Core jvm test failure"
   end_travis_section
 fi
@@ -184,7 +178,7 @@ fi
 if [[ "${skip_internal_backends:-false}" == "false" ]]; then
   start_travis_section "BackendTests" "Running internal backend python tests"
   (
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest \
+    ./pants.pex test.pytest \
     pants-plugins/tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Internal backend python test failure"
   end_travis_section
@@ -196,7 +190,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   fi
   start_travis_section "CoreTests" "Running core python tests${shard_desc}"
   (
-    ./pants.pex --tag='-integration' ${PANTS_ARGS[@]} test.pytest --chroot \
+    ./pants.pex --tag='-integration' test.pytest --chroot \
       --test-pytest-test-shard=${python_unit_shard} \
       tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Core python test failure"
@@ -209,8 +203,7 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
   fi
   start_travis_section "ContribTests" "Running contrib python tests${shard_desc}"
   (
-    ./pants.pex ${PANTS_ARGS[@]} --exclude-target-regexp='.*/testprojects/.*' \
-    --build-ignore=$SKIP_ANDROID_PATTERN test.pytest \
+    ./pants.pex --exclude-target-regexp='.*/testprojects/.*' test.pytest \
     --test-pytest-test-shard=${python_contrib_shard} \
     contrib:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Contrib python test failure"
@@ -220,11 +213,28 @@ fi
 if [[ "${skip_rust_tests:-false}" == "false" ]]; then
   start_travis_section "RustTests" "Running Pants rust tests"
   (
-    source "${REPO_ROOT}/build-support/pants_venv"
-    source "${REPO_ROOT}/build-support/bin/native/bootstrap.sh"
-    activate_pants_venv
-    RUST_BACKTRACE=1 PANTS_SRCPATH="${REPO_ROOT}/src/python" ensure_cffi_sources=1 run_cargo test "${MODE_FLAG}" --all --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml"
+    test_threads_flag=""
+    if [[ "$(uname)" == "Darwin" ]]; then
+      # The osx travis environment has a low file descriptors ulimit, so we avoid running too many
+      # tests in parallel.
+      test_threads_flag="--test-threads=1"
+    fi
+
+    RUST_BACKTRACE=all "${REPO_ROOT}/build-support/bin/native/cargo" test --all \
+      --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" -- "${test_threads_flag}" --nocapture
   ) || die "Pants rust test failure"
+  end_travis_section
+fi
+
+# NB: this only tests python tests right now -- the command needs to be edited if test targets in
+# other languages are tagged with 'platform_specific_behavior' in the future.
+if [[ "${test_platform_specific_behavior:-false}" == 'true' ]]; then
+  start_travis_section "Platform-specific tests" \
+                       "Running platform-specific testing on platform: $(uname)"
+  (
+    ./pants.pex --tag='+platform_specific_behavior' test \
+                tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
+  ) || die "Pants platform-specific test failure"
   end_travis_section
 fi
 
@@ -235,7 +245,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   fi
   start_travis_section "IntegrationTests" "Running Pants Integration tests${shard_desc}"
   (
-    ./pants.pex ${PANTS_ARGS[@]} --tag='+integration' test.pytest \
+    ./pants.pex --tag='+integration' test.pytest \
       --test-pytest-test-shard=${python_intg_shard} \
       tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Pants Integration test failure"

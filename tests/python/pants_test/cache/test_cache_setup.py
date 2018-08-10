@@ -2,10 +2,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import object
 
 from mock import Mock
 
@@ -19,8 +19,8 @@ from pants.cache.restful_artifact_cache import RESTfulArtifactCache
 from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
-from pants_test.base_test import BaseTest
 from pants_test.option.util.fakes import create_options
+from pants_test.test_base import TestBase
 from pants_test.testutils.mock_logger import MockLogger
 
 
@@ -42,10 +42,10 @@ class MockPinger(object):
 
   # Returns a fake ping time such that the last host is always the 'fastest'.
   def pings(self, hosts):
-    return map(lambda host: (host, self._hosts_to_times.get(host, 9999)), hosts)
+    return [(host, self._hosts_to_times.get(host, 9999)) for host in hosts]
 
 
-class TestCacheSetup(BaseTest):
+class TestCacheSetup(TestBase):
 
   TEST_RESOLVED_FROM = 'http://test-resolver'
   LOCAL_URI = '/a/local/path'
@@ -98,16 +98,16 @@ class TestCacheSetup(BaseTest):
   def test_sanitize_cache_spec(self):
     cache_factory = self.cache_factory()
 
-    self.assertEquals(self.CACHE_SPEC_LOCAL_ONLY,
+    self.assertEqual(self.CACHE_SPEC_LOCAL_ONLY,
                       cache_factory._sanitize_cache_spec([self.LOCAL_URI]))
 
-    self.assertEquals(self.CACHE_SPEC_REMOTE_ONLY,
+    self.assertEqual(self.CACHE_SPEC_REMOTE_ONLY,
                       cache_factory._sanitize_cache_spec([self.REMOTE_URI_1]))
 
     # (local, remote) and (remote, local) are equivalent as long as they are valid
-    self.assertEquals(self.CACHE_SPEC_LOCAL_REMOTE,
+    self.assertEqual(self.CACHE_SPEC_LOCAL_REMOTE,
                       cache_factory._sanitize_cache_spec([self.LOCAL_URI, self.REMOTE_URI_1]))
-    self.assertEquals(self.CACHE_SPEC_LOCAL_REMOTE,
+    self.assertEqual(self.CACHE_SPEC_LOCAL_REMOTE,
                       cache_factory._sanitize_cache_spec([self.REMOTE_URI_1, self.LOCAL_URI]))
 
     with self.assertRaises(InvalidCacheSpecError):
@@ -135,17 +135,17 @@ class TestCacheSetup(BaseTest):
   def test_resolve(self):
     cache_factory = self.cache_factory()
 
-    self.assertEquals(CacheSpec(local=None,
+    self.assertEqual(CacheSpec(local=None,
                                 remote='{}|{}'.format(self.REMOTE_URI_1, self.REMOTE_URI_2)),
                       cache_factory._resolve(self.CACHE_SPEC_RESOLVE_ONLY))
 
-    self.assertEquals(CacheSpec(local=self.LOCAL_URI,
+    self.assertEqual(CacheSpec(local=self.LOCAL_URI,
                                 remote='{}|{}'.format(self.REMOTE_URI_1, self.REMOTE_URI_2)),
                       cache_factory._resolve(self.CACHE_SPEC_LOCAL_RESOLVE))
 
     self.resolver.resolve.side_effect = Resolver.ResolverError()
     # still have local cache if resolver fails
-    self.assertEquals(CacheSpec(local=self.LOCAL_URI, remote=None),
+    self.assertEqual(CacheSpec(local=self.LOCAL_URI, remote=None),
                       cache_factory._resolve(self.CACHE_SPEC_LOCAL_RESOLVE))
     # no cache created if resolver fails and no local cache
     self.assertFalse(cache_factory._resolve(self.CACHE_SPEC_RESOLVE_ONLY))
@@ -154,11 +154,11 @@ class TestCacheSetup(BaseTest):
     self.resolver.resolve = Mock(return_value=[])
     cache_factory = self.cache_factory()
 
-    self.assertEquals(self.CACHE_SPEC_LOCAL_ONLY,
+    self.assertEqual(self.CACHE_SPEC_LOCAL_ONLY,
                       cache_factory._resolve(self.CACHE_SPEC_LOCAL_ONLY))
-    self.assertEquals(self.CACHE_SPEC_RESOLVE_ONLY,
+    self.assertEqual(self.CACHE_SPEC_RESOLVE_ONLY,
                       cache_factory._resolve(self.CACHE_SPEC_RESOLVE_ONLY))
-    self.assertEquals(self.CACHE_SPEC_LOCAL_RESOLVE,
+    self.assertEqual(self.CACHE_SPEC_LOCAL_RESOLVE,
                       cache_factory._resolve(self.CACHE_SPEC_LOCAL_RESOLVE))
 
   def test_cache_spec_parsing(self):
@@ -176,7 +176,7 @@ class TestCacheSetup(BaseTest):
     def check(expected_type, spec, resolver=None):
       cache = mk_cache(spec, resolver=resolver)
       self.assertIsInstance(cache, expected_type)
-      self.assertEquals(cache.artifact_root, self.pants_workdir)
+      self.assertEqual(cache.artifact_root, self.pants_workdir)
 
     with temporary_dir() as tmpdir:
       cachedir = os.path.join(tmpdir, 'cachedir')  # Must be a real path, so we can safe_mkdir it.

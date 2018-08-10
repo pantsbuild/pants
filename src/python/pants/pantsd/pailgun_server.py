@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import socket
@@ -54,8 +53,7 @@ class PailgunHandler(PailgunHandlerBase):
 
   def _run_pants(self, sock, arguments, environment):
     """Execute a given run with a pants runner."""
-    runner = self.server.runner_factory(sock, arguments, environment)
-    runner.run()
+    self.server.runner_factory(sock, arguments, environment).run()
 
   def handle(self):
     """Request handler for a single Pailgun request."""
@@ -76,6 +74,10 @@ class PailgunHandler(PailgunHandlerBase):
     # Execute the requested command with optional daemon-side profiling.
     with maybe_profiled(environment.get('PANTSD_PROFILE')):
       self._run_pants(self.request, arguments, environment)
+
+    # NB: This represents the end of pantsd's involvement in the request, but the request will
+    # continue to run post-fork.
+    self.logger.info('pailgun request completed: `{}`'.format(' '.join(arguments)))
 
   def handle_error(self, exc=None):
     """Error handler for failed calls to handle()."""

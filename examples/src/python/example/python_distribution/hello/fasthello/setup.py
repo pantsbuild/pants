@@ -2,15 +2,14 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from setuptools import setup, find_packages
 from distutils.core import Extension
 
 
-c_module = Extension(str('c_greet'), sources=[str('c_greet.c')])
-cpp_module = Extension(str('cpp_greet'), sources=[str('cpp_greet.cpp')])
+c_module = Extension(b'c_greet', sources=[b'c_greet.c'])
+cpp_module = Extension(b'cpp_greet', sources=[b'cpp_greet.cpp'])
 
 setup(
   name='fasthello',

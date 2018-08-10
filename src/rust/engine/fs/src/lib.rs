@@ -1,14 +1,19 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+mod glob_matching;
+pub use glob_matching::GlobMatching;
 mod snapshot;
-pub use snapshot::{Snapshot, StoreFileByDigest, EMPTY_DIGEST};
+pub use snapshot::{
+  OneOffStoreFileByDigest, Snapshot, StoreFileByDigest, EMPTY_DIGEST, EMPTY_FINGERPRINT,
+};
 mod store;
 pub use store::Store;
 mod pool;
 pub use pool::ResettablePool;
 
 extern crate bazel_protos;
+#[macro_use]
 extern crate boxfuture;
 extern crate byteorder;
 extern crate bytes;
@@ -18,8 +23,8 @@ extern crate futures_cpupool;
 extern crate glob;
 extern crate grpcio;
 extern crate hashing;
-extern crate hex;
 extern crate ignore;
+extern crate indexmap;
 extern crate itertools;
 #[macro_use]
 extern crate lazy_static;
@@ -28,24 +33,25 @@ extern crate lmdb;
 extern crate log;
 #[cfg(test)]
 extern crate mock;
-extern crate ordermap;
 extern crate protobuf;
+extern crate resettable;
 extern crate sha2;
-extern crate tempdir;
+#[cfg(test)]
+extern crate tempfile;
+#[cfg(test)]
+extern crate testutil;
 
-use std::collections::HashSet;
+use std::cmp::min;
+use std::io::{self, Read};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::{fmt, fs};
-use std::io::{self, Read};
-use std::cmp::min;
 
 use bytes::Bytes;
 use futures::future::{self, Future};
 use glob::Pattern;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
-use ordermap::OrderMap;
 
 use boxfuture::{BoxFuture, Boxable};
 
@@ -95,14 +101,14 @@ pub enum PathStat {
 }
 
 impl PathStat {
-  fn dir(path: PathBuf, stat: Dir) -> PathStat {
+  pub fn dir(path: PathBuf, stat: Dir) -> PathStat {
     PathStat::Dir {
       path: path,
       stat: stat,
     }
   }
 
-  fn file(path: PathBuf, stat: File) -> PathStat {
+  pub fn file(path: PathBuf, stat: File) -> PathStat {
     PathStat::File {
       path: path,
       stat: stat,
@@ -117,15 +123,64 @@ impl PathStat {
   }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub struct DirectoryListing(pub Vec<Stat>);
+
+#[derive(Debug)]
+pub struct GitignoreStyleExcludes {
+  patterns: Vec<String>,
+  gitignore: Gitignore,
+}
+
+impl GitignoreStyleExcludes {
+  fn create(patterns: &[String]) -> Result<Arc<Self>, String> {
+    if patterns.is_empty() {
+      return Ok(EMPTY_IGNORE.clone());
+    }
+
+    let gitignore = Self::create_gitignore(patterns)
+      .map_err(|e| format!("Could not parse glob excludes {:?}: {:?}", patterns, e))?;
+
+    Ok(Arc::new(Self {
+      patterns: patterns.to_vec(),
+      gitignore,
+    }))
+  }
+
+  fn create_gitignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {
+    let mut ignore_builder = GitignoreBuilder::new("");
+    for pattern in patterns {
+      ignore_builder.add_line(None, pattern.as_str())?;
+    }
+    ignore_builder.build()
+  }
+
+  fn exclude_patterns(&self) -> &[String] {
+    self.patterns.as_slice()
+  }
+
+  fn is_ignored(&self, stat: &Stat) -> bool {
+    let is_dir = match stat {
+      &Stat::Dir(_) => true,
+      _ => false,
+    };
+    match self.gitignore.matched(stat.path(), is_dir) {
+      ignore::Match::None | ignore::Match::Whitelist(_) => false,
+      ignore::Match::Ignore(_) => true,
+    }
+  }
+}
+
 lazy_static! {
   static ref PARENT_DIR: &'static str = "..";
-
   static ref SINGLE_STAR_GLOB: Pattern = Pattern::new("*").unwrap();
-
   static ref DOUBLE_STAR: &'static str = "**";
-  static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new("**").unwrap();
-
-  static ref EMPTY_IGNORE: Arc<Gitignore> = Arc::new(Gitignore::empty());
+  static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new(*DOUBLE_STAR).unwrap();
+  static ref EMPTY_IGNORE: Arc<GitignoreStyleExcludes> = Arc::new(GitignoreStyleExcludes {
+    patterns: vec![],
+    gitignore: Gitignore::empty(),
+  });
+  static ref MISSING_GLOB_SOURCE: GlobParsedSource = GlobParsedSource(String::from(""));
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -141,6 +196,29 @@ pub enum PathGlob {
     wildcard: Pattern,
     remainder: Vec<Pattern>,
   },
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct GlobParsedSource(String);
+
+#[derive(Clone, Debug)]
+pub struct PathGlobIncludeEntry {
+  pub input: GlobParsedSource,
+  pub globs: Vec<PathGlob>,
+}
+
+impl PathGlobIncludeEntry {
+  fn to_sourced_globs(&self) -> Vec<GlobWithSource> {
+    self
+      .globs
+      .clone()
+      .into_iter()
+      .map(|path_glob| GlobWithSource {
+        path_glob,
+        source: GlobSource::ParsedInput(self.input.clone()),
+      })
+      .collect()
+  }
 }
 
 impl PathGlob {
@@ -167,13 +245,28 @@ impl PathGlob {
   }
 
   pub fn create(filespecs: &[String]) -> Result<Vec<PathGlob>, String> {
-    let mut path_globs = Vec::new();
+    // Getting a Vec<PathGlob> per filespec is needed to create a `PathGlobs`, but we don't need
+    // that here.
+    let filespecs_globs = Self::spread_filespecs(filespecs)?;
+    let all_globs = Self::flatten_entries(filespecs_globs);
+    Ok(all_globs)
+  }
+
+  fn flatten_entries(entries: Vec<PathGlobIncludeEntry>) -> Vec<PathGlob> {
+    entries.into_iter().flat_map(|entry| entry.globs).collect()
+  }
+
+  fn spread_filespecs(filespecs: &[String]) -> Result<Vec<PathGlobIncludeEntry>, String> {
+    let mut spec_globs_map = Vec::new();
     for filespec in filespecs {
       let canonical_dir = Dir(PathBuf::new());
       let symbolic_path = PathBuf::new();
-      path_globs.extend(PathGlob::parse(canonical_dir, symbolic_path, filespec)?);
+      spec_globs_map.push(PathGlobIncludeEntry {
+        input: GlobParsedSource(filespec.clone()),
+        globs: PathGlob::parse(canonical_dir, symbolic_path, filespec)?,
+      });
     }
-    Ok(path_globs)
+    Ok(spec_globs_map)
   }
 
   ///
@@ -206,8 +299,10 @@ impl PathGlob {
 
       // NB: Because the filespec is a String input, calls to `to_str_lossy` are not lossy; the
       // use of `Path` is strictly for os-independent Path parsing.
-      parts.push(Pattern::new(&part.to_string_lossy())
-        .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", filespec, e))?);
+      parts.push(
+        Pattern::new(&part.to_string_lossy())
+          .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", filespec, e))?,
+      );
     }
 
     PathGlob::parse_globs(canonical_dir, symbolic_path, &parts)
@@ -276,81 +371,113 @@ impl PathGlob {
       PathGlob::parse_globs(canonical_dir_parent, symbolic_path_parent, &parts[1..])
     } else if parts.len() == 1 {
       // This is the path basename.
-      Ok(vec![
-        PathGlob::wildcard(canonical_dir, symbolic_path, parts[0].clone()),
-      ])
+      Ok(vec![PathGlob::wildcard(
+        canonical_dir,
+        symbolic_path,
+        parts[0].clone(),
+      )])
     } else {
       // This is a path dirname.
-      Ok(vec![
-        PathGlob::dir_wildcard(
-          canonical_dir,
-          symbolic_path,
-          parts[0].clone(),
-          parts[1..].to_vec(),
-        ),
-      ])
+      Ok(vec![PathGlob::dir_wildcard(
+        canonical_dir,
+        symbolic_path,
+        parts[0].clone(),
+        parts[1..].to_vec(),
+      )])
+    }
+  }
+}
+
+#[derive(Debug)]
+pub enum StrictGlobMatching {
+  Error,
+  Warn,
+  Ignore,
+}
+
+impl StrictGlobMatching {
+  // TODO(cosmicexplorer): match this up with the allowed values for the GlobMatchErrorBehavior type
+  // in python somehow?
+  pub fn create(behavior: &str) -> Result<Self, String> {
+    match behavior {
+      "ignore" => Ok(StrictGlobMatching::Ignore),
+      "warn" => Ok(StrictGlobMatching::Warn),
+      "error" => Ok(StrictGlobMatching::Error),
+      _ => Err(format!(
+        "Unrecognized strict glob matching behavior: {}.",
+        behavior,
+      )),
+    }
+  }
+
+  pub fn should_check_glob_matches(&self) -> bool {
+    match self {
+      &StrictGlobMatching::Ignore => false,
+      _ => true,
+    }
+  }
+
+  pub fn should_throw_on_error(&self) -> bool {
+    match self {
+      &StrictGlobMatching::Error => true,
+      _ => false,
     }
   }
 }
 
 #[derive(Debug)]
 pub struct PathGlobs {
-  include: Vec<PathGlob>,
-  exclude: Arc<Gitignore>,
+  include: Vec<PathGlobIncludeEntry>,
+  exclude: Arc<GitignoreStyleExcludes>,
+  strict_match_behavior: StrictGlobMatching,
 }
 
 impl PathGlobs {
-  pub fn create(include: &[String], exclude: &[String]) -> Result<PathGlobs, String> {
-    let ignore_for_exclude = if exclude.is_empty() {
-      EMPTY_IGNORE.clone()
-    } else {
-      Arc::new(create_ignore(exclude)
-        .map_err(|e| format!("Could not parse glob excludes {:?}: {:?}", exclude, e))?)
-    };
+  pub fn create(
+    include: &[String],
+    exclude: &[String],
+    strict_match_behavior: StrictGlobMatching,
+  ) -> Result<PathGlobs, String> {
+    let include = PathGlob::spread_filespecs(include)?;
+    Self::create_with_globs_and_match_behavior(include, exclude, strict_match_behavior)
+  }
+
+  fn create_with_globs_and_match_behavior(
+    include: Vec<PathGlobIncludeEntry>,
+    exclude: &[String],
+    strict_match_behavior: StrictGlobMatching,
+  ) -> Result<PathGlobs, String> {
+    let gitignore_excludes = GitignoreStyleExcludes::create(exclude)?;
     Ok(PathGlobs {
-      include: PathGlob::create(include)?,
-      exclude: ignore_for_exclude,
+      include,
+      exclude: gitignore_excludes,
+      strict_match_behavior,
     })
   }
 
-  pub fn from_globs(include: Vec<PathGlob>) -> PathGlobs {
-    PathGlobs {
-      include: include,
-      exclude: EMPTY_IGNORE.clone(),
-    }
+  pub fn from_globs(include: Vec<PathGlob>) -> Result<PathGlobs, String> {
+    let include = include
+      .into_iter()
+      .map(|glob| PathGlobIncludeEntry {
+        input: MISSING_GLOB_SOURCE.clone(),
+        globs: vec![glob],
+      })
+      .collect();
+    // An empty exclude becomes EMPTY_IGNORE.
+    PathGlobs::create_with_globs_and_match_behavior(include, &[], StrictGlobMatching::Ignore)
   }
 }
 
-#[derive(Debug)]
-struct PathGlobsExpansion<T: Sized> {
-  context: T,
-  // Globs that have yet to be expanded, in order.
-  todo: Vec<PathGlob>,
-  // Paths to exclude.
-  exclude: Arc<Gitignore>,
-  // Globs that have already been expanded.
-  completed: HashSet<PathGlob>,
-  // Unique Paths that have been matched, in order.
-  outputs: OrderMap<PathStat, ()>,
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum GlobSource {
+  ParsedInput(GlobParsedSource),
+  ParentGlob(PathGlob),
 }
 
-fn create_ignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {
-  let mut ignore_builder = GitignoreBuilder::new("");
-  for pattern in patterns {
-    ignore_builder.add_line(None, pattern.as_str())?;
-  }
-  ignore_builder.build()
-}
-
-fn is_ignored(ignore: &Gitignore, stat: &Stat) -> bool {
-  let is_dir = match stat {
-    &Stat::Dir(_) => true,
-    _ => false,
-  };
-  match ignore.matched(stat.path(), is_dir) {
-    ignore::Match::None | ignore::Match::Whitelist(_) => false,
-    ignore::Match::Ignore(_) => true,
-  }
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct GlobWithSource {
+  path_glob: PathGlob,
+  source: GlobSource,
 }
 
 ///
@@ -359,14 +486,14 @@ fn is_ignored(ignore: &Gitignore, stat: &Stat) -> bool {
 pub struct PosixFS {
   root: Dir,
   pool: Arc<ResettablePool>,
-  ignore: Gitignore,
+  ignore: Arc<GitignoreStyleExcludes>,
 }
 
 impl PosixFS {
   pub fn new<P: AsRef<Path>>(
     root: P,
     pool: Arc<ResettablePool>,
-    ignore_patterns: Vec<String>,
+    ignore_patterns: &[String],
   ) -> Result<PosixFS, String> {
     let root: &Path = root.as_ref();
     let canonical_root = root
@@ -385,7 +512,7 @@ impl PosixFS {
       })
       .map_err(|e| format!("Could not canonicalize root {:?}: {:?}", root, e))?;
 
-    let ignore = create_ignore(&ignore_patterns).map_err(|e| {
+    let ignore = GitignoreStyleExcludes::create(&ignore_patterns).map_err(|e| {
       format!(
         "Could not parse build ignore inputs {:?}: {:?}",
         ignore_patterns, e
@@ -398,7 +525,7 @@ impl PosixFS {
     })
   }
 
-  fn scandir_sync(root: PathBuf, dir_relative_to_root: Dir) -> Result<Vec<Stat>, io::Error> {
+  fn scandir_sync(root: PathBuf, dir_relative_to_root: &Dir) -> Result<Vec<Stat>, io::Error> {
     let dir_abs = root.join(&dir_relative_to_root.0);
     let mut stats: Vec<Stat> = dir_abs
       .read_dir()?
@@ -418,7 +545,7 @@ impl PosixFS {
   }
 
   pub fn is_ignored(&self, stat: &Stat) -> bool {
-    is_ignored(&self.ignore, stat)
+    self.ignore.is_ignored(stat)
   }
 
   pub fn read_file(&self, file: &File) -> BoxFuture<FileContent, io::Error> {
@@ -519,29 +646,32 @@ impl PosixFS {
   }
 
   pub fn stat(&self, relative_path: PathBuf) -> Result<Stat, io::Error> {
-    let metadata = fs::symlink_metadata(self.root.0.join(&relative_path))?;
-    PosixFS::stat_internal(relative_path, metadata.file_type(), &self.root.0, || {
-      Ok(metadata)
-    })
+    PosixFS::stat_path(relative_path, &self.root.0)
   }
 
-  pub fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
+  fn stat_path(relative_path: PathBuf, root: &Path) -> Result<Stat, io::Error> {
+    let metadata = fs::symlink_metadata(root.join(&relative_path))?;
+    PosixFS::stat_internal(relative_path, metadata.file_type(), &root, || Ok(metadata))
+  }
+
+  pub fn scandir(&self, dir: &Dir) -> BoxFuture<DirectoryListing, io::Error> {
     let dir = dir.to_owned();
     let root = self.root.0.clone();
     self
       .pool
-      .spawn_fn(move || PosixFS::scandir_sync(root, dir))
+      .spawn_fn(move || PosixFS::scandir_sync(root, &dir))
+      .map(DirectoryListing)
       .to_boxed()
   }
 }
 
 impl VFS<io::Error> for Arc<PosixFS> {
-  fn read_link(&self, link: Link) -> BoxFuture<PathBuf, io::Error> {
-    PosixFS::read_link(self, &link)
+  fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
+    PosixFS::read_link(self, link)
   }
 
-  fn scandir(&self, dir: Dir) -> BoxFuture<Vec<Stat>, io::Error> {
-    PosixFS::scandir(self, &dir)
+  fn scandir(&self, dir: Dir) -> BoxFuture<Arc<DirectoryListing>, io::Error> {
+    PosixFS::scandir(self, &dir).map(Arc::new).to_boxed()
   }
 
   fn is_ignored(&self, stat: &Stat) -> bool {
@@ -553,202 +683,55 @@ impl VFS<io::Error> for Arc<PosixFS> {
   }
 }
 
+pub trait PathStatGetter<E> {
+  fn path_stats(&self, paths: Vec<PathBuf>) -> BoxFuture<Vec<Option<PathStat>>, E>;
+}
+
+impl PathStatGetter<io::Error> for Arc<PosixFS> {
+  fn path_stats(&self, paths: Vec<PathBuf>) -> BoxFuture<Vec<Option<PathStat>>, io::Error> {
+    future::join_all(
+      paths
+        .into_iter()
+        .map(|path| {
+          let root = self.root.0.clone();
+          let fs = self.clone();
+          self
+            .pool
+            .spawn_fn(move || PosixFS::stat_path(path, &root))
+            .then(|stat_result| match stat_result {
+              Ok(v) => Ok(Some(v)),
+              Err(err) => match err.kind() {
+                io::ErrorKind::NotFound => Ok(None),
+                _ => Err(err),
+              },
+            })
+            .and_then(move |maybe_stat| {
+              match maybe_stat {
+                // Note: This will drop PathStats for symlinks which don't point anywhere.
+                Some(Stat::Link(link)) => fs.canonicalize(link.0.clone(), &link),
+                Some(Stat::Dir(dir)) => {
+                  future::ok(Some(PathStat::dir(dir.0.clone(), dir))).to_boxed()
+                }
+                Some(Stat::File(file)) => {
+                  future::ok(Some(PathStat::file(file.path.clone(), file))).to_boxed()
+                }
+                None => future::ok(None).to_boxed(),
+              }
+            })
+        })
+        .collect::<Vec<_>>(),
+    ).to_boxed()
+  }
+}
+
 ///
 /// A context for filesystem operations parameterized on an error type 'E'.
 ///
 pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
-  fn read_link(&self, link: Link) -> BoxFuture<PathBuf, E>;
-  fn scandir(&self, dir: Dir) -> BoxFuture<Vec<Stat>, E>;
+  fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, E>;
+  fn scandir(&self, dir: Dir) -> BoxFuture<Arc<DirectoryListing>, E>;
   fn is_ignored(&self, stat: &Stat) -> bool;
   fn mk_error(msg: &str) -> E;
-
-  ///
-  /// Canonicalize the Link for the given Path to an underlying File or Dir. May result
-  /// in None if the PathStat represents a broken Link.
-  ///
-  /// Skips ignored paths both before and after expansion.
-  ///
-  /// TODO: Should handle symlink loops (which would exhibit as an infinite loop in expand).
-  ///
-  fn canonicalize(&self, symbolic_path: PathBuf, link: Link) -> BoxFuture<Option<PathStat>, E> {
-    // Read the link, which may result in PathGlob(s) that match 0 or 1 Path.
-    let context = self.clone();
-    self
-      .read_link(link)
-      .map(|dest_path| {
-        // If the link destination can't be parsed as PathGlob(s), it is broken.
-        dest_path
-          .to_str()
-          .and_then(|dest_str| {
-            // Escape any globs in the parsed dest, which should guarantee one output PathGlob.
-            PathGlob::create(&[Pattern::escape(dest_str)]).ok()
-          })
-          .unwrap_or_else(|| vec![])
-      })
-      .and_then(move |link_globs| context.expand(PathGlobs::from_globs(link_globs)))
-      .map(|mut path_stats| {
-        // Since we've escaped any globs in the parsed path, expect either 0 or 1 destination.
-        path_stats.pop().map(|ps| match ps {
-          PathStat::Dir { stat, .. } => PathStat::dir(symbolic_path, stat),
-          PathStat::File { stat, .. } => PathStat::file(symbolic_path, stat),
-        })
-      })
-      .to_boxed()
-  }
-
-  fn directory_listing(
-    &self,
-    canonical_dir: Dir,
-    symbolic_path: PathBuf,
-    wildcard: Pattern,
-    exclude: &Arc<Gitignore>,
-  ) -> BoxFuture<Vec<PathStat>, E> {
-    // List the directory.
-    let context = self.clone();
-    let exclude = exclude.clone();
-
-    self
-      .scandir(canonical_dir)
-      .and_then(move |dir_listing| {
-        // Match any relevant Stats, and join them into PathStats.
-        future::join_all(
-          dir_listing
-            .into_iter()
-            .filter(|stat| {
-              // Match relevant filenames.
-              stat
-                .path()
-                .file_name()
-                .map(|file_name| wildcard.matches_path(Path::new(file_name)))
-                .unwrap_or(false)
-            })
-            .filter_map(|stat| {
-              // Append matched filenames.
-              stat
-                .path()
-                .file_name()
-                .map(|file_name| symbolic_path.join(file_name))
-                .map(|symbolic_stat_path| (symbolic_stat_path, stat))
-            })
-            .map(|(stat_symbolic_path, stat)| {
-              // Canonicalize matched PathStats, and filter paths that are ignored by either the
-              // context, or by local excludes. Note that we apply context ignore patterns to both
-              // the symbolic and canonical names of Links, but only apply local excludes to their
-              // symbolic names.
-              if context.is_ignored(&stat) || is_ignored(&exclude, &stat) {
-                future::ok(None).to_boxed()
-              } else {
-                match stat {
-                  Stat::Link(l) => context.canonicalize(stat_symbolic_path, l),
-                  Stat::Dir(d) => {
-                    future::ok(Some(PathStat::dir(stat_symbolic_path.to_owned(), d))).to_boxed()
-                  }
-                  Stat::File(f) => {
-                    future::ok(Some(PathStat::file(stat_symbolic_path.to_owned(), f))).to_boxed()
-                  }
-                }
-              }
-            })
-            .collect::<Vec<_>>(),
-        )
-      })
-      .map(|path_stats| {
-        // See the TODO above.
-        path_stats.into_iter().filter_map(|pso| pso).collect()
-      })
-      .to_boxed()
-  }
-
-  ///
-  /// Recursively expands PathGlobs into PathStats while applying excludes.
-  ///
-  fn expand(&self, path_globs: PathGlobs) -> BoxFuture<Vec<PathStat>, E> {
-    if path_globs.include.is_empty() {
-      return future::ok(vec![]).to_boxed();
-    }
-
-    let init = PathGlobsExpansion {
-      context: self.clone(),
-      todo: path_globs.include,
-      exclude: path_globs.exclude,
-      completed: HashSet::default(),
-      outputs: OrderMap::default(),
-    };
-    future::loop_fn(init, |mut expansion| {
-      // Request the expansion of all outstanding PathGlobs as a batch.
-      let round = future::join_all({
-        let exclude = &expansion.exclude;
-        let context = &expansion.context;
-        expansion
-          .todo
-          .drain(..)
-          .map(|path_glob| context.expand_single(path_glob, exclude))
-          .collect::<Vec<_>>()
-      });
-      round.map(move |paths_and_globs| {
-        // Collect distinct new PathStats and PathGlobs
-        for (paths, globs) in paths_and_globs.into_iter() {
-          expansion.outputs.extend(paths.into_iter().map(|p| (p, ())));
-          let completed = &mut expansion.completed;
-          expansion
-            .todo
-            .extend(globs.into_iter().filter(|pg| completed.insert(pg.clone())));
-        }
-
-        // If there were any new PathGlobs, continue the expansion.
-        if expansion.todo.is_empty() {
-          future::Loop::Break(expansion.outputs)
-        } else {
-          future::Loop::Continue(expansion)
-        }
-      })
-    }).map(|expansion_outputs| {
-      // Finally, capture the resulting PathStats from the expansion.
-      expansion_outputs.into_iter().map(|(k, _)| k).collect()
-    })
-      .to_boxed()
-  }
-
-  ///
-  /// Apply a PathGlob, returning PathStats and additional PathGlobs that are needed for the
-  /// expansion.
-  ///
-  fn expand_single(
-    &self,
-    path_glob: PathGlob,
-    exclude: &Arc<Gitignore>,
-  ) -> BoxFuture<(Vec<PathStat>, Vec<PathGlob>), E> {
-    match path_glob {
-      PathGlob::Wildcard { canonical_dir, symbolic_path, wildcard } =>
-        // Filter directory listing to return PathStats, with no continuation.
-        self.directory_listing(canonical_dir, symbolic_path, wildcard, exclude)
-          .map(|path_stats| (path_stats, vec![]))
-          .to_boxed(),
-      PathGlob::DirWildcard { canonical_dir, symbolic_path, wildcard, remainder } =>
-        // Filter directory listing and request additional PathGlobs for matched Dirs.
-        self.directory_listing(canonical_dir, symbolic_path, wildcard, exclude)
-          .and_then(move |path_stats| {
-            path_stats.into_iter()
-              .filter_map(|ps| match ps {
-                PathStat::Dir { path, stat } =>
-                  Some(
-                    PathGlob::parse_globs(stat, path, &remainder)
-                      .map_err(|e| Self::mk_error(e.as_str()))
-                  ),
-                PathStat::File { .. } => None,
-              })
-              .collect::<Result<Vec<_>, E>>()
-          })
-          .map(|path_globs| {
-            let flattened =
-              path_globs.into_iter()
-                .flat_map(|path_globs| path_globs.into_iter())
-                .collect();
-            (vec![], flattened)
-          })
-          .to_boxed(),
-    }
-  }
 }
 
 pub struct FileContent {
@@ -802,33 +785,35 @@ fn safe_create_dir_all(path: &Path) -> Result<(), String> {
 
 #[cfg(test)]
 mod posixfs_test {
-  extern crate tempdir;
+  extern crate tempfile;
   extern crate testutil;
 
-  use super::{Dir, File, Link, PosixFS, ResettablePool, Stat};
+  use super::{
+    Dir, DirectoryListing, File, Link, PathStat, PathStatGetter, PosixFS, ResettablePool, Stat,
+  };
   use futures::Future;
-  use self::testutil::make_file;
   use std;
   use std::path::{Path, PathBuf};
   use std::sync::Arc;
+  use testutil::make_file;
 
   #[test]
   fn is_executable_false() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     make_file(&dir.path().join("marmosets"), &[], 0o611);
     assert_only_file_is_executable(dir.path(), false);
   }
 
   #[test]
   fn is_executable_true() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     make_file(&dir.path().join("photograph_marmosets"), &[], 0o700);
     assert_only_file_is_executable(dir.path(), true);
   }
 
   #[test]
   fn read_file() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let path = PathBuf::from("marmosets");
     let content = "cute".as_bytes().to_vec();
     make_file(
@@ -837,18 +822,19 @@ mod posixfs_test {
       0o600,
     );
     let fs = new_posixfs(&dir.path());
-    let file_content = fs.read_file(&File {
-      path: path.clone(),
-      is_executable: false,
-    }).wait()
-      .unwrap();
+    let file_content =
+      fs.read_file(&File {
+        path: path.clone(),
+        is_executable: false,
+      }).wait()
+        .unwrap();
     assert_eq!(file_content.path, path);
     assert_eq!(file_content.content, content);
   }
 
   #[test]
   fn read_file_missing() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     new_posixfs(&dir.path())
       .read_file(&File {
         path: PathBuf::from("marmosets"),
@@ -860,7 +846,7 @@ mod posixfs_test {
 
   #[test]
   fn stat_executable_file() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("photograph_marmosets");
     make_file(&dir.path().join(&path), &[], 0o700);
@@ -875,7 +861,7 @@ mod posixfs_test {
 
   #[test]
   fn stat_nonexecutable_file() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("marmosets");
     make_file(&dir.path().join(&path), &[], 0o600);
@@ -890,7 +876,7 @@ mod posixfs_test {
 
   #[test]
   fn stat_dir() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
@@ -902,7 +888,7 @@ mod posixfs_test {
 
   #[test]
   fn stat_symlink() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("marmosets");
     make_file(&dir.path().join(&path), &[], 0o600);
@@ -924,7 +910,7 @@ mod posixfs_test {
 
   #[test]
   fn stat_missing() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     posix_fs
       .stat(PathBuf::from("no_marmosets"))
@@ -933,16 +919,19 @@ mod posixfs_test {
 
   #[test]
   fn scandir_empty() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("empty_enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
-    assert_eq!(posix_fs.scandir(&Dir(path)).wait().unwrap(), vec![]);
+    assert_eq!(
+      posix_fs.scandir(&Dir(path)).wait().unwrap(),
+      DirectoryListing(vec![])
+    );
   }
 
   #[test]
   fn scandir() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
@@ -971,7 +960,7 @@ mod posixfs_test {
 
     assert_eq!(
       posix_fs.scandir(&Dir(path)).wait().unwrap(),
-      vec![
+      DirectoryListing(vec![
         Stat::File(File {
           path: a_marmoset,
           is_executable: false,
@@ -986,13 +975,13 @@ mod posixfs_test {
           path: sneaky_marmoset,
           is_executable: false,
         }),
-      ]
+      ])
     );
   }
 
   #[test]
   fn scandir_missing() {
-    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     posix_fs
       .scandir(&Dir(PathBuf::from("no_marmosets_here")))
@@ -1000,11 +989,93 @@ mod posixfs_test {
       .expect_err("Want error");
   }
 
+  #[test]
+  fn path_stats_for_paths() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let root_path = dir.path();
+
+    // File tree:
+    // dir
+    // dir/recursive_symlink -> ../symlink -> executable_file
+    // dir_symlink -> dir
+    // executable_file
+    // regular_file
+    // symlink -> executable_file
+    // symlink_to_nothing -> doesnotexist
+
+    make_file(&root_path.join("executable_file"), &[], 0o700);
+    make_file(&root_path.join("regular_file"), &[], 0o600);
+    std::fs::create_dir(&root_path.join("dir")).unwrap();
+    std::os::unix::fs::symlink("executable_file", &root_path.join("symlink")).unwrap();
+    std::os::unix::fs::symlink(
+      "../symlink",
+      &root_path.join("dir").join("recursive_symlink"),
+    ).unwrap();
+    std::os::unix::fs::symlink("dir", &root_path.join("dir_symlink")).unwrap();
+    std::os::unix::fs::symlink("doesnotexist", &root_path.join("symlink_to_nothing")).unwrap();
+
+    let posix_fs = Arc::new(new_posixfs(&root_path));
+    let path_stats = posix_fs
+      .path_stats(vec![
+        PathBuf::from("executable_file"),
+        PathBuf::from("regular_file"),
+        PathBuf::from("dir"),
+        PathBuf::from("symlink"),
+        PathBuf::from("dir").join("recursive_symlink"),
+        PathBuf::from("dir_symlink"),
+        PathBuf::from("symlink_to_nothing"),
+        PathBuf::from("doesnotexist"),
+      ])
+      .wait()
+      .unwrap();
+    let v: Vec<Option<PathStat>> = vec![
+      Some(PathStat::file(
+        PathBuf::from("executable_file"),
+        File {
+          path: PathBuf::from("executable_file"),
+          is_executable: true,
+        },
+      )),
+      Some(PathStat::file(
+        PathBuf::from("regular_file"),
+        File {
+          path: PathBuf::from("regular_file"),
+          is_executable: false,
+        },
+      )),
+      Some(PathStat::dir(
+        PathBuf::from("dir"),
+        Dir(PathBuf::from("dir")),
+      )),
+      Some(PathStat::file(
+        PathBuf::from("symlink"),
+        File {
+          path: PathBuf::from("executable_file"),
+          is_executable: true,
+        },
+      )),
+      Some(PathStat::file(
+        PathBuf::from("dir").join("recursive_symlink"),
+        File {
+          path: PathBuf::from("executable_file"),
+          is_executable: true,
+        },
+      )),
+      Some(PathStat::dir(
+        PathBuf::from("dir_symlink"),
+        Dir(PathBuf::from("dir")),
+      )),
+      None,
+      None,
+    ];
+    assert_eq!(v, path_stats);
+  }
+
   fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
     let fs = new_posixfs(path);
     let stats = fs.scandir(&Dir(PathBuf::from("."))).wait().unwrap();
-    assert_eq!(stats.len(), 1);
-    match stats.get(0).unwrap() {
+    assert_eq!(stats.0.len(), 1);
+    match stats.0.get(0).unwrap() {
       &super::Stat::File(File {
         is_executable: got, ..
       }) => assert_eq!(want_is_executable, got),
@@ -1016,7 +1087,7 @@ mod posixfs_test {
     PosixFS::new(
       dir.as_ref(),
       Arc::new(ResettablePool::new("test-pool-".to_string())),
-      vec![],
+      &[],
     ).unwrap()
   }
 }

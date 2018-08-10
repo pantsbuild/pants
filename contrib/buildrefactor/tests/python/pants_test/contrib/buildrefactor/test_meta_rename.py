@@ -2,15 +2,14 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.contrib.buildrefactor.buildozer_util import prepare_dependencies
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.buildrefactor.meta_rename import MetaRename
 
@@ -22,8 +21,8 @@ class MetaRenameTest(TaskTestBase):
   def task_type(cls):
     return MetaRename
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(targets={ 'java_library': JavaLibrary })
 
   def setUp(self):
@@ -34,7 +33,7 @@ class MetaRenameTest(TaskTestBase):
     self.set_options(**{ 'from': '{}:a'.format(self.spec_path),
                          'to': '{}:{}'.format(self.spec_path, self.new_name) })
     self.meta_rename = self.create_task(
-      self.context(target_roots=prepare_dependencies(self).values()))
+      self.context(target_roots=list(prepare_dependencies(self).values())))
 
   def test_update_original_build_name(self):
     self.meta_rename.execute()

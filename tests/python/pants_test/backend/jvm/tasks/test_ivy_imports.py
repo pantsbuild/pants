@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import zipfile
@@ -53,7 +52,7 @@ class IvyImportsTest(NailgunTaskTestBase):
                                     libraries=[jar_library.address.spec],
                                     include_patterns=['a/b/c/*.proto'])
 
-      self.set_options(use_nailgun=False)
+      self.set_options(execution_strategy='subprocess')
       ivy_imports_task = self.execute(self.context(target_roots=[foo_target]))
 
       # Make sure the product is properly populated
@@ -66,6 +65,6 @@ class IvyImportsTest(NailgunTaskTestBase):
     jars_by_coordinate = dict(jar_import_products.imports(target))
     self.assertIn(expected_coordinate, jars_by_coordinate)
     jar_filename = jars_by_coordinate[expected_coordinate]
-    self.assertTrue(os.path.islink(jar_filename))
+    self.assertFalse(os.path.islink(jar_filename))
     # Make sure there is a real .jar there
     self.assertTrue(zipfile.is_zipfile(jar_filename))

@@ -12,9 +12,10 @@ python_library(
   name='scrooge_gen',
   sources=['scrooge_gen.py'],
   dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:future',
     ':java_thrift_library_fingerprint_strategy',
     ':thrift_util',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
@@ -34,25 +35,31 @@ python_library(
   name='thrift_linter',
   sources=['thrift_linter.py'],
   dependencies=[
+    '3rdparty/python:future',
     ':thrift_util',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
-    'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:worker_pool',
     'src/python/pants/base:workunit',
     'src/python/pants/option',
+    'src/python/pants/task'
   ],
 )
 
 python_library(
   name='thrift_util',
   sources=['thrift_util.py'],
+  dependencies = [
+    '3rdparty/python:future',
+  ],
 )
 
 python_library(
   name='java_thrift_library_fingerprint_strategy',
   sources=['java_thrift_library_fingerprint_strategy.py'],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/base:fingerprint_strategy',
   ],

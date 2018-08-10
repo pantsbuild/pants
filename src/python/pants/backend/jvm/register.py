@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
@@ -21,7 +20,7 @@ from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.junit_tests import JUnitTests
-from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
+from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
 from pants.backend.jvm.targets.managed_jar_dependencies import (ManagedJarDependencies,
@@ -30,6 +29,7 @@ from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
+from pants.backend.jvm.tasks.analysis_extraction import AnalysisExtraction
 from pants.backend.jvm.tasks.benchmark_run import BenchmarkRun
 from pants.backend.jvm.tasks.binary_create import BinaryCreate
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
@@ -47,6 +47,7 @@ from pants.backend.jvm.tasks.jar_create import JarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun
+from pants.backend.jvm.tasks.jvm_compile.javac.javac_compile import JavacCompile
 from pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher import RuntimeClasspathPublisher
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.backend.jvm.tasks.jvm_dependency_check import JvmDependencyCheck
@@ -67,6 +68,7 @@ from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
 from pants.backend.jvm.tasks.scalastyle import Scalastyle
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
 from pants.base.deprecated import warn_or_error
+from pants.build_graph.app_base import Bundle, DirectoryReMapper
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -157,6 +159,10 @@ def register_goals():
 
   # Compile
   task(name='zinc', action=ZincCompile).install('compile')
+  task(name='javac', action=JavacCompile).install('compile')
+
+  # Analysis extraction.
+  task(name='zinc', action=AnalysisExtraction).install('analysis')
 
   # Dependency resolution.
   task(name='ivy', action=IvyResolve).install('resolve', first=True)
@@ -170,7 +176,6 @@ def register_goals():
   task(name='services', action=PrepareServices).install('resources')
 
   task(name='export-classpath', action=RuntimeClasspathPublisher).install()
-  task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile')
 
   task(name='jvm', action=JvmDependencyUsage).install('dep-usage')
 
@@ -207,10 +212,13 @@ def register_goals():
   task(name='scalafmt', action=ScalaFmtCheckFormat, serialize=False).install('lint')
   task(name='scalastyle', action=Scalastyle, serialize=False).install('lint')
   task(name='checkstyle', action=Checkstyle, serialize=False).install('lint')
+  task(name='jvm-dep-check', action=JvmDependencyCheck, serialize=False).install('lint')
 
   # Formatting.
-  task(name='scalafmt', action=ScalaFmtFormat, serialize=False).install('fmt')
+  # Scalafix has to go before scalafmt in order not to
+  # further change Scala files after scalafmt.
   task(name='scalafix', action=ScalaFixFix).install('fmt')
+  task(name='scalafmt', action=ScalaFmtFormat, serialize=False).install('fmt')
 
   # Running.
   task(name='jvm', action=JvmRun, serialize=False).install('run')

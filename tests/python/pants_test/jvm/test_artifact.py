@@ -2,15 +2,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.artifact import Artifact, PublicationMetadata
 from pants.backend.jvm.repository import Repository
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class ArtifactTest(BaseTest):
+class ArtifactTest(TestBase):
 
   def test_validation(self):
     repo = Repository(name="myRepo",

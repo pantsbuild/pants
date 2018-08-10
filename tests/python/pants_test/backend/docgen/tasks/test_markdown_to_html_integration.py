@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -20,7 +19,7 @@ class MarkdownIntegrationTest(PantsRunIntegrationTest):
     out_path = os.path.join(get_buildroot(), 'dist', 'markdown/html',
                             'testprojects/src/java/org/pantsbuild/testproject/page',
                             'README.html')
-    with safe_open(out_path) as outfile:
+    with safe_open(out_path, 'r') as outfile:
       page_html = outfile.read()
       self.assertIn('../../../../../../../examples/src/java/org/pantsbuild/'
                     'example/hello/main/README.html',
@@ -34,7 +33,7 @@ class MarkdownIntegrationTest(PantsRunIntegrationTest):
     out_path = os.path.join(get_buildroot(), 'dist', 'markdown/html',
                             'testprojects/src/java/org/pantsbuild/testproject/page',
                             'sense.html')
-    with safe_open(out_path) as outfile:
+    with safe_open(out_path, 'r') as outfile:
       page_html = outfile.read()
       # should get Sense and Sensibility in title (or TITLE, sheesh):
       self.assertRegexpMatches(page_html,

@@ -2,10 +2,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import map, object, open
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -42,7 +42,7 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
 
     def jvm_platform_validate(self, *targets):
       return self.test.run_pants_with_workdir(['jvm-platform-validate', '--check=fatal']
-                                              + map(self.spec, targets),
+                                              + list(map(self.spec, targets)),
                                               workdir=self.workdir)
 
   @contextmanager

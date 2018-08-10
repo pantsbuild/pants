@@ -2,10 +2,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open, str
+
+from future.utils import PY2
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -16,7 +18,7 @@ from pants.subsystem.subsystem import Subsystem
 from pants.subsystem.subsystem_client_mixin import SubsystemDependency
 from pants.task.task import Task
 from pants.util.dirutil import safe_rmtree
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class DummyTask(Task):
@@ -137,7 +139,7 @@ class TaskTest(TaskTestBase):
 
   def assertContent(self, vt, content):
     with open(os.path.join(vt.current_results_dir, self._filename), 'r') as f:
-      self.assertEquals(f.read(), content)
+      self.assertEqual(f.read(), content)
 
   def _toggle_cache(self, enable_artifact_cache):
     cache_dir = self.create_dir(self._cachedir)
@@ -150,7 +152,12 @@ class TaskTest(TaskTestBase):
     )
 
   def _fixture(self, incremental, options=None):
-    target = self.make_target(':t', target_type=Files, sources=[self._filename])
+    target = self.make_target(
+      ':t',
+      target_type=Files,
+      sources=[self._filename],
+      make_missing_sources=False,
+    )
     context = self.context(options=options, target_roots=[target])
     task = self.create_task(context)
     task._incremental = incremental
@@ -180,7 +187,9 @@ class TaskTest(TaskTestBase):
     """Generate a synthesized subtype of `cls`."""
     if scope is None:
       scope = cls.options_scope
-    subclass_name = b'test_{0}_{1}_{2}'.format(cls.__name__, scope, name)
+    subclass_name = 'test_{0}_{1}_{2}'.format(cls.__name__, scope, name)
+    if PY2:
+      subclass_name = subclass_name.encode('utf-8')
     kwargs['options_scope'] = scope
     return type(subclass_name, (cls,), kwargs)
 

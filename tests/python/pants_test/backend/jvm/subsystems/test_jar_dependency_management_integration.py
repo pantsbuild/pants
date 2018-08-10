@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from collections import namedtuple
@@ -48,7 +47,7 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
     classpath = self._classpath_result(spec_name, **kwargs)
     for jar_set, value in expected_sets.items():
       for jar in jar_set:
-        self.assertEquals(value, jar in classpath)
+        self.assertEqual(value, jar in classpath)
 
   def test_unmanaged_no_default(self):
     self._assert_run_classpath({

@@ -2,10 +2,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
+from builtins import open
 from collections import OrderedDict
 from io import StringIO
 from tempfile import NamedTemporaryFile
@@ -63,7 +63,7 @@ a=prop
 
   def test_stream(self):
     with NamedTemporaryFile() as props_out:
-      props_out.write('''
+      props_out.write(b'''
       it's a = file
       ''')
       props_out.flush()
@@ -71,7 +71,7 @@ a=prop
         self.assertLoaded(props_in, {'it\'s a': 'file'})
 
   def assertLoaded(self, contents, expected):
-    self.assertEquals(expected, Properties.load(contents))
+    self.assertEqual(expected, Properties.load(contents))
 
   def test_dump(self):
     props = OrderedDict()
@@ -81,4 +81,4 @@ a=prop
     props['c'] =' 3 : ='
     out = StringIO()
     Properties.dump(props, out)
-    self.assertEquals('a=1\nb=2\\\n\nc=\\ 3\\ \\:\\ \\=\n', out.getvalue())
+    self.assertEqual('a=1\nb=2\\\n\nc=\\ 3\\ \\:\\ \\=\n', out.getvalue())

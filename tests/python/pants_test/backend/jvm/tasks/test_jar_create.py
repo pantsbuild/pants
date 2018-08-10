@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from contextlib import closing
@@ -20,7 +19,7 @@ from pants.build_graph.target import Target
 from pants.util.contextutil import open_zip
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.tasks.task_test_base import ensure_cached
+from pants_test.task_test_base import ensure_cached
 
 
 class JarCreateTestBase(JarTaskTestBase):
@@ -29,9 +28,9 @@ class JarCreateTestBase(JarTaskTestBase):
   def task_type(cls):
     return JarCreate
 
-  @property
-  def alias_groups(self):
-    return super(JarCreateTestBase, self).alias_groups.merge(BuildFileAliases(
+  @classmethod
+  def alias_groups(cls):
+    return super(JarCreateTestBase, cls).alias_groups().merge(BuildFileAliases(
       targets={
         'java_library': JavaLibrary,
         'java_thrift_library': JavaThriftLibrary,

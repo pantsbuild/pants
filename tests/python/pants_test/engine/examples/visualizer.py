@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import sys
@@ -80,5 +79,5 @@ def main_filespecs():
     '[build root path] [filespecs]*', sys.argv[1:])
 
   # Create PathGlobs for each arg relative to the buildroot.
-  path_globs = PathGlobs.create('', include=args, exclude=[])
+  path_globs = PathGlobs(include=args)
   visualize_build_request(build_root, goals, path_globs)

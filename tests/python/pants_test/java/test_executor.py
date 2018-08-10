@@ -2,12 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import textwrap
 import unittest
+from builtins import object
 from contextlib import contextmanager
 
 from pants.java.distribution.distribution import Distribution
@@ -42,7 +42,7 @@ class SubprocessExecutorTest(unittest.TestCase):
                                  stderr=subprocess.PIPE)
         _, stderr = process.communicate()
         self.assertEqual(0, process.returncode)
-        self.assertEqual('' if scrubbed else env_value, stderr.strip())
+        self.assertEqual('' if scrubbed else env_value, stderr.decode('utf-8').strip())
 
   def test_not_scrubbed(self):
     self.do_test_jre_env_var('FRED', 'frog', scrubbed=False)

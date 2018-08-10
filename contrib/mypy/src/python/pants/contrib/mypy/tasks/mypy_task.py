@@ -2,23 +2,22 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import filter, open, str
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
+from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
-from pants.backend.python.tasks.wrapped_pex import WrappedPEX
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_file_path
 from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
@@ -58,7 +57,7 @@ class MypyTask(ResolveRequirementsTaskBase):
 
   @staticmethod
   def is_python_target(target):
-    return isinstance(target, (PythonTarget,))
+    return isinstance(target, PythonTarget)
 
   def _calculate_python_sources(self, targets):
     """Generate a set of source files from the given targets."""
@@ -98,7 +97,7 @@ class MypyTask(ResolveRequirementsTaskBase):
     path = os.path.realpath(os.path.join(self.workdir, str(py3_interpreter.identity), mypy_version))
     if not os.path.isdir(path):
       self.merge_pexes(path, pex_info, py3_interpreter, [mypy_requirement_pex])
-    pex = WrappedPEX(PEX(path, py3_interpreter), py3_interpreter)
+    pex = PEX(path, py3_interpreter)
     return pex.run(mypy_args, **kwargs)
 
   def execute(self):
@@ -119,7 +118,7 @@ class MypyTask(ResolveRequirementsTaskBase):
     with temporary_file_path() as sources_list_path:
       with open(sources_list_path, 'w') as f:
         for source in sources:
-          f.write(b'{}\n'.format(source))
+          f.write('{}\n'.format(source))
 
       # Construct the mypy command line.
       cmd = ['--python-version={}'.format(interpreter_for_targets.identity.python)]

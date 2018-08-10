@@ -2,25 +2,25 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from abc import abstractproperty
 from collections import MutableMapping, MutableSequence
 
-import six
+from future.utils import binary_type, text_type
 
-from pants.engine.addressable import SubclassesOf, SuperclassesOf, addressable, addressable_list
+from pants.engine.addressable import addressable, addressable_list
 from pants.engine.objects import Serializable, SerializableFactory, Validatable, ValidationError
 from pants.util.meta import AbstractClass
+from pants.util.objects import SubclassesOf, SuperclassesOf
 
 
 def _normalize_utf8_keys(kwargs):
   """When kwargs are passed literally in a source file, their keys are ascii: normalize."""
-  if any(type(key) is six.binary_type for key in kwargs.keys()):
+  if any(type(key) is binary_type for key in kwargs.keys()):
     # This is to preserve the original dict type for kwargs.
     dict_type = type(kwargs)
-    return dict_type([(six.text_type(k), v) for k, v in kwargs.items()])
+    return dict_type([(text_type(k), v) for k, v in kwargs.items()])
   return kwargs
 
 
@@ -259,18 +259,15 @@ class Struct(Serializable, SerializableFactory, Validatable):
     return object.__getattribute__(self, item)
 
   def _key(self):
-    if self.address:
-      return self.address
-    else:
-      def hashable(value):
-        if isinstance(value, dict):
-          return tuple(sorted((k, hashable(v)) for k, v in value.items()))
-        elif isinstance(value, list):
-          return tuple(hashable(v) for v in value)
-        else:
-          return value
-      return tuple(sorted((k, hashable(v)) for k, v in self._kwargs.items()
-                          if k not in self._INHERITANCE_FIELDS))
+    def hashable(value):
+      if isinstance(value, dict):
+        return tuple(sorted((k, hashable(v)) for k, v in value.items()))
+      elif isinstance(value, list):
+        return tuple(hashable(v) for v in value)
+      else:
+        return value
+    return tuple(sorted((k, hashable(v)) for k, v in self._kwargs.items()
+                        if k not in self._INHERITANCE_FIELDS))
 
   def __hash__(self):
     return hash(self._key())

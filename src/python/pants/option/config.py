@@ -2,15 +2,17 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+import configparser
 import getpass
+import io
 import itertools
 import os
+from builtins import open
+from contextlib import contextmanager
 
 import six
-from six.moves import configparser
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
@@ -33,27 +35,61 @@ class Config(AbstractClass):
     pass
 
   @classmethod
-  def load(cls, configpaths, seed_values=None):
+  def load_file_contents(cls, file_contents, seed_values=None):
+    """Loads config from the given string payloads.
+
+    A handful of seed values will be set to act as if specified in the loaded config file's DEFAULT
+    section, and be available for use in substitutions.  The caller may override some of these
+    seed values.
+
+    :param list[FileContents] file_contents: Load from these FileContents. Later instances take
+                                             precedence over earlier ones. If empty, returns an
+                                             empty config.
+    :param seed_values: A dict with optional override seed values for buildroot, pants_workdir,
+                        pants_supportdir and pants_distdir.
+    """
+
+    @contextmanager
+    def opener(file_content):
+      with io.StringIO(file_content.content.decode('utf-8')) as fh:
+        yield fh
+
+    return cls._meta_load(opener, file_contents, seed_values)
+
+  @classmethod
+  def load(cls, config_paths, seed_values=None):
     """Loads config from the given paths.
 
     A handful of seed values will be set to act as if specified in the loaded config file's DEFAULT
     section, and be available for use in substitutions.  The caller may override some of these
     seed values.
 
-    :param list configpaths: Load from these paths. Later instances take precedence over earlier
-                             ones. If empty, returns an empty config.
+    :param list config_paths: Load from these paths. Later instances take precedence over earlier
+                              ones. If empty, returns an empty config.
     :param seed_values: A dict with optional override seed values for buildroot, pants_workdir,
                         pants_supportdir and pants_distdir.
     """
-    if not configpaths:
+
+    @contextmanager
+    def opener(f):
+      with open(f, 'r') as fh:
+        yield fh
+
+    return cls._meta_load(opener, config_paths, seed_values)
+
+  @classmethod
+  def _meta_load(cls, open_ctx, config_items, seed_values=None):
+    if not config_items:
       return _EmptyConfig()
 
     single_file_configs = []
-    for configpath in configpaths:
+    for config_item in config_items:
       parser = cls._create_parser(seed_values)
-      with open(configpath, 'r') as ini:
-        parser.readfp(ini)
-      single_file_configs.append(_SingleFileConfig(configpath, parser))
+      with open_ctx(config_item) as ini:
+        parser.read_file(ini)
+      config_path = config_item.path if hasattr(config_item, 'path') else config_item
+      single_file_configs.append(_SingleFileConfig(config_path, parser))
+
     return _ChainedConfig(single_file_configs)
 
   @classmethod
@@ -80,11 +116,12 @@ class Config(AbstractClass):
 
     def update_dir_from_seed_values(key, default):
       all_seed_values[key] = seed_values.get(key, os.path.join(buildroot, default))
+
     update_dir_from_seed_values('pants_workdir', '.pants.d')
     update_dir_from_seed_values('pants_supportdir', 'build-support')
     update_dir_from_seed_values('pants_distdir', 'dist')
 
-    return configparser.SafeConfigParser(all_seed_values)
+    return configparser.ConfigParser(all_seed_values)
 
   def get(self, section, option, type_=six.string_types, default=None):
     """Retrieves option from the specified section (or 'DEFAULT') and attempts to parse it as type.

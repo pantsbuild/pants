@@ -36,7 +36,7 @@ public class ExampleProcessor extends AbstractProcessor {
 
   private ProcessingEnvironment processingEnvironment = null;
 
-  @Override public void init(ProcessingEnvironment processingEnvironment) {
+  @Override public synchronized void init(ProcessingEnvironment processingEnvironment) {
     this.processingEnvironment = processingEnvironment;
   }
 

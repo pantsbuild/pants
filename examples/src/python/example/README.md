@@ -56,6 +56,60 @@ Relevant Goals and Targets
 > Python code from `.thrift` source; a Python target that has this
 > target in its `dependencies` can `import` the generated Python code.
 
+Configure the Python Version
+----------------------------
+
+Pants allows users to select their Python interpreter by configuring "interpreter constraints."
+By default, pants uses `['CPython>=2.7,<3']` - notice how the requirements-style string specifies
+an interpreter (e.g.: `CPython`, `PyPy`) and version constraint, and that a list of constraints
+may be specified.
+
+The most common approach is to configure interpreter constraints for your whole repo.
+For example, to use python3 for the whole repo, update `pants.ini` as follows:
+
+```ini
+[python-setup]
+interpreter_constraints: ["CPython>=3.5"]
+```
+
+If you require more granularity, the `compatibility` parameter may be specified on
+[python_library](https://www.pantsbuild.org/build_dictionary.html#bdict_python_library) targets
+that require a particular interpreter. For example, a mixed python2/python3 repo may have library
+targets that are only compatible with a given interpreter version.
+
+[python_binary](https://www.pantsbuild.org/build_dictionary.html#bdict_python_binary) targets
+also have the `compatibility` parameter, allowing users to build a PEX binary targeting a given
+interpreter. For example, an environment with production machines running a mix of python2/python3
+might have two `python_binary` targets that build the same binary, but targeting different
+interpreters.
+
+To configure interpreter constraints for an individual Python target, update its build target:
+
+```python
+python_binary(
+    name='server-bin',
+    dependencies = [
+        'src/main/python/server',
+    ],
+    source='main.py',
+    # No need to set compatibility if it matches the default interpreter constraints.
+    #compatibility='CPython>=2.7,<3',
+)
+
+python_binary(
+    name='server-bin3',
+    dependencies = [
+        'src/main/python/server',
+    ],
+    source='main.py',
+    # This target will always use python3, even if the default interpreter constraint is python2.
+    compatibility='CPython>=3',
+)
+```
+
+For additional details, see `./pants python-setup --help-advanced` and read the
+`--python-setup-interpreter-constraints` docstring.
+
 BUILD for a Simple Binary
 -------------------------
 
@@ -150,6 +204,64 @@ Use `test` to run the tests. This uses `pytest`:
     13:30:18 00:50     [specs]
                    SUCCESS
     $
+
+Python Apps for Deployment
+--------------------------
+
+For deploying your Python apps, Pants can create archives (e.g.: tar.gz, zip) that contain an
+executable pex along with other files it needs at runtime (e.g.: config files, data sets).
+These archives can be extracted and run on production machines as part of your deployment process.
+
+To create a Python app for deployment, define a `python_app` target. Notice how the `python_app`
+target combines an existing `python_binary` with `bundles` that describe the other files to
+include in the archive.
+
+!inc[start-at=python_binary](hello/main/BUILD)
+
+Use `./pants bundle` to create the archive.
+
+    $ ./pants bundle examples/src/python/example/hello/main/:hello-app --bundle-py-archive=tgz
+    <output omitted for brevity>
+    00:59:52 00:02   [bundle]
+    00:59:52 00:02     [py]
+                       created bundle copy dist/examples.src.python.example.hello.main.hello-app-bundle
+                       created archive copy dist/examples.src.python.example.hello.main.hello-app.tar.gz
+    00:59:53 00:03   [complete]
+
+The archive contains an executable pex file, along with a loose file matched by the bundle glob.
+
+    $ tar -tzvf dist/examples.src.python.example.hello.main.hello-app.tar.gz
+    drwxr-xr-x root/root         0 2018-05-02 02:16 ./
+    -rwxr-xr-x root/root    474997 2018-05-02 02:16 ./main.pex
+    -rw-rw-r-- root/root       562 2018-05-01 13:34 ./BUILD
+
+See <a pantsref="bdict_bundle">bundle</a> in the BUILD dictionary for additional details about
+defining the layout of files in your archive.
+
+Debugging Tests
+---------------
+Pants scrubs the environment's `PYTHONPATH` when running tests, to ensure a hermetic, repeatable test run.
+
+However some Python debuggers require you to add the debugger's code to the `PYTHONPATH`.
+To do so, set the `extra_pythonpath` option on the `test.pytest` scope.
+
+You can do so with the `--test-pytest-extra-pythonpath` flag, but it may be more convenient to 
+set this permanently in your personal environment using the `PANTS_TEST_PYTEST_EXTRA_PYTHONPATH` 
+environment variable.
+
+So, for example, to use PyCharm's interactive debugger:
+ 
+- Find the [pycharm-debug.egg](https://www.jetbrains.com/help/pycharm/remote-debugging.html) 
+  in your PyCharm installation.
+- Set the environment variable to point to it:  
+  `PANTS_TEST_PYTEST_EXTRA_PYTHONPATH=/path/to/pycharm-debug.egg`.
+- Start the debug server in PyCharm (this assumes you have previously set it up to listen on port 5000).
+- Set a breakpoint in your code by adding this line where you wish to break:    
+  `import pydevd;pydevd.settrace('localhost', port=5000, stdoutToServer=True, stderrToServer=True)`
+- Run your `./pants test` command.
+
+When your code hits the breakpoint, you'll enter an interactive debugging session in PyCharm!
+
 
 Handling `python_requirement`
 -----------------------------

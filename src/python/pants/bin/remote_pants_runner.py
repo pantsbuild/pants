@@ -2,14 +2,16 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import signal
 import sys
 import time
+from builtins import object, str
 from contextlib import contextmanager
+
+from future.utils import raise_with_traceback
 
 from pants.console.stty_utils import STTYSettings
 from pants.java.nailgun_client import NailgunClient
@@ -27,11 +29,14 @@ class RemotePantsRunner(object):
   class Fallback(Exception):
     """Raised when fallback to an alternate execution mode is requested."""
 
-  class PortNotFound(Exception):
-    """Raised when the pailgun port can't be found."""
+  class Terminated(Exception):
+    """Raised when an active run is terminated mid-flight."""
 
   PANTS_COMMAND = 'pants'
-  RECOVERABLE_EXCEPTIONS = (PortNotFound, NailgunClient.NailgunConnectionError)
+  RECOVERABLE_EXCEPTIONS = (
+    NailgunClient.NailgunConnectionError,
+    NailgunClient.NailgunExecutionError
+  )
 
   def __init__(self, exiter, args, env, bootstrap_options, stdin=None, stdout=None, stderr=None):
     """
@@ -86,6 +91,42 @@ class RemotePantsRunner(object):
     root.setLevel(log_level)
     root.addHandler(handler)
 
+  @staticmethod
+  def _backoff(attempt):
+    """Minimal backoff strategy for daemon restarts."""
+    time.sleep(attempt + (attempt - 1))
+
+  def _run_pants_with_retry(self, port, retries=3):
+    """Runs pants remotely with retry and recovery for nascent executions."""
+    attempt = 1
+    while 1:
+      logger.debug(
+        'connecting to pantsd on port {} (attempt {}/{})'.format(port, attempt, retries)
+      )
+      try:
+        return self._connect_and_execute(port)
+      except self.RECOVERABLE_EXCEPTIONS as e:
+        if attempt > retries:
+          raise self.Fallback(e)
+
+        self._backoff(attempt)
+        logger.warn(
+          'pantsd was unresponsive on port {}, retrying ({}/{})'
+          .format(port, attempt, retries)
+        )
+
+        # One possible cause of the daemon being non-responsive during an attempt might be if a
+        # another lifecycle operation is happening concurrently (incl teardown). To account for
+        # this, we won't begin attempting restarts until at least 1 second has passed (1 attempt).
+        if attempt > 1:
+          port = self._restart_pantsd()
+        attempt += 1
+      except NailgunClient.NailgunError as e:
+        # Ensure a newline.
+        logger.fatal('')
+        logger.fatal('lost active connection to pantsd!')
+        raise_with_traceback(self.Terminated('abruptly lost active connection to pantsd runner: {!r}'.format(e)))
+
   def _connect_and_execute(self, port):
     # Merge the nailgun TTY capability environment variables with the passed environment dict.
     ng_env = NailgunProtocol.isatty_to_env(self._stdin, self._stdout, self._stderr)
@@ -99,7 +140,8 @@ class RemotePantsRunner(object):
                            ins=self._stdin,
                            out=self._stdout,
                            err=self._stderr,
-                           exit_on_broken_pipe=True)
+                           exit_on_broken_pipe=True,
+                           expects_pid=True)
 
     with self._trapped_signals(client), STTYSettings.preserved():
       # Execute the command on the pailgun.
@@ -108,15 +150,13 @@ class RemotePantsRunner(object):
     # Exit.
     self._exiter.exit(result)
 
+  def _restart_pantsd(self):
+    return PantsDaemon.Factory.restart(bootstrap_options=self._bootstrap_options)
+
   def _maybe_launch_pantsd(self):
     return PantsDaemon.Factory.maybe_launch(bootstrap_options=self._bootstrap_options)
 
   def run(self, args=None):
     self._setup_logging()
     port = self._maybe_launch_pantsd()
-
-    logger.debug('connecting to pailgun on port {}'.format(port))
-    try:
-      self._connect_and_execute(port)
-    except self.RECOVERABLE_EXCEPTIONS as e:
-      raise self.Fallback(e)
+    self._run_pants_with_retry(port)

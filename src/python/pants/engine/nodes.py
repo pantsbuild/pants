@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 
@@ -39,7 +38,7 @@ class State(AbstractClass):
     return (type(self),) + self._to_components()
 
 
-class Return(datatype('Return', ['value']), State):
+class Return(datatype(['value']), State):
   """Indicates that a Node successfully returned a value."""
 
   @classmethod
@@ -50,11 +49,11 @@ class Return(datatype('Return', ['value']), State):
     return (self.value,)
 
 
-class Throw(datatype('Throw', ['exc']), State):
+class Throw(datatype(['exc']), State):
   """Indicates that a Node should have been able to return a value, but failed."""
 
 
-class Runnable(datatype('Runnable', ['func', 'args', 'cacheable']), State):
+class Runnable(datatype(['func', 'args', 'cacheable']), State):
   """Indicates that the Node is ready to run with the given closure.
 
   The return value of the Runnable will become the final state of the Node.

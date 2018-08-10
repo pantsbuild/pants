@@ -2,11 +2,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import sys
+from builtins import open, range
 
 import markdown
 from docutils.core import publish_parts
@@ -14,7 +14,6 @@ from pygments import highlight
 from pygments.formatters.html import HtmlFormatter
 from pygments.lexers import PythonLexer, TextLexer, guess_lexer_for_filename
 from pygments.util import ClassNotFound
-from six.moves import range
 
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_open
@@ -134,7 +133,7 @@ class IncludeExcerptPattern(markdown.inlinepatterns.Pattern):
     source_dir = os.path.dirname(self.source_path)
     include_path = os.path.join(source_dir, rel_include_path)
     try:
-      with open(include_path) as include_file:
+      with open(include_path, 'r') as include_file:
         file_text = include_file.read()
     except IOError as e:
       raise IOError('Markdown file {0} tried to include file {1}, got '
@@ -174,6 +173,10 @@ class IncludeExcerptExtension(markdown.Extension):
     md.inlinePatterns.add('excerpt',
                           IncludeExcerptPattern(source_path=self.source_path),
                           '_begin')
+    # NB: this line allows <!-- --> comments to be used in markdown files. This
+    # doesn't work otherwise due to a bug in markdown/preprocessors.py in the
+    # version of markdown we use, where it calls .keys() on an empty tuple ().
+    md.preprocessors['html_block'].markdown_in_raw = False
 
 
 def page_to_html_path(page):

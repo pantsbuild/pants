@@ -2,21 +2,25 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import unittest
 
+from pants.base.project_tree import Dir, File
+from pants.base.specs import SiblingAddresses, SingleAddress, Specs
 from pants.build_graph.address import Address
-from pants.engine.addressable import Exactly, addressable, addressable_dict
-from pants.engine.build_files import (ResolvedTypeMismatchError, create_graph_rules,
-                                      parse_address_family)
-from pants.engine.fs import Dir, FileContent, FilesContent, PathGlobs, create_fs_rules
-from pants.engine.mapper import AddressMapper, ResolveError
+from pants.engine.addressable import addressable, addressable_dict
+from pants.engine.build_files import (ResolvedTypeMismatchError, addresses_from_address_families,
+                                      create_graph_rules, parse_address_family)
+from pants.engine.fs import (DirectoryDigest, FileContent, FilesContent, Path, PathGlobs, Snapshot,
+                             create_fs_rules)
+from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.mapper import AddressFamily, AddressMapper, ResolveError
 from pants.engine.nodes import Return, Throw
 from pants.engine.parser import SymbolTable
 from pants.engine.struct import Struct, StructWithDeps
+from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import (JsonParser, PythonAssignmentsParser,
                                                 PythonCallbacksParser)
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -28,9 +32,69 @@ class ParseAddressFamilyTest(unittest.TestCase):
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
     address_mapper = AddressMapper(JsonParser(TestTable()))
     af = run_rule(parse_address_family, address_mapper, Dir('/dev/null'), {
-        (FilesContent, PathGlobs): lambda _: FilesContent([FileContent('/dev/null/BUILD', '')])
+        (Snapshot, PathGlobs): lambda _: Snapshot(DirectoryDigest('abc', 10), (File('/dev/null/BUILD'),)),
+        (FilesContent, DirectoryDigest): lambda _: FilesContent([FileContent('/dev/null/BUILD', b'')]),
       })
-    self.assertEquals(len(af.objects_by_name), 0)
+    self.assertEqual(len(af.objects_by_name), 0)
+
+
+class AddressesFromAddressFamiliesTest(unittest.TestCase):
+  def test_duplicated(self):
+    """Test that matching the same Spec twice succeeds."""
+    address = SingleAddress('a', 'a')
+    address_mapper = AddressMapper(JsonParser(TestTable()))
+    snapshot = Snapshot(DirectoryDigest('xx', 2),
+                        (Path('a/BUILD', File('a/BUILD')),))
+    address_family = AddressFamily('a', {'a': ('a/BUILD', 'this is an object!')})
+
+    bfas = run_rule(addresses_from_address_families, address_mapper, Specs([address, address]), {
+        (Snapshot, PathGlobs): lambda _: snapshot,
+        (AddressFamily, Dir): lambda _: address_family,
+      })
+
+    self.assertEqual(len(bfas.dependencies), 1)
+    self.assertEqual(bfas.dependencies[0].spec, 'a:a')
+
+  def test_tag_filter(self):
+    """Test that targets are filtered based on `tags`."""
+    spec = SiblingAddresses('root')
+    address_mapper = AddressMapper(JsonParser(TestTable()))
+    snapshot = Snapshot(DirectoryDigest('xx', 2),
+                        (Path('root/BUILD', File('root/BUILD')),))
+    address_family = AddressFamily('root',
+      {'a': ('root/BUILD', TargetAdaptor()),
+       'b': ('root/BUILD', TargetAdaptor(tags={'integration'})),
+       'c': ('root/BUILD', TargetAdaptor(tags={'not_integration'}))
+      }
+    )
+
+    targets = run_rule(
+      addresses_from_address_families, address_mapper, Specs([spec], tags=['+integration']), {
+      (Snapshot, PathGlobs): lambda _: snapshot,
+      (AddressFamily, Dir): lambda _: address_family,
+    })
+
+    self.assertEqual(len(targets.dependencies), 1)
+    self.assertEqual(targets.dependencies[0].spec, 'root:b')
+
+  def test_exclude_pattern(self):
+    """Test that targets are filtered based on exclude patterns."""
+    spec = SiblingAddresses('root')
+    address_mapper = AddressMapper(JsonParser(TestTable()))
+    snapshot = Snapshot(DirectoryDigest('xx', 2),
+                        (Path('root/BUILD', File('root/BUILD')),))
+    address_family = AddressFamily('root',
+      {'exclude_me': ('root/BUILD', TargetAdaptor()),
+       'not_me': ('root/BUILD', TargetAdaptor()),
+      }
+    )
+    targets = run_rule(
+      addresses_from_address_families, address_mapper, Specs([spec], exclude_patterns=tuple(['.exclude*'])),{
+      (Snapshot, PathGlobs): lambda _: snapshot,
+      (AddressFamily, Dir): lambda _: address_family,
+    })
+    self.assertEqual(len(targets.dependencies), 1)
+    self.assertEqual(targets.dependencies[0].spec, 'root:not_me')
 
 
 class ApacheThriftConfiguration(StructWithDeps):
@@ -84,9 +148,6 @@ class TestTable(SymbolTable):
 
 
 class GraphTestBase(unittest.TestCase, SchedulerTestBase):
-  def setUp(self):
-    super(GraphTestBase, self).setUp()
-
   def create(self, build_patterns=None, parser=None):
     address_mapper = AddressMapper(build_patterns=build_patterns,
                                    parser=parser)
@@ -104,17 +165,17 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
     request = scheduler.execution_request([TestTable().constraint()], [address])
     root_entries = scheduler.execute(request).root_products
-    self.assertEquals(1, len(root_entries))
+    self.assertEqual(1, len(root_entries))
     return request, root_entries[0][1]
 
   def resolve_failure(self, scheduler, address):
     _, state = self._populate(scheduler, address)
-    self.assertEquals(type(state), Throw, '{} is not a Throw.'.format(state))
+    self.assertEqual(type(state), Throw, '{} is not a Throw.'.format(state))
     return state.exc
 
   def resolve(self, scheduler, address):
     _, state = self._populate(scheduler, address)
-    self.assertEquals(type(state), Return, '{} is not a Return.'.format(state))
+    self.assertEqual(type(state), Return, '{} is not a Return.'.format(state))
     return state.value
 
 
@@ -126,30 +187,38 @@ class InlinedGraphTest(GraphTestBase):
 
     resolved_java1 = self.resolve(scheduler, address('java1'))
 
-    nonstrict = ApacheThriftConfiguration(address=address('nonstrict'),
+    nonstrict = ApacheThriftConfiguration(type_alias='ApacheThriftConfig',
+                                          address=address('nonstrict'),
                                           version='0.9.2',
                                           strict=False,
                                           lang='java')
-    public = Struct(address=address('public'),
+    public = Struct(type_alias='Struct',
+                    address=address('public'),
                     url='https://oss.sonatype.org/#stagingRepositories')
     thrift1 = Target(address=address('thrift1'))
     thrift2 = Target(address=address('thrift2'), dependencies=[thrift1])
     expected_java1 = Target(address=address('java1'),
                             configurations=[
-                              ApacheThriftConfiguration(version='0.9.2', strict=True, lang='java'),
-                              nonstrict,
                               PublishConfiguration(
+                                type_alias='PublishConfig',
                                 default_repo=public,
                                 repos={
                                   'jake':
-                                    Struct(url='https://dl.bintray.com/pantsbuild/maven'),
+                                    Struct(type_alias='Struct', url='https://dl.bintray.com/pantsbuild/maven'),
                                   'jane': public
                                 }
-                              )
+                              ),
+                              nonstrict,
+                              ApacheThriftConfiguration(type_alias='ApacheThriftConfig',
+                                                        version='0.9.2',
+                                                        strict=True,
+                                                        dependencies=[address('thrift2')],
+                                                        lang='java'),
                             ],
-                            dependencies=[thrift2])
+                            dependencies=[thrift2],
+                            type_alias='Target')
 
-    self.assertEqual(expected_java1, resolved_java1)
+    self.assertEqual(expected_java1.configurations, resolved_java1.configurations)
 
   def test_json(self):
     scheduler = self.create_json()
@@ -170,14 +239,14 @@ class InlinedGraphTest(GraphTestBase):
 
     nonstrict_address = Address.parse('graph_test:nonstrict')
     nonstrict = self.resolve(scheduler, nonstrict_address)
-    self.assertEquals(nonstrict, self.resolve(scheduler, nonstrict_address))
+    self.assertEqual(nonstrict, self.resolve(scheduler, nonstrict_address))
 
     # The already resolved `nonstrict` interior node should be re-used by `java1`.
     java1_address = Address.parse('graph_test:java1')
     java1 = self.resolve(scheduler, java1_address)
-    self.assertEquals(nonstrict, java1.configurations[1])
+    self.assertEqual(nonstrict, java1.configurations[1])
 
-    self.assertEquals(java1, self.resolve(scheduler, java1_address))
+    self.assertEqual(java1, self.resolve(scheduler, java1_address))
 
   def do_test_trace_message(self, scheduler, parsed_address, expected_string=None):
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
@@ -242,84 +311,6 @@ class InlinedGraphTest(GraphTestBase):
   def assert_resolve_failure_type(self, expected_type, mismatch, scheduler):
 
     failure = self.resolve_failure(scheduler, mismatch)
-    self.assertEquals(type(failure),
+    self.assertEqual(type(failure),
                       expected_type,
                       'type was not {}. Instead was {}, {!r}'.format(expected_type.__name__, type(failure).__name__, failure))
-
-
-class LazyResolvingGraphTest(GraphTestBase):
-  def do_test_codegen_simple(self, scheduler):
-    def address(name):
-      return Address(spec_path='graph_test', target_name=name)
-
-    java1_address = address('java1')
-    resolved_java1 = self.resolve(scheduler, java1_address)
-
-    nonstrict_address = address('nonstrict')
-    expected_nonstrict = ApacheThriftConfiguration(address=nonstrict_address,
-                                                   version='0.9.2',
-                                                   strict=False,
-                                                   lang='java')
-
-    public_address = address('public')
-    expected_public = Struct(address=public_address,
-                             url='https://oss.sonatype.org/#stagingRepositories')
-
-    thrift2_address = address('thrift2')
-    expected_java1 = Target(address=java1_address,
-                            sources={},
-                            configurations=[
-                              PublishConfiguration(
-                                default_repo=expected_public,
-                                repos={
-                                  'jake':
-                                    Struct(url='https://dl.bintray.com/pantsbuild/maven'),
-                                  'jane': expected_public
-                                }
-                              ),
-                              expected_nonstrict,
-                              ApacheThriftConfiguration(
-                                version='0.9.2',
-                                strict=True,
-                                lang='java',
-                                dependencies=[thrift2_address]
-                              ),
-                            ])
-
-    self.assertEqual(expected_java1, resolved_java1)
-
-    resolved_nonstrict = self.resolve(scheduler, nonstrict_address)
-    self.assertEqual(expected_nonstrict, resolved_nonstrict)
-    self.assertEqual(expected_nonstrict, expected_java1.configurations[1])
-    self.assertEquals(resolved_java1.configurations[1], resolved_nonstrict)
-
-    resolved_public = self.resolve(scheduler, public_address)
-    self.assertEqual(expected_public, resolved_public)
-    self.assertEqual(expected_public, expected_java1.configurations[0].default_repo)
-    self.assertEqual(expected_public, expected_java1.configurations[0].repos['jane'])
-    self.assertEquals(resolved_java1.configurations[0].default_repo, resolved_public)
-    self.assertEquals(resolved_java1.configurations[0].repos['jane'], resolved_public)
-
-    # NB: `dependencies` lists must be explicitly requested by tasks, so we expect an Address.
-    thrift1_address = address('thrift1')
-    expected_thrift2 = Target(address=thrift2_address, dependencies=[thrift1_address])
-    resolved_thrift2 = self.resolve(scheduler, thrift2_address)
-    self.assertEqual(expected_thrift2, resolved_thrift2)
-
-    expected_thrift1 = Target(address=thrift1_address)
-    resolved_thrift1 = self.resolve(scheduler, thrift1_address)
-    self.assertEqual(expected_thrift1, resolved_thrift1)
-
-  def test_json_lazy(self):
-    scheduler = self.create_json()
-    self.do_test_codegen_simple(scheduler)
-
-  def test_python_lazy(self):
-    scheduler = self.create(build_patterns=('*.BUILD.python',),
-                            parser=PythonAssignmentsParser(TestTable()))
-    self.do_test_codegen_simple(scheduler)
-
-  def test_python_classic_lazy(self):
-    scheduler = self.create(build_patterns=('*.BUILD',),
-                            parser=PythonCallbacksParser(TestTable()))
-    self.do_test_codegen_simple(scheduler)

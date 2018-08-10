@@ -2,13 +2,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from contextlib import contextmanager
 
-from pants.fs.archive import archiver, archiver_for_path
+from pants.fs.archive import archiver_for_path, create_archiver
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -72,7 +71,7 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
 
     with self._extract_archive(self.WEB_COMPONENT_BUTTON_PROCESSED_ARTIFACT) as temp_dir:
-      self.assertEquals(
+      self.assertEqual(
         set(os.listdir(temp_dir)),
         {'Button.js'}
       )
@@ -87,7 +86,7 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
 
     with self._extract_archive(self.JVM_PROJECT_ARTIFACT) as temp_dir:
-      self.assertEquals(
+      self.assertEqual(
         set(os.listdir(os.path.join(temp_dir, self.WEB_COMPONENT_BUTTON_PROCESSED_PROJECT))),
         {'Button.js'}
       )
@@ -107,7 +106,7 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
 
     with self._extract_archive(self.JVM_WITH_ARTIFACTS_ARTIFACT) as temp_dir:
       print (os.listdir(temp_dir))
-      self.assertEquals(
+      self.assertEqual(
         set(os.listdir(os.path.join(temp_dir, self.WITH_DEPENDENCY_ARTIFACTS_PROJECT))),
         {'Button.js'}
       )
@@ -123,7 +122,7 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(self.run_pants(command=command))
 
     with self._extract_archive(self.PREINSTALLED_ARTIFACT) as temp_dir:
-      self.assertEquals(
+      self.assertEqual(
         set(os.listdir(temp_dir)),
         {'src', 'test', 'node_modules', 'package.json'}
       )
@@ -137,9 +136,9 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
   def _extract_archive(self, archive_path):
     with temporary_dir() as temp_dir:
       _, extension = os.path.splitext(archive_path)
-      print (extension)
+      print(extension)
       if extension == '.jar':
-        extraction_archiver = archiver('zip')
+        extraction_archiver = create_archiver('zip')
       else:
         extraction_archiver = archiver_for_path(os.path.basename(archive_path))
       extraction_archiver.extract(archive_path, temp_dir)

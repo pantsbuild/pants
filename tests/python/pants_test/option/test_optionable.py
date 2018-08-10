@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
 
@@ -29,14 +28,14 @@ class OptionableTest(unittest.TestCase):
 
     class StringScope(Optionable):
       options_scope = 'good'
-    self.assertEquals('good', StringScope.options_scope)
+    self.assertEqual('good', StringScope.options_scope)
 
     class Intermediate(Optionable):
       pass
 
     class Indirect(Intermediate):
       options_scope = 'good'
-    self.assertEquals('good', Indirect.options_scope)
+    self.assertEqual('good', Indirect.options_scope)
 
   def test_is_valid_scope_name_component(self):
     def check_true(s):

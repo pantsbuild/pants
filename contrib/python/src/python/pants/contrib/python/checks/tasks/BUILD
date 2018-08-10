@@ -3,6 +3,7 @@
 
 python_library(
   dependencies=[
+    '3rdparty/python:future',
     ':resources',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python/targets:python',
@@ -11,7 +12,6 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:workunit',
-    'src/python/pants/python',
   ]
 )
 

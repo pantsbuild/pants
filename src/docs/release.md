@@ -12,8 +12,8 @@ Deciding the "who", "what", and "when" of releasing is described on the
 lucky release managers, this may result in two or more releases in a particular week.
 
 A release is always prepared for each pantsbuild/pants branch by a green Travis CI run; ie: master,
-1.0.x, 1.1.x, etc. branches on https://github.com/pantsbuild/pants will have wheels created, tested
-and deployed to https://binaries.pantsbuild.org ready for use in a release.
+1.0.x, 1.1.x, etc. branches on [github.com/pantsbuild/pants](https://github.com/pantsbuild/pants) will have wheels created, tested
+and deployed to [binaries.pantsbuild.org](https://binaries.pantsbuild.org) ready for use in a release.
  
 Once you know what to release, releasing pants involves:
 
@@ -31,33 +31,31 @@ these steps have been performed in one way or another, but you might
 like to go through this list ahead of time rather than have the release
 script fail:
 
-  - Create a pgp signing key if you don't already have one.
+  - **Create a pgp signing key** if you don't already have one.
 
-    You might use the gpg implemntation of pgp and start here:
-    https://www.gnupg.org/gph/en/manual/c14.html
+    You might use the gpg implementation of pgp and start here:
+    [www.gnupg.org/gph/en/manual/c14.html](https://www.gnupg.org/gph/en/manual/c14.html)
 
-  - If using gpg, ensure that the gpg-agent is running (for OS X, see
+  - If using gpg, **ensure that the gpg-agent is running** (for OS X, see
     instructions [here](https://blog.chendry.org/2015/03/13/starting-gpg-agent-in-osx.html)),
     and ensure that gpg is set up to use it (e.g., set `use-agent` in `~/.gnupg/gpg.conf`).
 
-  - Configure git to use your pgp key for signing release tags.
+  - **Configure git to use your pgp key** for signing release tags.
 
     A description of the configuration can be found here:
-    https://git-scm.com/book/tr/v2/Git-Tools-Signing-Your-Work#GPG-Introduction
+    [help.github.com/articles/telling-git-about-your-gpg-key/](https://help.github.com/articles/telling-git-about-your-gpg-key/)
 
-  - Create a pypi account if you don't already have one.
+  - **Create a pypi account** if you don't already have one.
 
-    You can register here: https://pypi.python.org/pypi?%3Aaction=register_form
-    Don't forget to include your pgp key id even though pypi considers
-    this step optional.
+    You can register here: [pypi.org/account/register](https://pypi.org/account/register/)
 
-  - Get your pypi account added as an `owner` for all pantsbuild.pants packages.
+  - **Get your pypi account added as an `owner` for all pantsbuild.pants packages.**
 
     You can ask any one of the [Owners](#owners) listed below to do this.
     Once this is done and you've performed your 1st release, add yourself to
     the [Owners](#owners) section below.
 
-  - Configure your pypi credentials locally in `~/.pypirc`
+  - **Configure your pypi credentials locally in `~/.pypirc`**
 
     For some versions of python it's necessary to use both a `server-login` and
     `pypi` section containing the same info. This will do it:
@@ -114,7 +112,7 @@ the release manager may also need to do a release from a stable branch.*
    [docs reference](http://www.pantsbuild.org/docs#generating-the-site)
 4. Bring the CONTRIBUTORS roster in
    [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
-   up to date by running `build-support/bin/contributors.sh`.
+   up to date by running `./build-support/bin/contributors.sh`.
 5. Create and land a review for changes in the master branch.
 6. Execute the release as described later on this page.
 7. Finally, if creating a release candidate, create the stable branch from the commit in
@@ -169,7 +167,7 @@ If new commits have landed after your release commit, you can reset to your comm
     $ ./build-support/bin/release.sh
 
 This also performs a dry run and then proceeds to upload the smoke
-tested wheels to PyPi.
+tested wheels to PyPi. It may take a few minutes for the packages to be downloadable.
 
 4. Announce
 -----------
@@ -194,24 +192,10 @@ if the tag for the prior release (eg: release_0.0.33)
     :::bash
     $ ./build-support/bin/contributors.sh -s <tag>
 
-Owners
+Listing Packages and Owners
 ------
 
-The following folks are set up to publish to pypi for
-pantsbuild.pants wheels:
-
-Name              | Email                       | PYPI Usename
-------------------|-----------------------------|---------------
-John Sirois       | john.sirois@gmail.com       | john.sirois
-Benjy Weinberger  | benjyw@gmail.com            | benjyw
-Ity Kaul          | itykaul@gmail.com           | ity
-Stu Hood          | stuhood@gmail.com           | stuhood
-Mateo Rodriguez   | mateorod9@gmail.com         | mateor
-Yi Cheng          | wisechengyi@gmail.com       | wisechengyi
-Daniel Wagner-Hall| dawagner@gmail.com          | illicitonion
-
-And the current list of packages that these folks can release can
-be obtained via:
+The current list of packages can be obtained via :
 
     :::bash
     $ ./build-support/bin/release.sh -l
@@ -219,22 +203,23 @@ be obtained via:
 Right now that's:
 
 - pantsbuild.pants
-- pantsbuild.pants.testinfra
-- pantsbuild.pants.contrib.android
-- pantsbuild.pants.contrib.scrooge
+- pantsbuild.pants.contrib.avro
 - pantsbuild.pants.contrib.buildgen
+- pantsbuild.pants.contrib.codeanalysis
+- pantsbuild.pants.contrib.confluence
+- pantsbuild.pants.contrib.cpp
+- pantsbuild.pants.contrib.errorprone
+- pantsbuild.pants.contrib.findbugs
 - pantsbuild.pants.contrib.go
+- pantsbuild.pants.contrib.googlejavaformat
+- pantsbuild.pants.contrib.jax_ws
+- pantsbuild.pants.contrib.mypy
 - pantsbuild.pants.contrib.node
 - pantsbuild.pants.contrib.python.checks
 - pantsbuild.pants.contrib.scalajs
-- pantsbuild.pants.contrib.findbugs
-- pantsbuild.pants.contrib.cpp
-- pantsbuild.pants.contrib.confluence
-- pantsbuild.pants.contrib.errorprone
-- pantsbuild.pants.contrib.codeanalysis
-- pantsbuild.pants.contrib.jax_ws
-- pantsbuild.pants.contrib.mypy
-- pantsbuild.pants.contrib.avro
+- pantsbuild.pants.contrib.scrooge
+- pantsbuild.pants.contrib.thrifty
+- pantsbuild.pants.testinfra
 
 You can run the following to get a full ownership roster for each
 package :

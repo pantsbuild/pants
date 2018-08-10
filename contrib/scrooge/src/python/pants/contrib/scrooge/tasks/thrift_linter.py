@@ -2,14 +2,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import multiprocessing
+from builtins import str
 
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
 from pants.base.workunit import WorkUnitLabel
@@ -23,14 +22,16 @@ class ThriftLintError(Exception):
   """Raised on a lint failure."""
 
 
-class ThriftLinterBase(NailgunTask):
+class ThriftLinter(LintTaskMixin, NailgunTask):
+  """Print lint warnings for thrift files."""
+
   @staticmethod
   def _is_thrift(target):
     return isinstance(target, JavaThriftLibrary)
 
   @classmethod
   def register_options(cls, register):
-    super(ThriftLinterBase, cls).register_options(register)
+    super(ThriftLinter, cls).register_options(register)
     register('--strict', type=bool, fingerprint=True,
              help='Fail the goal if thrift linter errors are found. Overrides the '
                   '`strict-default` option.')
@@ -132,27 +133,3 @@ class ThriftLinterBase(NailgunTask):
 
         if errors:
           raise TaskError('\n'.join(errors))
-
-
-class DeprecatedThriftLinter(ThriftLinterBase):
-  """Print lint warnings for thrift files."""
-  
-  @classmethod
-  def register_options(cls, register):
-    super(DeprecatedThriftLinter, cls).register_options(register)
-    register('--skip', type=bool, fingerprint=True, help='Skip thrift linting.')
-
-  def execute(self):
-    deprecated_conditional(
-      lambda: True, removal_version='1.7.0.dev0',
-      entity_description='The thrift-linter goal',
-      hint_message='Use the lint goal and the lint.thrift options scope instead.')
-    super(DeprecatedThriftLinter, self).execute()
-
-
-# TODO: After removing DeprecatedThriftLinter, merge this with ThriftLinterBase
-# (i.e., mix LintTaskMixin into ThriftLinterBase, copy the docstring,
-# and rename ThriftLinterBase to ThriftLinter).
-class ThriftLinter(LintTaskMixin, ThriftLinterBase):
-  """Print lint warnings for thrift files."""
-  pass

@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import six
 from twitter.common.collections import OrderedSet
@@ -24,30 +23,30 @@ class FilesystemBuildFileTest(BuildFileTestBase):
 
   def test_build_files_family_lookup_1(self):
     buildfile = self.create_buildfile('grandparent/parent/BUILD.twitter')
-    self.assertEquals({buildfile, self.buildfile},
+    self.assertEqual({buildfile, self.buildfile},
                       set(self.get_build_files_family('grandparent/parent')))
-    self.assertEquals({buildfile, self.buildfile},
+    self.assertEqual({buildfile, self.buildfile},
                       set(self.get_build_files_family('grandparent/parent/')))
 
-    self.assertEquals({self.create_buildfile('grandparent/parent/child2/child3/BUILD')},
+    self.assertEqual({self.create_buildfile('grandparent/parent/child2/child3/BUILD')},
                       set(self.get_build_files_family('grandparent/parent/child2/child3')))
 
   def test_build_files_family_lookup_2(self):
-    self.assertEquals(OrderedSet([
+    self.assertEqual(OrderedSet([
         self.create_buildfile('grandparent/parent/BUILD'),
         self.create_buildfile('grandparent/parent/BUILD.twitter'),
     ]), self.get_build_files_family('grandparent/parent'))
 
     buildfile = self.create_buildfile('grandparent/parent/child2/child3/BUILD')
-    self.assertEquals(OrderedSet([buildfile]), self.get_build_files_family('grandparent/parent/child2/child3'))
+    self.assertEqual(OrderedSet([buildfile]), self.get_build_files_family('grandparent/parent/child2/child3'))
 
   def test_build_files_family_lookup_with_ignore(self):
-    self.assertEquals(OrderedSet([
+    self.assertEqual(OrderedSet([
         self.create_buildfile('grandparent/parent/BUILD'),
     ]), self.get_build_files_family('grandparent/parent', build_ignore_patterns=['*.twitter']))
 
   def test_build_files_scan(self):
-    self.assertEquals(OrderedSet([
+    self.assertEqual(OrderedSet([
         self.create_buildfile('grandparent/parent/BUILD'),
         self.create_buildfile('grandparent/parent/BUILD.twitter'),
         self.create_buildfile('grandparent/parent/child1/BUILD'),
@@ -60,7 +59,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     buildfiles = self.scan_buildfiles('', build_ignore_patterns=[
         'grandparent/parent/child1',
         'grandparent/parent/child2'])
-    self.assertEquals(OrderedSet([
+    self.assertEqual(OrderedSet([
         self.create_buildfile('BUILD'),
         self.create_buildfile('BUILD.twitter'),
         self.create_buildfile('grandparent/parent/BUILD'),
@@ -70,7 +69,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     ]), buildfiles)
 
     buildfiles = self.scan_buildfiles('grandparent/parent', build_ignore_patterns=['grandparent/parent/child1'])
-    self.assertEquals(OrderedSet([
+    self.assertEqual(OrderedSet([
         self.create_buildfile('grandparent/parent/BUILD'),
         self.create_buildfile('grandparent/parent/BUILD.twitter'),
         self.create_buildfile('grandparent/parent/child2/child3/BUILD'),
@@ -79,7 +78,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
 
   def test_build_files_scan_with_abspath_ignore(self):
     self.touch('parent/BUILD')
-    self.assertEquals(OrderedSet([
+    self.assertEqual(OrderedSet([
       self.create_buildfile('BUILD'),
       self.create_buildfile('BUILD.twitter'),
       self.create_buildfile('grandparent/parent/BUILD'),
@@ -92,7 +91,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     ]), self.scan_buildfiles('', build_ignore_patterns=['/parent']))
 
   def test_build_files_scan_with_wildcard_ignore(self):
-    self.assertEquals(OrderedSet([
+    self.assertEqual(OrderedSet([
       self.create_buildfile('BUILD'),
       self.create_buildfile('BUILD.twitter'),
       self.create_buildfile('grandparent/parent/BUILD'),
@@ -101,7 +100,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     ]), self.scan_buildfiles('', build_ignore_patterns=['**/child*']))
 
   def test_build_files_scan_with_ignore_patterns(self):
-    self.assertEquals(OrderedSet([
+    self.assertEqual(OrderedSet([
       self.create_buildfile('BUILD'),
       self.create_buildfile('grandparent/parent/BUILD'),
       self.create_buildfile('grandparent/parent/child1/BUILD'),
@@ -113,7 +112,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
   def test_subdir_ignore(self):
     self.touch('grandparent/child1/BUILD')
 
-    self.assertEquals(OrderedSet([
+    self.assertEqual(OrderedSet([
       self.create_buildfile('BUILD'),
       self.create_buildfile('BUILD.twitter'),
       self.create_buildfile('grandparent/child1/BUILD'),
@@ -125,7 +124,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     ]), self.scan_buildfiles('', build_ignore_patterns=['**/parent/child1']))
 
   def test_subdir_file_pattern_ignore(self):
-    self.assertEquals(OrderedSet([
+    self.assertEqual(OrderedSet([
       self.create_buildfile('BUILD'),
       self.create_buildfile('grandparent/parent/BUILD'),
       self.create_buildfile('grandparent/parent/child1/BUILD'),
@@ -134,7 +133,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     ]), self.scan_buildfiles('', build_ignore_patterns=['BUILD.*']))
 
   def test_build_files_scan_with_non_default_relpath_ignore(self):
-    self.assertEquals(OrderedSet([
+    self.assertEqual(OrderedSet([
       self.create_buildfile('grandparent/parent/BUILD'),
       self.create_buildfile('grandparent/parent/BUILD.twitter'),
       self.create_buildfile('grandparent/parent/child2/child3/BUILD'),
@@ -156,19 +155,19 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     self.makedirs('suffix-test/child')
     self.touch('suffix-test/child/BUILD.suffix3')
     buildfile = self.create_buildfile('suffix-test/BUILD.suffix')
-    self.assertEquals(OrderedSet([buildfile, self.create_buildfile('suffix-test/BUILD.suffix2')]),
+    self.assertEqual(OrderedSet([buildfile, self.create_buildfile('suffix-test/BUILD.suffix2')]),
         OrderedSet(self.get_build_files_family('suffix-test')))
-    self.assertEquals(OrderedSet([self.create_buildfile('suffix-test/BUILD.suffix'),
+    self.assertEqual(OrderedSet([self.create_buildfile('suffix-test/BUILD.suffix'),
         self.create_buildfile('suffix-test/BUILD.suffix2')]),
         self.get_build_files_family('suffix-test'))
-    self.assertEquals(OrderedSet([self.create_buildfile('suffix-test/child/BUILD.suffix3')]),
+    self.assertEqual(OrderedSet([self.create_buildfile('suffix-test/child/BUILD.suffix3')]),
         self.scan_buildfiles('suffix-test/child'))
 
   def test_directory_called_build_skipped(self):
     # Ensure the buildfiles found do not include grandparent/BUILD since it is a dir.
     buildfiles = self.scan_buildfiles('grandparent')
 
-    self.assertEquals(OrderedSet([
+    self.assertEqual(OrderedSet([
       self.create_buildfile('grandparent/parent/BUILD'),
       self.create_buildfile('grandparent/parent/BUILD.twitter'),
       self.create_buildfile('grandparent/parent/child1/BUILD'),

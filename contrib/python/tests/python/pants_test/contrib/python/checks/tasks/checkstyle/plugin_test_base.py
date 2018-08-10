@@ -2,12 +2,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
 import os
 import unittest
+from builtins import open
 
 from pants.util.dirutil import safe_mkdtemp
 from pants_test.option.util.fakes import create_options
@@ -15,6 +15,8 @@ from pants_test.option.util.fakes import create_options
 from pants.contrib.python.checks.tasks.checkstyle.common import Nit, PythonFile
 
 
+# TODO: Refactor this test suite to leverage the ConsoleTaskTestBase class
+# for proper integration testing (i.e. any test that runs task.execute()).
 class CheckstylePluginTestBase(unittest.TestCase):
   plugin_type = None   # Subclasses must override.
 
@@ -26,7 +28,7 @@ class CheckstylePluginTestBase(unittest.TestCase):
   def create_python_file(self, file_content):
     if self.file_required:
       tmpdir = safe_mkdtemp()
-      with open(os.path.join(tmpdir, 'file.py'), 'wb') as fp:
+      with open(os.path.join(tmpdir, 'file.py'), 'w') as fp:
         fp.write(file_content)
         fp.close()
         return PythonFile.parse(fp.name)

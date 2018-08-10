@@ -2,16 +2,15 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants_test import base_test
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
+from pants_test.test_base import TestBase
 
 from pants.contrib.go.subsystems.fetcher_factory import FetcherFactory
 
 
-class FetchersTest(base_test.BaseTest):
+class FetchersTest(TestBase):
   def fetcher(self, import_path):
     fetcher_factory = global_subsystem_instance(FetcherFactory)
     return fetcher_factory.get_fetcher(import_path)

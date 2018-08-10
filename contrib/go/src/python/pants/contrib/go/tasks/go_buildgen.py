@@ -2,10 +2,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import object, str
 from collections import defaultdict, namedtuple
 from textwrap import dedent
 
@@ -62,7 +62,7 @@ class GoTargetGenerator(object):
       for local_go_target in local_go_targets:
         deps = self._list_deps(gopath, local_go_target.address)
         self._generate_missing(gopath, local_go_target.address, deps, visited)
-    return visited.items()
+    return list(visited.items())
 
   def _generate_missing(self, gopath, local_address, import_listing, visited):
     target_type = GoBinary if import_listing.pkg_name == 'main' else GoLibrary

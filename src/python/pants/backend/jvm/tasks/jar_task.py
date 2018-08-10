@@ -2,13 +2,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import shutil
 import tempfile
 from abc import abstractmethod
+from builtins import object, open
 from contextlib import contextmanager
 
 import six
@@ -230,7 +230,7 @@ class Jar(object):
       def as_cli_entry(entry):
         src = entry.materialize(manifest_stage_dir)
         return '{}={}'.format(src, entry.dest) if entry.dest else src
-      files = map(as_cli_entry, self._entries) if self._entries else []
+      files = [as_cli_entry(entry) for entry in self._entries] if self._entries else []
 
       jars = self._jars or []
 
@@ -432,10 +432,11 @@ class JarBuilderTask(JarTask):
       if isinstance(target, JvmBinary):
         self._add_manifest_entries(target, self._manifest)
         products_added = True
-      elif isinstance(target, JavaAgent):
-        self._add_agent_manifest(target, self._manifest)
-        products_added = True
-      elif recursive:
+
+      # Ensure that JavaAgent entries are added to the manifest. Either by adding all of the
+      # transitive JavaAgent deps, if recursive, or by adding the root target, if the root target
+      # is itself a JavaAgent.
+      if recursive:
         agents = [t for t in target.closure() if isinstance(t, JavaAgent)]
         if len(agents) > 1:
           raise TaskError('Only 1 agent can be added to a jar, found {} for {}:\n\t{}'
@@ -445,6 +446,9 @@ class JarBuilderTask(JarTask):
         elif agents:
           self._add_agent_manifest(agents[0], self._manifest)
           products_added = True
+      elif isinstance(target, JavaAgent):
+        self._add_agent_manifest(target, self._manifest)
+        products_added = True
 
       # In the transitive case we'll gather internal resources naturally as dependencies, but in the
       # non-transitive case we need to manually add these special (in the context of jarring)

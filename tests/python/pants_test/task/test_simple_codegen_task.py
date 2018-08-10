@@ -2,20 +2,19 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open, str
 from textwrap import dedent
 
 from pants.base.payload import Payload
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.build_graph.target import Target
-from pants.invalidation.build_invalidator import CacheKey
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdtemp
-from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
+from pants_test.task_test_base import TaskTestBase, ensure_cached
 
 
 # A dummy target with sources= and copied= fields.
@@ -61,6 +60,8 @@ class DummyGen(SimpleCodegenTask):
   by SimpleCodegenTask.
   """
 
+  sources_globs = ('**/*.java',)
+
   def __init__(self, *args, **kwargs):
     super(DummyGen, self).__init__(*args, **kwargs)
     self._test_case = None
@@ -100,7 +101,9 @@ class DummyGen(SimpleCodegenTask):
           line = line.strip()
           if line:
             package_name, class_name = line.split(' ')
-            yield os.path.join(target_workdir, os.path.join(*package_name.split('.')), class_name)
+            yield os.path.join(target_workdir,
+                               os.path.join(*package_name.split('.')),
+                               '{}.java'.format(class_name))
 
   def synthetic_target_type(self, target):
     return SyntheticDummyLibrary
@@ -116,8 +119,8 @@ class SimpleCodegenTaskTest(TaskTestBase):
   def task_type(cls):
     return DummyGen
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return register_core().merge(BuildFileAliases({
       'dummy_library': DummyLibrary
     }))
@@ -210,9 +213,11 @@ class SimpleCodegenTaskTest(TaskTestBase):
       for target in targets:
         target_workdir = target_workdirs[target]
         task.execute_codegen(target, target_workdir)
-        task._handle_duplicate_sources(target, target_workdir)
-        fingerprint = CacheKey("test", target.invalidation_hash())
-        syn_targets.append(task._inject_synthetic_target(target, target_workdir, fingerprint))
+        sources = task._capture_sources(((target, target_workdir),))[0]
+        task._handle_duplicate_sources(target, target_workdir, sources)
+        # _handle_duplicate_sources may delete files from the filesystem, so we need to re-capture.
+        sources = task._capture_sources(((target, target_workdir),))[0]
+        syn_targets.append(task._inject_synthetic_target(target, target_workdir, sources))
 
     if should_fail:
       # If we're expected to fail, validate the resulting message.
@@ -241,7 +246,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
     parent, good, bad = self._do_test_duplication(targets, allow_dups=True, should_fail=False)
     # Confirm that the duped sources were removed.
     for source in bad.sources_relative_to_source_root():
-      self.assertNotIn(source, parent.sources_relative_to_source_root())
+      self.assertNotIn(source, tuple(parent.sources_relative_to_source_root()))
 
   def test_duplicated_code_generation_nodupes(self):
     # Without the duplicated target, either mode is fine.
@@ -267,11 +272,11 @@ class SimpleCodegenTaskTest(TaskTestBase):
     self.assertEqual('copythis', task.codegen_targets()[0].copied)
 
   def test_invalidation_of_generated_sources(self):
-    self.create_file('src/thrift/com/foo/one.thrift', 'initial state')
+    self.create_file('src/dummy/com/foo/one.dummy', 'com.foo InitialState')
 
-    t1 = self.make_target(spec='src/thrift/com/foo:one',
+    t1 = self.make_target(spec='src/dummy/com/foo:one',
                           target_type=DummyLibrary,
-                          sources=['one.thrift'])
+                          sources=['one.dummy'])
 
     task1 = self._create_dummy_task(target_roots=t1)
     task1.execute()
@@ -284,11 +289,11 @@ class SimpleCodegenTaskTest(TaskTestBase):
 
     self.reset_build_graph()
 
-    self.create_file('src/thrift/com/foo/one.thrift', 'changed state')
+    self.create_file('src/dummy/com/foo/one.dummy', 'com.foo ChangedState')
 
-    t2 = self.make_target(spec='src/thrift/com/foo:one',
+    t2 = self.make_target(spec='src/dummy/com/foo:one',
                           target_type=DummyLibrary,
-                          sources=['one.thrift'])
+                          sources=['one.dummy'])
 
     task2 = self._create_dummy_task(target_roots=t2)
     task2.execute()
@@ -345,8 +350,8 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
   def task_type(cls):
     return ExportingDummyGen
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return register_core().merge(BuildFileAliases({
       'target': Target,
       'dummy_library': DummyLibrary,

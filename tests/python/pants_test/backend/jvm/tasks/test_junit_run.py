@@ -2,10 +2,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open, range
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -31,7 +31,7 @@ from pants.util.dirutil import safe_file_dump, touch
 from pants.util.process_handler import subprocess
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystem
-from pants_test.tasks.task_test_base import ensure_cached
+from pants_test.task_test_base import ensure_cached
 
 
 class JUnitRunnerTest(JvmToolTaskTestBase):
@@ -40,9 +40,9 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
   def task_type(cls):
     return JUnitRun
 
-  @property
-  def alias_groups(self):
-    return super(JUnitRunnerTest, self).alias_groups.merge(BuildFileAliases(
+  @classmethod
+  def alias_groups(cls):
+    return super(JUnitRunnerTest, cls).alias_groups().merge(BuildFileAliases(
       targets={
         'files': Files,
         'junit_tests': JUnitTests,
@@ -129,7 +129,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                       '-dependency', 'junit', 'junit-dep', '4.10'],
                 executor=SubprocessExecutor(distribution=distribution))
 
-    with open(classpath_file_abs_path) as fp:
+    with open(classpath_file_abs_path, 'r') as fp:
       classpath = fp.read()
 
     # Now directly invoke javac to compile the test java code into classfiles that we can later
@@ -218,7 +218,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     # Existing files (with and without the method name) should trigger.
     srcfile = os.path.join(self.test_workdir, 'this.is.a.source.file.scala')
-    safe_file_dump(srcfile, 'content!')
+    safe_file_dump(srcfile, 'content!', binary_mode=False)
     self.assertTrue(JUnitRun.request_classes_by_source([srcfile]))
     self.assertTrue(JUnitRun.request_classes_by_source(['{}#method'.format(srcfile)]))
 

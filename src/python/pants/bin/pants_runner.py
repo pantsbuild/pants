@@ -2,12 +2,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import sys
+from builtins import object
 
 from pants.bin.remote_pants_runner import RemotePantsRunner
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -38,12 +38,12 @@ class PantsRunner(object):
       try:
         return RemotePantsRunner(self._exiter, self._args, self._env, bootstrap_options).run()
       except RemotePantsRunner.Fallback as e:
-        logger.debug('caught client exception: {!r}, falling back to non-daemon mode'.format(e))
+        logger.warn('caught client exception: {!r}, falling back to non-daemon mode'.format(e))
 
     # N.B. Inlining this import speeds up the python thin client run by about 100ms.
     from pants.bin.local_pants_runner import LocalPantsRunner
 
-    runner = LocalPantsRunner(
+    runner = LocalPantsRunner.create(
         self._exiter,
         self._args,
         self._env,

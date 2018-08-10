@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import atexit
 import errno
@@ -13,6 +12,7 @@ import stat
 import tempfile
 import threading
 import uuid
+from builtins import open
 from collections import defaultdict
 from contextlib import contextmanager
 
@@ -84,24 +84,44 @@ def safe_mkdir_for(path, clean=False):
   safe_mkdir(os.path.dirname(path), clean=clean)
 
 
-def safe_file_dump(filename, payload):
+def safe_mkdir_for_all(paths):
+  """Make directories which would contain all of the passed paths.
+
+  This avoids attempting to re-make the same directories, which may be noticeably expensive if many
+  paths mostly fall in the same set of directories.
+
+  :param list of str paths: The paths for which containing directories should be created.
+  """
+  created_dirs = set()
+  for path in paths:
+    dir_to_make = os.path.dirname(path)
+    if dir_to_make not in created_dirs:
+      safe_mkdir(dir_to_make)
+      created_dirs.add(dir_to_make)
+
+
+def safe_file_dump(filename, payload, binary_mode=True):
   """Write a string to a file.
 
   :param string filename: The filename of the file to write to.
   :param string payload: The string to write to the file.
+  :param bool binary_mode: Write to file as bytes or unicode.
   """
-  with safe_open(filename, 'wb') as f:
+  mode = 'wb' if binary_mode else 'w'
+  with safe_open(filename, mode) as f:
     f.write(payload)
 
 
-def read_file(filename):
+def read_file(filename, binary_mode=True):
   """Read and return the contents of a file in a single file.read().
 
   :param string filename: The filename of the file to read.
+  :param bool binary_mode: Read from file as bytes or unicode.
   :returns: The contents of the file.
   :rtype: string
   """
-  with open(filename, 'rb') as f:
+  mode = 'rb' if binary_mode else 'r'
+  with open(filename, mode) as f:
     return f.read()
 
 
@@ -442,6 +462,23 @@ def touch(path, times=None):
     os.utime(path, times)
 
 
+def recursive_dirname(f):
+  """Given a relative path like 'a/b/c/d', yield all ascending path components like:
+
+        'a/b/c/d'
+        'a/b/c'
+        'a/b'
+        'a'
+        ''
+  """
+  prev = None
+  while f != prev:
+    yield f
+    prev = f
+    f = os.path.dirname(f)
+  yield ''
+
+
 def get_basedir(path):
   """Returns the base directory of a path.
 
@@ -477,3 +514,26 @@ def rm_rf(name):
 def is_executable(path):
   """Returns whether a path names an existing executable file."""
   return os.path.isfile(path) and os.access(path, os.X_OK)
+
+
+def split_basename_and_dirname(path):
+  if not os.path.isfile(path):
+    raise ValueError("{} does not exist or is not a regular file.".format(path))
+  return (os.path.dirname(path), os.path.basename(path))
+
+
+def check_no_overlapping_paths(paths):
+  """Given a list of paths, ensure that all are unique and do not have the same prefix."""
+  for path in paths:
+    list_copy_without_path = list(paths)
+    list_copy_without_path.remove(path)
+    if path in list_copy_without_path:
+      raise ValueError('{} appeared more than once. All paths must be unique.'.format(path))
+    for p in list_copy_without_path:
+      if path in p:
+        raise ValueError('{} and {} have the same prefix. All paths must be unique and cannot overlap.'.format(path, p))
+
+
+def is_readable_dir(path):
+  """Returns whether a path names an existing directory that we can read."""
+  return os.path.isdir(path) and os.access(path, os.R_OK)

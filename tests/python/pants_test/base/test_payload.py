@@ -2,21 +2,21 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.payload import Payload, PayloadFieldAlreadyDefinedError, PayloadFrozenError
 from pants.base.payload_field import PrimitiveField
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.source.wrapped_globs import Globs
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class PayloadTest(BaseTest):
+class PayloadTest(TestBase):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         # TODO: Use a dummy task type here, instead of depending on the jvm backend.
@@ -75,7 +75,7 @@ class PayloadTest(BaseTest):
   def test_no_nested_globs(self):
     # nesting no longer allowed
     self.add_to_build_file('z/BUILD', 'java_library(name="z", sources=[globs("*")])')
-    with self.assertRaises(ValueError):
+    with self.assertRaises(AddressLookupError):
       self.context().scan()
 
   def test_flat_globs_list(self):
@@ -91,17 +91,17 @@ class PayloadTest(BaseTest):
     payload = Payload()
     payload.add_field('foo', PrimitiveField('test-value'))
     payload.add_field('bar', PrimitiveField(None))
-    self.assertEquals('test-value', payload.foo);
-    self.assertEquals('test-value', payload.get_field('foo').value)
-    self.assertEquals('test-value', payload.get_field_value('foo'))
-    self.assertEquals(None, payload.bar);
-    self.assertEquals(None, payload.get_field('bar').value)
-    self.assertEquals(None, payload.get_field_value('bar'))
-    self.assertEquals(None, payload.get_field('bar', default='nothing').value)
-    self.assertEquals(None, payload.get_field_value('bar', default='nothing'))
+    self.assertEqual('test-value', payload.foo);
+    self.assertEqual('test-value', payload.get_field('foo').value)
+    self.assertEqual('test-value', payload.get_field_value('foo'))
+    self.assertEqual(None, payload.bar);
+    self.assertEqual(None, payload.get_field('bar').value)
+    self.assertEqual(None, payload.get_field_value('bar'))
+    self.assertEqual(None, payload.get_field('bar', default='nothing').value)
+    self.assertEqual(None, payload.get_field_value('bar', default='nothing'))
     with self.assertRaises(KeyError):
-      self.assertEquals(None, payload.field_doesnt_exist)
-    self.assertEquals(None, payload.get_field('field_doesnt_exist'))
-    self.assertEquals(None, payload.get_field_value('field_doesnt_exist'))
-    self.assertEquals('nothing', payload.get_field('field_doesnt_exist', default='nothing'))
-    self.assertEquals('nothing', payload.get_field_value('field_doesnt_exist', default='nothing'))
+      self.assertEqual(None, payload.field_doesnt_exist)
+    self.assertEqual(None, payload.get_field('field_doesnt_exist'))
+    self.assertEqual(None, payload.get_field_value('field_doesnt_exist'))
+    self.assertEqual('nothing', payload.get_field('field_doesnt_exist', default='nothing'))
+    self.assertEqual('nothing', payload.get_field_value('field_doesnt_exist', default='nothing'))

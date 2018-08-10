@@ -13,11 +13,11 @@ import org.pantsbuild.example.temperature.TemperatureService;
  */
 class WireTemperatureExample implements TemperatureService {
 
-  public Temperature getTemperature(TemperatureRequest request) {
+  @Override public Temperature getTemperature(TemperatureRequest request) {
     return new Temperature.Builder().unit("celsius").number(19L).build();
   }
 
-  public Temperature predictTemperature(TemperatureRequest request) {
+  @Override public Temperature predictTemperature(TemperatureRequest request) {
     return new Temperature.Builder().unit("fahrenheit").number(82L).build();
   }
 

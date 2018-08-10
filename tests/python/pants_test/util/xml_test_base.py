@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import textwrap
 import unittest
@@ -26,7 +25,7 @@ class XmlTestBase(unittest.TestCase):
                android_name_attribute='android:name',
                application_name_value='org.pantsbuild.example.hello.HelloWorld'):
     """Represent an .xml file (Here an AndroidManifest.xml is used)."""
-    with temporary_file() as fp:
+    with temporary_file(binary_mode=False) as fp:
       fp.write(textwrap.dedent(
         """<?xml version="1.0" encoding="utf-8"?>
         <{manifest} xmlns:android="http://schemas.android.com/apk/res/android"

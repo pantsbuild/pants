@@ -26,7 +26,7 @@ Pants, you can use the following technique using sources stored directly in your
 All you need to do is name the package where the plugin is defined, and the pythonpath entry to
 load it from.
 
-In the example below, the stock `JvmBinary` target will subclassed so that a custom task (not shown)
+In the example below, the stock `JvmBinary` target is subclassed so that a custom task (not shown)
 can consume it specifically but disregard regular `JvmBinary` instances (using `isinstance()`).
 
 - Define a home for your plugins. In this example we'll use a top-level `plugins/` directory but

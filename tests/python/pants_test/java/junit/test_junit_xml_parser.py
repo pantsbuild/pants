@@ -2,16 +2,17 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import unittest
+from builtins import object, open
 
-from pants.java.junit.junit_xml_parser import Test as JUnitTest
 # NB: The Test -> JUnitTest import re-name above is needed to work around conflicts with pytest test
 # collection and a conflicting Test type in scope during that process.
-from pants.java.junit.junit_xml_parser import ParseError, RegistryOfTests, parse_failed_targets
+from pants.java.junit.junit_xml_parser import ParseError, RegistryOfTests
+from pants.java.junit.junit_xml_parser import Test as JUnitTest
+from pants.java.junit.junit_xml_parser import parse_failed_targets
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
 from pants.util.xml_parser import XmlParser
@@ -166,7 +167,7 @@ class TestParseFailedTargets(unittest.TestCase):
         fp.write('<invalid></xml>')
       with self.assertRaises(ParseError) as exc:
         parse_failed_targets(registry, junit_xml_dir, self._raise_handler)
-      self.assertEqual(junit_xml_file, exc.exception.junit_xml_path)
+      self.assertEqual(junit_xml_file, exc.exception.xml_path)
       self.assertIsInstance(exc.exception.cause, XmlParser.XmlError)
 
   def test_parse_failed_targets_error_continue(self):
@@ -190,6 +191,6 @@ class TestParseFailedTargets(unittest.TestCase):
       collect_handler = self.CollectHandler()
       failed_targets = parse_failed_targets(registry, junit_xml_dir, collect_handler)
       self.assertEqual(2, len(collect_handler.errors))
-      self.assertEqual({bad_file1, bad_file2}, {e.junit_xml_path for e in collect_handler.errors})
+      self.assertEqual({bad_file1, bad_file2}, {e.xml_path for e in collect_handler.errors})
 
       self.assertEqual({None: {JUnitTest('org.pantsbuild.Error', 'testError')}}, failed_targets)

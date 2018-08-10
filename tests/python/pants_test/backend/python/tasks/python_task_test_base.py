@@ -2,16 +2,40 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import map
 from textwrap import dedent
+
+from pex import pep425tags
 
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.build_graph.address import Address
 from pants_test.backend.python.tasks.interpreter_cache_test_mixin import InterpreterCacheTestMixin
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
+
+
+def normalize_platform_tag(platform_tag):
+  return platform_tag.replace('-', '_')
+
+
+def name_and_platform(whl):
+  # The wheel filename is of the format
+  # {distribution}-{version}(-{build tag})?-{python tag}-{abi tag}-{platform tag}.whl
+  # See https://www.python.org/dev/peps/pep-0425/.
+  # We don't care about the python or abi versions (they depend on what we're currently
+  # running on), we just want to make sure we have all the platforms we expect.
+  parts = os.path.splitext(whl)[0].split('-')
+  dist = parts[0]
+  version = parts[1]
+  platform_tag = parts[-1]
+  return dist, version, normalize_platform_tag(platform_tag)
+
+
+def check_wheel_platform_matches_host(wheel_dist):
+  _, _, wheel_platform = name_and_platform(wheel_dist)
+  return wheel_platform == normalize_platform_tag(pep425tags.get_platform())
 
 
 class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
@@ -19,8 +43,8 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
   :API: public
   """
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     """
     :API: public
     """
@@ -31,9 +55,9 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
     """
     :API: public
     """
-    sources = None if source_contents_map is None else ['__init__.py'] + source_contents_map.keys()
+    sources = None if source_contents_map is None else ['__init__.py'] + list(source_contents_map.keys())
     sources_strs = ["'{0}'".format(s) for s in sources] if sources else None
-    self.create_file(relpath=self.build_path(relpath), contents=dedent("""
+    self.add_to_build_file(relpath=relpath, target=dedent("""
     python_library(
       name='{name}',
       {sources_clause}
@@ -57,7 +81,7 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
     """
     :API: public
     """
-    self.create_file(relpath=self.build_path(relpath), contents=dedent("""
+    self.add_to_build_file(relpath=relpath, target=dedent("""
     python_binary(
       name='{name}',
       entry_point='{entry_point}',
@@ -79,7 +103,7 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
     def make_requirement(req):
       return 'python_requirement("{}")'.format(req)
 
-    self.create_file(relpath=self.build_path(relpath), contents=dedent("""
+    self.add_to_build_file(relpath=relpath, target=dedent("""
     python_requirement_library(
       name='{name}',
       requirements=[

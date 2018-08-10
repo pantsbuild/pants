@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import tokenize
 
@@ -11,7 +10,7 @@ from pants.contrib.python.checks.tasks.checkstyle.common import CheckstylePlugin
 
 
 # TODO(wickman) Update this to sanitize line continuation styling as we have
-# disabled it from pep8.py due to mismatched indentation styles.
+# disabled it from pycodestyle.py due to mismatched indentation styles.
 class Indentation(CheckstylePlugin):
   """Enforce proper indentation."""
   INDENT_LEVEL = 2  # the one true way

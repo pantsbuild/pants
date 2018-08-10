@@ -2,22 +2,23 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import logging
 import os
 import site
+from builtins import object, open
 
+from future.utils import PY3
 from pex import resolver
 from pex.base import requirement_is_exact
-from pkg_resources import working_set as global_working_set
 from pkg_resources import Requirement
+from pkg_resources import working_set as global_working_set
 from wheel.install import WheelFile
 
+from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.option.global_options import GlobalOptionsRegistrar
-from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.memo import memoized_property
@@ -89,7 +90,7 @@ class PluginResolver(object):
   def _resolve_exact_plugin_locations(self):
     hasher = hashlib.sha1()
     for req in sorted(self._plugin_requirements):
-      hasher.update(req)
+      hasher.update(req.encode('utf-8'))
     resolve_hash = hasher.hexdigest()
     resolved_plugins_list = os.path.join(self.plugin_cache_dir,
                                          'plugins-{}.txt'.format(resolve_hash))
@@ -98,10 +99,10 @@ class PluginResolver(object):
       tmp_plugins_list = resolved_plugins_list + '~'
       with safe_open(tmp_plugins_list, 'w') as fp:
         for plugin in self._resolve_plugins():
-          fp.write(plugin.location)
+          fp.write(plugin.location if PY3 else plugin.location.decode('utf-8'))
           fp.write('\n')
       os.rename(tmp_plugins_list, resolved_plugins_list)
-    with open(resolved_plugins_list) as fp:
+    with open(resolved_plugins_list, 'r') as fp:
       for plugin_location in fp:
         yield plugin_location.strip()
 
@@ -112,7 +113,10 @@ class PluginResolver(object):
                             context=self._python_repos.get_network_context(),
                             cache=self.plugin_cache_dir,
                             cache_ttl=10 * 365 * 24 * 60 * 60,  # Effectively never expire.
-                            allow_prereleases=PANTS_SEMVER.is_prerelease)
+                            allow_prereleases=PANTS_SEMVER.is_prerelease,
+                            # Plugins will all depend on `pantsbuild.pants` which is distributed as
+                            # a manylinux wheel.
+                            use_manylinux=True)
 
   @memoized_property
   def plugin_cache_dir(self):

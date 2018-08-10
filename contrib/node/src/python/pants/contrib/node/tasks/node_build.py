@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from collections import defaultdict
@@ -43,22 +42,13 @@ class NodeBuild(NodeTask):
     if target.payload.build_script:
       self.context.log.info('Running node build {} for {} at {}\n'.format(
         target.payload.build_script, target_address, node_installed_path))
-      package_manager = self.get_package_manager_for_target(target)
-      if package_manager == self.node_distribution.PACKAGE_MANAGER_NPM:
-        result, build_command = self.execute_npm(
-          ['run-script', target.payload.build_script],
-          node_paths=node_paths,
-          workunit_name=target_address,
-          workunit_labels=[WorkUnitLabel.COMPILER])
-      elif package_manager == self.node_distribution.PACKAGE_MANAGER_YARNPKG:
-        result, build_command = self.execute_yarnpkg(
-          ['run', target.payload.build_script],
-          node_paths=node_paths,
-          workunit_name=target_address,
-          workunit_labels=[WorkUnitLabel.COMPILER]
-          )
-      else:
-        raise TaskError('Unknown node package manager {}'.format(package_manager))
+      result, build_command = self.run_script(
+        target.payload.build_script,
+        target=target,
+        node_paths=node_paths,
+        workunit_name=target_address,
+        workunit_labels=[WorkUnitLabel.COMPILER]
+      )
       # Make sure script run is successful.
       if result != 0:
         raise TaskError(

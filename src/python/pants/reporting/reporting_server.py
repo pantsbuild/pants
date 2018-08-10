@@ -2,10 +2,9 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
-import BaseHTTPServer
+import http.server
 import itertools
 import json
 import logging
@@ -13,14 +12,13 @@ import mimetypes
 import os
 import pkgutil
 import re
-import urllib
-import urlparse
+from builtins import object, open, range, str, zip
 from collections import namedtuple
 from datetime import date, datetime
 from textwrap import dedent
 
 import pystache
-from six.moves import range
+from future.moves.urllib.parse import parse_qs, urlencode, urlsplit, urlunparse
 
 from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
@@ -35,7 +33,7 @@ logger = logging.getLogger(__name__)
 PPP_RE = re.compile("""^lang-.*\.js$""")
 
 
-class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+class PantsHandler(http.server.BaseHTTPRequestHandler):
   """A handler that demultiplexes various pants reporting URLs."""
 
   def __init__(self, settings, renderer, request, client_address, server):
@@ -59,7 +57,7 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     # Note: BaseHTTPServer.BaseHTTPRequestHandler is an old-style class, so we must
     # invoke its __init__ like this.
     # TODO: Replace this entirely with a proper server as part of the pants daemon.
-    BaseHTTPServer.BaseHTTPRequestHandler.__init__(self, request, client_address, server)
+    http.server.BaseHTTPRequestHandler.__init__(self, request, client_address, server)
 
   def do_GET(self):
     """GET method implementation for BaseHTTPRequestHandler."""
@@ -67,8 +65,8 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       return
 
     try:
-      (_, _, path, query, _) = urlparse.urlsplit(self.path)
-      params = urlparse.parse_qs(query)
+      (_, _, path, query, _) = urlsplit(self.path)
+      params = parse_qs(query)
       # Give each handler a chance to respond.
       for prefix, handler in self._GET_handlers:
         if self._maybe_handle(prefix, handler, path, params):
@@ -78,7 +76,7 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self._handle_runs('', {})
         return
 
-      self._send_content('Invalid GET request {}'.format(self.path), 'text/html', code=400)
+      self._send_content('Invalid GET request {}'.format(self.path).encode('utf-8'), 'text/html', code=400)
     except (IOError, ValueError):
       pass  # Printing these errors gets annoying, and there's nothing to do about them anyway.
       #sys.stderr.write('Invalid GET request {}'.format(self.path))
@@ -168,10 +166,10 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     """Render file content for pretty display."""
     abspath = os.path.normpath(os.path.join(self._root, relpath))
     if os.path.isfile(abspath):
-      with open(abspath, 'r') as infile:
+      with open(abspath, 'rb') as infile:
         content = infile.read()
     else:
-      content = 'No file found at {}'.format(abspath)
+      content = 'No file found at {}'.format(abspath).encode('utf-8')
     content_type = mimetypes.guess_type(abspath)[0] or 'text/plain'
     if not content_type.startswith('text/') and not content_type == 'application/xml':
       # Binary file. Display it as hex, split into lines.
@@ -197,7 +195,7 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     """Statically serve assets: js, css etc."""
     if self._settings.assets_dir:
       abspath = os.path.normpath(os.path.join(self._settings.assets_dir, relpath))
-      with open(abspath, 'r') as infile:
+      with open(abspath, 'rb') as infile:
         content = infile.read()
     else:
       content = pkgutil.get_data(__name__, os.path.join('assets', relpath))
@@ -219,7 +217,7 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       if path:
         abspath = os.path.normpath(os.path.join(self._root, path))
         if os.path.isfile(abspath):
-          with open(abspath, 'r') as infile:
+          with open(abspath, 'rb') as infile:
             if pos:
               infile.seek(pos)
             content = infile.read()
@@ -233,7 +231,7 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     """
     latest_runinfo = self._get_run_info_dict('latest')
     if latest_runinfo is None:
-      self._send_content('none', 'text/plain')
+      self._send_content(b'none', 'text/plain')
     else:
       self._send_content(latest_runinfo['id'], 'text/plain')
 
@@ -285,8 +283,10 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     # We copy the RunInfo as a dict, so we can add stuff to it to pass to the template.
     # We filter only those that have a timestamp, to avoid a race condition with writing
     # that field.
-    return filter(lambda d: 'timestamp' in d, [RunInfo(os.path.join(p, 'info')).get_as_dict()
-            for p in paths if os.path.isdir(p) and not os.path.islink(p)])
+    return [d for d in
+            [RunInfo(os.path.join(p, 'info')).get_as_dict() for p in paths
+             if os.path.isdir(p) and not os.path.islink(p)]
+            if 'timestamp' in d]
 
   def _serve_dir(self, abspath, params):
     """Show a directory listing."""
@@ -307,7 +307,7 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     """
     relpath = os.path.relpath(abspath, self._root)
     breadcrumbs = self._create_breadcrumbs(relpath)
-    link_path = urlparse.urlunparse([None, None, relpath, None, urllib.urlencode(params), None])
+    link_path = urlunparse([None, None, relpath, None, urlencode(params), None])
     args = self._default_template_args('file.html')
     args.update({'root_parent': os.path.dirname(self._root),
                  'breadcrumbs': breadcrumbs,
@@ -327,7 +327,7 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     client_ip = self._client_address[0]
     if not client_ip in self._settings.allowed_clients and \
        not 'ALL' in self._settings.allowed_clients:
-      self._send_content('Access from host {} forbidden.'.format(client_ip), 'text/html')
+      self._send_content('Access from host {} forbidden.'.format(client_ip).encode('utf-8'), 'text/html')
       return False
     return True
 
@@ -395,7 +395,7 @@ class ReportingServer(object):
       def __init__(self, request, client_address, server):
         PantsHandler.__init__(self, settings, renderer, request, client_address, server)
 
-    self._httpd = BaseHTTPServer.HTTPServer(('', port), MyHandler)
+    self._httpd = http.server.HTTPServer(('', port), MyHandler)
     self._httpd.timeout = 0.1  # Not the network timeout, but how often handle_request yields.
 
   def server_port(self):

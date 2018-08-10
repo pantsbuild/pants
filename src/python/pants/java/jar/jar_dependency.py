@@ -2,11 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-import urlparse
+from builtins import object
+
+from future.moves.urllib import parse
 
 from pants.base.build_environment import get_buildroot
 from pants.base.hash_utils import stable_json_hash
@@ -69,7 +70,7 @@ class JarDependencyParseContextWrapper(object):
                          excludes, self._parse_context.rel_path)
 
 
-class JarDependency(datatype('JarDependency', [
+class JarDependency(datatype([
   'org', 'base_name', 'rev', 'force', 'ext', 'url', 'apidocs',
   'classifier', 'mutable', 'intransitive', 'excludes', 'base_path'])):
   """A pre-built Maven repository dependency.
@@ -116,7 +117,7 @@ class JarDependency(datatype('JarDependency', [
   @memoized_method
   def get_url(self, relative=False):
     if self.url:
-      parsed_url = urlparse.urlparse(self.url)
+      parsed_url = parse.urlparse(self.url)
       if parsed_url.scheme == 'file':
         if relative and os.path.isabs(parsed_url.path):
           relative_path = os.path.relpath(parsed_url.path,

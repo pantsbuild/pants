@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -14,10 +13,10 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.resources import Resources
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class PythonTargetTest(BaseTest):
+class PythonTargetTest(TestBase):
 
   def test_validation(self):
     internal_repo = Repository(url=None, push_db_basedir=None)
@@ -36,14 +35,14 @@ class PythonTargetTest(BaseTest):
     pt_with_artifact = self.make_target(spec=spec,
                                         target_type=PythonTarget,
                                         provides=pa)
-    self.assertEquals(pt_with_artifact.address.spec, spec)
+    self.assertEqual(pt_with_artifact.address.spec, spec)
 
     spec = "//:test-with-none"
     # This test verifies that having no provides is okay.
     pt_no_artifact = self.make_target(spec=spec,
                                       target_type=PythonTarget,
                                       provides=None)
-    self.assertEquals(pt_no_artifact.address.spec, spec)
+    self.assertEqual(pt_no_artifact.address.spec, spec)
 
   def assert_single_resource_dep(self, target, expected_resource_path, expected_resource_contents):
     self.assertEqual(1, len(target.dependencies))

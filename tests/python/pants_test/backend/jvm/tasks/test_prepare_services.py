@@ -2,17 +2,17 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.prepare_services import PrepareServices
 from pants.java.jar.exclude import Exclude
 from pants.util.contextutil import temporary_dir
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class PrepareServicesTest(TaskTestBase):
@@ -114,7 +114,7 @@ class PrepareServicesTest(TaskTestBase):
 
       def assert_contents(path, services):
         read_services = []
-        with open(os.path.join(chroot, path)) as fp:
+        with open(os.path.join(chroot, path), 'r') as fp:
           for line in fp.readlines():
             line = line.strip()
             if not line.startswith('#'):

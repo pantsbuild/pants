@@ -2,14 +2,15 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import str
 
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -17,7 +18,6 @@ from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pex_build_util import is_python_target
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
-from pants.backend.python.tasks.wrapped_pex import WrappedPEX
 from pants.build_graph.files import Files
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.util.contextutil import temporary_file
@@ -46,7 +46,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     """
     return ()
 
-  class ExtraFile(datatype('ExtraFile', ['path', 'content'])):
+  class ExtraFile(datatype(['path', 'content'])):
     """Models an extra file to place in a PEX."""
 
     @classmethod
@@ -69,6 +69,10 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
         fp.close()
         add = builder.add_source if self.path.endswith('.py') else builder.add_resource
         add(fp.name, self.path)
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(PythonExecutionTaskBase, cls).subsystem_dependencies() + (PythonSetup,)
 
   def extra_files(self):
     """Override to provide extra files needed for execution.
@@ -112,11 +116,11 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
           # in the target set's dependency closure.
           pexes = [extra_requirements_pex] + pexes
         constraints = {constraint for rt in relevant_targets if is_python_target(rt)
-                       for constraint in rt.compatibility}
+                       for constraint in PythonSetup.global_instance().compatibility_or_constraints(rt)}
 
         with self.merged_pex(path, pex_info, interpreter, pexes, constraints) as builder:
           for extra_file in self.extra_files():
             extra_file.add_to(builder)
           builder.freeze()
 
-    return WrappedPEX(PEX(path, interpreter), interpreter)
+    return PEX(path, interpreter)

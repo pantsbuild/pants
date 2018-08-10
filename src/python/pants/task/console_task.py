@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import errno
 import os
@@ -30,10 +29,10 @@ class ConsoleTask(QuietTaskMixin, Task):
 
   def __init__(self, *args, **kwargs):
     super(ConsoleTask, self).__init__(*args, **kwargs)
-    self._console_separator = self.get_options().sep.decode('string-escape')
+    self._console_separator = self.get_options().sep.decode('unicode_escape')
     if self.get_options().output_file:
       try:
-        self._outstream = safe_open(os.path.abspath(self.get_options().output_file), 'w')
+        self._outstream = safe_open(os.path.abspath(self.get_options().output_file), 'wb')
       except IOError as e:
         raise TaskError('Error opening stream {out_file} due to'
                         ' {error_str}'.format(out_file=self.get_options().output_file, error_str=e))
@@ -56,7 +55,7 @@ class ConsoleTask(QuietTaskMixin, Task):
         targets = self.context.targets()
         for value in self.console_output(targets) or tuple():
           self._outstream.write(value.encode('utf-8'))
-          self._outstream.write(self._console_separator)
+          self._outstream.write(self._console_separator.encode('utf-8'))
       finally:
         self._outstream.flush()
         if self.get_options().output_file:

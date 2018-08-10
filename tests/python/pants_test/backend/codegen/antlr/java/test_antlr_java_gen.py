@@ -2,12 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
 import time
+from builtins import open
 from textwrap import dedent
 
 from twitter.common.dirutil.fileset import Fileset
@@ -16,7 +16,6 @@ from pants.backend.codegen.antlr.java.antlr_java_gen import AntlrJavaGen
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.invalidation.build_invalidator import CacheKey
 from pants.util.dirutil import safe_mkdtemp
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
@@ -26,9 +25,9 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
   def task_type(cls):
     return AntlrJavaGen
 
-  @property
-  def alias_groups(self):
-    return super(AntlrJavaGenTest, self).alias_groups.merge(BuildFileAliases(
+  @classmethod
+  def alias_groups(cls):
+    return super(AntlrJavaGenTest, cls).alias_groups().merge(BuildFileAliases(
       targets={
         'java_antlr_library': JavaAntlrLibrary,
       },
@@ -78,17 +77,17 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
 
     # Generate code, then create a synthetic target.
     task.execute_codegen(target, target_workdir)
-    fingerprint = CacheKey("test", target.invalidation_hash())
-    syn_target = task._inject_synthetic_target(target, target_workdir, fingerprint)
+    sources = task._capture_sources(((target, target_workdir),))[0]
+    syn_target = task._inject_synthetic_target(target, target_workdir, sources)
 
     actual_sources = [s for s in Fileset.rglobs('*.java', root=target_workdir)]
     expected_sources = syn_target.sources_relative_to_source_root()
-    self.assertEquals(set(expected_sources), set(actual_sources))
+    self.assertEqual(set(expected_sources), set(actual_sources))
 
     # Check that the synthetic target has a valid source root and the generated sources have the
     # expected java package
     def get_package(path):
-      with open(path) as fp:
+      with open(path, 'r') as fp:
         for line in fp:
           match = self.PACKAGE_RE.match(line)
           if match:
@@ -176,19 +175,19 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
     self._test_generated_target_fingerprint_stable('4', self.PARTS['dir'].replace('/', '.'))
 
   def _test_generated_target_fingerprint_stable(self, version, package):
-    # Use a stable workdir for both builds.
-    target_workdir_fun = lambda root: os.path.join(root, 'stable')
+    self.add_to_build_file(self.BUILDFILE, dedent("""
+      java_antlr_library(
+        name='{name}',
+        compiler='antlr{version}',
+        sources=['{prefix}.g{version}'],
+      )
+    """.format(version=version, **self.PARTS)))
 
     def execute_and_get_synthetic_target_hash():
-      # Rerun setUp() to clear up the build graph of injected synthetic targets.
-      self.setUp()
-      self.add_to_build_file(self.BUILDFILE, dedent("""
-        java_antlr_library(
-          name='{name}',
-          compiler='antlr{version}',
-          sources=['{prefix}.g{version}'],
-        )
-      """.format(version=version, **self.PARTS)))
+      # Recreate the build graph.
+      self.reset_build_graph()
+      # Use a stable workdir for both builds.
+      target_workdir_fun = lambda root: os.path.join(root, 'stable')
       syn_target = self.execute_antlr_test(package, target_workdir_fun=target_workdir_fun)
       return syn_target.transitive_invalidation_hash()
 

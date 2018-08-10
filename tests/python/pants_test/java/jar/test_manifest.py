@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
 
@@ -21,8 +20,8 @@ class TestManifest(unittest.TestCase):
   def test_addentry(self):
     manifest = Manifest()
     manifest.addentry('Header', 'value')
-    self.assertEquals(
-      'Header: value\n', manifest.contents())
+    self.assertEqual(
+      b'Header: value\n', manifest.contents())
 
   def test_too_long_entry(self):
     manifest = Manifest()

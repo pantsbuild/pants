@@ -2,11 +2,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
+from builtins import open
 
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -24,7 +24,7 @@ class TestJvmDependencyUsageIntegration(PantsRunIntegrationTest):
       outfile = os.path.join(outdir, 'out.json')
       args = [
           # Enable the on-line equivalent of this check, to confirm consistency.
-          '--compile-zinc-unused-deps=fatal',
+          '--lint-jvm-dep-check-unnecessary-deps=fatal',
           'dep-usage',
           target,
           '--dep-usage-jvm-output-file={}'.format(outfile),
@@ -34,7 +34,7 @@ class TestJvmDependencyUsageIntegration(PantsRunIntegrationTest):
 
       # Run, and then parse the report from json.
       self.assert_success(self.run_pants_with_workdir(args, workdir, config))
-      with open(outfile) as f:
+      with open(outfile, 'r') as f:
         return json.load(f)
 
   def _assert_non_zero_usage(self, dep_usage_json):

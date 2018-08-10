@@ -2,11 +2,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import json
+from builtins import object, open
+
+from future.utils import PY3
+
+from pants.util.strutil import ensure_binary
 
 
 def hash_all(strs, digest=None):
@@ -16,8 +20,9 @@ def hash_all(strs, digest=None):
   """
   digest = digest or hashlib.sha1()
   for s in strs:
+    s = ensure_binary(s)
     digest.update(s)
-  return digest.hexdigest()
+  return digest.hexdigest() if PY3 else digest.hexdigest().decode('utf-8')
 
 
 def hash_file(path, digest=None):
@@ -31,7 +36,7 @@ def hash_file(path, digest=None):
     while s:
       digest.update(s)
       s = fd.read(8192)
-  return digest.hexdigest()
+  return digest.hexdigest() if PY3 else digest.hexdigest().decode('utf-8')
 
 
 def stable_json_hash(obj, digest=None, encoder=None):

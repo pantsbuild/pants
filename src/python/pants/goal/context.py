@@ -2,11 +2,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import sys
+from builtins import filter, object
 from collections import defaultdict
 from contextlib import contextmanager
 
@@ -14,8 +14,9 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.worker_pool import SubprocPool
-from pants.base.workunit import WorkUnitLabel
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.target import Target
+from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
 from pants.process.lock import OwnerPrintingInterProcessFileLock
@@ -160,9 +161,8 @@ class Context(object):
     """A contextmanager that sets metrics in the context of a (v1) engine execution."""
     self._set_target_root_count_in_runtracker()
     yield
+    self.run_tracker.pantsd_stats.set_scheduler_metrics(self._scheduler.metrics())
     self._set_affected_target_count_in_runtracker()
-    self._set_affected_target_files_count_in_runtracker()
-    self._set_resulting_graph_size_in_runtracker()
 
   def _set_target_root_count_in_runtracker(self):
     """Sets the target root count in the run tracker's daemon stats object."""
@@ -177,19 +177,6 @@ class Context(object):
     target_count = len(self.build_graph)
     self.run_tracker.pantsd_stats.set_affected_targets_size(target_count)
     return target_count
-
-  def _set_affected_target_files_count_in_runtracker(self):
-    """Sets the realized target file count in the run tracker's daemon stats object."""
-    # TODO: Move this file counting into the `ProductGraph`.
-    target_file_count = self.build_graph.target_file_count()
-    self.run_tracker.pantsd_stats.set_affected_targets_file_count(target_file_count)
-    return target_file_count
-
-  def _set_resulting_graph_size_in_runtracker(self):
-    """Sets the resulting graph size in the run tracker's daemon stats object."""
-    node_count = self._scheduler.graph_len()
-    self.run_tracker.pantsd_stats.set_resulting_graph_size(node_count)
-    return node_count
 
   def submit_background_work_chain(self, work_chain, parent_workunit_name=None):
     """
@@ -346,7 +333,7 @@ class Context(object):
         synthetics.add(self.build_graph.get_target(synthetic_address))
     target_set.update(self._collect_targets(synthetics, **kwargs))
 
-    return filter(predicate, target_set)
+    return list(filter(predicate, target_set))
 
   def _collect_targets(self, root_targets, **kwargs):
     return Target.closure_for_targets(
@@ -391,3 +378,24 @@ class Context(object):
     for address in self.address_mapper.scan_addresses(root):
       build_graph.inject_address_closure(address)
     return build_graph
+
+  def execute_process_synchronously(self, execute_process_request, name, labels=None):
+    """Executes a process (possibly remotely), and returns information about its output.
+
+    :param execute_process_request: The ExecuteProcessRequest to run.
+    :param name: A descriptive name representing the process being executed.
+    :param labels: A tuple of WorkUnitLabels.
+    :return: An ExecuteProcessResult with information about the execution.
+
+    Note that this is an unstable, experimental API, which is subject to change with no notice.
+    """
+    with self.new_workunit(
+      name=name,
+      labels=labels,
+      cmd=' '.join(execute_process_request.argv),
+    ) as workunit:
+      result = self._scheduler.product_request(FallibleExecuteProcessResult, [execute_process_request])[0]
+      workunit.output("stdout").write(result.stdout)
+      workunit.output("stderr").write(result.stderr)
+      workunit.set_outcome(WorkUnit.FAILURE if result.exit_code else WorkUnit.SUCCESS)
+      return result

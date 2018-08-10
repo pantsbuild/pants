@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import shlex
 import unittest
@@ -37,16 +36,16 @@ class ArgSplitterTest(unittest.TestCase):
     splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
     args = shlex.split(args_str)
     goals, scope_to_flags, target_specs, passthru, passthru_owner = splitter.split_args(args)
-    self.assertEquals(expected_goals, goals)
-    self.assertEquals(expected_scope_to_flags, scope_to_flags)
-    self.assertEquals(expected_target_specs, target_specs)
-    self.assertEquals(expected_passthru, passthru)
-    self.assertEquals(expected_passthru_owner, passthru_owner)
-    self.assertEquals(expected_is_help, splitter.help_request is not None)
-    self.assertEquals(expected_help_advanced,
+    self.assertEqual(expected_goals, goals)
+    self.assertEqual(expected_scope_to_flags, scope_to_flags)
+    self.assertEqual(expected_target_specs, target_specs)
+    self.assertEqual(expected_passthru, passthru)
+    self.assertEqual(expected_passthru_owner, passthru_owner)
+    self.assertEqual(expected_is_help, splitter.help_request is not None)
+    self.assertEqual(expected_help_advanced,
                       (isinstance(splitter.help_request, OptionsHelp) and
                        splitter.help_request.advanced))
-    self.assertEquals(expected_help_all,
+    self.assertEqual(expected_help_all,
                       (isinstance(splitter.help_request, OptionsHelp) and
                        splitter.help_request.all_scopes))
 

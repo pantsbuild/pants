@@ -2,10 +2,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import str
 from contextlib import contextmanager
 
 import mock
@@ -13,15 +13,15 @@ from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import Unsatisfiable, resolve
 
 from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInterpreterCache
+from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_dir
-from pants_test.base_test import BaseTest
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.test_base import TestBase
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
 
-class TestInterpreterCache(BaseTest):
+class TestInterpreterCache(TestBase):
   @staticmethod
   def _make_bad_requirement(requirement):
     """Turns a requirement that passes into one we know will fail.
@@ -58,7 +58,7 @@ class TestInterpreterCache(BaseTest):
     self._do_test([self._make_bad_requirement(self._interpreter.identity.requirement)], [], [])
 
   def test_cache_setup_with_no_filters_uses_repo_default(self):
-    self._do_test((b'',), [], [self._interpreter])
+    self._do_test(('',), [], [self._interpreter])
 
   def test_cache_setup_with_filter_overrides_repo_default(self):
     self._do_test([self._make_bad_requirement(self._interpreter.identity.requirement)],

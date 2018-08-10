@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from collections import defaultdict
@@ -12,7 +11,7 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.goal.products import MultipleRootedProducts
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.node.targets.node_bundle import NodeBundle
 from pants.contrib.node.targets.node_module import NodeModule
@@ -58,8 +57,8 @@ class TestNodeBundle(TaskTestBase):
 
       product_data = product.get(target)
       self.assertIsNotNone(product_data)
-      product_basedir = product_data.keys()[0]
-      self.assertEquals(product_data[product_basedir], ['{}.tar.gz'.format(self.target_name)])
+      product_basedir = list(product_data.keys())[0]
+      self.assertEqual(product_data[product_basedir], ['{}.tar.gz'.format(self.target_name)])
 
   def test_no_dependencies_for_node_bundle(self):
     with temporary_dir() as tmp_dir:

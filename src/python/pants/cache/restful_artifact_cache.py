@@ -2,13 +2,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import multiprocessing
-import Queue
+import queue
 import threading
+from builtins import object, open
 
 import requests
 from requests import RequestException
@@ -38,7 +38,7 @@ class RESTfulArtifactCache(ArtifactCache):
 
   READ_SIZE_BYTES = 4 * 1024 * 1024
 
-  def __init__(self, artifact_root, best_url_selector, local):
+  def __init__(self, artifact_root, best_url_selector, local, read_timeout=4.0, write_timeout=4.0):
     """
     :param string artifact_root: The path under which cacheable products will be read/written.
     :param BestUrlSelector best_url_selector: Url selector that supports fail-over. Each returned
@@ -49,7 +49,8 @@ class RESTfulArtifactCache(ArtifactCache):
     super(RESTfulArtifactCache, self).__init__(artifact_root)
 
     self.best_url_selector = best_url_selector
-    self._timeout_secs = 4.0
+    self._read_timeout_secs = read_timeout
+    self._write_timeout_secs = write_timeout
     self._localcache = local
 
   def try_insert(self, cache_key, paths):
@@ -77,7 +78,7 @@ class RESTfulArtifactCache(ArtifactCache):
           target=_log_if_no_response,
           args=(
             60,
-            "Still downloading artifacts (either they're very large or the connection to the cache is slow)",
+            "\nStill downloading artifacts (either they're very large or the connection to the cache is slow)",
             queue.get,
           )
         ).start()
@@ -107,13 +108,13 @@ class RESTfulArtifactCache(ArtifactCache):
       logger.debug('Sending {0} request to {1}'.format(method, url))
       try:
         if 'PUT' == method:
-          response = session.put(url, data=body, timeout=self._timeout_secs)
+          response = session.put(url, data=body, timeout=self._write_timeout_secs)
         elif 'GET' == method:
-          response = session.get(url, timeout=self._timeout_secs, stream=True)
+          response = session.get(url, timeout=self._read_timeout_secs, stream=True)
         elif 'HEAD' == method:
-          response = session.head(url, timeout=self._timeout_secs)
+          response = session.head(url, timeout=self._read_timeout_secs)
         elif 'DELETE' == method:
-          response = session.delete(url, timeout=self._timeout_secs)
+          response = session.delete(url, timeout=self._write_timeout_secs)
         else:
           raise ValueError('Unknown request method {0}'.format(method))
       except RequestException as e:
@@ -134,7 +135,7 @@ class RESTfulArtifactCache(ArtifactCache):
     return '{0}/{1}.tgz'.format(cache_key.id, cache_key.hash)
 
   def _url_for_key(self, url, cache_key):
-    path_prefix = url.path.rstrip(b'/')
+    path_prefix = url.path.rstrip('/')
     path = '{0}/{1}'.format(path_prefix, self._url_suffix_for_key(cache_key))
     return '{0}://{1}{2}'.format(url.scheme, url.netloc, path)
 
@@ -144,5 +145,5 @@ def _log_if_no_response(timeout_seconds, message, getter):
     try:
       getter(True, timeout_seconds)
       return
-    except Queue.Empty:
+    except queue.Empty:
       logger.info(message)

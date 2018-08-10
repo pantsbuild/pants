@@ -5,8 +5,8 @@ package org.pantsbuild.testproject.cucumber;
 
 import java.lang.Exception;
 import java.lang.RuntimeException;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.LinkedList;
 
 import cucumber.api.java.After;
 import cucumber.api.java.Before;
@@ -23,8 +23,8 @@ public class BadnamesSteps {
   private List<String> theListOfStrings;
 
   @Before public void before() {
-    theStrings = new LinkedList<String>();
-    theListOfStrings = new LinkedList<String>();
+    theStrings = new ArrayList<String>();
+    theListOfStrings = new ArrayList<String>();
   }
 
   @After public void after() {

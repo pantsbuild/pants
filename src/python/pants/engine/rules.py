@@ -2,22 +2,22 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
+import functools
 import inspect
 import logging
 from abc import abstractproperty
+from builtins import bytes, str
 from collections import OrderedDict
-from types import TypeType
 
+from future.utils import PY2
 from twitter.common.collections import OrderedSet
 
-from pants.engine.addressable import Exactly
 from pants.engine.selectors import Get, type_or_constraint_repr
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
+from pants.util.objects import Exactly, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -34,13 +34,39 @@ class _RuleVisitor(ast.NodeVisitor):
     self.gets.append(Get.extract_constraints(node))
 
 
-def rule(output_type, input_selectors):
+class _GoalProduct(object):
+  """GoalProduct is a factory for anonymous singleton types representing the execution of goals.
+
+  The created types are returned by `@console_rule` instances, which may not have any outputs
+  of their own.
+  """
+  PRODUCT_MAP = {}
+
+  @staticmethod
+  def _synthesize_goal_product(name):
+    product_type_name = '{}GoalExecution'.format(name.capitalize())
+    if PY2:
+      product_type_name = product_type_name.encode('utf-8')
+    return type(product_type_name, (datatype([]),), {})
+
+  @classmethod
+  def for_name(cls, name):
+    assert isinstance(name, (bytes, str))
+    if name is bytes:
+      name = name.decode('utf-8')
+    if name not in cls.PRODUCT_MAP:
+      cls.PRODUCT_MAP[name] = cls._synthesize_goal_product(name)
+    return cls.PRODUCT_MAP[name]
+
+
+def _make_rule(output_type, input_selectors, for_goal=None):
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
   :param Constraint output_type: The return/output type for the Rule. This may be either a
     concrete Python type, or an instance of `Exactly` representing a union of multiple types.
   :param list input_selectors: A list of Selector instances that matches the number of arguments
     to the @decorated function.
+  :param str for_goal: If this is a @console_rule, which goal string it's called for.
   """
 
   def wrapper(func):
@@ -52,21 +78,46 @@ def rule(output_type, input_selectors):
 
     def resolve_type(name):
       resolved = caller_frame.f_globals.get(name) or caller_frame.f_builtins.get(name)
-      if not isinstance(resolved, (TypeType, Exactly)):
+      if not isinstance(resolved, (type, Exactly)):
+        # TODO: should this say "...or Exactly instance;"?
         raise ValueError('Expected either a `type` constructor or TypeConstraint instance; '
                          'got: {}'.format(name))
       return resolved
 
-    gets = []
+    gets = OrderedSet()
     for node in ast.iter_child_nodes(module_ast):
       if isinstance(node, ast.FunctionDef) and node.name == func.__name__:
         rule_visitor = _RuleVisitor()
         rule_visitor.visit(node)
-        gets.extend(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
+        gets.update(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
 
-    func._rule = TaskRule(output_type, input_selectors, func, input_gets=gets)
-    return func
+    # For @console_rule, redefine the function to avoid needing a literal return of the output type.
+    if for_goal:
+      def goal_and_return(*args, **kwargs):
+        res = func(*args, **kwargs)
+        if res is not None:
+          raise Exception('A @console_rule should not have a return value.')
+        return output_type()
+      functools.update_wrapper(goal_and_return, func)
+      wrapped_func = goal_and_return
+    else:
+      wrapped_func = func
+
+    wrapped_func._rule = TaskRule(output_type, input_selectors, wrapped_func, input_gets=list(gets))
+    wrapped_func.output_type = output_type
+    wrapped_func.goal = for_goal
+
+    return wrapped_func
   return wrapper
+
+
+def rule(output_type, input_selectors):
+  return _make_rule(output_type, input_selectors)
+
+
+def console_rule(goal_name, input_selectors):
+  output_type = _GoalProduct.for_name(goal_name)
+  return _make_rule(output_type, input_selectors, goal_name)
 
 
 class Rule(AbstractClass):
@@ -85,9 +136,9 @@ class Rule(AbstractClass):
     """Collection of input selectors."""
 
 
-class TaskRule(datatype('TaskRule', ['output_constraint', 'input_selectors', 'input_gets', 'func']), Rule):
+class TaskRule(datatype(['output_constraint', 'input_selectors', 'input_gets', 'func']), Rule):
   """A Rule that runs a task function when all of its input selectors are satisfied.
-  
+
   TODO: Make input_gets non-optional when more/all rules are using them.
   """
 
@@ -121,8 +172,12 @@ class TaskRule(datatype('TaskRule', ['output_constraint', 'input_selectors', 'in
                                    self.func.__name__)
 
 
-class SingletonRule(datatype('SingletonRule', ['output_constraint', 'value']), Rule):
+class SingletonRule(datatype(['output_constraint', 'value']), Rule):
   """A default rule for a product, which is thus a singleton for that product."""
+
+  @classmethod
+  def from_instance(cls, obj):
+    return cls(type(obj), obj)
 
   def __new__(cls, output_type, value):
     # Validate result type.
@@ -144,9 +199,9 @@ class SingletonRule(datatype('SingletonRule', ['output_constraint', 'value']), R
     return '{}({}, {})'.format(type(self).__name__, type_or_constraint_repr(self.output_constraint), self.value)
 
 
-class RootRule(datatype('RootRule', ['output_constraint']), Rule):
+class RootRule(datatype(['output_constraint']), Rule):
   """Represents a root input to an execution of a rule graph.
-  
+
   Roots act roughly like parameters, in that in some cases the only source of a
   particular type might be when a value is provided as a root subject at the beginning
   of an execution.
@@ -156,12 +211,12 @@ class RootRule(datatype('RootRule', ['output_constraint']), Rule):
     return []
 
 
-class RuleIndex(datatype('RuleIndex', ['rules', 'roots'])):
+class RuleIndex(datatype(['rules', 'roots'])):
   """Holds an index of Tasks and Singletons used to instantiate Nodes."""
 
   @classmethod
   def create(cls, rule_entries):
-    """Creates a NodeBuilder with tasks indexed by their output type."""
+    """Creates a RuleIndex with tasks indexed by their output type."""
     # NB make tasks ordered so that gen ordering is deterministic.
     serializable_rules = OrderedDict()
     serializable_roots = set()
@@ -175,11 +230,10 @@ class RuleIndex(datatype('RuleIndex', ['rules', 'roots'])):
       if isinstance(rule, RootRule):
         serializable_roots.add(rule.output_constraint)
         return
-      # TODO: The heterogenity here has some confusing implications here:
-      # see https://github.com/pantsbuild/pants/issues/4005
+      # TODO: Ensure that interior types work by indexing on the list of types in
+      # the constraint. This heterogenity has some confusing implications:
+      #   see https://github.com/pantsbuild/pants/issues/4005
       for kind in rule.output_constraint.types:
-        # NB Ensure that interior types from SelectDependencies work by
-        # indexing on the list of types in the constraint.
         add_task(kind, rule)
       add_task(rule.output_constraint, rule)
 

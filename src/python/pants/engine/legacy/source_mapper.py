@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -79,11 +78,11 @@ class EngineSourceMapper(SourceMapper):
     """Bulk, iterable form of `target_addresses_for_source`."""
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
     sources_set = set(sources)
-    specs = tuple(AscendantAddresses(directory=d) for d in self._unique_dirs_for_sources(sources_set))
+    dependencies = tuple(AscendantAddresses(directory=d) for d in self._unique_dirs_for_sources(sources_set))
 
     # Uniqify all transitive hydrated targets.
     hydrated_target_to_address = {}
-    hydrated_targets, = self._scheduler.product_request(HydratedTargets, [Specs(specs)])
+    hydrated_targets, = self._scheduler.product_request(HydratedTargets, [Specs(dependencies=dependencies)])
     for hydrated_target in hydrated_targets.dependencies:
       if hydrated_target not in hydrated_target_to_address:
         hydrated_target_to_address[hydrated_target] = hydrated_target.adaptor.address

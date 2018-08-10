@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from textwrap import dedent
@@ -15,7 +14,6 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.context import Context
-from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from twitter.common.collections import OrderedSet
 
@@ -30,9 +28,9 @@ class ScroogeGenTest(NailgunTaskTestBase):
   def task_type(cls):
     return ScroogeGen
 
-  @property
-  def alias_groups(self):
-    return super(ScroogeGenTest, self).alias_groups.merge(
+  @classmethod
+  def alias_groups(cls):
+    return super(ScroogeGenTest, cls).alias_groups().merge(
       BuildFileAliases(targets={'java_thrift_library': JavaThriftLibrary,
                                 'java_library': JavaLibrary,
                                 'scala_library': ScalaLibrary}))
@@ -86,7 +84,7 @@ class ScroogeGenTest(NailgunTaskTestBase):
     self._test_help('scala', ScalaLibrary, [], sources)
 
   def compiler_args_to_string(self, compiler_args):
-    quoted = map(lambda x: "'{}'".format(x), compiler_args)
+    quoted = ["'{}'".format(x) for x in compiler_args]
     comma_separated = ', '.join(quoted)
     return '[{}]'.format(comma_separated)
 
@@ -129,20 +127,17 @@ class ScroogeGenTest(NailgunTaskTestBase):
       Context.add_new_target = mock
       task.execute()
 
-      self.assertEquals(1, mock.call_count)
+      self.assertEqual(1, mock.call_count)
       _, call_kwargs = mock.call_args
-      self.assertEquals(call_kwargs['target_type'], library_type)
-      self.assertEquals(call_kwargs['dependencies'], OrderedSet())
-      self.assertEquals(call_kwargs['provides'], None)
-      self.assertEquals(call_kwargs['derived_from'], target)
-      self.assertEquals(call_kwargs['strict_deps'], True)
-      self.assertEquals(call_kwargs['fatal_warnings'], False)
+      self.assertEqual(call_kwargs['target_type'], library_type)
+      self.assertEqual(call_kwargs['dependencies'], OrderedSet())
+      self.assertEqual(call_kwargs['provides'], None)
+      self.assertEqual(call_kwargs['derived_from'], target)
+      self.assertEqual(call_kwargs['strict_deps'], True)
+      self.assertEqual(call_kwargs['fatal_warnings'], False)
 
       sources = call_kwargs['sources']
-      if isinstance(sources, EagerFilesetWithSpec):
-        self.assertEquals(sources.files, [])
-      else:
-        self.assertEquals(sources, [])
+      self.assertEqual(sources.files, ())
 
     finally:
       Context.add_new_target = saved_add_new_target
@@ -177,5 +172,5 @@ class ScroogeGenTest(NailgunTaskTestBase):
   def _test_dependencies_help(self, contents, declares_service, declares_exception):
     source = 'test_smoke/a.thrift'
     self.create_file(relpath=source, contents=contents)
-    self.assertEquals(ScroogeGen._declares_service(source), declares_service)
-    self.assertEquals(ScroogeGen._declares_exception(source), declares_exception)
+    self.assertEqual(ScroogeGen._declares_service(source), declares_service)
+    self.assertEqual(ScroogeGen._declares_exception(source), declares_exception)

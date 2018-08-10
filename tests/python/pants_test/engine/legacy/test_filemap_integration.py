@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -31,7 +30,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
     for root, dirs, files in project_tree.walk(''):
       scan_set.update({os.path.join(root, f) for f in files if not should_ignore(f)})
 
-    self.assertEquals(scan_set, self.TEST_EXCLUDE_FILES)
+    self.assertEqual(scan_set, self.TEST_EXCLUDE_FILES)
 
   def _mk_target(self, test_name):
     return '{}:{}'.format(self.PATH_PREFIX, test_name)
@@ -67,44 +66,44 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
 
   def test_exclude_list_of_strings(self):
     test_out = self._extract_exclude_output('exclude_list_of_strings')
-    self.assertEquals(self.TEST_EXCLUDE_FILES - {'aaa.py', 'dir1/aaa.py'},
+    self.assertEqual(self.TEST_EXCLUDE_FILES - {'aaa.py', 'dir1/aaa.py'},
                       test_out)
 
   def test_exclude_globs(self):
     test_out = self._extract_exclude_output('exclude_globs')
-    self.assertEquals(self.TEST_EXCLUDE_FILES - {'aabb.py', 'dir1/dirdir1/aa.py'},
+    self.assertEqual(self.TEST_EXCLUDE_FILES - {'aabb.py', 'dir1/dirdir1/aa.py'},
                       test_out)
 
   def test_exclude_strings(self):
     test_out = self._extract_exclude_output('exclude_strings')
-    self.assertEquals(self.TEST_EXCLUDE_FILES - {'aa.py', 'ab.py'},
+    self.assertEqual(self.TEST_EXCLUDE_FILES - {'aa.py', 'ab.py'},
                       test_out)
 
   def test_exclude_set(self):
     test_out = self._extract_exclude_output('exclude_set')
-    self.assertEquals(self.TEST_EXCLUDE_FILES - {'aaa.py', 'a.py'},
+    self.assertEqual(self.TEST_EXCLUDE_FILES - {'aaa.py', 'a.py'},
                       test_out)
 
   def test_exclude_rglobs(self):
     test_out = self._extract_exclude_output('exclude_rglobs')
-    self.assertEquals(self.TEST_EXCLUDE_FILES - {'ab.py', 'aabb.py', 'dir1/ab.py', 'dir1/aabb.py', 'dir1/dirdir1/ab.py'},
+    self.assertEqual(self.TEST_EXCLUDE_FILES - {'ab.py', 'aabb.py', 'dir1/ab.py', 'dir1/aabb.py', 'dir1/dirdir1/ab.py'},
                       test_out)
 
   def test_exclude_zglobs(self):
     test_out = self._extract_exclude_output('exclude_zglobs')
-    self.assertEquals(self.TEST_EXCLUDE_FILES - {'ab.py', 'aabb.py', 'dir1/ab.py', 'dir1/aabb.py', 'dir1/dirdir1/ab.py'},
+    self.assertEqual(self.TEST_EXCLUDE_FILES - {'ab.py', 'aabb.py', 'dir1/ab.py', 'dir1/aabb.py', 'dir1/dirdir1/ab.py'},
                       test_out)
 
   def test_exclude_composite(self):
     test_out = self._extract_exclude_output('exclude_composite')
-    self.assertEquals(self.TEST_EXCLUDE_FILES -
+    self.assertEqual(self.TEST_EXCLUDE_FILES -
                       {'a.py', 'aaa.py', 'dir1/a.py', 'dir1/dirdir1/a.py'},
                       test_out)
 
   def test_implicit_sources(self):
     test_out = self._extract_exclude_output('implicit_sources')
-    self.assertEquals({'a.py', 'aa.py', 'aaa.py', 'aabb.py', 'ab.py'},
+    self.assertEqual({'a.py', 'aa.py', 'aaa.py', 'aabb.py', 'ab.py'},
                       test_out)
 
     test_out = self._extract_exclude_output('test_with_implicit_sources')
-    self.assertEquals({'test_a.py'}, test_out)
+    self.assertEqual({'test_a.py'}, test_out)

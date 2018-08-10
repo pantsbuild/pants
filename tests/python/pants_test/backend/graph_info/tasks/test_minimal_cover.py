@@ -2,15 +2,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
 from pants.backend.graph_info.tasks.minimal_cover import MinimalCover
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class BaseMinimalCovertTest(ConsoleTaskTestBase):
@@ -25,8 +24,8 @@ class MinimalCoverEmptyTest(BaseMinimalCovertTest):
 
 
 class MinimalCoverTest(BaseMinimalCovertTest):
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(targets={'python_library': PythonLibrary})
 
   def setUp(self):

@@ -2,10 +2,10 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.backend.codegen.thrift.lib.apache_thrift_gen_base import ApacheThriftGenBase
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
@@ -20,6 +20,8 @@ class ApacheThriftPyGen(ApacheThriftGenBase):
   default_gen_options_map = {
     'new_style': None
   }
+
+  sources_globs = ('**/*',)
 
   def synthetic_target_type(self, target):
     return PythonLibrary

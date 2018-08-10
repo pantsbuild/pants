@@ -2,13 +2,15 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
 import sys
+from builtins import next, object, open
 from collections import defaultdict, namedtuple
+
+from future.utils import PY3
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
@@ -91,7 +93,7 @@ class JvmDependencyUsage(Task):
       with open(output_file, 'w') as fh:
         self._render(graph, fh)
     else:
-      sys.stdout.write(b'\n')
+      sys.stdout.write('\n')
       self._render(graph, sys.stdout)
 
   @classmethod
@@ -157,7 +159,7 @@ class JvmDependencyUsage(Task):
     `classes_by_source`, `runtime_classpath`, `product_deps_by_src` parameters and
     stores the result to the build cache.
     """
-    analyzer = JvmDependencyAnalyzer(get_buildroot(), runtime_classpath, product_deps_by_src)
+    analyzer = JvmDependencyAnalyzer(get_buildroot(), runtime_classpath)
     targets = self.context.targets()
     targets_by_file = analyzer.targets_by_file(targets)
     transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(targets)
@@ -165,11 +167,13 @@ class JvmDependencyUsage(Task):
       transitive_deps = set(transitive_deps_by_target.get(target))
       node = self.create_dep_usage_node(target,
                                         analyzer,
+                                        product_deps_by_src,
                                         classes_by_source,
                                         targets_by_file,
                                         transitive_deps)
       vt = target_to_vts[target]
-      with open(self.nodes_json(vt.results_dir), mode='w') as fp:
+      mode = 'w' if PY3 else 'wb'
+      with open(self.nodes_json(vt.results_dir), mode=mode) as fp:
         json.dump(node.to_cacheable_dict(), fp, indent=2, sort_keys=True)
       vt.update()
       return node
@@ -183,9 +187,9 @@ class JvmDependencyUsage(Task):
       vt = target_to_vts[target]
       if vt.valid and os.path.exists(self.nodes_json(vt.results_dir)):
         try:
-          with open(self.nodes_json(vt.results_dir)) as fp:
+          with open(self.nodes_json(vt.results_dir), 'r') as fp:
             return Node.from_cacheable_dict(json.load(fp),
-                                            lambda spec: self.context.resolve(spec).__iter__().next())
+                                            lambda spec: next(self.context.resolve(spec).__iter__()))
         except Exception:
           self.context.log.warn("Can't deserialize json for target {}".format(target))
           return Node(target.concrete_derived_from)
@@ -212,7 +216,7 @@ class JvmDependencyUsage(Task):
         nodes[concrete_target] = node
 
     # Prune any Nodes with 0 products.
-    for concrete_target, node in nodes.items()[:]:
+    for concrete_target, node in list(nodes.items()):  # copy because mutation
       if node.products_total == 0:
         nodes.pop(concrete_target)
 
@@ -221,8 +225,13 @@ class JvmDependencyUsage(Task):
   def cache_target_dirs(self):
     return True
 
-  def create_dep_usage_node(self, target, analyzer, classes_by_source, targets_by_file, transitive_deps):
-    product_deps_by_src = analyzer.product_deps_by_src
+  def create_dep_usage_node(self,
+                            target,
+                            analyzer,
+                            product_deps_by_src,
+                            classes_by_source,
+                            targets_by_file,
+                            transitive_deps):
     declared_deps_with_aliases = set(analyzer.resolve_aliases(target))
     eligible_unused_deps = set(d for d, _ in analyzer.resolve_aliases(target, scope=Scopes.DEFAULT))
     concrete_target = target.concrete_derived_from
@@ -399,7 +408,7 @@ class DependencyUsageGraph(object):
     scores = []
     for target, max_usage in max_target_usage.items():
       cost_transitive = self._trans_cost(target)
-      score = int(cost_transitive / (max_usage if max_usage > 0.0 else 1.0))
+      score = int(max(cost_transitive, 1) / (max_usage if max_usage > 0.0 else 1.0))
       scores.append(Score(score, max_usage, cost_transitive, target.address.spec))
 
     # Output in order by score.

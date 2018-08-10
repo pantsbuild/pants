@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -39,7 +38,7 @@ class GoLocalSource(GoTarget):
     if 'name' in kwargs:
       raise TargetDefinitionException(Address(parse_context.rel_path, kwargs['name']).spec,
                                       'A {} does not accept a name; instead, the name is taken '
-                                      'from the the BUILD file location.'.format(cls.alias()))
+                                      'from the BUILD file location.'.format(cls.alias()))
     name = os.path.basename(parse_context.rel_path)
 
     if 'sources' in kwargs:

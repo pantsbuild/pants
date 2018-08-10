@@ -2,10 +2,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import object
 from textwrap import dedent
 
 from pants.backend.graph_info.tasks.listtargets import ListTargets
@@ -16,7 +16,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class BaseListTargetsTest(ConsoleTaskTestBase):
@@ -36,8 +36,8 @@ class ListTargetsTestEmpty(BaseListTargetsTest):
 
 class ListTargetsTest(BaseListTargetsTest):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
         'target': Target,
@@ -172,7 +172,7 @@ class ListTargetsTest(BaseListTargetsTest):
     targets = []
     targets.extend(self.targets('a/b/d/::'))
     targets.extend(self.target('f:alias').dependencies)
-    self.assertEquals(3, len(targets), "Expected a duplicate of a/b/d:d")
+    self.assertEqual(3, len(targets), "Expected a duplicate of a/b/d:d")
     self.assert_console_output(
       'a/b/c:c3',
       'a/b/d:d',

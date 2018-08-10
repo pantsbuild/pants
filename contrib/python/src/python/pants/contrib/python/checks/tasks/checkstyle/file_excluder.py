@@ -2,11 +2,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
+from builtins import object, open
 
 from pants.base.exceptions import TaskError
 
@@ -17,15 +17,15 @@ class FileExcluder(object):
     if excludes_path:
       if not os.path.exists(excludes_path):
         raise TaskError('Excludes file does not exist: {0}'.format(excludes_path))
-      with open(excludes_path) as fh:
+      with open(excludes_path, 'r') as fh:
         for line in fh.readlines():
           if line and not line.startswith('#') and '::' in line:
             pattern, plugins = line.strip().split('::', 2)
-            plugins = plugins.split()
+            style_plugins = plugins.split()
 
             self.excludes[pattern] = {
               'regex': re.compile(pattern),
-              'plugins': plugins
+              'plugins': style_plugins
             }
             log.debug('Exclude pattern: {pattern}'.format(pattern=pattern))
     else:

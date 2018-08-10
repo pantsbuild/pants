@@ -81,6 +81,11 @@ The properties file supports the following keys with noted defaults if omitted:
 
     Assumes your pgp implementation is gpg and defaults to `~/.gnupg/secring.gpg`
 
+    If you are using gpg version >=2.1 this file will NOT exist.  You need to run:
+
+        :::bash
+        $ gpg --export-secret-keys >~/.gnupg/secring.gpg
+
   - `pgp.keyid`
 
     Defaults to `auto`.  If you're unsure which pgp key `auto` will
@@ -104,6 +109,10 @@ The properties file supports the following keys with noted defaults if omitted:
 
         :::bash
         $ echo pgp.keyid=67B5C626 >> ~/.config/pants/release/jvm/pgp.properties
+
+    The keyid is the "short key id".  It should be 32 bits / 8 hex characters.  If you are
+    using gpg version >=2.1 it will tell you the "long key id", so you need to use the
+    last 8 hex characters.
 
   - `pgp.password`
 

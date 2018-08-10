@@ -2,13 +2,13 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import tokenize
-from StringIO import StringIO
+from builtins import object
+from io import BytesIO
 
 import six
 
@@ -143,7 +143,7 @@ class LegacyPythonCallbacksParser(Parser):
     # But it's sufficient to tell most users who aren't being actively malicious that they're doing
     # something wrong, and it has a low performance overhead.
     if self._build_file_imports_behavior != 'allow' and 'import' in python:
-      for token in tokenize.generate_tokens(StringIO(python).readline):
+      for token in tokenize.generate_tokens(BytesIO(python).readline):
         if token[1] == 'import':
           line_being_tokenized = token[4]
           if self._build_file_imports_behavior == 'warn':

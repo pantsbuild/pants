@@ -2,12 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import glob
 import os
 import time
+from builtins import range
 
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, touch
@@ -132,9 +132,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
     will be kept, and the rest will be purged.
     """
 
-    with temporary_dir() as tmp_dir:
-      workdir = os.path.join(tmp_dir, '.pants.d')
-
+    with self.temporary_workdir() as workdir:
       self.assert_success(self.run_pants_with_workdir([
         'compile',
         'export-classpath',

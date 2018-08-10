@@ -3,6 +3,7 @@ version = "0.0.1"
 name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 build = "src/cffi_build.rs"
+publish = false
 
 [profile.release]
 # Enable debug symbols in the `release` profile: doesn't add a noticeable overhead in size/speed,
@@ -15,34 +16,68 @@ codegen-units = 1
 crate-type = ["cdylib"]
 
 [build-dependencies]
+build_utils = { path = "build_utils" }
 cc = "1.0"
 
 [workspace]
+# These are the packages which are built/tested when the --all flag is passed to cargo.
+#
 # We need to explicitly list these, because otherwise the standalone tools
-# (e.g. fs_util) won't be included.
+# (e.g. fs_util) won't be included when we build/test things.
 members = [
+  ".",
+  "async_semaphore",
   "boxfuture",
   "fs",
+  "fs/brfs",
   "fs/fs_util",
+  "graph",
   "hashing",
   "process_execution",
   "process_execution/bazel_protos",
   "process_executor",
+  "resettable",
   "testutil",
   "testutil/mock",
+  "ui"
+]
+
+# These are the packages which are built/tested when no special selector flags are passed to cargo.
+#
+# This is the set of packages which are expected to work on any arbitrary system that checks out the code.
+# It should be exactly equivalent to members, except without any packages that require more system
+# configuration than we're comfortable doing in our bootstrap scripts.
+#
+# In particular, it does not contain the fs/brfs package, which will not compile without a fuse installation.
+# On Ubuntu, that means installing libfuse-dev. On OSX, that means installing OSXFUSE.
+default-members = [
+  ".",
+  "async_semaphore",
+  "boxfuture",
+  "fs",
+  "fs/fs_util",
+  "graph",
+  "hashing",
+  "process_execution",
+  "process_execution/bazel_protos",
+  "process_executor",
+  "resettable",
+  "testutil",
+  "testutil/mock",
+  "ui"
 ]
 
 [dependencies]
-bazel_protos = { path = "process_execution/bazel_protos" }
 boxfuture = { path = "boxfuture" }
 enum_primitive = "0.1.1"
 fnv = "1.0.5"
 fs = { path = "fs" }
-futures = "0.1.16"
+futures = "^0.1.16"
+graph = { path = "graph" }
 hashing = { path = "hashing" }
 lazy_static = "0.2.2"
 log = "0.4"
-ordermap = "0.2.8"
-petgraph = "0.4.5"
 process_execution = { path = "process_execution" }
-tempdir = "0.3.5"
+resettable = { path = "resettable" }
+tokio = "0.1"
+tempfile = "3"

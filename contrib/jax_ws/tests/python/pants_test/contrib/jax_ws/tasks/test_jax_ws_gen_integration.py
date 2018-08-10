@@ -2,8 +2,7 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from contextlib import contextmanager
@@ -52,7 +51,7 @@ class JaxWsGenTest(PantsRunIntegrationTest):
                           'contrib.jax_ws.tests.wsdl.org.pantsbuild.contrib.jax_ws.hello-service',
                           'current')
 
-      self.assertEquals(sorted(['com/example/HelloWorldServer.java',
+      self.assertEqual(sorted(['com/example/HelloWorldServer.java',
                                 'com/example/HelloWorldServerImplService.java']),
                         sorted(exact_files(root)))
 

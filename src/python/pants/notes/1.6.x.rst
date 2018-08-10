@@ -3,6 +3,69 @@
 
 This document describes releases leading up to the ``1.6.x`` ``stable`` series.
 
+1.6.0 (05/10/2018)
+------------------
+
+The ``1.6.0`` stable release.
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Disable lint for Python 3 targets (#5765)
+  `PR #5765 <https://github.com/pantsbuild/pants/pull/5765>`_
+
+* Address @jsirois final comments that were not addressed on PR #5765 (#5773)
+  `PR #5773 <https://github.com/pantsbuild/pants/pull/5773>`_
+
+1.6.0rc3 (04/26/2018)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Break a Core / Node cycle  (#5733)
+  `PR #5733 <https://github.com/pantsbuild/pants/pull/5733>`_
+
+* Bump max local store size (#5728)
+  `PR #5728 <https://github.com/pantsbuild/pants/pull/5728>`_
+
+* Add interpreter identity check for non-blacklisted interpreters (#5724)
+  `PR #5724 <https://github.com/pantsbuild/pants/pull/5724>`_
+
+* Ensure test goal implicitly targets current platform when using python_dist targets (#5720)
+  `PR #5720 <https://github.com/pantsbuild/pants/pull/5720>`_
+  `PR #5618 <https://github.com/pantsbuild/pants/pull/5618>`_
+
+* Plumb requirement blacklist through to the pex resolver (#5697)
+  `PR #5697 <https://github.com/pantsbuild/pants/pull/5697>`_
+
+1.6.0rc2 (04/12/2018)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Reset LMDB Environments when forking
+  `PR #5689 <https://github.com/pantsbuild/pants/pull/5689>`_
+
+1.6.0rc1 (04/09/2018)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Do not fail for a particular Spec if some other Spec has already matched it.
+  `PR #5683 <https://github.com/pantsbuild/pants/pull/5683>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Upgrade virtualenv. (#5679)
+  `PR #5679 <https://github.com/pantsbuild/pants/pull/5679>`_
+
+* Narrow down BuildLocalPythonDistributions target type (#5659)
+  `PR #5659 <https://github.com/pantsbuild/pants/pull/5659>`_
+
 1.6.0rc0 (04/04/2018)
 ---------------------
 

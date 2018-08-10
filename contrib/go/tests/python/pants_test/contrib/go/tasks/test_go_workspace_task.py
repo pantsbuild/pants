@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import time
@@ -12,7 +11,7 @@ from itertools import chain
 
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, touch
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.go.targets.go_library import GoLibrary
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary

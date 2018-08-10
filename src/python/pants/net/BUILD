@@ -4,6 +4,7 @@
 python_library(
   sources = rglobs('*.py'),
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:requests',
     '3rdparty/python:pyopenssl',
     '3rdparty/python:six',

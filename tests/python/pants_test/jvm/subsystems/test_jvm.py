@@ -2,14 +2,13 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.subsystems.jvm import JVM
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class TestJvm(BaseTest):
+class TestJvm(TestBase):
   def create_JVM(self, **kwargs):
     # Note: don't be confused by the fact that the JVM subsystem happens to have an option
     # named 'options', which we set in several tests below.  We name this method's arguments

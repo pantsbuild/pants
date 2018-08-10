@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from unittest import expectedFailure
 
@@ -12,7 +11,7 @@ from pants.goal.error import GoalError
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
 from pants.task.task import Task
-from pants_test.tasks.task_test_base import ConsoleTaskTestBase
+from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class ListGoalsTest(ConsoleTaskTestBase):
@@ -100,8 +99,8 @@ class ListGoalsTest(ConsoleTaskTestBase):
     with self.assertRaises(GoalError) as ctx:
       goal.install(TaskRegistrar(task_name, OtherNoopTask))
 
-    self.assertIn('foo', ctx.exception.message)
-    self.assertIn(self._LIST_GOALS_NAME, ctx.exception.message)
+    self.assertIn('foo', str(ctx.exception))
+    self.assertIn(self._LIST_GOALS_NAME, str(ctx.exception))
 
   def test_register_duplicate_task_name_is_not_error_when_replacing(self):
     Goal.clear()

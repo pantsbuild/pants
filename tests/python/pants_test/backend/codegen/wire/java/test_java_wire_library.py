@@ -2,15 +2,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
 from pants.base.exceptions import TargetDefinitionException
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class JavaWireLibraryTest(BaseTest):
+class JavaWireLibraryTest(TestBase):
 
   def setUp(self):
     super(JavaWireLibraryTest, self).setUp()
@@ -33,7 +32,7 @@ class JavaWireLibraryTest(BaseTest):
     target = self.make_target('//:wire_service_options', JavaWireLibrary,
                               service_writer='com.squareup.wire.RetrofitServiceWriter',
                               service_writer_options=['foo', 'bar', 'baz'])
-    self.assertEquals(['foo', 'bar', 'baz'], target.payload.service_writer_options)
+    self.assertEqual(['foo', 'bar', 'baz'], target.payload.service_writer_options)
 
   def test_invalid_service_writer_opts(self):
     with self.assertRaisesRegexp(TargetDefinitionException,

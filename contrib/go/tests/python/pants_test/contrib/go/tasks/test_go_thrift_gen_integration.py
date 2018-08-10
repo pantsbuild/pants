@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from contextlib import contextmanager
@@ -109,7 +108,7 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
         root = os.path.join(workdir, 'gen', 'go-thrift', hash_dir,
                             target_dir.replace(os.path.sep, '.'), 'current')
 
-        self.assertEquals(sorted(['src/go/thrifttest/duck/constants.go',
+        self.assertEqual(sorted(['src/go/thrifttest/duck/constants.go',
                                   'src/go/thrifttest/duck/ttypes.go',
                                   'src/go/thrifttest/duck/feeder.go',
                                   'src/go/thrifttest/duck/feeder-remote/feeder-remote.go']),
@@ -130,7 +129,7 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
       with self._create_thrift_project(thrift_files) as (srcdir, config):
         args = [
             # Necessary to use a newer thrift version.
-            '--thrift-binary-version=0.10.0',
+            '--thrift-version=0.10.0',
             'compile',
             os.path.join(srcdir, 'src/go/usethrift')
           ]

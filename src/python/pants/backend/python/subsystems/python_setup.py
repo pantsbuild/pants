@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -20,13 +19,6 @@ class PythonSetup(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(PythonSetup, cls).register_options(register)
-    # Note: This replaces two options:
-    # A) The global --interpreter option in the old python tasks.
-    #    That flag is only relevant in the python backend, and should never have been
-    #    global to begin with.
-    # B) The --interpreter-requirement option above.  That flag merely served to set the
-    #    effective default for when no other constraints were set, so we might as well
-    #    roll that into the more general constraints.
     register('--interpreter-constraints', advanced=True, default=['CPython>=2.7,<3'], type=list,
              metavar='<requirement>',
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
@@ -34,7 +26,7 @@ class PythonSetup(Subsystem):
                   "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
                   "be ORed together. These constraints are applied in addition to any "
                   "compatibilities required by the relevant targets.")
-    register('--setuptools-version', advanced=True, default='30.0.0',
+    register('--setuptools-version', advanced=True, default='33.1.1',
              help='The setuptools version for this python environment.')
     register('--wheel-version', advanced=True, default='0.29.0',
              help='The wheel version for this python environment.')
@@ -64,11 +56,24 @@ class PythonSetup(Subsystem):
              help='A list of paths to search for python interpreters. Note that if a PEX_PYTHON_PATH '
               'variable is defined in a pexrc file, those interpreter paths will take precedence over ' 
               'this option.')
+    register('--resolver-blacklist', advanced=True, type=dict, default={},
+             metavar='<blacklist>',
+             help='A blacklist dict (str->str) that maps package name to an interpreter '
+              'constraint. If a package name is in the blacklist and its interpreter '
+              'constraint matches the target interpreter, skip the requirement. This is needed '
+              'to ensure that universal requirement resolves for a target interpreter version do '
+              'not error out on interpreter specific requirements such as backport libs like '
+              '`functools32`. For example, a valid blacklist is {"functools32": "CPython>3"}. '
+              'NOTE: this keyword is a temporary fix and will be reverted per: '
+              'https://github.com/pantsbuild/pants/issues/5696. The long term '
+              'solution is tracked by: https://github.com/pantsbuild/pex/issues/456.')
+    register('--resolver-use-manylinux', advanced=True, type=bool, default=True, fingerprint=True,
+             help='Whether to consider manylinux wheels when resolving requirements for linux '
+                  'platforms.')
 
   @property
   def interpreter_constraints(self):
-    return (self.get_options().interpreter_constraints or self.get_options().interpreter or
-            [self.get_options().interpreter_requirement or b''])
+    return tuple(self.get_options().interpreter_constraints)
 
   @property
   def interpreter_search_paths(self):
@@ -110,6 +115,14 @@ class PythonSetup(Subsystem):
     return self.get_options().resolver_allow_prereleases
 
   @property
+  def resolver_blacklist(self):
+    return self.get_options().resolver_blacklist
+
+  @property
+  def use_manylinux(self):
+    return self.get_options().resolver_use_manylinux
+
+  @property
   def artifact_cache_dir(self):
     """Note that this is unrelated to the general pants artifact cache."""
     return (self.get_options().artifact_cache_dir or
@@ -118,6 +131,10 @@ class PythonSetup(Subsystem):
   @property
   def scratch_dir(self):
     return os.path.join(self.get_options().pants_workdir, *self.options_scope.split('.'))
+
+  def compatibility_or_constraints(self, target):
+    """Return either the compatibility of the given target, or the interpreter constraints."""
+    return tuple(target.compatibility or self.interpreter_constraints)
 
   def setuptools_requirement(self):
     return self._failsafe_parse('setuptools=={0}'.format(self.setuptools_version))

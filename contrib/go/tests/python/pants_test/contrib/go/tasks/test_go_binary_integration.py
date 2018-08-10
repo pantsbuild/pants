@@ -2,8 +2,7 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.util.dirutil import safe_delete
 from pants.util.process_handler import subprocess
@@ -20,4 +19,4 @@ class GoBinaryIntegrationTest(PantsRunIntegrationTest):
             'contrib/go/examples/src/go/hello']
     pants_run = self.run_pants(args, extra_env={"GOOS": "windows"})
     self.assert_success(pants_run)
-    self.assertIn("for MS Windows", subprocess.check_output(["file", output_file]))
+    self.assertIn(b"for MS Windows", subprocess.check_output(["file", output_file]))

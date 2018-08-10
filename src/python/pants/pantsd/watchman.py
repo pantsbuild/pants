@@ -2,13 +2,13 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import json
 import logging
 import os
+from builtins import str
 from collections import namedtuple
 
 from pants.pantsd.process_manager import ProcessManager
@@ -76,13 +76,13 @@ class Watchman(ProcessManager):
 
   def _normalize_watchman_path(self, watchman_path):
     if not self._is_valid_executable(watchman_path):
-      raise self.ExecutionError('invalid watchman binary at {}!'.format(watchman_path))
+      raise ProcessManager.ExecutionError('invalid watchman binary at {}!'.format(watchman_path))
     return os.path.abspath(watchman_path)
 
   def _maybe_init_metadata(self):
     safe_mkdir(self._watchman_work_dir)
     # Initialize watchman with an empty, but valid statefile so it doesn't complain on startup.
-    safe_file_dump(self._state_file, '{}')
+    safe_file_dump(self._state_file, b'{}')
 
   def _construct_cmd(self, cmd_parts, state_file, sock_file, pid_file, log_file, log_level):
     return [part for part in cmd_parts] + ['--no-save-state',
@@ -100,11 +100,11 @@ class Watchman(ProcessManager):
     except ValueError:
       # JSON parse failure.
       self._logger.critical('invalid output from watchman!\n{output!s}'.format(output=output))
-      raise self.InvalidCommandOutput(output)
+      raise ProcessManager.InvalidCommandOutput(output)
     except KeyError:
       # Key access error on 'pid' - bad output from watchman.
       self._logger.critical('no pid from watchman!')
-      raise self.InvalidCommandOutput(output)
+      raise ProcessManager.InvalidCommandOutput(output)
 
   def launch(self):
     """Launch and synchronously write metadata.
@@ -134,7 +134,7 @@ class Watchman(ProcessManager):
     # to give the server-side socket setup a few chances to quiesce before potentially orphaning it.
 
     get_output = functools.partial(self.get_subprocess_output, cmd)
-    output = retry_on_exception(get_output, 3, (self.ExecutionError,), lambda n: n * .5)
+    output = retry_on_exception(get_output, 3, (ProcessManager.ExecutionError,), lambda n: n * .5)
 
     # Parse the watchman PID from the cli output.
     pid = self._parse_pid_from_output(output)

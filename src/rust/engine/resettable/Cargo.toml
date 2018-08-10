@@ -1,0 +1,7 @@
+[package]
+name = "resettable"
+version = "0.0.1"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
+
+[dependencies]

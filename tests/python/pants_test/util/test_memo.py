@@ -2,12 +2,14 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
+from builtins import object
 
-from pants.util.memo import memoized, memoized_property, per_instance, testable_memoized_property
+from pants.util.memo import (memoized, memoized_classmethod, memoized_classproperty,
+                             memoized_method, memoized_property, memoized_staticmethod,
+                             memoized_staticproperty, per_instance, testable_memoized_property)
 
 
 class MemoizeTest(unittest.TestCase):
@@ -220,6 +222,61 @@ class MemoizeTest(unittest.TestCase):
         @property
         def name(self):
           pass
+
+  def test_memoized_method(self):
+    class Foo(object):
+      _x = 'x0'
+
+      @memoized_method
+      def method(self, y):
+        return self._x + y
+
+    foo = Foo()
+    self.assertEqual('x0y0', foo.method('y0'))
+    Foo._x = 'x1'
+    self.assertEqual('x0y0', foo.method('y0'))
+    # The (foo, 'y1') pair is the cache key, which is different than the previous (foo, 'y0'), so we
+    # recalculate, and in the process read the new value of `Foo._x`.
+    self.assertEqual('x1y1', foo.method('y1'))
+
+  def test_memoized_class_methods(self):
+    externally_scoped_value = 'e0'
+
+    class Foo(object):
+      _x = 'x0'
+
+      @memoized_classmethod
+      def class_method(cls, y):
+        return cls._x + y
+
+      @memoized_classproperty
+      def class_property(cls):
+        return cls._x
+
+      @memoized_staticmethod
+      def static_method(z):
+        return externally_scoped_value + z
+
+      @memoized_staticproperty
+      def static_property():
+        return externally_scoped_value
+
+    self.assertEqual('x0', Foo.class_property)
+    self.assertEqual('x0y0', Foo.class_method('y0'))
+    self.assertEqual('e0', Foo.static_property)
+    self.assertEqual('e0z0', Foo.static_method('z0'))
+
+    Foo._x = 'x1'
+    # The property is cached.
+    self.assertEqual('x0', Foo.class_property)
+    # The method is cached for previously made calls only.
+    self.assertEqual('x0y0', Foo.class_method('y0'))
+    self.assertEqual('x1y1', Foo.class_method('y1'))
+
+    externally_scoped_value = 'e1'
+    self.assertEqual('e0', Foo.static_property)
+    self.assertEqual('e0z0', Foo.static_method('z0'))
+    self.assertEqual('e1z1', Foo.static_method('z1'))
 
   def test_descriptor_application_valid(self):
     class Foo(self._Called):

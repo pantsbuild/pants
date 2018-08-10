@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
@@ -15,10 +14,10 @@ import pywatchman
 
 from pants.pantsd.watchman import Watchman
 from pants.pantsd.watchman_client import StreamableWatchmanClient
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class TestWatchman(BaseTest):
+class TestWatchman(TestBase):
   PATCH_OPTS = dict(autospec=True, spec_set=True)
   BUILD_ROOT = '/path/to/a/fake/build_root'
   WATCHMAN_PATH = '/path/to/a/fake/watchman'
@@ -44,7 +43,7 @@ class TestWatchman(BaseTest):
 
   def test_client_property_cached(self):
     self.watchman._watchman_client = 1
-    self.assertEquals(self.watchman.client, 1)
+    self.assertEqual(self.watchman.client, 1)
 
   def test_make_client(self):
     self.assertIsInstance(self.watchman._make_client(), pywatchman.client)
@@ -73,7 +72,7 @@ class TestWatchman(BaseTest):
                                           'log_file',
                                           'log_level')
 
-    self.assertEquals(output, ['cmd',
+    self.assertEqual(output, ['cmd',
                                'parts',
                                'etc',
                                '--no-save-state',
@@ -87,16 +86,16 @@ class TestWatchman(BaseTest):
 
   def test_parse_pid_from_output(self):
     output = json.dumps(dict(pid=3))
-    self.assertEquals(self.watchman._parse_pid_from_output(output), 3)
+    self.assertEqual(self.watchman._parse_pid_from_output(output), 3)
 
   def test_parse_pid_from_output_bad_output(self):
     output = '{bad JSON.,/#!'
-    with self.assertRaises(self.watchman.InvalidCommandOutput):
+    with self.assertRaises(Watchman.InvalidCommandOutput):
       self.watchman._parse_pid_from_output(output)
 
   def test_parse_pid_from_output_no_pid(self):
     output = json.dumps(dict(nothing=True))
-    with self.assertRaises(self.watchman.InvalidCommandOutput):
+    with self.assertRaises(Watchman.InvalidCommandOutput):
       self.watchman._parse_pid_from_output(output)
 
   def test_launch(self):
@@ -128,13 +127,13 @@ class TestWatchman(BaseTest):
     """Test yielding when watchman reads timeout."""
     with self.setup_subscribed([None]):
       out = self.watchman.subscribed(self.BUILD_ROOT, self.HANDLERS)
-      self.assertEquals(list(out), [(None, None)])
+      self.assertEqual(list(out), [(None, None)])
 
   def test_subscribed_response(self):
     """Test yielding on the watchman response to the initial subscribe command."""
     with self.setup_subscribed([dict(subscribe='test')]):
       out = self.watchman.subscribed(self.BUILD_ROOT, self.HANDLERS)
-      self.assertEquals(list(out), [(None, None)])
+      self.assertEqual(list(out), [(None, None)])
 
   def test_subscribed_event(self):
     """Test yielding on a watchman event for a given subscription."""
@@ -142,10 +141,10 @@ class TestWatchman(BaseTest):
 
     with self.setup_subscribed([test_event]):
       out = self.watchman.subscribed(self.BUILD_ROOT, self.HANDLERS)
-      self.assertEquals(list(out), [('test3', test_event)])
+      self.assertEqual(list(out), [('test3', test_event)])
 
   def test_subscribed_unknown_event(self):
     """Test yielding on an unknown watchman event."""
     with self.setup_subscribed([dict(unknown=True)]):
       out = self.watchman.subscribed(self.BUILD_ROOT, self.HANDLERS)
-      self.assertEquals(list(out), [])
+      self.assertEqual(list(out), [])

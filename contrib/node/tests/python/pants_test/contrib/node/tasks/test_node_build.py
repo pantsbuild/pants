@@ -2,16 +2,16 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import shutil
+from builtins import open
 from textwrap import dedent
 
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_mkdtemp
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.tasks.node_build import NodeBuild as NodeBuildTask
@@ -60,24 +60,24 @@ class TestNodeBuild(TaskTestBase):
       [(target, None), (node_dependent_module, None)])
 
     node_dependent_paths = self._get_all_bundleable_js_path(bundleable_js, node_dependent_module)
-    self.assertEquals(1, len(node_dependent_paths))
-    self.assertEquals(
+    self.assertEqual(1, len(node_dependent_paths))
+    self.assertEqual(
       os.path.normpath(node_dependent_paths[0]),
       os.path.normpath(node_paths.node_path(node_dependent_module)))
     target_paths = self._get_all_bundleable_js_path(bundleable_js, target)
-    self.assertEquals(1, len(target_paths))
-    self.assertEquals(
+    self.assertEqual(1, len(target_paths))
+    self.assertEqual(
       os.path.normpath(target_paths[0]),
       os.path.normpath(node_paths.node_path(target)))
 
     node_dependent_classpath = runtime_classpath.get_for_target(node_dependent_module)
-    self.assertEquals(1, len(node_dependent_classpath))
-    self.assertEquals(
+    self.assertEqual(1, len(node_dependent_classpath))
+    self.assertEqual(
       os.path.realpath(os.path.join(node_dependent_classpath[0][1], node_dependent_module_name)),
       os.path.realpath(node_paths.node_path(node_dependent_module)))
     target_classpaths = runtime_classpath.get_for_target(target)
-    self.assertEquals(1, len(target_classpaths))
-    self.assertEquals(
+    self.assertEqual(1, len(target_classpaths))
+    self.assertEqual(
       os.path.realpath(os.path.join(target_classpaths[0][1], target_name)),
       os.path.realpath(node_paths.node_path(target)))
 
@@ -122,13 +122,13 @@ class TestNodeBuild(TaskTestBase):
     target_paths = self._get_all_bundleable_js_path(bundleable_js, target)
     target_classpaths = runtime_classpath.get_for_target(target)
 
-    self.assertEquals(
+    self.assertEqual(
       os.path.realpath(target_paths[0]),
       os.path.realpath(os.path.join(target_classpaths[0][1], 'build_test')))
     self.assertTrue(os.path.realpath(target_paths[0]).endswith('myOutput'))
-    self.assertEquals(set(os.listdir(target_paths[0])), set(['output_file']))
-    with open(os.path.join(target_paths[0], 'output_file')) as f:
-      self.assertEquals(f.read(), 'Hello, world!\n')
+    self.assertEqual(set(os.listdir(target_paths[0])), set(['output_file']))
+    with open(os.path.join(target_paths[0], 'output_file'), 'r') as f:
+      self.assertEqual(f.read(), 'Hello, world!\n')
 
   def test_run_non_existing_script(self):
     package_json_file = self.create_file(

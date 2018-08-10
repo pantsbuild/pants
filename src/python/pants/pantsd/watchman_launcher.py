@@ -2,12 +2,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+from builtins import object
 
-from pants.binaries.binary_util import BinaryUtilPrivate
+from pants.binaries.binary_util import BinaryToolFetcher, BinaryUtil
 from pants.pantsd.watchman import Watchman
 from pants.util.memo import testable_memoized_property
 
@@ -20,12 +20,15 @@ class WatchmanLauncher(object):
     """
     :param Options bootstrap_options: The bootstrap options bag.
     """
-    binary_util = BinaryUtilPrivate(
-      bootstrap_options.binaries_baseurls,
-      bootstrap_options.binaries_fetch_timeout_secs,
-      bootstrap_options.pants_bootstrapdir,
-      bootstrap_options.binaries_path_by_id
-    )
+    binary_tool_fetcher = BinaryToolFetcher(
+      bootstrap_dir=bootstrap_options.pants_bootstrapdir,
+      timeout_secs=bootstrap_options.binaries_fetch_timeout_secs)
+    binary_util = BinaryUtil(
+      baseurls=bootstrap_options.binaries_baseurls,
+      binary_tool_fetcher=binary_tool_fetcher,
+      path_by_id=bootstrap_options.binaries_path_by_id,
+      # TODO(cosmicexplorer): do we need to test this?
+      allow_external_binary_tool_downloads=bootstrap_options.allow_external_binary_tool_downloads)
 
     return WatchmanLauncher(
       binary_util,
@@ -87,7 +90,7 @@ class WatchmanLauncher(object):
       self._logger.debug('launching watchman')
       try:
         self.watchman.launch()
-      except (self.watchman.ExecutionError, self.watchman.InvalidCommandOutput) as e:
+      except (Watchman.ExecutionError, Watchman.InvalidCommandOutput) as e:
         self._logger.fatal('failed to launch watchman: {!r})'.format(e))
         raise
 

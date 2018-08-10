@@ -2,16 +2,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
-import urlparse
+from builtins import object, range, zip
 from collections import Counter, deque
 from contextlib import contextmanager
 from multiprocessing.pool import ThreadPool
 
 import requests
-from six.moves import range
+from future.moves.urllib.parse import urlparse
 
 from pants.cache.artifact_cache import ArtifactCacheError
 from pants.util.contextutil import Timer
@@ -69,7 +68,7 @@ class Pinger(object):
     rt_secs = pool.map(self.ping, urls, chunksize=1)
     pool.close()
     pool.join()
-    return zip(urls, rt_secs)
+    return list(zip(urls, rt_secs))
 
 
 class BestUrlSelector(object):
@@ -90,7 +89,7 @@ class BestUrlSelector(object):
     self.max_failures = max_failures
 
   def _parse_urls(self, urls):
-    parsed_urls = [urlparse.urlparse(url) for url in urls]
+    parsed_urls = [urlparse(url) for url in urls]
     for parsed_url in parsed_urls:
       if not parsed_url.scheme in self.SUPPORTED_PROTOCOLS:
         raise InvalidRESTfulCacheProtoError(

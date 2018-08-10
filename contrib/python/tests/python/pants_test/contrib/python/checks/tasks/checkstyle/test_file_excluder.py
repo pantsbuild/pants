@@ -2,13 +2,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import textwrap
 
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 from pants.contrib.python.checks.tasks.checkstyle.file_excluder import FileExcluder
 
@@ -16,7 +15,7 @@ from pants.contrib.python.checks.tasks.checkstyle.file_excluder import FileExclu
 logger = logging.getLogger(__name__)
 
 
-class TestExcluder(BaseTest):
+class TestExcluder(TestBase):
 
   def setUp(self):
     super(TestExcluder, self).setUp()

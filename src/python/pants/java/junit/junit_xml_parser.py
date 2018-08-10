@@ -2,11 +2,11 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import fnmatch
 import os
+from builtins import object
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -16,7 +16,7 @@ from pants.util.objects import datatype
 from pants.util.xml_parser import XmlParser
 
 
-class Test(datatype('Test', ['classname', 'methodname'])):
+class Test(datatype(['classname', 'methodname'])):
   """Describes a junit-style test or collection of tests."""
 
   def __new__(cls, classname, methodname=None):
@@ -100,20 +100,20 @@ class RegistryOfTests(object):
 class ParseError(Exception):
   """Indicates an error parsing a junit xml report file."""
 
-  def __init__(self, junit_xml_path, cause):
+  def __init__(self, xml_path, cause):
     super(ParseError, self).__init__('Error parsing test result file {}: {}'
-                                     .format(junit_xml_path, cause))
-    self._junit_xml_path = junit_xml_path
+                                     .format(xml_path, cause))
+    self._xml_path = xml_path
     self._cause = cause
 
   @property
-  def junit_xml_path(self):
+  def xml_path(self):
     """Return the path of the file the parse error was encountered in.
 
     :return: The path of the file the parse error was encountered in.
     :rtype: string
     """
-    return self._junit_xml_path
+    return self._xml_path
 
   @property
   def cause(self):

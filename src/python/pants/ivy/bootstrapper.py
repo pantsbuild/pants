@@ -2,13 +2,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import logging
 import os
 import shutil
+from builtins import map, object, open
 
 from pants.base.build_environment import get_buildroot
 from pants.ivy.ivy import Ivy
@@ -87,7 +87,7 @@ class Bootstrapper(object):
     """
     return Ivy(self._get_classpath(bootstrap_workunit_factory),
                ivy_settings=self._ivy_subsystem.get_options().ivy_settings,
-               ivy_cache_dir=self._ivy_subsystem.get_options().cache_dir,
+               ivy_resolution_cache_dir=self._ivy_subsystem.resolution_cache_dir(),
                extra_jvm_options=self._ivy_subsystem.extra_jvm_options())
 
   def _get_classpath(self, workunit_factory):
@@ -107,10 +107,10 @@ class Bootstrapper(object):
                                      'tools', 'jvm', 'ivy')
     digest = hashlib.sha1()
     if os.path.isfile(self._version_or_ivyxml):
-      with open(self._version_or_ivyxml) as fp:
+      with open(self._version_or_ivyxml, 'rb') as fp:
         digest.update(fp.read())
     else:
-      digest.update(self._version_or_ivyxml)
+      digest.update(self._version_or_ivyxml.encode('utf-8'))
     classpath = os.path.join(ivy_bootstrap_dir, '{}.classpath'.format(digest.hexdigest()))
 
     if not os.path.exists(classpath):
@@ -127,7 +127,7 @@ class Bootstrapper(object):
         safe_delete(classpath)
         raise self.Error('Failed to bootstrap an ivy classpath! {}'.format(e))
 
-    with open(classpath) as fp:
+    with open(classpath, 'r') as fp:
       cp = fp.read().strip().split(os.pathsep)
       if not all(map(os.path.exists, cp)):
         safe_delete(classpath)
@@ -159,5 +159,5 @@ class Bootstrapper(object):
 
     return Ivy(bootstrap_jar_path,
                ivy_settings=options.bootstrap_ivy_settings or options.ivy_settings,
-               ivy_cache_dir=options.cache_dir,
+               ivy_resolution_cache_dir=self._ivy_subsystem.resolution_cache_dir(),
                extra_jvm_options=self._ivy_subsystem.extra_jvm_options())

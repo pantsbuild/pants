@@ -2,20 +2,23 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
 import re
+from builtins import str
 from types import GeneratorType
 
-from pants.binaries.binary_util import BinaryUtilPrivate
-from pants.engine.addressable import SubclassesOf, addressable_list
+from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.binaries.binary_util import BinaryUtil
+from pants.engine.addressable import addressable_list
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
-from pants.engine.rules import RuleIndex
-from pants.engine.scheduler import WrappedNativeScheduler
+from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Get
 from pants.engine.struct import HasProducts, Struct
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
+from pants.util.objects import SubclassesOf
 from pants_test.option.util.fakes import create_options_for_optionables
 from pants_test.subsystem.subsystem_util import init_subsystem
 
@@ -82,17 +85,22 @@ def run_rule(rule, *args):
 
 def init_native():
   """Initialize and return a `Native` instance."""
-  init_subsystem(BinaryUtilPrivate.Factory)
+  init_subsystem(BinaryUtil.Factory)
   opts = create_options_for_optionables([])
   return Native.create(opts.for_global_scope())
 
 
-def create_native_scheduler(rules):
-  """Create a WrappedNativeScheduler, with an initialized native instance."""
-  rule_index = RuleIndex.create(rules)
+def create_scheduler(rules, validate=True):
+  """Create a Scheduler."""
   native = init_native()
-  scheduler = WrappedNativeScheduler(native, '.', './.pants.d', [], rule_index)
-  return scheduler
+  return Scheduler(
+    native,
+    FileSystemProjectTree(os.getcwd()),
+    './.pants.d',
+    rules,
+    execution_options=DEFAULT_EXECUTION_OPTIONS,
+    validate=validate,
+  )
 
 
 class Target(Struct, HasProducts):

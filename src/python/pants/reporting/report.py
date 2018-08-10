@@ -2,11 +2,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import threading
 import time
+from builtins import object
 
 
 class ReportingError(Exception):
@@ -128,7 +128,7 @@ class Report(object):
     # Assumes self._lock is held by the caller.
     for workunit in self._workunits.values():
       for label, output in workunit.outputs().items():
-        s = output.read()
+        s = output.read().decode('utf-8')
         if len(s) > 0:
           for reporter in self._reporters.values():
             reporter.handle_output(workunit, label, s)

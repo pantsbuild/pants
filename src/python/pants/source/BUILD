@@ -2,7 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  sources = globs('*.py', exclude=[globs('payload_fields.py')]),
   dependencies=[
+    '3rdparty/python:future',
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/base:build_environment',
@@ -13,4 +15,13 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ]
+)
+
+python_library(
+  name = 'payload_fields',
+  sources = ['payload_fields.py'],
+  dependencies = [
+    ':source',
+    'src/python/pants/engine:fs',
+  ],
 )

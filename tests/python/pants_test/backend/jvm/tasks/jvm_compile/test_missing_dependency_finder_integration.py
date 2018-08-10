@@ -2,8 +2,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
 
@@ -34,7 +33,7 @@ class MissingDependencyFinderIntegrationTest(PantsRunIntegrationTest):
       '--compile-zinc-buildozer=path/to/buildozer',
     ])
     self.assert_failure(run)
-    self.assertTrue(re.search("path/to/buildozer 'add dependencies 3rdparty:guava' " + target,
+    self.assertTrue(re.search("\n *path/to/buildozer 'add dependencies 3rdparty:guava' " + target,
                               run.stdout_data,
                               re.DOTALL))
 

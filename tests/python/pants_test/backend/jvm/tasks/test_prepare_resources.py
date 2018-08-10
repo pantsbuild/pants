@@ -2,10 +2,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -13,7 +13,7 @@ from pants.backend.jvm.tasks.prepare_resources import PrepareResources
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.util.contextutil import temporary_dir
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 class PrepareResourcesTest(TaskTestBase):
@@ -95,7 +95,7 @@ class PrepareResourcesTest(TaskTestBase):
         for f in files:
           abs_path = os.path.join(root, f)
           rel_path = os.path.relpath(abs_path, chroot)
-          with open(abs_path) as fp:
+          with open(abs_path, 'r') as fp:
             self.assertEqual(rel_path, fp.read())
           resource_files.append(rel_path)
       self.assertEqual(sorted(['a/b.txt', 'c.txt']), sorted(resource_files))

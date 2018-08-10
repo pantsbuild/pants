@@ -13,20 +13,11 @@ python_library(
   name = 'git',
   sources = ['git.py'],
   dependencies = [
+    '3rdparty/python:future',
     ':scm',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:process_handler',
     'src/python/pants/util:strutil',
-  ],
-)
-
-python_library(
-  name = 'change_calculator',
-  sources = ['change_calculator.py'],
-  dependencies = [
-    'src/python/pants/base:specs',
-    'src/python/pants/build_graph',
-    'src/python/pants/goal:workspace',
   ],
 )

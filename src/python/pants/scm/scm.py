@@ -2,8 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from abc import abstractmethod, abstractproperty
 
@@ -133,7 +132,7 @@ class Scm(AbstractClass):
     """
 
   @abstractmethod
-  def commit(self, message):
+  def commit(self, message, verify=True):
     """Commits all the changes for tracked files in the local workspace.
 
     Subclasses should raise LocalException if there is a problem making the commit.

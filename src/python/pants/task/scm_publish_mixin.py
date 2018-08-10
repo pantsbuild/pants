@@ -2,12 +2,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
 import traceback
 from abc import abstractmethod
+from builtins import object, range
 
 from pants.base.exceptions import TaskError
 from pants.scm.scm import Scm
@@ -158,6 +158,9 @@ class ScmPublishMixin(object):
              help='Allow pushes only from one of these branches.')
     register('--restrict-push-urls', advanced=True, type=list,
              help='Allow pushes to only one of these urls.')
+    register('--verify-commit', advanced=True, type=bool, default=True,
+             help='Whether or not to "verify" commits made using SCM publishing. For git, this '
+                  'means running commit hooks.')
 
   @property
   def restrict_push_branches(self):
@@ -205,7 +208,8 @@ class ScmPublishMixin(object):
   def commit_pushdb(self, coordinates, postscript=None):
     """Commit changes to the pushdb with a message containing the provided coordinates."""
     self.scm.commit('pants build committing publish data for push of {coordinates}'
-                    '{postscript}'.format(coordinates=coordinates, postscript=postscript or ''))
+                    '{postscript}'.format(coordinates=coordinates, postscript=postscript or ''),
+                    verify=self.get_options().verify_commit)
 
   def publish_pushdb_changes_to_remote_scm(self, pushdb_file, coordinate, tag_name, tag_message,
                                            postscript=None):

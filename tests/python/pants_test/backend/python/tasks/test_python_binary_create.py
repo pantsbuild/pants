@@ -2,10 +2,10 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 from textwrap import dedent
 
 from pants.backend.python.tasks.gather_sources import GatherSources
@@ -22,9 +22,9 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
   def task_type(cls):
     return PythonBinaryCreate
 
-  @property
-  def alias_groups(self):
-    return super(PythonBinaryCreateTest, self).alias_groups.merge(register_core())
+  @classmethod
+  def alias_groups(cls):
+    return super(PythonBinaryCreateTest, cls).alias_groups().merge(register_core())
 
   def _assert_pex(self, binary, expected_output=None, expected_shebang=None):
     # The easiest way to create products required by the PythonBinaryCreate task is to
@@ -49,21 +49,21 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
     products = context.products.get('deployable_archives')
     self.assertIsNotNone(products)
     product_data = products.get(binary)
-    product_basedir = product_data.keys()[0]
-    self.assertEquals(product_data[product_basedir], [pex_name])
+    product_basedir = list(product_data.keys())[0]
+    self.assertEqual(product_data[product_basedir], [pex_name])
 
     # Check pex copy.
     pex_copy = os.path.join(self.build_root, 'dist', pex_name)
     self.assertTrue(os.path.isfile(pex_copy))
 
     # Check that the pex runs.
-    output = subprocess.check_output(pex_copy)
+    output = subprocess.check_output(pex_copy).decode('utf-8')
     if expected_output:
       self.assertEqual(expected_output, output)
 
     # Check that the pex has the expected shebang.
     if expected_shebang:
-      with open(pex_copy, 'r') as pex:
+      with open(pex_copy, 'rb') as pex:
         line = pex.readline()
         self.assertEqual(expected_shebang, line)
 
@@ -84,6 +84,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
     self.create_library('src/things', 'files', 'things', sources=['loose_file'])
     self.create_file('src/things/loose_file', 'data!')
     self.create_python_library('src/python/lib', 'lib', {'lib.py': dedent("""
+    import io
     import os
     import sys
 
@@ -91,7 +92,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
     def main():
       here = os.path.dirname(__file__)
       loose_file = os.path.join(here, '../src/things/loose_file')
-      with open(os.path.realpath(loose_file)) as fp:
+      with io.open(os.path.realpath(loose_file), 'r') as fp:
         sys.stdout.write(fp.read())
     """)})
 
@@ -109,4 +110,4 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
                                        shebang='/usr/bin/env python2',
                                        dependencies=['src/python/lib'])
 
-    self._assert_pex(binary, expected_output='Hello World!\n', expected_shebang='#!/usr/bin/env python2\n')
+    self._assert_pex(binary, expected_output='Hello World!\n', expected_shebang=b'#!/usr/bin/env python2\n')

@@ -2,8 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import inspect
 from abc import abstractmethod, abstractproperty
@@ -71,7 +70,9 @@ class Serializable(AbstractClass):
 
     :rtype: bool
     """
-    return isinstance(obj, Serializable) or (not inspect.isclass(obj) and hasattr(obj, '_asdict'))
+    if inspect.isclass(obj):
+      return Serializable.is_serializable_type(obj)
+    return isinstance(obj, Serializable) or hasattr(obj, '_asdict')
 
   @staticmethod
   def is_serializable_type(type_):
@@ -79,7 +80,9 @@ class Serializable(AbstractClass):
 
     :rtype: bool
     """
-    return issubclass(type_, Serializable) or (inspect.isclass(type_) and hasattr(type_, '_asdict'))
+    if not inspect.isclass(type_):
+      return Serializable.is_serializable(type_)
+    return issubclass(type_, Serializable) or hasattr(type_, '_asdict')
 
   @abstractmethod
   def _asdict(self):

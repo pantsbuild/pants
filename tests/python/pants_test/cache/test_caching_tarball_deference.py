@@ -2,31 +2,31 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.base.payload import Payload
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.cache.cache_setup import CacheFactory, CacheSetup
 from pants.task.task import Task
 from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_open
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.task_test_base import TaskTestBase
 
 
 SYMLINK_NAME = 'link'
 DUMMY_FILE_NAME = 'dummy'
-DUMMY_FILE_CONTENT = 'dummy_content'
+DUMMY_FILE_CONTENT = b'dummy_content'
 
 
 class DummyCacheLibrary(Target):
-  def __init__(self, address, source, *args, **kwargs):
+  def __init__(self, address, sources, *args, **kwargs):
     payload = Payload()
-    payload.add_fields({'sources': self.create_sources_field(sources=[source],
+    payload.add_fields({'sources': self.create_sources_field(sources=sources,
                                                              sources_rel_path=address.spec_path)})
-    self.source = source
     super(DummyCacheLibrary, self).__init__(address=address, payload=payload, *args, **kwargs)
 
 
@@ -67,6 +67,10 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
   _filename = 'f'
 
   @classmethod
+  def alias_groups(cls):
+    return BuildFileAliases(targets={'dummy_cache_library': DummyCacheLibrary})
+
+  @classmethod
   def task_type(cls):
     return DummyCacheTask
 
@@ -83,7 +87,7 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
     return os.path.join(
       self.artifact_cache,
       CacheFactory.make_task_cache_dirname(self.task),
-      self.target.id,
+      self._target.id,
       '{}.tgz'.format(vt.cache_key.hash),
     )
 
@@ -113,8 +117,9 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
       regular_file=regular_file,
       regular_file_in_results_dir=regular_file_in_results_dir
     )
-    self.target = self.make_target(':t', target_type=DummyCacheLibrary, source=self._filename)
-    context = self.context(for_task_types=[DummyCacheTask], target_roots=[self.target])
+    self.add_to_build_file('', 'dummy_cache_library(name = "t", source = "{}")'.format(self._filename))
+    self._target = self.target(':t')
+    context = self.context(for_task_types=[DummyCacheTask], target_roots=[self._target])
     self.task = self.create_task(context)
 
   def _assert_dereferenced_symlink_in_cache(self, all_vts):
@@ -132,7 +137,7 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
           os.path.islink(file_path)
           , "{} in artifact {} should not be a symlink but it is.".format(SYMLINK_NAME, artifact_address)
         )
-        with open(file_path, 'r') as f:
+        with open(file_path, 'rb') as f:
           self.assertEqual(DUMMY_FILE_CONTENT, f.read())
 
   # Cache creation should fail because the symlink destination is non-existent.
@@ -161,7 +166,7 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
         )
         # The destination of the symlink should be non-existent, hence IOError.
         with self.assertRaises(IOError):
-          with open(file_path, 'r') as f:
+          with open(file_path, 'rb') as f:
             f.read()
 
   # Symlink in cache should stay as a symlink, and so does the dst file.
@@ -182,7 +187,7 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
           os.path.islink(file_path),
           "{} in artifact {} should be a symlink but it is not.".format(SYMLINK_NAME, artifact_address)
         )
-        with open(file_path, 'r') as f:
+        with open(file_path, 'rb') as f:
           self.assertEqual(DUMMY_FILE_CONTENT, f.read())
 
   def test_cache_dereference_file_inside_results_dir(self):
