@@ -4,8 +4,106 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
-1.10.0dev1 (08/03/2018)
------------------------
+1.10.0.dev2 (08/10/2018)
+------------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add a `--loop` flag, to allow for running continuously (#6270)
+  `PR #6270 <https://github.com/pantsbuild/pants/pull/6270>`_
+
+Bugfixes
+~~~~~~~~
+
+* pantsrc file paths are always unicode (#6316)
+  `PR #6316 <https://github.com/pantsbuild/pants/pull/6316>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Relativize most paths in the zinc compile command line (#6322)
+  `PR #6322 <https://github.com/pantsbuild/pants/pull/6322>`_
+
+* A few misc cleanups (#6324)
+  `PR #6324 <https://github.com/pantsbuild/pants/pull/6324>`_
+
+* Use dependency ClasspathEntries, not merged strings (#6317)
+  `PR #6317 <https://github.com/pantsbuild/pants/pull/6317>`_
+
+* Register products when compilation finishes (#6315)
+  `PR #6315 <https://github.com/pantsbuild/pants/pull/6315>`_
+
+* ClasspathEntry optionally takes a DirectoryDigest (#6297)
+  `PR #6297 <https://github.com/pantsbuild/pants/pull/6297>`_
+
+* Cache more of rust. (#6309)
+  `PR #6309 <https://github.com/pantsbuild/pants/pull/6309>`_
+
+* Tighten up local process streaming. (#6307)
+  `PR #6307 <https://github.com/pantsbuild/pants/pull/6307>`_
+
+* Bump rust to 1.28 (#6306)
+  `PR #6306 <https://github.com/pantsbuild/pants/pull/6306>`_
+
+* Remove unused Task._build_invalidator root param. (#6308)
+  `PR #6308 <https://github.com/pantsbuild/pants/pull/6308>`_
+
+* Reinstate possibility of local process streaming. (#6300)
+  `PR #6300 <https://github.com/pantsbuild/pants/pull/6300>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Document Pants features for Organizations (#5673)
+  `PR #5673 <https://github.com/pantsbuild/pants/pull/5673>`_
+
+* Add Sigma to "Powered by Pants" page (#6314)
+  `PR #6314 <https://github.com/pantsbuild/pants/pull/6314>`_
+
+* Add contributor (#6312)
+  `PR #6312 <https://github.com/pantsbuild/pants/pull/6312>`_
+
+Migration to Python3 compatibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Skip known to fail tests in py3 (#6323)
+  `PR #6323 <https://github.com/pantsbuild/pants/pull/6323>`_
+
+* Strings are correctly returned from rust code (#6325)
+  `PR #6325 <https://github.com/pantsbuild/pants/pull/6325>`_
+
+* Switch to Py2 and Py3 shards. (#6289)
+  `PR #6289 <https://github.com/pantsbuild/pants/pull/6289>`_
+
+* Python 3 fixes - various bytes vs unicode issues (#6311)
+  `PR #6311 <https://github.com/pantsbuild/pants/pull/6311>`_
+
+* Always return unicode with hexdigest() (#6313)
+  `PR #6313 <https://github.com/pantsbuild/pants/pull/6313>`_
+
+* Specify unicode vs bytes for Path and FileContent types (#6303)
+  `PR #6303 <https://github.com/pantsbuild/pants/pull/6303>`_
+
+* Python 3 fixes - add open backport to contrib (#6295)
+  `PR #6295 <https://github.com/pantsbuild/pants/pull/6295>`_
+
+* Python 3 fixes - add open() backport to safe_open() (#6304)
+  `PR #6304 <https://github.com/pantsbuild/pants/pull/6304>`_
+  `PR #6290 <https://github.com/pantsbuild/pants/pull/6290>`_
+
+* Require the system encoding to be UTF-8 (#6305)
+  `PR #6305 <https://github.com/pantsbuild/pants/pull/6305>`_
+
+* Python 3 fixes - add open() backport stage 2 (#6291)
+  `PR #6291 <https://github.com/pantsbuild/pants/pull/6291>`_
+  `PR #6290 <https://github.com/pantsbuild/pants/pull/6290>`_
+
+* drop self from __init__ and __new__ (#6299)
+  `PR #6299 <https://github.com/pantsbuild/pants/pull/6299>`_
+
+1.10.0.dev1 (08/03/2018)
+------------------------
 
 New features
 ~~~~~~~~~~~~
@@ -67,8 +165,8 @@ Migration to Python3 compatibility
 * Python 3 fixes - fix contrib/python checkstyle (#6274)
   `PR #6274 <https://github.com/pantsbuild/pants/pull/6274>`_
 
-1.10.0dev0 (07/27/2018)
------------------------
+1.10.0.dev0 (07/27/2018)
+------------------------
 
 * Remove 1.10.x deprecations (#6268)
   `PR #6268 <https://github.com/pantsbuild/pants/pull/6268>`_
