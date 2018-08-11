@@ -52,12 +52,6 @@ def subsystem(scope):
 class OptionsTestBase(ContextutilTestBase):
 
   @contextmanager
-  def warnings_catcher(self):
-    with warnings.catch_warnings(record=True) as w:
-      warnings.simplefilter('always')
-      yield w
-
-  @contextmanager
   def stderr_catcher(self, expected_msg):
     with self.stdio_as_tempfiles(
         stdin_data='',
@@ -65,14 +59,6 @@ class OptionsTestBase(ContextutilTestBase):
         stderr_data=expected_msg,
         strict_text_match=False):
       yield
-
-  def assertWarning(self, w, option_string):
-    self.assertEquals(1, len(w))
-    self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
-    warning_message = str(w[-1].message)
-    self.assertIn("will be removed in version",
-                  warning_message)
-    self.assertIn(option_string, warning_message)
 
   @contextmanager
   def _write_config_to_file(self, fp, config):
@@ -845,11 +831,10 @@ class OptionsTest(OptionsTestBase):
       yield w
 
   def assertWarning(self, w, option_string):
-    self.assertEqual(1, len(w))
-    self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
-    warning_message = str(w[-1].message)
-    self.assertIn("will be removed in version",
-                  warning_message)
+    single_warning = assert_single_element(w)
+    self.assertEqual(single_warning.category, DeprecationWarning)
+    warning_message = single_warning.message
+    self.assertIn("will be removed in version", warning_message)
     self.assertIn(option_string, warning_message)
 
   def test_arbitrary_deprecation_matcher(self):
