@@ -190,6 +190,7 @@ def enum(field_name, all_values):
 
     @memoized_classproperty
     def _singletons(cls):
+      """Generate memoized instances this enum wrapping each of this enum's allowed values."""
       return {
         value: cls(value) for value in cls.allowed_values
       }
