@@ -7,8 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import io
 import os
 import shlex
-import tempfile
-import unittest
 import warnings
 from abc import abstractmethod
 from builtins import open, str
@@ -848,7 +846,7 @@ class OptionsTest(OptionsTestBase):
   def assertWarning(self, w, option_string):
     self.assertEqual(1, len(w))
     self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
-    warning_message = str(w[-1].message.args)
+    warning_message = str(w[-1].message)
     self.assertIn("will be removed in version",
                   warning_message)
     self.assertIn(option_string, warning_message)

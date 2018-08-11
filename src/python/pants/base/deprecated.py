@@ -85,12 +85,17 @@ def validate_removal_semver(removal_version):
 def get_frame_info(stacklevel, context=1):
   """Get a Traceback for the given `stacklevel`.
 
-  stacklevel=0 means this function's frame (get_frame_info()).
-  stacklevel=1 means the calling function's frame.
+  For example:
+  `stacklevel=0` means this function's frame (get_frame_info()).
+  `stacklevel=1` means the calling function's frame.
   See https://docs.python.org/2/library/inspect.html#inspect.getouterframes for more info.
+
+  NB: If `stacklevel` is greater than the number of actual frames, the outermost frame is used
+  instead.
   """
   frame_list = inspect.getouterframes(inspect.currentframe(), context=context)
-  return frame_list[stacklevel]
+  frame_stack_index = stacklevel if stacklevel < len(frame_list) else len(frame_list) - 1
+  return frame_list[frame_stack_index]
 
 
 def warn_or_error(removal_version, deprecated_entity_description, hint=None, stacklevel=3,
@@ -134,7 +139,7 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None, sta
         msg, DeprecationWarning, filename, line_number, line=context_lines)
       print(warning_msg, file=sys.stderr)
     else:
-      warnings.warn_explicit(msg, DeprecationWarning, filename, line_number, line=context_lines)
+      warnings.showwarning(msg, DeprecationWarning, filename, line_number, line=context_lines)
   else:
     raise CodeRemovedError(msg)
 
