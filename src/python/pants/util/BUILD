@@ -79,6 +79,9 @@ python_library(
 python_library(
   name = 'memo',
   sources = ['memo.py'],
+  dependencies = [
+      ':meta'
+  ],
 )
 
 python_library(

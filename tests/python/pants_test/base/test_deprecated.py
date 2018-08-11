@@ -13,6 +13,7 @@ from pants.base.deprecated import (BadDecoratorNestingError, BadRemovalVersionEr
                                    CodeRemovedError, MissingRemovalVersionError,
                                    NonDevRemovalVersionError, deprecated, deprecated_conditional,
                                    deprecated_module, warn_or_error)
+from pants.util.collections import assert_single_element
 from pants.version import PANTS_SEMVER, VERSION
 
 
@@ -24,9 +25,8 @@ class DeprecatedTest(unittest.TestCase):
     with warnings.catch_warnings(record=True) as seen_warnings:
       def assert_deprecation_warning():
         if deprecation_expected:
-          self.assertEqual(1, len(seen_warnings))
-          warning = seen_warnings[0]
-          self.assertIsInstance(warning.message, DeprecationWarning)
+          warning = assert_single_element(seen_warnings)
+          self.assertEqual(warning.category, DeprecationWarning)
           return warning.message
         else:
           self.assertEqual(0, len(seen_warnings))
