@@ -48,8 +48,8 @@ fn main() {
   let mut done = false;
   let mut counter: u64 = 0;
 
-  for worker_id in worker_ids.clone().into_iter() {
-    display.add_worker(String::from(worker_id));
+  for worker_id in worker_ids.clone() {
+    display.add_worker(worker_id);
     display.render();
     thread::sleep(Duration::from_millis(63));
   }

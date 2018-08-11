@@ -241,7 +241,7 @@ impl Snapshot {
             .get_files()
             .iter()
             .group_by(|f| f.get_name().to_owned());
-          for (file_name, group) in groups.into_iter() {
+          for (file_name, group) in &groups {
             if group.count() > 1 {
               return future::err(format!(
                 "Can only merge Directories with no duplicates, but found duplicate files: {}",
