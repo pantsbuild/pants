@@ -170,7 +170,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
 
 def enum(field_name, all_values):
-  """A datatype which can take on a finite set of values.
+  """A datatype which can take on a finite set of values. This method is experimental and unstable.
 
   NB: `all_values` must be a finite, non-empty iterable with unique values!
 
