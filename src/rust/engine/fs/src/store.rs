@@ -1689,15 +1689,15 @@ mod remote {
               })
             })
             .and_then(move |received| {
-              if received.get_committed_size() != len as i64 {
+              if received.get_committed_size() == len as i64 {
+                Ok(Digest(fingerprint, len))
+              } else {
                 Err(format!(
                   "Uploading file with fingerprint {}: want commited size {} but got {}",
                   fingerprint,
                   len,
                   received.get_committed_size()
                 ))
-              } else {
-                Ok(Digest(fingerprint, len))
               }
             })
             .to_boxed()

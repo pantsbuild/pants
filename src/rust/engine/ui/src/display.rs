@@ -46,13 +46,13 @@ impl EngineDisplay {
       divider: "▵".to_string(),
       poll_interval_ms: Duration::from_millis(55),
       padding: " ".repeat(indent_level.into()),
-      terminal: if !is_tty {
-        Console::Pipe(write_handle)
-      } else {
+      terminal: if is_tty {
         match write_handle.into_raw_mode() {
           Ok(t) => Console::Terminal(t),
           Err(_) => Console::Pipe(stdout()),
         }
+      } else {
+        Console::Pipe(write_handle)
       },
       action_map: BTreeMap::new(),
       // This is arbitrary based on a guesstimated peak terminal row size for modern displays.

@@ -497,10 +497,10 @@ fn task_display(task: &Task) -> String {
     .map(|g| get_str(g))
     .collect::<Vec<_>>()
     .join(", ");
-  get_portion = if !task.gets.is_empty() {
-    format!("[{}], ", get_portion)
-  } else {
+  get_portion = if task.gets.is_empty() {
     "".to_string()
+  } else {
+    format!("[{}], ", get_portion)
   };
   let function_name = function_str(&&task.func);
   format!(
