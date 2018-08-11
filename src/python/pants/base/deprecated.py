@@ -131,7 +131,10 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None, sta
   if frame_info is None:
     frame_info = get_frame_info(stacklevel)
   _, filename, line_number, _, code_context, _ = frame_info
-  context_lines = ''.join(code_context)
+  if code_context:
+    context_lines = ''.join(code_context)
+  else:
+    context_lines = '<no code context available>'
 
   if removal_semver > PANTS_SEMVER:
     if ensure_stderr:
