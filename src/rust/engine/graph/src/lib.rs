@@ -163,7 +163,9 @@ impl<N: Node> InnerGraph<N> {
 
     // Clear roots and remove their outbound edges.
     for id in &root_ids {
-      self.pg.node_weight_mut(*id).map(|entry| entry.clear());
+      if let Some(entry) = self.pg.node_weight_mut(*id) {
+        entry.clear();
+      }
     }
     self.pg.retain_edges(|pg, edge| {
       if let Some((src, _)) = pg.edge_endpoints(edge) {

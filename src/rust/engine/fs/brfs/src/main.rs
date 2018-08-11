@@ -498,9 +498,8 @@ impl fuse::Filesystem for BuildResultFS {
             let mut reply = reply.lock().unwrap();
             reply.take().unwrap().data(&bytes.slice(begin, end));
           })
-          .map(|v| match v {
-            Some(_) => {}
-            None => {
+          .map(|v| {
+            if v.is_none() {
               let maybe_reply = reply2.lock().unwrap().take();
               if let Some(reply) = maybe_reply {
                 reply.error(libc::ENOENT);

@@ -235,9 +235,10 @@ impl EngineDisplay {
   // Paints one screen of rendering.
   pub fn render(&mut self) {
     // TODO: Split this fork out into sub-types of EngineDisplay.
-    match self.is_tty {
-      true => self.render_for_tty(),
-      false => self.render_for_pipe(),
+    if self.is_tty {
+      self.render_for_tty()
+    } else {
+      self.render_for_pipe()
     }
   }
 
