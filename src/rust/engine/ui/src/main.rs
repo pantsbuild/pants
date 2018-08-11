@@ -45,41 +45,6 @@ fn main() {
     "Link".to_string()
   );
 
-  fn gen_display_work(
-    display: &mut EngineDisplay,
-    counter: &u64,
-    type_selection: &Vec<String>,
-    worker_ids: &Vec<String>,
-    verb_selection: &Vec<String>,
-    log_level_selection: &Vec<String>,
-  ) {
-    let mut rng = rand::thread_rng();
-
-    for worker_id in worker_ids.clone().into_iter() {
-      let random_product = rng.choose(&type_selection).unwrap();
-      let random_subject = rng.choose(&type_selection).unwrap();
-
-      display.update(
-        worker_id,
-        String::from(format!(
-          "computing {} for {}(...)",
-          random_product, random_subject
-        )),
-      );
-    }
-
-    if counter > &50 && counter % 2 == 0 {
-      let random_log_level = rng.choose(&log_level_selection).unwrap();
-      let random_verb = rng.choose(&verb_selection).unwrap();
-      let random_product_2 = rng.choose(&type_selection).unwrap();
-
-      display.log(format!(
-        "{}] {} {}",
-        random_log_level, random_verb, random_product_2
-      ));
-    }
-  }
-
   let mut done = false;
   let mut counter: u64 = 0;
 
@@ -112,4 +77,36 @@ fn main() {
   }
 
   display.finish();
+}
+
+fn gen_display_work(
+  display: &mut EngineDisplay,
+  counter: u64,
+  type_selection: &[String],
+  worker_ids: &[String],
+  verb_selection: &[String],
+  log_level_selection: &[String],
+) {
+  let mut rng = rand::thread_rng();
+
+  for worker_id in worker_ids {
+    let random_product = rng.choose(&type_selection).unwrap();
+    let random_subject = rng.choose(&type_selection).unwrap();
+
+    display.update(
+      worker_id.to_string(),
+      format!("computing {} for {}(...)", random_product, random_subject),
+    );
+  }
+
+  if counter > 50 && counter % 2 == 0 {
+    let random_log_level = rng.choose(&log_level_selection).unwrap();
+    let random_verb = rng.choose(&verb_selection).unwrap();
+    let random_product_2 = rng.choose(&type_selection).unwrap();
+
+    display.log(format!(
+      "{}] {} {}",
+      random_log_level, random_verb, random_product_2
+    ));
+  }
 }
