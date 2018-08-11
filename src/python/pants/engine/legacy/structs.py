@@ -19,7 +19,7 @@ from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.contextutil import exception_logging
 from pants.util.meta import AbstractClass
-from pants.util.objects import Exactly, datatype
+from pants.util.objects import Exactly, SubclassesOf, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -33,6 +33,8 @@ class TargetAdaptor(StructWithDeps):
 
   def get_sources(self):
     """Returns target's non-deferred sources if exists or the default sources if defined.
+
+    :rtype: :class:`GlobsWithConjunction`
 
     NB: once ivy is implemented in the engine, we can fetch sources natively here, and/or
     refactor how deferred sources are implemented.
@@ -59,12 +61,13 @@ class TargetAdaptor(StructWithDeps):
     # N.B. Here we check specifically for `sources is None`, as it's possible for sources
     # to be e.g. an explicit empty list (sources=[]).
     if sources is None and self.default_sources_globs is not None:
-      sources = Globs(*self.default_sources_globs,
+      globs = Globs(*self.default_sources_globs,
                       spec_path=self.address.spec_path,
                       exclude=self.default_sources_exclude_globs or [])
-      conjunction_globs = GlobsWithConjunction(sources, Conjunction('or'))
+      conjunction_globs = GlobsWithConjunction(globs, Conjunction('or'))
     else:
-      conjunction_globs = GlobsWithConjunction(sources, Conjunction('and'))
+      globs = BaseGlobs.from_sources_field(sources, self.address.spec_path)
+      conjunction_globs = GlobsWithConjunction(globs, Conjunction('and'))
 
     return conjunction_globs
 
@@ -284,7 +287,7 @@ class PythonTestsAdaptor(PythonTargetAdaptor):
 
 class PantsPluginAdaptor(PythonTargetAdaptor):
   def get_sources(self):
-    return ['register.py']
+    return GlobsWithConjunction.for_literal_files(['register.py'])
 
 
 class BaseGlobs(Locatable, AbstractClass):
@@ -409,6 +412,11 @@ class ZGlobs(BaseGlobs):
 
 
 class GlobsWithConjunction(datatype([
-    'non_path_globs',
+    ('non_path_globs', SubclassesOf(BaseGlobs)),
     ('conjunction', Conjunction),
-])): pass
+])):
+  """"""
+
+  @classmethod
+  def for_literal_files(cls, file_paths):
+    return cls(Files(*file_paths), Conjunction('and'))
