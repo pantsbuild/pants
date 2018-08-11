@@ -31,6 +31,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
 from pants_test.util.contextutil_test_base import ContextutilTestBase
@@ -1336,9 +1337,9 @@ class OptionsTest(OptionsTestBase):
       vals1 = options.for_scope(DummyOptionable1.options_scope)
 
     # Check that we got a warning, but not for the inherited option.
-    self.assertEqual(1, len(w))
-    self.assertTrue(isinstance(w[0].message, DeprecationWarning))
-    self.assertNotIn('inherited', w[0].message.args)
+    single_warning_dummy1 = assert_single_element(w)
+    self.assertEqual(single_warning_dummy1.category, DeprecationWarning)
+    self.assertNotIn('inherited', single_warning_dummy1.message)
 
     # Check values.
     # Deprecated scope takes precedence at equal rank.
@@ -1351,9 +1352,9 @@ class OptionsTest(OptionsTestBase):
       vals2 = options.for_scope(DummyOptionable2.options_scope)
 
     # Check that we got a warning.
-    self.assertEqual(1, len(w))
-    self.assertTrue(isinstance(w[0].message, DeprecationWarning))
-    self.assertNotIn('inherited', w[0].message.args)
+    single_warning_dummy2 = assert_single_element(w)
+    self.assertEqual(single_warning_dummy2.category, DeprecationWarning)
+    self.assertNotIn('inherited', single_warning_dummy2.message)
 
     # Check values.
     self.assertEqual('uu', vals2.qux)
