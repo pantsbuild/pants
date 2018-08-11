@@ -193,7 +193,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
   ) {
     {
       let mut request_count = self.read_request_count.lock().unwrap();
-      *request_count = *request_count + 1;
+      *request_count += 1;
     }
     match self.read_internal(&req) {
       Ok(response) => self.send(

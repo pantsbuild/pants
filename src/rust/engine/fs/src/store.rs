@@ -809,7 +809,7 @@ mod local {
           .open_ro_cursor(*database)
           .map_err(|err| format!("Failed to open lmdb read cursor: {}", err))?;
         for (key, bytes) in cursor.iter() {
-          *used_bytes = *used_bytes + bytes.len();
+          *used_bytes += bytes.len();
 
           // Random access into the lease_database is slower than iterating, but hopefully garbage
           // collection is rare enough that we can get away with this, rather than do two passes
