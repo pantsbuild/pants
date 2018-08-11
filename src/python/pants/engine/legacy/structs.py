@@ -60,11 +60,14 @@ class TargetAdaptor(StructWithDeps):
 
     # N.B. Here we check specifically for `sources is None`, as it's possible for sources
     # to be e.g. an explicit empty list (sources=[]).
-    if sources is None and self.default_sources_globs is not None:
-      globs = Globs(*self.default_sources_globs,
+    if sources is None:
+      if self.default_sources_globs is not None:
+        globs = Globs(*self.default_sources_globs,
                       spec_path=self.address.spec_path,
                       exclude=self.default_sources_exclude_globs or [])
-      conjunction_globs = GlobsWithConjunction(globs, Conjunction('or'))
+        conjunction_globs = GlobsWithConjunction(globs, Conjunction('or'))
+      else:
+        conjunction_globs = None
     else:
       globs = BaseGlobs.from_sources_field(sources, self.address.spec_path)
       conjunction_globs = GlobsWithConjunction(globs, Conjunction('and'))
@@ -76,6 +79,10 @@ class TargetAdaptor(StructWithDeps):
     """Returns a tuple of Fields for captured fields which need additional treatment."""
     with exception_logging(logger, 'Exception in `field_adaptors` property'):
       conjunction_globs = self.get_sources()
+
+      if conjunction_globs is None:
+        return tuple()
+
       sources = conjunction_globs.non_path_globs
       conjunction = conjunction_globs.conjunction
 
