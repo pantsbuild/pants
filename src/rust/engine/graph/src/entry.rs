@@ -50,6 +50,7 @@ impl Generation {
   }
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(type_complexity))]
 pub(crate) enum EntryState<N: Node> {
   // A node that has either been explicitly cleared, or has not yet started Running. In this state
   // there is no need for a dirty bit because the RunToken is either in its initial state, or has
