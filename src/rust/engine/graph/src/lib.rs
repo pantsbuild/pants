@@ -335,7 +335,7 @@ impl<N: Node> InnerGraph<N> {
     let file = try!(OpenOptions::new().append(true).open(file_path));
     let mut f = BufWriter::new(file);
 
-    let _format = |eid: EntryId, depth: usize, is_last: bool| -> String {
+    let format = |eid: EntryId, depth: usize, is_last: bool| -> String {
       let entry = self.unsafe_entry_for_id(eid);
       let indent = "  ".repeat(depth);
       let output = format!("{}Computing {}", indent, entry.node().format());
@@ -356,7 +356,7 @@ impl<N: Node> InnerGraph<N> {
       try!(writeln!(
         &mut f,
         "{}",
-        _format(*id, depth, path_iter.peek().is_none())
+        format(*id, depth, path_iter.peek().is_none())
       ));
     }
 
