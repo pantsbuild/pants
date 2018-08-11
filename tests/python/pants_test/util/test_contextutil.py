@@ -9,9 +9,10 @@ import pstats
 import shutil
 import signal
 import sys
+import unittest
 import uuid
 import zipfile
-from builtins import next, object, range
+from builtins import next, object, range, str
 from contextlib import contextmanager
 
 import mock
@@ -22,31 +23,12 @@ from pants.util.contextutil import (HardSystemExit, InvalidZipPath, Timer, envir
                                     maybe_profiled, open_zip, pushd, signal_handler_as, stdio_as,
                                     temporary_dir, temporary_file)
 from pants.util.process_handler import subprocess
-from pants_test.util.contextutil_test_base import ContextutilTestBase
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 
-class ContextutilTest(ContextutilTestBase):
-
-  @contextmanager
-  def _wrapped_stdio_as_tempfiles(self):
-    # Prefix contents written within this instance with a unique string to differentiate
-    # them from other instances.
-    uuid_str = str(uuid.uuid4())
-    def u(string):
-      return '{}#{}'.format(uuid_str, string)
-    stdin_data = u('stdio')
-    stdout_data = u('stdout')
-    stderr_data = u('stderr')
-
-    with self.stdio_as_tempfiles(stdin_data=stdin_data,
-                                 stdout_data=stdout_data,
-                                 stderr_data=stderr_data):
-      print(stdout_data, file=sys.stdout)
-      print(stderr_data, file=sys.stderr)
-      yield
+class ContextutilTest(unittest.TestCase):
 
   def test_empty_environment(self):
     with environment_as():
@@ -273,9 +255,9 @@ class ContextutilTest(ContextutilTestBase):
 
     # The first level tests that when `sys.std*` are file-likes (in particular, the ones set up in
     # pytest's harness) rather than actual files, we stash and restore them properly.
-    with self._wrapped_stdio_as_tempfiles():
+    with self._stdio_as_tempfiles():
       # The second level stashes the first level's actual file objects and then re-opens them.
-      with self._wrapped_stdio_as_tempfiles():
+      with self._stdio_as_tempfiles():
         pass
 
       # Validate that after the second level completes, the first level still sees valid
@@ -290,7 +272,7 @@ class ContextutilTest(ContextutilTestBase):
 
   def test_stdio_as_dev_null(self):
     # Capture output to tempfiles.
-    with self._wrapped_stdio_as_tempfiles():
+    with self._stdio_as_tempfiles():
       # Read/write from/to `/dev/null`, which will be validated by the harness as not
       # affecting the tempfiles.
       with stdio_as(stdout_fd=-1, stderr_fd=-1, stdin_fd=-1):

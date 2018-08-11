@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import io
 import os
 import shlex
+import unittest
 import warnings
 from abc import abstractmethod
 from builtins import open, str
@@ -34,7 +35,6 @@ from pants.option.scope import ScopeInfo
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
-from pants_test.util.contextutil_test_base import ContextutilTestBase
 
 
 def task(scope):
@@ -49,16 +49,7 @@ def subsystem(scope):
   return ScopeInfo(scope, ScopeInfo.SUBSYSTEM)
 
 
-class OptionsTestBase(ContextutilTestBase):
-
-  @contextmanager
-  def stderr_catcher(self, expected_msg):
-    with self.stdio_as_tempfiles(
-        stdin_data='',
-        stdout_data='',
-        stderr_data=expected_msg,
-        strict_text_match=False):
-      yield
+class OptionsTestBase(unittest.TestCase):
 
   @contextmanager
   def _write_config_to_file(self, fp, config):

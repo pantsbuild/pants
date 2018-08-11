@@ -20,14 +20,6 @@ python_tests(
   ]
 )
 
-python_library(
-  name = 'contextutil-test-base',
-  sources = ['contextutil_test_base.py'],
-  dependencies = [
-    'src/python/pants/util:contextutil',
-  ]
-)
-
 python_tests(
   name = 'contextutil',
   sources = ['test_contextutil.py'],
@@ -35,7 +27,6 @@ python_tests(
   dependencies = [
     '3rdparty/python:future',
     '3rdparty/python:mock',
-    ':contextutil-test-base',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
   ]
