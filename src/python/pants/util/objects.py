@@ -172,12 +172,13 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 def enum(field_name, all_values):
   """A datatype which can take on a finite set of values. This method is experimental and unstable.
 
-  NB: `all_values` must be a finite, non-empty iterable with unique values!
-
-  An enum subclass can be constructed with its create() classmethod. This method will use the first
+  Any enum subclass can be constructed with its create() classmethod. This method will use the first
   element of `all_values` as the enum value if none is specified.
 
+  :param field_name: A string used as the field for the datatype. Note that enum does not yet
+                     support type checking as with datatype.
   :param all_values: An iterable of objects representing all possible values for the enum.
+                     NB: `all_values` must be a finite, non-empty iterable with unique values!
   """
 
   class ChoiceDatatype(datatype([field_name])):
@@ -185,7 +186,7 @@ def enum(field_name, all_values):
     # `OrderedSet` maintains the order of the input iterable, and will eagerly evaluate any input
     # which would otherwise be lazy, such as a generator.
     allowed_values = OrderedSet(all_values)
-    default_value = all_values[0]
+    default_value = iter(allowed_values).next()
 
     @memoized_classproperty
     def _singletons(cls):
