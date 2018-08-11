@@ -507,6 +507,10 @@ impl ExecuteProcess {
       .parse::<f64>()
       .map_err(|err| format!("Timeout was not a float: {:?}", err))?;
 
+    if timeout_in_seconds < 0.0 {
+      return Err(format!("Timeout was negative: {:?}", timeout_in_seconds));
+    }
+
     let description = externs::project_str(&value, "description");
 
     let jdk_home = {
