@@ -10,6 +10,7 @@ from builtins import object, zip
 from collections import OrderedDict, namedtuple
 
 from future.utils import PY2
+from twitter.common.collections import OrderedSet
 
 from pants.util.memo import memoized, memoized_classproperty
 from pants.util.meta import AbstractClass
@@ -169,11 +170,21 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
 
 def enum(field_name, all_values):
-  """???"""
+  """A datatype which can take on a finite set of values.
+
+  NB: `all_values` must be a finite, non-empty iterable with unique values!
+
+  An enum subclass can be constructed with its create() classmethod. This method will use the first
+  element of `all_values` as the enum value if none is specified.
+
+  :param all_values: An iterable of objects representing all possible values for the enum.
+  """
 
   class ChoiceDatatype(datatype([field_name])):
 
-    allowed_values = all_values
+    # `OrderedSet` maintains the order of the input iterable, and will eagerly evaluate any input
+    # which would otherwise be lazy, such as a generator.
+    allowed_values = OrderedSet(all_values)
     default_value = all_values[0]
 
     @memoized_classproperty

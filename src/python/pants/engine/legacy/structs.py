@@ -422,7 +422,6 @@ class GlobsWithConjunction(datatype([
     ('non_path_globs', SubclassesOf(BaseGlobs)),
     ('conjunction', Conjunction),
 ])):
-  """"""
 
   @classmethod
   def for_literal_files(cls, file_paths):
