@@ -525,7 +525,7 @@ impl PosixFS {
     })
   }
 
-  fn scandir_sync(root: PathBuf, dir_relative_to_root: &Dir) -> Result<Vec<Stat>, io::Error> {
+  fn scandir_sync(root: &Path, dir_relative_to_root: &Dir) -> Result<Vec<Stat>, io::Error> {
     let dir_abs = root.join(&dir_relative_to_root.0);
     let mut stats: Vec<Stat> = dir_abs
       .read_dir()?
@@ -659,7 +659,7 @@ impl PosixFS {
     let root = self.root.0.clone();
     self
       .pool
-      .spawn_fn(move || PosixFS::scandir_sync(root, &dir))
+      .spawn_fn(move || PosixFS::scandir_sync(&root, &dir))
       .map(DirectoryListing)
       .to_boxed()
   }

@@ -664,7 +664,7 @@ impl Snapshot {
       .expand(path_globs)
       .map_err(|e| format!("PathGlobs expansion failed: {:?}", e))
       .and_then(move |path_stats| {
-        fs::Snapshot::from_path_stats(context.core.store.clone(), context.clone(), path_stats)
+        fs::Snapshot::from_path_stats(context.core.store.clone(), &context, path_stats)
           .map_err(move |e| format!("Snapshot failed: {}", e))
       })
       .map_err(|e| throw(&e))

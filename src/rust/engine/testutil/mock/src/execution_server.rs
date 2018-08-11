@@ -210,7 +210,7 @@ impl MockResponder {
 
   fn send_next_operation_stream(
     &self,
-    ctx: grpcio::RpcContext,
+    ctx: &grpcio::RpcContext,
     sink: grpcio::ServerStreamingSink<super::bazel_protos::operations::Operation>,
   ) {
     match self
@@ -273,7 +273,7 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
       return;
     }
 
-    self.send_next_operation_stream(ctx, sink);
+    self.send_next_operation_stream(&ctx, sink);
   }
 
   fn wait_execution(

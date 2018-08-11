@@ -23,7 +23,7 @@ impl RunToken {
     RunToken(0)
   }
 
-  fn next(&self) -> RunToken {
+  fn next(self) -> RunToken {
     RunToken(self.0 + 1)
   }
 }
@@ -45,7 +45,7 @@ impl Generation {
     Generation(0)
   }
 
-  fn next(&self) -> Generation {
+  fn next(self) -> Generation {
     Generation(self.0 + 1)
   }
 }

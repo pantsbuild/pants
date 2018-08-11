@@ -62,7 +62,7 @@ fn main() {
 
     gen_display_work(
       &mut display,
-      &counter,
+      counter,
       &random_products,
       &worker_ids,
       &random_verbs,

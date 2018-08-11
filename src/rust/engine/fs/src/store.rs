@@ -707,7 +707,7 @@ mod local {
         let (env, _, lease_database) = self.inner.file_dbs.get()?.get(&digest.0);
         env
           .begin_rw_txn()
-          .and_then(|mut txn| self.lease(&lease_database, &digest.0, until, &mut txn))
+          .and_then(|mut txn| self.lease(lease_database, &digest.0, until, &mut txn))
           .map_err(|err| format!("Error leasing digest {:?}: {}", digest, err))?;
       }
       Ok(())
@@ -722,14 +722,14 @@ mod local {
 
     fn lease(
       &self,
-      database: &Database,
+      database: Database,
       fingerprint: &Fingerprint,
       until_secs_since_epoch: u64,
       txn: &mut RwTransaction,
     ) -> Result<(), lmdb::Error> {
       let mut buf = [0; 8];
       LittleEndian::write_u64(&mut buf, until_secs_since_epoch);
-      txn.put(*database, &fingerprint.as_ref(), &buf, WriteFlags::empty())
+      txn.put(database, &fingerprint.as_ref(), &buf, WriteFlags::empty())
     }
 
     ///
@@ -870,7 +870,7 @@ mod local {
             txn.put(content_database, &fingerprint, &bytes, NO_OVERWRITE)?;
             if initial_lease {
               bytestore.lease(
-                &lease_database,
+                lease_database,
                 &fingerprint,
                 Self::default_lease_until_secs_since_epoch(),
                 &mut txn,

@@ -294,7 +294,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           .and_then(move |paths| {
             Snapshot::from_path_stats(
               store_copy.clone(),
-              fs::OneOffStoreFileByDigest::new(store_copy, posix_fs),
+              &fs::OneOffStoreFileByDigest::new(store_copy, posix_fs),
               paths,
             )
           })

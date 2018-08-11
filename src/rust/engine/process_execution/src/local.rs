@@ -79,7 +79,7 @@ impl CommandRunner {
 
         fs::Snapshot::from_path_stats(
           store.clone(),
-          fs::OneOffStoreFileByDigest::new(store, posix_fs),
+          &fs::OneOffStoreFileByDigest::new(store, posix_fs),
           paths.into_iter().filter_map(|v| v).collect(),
         )
       })
