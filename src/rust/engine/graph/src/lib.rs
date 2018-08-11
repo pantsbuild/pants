@@ -297,7 +297,7 @@ impl<N: Node> InnerGraph<N> {
       let minimum_path_id = root_ids
         .iter()
         .min_by_key(|root_id| path_weights[root_id.index()] as usize)
-        .ok_or_else(|| format!("Encountered a Node that was not reachable from any roots."))?;
+        .ok_or_else(|| "Encountered a Node that was not reachable from any roots.".to_owned())?;
 
       // Collect the path by walking through the `paths` Vec, which contains the indexes of
       // predecessor Nodes along a path to the bottom Node.
