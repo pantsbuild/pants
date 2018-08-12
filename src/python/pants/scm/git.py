@@ -173,7 +173,7 @@ class Git(Scm):
                                              raise_type=Scm.LocalException)
       files.update(committed_changes.split())
     if include_untracked:
-      untracked_cmd = ['ls-files', '--other', '--exclude-standard'] + rel_suffix
+      untracked_cmd = ['ls-files', '--other', '--exclude-standard', '--full-name'] + rel_suffix
       untracked = self._check_output(untracked_cmd,
                                      raise_type=Scm.LocalException)
       files.update(untracked.split())
