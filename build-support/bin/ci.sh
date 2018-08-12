@@ -13,7 +13,7 @@ function usage() {
   cat <<EOF
 Runs commons tests for local or hosted CI.
 
-Usage: $0 (-h|-3fxbkmrjlpuneycitz)
+Usage: $0 (-h|-3fxbkmrjlpuneycitzs)
  -h           print out this help message
  -3           After pants is bootstrapped, set --python-setup-interpreter-constraints such that any
               python tests run with Python 3.
@@ -34,6 +34,7 @@ Usage: $0 (-h|-3fxbkmrjlpuneycitz)
               to run only even tests: '-u 0/2', odd: '-u 1/2'
  -n           run contrib python tests
  -e           run rust tests
+ -s           run clippy on rust code
  -y SHARD_NUMBER/TOTAL_SHARDS
               if running contrib python tests, divide them into
               TOTAL_SHARDS shards and just run those in SHARD_NUMBER
@@ -64,7 +65,7 @@ python_contrib_shard="0/1"
 python_intg_shard="0/1"
 python_three="false"
 
-while getopts "h3fxbkmrjlpeu:ny:ci:tz" opt; do
+while getopts "h3fxbkmrjlpesu:ny:ci:tz" opt; do
   case ${opt} in
     h) usage ;;
     3) python_three="true" ;;
@@ -79,6 +80,7 @@ while getopts "h3fxbkmrjlpeu:ny:ci:tz" opt; do
     p) run_python="true" ;;
     u) python_unit_shard=${OPTARG} ;;
     e) run_rust_tests="true" ;;
+    s) run_rust_clippy="true" ;;
     n) run_contrib="true" ;;
     y) python_contrib_shard=${OPTARG} ;;
     c) run_integration="true" ;;
@@ -229,6 +231,13 @@ if [[ "${run_rust_tests:-false}" == "true" ]]; then
       --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" -- "${test_threads_flag}" --nocapture
   ) || die "Pants rust test failure"
   end_travis_section
+fi
+
+if [[ "${run_rust_clippy:-false}" == "true" ]]; then
+  start_travis_section "RustClippy" "Running Clippy on rust code"
+  (
+    "${REPO_ROOT}/build-support/bin/native/cargo" +nightly clippy --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" --all
+  ) || die "Pants clippy failure"
 fi
 
 # NB: this only tests python tests right now -- the command needs to be edited if test targets in
