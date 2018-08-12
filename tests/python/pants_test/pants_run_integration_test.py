@@ -152,12 +152,13 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # Some integration tests rely on clean subsystem state (e.g., to set up a DistributionLocator).
     Subsystem.reset()
 
-  def temporary_workdir(self, cleanup=True):
+  def temporary_workdir(self, cleanup=True, rootdir=None):
+    rootdir = rootdir or get_buildroot()
     # We can hard-code '.pants.d' here because we know that will always be its value
     # in the pantsbuild/pants repo (e.g., that's what we .gitignore in that repo).
     # Grabbing the pants_workdir config would require this pants's config object,
     # which we don't have a reference to here.
-    root = os.path.join(get_buildroot(), '.pants.d', 'tmp')
+    root = os.path.join(rootdir, '.pants.d', 'tmp')
     safe_mkdir(root)
     return temporary_dir(root_dir=root, cleanup=cleanup, suffix='.pants.d')
 
@@ -464,7 +465,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       os.unlink(path)
 
   @contextmanager
-  def mock_buildroot(self, dirs_to_copy=None):
+  def mock_buildroot(self, dirs_to_copy=None, root_dir=None):
     """Construct a mock buildroot and return a helper object for interacting with it."""
     class Manager(datatype(['write_file', 'pushd', 'new_buildroot'])): pass
     # N.B. BUILD.tools, contrib, 3rdparty needs to be copied vs symlinked to avoid
@@ -480,7 +481,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
                      'src')
     dirs_to_copy = ('3rdparty', 'contrib') + tuple(dirs_to_copy or [])
 
-    with self.temporary_workdir() as tmp_dir:
+    root_dir = root_dir or get_buildroot()
+
+    with temporary_dir(root_dir=root_dir) as tmp_dir:
       for filename in files_to_copy:
         shutil.copy(os.path.join(get_buildroot(), filename), os.path.join(tmp_dir, filename))
 

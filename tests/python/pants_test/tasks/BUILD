@@ -35,7 +35,7 @@ python_tests(
     'tests/python/pants_test/testutils:git_util',
   ],
   tags = {'integration'},
-  timeout=120,
+  timeout=600,
 )
 
 python_tests(
