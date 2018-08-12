@@ -93,7 +93,7 @@ class ImportOracle(object):
     :rtype: frozenset of string
     """
     out = self._go_dist.create_go_cmd('list', args=['std']).check_output()
-    return frozenset(out.strip().split())
+    return frozenset(out.decode('utf-8').strip().split())
 
   # This simple regex mirrors the behavior of the relevant go code in practice (see
   # repoRootForImportDynamic and surrounding code in

@@ -41,7 +41,7 @@ class GoFetchTest(TaskTestBase):
     """)
     remote_import_ids = go_fetch._get_remote_import_paths('github.com/u/a',
                                                           gopath=self.build_root)
-    self.assertItemsEqual(remote_import_ids, ['bitbucket.org/u/b', 'github.com/u/c'])
+    self.assertEqual(sorted(remote_import_ids), sorted(['bitbucket.org/u/b', 'github.com/u/c']))
 
   def test_resolve_and_inject_explicit(self):
     r1 = self.make_target(spec='3rdparty/go/r1', target_type=GoRemoteLibrary)
@@ -219,4 +219,4 @@ class GoFetchTest(TaskTestBase):
     """)
     remote_import_ids = go_fetch._get_remote_import_paths('github.com/u/a',
                                                           gopath=self.build_root)
-    self.assertItemsEqual(remote_import_ids, ['bitbucket.org/u/b', 'github.com/u/c'])
+    self.assertEqual(sorted(remote_import_ids), sorted(['bitbucket.org/u/b', 'github.com/u/c']))
