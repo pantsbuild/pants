@@ -178,7 +178,7 @@ class Git(Scm):
       untracked_cmd = ['ls-files', '--other', '--exclude-standard', '--full-name'] + rel_suffix
       untracked = self._check_output(untracked_cmd,
                                      raise_type=Scm.LocalException)
-      files.update(untracked.split())
+      files.update(untracked.splitlines())
     # git will report changed files relative to the worktree: re-relativize to relative_to
     return set(self.fix_git_relative_path(f, relative_to) for f in files)
 
