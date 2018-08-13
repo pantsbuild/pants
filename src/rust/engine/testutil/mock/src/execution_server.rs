@@ -12,12 +12,33 @@ use futures::{Future, Sink};
 use grpcio;
 use protobuf;
 
+///
+/// A MockOperation to be used with MockExecution.
+///
+/// If the op is None, the MockExecution will drop the channel, triggering cancelation on the
+/// client. If the duration is not None, it represents a delay before either responding or
+/// canceling for the operation.
+///
+#[derive(Clone, Debug)]
+pub struct MockOperation {
+  pub op: Option<bazel_protos::operations::Operation>,
+  pub duration: Option<Duration>,
+}
+
+impl MockOperation {
+  pub fn new(op: bazel_protos::operations::Operation) -> MockOperation {
+    MockOperation {
+      op: Some(op),
+      duration: None,
+    }
+  }
+}
+
 #[derive(Clone, Debug)]
 pub struct MockExecution {
   name: String,
   execute_request: bazel_protos::remote_execution::ExecuteRequest,
-  operation_responses:
-    Arc<Mutex<VecDeque<(bazel_protos::operations::Operation, Option<Duration>)>>>,
+  operation_responses: Arc<Mutex<VecDeque<MockOperation>>>,
 }
 
 impl MockExecution {
@@ -32,7 +53,7 @@ impl MockExecution {
   pub fn new(
     name: String,
     execute_request: bazel_protos::remote_execution::ExecuteRequest,
-    operation_responses: Vec<(bazel_protos::operations::Operation, Option<Duration>)>,
+    operation_responses: Vec<MockOperation>,
   ) -> MockExecution {
     MockExecution {
       name: name,
@@ -169,7 +190,17 @@ impl MockResponder {
       .unwrap()
       .pop_front()
     {
-      Some((op, duration)) => {
+      Some(MockOperation { op: None, duration }) => {
+        if let Some(d) = duration {
+          sleep(d);
+        }
+        // Cancel the request by dropping the sink.
+        drop(sink)
+      }
+      Some(MockOperation {
+        op: Some(op),
+        duration,
+      }) => {
         if let Some(d) = duration {
           sleep(d);
         }
@@ -196,7 +227,17 @@ impl MockResponder {
       .unwrap()
       .pop_front()
     {
-      Some((op, duration)) => {
+      Some(MockOperation { op: None, duration }) => {
+        if let Some(d) = duration {
+          sleep(d);
+        }
+        // Cancel the request by dropping the sink.
+        drop(sink)
+      }
+      Some(MockOperation {
+        op: Some(op),
+        duration,
+      }) => {
         if let Some(d) = duration {
           sleep(d);
         }
