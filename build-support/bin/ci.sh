@@ -70,7 +70,7 @@ while getopts "h3fxbkmrjlpeu:ny:ci:tz" opt; do
     3) python_three="true" ;;
     f) run_pre_commit_checks="true" ;;
     x) run_bootstrap_clean="true" ;;
-    b) run_bootstrap="true" ;;
+    b) run_bootstrap="false" ;;
     k) bootstrap_compile_args=() ;;
     m) run_sanity_checks="true" ;;
     r) run_docs="true" ;;
@@ -110,7 +110,7 @@ if [[ "${run_pre_commit_checks:-false}" == "true" ]]; then
   end_travis_section
 fi
 
-if [[ "${run_bootstrap:-false}" == "true" ]]; then
+if [[ "${run_bootstrap:-true}" == "true" ]]; then
   start_travis_section "Bootstrap" "Bootstrapping pants"
   (
     if [[ "${run_bootstrap_clean:-false}" == "true" ]]; then
