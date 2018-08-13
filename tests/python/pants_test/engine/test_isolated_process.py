@@ -72,9 +72,9 @@ class CatExecutionRequest(datatype([('shell_cat', ShellCat), ('path_globs', Path
 def cat_files_process_result_concatted(cat_exe_req):
   cat_bin = cat_exe_req.shell_cat
   cat_files_snapshot = yield Get(Snapshot, PathGlobs, cat_exe_req.path_globs)
-  process_request = ExecuteProcessRequest.create_from_snapshot(
+  process_request = ExecuteProcessRequest(
     argv=cat_bin.argv_from_snapshot(cat_files_snapshot),
-    snapshot=cat_files_snapshot,
+    input_files=cat_files_snapshot.directory_digest,
     description='cat some files',
   )
   cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
@@ -102,9 +102,10 @@ class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)
 
 @rule(ExecuteProcessRequest, [Select(JavacVersionExecutionRequest)])
 def process_request_from_javac_version(javac_version_exe_req):
-  yield ExecuteProcessRequest.create_with_empty_snapshot(
+  yield ExecuteProcessRequest(
     argv=javac_version_exe_req.gen_argv(),
     description=javac_version_exe_req.description,
+    input_files=EMPTY_DIRECTORY_DIGEST,
   )
 
 
@@ -168,9 +169,9 @@ def javac_compile_process_result(javac_compile_req):
       raise ValueError("Can only compile .java files but got {}".format(java_file))
   sources_snapshot = yield Get(Snapshot, PathGlobs, PathGlobs(java_files, ()))
   output_dirs = tuple({os.path.dirname(java_file) for java_file in java_files})
-  process_request = ExecuteProcessRequest.create_from_snapshot(
+  process_request = ExecuteProcessRequest(
     argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
-    snapshot=sources_snapshot,
+    input_files=sources_snapshot.directory_digest,
     output_directories=output_dirs,
     description='javac compilation'
   )
@@ -196,10 +197,11 @@ def create_javac_compile_rules():
 class ExecuteProcessRequestTest(unittest.TestCase):
   def _default_args_execute_process_request(self, argv=tuple(), env=None):
     env = env or dict()
-    return ExecuteProcessRequest.create_with_empty_snapshot(
+    return ExecuteProcessRequest(
       argv=argv,
       description='',
       env=env,
+      input_files=EMPTY_DIRECTORY_DIGEST,
       output_files=(),
     )
 
@@ -219,7 +221,7 @@ class ExecuteProcessRequestTest(unittest.TestCase):
     with self.assertRaisesRegexp(TypeCheckError, "env"):
       ExecuteProcessRequest(
         argv=('1',),
-        env=dict(),
+        env=(),
         input_files='',
         output_files=(),
         output_directories=(),
@@ -238,7 +240,7 @@ class ExecuteProcessRequestTest(unittest.TestCase):
     with self.assertRaisesRegexp(TypeCheckError, "output_files"):
       ExecuteProcessRequest(
         argv=('1',),
-        env=tuple(),
+        env=dict(),
         input_files=EMPTY_DIRECTORY_DIGEST,
         output_files=("blah"),
         output_directories=(),
@@ -248,7 +250,7 @@ class ExecuteProcessRequestTest(unittest.TestCase):
     with self.assertRaisesRegexp(TypeCheckError, "timeout"):
       ExecuteProcessRequest(
         argv=('1',),
-        env=tuple(),
+        env=dict(),
         input_files=EMPTY_DIRECTORY_DIGEST,
         output_files=("blah"),
         output_directories=(),
@@ -257,10 +259,11 @@ class ExecuteProcessRequestTest(unittest.TestCase):
       )
 
   def test_create_from_snapshot_with_env(self):
-    req = ExecuteProcessRequest.create_with_empty_snapshot(
+    req = ExecuteProcessRequest(
       argv=('foo',),
       description="Some process",
       env={'VAR': 'VAL'},
+      input_files=EMPTY_DIRECTORY_DIGEST,
     )
     self.assertEqual(req.env, ('VAR', 'VAL'))
 
@@ -294,10 +297,11 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
     self.assertIn('javac', result.value)
 
   def test_write_file(self):
-    request = ExecuteProcessRequest.create_with_empty_snapshot(
+    request = ExecuteProcessRequest(
       argv=("/bin/bash", "-c", "echo -n 'European Burmese' > roland"),
       description="echo roland",
-      output_files=("roland",)
+      output_files=("roland",),
+      input_files=EMPTY_DIRECTORY_DIGEST,
     )
 
     execute_process_result = self.scheduler.product_request(
@@ -328,10 +332,11 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
     # but this allows us to ensure that all of the setup
     # on the python side does not blow up.
 
-    request = ExecuteProcessRequest.create_with_empty_snapshot(
+    request = ExecuteProcessRequest(
       argv=("/bin/bash", "-c", "/bin/sleep 1; echo -n 'European Burmese'"),
       timeout_seconds=0.1,
       description='sleepy-cat',
+      input_files=EMPTY_DIRECTORY_DIGEST,
     )
 
     self.scheduler.product_request(ExecuteProcessResult, [request])[0]
@@ -383,9 +388,10 @@ class Broken {
     self.assertIn("NOT VALID JAVA", e.stderr)
 
   def test_fallible_failing_command_returns_exited_result(self):
-    request = ExecuteProcessRequest.create_with_empty_snapshot(
+    request = ExecuteProcessRequest(
       argv=("/bin/bash", "-c", "exit 1"),
       description='one-cat',
+      input_files=EMPTY_DIRECTORY_DIGEST,
     )
 
     result = self.scheduler.product_request(FallibleExecuteProcessResult, [request])[0]
@@ -393,9 +399,10 @@ class Broken {
     self.assertEqual(result.exit_code, 1)
 
   def test_non_fallible_failing_command_raises(self):
-    request = ExecuteProcessRequest.create_with_empty_snapshot(
+    request = ExecuteProcessRequest(
       argv=("/bin/bash", "-c", "exit 1"),
       description='one-cat',
+      input_files=EMPTY_DIRECTORY_DIGEST,
     )
 
     with self.assertRaises(ExecutionError) as cm:

@@ -8,7 +8,7 @@ import logging
 
 import six
 
-from pants.engine.fs import EMPTY_SNAPSHOT, DirectoryDigest
+from pants.engine.fs import DirectoryDigest
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
 from pants.util.objects import Exactly, SubclassesOf, TypeCheckError, datatype
@@ -21,21 +21,20 @@ _default_timeout_seconds = 15 * 60
 
 class ExecuteProcessRequest(datatype([
   ('argv', tuple),
-  ('env', tuple),
   ('input_files', DirectoryDigest),
+  ('description', SubclassesOf(*six.string_types)),
+  ('env', tuple),
   ('output_files', tuple),
   ('output_directories', tuple),
   # NB: timeout_seconds covers the whole remote operation including queuing and setup.
   ('timeout_seconds', Exactly(float, int)),
-  ('description', SubclassesOf(*six.string_types)),
 ])):
   """Request for execution with args and snapshots to extract."""
 
-  @classmethod
-  def create_from_snapshot(
+  def __new__(
     cls,
     argv,
-    snapshot,
+    input_files,
     description,
     env=None,
     output_files=(),
@@ -45,49 +44,26 @@ class ExecuteProcessRequest(datatype([
     if env is None:
       env = ()
     else:
-      cls._verify_env_is_dict(env)
+      if not isinstance(env, dict):
+        raise TypeCheckError(
+          cls.__name__,
+          "arg 'env' was invalid: value {} (with type {}) must be a dict".format(
+            env,
+            type(env)
+          )
+        )
       env = tuple(item for pair in env.items() for item in pair)
 
-    return ExecuteProcessRequest(
+    return super(ExecuteProcessRequest, cls).__new__(
+      cls,
       argv=argv,
       env=env,
-      input_files=snapshot.directory_digest,
+      input_files=input_files,
+      description=description,
       output_files=output_files,
       output_directories=output_directories,
       timeout_seconds=timeout_seconds,
-      description=description,
     )
-
-  @classmethod
-  def create_with_empty_snapshot(
-    cls,
-    argv,
-    description,
-    env=None,
-    output_files=(),
-    output_directories=(),
-    timeout_seconds=_default_timeout_seconds,
-  ):
-    return cls.create_from_snapshot(
-      argv,
-      EMPTY_SNAPSHOT,
-      description,
-      env,
-      output_files,
-      output_directories,
-      timeout_seconds,
-    )
-
-  @classmethod
-  def _verify_env_is_dict(cls, env):
-    if not isinstance(env, dict):
-      raise TypeCheckError(
-        cls.__name__,
-        "arg 'env' was invalid: value {} (with type {}) must be a dict".format(
-          env,
-          type(env)
-        )
-      )
 
 
 class ExecuteProcessResult(datatype(['stdout', 'stderr', 'output_directory_digest'])):
