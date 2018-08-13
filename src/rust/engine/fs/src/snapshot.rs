@@ -218,16 +218,17 @@ impl Snapshot {
         let mut out_dir = bazel_protos::remote_execution::Directory::new();
 
         // Merge FileNodes.
+        let file_nodes = Itertools::flatten(
+          directories
+            .iter_mut()
+            .map(|directory| directory.take_files().into_iter()),
+        ).sorted_by(|a, b| a.name.cmp(&b.name));
+
         out_dir.set_files(protobuf::RepeatedField::from_vec(
-          Itertools::flatten(
-            directories
-              .iter_mut()
-              .map(|directory| directory.take_files().into_iter()),
-          ).collect(),
+          file_nodes.into_iter().dedup().collect(),
         ));
-        out_dir.mut_files().sort_by(|a, b| a.name.cmp(&b.name));
         let unique_count = out_dir
-          .mut_files()
+          .get_files()
           .iter()
           .map(|v| v.get_name())
           .dedup()
@@ -537,6 +538,36 @@ mod tests {
       err.contains("roland"),
       "Want error message to contain roland but was: {}",
       err
+    );
+  }
+
+  #[test]
+  fn merge_directories_same_files() {
+    let (store, _, _, _) = setup();
+
+    let containing_roland = TestDirectory::containing_roland();
+    let containing_roland_and_treats = TestDirectory::containing_roland_and_treats();
+
+    store
+      .record_directory(&containing_roland.directory(), false)
+      .wait()
+      .expect("Storing roland directory");
+    store
+      .record_directory(&containing_roland_and_treats.directory(), false)
+      .wait()
+      .expect("Storing treats directory");
+
+    let result = Snapshot::merge_directories(
+      store,
+      vec![
+        containing_roland.digest(),
+        containing_roland_and_treats.digest(),
+      ],
+    ).wait();
+
+    assert_eq!(
+      result,
+      Ok(TestDirectory::containing_roland_and_treats().digest())
     );
   }
 
