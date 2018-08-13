@@ -192,7 +192,10 @@ impl Snapshot {
 
   ///
   /// Given Digest(s) representing Directory instances, merge them recursively into a single
-  /// output Directory Digest. Fails for collisions.
+  /// output Directory Digest.
+  ///
+  /// If a file is present with the same name and contents multiple times, it will appear once.
+  /// If a file is present with the same name, but different contents, an error will be returned.
   ///
   pub fn merge_directories(store: Store, dir_digests: Vec<Digest>) -> BoxFuture<Digest, String> {
     if dir_digests.is_empty() {
