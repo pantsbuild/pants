@@ -51,13 +51,14 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
       return None
 
     hasher = hashlib.sha1()
-    hasher.update(target.payload.fingerprint().encode('utf-8'))
+    fingerprint = target.payload.fingerprint().encode('utf-8')
+    hasher.update(fingerprint)
 
     for conf in self._confs:
-      hasher.update(conf)
+      hasher.update(conf.encode('utf-8'))
 
     for element in hash_elements_for_target:
-      hasher.update(element)
+      hasher.update(element.encode('utf-8'))
 
     return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
