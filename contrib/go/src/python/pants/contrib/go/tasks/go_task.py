@@ -154,7 +154,7 @@ class ImportOracle(object):
       if returncode != 0:
         raise self.ListDepsError('Problem listing imports for {}: {} failed with exit code {}'
                                  .format(pkg, go_cmd, returncode))
-      data = json.loads(out)
+      data = json.loads(out.decode('utf-8'))
 
       # XTestImports are for black box tests.  These test files live inside the package dir but
       # declare a different package and thus can only access the public members of the package's
