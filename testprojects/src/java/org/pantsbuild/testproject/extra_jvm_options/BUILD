@@ -6,7 +6,7 @@ jvm_binary(
 )
 
 jvm_binary(
-    name = 'no-opts',
+    name = 'noopts',
     main = 'opts.Main',
     sources = ['Main.java']
 )
