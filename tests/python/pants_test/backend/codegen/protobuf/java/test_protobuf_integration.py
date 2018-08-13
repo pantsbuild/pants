@@ -35,7 +35,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
                                   stdout=subprocess.PIPE,
                                   cwd=out_path)
       java_retcode = java_run.wait()
-      java_out = java_run.stdout.read()
+      java_out = java_run.stdout.read().decode('utf-8')
       self.assertEqual(java_retcode, 0)
       self.assertIn("parsec", java_out)
 
@@ -54,7 +54,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
         stdout=subprocess.PIPE,
         cwd=out_path)
       java_retcode = java_run.wait()
-      java_out = java_run.stdout.read()
+      java_out = java_run.stdout.read().decode('utf-8')
       self.assertEqual(java_retcode, 0)
       self.assertIn("very test", java_out)
 
@@ -76,7 +76,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
               'org.pantsbuild.example.protobuf.unpacked_jars.ExampleProtobufExternalArchive']
       java_run = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=out_path)
       java_retcode = java_run.wait()
-      java_out = java_run.stdout.read()
+      java_out = java_run.stdout.read().decode('utf-8')
       self.assertEqual(java_retcode, 0)
       self.assertIn("Message is: Hello World!", java_out)
 
