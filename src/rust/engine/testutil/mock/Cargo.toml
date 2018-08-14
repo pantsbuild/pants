@@ -8,6 +8,7 @@ publish = false
 bazel_protos = { path = "../../process_execution/bazel_protos" }
 bytes = "0.4.5"
 futures = "^0.1.16"
+# Pull in https://github.com/pingcap/grpc-rs/pull/211
 grpcio = { git = "https://github.com/illicitonion/grpc-rs.git", rev = "d106c615bc0c289ba6d1ce6871786266d109c31c", features = ["secure"] }
 hashing = { path = "../../hashing" }
 protobuf = { version = "2.0.4", features = ["with-bytes"] }
