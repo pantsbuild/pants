@@ -109,9 +109,9 @@ impl Store {
   }
 
   ///
-  /// Loads the bytes of the file with the passed fingerprint from the local store
-  /// and back-fill from remote when necessary, and returns the result of applying f
-  /// to that value.
+  /// Loads the bytes of the file with the passed fingerprint from the local store and back-fill
+  /// from remote when necessary and possible (i.e. when remote is configured), and returns the
+  /// result of applying f to that value.
   ///
   pub fn load_file_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
     &self,
