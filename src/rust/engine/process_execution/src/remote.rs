@@ -1737,11 +1737,6 @@ mod tests {
     }
   }
 
-  // NB: The following helper functions return tuples of Operation and an optional Duration in
-  // order to make setting up the operations for a test execution server easier to read.
-  // The test execution server uses the duration to introduce a delay so that we can test
-  // timeouts.
-
   fn make_canceled_operation(duration: Option<Duration>) -> MockOperation {
     MockOperation { op: None, duration }
   }
@@ -1830,10 +1825,7 @@ mod tests {
       });
       response
     }));
-    MockOperation {
-      op: Some(operation),
-      duration: None,
-    }
+    MockOperation::new(operation)
   }
 
   fn run_command_remote(

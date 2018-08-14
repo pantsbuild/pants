@@ -190,21 +190,17 @@ impl MockResponder {
       .unwrap()
       .pop_front()
     {
-      Some(MockOperation { op: None, duration }) => {
+      Some(MockOperation { op, duration }) => {
         if let Some(d) = duration {
           sleep(d);
         }
-        // Cancel the request by dropping the sink.
-        drop(sink)
-      }
-      Some(MockOperation {
-        op: Some(op),
-        duration,
-      }) => {
-        if let Some(d) = duration {
-          sleep(d);
+        if let Some(op) = op {
+          // Complete the channel with the op.
+          sink.success(op.clone());
+        } else {
+          // Cancel the request by dropping the sink.
+          drop(sink);
         }
-        sink.success(op.clone());
       }
       None => {
         sink.fail(grpcio::RpcStatus::new(
@@ -227,27 +223,22 @@ impl MockResponder {
       .unwrap()
       .pop_front()
     {
-      Some(MockOperation { op: None, duration }) => {
+      Some(MockOperation { op, duration }) => {
         if let Some(d) = duration {
           sleep(d);
         }
-        // Cancel the request by dropping the sink.
-        drop(sink)
-      }
-      Some(MockOperation {
-        op: Some(op),
-        duration,
-      }) => {
-        if let Some(d) = duration {
-          sleep(d);
+        if let Some(op) = op {
+          ctx.spawn(
+            sink
+              .send((op.clone(), grpcio::WriteFlags::default()))
+              .map(|mut stream| stream.close())
+              .map(|_| ())
+              .map_err(|_| ()),
+          )
+        } else {
+          // Cancel the request by dropping the sink.
+          drop(sink)
         }
-        ctx.spawn(
-          sink
-            .send((op.clone(), grpcio::WriteFlags::default()))
-            .map(|mut stream| stream.close())
-            .map(|_| ())
-            .map_err(|_| ()),
-        )
       }
       None => ctx.spawn(
         sink
