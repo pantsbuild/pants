@@ -509,6 +509,15 @@ impl ExecuteProcess {
 
     let description = externs::project_str(&value, "description");
 
+    let jdk_home = {
+      let val = externs::project_str(&value, "jdk_home");
+      if val.is_empty() {
+        None
+      } else {
+        Some(PathBuf::from(val))
+      }
+    };
+
     Ok(ExecuteProcess(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
@@ -517,6 +526,7 @@ impl ExecuteProcess {
       output_directories: output_directories,
       timeout: Duration::from_millis((timeout_in_seconds * 1000.0) as u64),
       description: description,
+      jdk_home: jdk_home,
     }))
   }
 }

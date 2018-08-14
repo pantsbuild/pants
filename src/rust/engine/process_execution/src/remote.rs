@@ -92,6 +92,8 @@ impl super::CommandRunner for CommandRunner {
   /// Loops until the server gives a response, either successful or error. Does not have any
   /// timeout: polls in a tight loop.
   ///
+  /// TODO: Request jdk_home be created if set.
+  ///
   fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let operations_client = self.operations_client.clone();
 
@@ -710,6 +712,7 @@ mod tests {
         .collect(),
       timeout: Duration::from_millis(1000),
       description: "some description".to_owned(),
+      jdk_home: None,
     };
     let result = super::make_execute_request(&req);
 
@@ -774,6 +777,7 @@ mod tests {
           output_directories: BTreeSet::new(),
           timeout: Duration::from_millis(1000),
           description: "wrong command".to_string(),
+          jdk_home: None,
         }).unwrap()
           .2,
         vec![],
@@ -986,6 +990,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: request_timeout,
       description: "echo-a-foo".to_string(),
+      jdk_home: None,
     };
 
     let mock_server = {
@@ -1662,6 +1667,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(5000),
       description: "echo a foo".to_string(),
+      jdk_home: None,
     }
   }
 
@@ -1839,6 +1845,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "cat a roland".to_string(),
+      jdk_home: None,
     }
   }
 
@@ -1851,6 +1858,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "unleash a roaring meow".to_string(),
+      jdk_home: None,
     }
   }
 }
