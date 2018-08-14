@@ -1035,6 +1035,42 @@ mod tests {
   }
 
   #[test]
+  fn retry_for_canceled_channel() {
+    let execute_request = echo_foo_request();
+
+    let mock_server = {
+      let op_name = "gimme-foo".to_string();
+
+      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
+        op_name.clone(),
+        super::make_execute_request(&execute_request).unwrap().2,
+        vec![
+          make_incomplete_operation(&op_name),
+          make_canceled_operation(Some(Duration::from_millis(100))),
+          make_successful_operation(
+            &op_name,
+            StdoutType::Raw("foo".to_owned()),
+            StderrType::Raw("".to_owned()),
+            0,
+          ),
+        ],
+      ))
+    };
+
+    let result = run_command_remote(mock_server.address(), execute_request).unwrap();
+
+    assert_eq!(
+      result,
+      FallibleExecuteProcessResult {
+        stdout: as_bytes("foo"),
+        stderr: as_bytes(""),
+        exit_code: 0,
+        output_directory: fs::EMPTY_DIGEST,
+      }
+    );
+  }
+
+  #[test]
   fn bad_result_bytes() {
     let execute_request = echo_foo_request();
 
@@ -1705,6 +1741,10 @@ mod tests {
   // order to make setting up the operations for a test execution server easier to read.
   // The test execution server uses the duration to introduce a delay so that we can test
   // timeouts.
+
+  fn make_canceled_operation(duration: Option<Duration>) -> MockOperation {
+    MockOperation { op: None, duration }
+  }
 
   fn make_incomplete_operation(operation_name: &str) -> MockOperation {
     let mut op = bazel_protos::operations::Operation::new();
