@@ -198,9 +198,9 @@ impl Store {
   }
 
   ///
-  /// Loads bytes from remote cas. Takes two functions f_local and f_remote. These functions are
-  /// any validation or transformations you want to perform on the bytes received from the
-  /// local and remote cas.
+  /// Loads bytes from remote cas if required and possible (i.e. if remote is configured). Takes
+  /// two functions f_local and f_remote. These functions are any validation or transformations you
+  /// want to perform on the bytes received from the local and remote cas (if remote is configured).
   ///
   fn load_bytes_with<
     T: Send + 'static,
