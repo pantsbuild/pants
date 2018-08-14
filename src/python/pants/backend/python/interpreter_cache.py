@@ -84,7 +84,7 @@ class PythonInterpreterCache(object):
       filters.add(self._python_setup.get_options().interpreter_constraints[-1])
     else:
       for target in targets:
-        if isinstance(target, PythonTarget) and target.compatibility:
+        if isinstance(target, PythonTarget):
           c = self._python_setup.compatibility_or_constraints(target)
           tgts_by_compatibilities[c].append(target)
           filters.update(c)
