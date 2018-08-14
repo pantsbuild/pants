@@ -75,13 +75,10 @@ class CountLinesOfCode(ConsoleTask):
 
     # The cloc script reaches into $PATH to look up perl. Let's assume it's in /usr/bin.
     req = ExecuteProcessRequest(
-      cmd,
-      (),
-      directory_digest,
-      ('ignored', 'report'),
-      (),
-      15 * 60,
-      'cloc'
+      argv=cmd,
+      input_files=directory_digest,
+      output_files=('ignored', 'report'),
+      description='cloc',
     )
     exec_result = self.context.execute_process_synchronously(req, 'cloc', (WorkUnitLabel.TOOL,))
 

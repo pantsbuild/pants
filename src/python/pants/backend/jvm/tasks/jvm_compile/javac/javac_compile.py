@@ -216,9 +216,9 @@ class JavacCompile(JvmCompile):
       os.path.relpath(f.path.replace('.java', '.class'), ctx.target.target_base)
       for f in input_snapshot.files if f.path.endswith('.java')
     )
-    exec_process_request = ExecuteProcessRequest.create_from_snapshot(
+    exec_process_request = ExecuteProcessRequest(
       argv=tuple(cmd),
-      snapshot=input_snapshot,
+      input_files=input_snapshot.directory_digest,
       output_files=output_files,
       description='Compiling {} with javac'.format(ctx.target.address.spec),
     )
