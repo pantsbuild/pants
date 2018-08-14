@@ -336,8 +336,8 @@ class JvmBinary(JvmTarget):
       (aka monolithic aka fat) binary jar. The order of the rules matters: the first rule which
       matches a fully-qualified class name is used to shade it. See shading_relocate(),
       shading_exclude(), shading_relocate_package(), and shading_exclude_package().
-    :param list extra_jvm_options: A list of key value pairs of jvm options to use when running the
-      binary. Example: ['-Dexample.property=1'] If unspecified, no extra jvm options will be added.
+    :param list extra_jvm_options: A list of options to be passed to the jvm when running the
+      binary. Example: ['-Dexample.property=1', '-DMyFlag', '-Xmx4G'] If unspecified, no extra jvm options will be added.
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     if main and not isinstance(main, string_types):
