@@ -6,12 +6,12 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 
-import six
+from future.utils import text_type
 
 from pants.engine.fs import DirectoryDigest
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
-from pants.util.objects import Exactly, SubclassesOf, TypeCheckError, datatype
+from pants.util.objects import Exactly, TypeCheckError, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -22,12 +22,13 @@ _default_timeout_seconds = 15 * 60
 class ExecuteProcessRequest(datatype([
   ('argv', tuple),
   ('input_files', DirectoryDigest),
-  ('description', SubclassesOf(*six.string_types)),
+  ('description', text_type),
   ('env', tuple),
   ('output_files', tuple),
   ('output_directories', tuple),
   # NB: timeout_seconds covers the whole remote operation including queuing and setup.
   ('timeout_seconds', Exactly(float, int)),
+  ('jdk_home', Exactly(text_type, type(None))),
 ])):
   """Request for execution with args and snapshots to extract."""
 
@@ -40,6 +41,7 @@ class ExecuteProcessRequest(datatype([
     output_files=(),
     output_directories=(),
     timeout_seconds=_default_timeout_seconds,
+    jdk_home=None,
   ):
     if env is None:
       env = ()
@@ -63,6 +65,7 @@ class ExecuteProcessRequest(datatype([
       output_files=output_files,
       output_directories=output_directories,
       timeout_seconds=timeout_seconds,
+      jdk_home=jdk_home,
     )
 
 

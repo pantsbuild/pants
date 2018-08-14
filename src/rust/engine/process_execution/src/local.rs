@@ -7,7 +7,7 @@ use futures::{future, Future, Stream};
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::ops::Neg;
-use std::os::unix::process::ExitStatusExt;
+use std::os::unix::{fs::symlink, process::ExitStatusExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
@@ -227,17 +227,27 @@ impl super::CommandRunner for CommandRunner {
     );
     let workdir_path = workdir.path().to_owned();
     let workdir_path2 = workdir_path.clone();
+    let workdir_path3 = workdir_path.clone();
     let store = self.store.clone();
     let fs_pool = self.fs_pool.clone();
+
     let env = req.env;
     let output_file_paths = req.output_files;
     let output_dir_paths = req.output_directories;
     let cleanup_local_dirs = self.cleanup_local_dirs;
     let argv = req.argv;
     let req_description = req.description;
+    let maybe_jdk_home = req.jdk_home;
     self
       .store
       .materialize_directory(workdir_path.clone(), req.input_files)
+      .and_then(move |()| {
+        if let Some(jdk_home) = maybe_jdk_home {
+          symlink(jdk_home, workdir_path3.join(".jdk")).map_err(|err| format!("Error making symlink for local execution: {:?}", err))
+        } else {
+          Ok(())
+        }
+      })
       .and_then(move |()| {
         StreamedHermeticCommand::new(&argv[0])
           .args(&argv[1..])
@@ -337,6 +347,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
+      jdk_home: None,
     });
 
     assert_eq!(
@@ -361,6 +372,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo foo and fail".to_string(),
+      jdk_home: None,
     });
 
     assert_eq!(
@@ -386,6 +398,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "kill self".to_string(),
+      jdk_home: None,
     });
 
     assert_eq!(
@@ -414,6 +427,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "run env".to_string(),
+      jdk_home: None,
     });
 
     let stdout = String::from_utf8(result.unwrap().stdout.to_vec()).unwrap();
@@ -449,6 +463,7 @@ mod tests {
         output_directories: BTreeSet::new(),
         timeout: Duration::from_millis(1000),
         description: "run env".to_string(),
+        jdk_home: None,
       }
     }
 
@@ -468,6 +483,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
+      jdk_home: None,
     }).expect_err("Want Err");
   }
 
@@ -485,6 +501,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
+      jdk_home: None,
     });
     assert_eq!(
       result.unwrap(),
@@ -511,6 +528,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
+      jdk_home: None,
     });
 
     assert_eq!(
@@ -543,6 +561,7 @@ mod tests {
       output_directories: vec![PathBuf::from("cats")].into_iter().collect(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
+      jdk_home: None,
     });
 
     assert_eq!(
@@ -576,6 +595,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "treats-roland".to_string(),
+      jdk_home: None,
     });
 
     assert_eq!(
@@ -607,6 +627,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
+      jdk_home: None,
     });
 
     assert_eq!(
@@ -636,6 +657,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo-roland".to_string(),
+      jdk_home: None,
     });
 
     assert_eq!(
@@ -646,6 +668,34 @@ mod tests {
         exit_code: 0,
         output_directory: TestDirectory::containing_roland().digest(),
       }
+    )
+  }
+
+  #[test]
+  fn jdk_symlink() {
+    let preserved_work_tmpdir = TempDir::new().unwrap();
+    let roland = TestData::roland().bytes();
+    std::fs::write(preserved_work_tmpdir.path().join("roland"), roland.clone())
+      .expect("Writing temporary file");
+
+    let result = run_command_locally(ExecuteProcessRequest {
+      argv: vec!["/bin/cat".to_owned(), ".jdk/roland".to_owned()],
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
+      timeout: Duration::from_millis(1000),
+      description: "cat roland".to_string(),
+      jdk_home: Some(preserved_work_tmpdir.path().to_path_buf()),
+    });
+    assert_eq!(
+      result,
+      Ok(FallibleExecuteProcessResult {
+        stdout: roland,
+        stderr: as_bytes(""),
+        exit_code: 0,
+        output_directory: fs::EMPTY_DIGEST,
+      })
     )
   }
 
@@ -667,6 +717,7 @@ mod tests {
         output_directories: BTreeSet::new(),
         timeout: Duration::from_millis(1000),
         description: "bash".to_string(),
+        jdk_home: None,
       },
       preserved_work_root.clone(),
       false,
@@ -701,6 +752,7 @@ mod tests {
         output_directories: BTreeSet::new(),
         timeout: Duration::from_millis(1000),
         description: "failing execution".to_string(),
+        jdk_home: None,
       },
       preserved_work_root.clone(),
       false,

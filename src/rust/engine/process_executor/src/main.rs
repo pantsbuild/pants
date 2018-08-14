@@ -154,6 +154,7 @@ fn main() {
     output_directories: BTreeSet::new(),
     timeout: Duration::new(15 * 60, 0),
     description: "process_executor".to_string(),
+    jdk_home: None,
   };
 
   let runner: Box<process_execution::CommandRunner> = match server_arg {

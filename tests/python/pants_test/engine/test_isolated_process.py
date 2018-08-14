@@ -17,6 +17,7 @@ from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcess
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, Select
+from pants.util.contextutil import temporary_dir
 from pants.util.objects import TypeCheckError, datatype
 from pants_test.test_base import TestBase
 
@@ -386,6 +387,19 @@ class Broken {
     self.assertEqual(1, e.exit_code)
     self.assertIn('javac compilation', str(e))
     self.assertIn("NOT VALID JAVA", e.stderr)
+
+  def test_jdk(self):
+    with temporary_dir() as temp_dir:
+      with open(os.path.join(temp_dir, 'roland'), 'w') as f:
+        f.write('European Burmese')
+      request = ExecuteProcessRequest(
+        argv=('/bin/cat', '.jdk/roland'),
+        input_files=EMPTY_DIRECTORY_DIGEST,
+        description='cat JDK roland',
+        jdk_home=temp_dir,
+      )
+      result = self.scheduler.product_request(ExecuteProcessResult, [request])[0]
+      self.assertEqual(result.stdout, 'European Burmese')
 
   def test_fallible_failing_command_returns_exited_result(self):
     request = ExecuteProcessRequest(

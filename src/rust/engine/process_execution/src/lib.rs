@@ -65,6 +65,12 @@ pub struct ExecuteProcessRequest {
   pub timeout: std::time::Duration,
 
   pub description: String,
+
+  ///
+  /// If present, a symlink will be created at .jdk which points to this directory for local
+  /// execution.
+  ///
+  pub jdk_home: Option<PathBuf>,
 }
 
 ///
