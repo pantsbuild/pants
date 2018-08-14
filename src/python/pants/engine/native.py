@@ -448,7 +448,10 @@ def _initialize_externs(ffi):
   def extern_val_to_str(context_handle, val):
     """Given a Handle for `obj`, write str(obj) and return it."""
     c = ffi.from_handle(context_handle)
-    return c.utf8_buf(text_type(c.from_value(val[0])))
+    v = c.from_value(val[0])
+    # Consistently use the empty string to indicate None.
+    v_str = '' if v is None else text_type(v)
+    return c.utf8_buf(v_str)
 
   @ffi.def_extern()
   def extern_satisfied_by(context_handle, constraint_val, val):
