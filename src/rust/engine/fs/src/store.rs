@@ -2261,15 +2261,37 @@ mod tests {
     let roland = TestData::roland();
     let catnip = TestData::catnip();
     let testdir = TestDirectory::containing_roland();
+    let testdir_digest = testdir.digest();
+    let testdir_directory = testdir.directory();
     let recursive_testdir = TestDirectory::recursive();
+    let recursive_testdir_directory = recursive_testdir.directory();
+    let recursive_testdir_digest = recursive_testdir.digest();
 
-    let cas = StubCAS::with_content(1024, vec![roland, catnip], vec![testdir, recursive_testdir]);
+    let cas = StubCAS::with_content(
+        1024,
+        vec![roland.clone(), catnip.clone()], vec![testdir, recursive_testdir]
+    );
     new_store(dir.path(), cas.address())
-      .ensure_local_has_recursive_directory(recursive_testdir.digest())
+      .ensure_local_has_recursive_directory(recursive_testdir_digest)
       .wait()
-      .expect("Successfully downloaded recursive dir");
+      .expect("Downloading recursive directory should have succeeded.");
 
-    // TODO(ity): Add check for individual directory/file bytes
+    assert_eq!(
+      load_file_bytes(&new_local_store(dir.path()), roland.digest()),
+      Ok(Some(roland.bytes()))
+    );
+    assert_eq!(
+      load_file_bytes(&new_local_store(dir.path()), catnip.digest()),
+      Ok(Some(catnip.bytes()))
+    );
+    assert_eq!(
+      new_local_store(dir.path()).load_directory(testdir_digest).wait(),
+      Ok(Some(testdir_directory))
+    );
+    assert_eq!(
+      new_local_store(dir.path()).load_directory(recursive_testdir_digest).wait(),
+      Ok(Some(recursive_testdir_directory))
+    );
   }
 
 

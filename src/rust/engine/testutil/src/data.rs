@@ -5,6 +5,7 @@ use hashing;
 use protobuf::Message;
 use sha2::{self, Digest};
 
+#[derive(Clone)]
 pub struct TestData {
   string: String,
 }
