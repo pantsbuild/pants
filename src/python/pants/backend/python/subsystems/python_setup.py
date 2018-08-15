@@ -8,7 +8,6 @@ import os
 
 from pex.package import SourcePackage
 from pex.sorter import Sorter
-
 from pkg_resources import Requirement
 
 from pants.option.custom_types import UnsetBool

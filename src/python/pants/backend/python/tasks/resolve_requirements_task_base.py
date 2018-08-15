@@ -13,8 +13,8 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.pex_build_util import dump_requirement_libs, dump_requirements
 from pants.base.hash_utils import hash_all
@@ -74,9 +74,8 @@ class ResolveRequirementsTaskBase(Task):
 
       # If sdist_builds are allowed, we don't want the translated bdist to be cached locally
       # as this will cause undeterministic resolves in the future.
-      # TODO(): Translated dists should be cached in a separate cache.
-      cache_distribution = python_setup.allow_sdist_builds
-      python_setup = PythonSetup.global_instance()
+      # TODO(6353): Translated dists should be cached in a separate cache.
+      cache_distribution = PythonSetup.global_instance().allow_sdist_builds
       path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity), target_set_id))
       # Note that we check for the existence of the directory, instead of for invalid_vts,
       # to cover the empty case.

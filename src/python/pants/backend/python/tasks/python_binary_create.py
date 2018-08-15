@@ -10,8 +10,8 @@ from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_sources,
