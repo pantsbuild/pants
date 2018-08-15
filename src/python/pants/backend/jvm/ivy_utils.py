@@ -1017,7 +1017,7 @@ class IvyUtils(object):
 
   @classmethod
   def _write_ivy_xml_file(cls, ivyxml, template_data, template_relpath):
-    template_text = pkgutil.get_data(__name__, template_relpath)
+    template_text = pkgutil.get_data(__name__, template_relpath).decode('utf-8')
     generator = Generator(template_text, lib=template_data)
     with safe_open(ivyxml, 'w') as output:
       generator.write(output)
