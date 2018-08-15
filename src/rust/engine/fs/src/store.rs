@@ -331,10 +331,7 @@ impl Store {
   /// Download a directory from Remote ByteStore recursively to the local one. Called only with the
   /// Digest of a Directory.
   ///
-  pub fn ensure_local_has_recursive_directory(
-    &self,
-    dir_digest: Digest
-  ) -> BoxFuture<(), String> {
+  pub fn ensure_local_has_recursive_directory(&self, dir_digest: Digest) -> BoxFuture<(), String> {
     let store = self.clone();
     self
       .load_directory(dir_digest)
@@ -342,28 +339,28 @@ impl Store {
         directory_opt.ok_or_else(|| format!("Could not read dir with digest {:?}", dir_digest))
       })
       .and_then(move |directory| {
-          // Traverse the files within directory
-          let file_futures = directory
-              .get_files()
-              .iter()
-              .map(|file_node| {
-                let file_digest = try_future!(file_node.get_digest().into());
-                store.load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
-              })
-              .collect::<Vec<_>>();
+        // Traverse the files within directory
+        let file_futures = directory
+          .get_files()
+          .iter()
+          .map(|file_node| {
+            let file_digest = try_future!(file_node.get_digest().into());
+            store.load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
+          })
+          .collect::<Vec<_>>();
 
-          // Recursively call with sub-directories
-          let directory_futures = directory
-            .get_directories()
-            .iter()
-            .map (move |child_dir| {
-              let child_digest = try_future!(child_dir.get_digest().into());
-              store.ensure_local_has_recursive_directory(child_digest)
-            })
-            .collect::<Vec<_>>();
-          future::join_all(file_futures)
-              .join(future::join_all(directory_futures))
-              .map(|_| ())
+        // Recursively call with sub-directories
+        let directory_futures = directory
+          .get_directories()
+          .iter()
+          .map(move |child_dir| {
+            let child_digest = try_future!(child_dir.get_digest().into());
+            store.ensure_local_has_recursive_directory(child_digest)
+          })
+          .collect::<Vec<_>>();
+        future::join_all(file_futures)
+          .join(future::join_all(directory_futures))
+          .map(|_| ())
       })
       .to_boxed()
   }
@@ -2268,8 +2265,9 @@ mod tests {
     let recursive_testdir_digest = recursive_testdir.digest();
 
     let cas = StubCAS::with_content(
-        1024,
-        vec![roland.clone(), catnip.clone()], vec![testdir, recursive_testdir]
+      1024,
+      vec![roland.clone(), catnip.clone()],
+      vec![testdir, recursive_testdir],
     );
     new_store(dir.path(), cas.address())
       .ensure_local_has_recursive_directory(recursive_testdir_digest)
@@ -2285,15 +2283,18 @@ mod tests {
       Ok(Some(catnip.bytes()))
     );
     assert_eq!(
-      new_local_store(dir.path()).load_directory(testdir_digest).wait(),
+      new_local_store(dir.path())
+        .load_directory(testdir_digest)
+        .wait(),
       Ok(Some(testdir_directory))
     );
     assert_eq!(
-      new_local_store(dir.path()).load_directory(recursive_testdir_digest).wait(),
+      new_local_store(dir.path())
+        .load_directory(recursive_testdir_digest)
+        .wait(),
       Ok(Some(recursive_testdir_directory))
     );
   }
-
 
   #[test]
   fn load_file_missing_is_none() {
