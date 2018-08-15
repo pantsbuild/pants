@@ -154,73 +154,73 @@ matrix:
       env:
         - SHARD="Self checks, lint, and JVM tests"
       script:
-        - ./build-support/bin/ci.sh -x -celpn "${SHARD}"
+        - ./build-support/bin/ci.sh -fkmrjt "${SHARD}"
 
     - <<: *default_test_config
       env:
         - SHARD="Py2 - Unit tests for pants and pants-plugins"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjcnt "${SHARD}"
+        - ./build-support/bin/ci.sh -lp "${SHARD}"
 
     - <<: *default_test_config
       env:
         - SHARD="Py3 - Unit tests for pants and pants-plugins"
       script:
-        - ./build-support/bin/ci.sh -x -3efkmrjcnt "${SHARD}"
+        - ./build-support/bin/ci.sh -3lp "${SHARD}"
 
     - <<: *default_test_config
       env:
         - SHARD="Py2 - Python contrib tests"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcjlpt "${SHARD}"
+        - ./build-support/bin/ci.sh -n "${SHARD}"
 
     - <<: *default_test_config
       env:
         - SHARD="Py3 - Python contrib tests"
       script:
-        - ./build-support/bin/ci.sh -x -3efkmrcjlpt "${SHARD}"
+        - ./build-support/bin/ci.sh -3n "${SHARD}"
 
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 1"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 0/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -c -i 0/7 "${SHARD}"
 
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 2"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 1/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -c -i 1/7 "${SHARD}"
 
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 3"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 2/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -c -i 2/7 "${SHARD}"
 
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 4"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 3/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -c -i 3/7 "${SHARD}"
 
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 5"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 4/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -c -i 4/7 "${SHARD}"
 
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 6"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 5/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -c -i 5/7 "${SHARD}"
 
     - <<: *default_test_config
       env:
         - SHARD="Python integration tests for pants - shard 7"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 6/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -c -i 6/7 "${SHARD}"
 
     # Rust on linux
     - os: linux
@@ -244,8 +244,7 @@ matrix:
         - ulimit -c unlimited
         - ulimit -n 8192
       script:
-        - ./build-support/bin/ci.sh -bcfjklmnprtx
-
+        - ./build-support/bin/ci.sh -be
     # Rust on macOS
     - os: osx
       # Fuse actually works on this image. It hangs on many others.
@@ -266,8 +265,7 @@ matrix:
         - ulimit -n 8192
       script:
         # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and set -z to run the platform-specific tests.
-        - ./build-support/bin/ci.sh -cfjklmnprtxz
-
+        - ./build-support/bin/ci.sh -ez
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/s3/
   provider: s3

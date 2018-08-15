@@ -32,6 +32,9 @@ readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
 # only pants core is included.
 : ${PANTS_PEX_PACKAGES:="pantsbuild.pants"}
 
+# URL from which pex release binaries can be downloaded.
+: ${PEX_DOWNLOAD_PREFIX:="https://github.com/pantsbuild/pex/releases/download"}
+
 source ${ROOT}/contrib/release_packages.sh
 
 function find_pkg() {
@@ -601,12 +604,12 @@ function build_pex() {
     cd $(mktemp -d -t build_pex.XXXXX)
     trap "rm -rf $(pwd -P)" EXIT
 
-    curl -sSL https://github.com/pantsbuild/pex/releases/download/v${PEX_VERSION}/${PEX_PEX} -O
+    curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/${PEX_PEX}" -O
     chmod +x ./${PEX_PEX}
 
     ./${PEX_PEX} \
       -o "${dest}" \
-      -c pants \
+      --entry-point="pants.bin.pants_loader:main" \
       --no-build \
       --no-pypi \
       --disable-cache \
