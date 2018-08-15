@@ -9,6 +9,7 @@ python_tests(
     'src/python/pants/util:process_handler',
     'src/python/pants/util:strutil',
     'tests/python/pants_test:test_base',
+    'tests/python/pants_test/backend/native/util',
     'tests/python/pants_test/engine:scheduler_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ],

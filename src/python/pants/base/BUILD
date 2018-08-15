@@ -17,6 +17,7 @@ python_library(
   name = 'project_tree',
   sources = ['file_system_project_tree.py', 'project_tree.py', 'project_tree_factory.py'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:pathspec',
     '3rdparty/python:scandir',
     '3rdparty/python:six',
@@ -52,6 +53,7 @@ python_library(
   name = 'build_root',
   sources = ['build_root.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:meta',
   ],
 )

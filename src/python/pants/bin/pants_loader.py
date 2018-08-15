@@ -8,6 +8,7 @@ import importlib
 import locale
 import os
 import warnings
+from builtins import object
 
 
 class PantsLoader(object):
@@ -15,6 +16,8 @@ class PantsLoader(object):
 
   ENTRYPOINT_ENV_VAR = 'PANTS_ENTRYPOINT'
   DEFAULT_ENTRYPOINT = 'pants.bin.pants_exe:main'
+
+  ENCODING_IGNORE_ENV_VAR = 'PANTS_IGNORE_UNRECOGNIZED_ENCODING'
 
   class InvalidLocaleError(Exception):
     """Raised when a valid locale can't be found."""
@@ -32,15 +35,15 @@ class PantsLoader(object):
     # Sanity check for locale, See https://github.com/pantsbuild/pants/issues/2465.
     # This check is done early to give good feedback to user on how to fix the problem. Other
     # libraries called by Pants may fail with more obscure errors.
-    try:
-      locale.getlocale()[1] or locale.getdefaultlocale()[1]
-    except Exception as e:
+    encoding = locale.getpreferredencoding()
+    if encoding.lower() != 'utf-8' and os.environ.get(cls.ENCODING_IGNORE_ENV_VAR, None) is None:
       raise cls.InvalidLocaleError(
-        '{}: {}\n'
-        '  Could not get a valid locale. Check LC_* and LANG environment settings.\n'
-        '  Example for US English:\n'
-        '    LC_ALL=en_US.UTF-8\n'
-        '    LANG=en_US.UTF-8'.format(type(e).__name__, e)
+        'System preferred encoding is `{}`, but `UTF-8` is required.\n'
+        'Check and set the LC_* and LANG environment settings. Example:\n'
+        '  LC_ALL=en_US.UTF-8\n'
+        '  LANG=en_US.UTF-8\n'
+        'To bypass this error, please file an issue and then set:\n'
+        '  {}=1'.format(encoding, cls.ENCODING_IGNORE_ENV_VAR)
       )
 
   @staticmethod

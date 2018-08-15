@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import open
 
 from pants.backend.codegen.thrift.lib.thrift import Thrift
 from pants.base.build_environment import get_buildroot
@@ -77,11 +78,11 @@ class GoThriftGen(SimpleCodegenTask):
   NAMESPACE_PARSER = re.compile(r'^\s*namespace go\s+([^\s]+)', re.MULTILINE)
 
   def _declares_service(self, source):
-    with open(source) as thrift:
+    with open(source, 'r') as thrift:
       return any(line for line in thrift if self.SERVICE_PARSER.search(line))
 
   def _get_go_namespace(self, source):
-    with open(source) as thrift:
+    with open(source, 'r') as thrift:
       namespace = self.NAMESPACE_PARSER.search(thrift.read())
       if not namespace:
         raise TaskError('Thrift file {} must contain "namespace go "', source)

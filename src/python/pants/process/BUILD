@@ -3,6 +3,7 @@
 
 python_library(
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:fasteners',
     '3rdparty/python:psutil',
     'src/python/pants/util:dirutil',

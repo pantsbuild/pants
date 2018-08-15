@@ -5,21 +5,24 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-import tarfile
 import unittest
+from builtins import str
+
+from future.utils import text_type
 
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, FileContent, FilesContent,
-                             PathGlobs, Snapshot, create_fs_rules)
+                             PathGlobs, Snapshot)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
-                                           FallibleExecuteProcessResult, ProcessExecutionFailure,
-                                           create_process_rules)
+                                           FallibleExecuteProcessResult, ProcessExecutionFailure)
 from pants.engine.rules import RootRule, rule
+from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, Select
+from pants.util.contextutil import temporary_dir
 from pants.util.objects import TypeCheckError, datatype
-from pants_test.engine.scheduler_test_base import SchedulerTestBase
+from pants_test.test_base import TestBase
 
 
-class Concatted(datatype([('value', str)])): pass
+class Concatted(datatype([('value', text_type)])): pass
 
 
 class BinaryLocation(datatype(['bin_path'])):
@@ -58,7 +61,9 @@ class ShellCat(datatype([('binary_location', BinaryLocation)])):
         "invalid file names: '{}' look like command-line options"
         .format(option_like_files))
 
-    return (self.bin_path,) + tuple(cat_file_paths)
+    # Add /dev/null to the list of files, so that cat doesn't hang forever if no files are in the
+    # Snapshot.
+    return (self.bin_path, "/dev/null") + tuple(cat_file_paths)
 
 
 class CatExecutionRequest(datatype([('shell_cat', ShellCat), ('path_globs', PathGlobs)])): pass
@@ -68,13 +73,13 @@ class CatExecutionRequest(datatype([('shell_cat', ShellCat), ('path_globs', Path
 def cat_files_process_result_concatted(cat_exe_req):
   cat_bin = cat_exe_req.shell_cat
   cat_files_snapshot = yield Get(Snapshot, PathGlobs, cat_exe_req.path_globs)
-  process_request = ExecuteProcessRequest.create_from_snapshot(
+  process_request = ExecuteProcessRequest(
     argv=cat_bin.argv_from_snapshot(cat_files_snapshot),
-    snapshot=cat_files_snapshot,
+    input_files=cat_files_snapshot.directory_digest,
     description='cat some files',
   )
   cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
-  yield Concatted(str(cat_process_result.stdout))
+  yield Concatted(text_type(cat_process_result.stdout))
 
 
 def create_cat_stdout_rules():
@@ -98,13 +103,14 @@ class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)
 
 @rule(ExecuteProcessRequest, [Select(JavacVersionExecutionRequest)])
 def process_request_from_javac_version(javac_version_exe_req):
-  yield ExecuteProcessRequest.create_with_empty_snapshot(
+  yield ExecuteProcessRequest(
     argv=javac_version_exe_req.gen_argv(),
     description=javac_version_exe_req.description,
+    input_files=EMPTY_DIRECTORY_DIGEST,
   )
 
 
-class JavacVersionOutput(datatype([('value', str)])): pass
+class JavacVersionOutput(datatype([('value', text_type)])): pass
 
 
 @rule(JavacVersionOutput, [Select(JavacVersionExecutionRequest)])
@@ -114,7 +120,7 @@ def get_javac_version_output(javac_version_command):
   javac_version_proc_result = yield Get(
     ExecuteProcessResult, ExecuteProcessRequest, javac_version_proc_req)
 
-  yield JavacVersionOutput(str(javac_version_proc_result.stderr))
+  yield JavacVersionOutput(text_type(javac_version_proc_result.stderr))
 
 
 class JavacSources(datatype([('java_files', tuple)])):
@@ -144,8 +150,8 @@ class JavacCompileRequest(datatype([
 
 
 class JavacCompileResult(datatype([
-  ('stdout', str),
-  ('stderr', str),
+  ('stdout', text_type),
+  ('stderr', text_type),
   ('directory_digest', DirectoryDigest),
 ])): pass
 
@@ -164,9 +170,9 @@ def javac_compile_process_result(javac_compile_req):
       raise ValueError("Can only compile .java files but got {}".format(java_file))
   sources_snapshot = yield Get(Snapshot, PathGlobs, PathGlobs(java_files, ()))
   output_dirs = tuple({os.path.dirname(java_file) for java_file in java_files})
-  process_request = ExecuteProcessRequest.create_from_snapshot(
+  process_request = ExecuteProcessRequest(
     argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
-    snapshot=sources_snapshot,
+    input_files=sources_snapshot.directory_digest,
     output_directories=output_dirs,
     description='javac compilation'
   )
@@ -176,8 +182,8 @@ def javac_compile_process_result(javac_compile_req):
   stderr = javac_proc_result.stderr
 
   yield JavacCompileResult(
-    stdout,
-    stderr,
+    text_type(stdout),
+    text_type(stderr),
     javac_proc_result.output_directory_digest,
   )
 
@@ -189,13 +195,14 @@ def create_javac_compile_rules():
   ]
 
 
-class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
+class ExecuteProcessRequestTest(unittest.TestCase):
   def _default_args_execute_process_request(self, argv=tuple(), env=None):
     env = env or dict()
-    return ExecuteProcessRequest.create_with_empty_snapshot(
+    return ExecuteProcessRequest(
       argv=argv,
       description='',
       env=env,
+      input_files=EMPTY_DIRECTORY_DIGEST,
       output_files=(),
     )
 
@@ -215,7 +222,7 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
     with self.assertRaisesRegexp(TypeCheckError, "env"):
       ExecuteProcessRequest(
         argv=('1',),
-        env=dict(),
+        env=(),
         input_files='',
         output_files=(),
         output_directories=(),
@@ -234,7 +241,7 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
     with self.assertRaisesRegexp(TypeCheckError, "output_files"):
       ExecuteProcessRequest(
         argv=('1',),
-        env=tuple(),
+        env=dict(),
         input_files=EMPTY_DIRECTORY_DIGEST,
         output_files=("blah"),
         output_directories=(),
@@ -244,7 +251,7 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
     with self.assertRaisesRegexp(TypeCheckError, "timeout"):
       ExecuteProcessRequest(
         argv=('1',),
-        env=tuple(),
+        env=dict(),
         input_files=EMPTY_DIRECTORY_DIGEST,
         output_files=("blah"),
         output_directories=(),
@@ -252,102 +259,109 @@ class ExecuteProcessRequestTest(SchedulerTestBase, unittest.TestCase):
         description=''
       )
 
+  def test_create_from_snapshot_with_env(self):
+    req = ExecuteProcessRequest(
+      argv=('foo',),
+      description="Some process",
+      env={'VAR': 'VAL'},
+      input_files=EMPTY_DIRECTORY_DIGEST,
+    )
+    self.assertEqual(req.env, ('VAR', 'VAL'))
 
-class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
-  def test_integration_concat_with_snapshots_stdout(self):
-    scheduler = self.mk_scheduler_in_example_fs(create_cat_stdout_rules())
+class IsolatedProcessTest(TestBase, unittest.TestCase):
 
-    cat_exe_req = CatExecutionRequest(
-      ShellCat(BinaryLocation('/bin/cat')),
-      PathGlobs(include=['fs_test/a/b/*']))
-
-    self.assertEqual(
-      repr(cat_exe_req),
-      "CatExecutionRequest(shell_cat=ShellCat(binary_location=BinaryLocation(bin_path='/bin/cat')), path_globs=PathGlobs(include=(u'fs_test/a/b/*',), exclude=(), glob_match_error_behavior=GlobMatchErrorBehavior(failure_behavior=u'ignore')))")
-
-    results = self.execute(scheduler, Concatted, cat_exe_req)
-    self.assertEqual(1, len(results))
-    concatted = results[0]
-    self.assertEqual(Concatted(str('one\ntwo\n')), concatted)
-
-  def test_javac_version_example(self):
-    scheduler = self.mk_scheduler_in_example_fs([
+  @classmethod
+  def rules(cls):
+    return super(IsolatedProcessTest, cls).rules() + [
       RootRule(JavacVersionExecutionRequest),
       process_request_from_javac_version,
       get_javac_version_output,
-    ])
+    ] + create_cat_stdout_rules() + create_javac_compile_rules()
 
-    request = JavacVersionExecutionRequest(BinaryLocation('/usr/bin/javac'))
+  def test_integration_concat_with_snapshots_stdout(self):
 
-    self.assertEqual(
-      repr(request),
-      "JavacVersionExecutionRequest(binary_location=BinaryLocation(bin_path='/usr/bin/javac'))")
+    self.create_file('f1', 'one\n')
+    self.create_file('f2', 'two\n')
 
-    results = self.execute(scheduler, JavacVersionOutput, request)
-    self.assertEqual(1, len(results))
-    javac_version_output = results[0]
-    self.assertIn('javac', javac_version_output.value)
-
-  def test_write_file(self):
-    scheduler = self.mk_scheduler_in_example_fs(())
-
-    request = ExecuteProcessRequest.create_with_empty_snapshot(
-      argv=("/bin/bash", "-c", "echo -n 'European Burmese' > roland"),
-      description="echo roland",
-      output_files=("roland",)
+    cat_exe_req = CatExecutionRequest(
+      ShellCat(BinaryLocation('/bin/cat')),
+      PathGlobs(include=['f*']),
     )
 
-    execute_process_result = self.execute_expecting_one_result(scheduler, ExecuteProcessResult, request).value
+    concatted = self.scheduler.product_request(Concatted, [cat_exe_req])[0]
+    self.assertEqual(Concatted(text_type('one\ntwo\n')), concatted)
 
-    self.assertEquals(
+  def test_javac_version_example(self):
+    request = JavacVersionExecutionRequest(BinaryLocation('/usr/bin/javac'))
+    result = self.scheduler.product_request(JavacVersionOutput, [request])[0]
+    self.assertIn('javac', result.value)
+
+  def test_write_file(self):
+    request = ExecuteProcessRequest(
+      argv=("/bin/bash", "-c", "echo -n 'European Burmese' > roland"),
+      description="echo roland",
+      output_files=("roland",),
+      input_files=EMPTY_DIRECTORY_DIGEST,
+    )
+
+    execute_process_result = self.scheduler.product_request(
+      ExecuteProcessResult,
+      [request],
+    )[0]
+
+    self.assertEqual(
       execute_process_result.output_directory_digest,
       DirectoryDigest(
-        fingerprint=str("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        fingerprint=text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         serialized_bytes_length=80,
       )
     )
 
-    files_content_result = self.execute_expecting_one_result(
-      scheduler,
+    files_content_result = self.scheduler.product_request(
       FilesContent,
-      execute_process_result.output_directory_digest
-    ).value
+      [execute_process_result.output_directory_digest],
+    )[0]
 
-    self.assertEquals(
-      (files_content_result.dependencies),
-      (FileContent("roland", "European Burmese"),)
+    self.assertEqual(
+      files_content_result.dependencies,
+      (FileContent("roland", b"European Burmese"),)
     )
 
   def test_exercise_python_side_of_timeout_implementation(self):
     # Local execution currently doesn't support timeouts,
     # but this allows us to ensure that all of the setup
     # on the python side does not blow up.
-    scheduler = self.mk_scheduler_in_example_fs(())
 
-    request = ExecuteProcessRequest.create_with_empty_snapshot(
+    request = ExecuteProcessRequest(
       argv=("/bin/bash", "-c", "/bin/sleep 1; echo -n 'European Burmese'"),
       timeout_seconds=0.1,
       description='sleepy-cat',
+      input_files=EMPTY_DIRECTORY_DIGEST,
     )
 
-    self.execute_expecting_one_result(scheduler, ExecuteProcessResult, request).value
+    self.scheduler.product_request(ExecuteProcessResult, [request])[0]
 
   def test_javac_compilation_example_success(self):
-    scheduler = self.mk_scheduler_in_example_fs(create_javac_compile_rules())
+    self.create_dir('simple')
+    self.create_file('simple/Simple.java', '''package simple;
+// Valid java. Totally complies.
+class Simple {
+
+}''')
 
     request = JavacCompileRequest(
       BinaryLocation('/usr/bin/javac'),
-      JavacSources((u'scheduler_inputs/src/java/simple/Simple.java',)),
+      JavacSources((u'simple/Simple.java',)),
     )
 
-    result = self.execute_expecting_one_result(scheduler, JavacCompileResult, request).value
-    files_content = self.execute_expecting_one_result(scheduler, FilesContent, result.directory_digest).value.dependencies
+    result = self.scheduler.product_request(JavacCompileResult, [request])[0]
+    files_content = self.scheduler.product_request(FilesContent, [result.directory_digest])[0].dependencies
 
-    self.assertEquals(
+    self.assertEqual(
       tuple(sorted((
-        "scheduler_inputs/src/java/simple/Simple.java",
-        "scheduler_inputs/src/java/simple/Simple.class",
+        "simple/Simple.java",
+        "simple/Simple.class",
       ))),
       tuple(sorted(file.path for file in files_content))
     )
@@ -355,51 +369,56 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertGreater(len(files_content[0].content), 0)
 
   def test_javac_compilation_example_failure(self):
-    scheduler = self.mk_scheduler_in_example_fs(create_javac_compile_rules())
+    self.create_dir('simple')
+    self.create_file('simple/Broken.java', '''package simple;
+class Broken {
+  NOT VALID JAVA!
+}''')
 
     request = JavacCompileRequest(
       BinaryLocation('/usr/bin/javac'),
-      JavacSources(('scheduler_inputs/src/java/simple/Broken.java',))
+      JavacSources(('simple/Broken.java',))
     )
 
-    with self.assertRaises(ProcessExecutionFailure) as cm:
-      self.execute_raising_throw(scheduler, JavacCompileResult, request)
-    e = cm.exception
+    with self.assertRaises(ExecutionError) as cm:
+      self.scheduler.product_request(JavacCompileResult, [request])[0]
+    e = cm.exception.wrapped_exceptions[0]
+    self.assertIsInstance(e, ProcessExecutionFailure)
     self.assertEqual(1, e.exit_code)
     self.assertIn('javac compilation', str(e))
     self.assertIn("NOT VALID JAVA", e.stderr)
 
-  def test_fallible_failing_command_returns_exited_result(self):
-    scheduler = self.mk_scheduler_in_example_fs(())
+  def test_jdk(self):
+    with temporary_dir() as temp_dir:
+      with open(os.path.join(temp_dir, 'roland'), 'w') as f:
+        f.write('European Burmese')
+      request = ExecuteProcessRequest(
+        argv=('/bin/cat', '.jdk/roland'),
+        input_files=EMPTY_DIRECTORY_DIGEST,
+        description='cat JDK roland',
+        jdk_home=temp_dir,
+      )
+      result = self.scheduler.product_request(ExecuteProcessResult, [request])[0]
+      self.assertEqual(result.stdout, 'European Burmese')
 
-    request = ExecuteProcessRequest.create_with_empty_snapshot(
+  def test_fallible_failing_command_returns_exited_result(self):
+    request = ExecuteProcessRequest(
       argv=("/bin/bash", "-c", "exit 1"),
       description='one-cat',
+      input_files=EMPTY_DIRECTORY_DIGEST,
     )
 
-    result = self.execute_expecting_one_result(scheduler, FallibleExecuteProcessResult, request).value
+    result = self.scheduler.product_request(FallibleExecuteProcessResult, [request])[0]
 
-    self.assertEquals(result.exit_code, 1)
+    self.assertEqual(result.exit_code, 1)
 
   def test_non_fallible_failing_command_raises(self):
-    scheduler = self.mk_scheduler_in_example_fs(())
-
-    request = ExecuteProcessRequest.create_with_empty_snapshot(
+    request = ExecuteProcessRequest(
       argv=("/bin/bash", "-c", "exit 1"),
       description='one-cat',
+      input_files=EMPTY_DIRECTORY_DIGEST,
     )
 
-    with self.assertRaises(ProcessExecutionFailure) as cm:
-      self.execute_raising_throw(scheduler, ExecuteProcessResult, request)
+    with self.assertRaises(ExecutionError) as cm:
+      self.scheduler.product_request(ExecuteProcessResult, [request])
     self.assertIn("process 'one-cat' failed with exit code 1.", str(cm.exception))
-
-  def mk_example_fs_tree(self):
-    fs_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
-    test_fs = os.path.join(fs_tree.build_root, 'fs_test')
-    with tarfile.open(os.path.join(test_fs, 'fs_test.tar')) as tar:
-      tar.extractall(test_fs)
-    return fs_tree
-
-  def mk_scheduler_in_example_fs(self, rules):
-    rules = list(rules) + create_fs_rules() + create_process_rules()
-    return self.mk_scheduler(rules=rules, project_tree=self.mk_example_fs_tree())

@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.util.contextutil import temporary_file
 from pants_test.task_test_base import TaskTestBase
@@ -66,7 +67,7 @@ class GoEnvTest(TaskTestBase):
     with temporary_file() as stdout:
       task.execute(stdout=stdout)
       stdout.close()
-      with open(stdout.name) as output:
+      with open(stdout.name, 'r') as output:
         self.assertEqual(output.read().strip(),
                          os.pathsep.join([task.get_gopath(bob_binary),
                                           task.get_gopath(jane_binary)]))
@@ -87,7 +88,7 @@ class GoGoTest(TaskTestBase):
     with temporary_file() as stdout:
       task.execute(stdout=stdout)
       stdout.close()
-      with open(stdout.name) as output:
+      with open(stdout.name, 'r') as output:
         self.assertEqual(output.read().strip(),
                          os.pathsep.join([task.get_gopath(bob_binary),
                                           task.get_gopath(jane_binary)]))

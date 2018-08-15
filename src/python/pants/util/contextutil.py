@@ -13,11 +13,11 @@ import tempfile
 import time
 import uuid
 import zipfile
-from builtins import object
+from builtins import object, open
 from contextlib import closing, contextmanager
 
 from colors import green
-from future.utils import string_types
+from future.utils import PY3, string_types
 
 from pants.util.dirutil import safe_delete
 from pants.util.tarutil import TarFile
@@ -50,7 +50,7 @@ def environment_as(**kwargs):
 
   def setenv(key, val):
     if val is not None:
-      os.environ[key] = _os_encode(val)
+      os.environ[key] = val if PY3 else _os_encode(val)
     else:
       if key in os.environ:
         del os.environ[key]
@@ -80,13 +80,13 @@ def _purge_env():
 
 def _restore_env(env):
   for k, v in env.items():
-    os.environ[k] = _os_encode(v)
+    os.environ[k] = v if PY3 else _os_encode(v)
 
 
 @contextmanager
 def hermetic_environment_as(**kwargs):
   """Set the environment to the supplied values from an empty state."""
-  old_environment = _copy_and_decode_env(os.environ)
+  old_environment = os.environ.copy() if PY3 else _copy_and_decode_env(os.environ)
   _purge_env()
   try:
     with environment_as(**kwargs):
@@ -133,10 +133,12 @@ def stdio_as(stdout_fd, stderr_fd, stdin_fd):
   possible that the OS has repurposed fds `0, 1, 2` to represent other files or sockets. It's
   impossible for this method to locate all python objects which refer to those fds, so it's up
   to the caller to guarantee that `0, 1, 2` are safe to replace.
+
+  In Python3, the streams expect unicode. To write and read bytes, access their buffer, e.g. `stdin.buffer.read()`.
   """
-  with _stdio_stream_as(stdin_fd,  0, 'stdin',  'rb'),\
-       _stdio_stream_as(stdout_fd, 1, 'stdout', 'wb'),\
-       _stdio_stream_as(stderr_fd, 2, 'stderr', 'wb'):
+  with _stdio_stream_as(stdin_fd,  0, 'stdin',  'r'),\
+       _stdio_stream_as(stdout_fd, 1, 'stdout', 'w'),\
+       _stdio_stream_as(stderr_fd, 2, 'stderr', 'w'):
     yield
 
 
@@ -155,7 +157,7 @@ def signal_handler_as(sig, handler):
 
 
 @contextmanager
-def temporary_dir(root_dir=None, cleanup=True, suffix=b'', permissions=None, prefix=tempfile.template):
+def temporary_dir(root_dir=None, cleanup=True, suffix='', permissions=None, prefix=tempfile.template):
   """
     A with-context that creates a temporary directory.
 
@@ -194,7 +196,7 @@ def temporary_file_path(root_dir=None, cleanup=True, suffix='', permissions=None
 
 
 @contextmanager
-def temporary_file(root_dir=None, cleanup=True, suffix='', permissions=None):
+def temporary_file(root_dir=None, cleanup=True, suffix='', permissions=None, binary_mode=True):
   """
     A with-context that creates a temporary file and returns a writeable file descriptor to it.
 
@@ -207,8 +209,10 @@ def temporary_file(root_dir=None, cleanup=True, suffix='', permissions=None):
                        if you need one, put it at the beginning of suffix.
                        See :py:class:`tempfile.NamedTemporaryFile`.
     :param int permissions: If provided, sets the file to use these permissions.
+    :param bool binary_mode: Whether file opens in binary or text mode.
   """
-  with tempfile.NamedTemporaryFile(suffix=suffix, dir=root_dir, delete=False) as fd:
+  mode = 'w+b' if binary_mode else 'w+'  # tempfile's default is 'w+b'
+  with tempfile.NamedTemporaryFile(suffix=suffix, dir=root_dir, delete=False, mode=mode) as fd:
     try:
       if permissions is not None:
         os.chmod(fd.name, permissions)

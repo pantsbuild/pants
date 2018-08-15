@@ -5,6 +5,7 @@ use hashing;
 use protobuf::Message;
 use sha2::{self, Digest};
 
+#[derive(Clone)]
 pub struct TestData {
   string: String,
 }
@@ -20,6 +21,10 @@ impl TestData {
 
   pub fn catnip() -> TestData {
     TestData::new("catnip")
+  }
+
+  pub fn robin() -> TestData {
+    TestData::new("Pug")
   }
 
   pub fn fourty_chars() -> TestData {
@@ -76,6 +81,21 @@ impl TestDirectory {
       let mut file = bazel_protos::remote_execution::FileNode::new();
       file.set_name("roland".to_owned());
       file.set_digest((&TestData::roland().digest()).into());
+      file.set_is_executable(false);
+      file
+    });
+    TestDirectory { directory }
+  }
+
+  // Directory structure:
+  //
+  // /robin
+  pub fn containing_robin() -> TestDirectory {
+    let mut directory = bazel_protos::remote_execution::Directory::new();
+    directory.mut_files().push({
+      let mut file = bazel_protos::remote_execution::FileNode::new();
+      file.set_name("robin".to_owned());
+      file.set_digest((&TestData::robin().digest()).into());
       file.set_is_executable(false);
       file
     });

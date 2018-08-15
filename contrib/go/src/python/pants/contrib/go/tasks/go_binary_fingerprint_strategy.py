@@ -5,7 +5,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
+from builtins import str
 
+from future.utils import PY3
 from pants.base.fingerprint_strategy import FingerprintStrategy
 
 from pants.contrib.go.targets.go_binary import GoBinary
@@ -31,8 +33,8 @@ class GoBinaryFingerprintStrategy(FingerprintStrategy):
 
     hasher = hashlib.sha1()
     hasher.update(fp)
-    hasher.update(str(self._get_build_flags_func(target)))
-    return hasher.hexdigest()
+    hasher.update(str(self._get_build_flags_func(target)).encode('utf-8'))
+    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def __hash__(self):
     return hash((type(self), self._get_build_flags_func))

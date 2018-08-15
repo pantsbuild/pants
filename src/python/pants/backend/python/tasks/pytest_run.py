@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import configparser
 import itertools
 import json
 import os
@@ -11,13 +12,11 @@ import shutil
 import time
 import traceback
 import uuid
-from builtins import str
+from builtins import open, str
 from collections import OrderedDict
 from contextlib import contextmanager
+from io import StringIO
 from textwrap import dedent
-
-from six import StringIO
-from six.moves import configparser
 
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
@@ -152,7 +151,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
   class InvalidShardSpecification(TaskError):
     """Indicates an invalid `--test-shard` option."""
 
-  DEFAULT_COVERAGE_CONFIG = dedent(b"""
+  DEFAULT_COVERAGE_CONFIG = dedent("""
     [run]
     branch = True
     timid = False
@@ -199,8 +198,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     cp.set(plugin_module, 'src_to_target_base', json.dumps(src_to_target_base))
 
   def _generate_coverage_config(self, src_to_target_base):
-    cp = configparser.SafeConfigParser()
-    cp.readfp(StringIO(self.DEFAULT_COVERAGE_CONFIG))
+    cp = configparser.ConfigParser()
+    cp.read_file(StringIO(self.DEFAULT_COVERAGE_CONFIG))
 
     self._add_plugin_config(cp, self._source_chroot_path, src_to_target_base)
 
@@ -451,7 +450,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     """.format(sources_map=dict(sources_map), rootdir_comm_path=rootdir_comm_path))
     # Add in the sharding conftest, if any.
     shard_conftest_content = self._get_shard_conftest_content()
-    return (console_output_conftest_content + shard_conftest_content).encode('utf8')
+    return console_output_conftest_content + shard_conftest_content
 
   @contextmanager
   def _conftest(self, sources_map):
@@ -516,7 +515,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         env['PEX_PROFILE_FILENAME'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
 
       with self.context.new_workunit(name='run',
-                                     cmd=pex.cmdline(args),
+                                     cmd=' '.join(pex.cmdline(args)),
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
         rc = self._spawn_and_wait(pex, workunit=workunit, args=args, setsid=True, env=env)
         return PytestResult.rc(rc)
@@ -730,7 +729,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
   def _pex_run(self, pex, workunit_name, args, env):
     with self.context.new_workunit(name=workunit_name,
-                                   cmd=pex.cmdline(args),
+                                   cmd=' '.join(pex.cmdline(args)),
                                    labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
       process = self._spawn(pex, workunit, args, setsid=False, env=env)
       return process.wait()

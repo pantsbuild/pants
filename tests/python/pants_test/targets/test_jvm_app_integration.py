@@ -15,7 +15,7 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
     Verify synthetic jar contains only a manifest file and the rest bundle contains
     other library jars.
     """
-    self.assertEquals(
+    self.assertEqual(
       'Hello world from Foo\n',
       self.bundle_and_run(
         'testprojects/src/java/org/pantsbuild/testproject/bundle',
@@ -38,7 +38,7 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
 
     Verify monolithic jar is created with manifest file and the library class.
     """
-    self.assertEquals(
+    self.assertEqual(
       'Hello world from Foo\n',
       self.bundle_and_run(
         'testprojects/src/java/org/pantsbuild/testproject/bundle',

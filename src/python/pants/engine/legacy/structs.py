@@ -7,10 +7,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os.path
 from abc import abstractproperty
+from builtins import object, str
 
 from six import string_types
 
-from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_list
 from pants.engine.fs import PathGlobs
@@ -328,16 +328,6 @@ class BaseGlobs(Locatable, AbstractClass):
     raw_exclude = kwargs.pop('exclude', [])
     self._excluded_file_globs = self._filespec_for_exclude(raw_exclude, raw_spec_path).get('globs', [])
     self._spec_path = raw_spec_path
-
-    # `follow_links=True` is the default behavior for wrapped globs, so we pop the old kwarg
-    # and warn here to bridge the gap from v1->v2 BUILD files.
-    if kwargs.pop('follow_links', None) is not None:
-      deprecated_conditional(
-        lambda: True,
-        '1.10.0.dev0',
-        'Ignoring `follow_links` kwarg on glob in `{}`. Default behavior is to follow all links.'
-          .format(self._spec_path)
-      )
 
     if kwargs:
       raise ValueError('kwargs not supported for {}. Got: {}'.format(type(self), kwargs))

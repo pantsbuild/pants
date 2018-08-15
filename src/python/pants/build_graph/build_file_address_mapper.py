@@ -101,7 +101,7 @@ class BuildFileAddressMapper(AddressMapper):
 
   def addresses_in_spec_path(self, spec_path):
     """Returns only the addresses gathered by `address_map_from_spec_path`, with no values."""
-    return self._address_map_from_spec_path(spec_path).keys()
+    return list(self._address_map_from_spec_path(spec_path).keys())
 
   def spec_to_address(self, spec, relative_to=''):
     """A helper method for mapping a spec to the correct build file address.

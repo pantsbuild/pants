@@ -24,7 +24,7 @@ class UnpackedJarsTest(TestBase):
     self.assertIsInstance(target, UnpackedJars)
     dependency_specs = [spec for spec in target.compute_dependency_specs(payload=target.payload)]
     self.assertSequenceEqual([':import_jars'], dependency_specs)
-    self.assertEquals(1, len(target.imported_jars))
+    self.assertEqual(1, len(target.imported_jars))
     import_jar_dep = target.imported_jars[0]
     self.assertIsInstance(import_jar_dep, JarDependency)
 

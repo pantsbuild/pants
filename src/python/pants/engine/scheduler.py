@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import time
+from builtins import object, open, str, zip
 from collections import defaultdict
 from types import GeneratorType
 
@@ -24,6 +25,7 @@ from pants.engine.struct import HasProducts, Variants
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
 from pants.util.objects import Collection, SubclassesOf, datatype
+from pants.util.strutil import pluralize
 
 
 logger = logging.getLogger(__name__)
@@ -68,7 +70,9 @@ class ExecutionResult(datatype(['error', 'root_products'])):
 
 
 class ExecutionError(Exception):
-  pass
+  def __init__(self, message, wrapped_exceptions=None):
+    super(ExecutionError, self).__init__(message)
+    self.wrapped_exceptions = wrapped_exceptions or ()
 
 
 class Scheduler(object):
@@ -104,7 +108,7 @@ class Scheduler(object):
 
     # Validate and register all provided and intrinsic tasks.
     rule_index = RuleIndex.create(list(rules))
-    self._root_subject_types = sorted(rule_index.roots)
+    self._root_subject_types = sorted(rule_index.roots, key=repr)
 
     # Create the native Scheduler and Session.
     # TODO: This `_tasks` reference could be a local variable, since it is not used
@@ -113,34 +117,34 @@ class Scheduler(object):
     self._register_rules(rule_index)
 
     self._scheduler = native.new_scheduler(
-      self._tasks,
-      self._root_subject_types,
-      project_tree.build_root,
-      work_dir,
-      project_tree.ignore_patterns,
-      execution_options,
-      DirectoryDigest,
-      Snapshot,
-      FileContent,
-      FilesContent,
-      Path,
-      Dir,
-      File,
-      Link,
-      FallibleExecuteProcessResult,
-      has_products_constraint,
-      constraint_for(Address),
-      constraint_for(Variants),
-      constraint_for(PathGlobs),
-      constraint_for(DirectoryDigest),
-      constraint_for(Snapshot),
-      constraint_for(FilesContent),
-      constraint_for(Dir),
-      constraint_for(File),
-      constraint_for(Link),
-      constraint_for(ExecuteProcessRequest),
-      constraint_for(FallibleExecuteProcessResult),
-      constraint_for(GeneratorType),
+      tasks=self._tasks,
+      root_subject_types=self._root_subject_types,
+      build_root=project_tree.build_root,
+      work_dir=work_dir,
+      ignore_patterns=project_tree.ignore_patterns,
+      execution_options=execution_options,
+      construct_directory_digest=DirectoryDigest,
+      construct_snapshot=Snapshot,
+      construct_file_content=FileContent,
+      construct_files_content=FilesContent,
+      construct_path_stat=Path,
+      construct_dir=Dir,
+      construct_file=File,
+      construct_link=Link,
+      construct_process_result=FallibleExecuteProcessResult,
+      constraint_has_products=has_products_constraint,
+      constraint_address=constraint_for(Address),
+      constraint_variants=constraint_for(Variants),
+      constraint_path_globs=constraint_for(PathGlobs),
+      constraint_directory_digest=constraint_for(DirectoryDigest),
+      constraint_snapshot=constraint_for(Snapshot),
+      constraint_files_content=constraint_for(FilesContent),
+      constraint_dir=constraint_for(Dir),
+      constraint_file=constraint_for(File),
+      constraint_link=constraint_for(Link),
+      constraint_process_request=constraint_for(ExecuteProcessRequest),
+      constraint_process_result=constraint_for(FallibleExecuteProcessResult),
+      constraint_generator=constraint_for(GeneratorType),
     )
 
     # If configured, visualize the rule graph before asserting that it is valid.
@@ -152,12 +156,12 @@ class Scheduler(object):
       self._assert_ruleset_valid()
 
   def _root_type_ids(self):
-    return self._to_ids_buf(sorted(self._root_subject_types))
+    return self._to_ids_buf(sorted(self._root_subject_types, key=repr))
 
   def graph_trace(self, execution_request):
     with temporary_file_path() as path:
-      self._native.lib.graph_trace(self._scheduler, execution_request, bytes(path))
-      with open(path) as fd:
+      self._native.lib.graph_trace(self._scheduler, execution_request, path.encode('utf-8'))
+      with open(path, 'r') as fd:
         for line in fd.readlines():
           yield line.rstrip()
 
@@ -247,14 +251,14 @@ class Scheduler(object):
     self._native.lib.tasks_task_end(self._tasks)
 
   def visualize_graph_to_file(self, session, filename):
-    res = self._native.lib.graph_visualize(self._scheduler, session, bytes(filename))
+    res = self._native.lib.graph_visualize(self._scheduler, session, filename.encode('utf-8'))
     self._raise_or_return(res)
 
   def visualize_rule_graph_to_file(self, filename):
     self._native.lib.rule_graph_visualize(
       self._scheduler,
       self._root_type_ids(),
-      bytes(filename))
+      filename.encode('utf-8'))
 
   def rule_graph_visualization(self):
     with temporary_file_path() as path:
@@ -272,8 +276,8 @@ class Scheduler(object):
         self._scheduler,
         root_type_id,
         product_type_id,
-        bytes(path))
-      with open(path) as fd:
+        path.encode('utf-8'))
+      with open(path, 'r') as fd:
         for line in fd.readlines():
           yield line.rstrip()
 
@@ -283,7 +287,7 @@ class Scheduler(object):
     filenames = set(direct_filenames)
     filenames.update(os.path.dirname(f) for f in direct_filenames)
     filenames_buf = self._native.context.utf8_buf_buf(filenames)
-    invalidated =  self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
+    invalidated = self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
     logger.info('invalidated %d nodes for: %s', invalidated, filenames)
     return invalidated
 
@@ -400,6 +404,8 @@ class SchedulerSession(object):
   a Session.
   """
 
+  execution_error_type = ExecutionError
+
   def __init__(self, scheduler, session):
     self._scheduler = scheduler
     self._session = session
@@ -484,8 +490,8 @@ class SchedulerSession(object):
     scheduling thread.
     """
     start_time = time.time()
-    roots = zip(execution_request.roots,
-                self._scheduler._run_and_return_roots(self._session, execution_request.native))
+    roots = list(zip(execution_request.roots,
+                     self._scheduler._run_and_return_roots(self._session, execution_request.native)))
 
     self._maybe_visualize()
 
@@ -537,17 +543,22 @@ class SchedulerSession(object):
     # TODO: See https://github.com/pantsbuild/pants/issues/3912
     throw_root_states = tuple(state for root, state in result.root_products if type(state) is Throw)
     if throw_root_states:
+      unique_exceptions = tuple(set(t.exc for t in throw_root_states))
+      exception_noun = pluralize(len(unique_exceptions), 'Exception')
+
       if self._scheduler.include_trace_on_error:
         cumulative_trace = '\n'.join(self.trace(request))
-        raise ExecutionError('Received unexpected Throw state(s):\n{}'.format(cumulative_trace))
-
-      unique_exceptions = set(t.exc for t in throw_root_states)
-      if len(unique_exceptions) == 1:
-        raise throw_root_states[0].exc
+        raise ExecutionError(
+          '{} encountered:\n{}'.format(exception_noun, cumulative_trace),
+          unique_exceptions,
+        )
       else:
-        raise ExecutionError('Multiple exceptions encountered:\n  {}'
-                             .format('\n  '.join('{}: {}'.format(type(t).__name__, str(t))
-                                                                 for t in unique_exceptions)))
+        raise ExecutionError(
+          '{} encountered:\n  {}'.format(
+            exception_noun,
+            '\n  '.join('{}: {}'.format(type(t).__name__, str(t)) for t in unique_exceptions)),
+          unique_exceptions
+        )
 
     # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
     # order in output lists.

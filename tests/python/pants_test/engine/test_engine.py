@@ -6,11 +6,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import unittest
+from builtins import object, str
 from textwrap import dedent
 
 from pants.build_graph.address import Address
 from pants.engine.nodes import Return
 from pants.engine.rules import RootRule, TaskRule, rule
+from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, Select
 from pants.util.contextutil import temporary_dir
 from pants.util.objects import datatype
@@ -110,10 +112,10 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     scheduler = self.scheduler(rules, include_trace_on_error=False)
 
-    with self.assertRaises(Exception) as cm:
+    with self.assertRaises(ExecutionError) as cm:
       list(scheduler.product_request(A, subjects=[(B())]))
 
-    self.assert_equal_with_printing('An exception for B', str(cm.exception))
+    self.assert_equal_with_printing('1 Exception encountered:\n  Exception: An exception for B', str(cm.exception))
 
   def test_no_include_trace_error_multiple_paths_raises_executionerror(self):
     rules = [
@@ -123,11 +125,11 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     scheduler = self.scheduler(rules, include_trace_on_error=False)
 
-    with self.assertRaises(Exception) as cm:
+    with self.assertRaises(ExecutionError) as cm:
       list(scheduler.product_request(A, subjects=[B(), B()]))
 
     self.assert_equal_with_printing(dedent('''
-      Multiple exceptions encountered:
+      2 Exceptions encountered:
         Exception: An exception for B
         Exception: An exception for B''').lstrip(),
       str(cm.exception))
@@ -139,11 +141,11 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     ]
 
     scheduler = self.scheduler(rules, include_trace_on_error=True)
-    with self.assertRaises(Exception) as cm:
+    with self.assertRaises(ExecutionError) as cm:
       list(scheduler.product_request(A, subjects=[(B())]))
 
     self.assert_equal_with_printing(dedent('''
-      Received unexpected Throw state(s):
+      1 Exception encountered:
       Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
         Computing Task(nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
           Throw(An exception for B)
@@ -168,11 +170,11 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     ]
 
     scheduler = self.scheduler(rules, include_trace_on_error=True)
-    with self.assertRaises(Exception) as cm:
+    with self.assertRaises(ExecutionError) as cm:
       list(scheduler.product_request(A, subjects=[(B())]))
 
     self.assert_equal_with_printing(dedent('''
-      Received unexpected Throw state(s):
+      1 Exception encountered:
       Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
         Computing Task(A, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
           Computing Task(nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =D)

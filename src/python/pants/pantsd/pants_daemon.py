@@ -8,18 +8,18 @@ import logging
 import os
 import sys
 import threading
+from builtins import object
 from contextlib import contextmanager
 
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import Exiter
-from pants.bin.daemon_pants_runner import DaemonExiter, DaemonPantsRunner
+from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.native import Native
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import setup_logging
 from pants.init.options_initializer import BuildConfigInitializer
-from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionsFingerprinter
@@ -187,11 +187,9 @@ class PantsDaemon(FingerprintedProcessManager):
       )
 
       pailgun_service = PailgunService(
-        bind_addr=(bootstrap_options.pantsd_pailgun_host, bootstrap_options.pantsd_pailgun_port),
-        exiter_class=DaemonExiter,
-        runner_class=DaemonPantsRunner,
-        target_roots_calculator=TargetRootsCalculator,
-        scheduler_service=scheduler_service
+        (bootstrap_options.pantsd_pailgun_host, bootstrap_options.pantsd_pailgun_port),
+        DaemonPantsRunner,
+        scheduler_service
       )
 
       store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)
@@ -328,20 +326,20 @@ class PantsDaemon(FingerprintedProcessManager):
       self._logger.info('starting service {}'.format(service))
       try:
         service_thread.start()
-      except (RuntimeError, service.ServiceError):
+      except (RuntimeError, FSEventService.ServiceError):
         self.shutdown(service_thread_map)
-        raise self.StartupFailure('service {} failed to start, shutting down!'.format(service))
+        raise PantsDaemon.StartupFailure('service {} failed to start, shutting down!'.format(service))
 
     # Once all services are started, write our pid.
     self.write_pid()
-    self.write_metadata_by_name('pantsd', self.FINGERPRINT_KEY, self.options_fingerprint)
+    self.write_metadata_by_name('pantsd', self.FINGERPRINT_KEY, self.options_fingerprint.decode('utf-8'))
 
     # Monitor services.
     while not self.is_killed:
       for service, service_thread in service_thread_map.items():
         if not service_thread.is_alive():
           self.shutdown(service_thread_map)
-          raise self.RuntimeFailure('service failure for {}, shutting down!'.format(service))
+          raise PantsDaemon.RuntimeFailure('service failure for {}, shutting down!'.format(service))
         else:
           # Avoid excessive CPU utilization.
           service_thread.join(self.JOIN_TIMEOUT_SECONDS)

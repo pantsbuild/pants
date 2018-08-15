@@ -35,14 +35,14 @@ class PythonTargetTest(TestBase):
     pt_with_artifact = self.make_target(spec=spec,
                                         target_type=PythonTarget,
                                         provides=pa)
-    self.assertEquals(pt_with_artifact.address.spec, spec)
+    self.assertEqual(pt_with_artifact.address.spec, spec)
 
     spec = "//:test-with-none"
     # This test verifies that having no provides is okay.
     pt_no_artifact = self.make_target(spec=spec,
                                       target_type=PythonTarget,
                                       provides=None)
-    self.assertEquals(pt_no_artifact.address.spec, spec)
+    self.assertEqual(pt_no_artifact.address.spec, spec)
 
   def assert_single_resource_dep(self, target, expected_resource_path, expected_resource_contents):
     self.assertEqual(1, len(target.dependencies))

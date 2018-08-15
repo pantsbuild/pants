@@ -7,7 +7,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import glob
 import os
 from contextlib import closing, contextmanager
-from StringIO import StringIO
+from io import BytesIO
+
+from future.utils import PY2
 
 from pants.base.deprecated import deprecated_module
 from pants.goal.goal import Goal
@@ -18,7 +20,7 @@ from pants.util.process_handler import subprocess
 from pants_test.base_test import BaseTest
 
 
-deprecated_module('1.10.0.dev0', 'Use pants_test.TaskTestBase instead')
+deprecated_module('1.12.0.dev0', 'Use pants_test.TaskTestBase instead')
 
 
 # TODO: Find a better home for this?
@@ -107,7 +109,9 @@ class TaskTestBase(BaseTest):
     :param options_scope: The scope to give options on the generated task type.
     :return: A pair (type, options_scope)
     """
-    subclass_name = b'test_{0}_{1}'.format(task_type.__name__, options_scope)
+    subclass_name = 'test_{0}_{1}'.format(task_type.__name__, options_scope)
+    if PY2:
+      subclass_name = subclass_name.encode('utf-8')
     return type(subclass_name, (task_type,), {'_stable_name': task_type._compute_stable_name(),
                                               'options_scope': options_scope})
 
@@ -193,7 +197,7 @@ class ConsoleTaskTestBase(TaskTestBase):
     Returns the text output of the task.
     """
     options = options or {}
-    with closing(StringIO()) as output:
+    with closing(BytesIO()) as output:
       self.set_options(**options)
       context = self.context(target_roots=targets, console_outstream=output)
       task = self.create_task(context)

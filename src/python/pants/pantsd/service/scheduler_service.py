@@ -6,11 +6,14 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import os
-import Queue
+import queue
+import sys
 import threading
+from builtins import open
 
 from twitter.common.dirutil import Fileset
 
+from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.pantsd.service.pants_service import PantsService
 
 
@@ -40,6 +43,7 @@ class SchedulerService(PantsService):
     :param str build_root: The current build root.
     :param list invalidation_globs: A list of `globs` that when encountered in filesystem event
                                     subscriptions will tear down the daemon.
+    :param string pantsd_pidfile: The path to the pantsd pidfile for fs event monitoring.
     """
     super(SchedulerService, self).__init__()
     self._fs_event_service = fs_event_service
@@ -50,9 +54,11 @@ class SchedulerService(PantsService):
 
     self._scheduler = legacy_graph_scheduler.scheduler
     self._logger = logging.getLogger(__name__)
-    self._event_queue = Queue.Queue(maxsize=self.QUEUE_SIZE)
+    self._event_queue = queue.Queue(maxsize=self.QUEUE_SIZE)
     self._watchman_is_running = threading.Event()
     self._invalidating_files = set()
+
+    self._loop_condition = LoopCondition()
 
   @staticmethod
   def _combined_invalidating_fileset_from_globs(glob_strs, root):
@@ -113,17 +119,18 @@ class SchedulerService(PantsService):
   def _handle_batch_event(self, files):
     self._logger.debug('handling change event for: %s', files)
 
-    with self.lifecycle_lock:
-      self._maybe_invalidate_scheduler_batch(files)
+    self._maybe_invalidate_scheduler_batch(files)
 
     with self.fork_lock:
-      self._scheduler.invalidate_files(files)
+      invalidated = self._scheduler.invalidate_files(files)
+      if invalidated:
+        self._loop_condition.notify_all()
 
   def _process_event_queue(self):
     """File event notification queue processor."""
     try:
       event = self._event_queue.get(timeout=1)
-    except Queue.Empty:
+    except queue.Empty:
       return
 
     try:
@@ -156,8 +163,8 @@ class SchedulerService(PantsService):
     """
     return self._scheduler.graph_len()
 
-  def warm_product_graph(self, options, target_roots_calculator):
-    """Runs an execution request against the captive scheduler given a set of input specs to warm.
+  def prefork(self, options, build_config):
+    """Runs all pre-fork logic in the process context of the daemon.
 
     :returns: `(LegacyGraphSession, TargetRoots)`
     """
@@ -169,18 +176,80 @@ class SchedulerService(PantsService):
       self._watchman_is_running.wait()
 
     session = self._graph_helper.new_session()
+    if options.for_global_scope().loop:
+      return session, self._prefork_loop(session, options)
+    else:
+      return session, self._prefork_body(session, options)
+
+  def _prefork_loop(self, session, options):
+    # TODO: See https://github.com/pantsbuild/pants/issues/6288 regarding Ctrl+C handling.
+    iterations = options.for_global_scope().loop_max
+    target_roots = None
+    while iterations and not self.is_killed:
+      try:
+        target_roots = self._prefork_body(session, options)
+      except session.scheduler_session.execution_error_type as e:
+        # Render retryable exceptions raised by the Scheduler.
+        print(e, file=sys.stderr)
+
+      iterations -= 1
+      while iterations and not self.is_killed and not self._loop_condition.wait(timeout=1):
+        continue
+    return target_roots
+
+  def _prefork_body(self, session, options):
     with self.fork_lock:
-      target_roots = target_roots_calculator.create(
+      global_options = options.for_global_scope()
+      target_roots = TargetRootsCalculator.create(
         options=options,
         session=session.scheduler_session,
         symbol_table=session.symbol_table,
-        exclude_patterns=tuple(options.for_global_scope().exclude_target_regexp) if options.for_global_scope().exclude_target_regexp else tuple(),
-        tags=tuple(options.for_global_scope().tag) if options.for_global_scope().tag else tuple()
+        exclude_patterns=tuple(global_options.exclude_target_regexp) if global_options.exclude_target_regexp else tuple(),
+        tags=tuple(global_options.tag) if global_options.tag else tuple()
       )
-      session.warm_product_graph(target_roots)
-      return session, target_roots
+
+      if global_options.v1:
+        session.warm_product_graph(target_roots)
+
+      if global_options.v2:
+        if not global_options.v1:
+          session.validate_goals(options.goals)
+
+        # N.B. @console_rules run pre-fork in order to cache the products they request during execution.
+        session.run_console_rules(options.goals, target_roots)
+
+      return target_roots
 
   def run(self):
     """Main service entrypoint."""
     while not self.is_killed:
       self._process_event_queue()
+
+
+class LoopCondition(object):
+  """A wrapped condition variable to handle deciding when loop consumers should re-run.
+
+  Any number of threads may wait and/or notify the condition.
+  """
+
+  def __init__(self):
+    super(LoopCondition, self).__init__()
+    self._condition = threading.Condition(threading.Lock())
+    self._iteration = 0
+
+  def notify_all(self):
+    """Notifies all threads waiting for the condition."""
+    with self._condition:
+      self._iteration += 1
+      self._condition.notify_all()
+
+  def wait(self, timeout):
+    """Waits for the condition for at most the given timeout and returns True if the condition triggered.
+
+    Generally called in a loop until the condition triggers.
+    """
+
+    with self._condition:
+      previous_iteration = self._iteration
+      self._condition.wait(timeout)
+      return previous_iteration != self._iteration

@@ -5,8 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-
-from six.moves import range
+from builtins import range
 
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -74,7 +73,7 @@ class RunPrepCommandTest(TaskTestBase):
       context = self.context(target_roots=[a])
       task = self.create_task(context=context, workdir=workdir)
       task.execute()
-      self.assertEquals('fleem', os.environ['test_prep_env_var'])
+      self.assertEqual('fleem', os.environ['test_prep_env_var'])
 
   def test_prep_no_command(self):
     with self.assertRaises(TaskError):
@@ -97,16 +96,16 @@ class RunPrepCommandTest(TaskTestBase):
 
   def test_valid_target_default_goals(self):
     prep_command = self.make_target('foo', PrepCommand, prep_executable='foo.sh')
-    self.assertEquals(frozenset(['test']), prep_command.goals)
+    self.assertEqual(frozenset(['test']), prep_command.goals)
 
   def test_valid_target_single_goal(self):
     prep_command = self.make_target('foo', PrepCommand, prep_executable='foo.sh', goals=['binary'])
-    self.assertEquals(frozenset(['binary']), prep_command.goals)
+    self.assertEqual(frozenset(['binary']), prep_command.goals)
 
   def test_valid_target_multiple_goals(self):
     prep_command = self.make_target('foo', PrepCommand, prep_executable='foo.sh',
                                     goals=['binary', 'test'])
-    self.assertEquals(frozenset(['binary', 'test']), prep_command.goals)
+    self.assertEqual(frozenset(['binary', 'test']), prep_command.goals)
 
   def test_invalid_target_no_executable(self):
     with self.assertRaisesRegexp(TargetDefinitionException,

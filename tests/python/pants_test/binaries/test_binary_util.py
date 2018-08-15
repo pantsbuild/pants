@@ -6,8 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import os
+from builtins import object, open, str
 
 import mock
+from future.utils import PY2, PY3
 
 from pants.binaries.binary_util import (BinaryRequest, BinaryToolFetcher, BinaryToolUrlGenerator,
                                         BinaryUtil)
@@ -49,10 +51,10 @@ class BinaryUtilTest(TestBase):
       return path_or_fd
 
     def keys(self):
-      return self._map.keys()
+      return list(self._map.keys())
 
     def values(self):
-      return self._map.values()
+      return list(self._map.values())
 
     def __getitem__(self, key):
       return self._map[key]  # Vanilla internal map access (without lambda shenanigans).
@@ -169,25 +171,25 @@ class BinaryUtilTest(TestBase):
                                   ('bin/ivy', '4.3.7', 'ivy'),
                                   ('bin/bash', '4.4.3', 'bash'))}
     fetcher = self.MapFetcher({
-      fake_url(binaries, bases[0], 'protoc'): 'SEEN PROTOC',
-      fake_url(binaries, bases[0], 'ivy'): 'SEEN IVY',
-      fake_url(binaries, bases[1], 'bash'): 'SEEN BASH',
-      fake_url(binaries, bases[1], 'protoc'): 'UNSEEN PROTOC 1',
-      fake_url(binaries, bases[2], 'protoc'): 'UNSEEN PROTOC 2',
-      fake_url(binaries, bases[2], 'ivy'): 'UNSEEN IVY 2',
+      fake_url(binaries, bases[0], 'protoc'): b'SEEN PROTOC',
+      fake_url(binaries, bases[0], 'ivy'): b'SEEN IVY',
+      fake_url(binaries, bases[1], 'bash'): b'SEEN BASH',
+      fake_url(binaries, bases[1], 'protoc'): b'UNSEEN PROTOC 1',
+      fake_url(binaries, bases[2], 'protoc'): b'UNSEEN PROTOC 2',
+      fake_url(binaries, bases[2], 'ivy'): b'UNSEEN IVY 2',
     })
 
     binary_util = self._gen_binary_util(
       baseurls=bases,
       fetcher=fetcher)
 
-    unseen = [item for item in fetcher.values() if item.startswith('SEEN ')]
+    unseen = [item for item in fetcher.values() if item.startswith(b'SEEN ')]
     for supportdir, version, name in binaries.values():
       binary_path_abs = binary_util.select_binary(
         supportdir=supportdir,
         version=version,
         name=name)
-      expected_content = 'SEEN {}'.format(name.upper())
+      expected_content = 'SEEN {}'.format(name.upper()).encode('utf-8')
       self.assertEqual(expected_content, self._read_file(binary_path_abs))
       unseen.remove(expected_content)
     self.assertEqual(0, len(unseen))  # Make sure we've seen all the SEENs.
@@ -200,7 +202,7 @@ class BinaryUtilTest(TestBase):
 
     binary_request = binary_util._make_deprecated_binary_request("supportdir", "version", "name")
 
-    self.assertEquals("supportdir/linux/x86_64/version/name",
+    self.assertEqual("supportdir/linux/x86_64/version/name",
                       binary_util._get_download_path(binary_request))
 
   def test_select_binary_base_path_darwin(self):
@@ -211,7 +213,7 @@ class BinaryUtilTest(TestBase):
 
     binary_request = binary_util._make_deprecated_binary_request("supportdir", "version", "name")
 
-    self.assertEquals("supportdir/mac/10.10/version/name",
+    self.assertEqual("supportdir/mac/10.10/version/name",
                       binary_util._get_download_path(binary_request))
 
   def test_select_binary_base_path_missing_os(self):
@@ -226,11 +228,14 @@ class BinaryUtilTest(TestBase):
     the_raised_exception_message = str(cm.exception)
 
     self.assertIn(BinaryUtil.MissingMachineInfo.__name__, the_raised_exception_message)
-    expected_msg = (
+    expected_msg_prefix = (
       "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
       "name=name, platform_dependent=True, external_url_generator=None, archiver=None): "
       "Pants could not resolve binaries for the current host: platform 'vms' was not recognized. "
-      "Recognized platforms are: [u'darwin', u'linux'].")
+      "Recognized platforms are: ")
+    expected_msg = expected_msg_prefix + ("dict_keys([\\'linux\', \\'darwin\'])."
+                                          if PY3 else
+                                          "[u'darwin', u'linux'].")
     self.assertIn(expected_msg, the_raised_exception_message)
 
   def test_select_binary_base_path_missing_version(self):
@@ -248,7 +253,8 @@ class BinaryUtilTest(TestBase):
       "Error resolving binary request BinaryRequest(supportdir=mysupportdir, version=myversion, "
       "name=myname, platform_dependent=True, external_url_generator=None, archiver=None): Pants could not "
       "resolve binaries for the current host. Update --binaries-path-by-id to find binaries for "
-      "the current host platform (u\'darwin\', u\'999\').\\n--binaries-path-by-id was:")
+      "the current host platform ({unicode_literal}\'darwin\', {unicode_literal}\'999\').\\n--binaries-path-by-id was:"
+    ).format(unicode_literal='u' if PY2 else '')
     self.assertIn(expected_msg, the_raised_exception_message)
 
   def test_select_script_missing_version(self):
@@ -267,7 +273,9 @@ class BinaryUtilTest(TestBase):
       # platform_dependent=False when doing select_script()
       "name=myname, platform_dependent=False, external_url_generator=None, archiver=None): Pants "
       "could not resolve binaries for the current host. Update --binaries-path-by-id to find "
-      "binaries for the current host platform (u\'darwin\', u\'999\').\\n--binaries-path-by-id was:")
+      "binaries for the current host platform ({unicode_literal}\'darwin\', {unicode_literal}\'999\')."
+      "\\n--binaries-path-by-id was:"
+    ).format(unicode_literal='u' if PY2 else '')
     self.assertIn(expected_msg, the_raised_exception_message)
 
   def test_select_binary_base_path_override(self):
@@ -279,7 +287,7 @@ class BinaryUtilTest(TestBase):
 
     binary_request = binary_util._make_deprecated_binary_request("supportdir", "version", "name")
 
-    self.assertEquals("supportdir/skynet/42/version/name",
+    self.assertEqual("supportdir/skynet/42/version/name",
                       binary_util._get_download_path(binary_request))
 
   def test_external_url_generator(self):

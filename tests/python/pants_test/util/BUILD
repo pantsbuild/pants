@@ -58,6 +58,8 @@ python_tests(
   name = 'fileutil',
   sources = ['test_fileutil.py'],
   dependencies = [
+    '3rdparty/python:future',
+    '3rdparty/python:mock',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:fileutil',
   ]
@@ -162,6 +164,7 @@ python_tests(
   name = 'tarutil',
   sources = ['test_tarutil.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:tarutil',
   ]

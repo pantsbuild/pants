@@ -21,9 +21,9 @@ class PythonEvalTest(PythonTaskTestBase):
 
   def setUp(self):
     super(PythonEvalTest, self).setUp()
-    self._create_graph(broken_b_library=True)
+    self._create_graph()
 
-  def _create_graph(self, broken_b_library):
+  def _create_graph(self, broken_c_library=True):
     self.reset_build_graph(delete_build_files=True)
 
     self.a_library = self.create_python_library('src/python/a', 'a', {'a.py': dedent("""
@@ -45,15 +45,14 @@ class PythonEvalTest(PythonTaskTestBase):
       pass
     """)})
 
-    # TODO: Presumably this was supposed to be c_library, not override b_library. Unravel and fix.
-    self.b_library = self.create_python_library('src/python/c', 'c', {'c.py': dedent("""
+    self.c_library = self.create_python_library('src/python/c', 'c', {'c.py': dedent("""
     from a.a import compile_time_check_decorator
 
 
     @compile_time_check_decorator
     {}:
       pass
-    """.format('def baz_c()' if broken_b_library else 'class BazC(object)')
+    """.format('def baz_c()' if broken_c_library else 'class BazC(object)')
     )}, dependencies=['//src/python/a'])
 
     self.d_library = self.create_python_library('src/python/d', 'd', { 'd.py': dedent("""
@@ -112,26 +111,26 @@ class PythonEvalTest(PythonTaskTestBase):
     self.assertEqual({self.d_library, self.a_library}, set(compiled))
 
   def test_compile_fail_closure(self):
-    python_eval = self._create_task(target_roots=[self.b_library])
+    python_eval = self._create_task(target_roots=[self.c_library])
 
     with self.assertRaises(PythonEval.Error) as e:
       python_eval.execute()
     self.assertEqual([self.a_library], e.exception.compiled)
-    self.assertEqual([self.b_library], e.exception.failed)
+    self.assertEqual([self.c_library], e.exception.failed)
 
   def test_compile_incremental_progress(self):
-    python_eval = self._create_task(target_roots=[self.b_library])
+    python_eval = self._create_task(target_roots=[self.c_library])
 
     with self.assertRaises(PythonEval.Error) as e:
       python_eval.execute()
     self.assertEqual([self.a_library], e.exception.compiled)
-    self.assertEqual([self.b_library], e.exception.failed)
+    self.assertEqual([self.c_library], e.exception.failed)
 
-    self._create_graph(broken_b_library=False)
-    python_eval = self._create_task(target_roots=[self.b_library])
+    self._create_graph(broken_c_library=False)
+    python_eval = self._create_task(target_roots=[self.c_library])
 
     compiled = python_eval.execute()
-    self.assertEqual([self.b_library], compiled)
+    self.assertEqual([self.c_library], compiled)
 
   def test_compile_fail_missing_build_dep(self):
     python_eval = self._create_task(target_roots=[self.b_library], options={'transitive': False})

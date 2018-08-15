@@ -31,7 +31,7 @@ class ListIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.do_command('list',
                                 'testprojects/tests/python/pants/build_parsing::',
                                 success=True)
-    self.assertEquals(
+    self.assertEqual(
       pants_run.stdout_data.strip(),
       'testprojects/tests/python/pants/build_parsing:test-nested-variable-access-in-function-call'
     )

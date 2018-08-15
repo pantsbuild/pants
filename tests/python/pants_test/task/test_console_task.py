@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import threading
-from Queue import Empty, Queue
+from queue import Empty, Queue
 
 from pants.task.console_task import ConsoleTask
 from pants_test.task_test_base import TaskTestBase

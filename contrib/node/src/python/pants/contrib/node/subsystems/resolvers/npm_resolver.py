@@ -6,7 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import json
 import os
+from builtins import open
 
+from future.utils import PY3
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.subsystem.subsystem import Subsystem
@@ -103,5 +105,6 @@ class NpmResolver(Subsystem, NodeResolverBase):
       'Adding {} to package.json for {}'.format(dependencies, package['name']))
     package['dependencies'] = dependencies
 
-    with open(package_json_path, 'wb') as fp:
+    mode = 'w' if PY3 else 'wb'
+    with open(package_json_path, mode) as fp:
       json.dump(package, fp, indent=2)

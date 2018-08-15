@@ -17,23 +17,23 @@ class TestBuildEnvironment(unittest.TestCase):
 
   def test_get_configdir(self):
     with environment_as(XDG_CONFIG_HOME=''):
-      self.assertEquals(os.path.expanduser('~/.config/pants'), get_pants_configdir())
+      self.assertEqual(os.path.expanduser('~/.config/pants'), get_pants_configdir())
 
   def test_get_cachedir(self):
     with environment_as(XDG_CACHE_HOME=''):
-      self.assertEquals(os.path.expanduser('~/.cache/pants'), get_pants_cachedir())
+      self.assertEqual(os.path.expanduser('~/.cache/pants'), get_pants_cachedir())
 
   def test_set_configdir(self):
     with temporary_file() as temp:
       with environment_as(XDG_CONFIG_HOME=temp.name):
-        self.assertEquals(os.path.join(temp.name, 'pants'),  get_pants_configdir())
+        self.assertEqual(os.path.join(temp.name, 'pants'),  get_pants_configdir())
 
   def test_set_cachedir(self):
     with temporary_file() as temp:
       with environment_as(XDG_CACHE_HOME=temp.name):
-        self.assertEquals(os.path.join(temp.name, 'pants'), get_pants_cachedir())
+        self.assertEqual(os.path.join(temp.name, 'pants'), get_pants_cachedir())
 
   def test_expand_home_configdir(self):
     with environment_as(XDG_CONFIG_HOME='~/somewhere/in/home'):
-      self.assertEquals(os.path.expanduser(os.path.join('~/somewhere/in/home', 'pants')),
+      self.assertEqual(os.path.expanduser(os.path.join('~/somewhere/in/home', 'pants')),
                         get_pants_configdir())

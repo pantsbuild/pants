@@ -14,6 +14,12 @@ from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_method, memoized_property
 
 
+MIN_OSX_SUPPORTED_VERSION = '10.11'
+
+
+MIN_OSX_VERSION_ARG = '-mmacosx-version-min={}'.format(MIN_OSX_SUPPORTED_VERSION)
+
+
 class XCodeCLITools(Subsystem):
   """Subsystem to detect and provide the XCode command line developer tools.
 
@@ -122,6 +128,7 @@ class XCodeCLITools(Subsystem):
 
     all_inc_dirs = base_inc_dirs
     for d in base_inc_dirs:
+      # FIXME: what does this directory do?
       secure_inc_dir = os.path.join(d, 'secure')
       if is_readable_dir(secure_inc_dir):
         all_inc_dirs.append(secure_inc_dir)
@@ -140,7 +147,9 @@ class XCodeCLITools(Subsystem):
     return Linker(
       path_entries=self.path_entries(),
       exe_filename='ld',
-      library_dirs=[])
+      library_dirs=[],
+      linking_library_dirs=[],
+      extra_args=[MIN_OSX_VERSION_ARG])
 
   @memoized_method
   def c_compiler(self):
@@ -148,7 +157,8 @@ class XCodeCLITools(Subsystem):
       path_entries=self.path_entries(),
       exe_filename='clang',
       library_dirs=self.lib_dirs(),
-      include_dirs=self.include_dirs())
+      include_dirs=self.include_dirs(),
+      extra_args=[MIN_OSX_VERSION_ARG])
 
   @memoized_method
   def cpp_compiler(self):
@@ -156,7 +166,8 @@ class XCodeCLITools(Subsystem):
       path_entries=self.path_entries(),
       exe_filename='clang++',
       library_dirs=self.lib_dirs(),
-      include_dirs=self.include_dirs())
+      include_dirs=self.include_dirs(),
+      extra_args=[MIN_OSX_VERSION_ARG])
 
 
 @rule(Assembler, [Select(XCodeCLITools)])

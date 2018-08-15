@@ -15,7 +15,7 @@ function usage() {
   fi
 }
 
-write_mode=diff
+check="true"
 
 while getopts "hf" opt; do
   case ${opt} in
@@ -24,7 +24,7 @@ while getopts "hf" opt; do
       exit 0
       ;;
     f)
-      write_mode=overwrite
+      check="false"
       ;;
     *)
       usage "Unrecognized arguments."
@@ -38,6 +38,9 @@ NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
 cmd=(
   ${REPO_ROOT}/build-support/bin/native/cargo fmt --all --
 )
+if [[ "${check}" == "true" ]]; then
+  cmd=("${cmd[@]}" "--check")
+fi
 
 bad_files=(
   $(
@@ -48,30 +51,27 @@ bad_files=(
     echo >&2 "Ensuring generated code is present for downstream formatting checks..."
     ${REPO_ROOT}/build-support/bin/native/cargo check -p bazel_protos
 
-    ${cmd[*]} --write-mode=${write_mode} | \
+    ${cmd[@]} | \
       awk '$0 ~ /^Diff in/ {print $3}' | \
       sort -u
     exit ${PIPESTATUS[0]}
   )
 )
-case $? in
-  4)
+exit_code=$?
+
+if [[ ${exit_code} -ne 0 ]]; then
+  if [[ "${check}" == "true" ]]; then
     echo >&2 "The following rust files were incorrectly formatted, run \`$0 -f\` to reformat them:"
     for bad_file in ${bad_files[*]}; do
       echo >&2 ${bad_file}
     done
-    exit 1
-    ;;
-  0)
-    exit 0
-    ;;
-  *)
+  else
     cat << EOF >&2
 An error occurred while checking the formatting of rust files.
-Try running \`(cd "${NATIVE_ROOT}" && ${cmd[*]} --write-mode=diff)\` to investigate.
+Try running \`(cd "${NATIVE_ROOT}" && ${cmd[@]})\` to investigate.
 Its error is:
 EOF
-    cd "${NATIVE_ROOT}" && ${cmd[*]} --write-mode=diff >/dev/null
-    exit 1
-    ;;
-esac
+    cd "${NATIVE_ROOT}" && ${cmd[@]} >/dev/null
+  fi
+  exit 1
+fi

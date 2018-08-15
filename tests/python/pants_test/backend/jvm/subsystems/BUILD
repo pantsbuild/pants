@@ -5,6 +5,7 @@ python_tests(
   name='shader',
   sources=['test_shader.py'],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
@@ -45,6 +46,7 @@ python_tests(
   name='shader_integration',
   sources=['test_shader_integration.py'],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/fs',
     'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',

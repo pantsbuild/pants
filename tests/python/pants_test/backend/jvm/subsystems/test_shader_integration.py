@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import json
 import os
+from builtins import open
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
@@ -48,9 +49,9 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
     path = os.path.join('dist', 'shading.jar')
     init_subsystem(DistributionLocator)
     execute_java = DistributionLocator.cached(minimum_version='1.6').execute_java
-    self.assertEquals(0, execute_java(classpath=[path],
+    self.assertEqual(0, execute_java(classpath=[path],
                                       main='org.pantsbuild.testproject.shading.Main'))
-    self.assertEquals(0, execute_java(classpath=[path],
+    self.assertEqual(0, execute_java(classpath=[path],
                                       main='org.pantsbuild.testproject.foo.bar.MyNameIsDifferentNow'))
 
     received_classes = set()
@@ -67,7 +68,7 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
 
     All jars including the main jar as well as libraries will run through shader.
     """
-    self.assertEquals({
+    self.assertEqual({
           'Gson': 'moc.elgoog.nosg.Gson',
           'Third': 'org.pantsbuild.testproject.shading.Third',
           'Second': 'hello.org.pantsbuild.testproject.shading.Second',
@@ -85,7 +86,7 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
           'third.jar']).strip()))
 
   def test_deployjar_run(self):
-    self.assertEquals({
+    self.assertEqual({
           'Gson': 'moc.elgoog.nosg.Gson',
           'Third': 'org.pantsbuild.testproject.shading.Third',
           'Second': 'hello.org.pantsbuild.testproject.shading.Second',
@@ -143,4 +144,4 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
       self.run_pants(['clean-all'])
       os.remove(jar_path)
       self.assert_success(self.run_pants(['binary', tmpdir]))
-      self.assertEquals(permissions, os.stat(jar_path).st_mode)
+      self.assertEqual(permissions, os.stat(jar_path).st_mode)

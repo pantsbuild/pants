@@ -9,6 +9,7 @@ python_dist(
   sources=[
     'hello_package/hello.py',
     'hello_package/__init__.py',
+    'setup.cfg',
     'setup.py'
   ],
   setup_requires=[

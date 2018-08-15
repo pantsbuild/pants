@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open, range
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -128,7 +129,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                       '-dependency', 'junit', 'junit-dep', '4.10'],
                 executor=SubprocessExecutor(distribution=distribution))
 
-    with open(classpath_file_abs_path) as fp:
+    with open(classpath_file_abs_path, 'r') as fp:
       classpath = fp.read()
 
     # Now directly invoke javac to compile the test java code into classfiles that we can later
@@ -217,7 +218,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     # Existing files (with and without the method name) should trigger.
     srcfile = os.path.join(self.test_workdir, 'this.is.a.source.file.scala')
-    safe_file_dump(srcfile, 'content!')
+    safe_file_dump(srcfile, 'content!', binary_mode=False)
     self.assertTrue(JUnitRun.request_classes_by_source([srcfile]))
     self.assertTrue(JUnitRun.request_classes_by_source(['{}#method'.format(srcfile)]))
 

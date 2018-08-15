@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import object
 from textwrap import dedent
 
 from pants.backend.graph_info.tasks.listtargets import ListTargets
@@ -171,7 +172,7 @@ class ListTargetsTest(BaseListTargetsTest):
     targets = []
     targets.extend(self.targets('a/b/d/::'))
     targets.extend(self.target('f:alias').dependencies)
-    self.assertEquals(3, len(targets), "Expected a duplicate of a/b/d:d")
+    self.assertEqual(3, len(targets), "Expected a duplicate of a/b/d:d")
     self.assert_console_output(
       'a/b/c:c3',
       'a/b/d:d',

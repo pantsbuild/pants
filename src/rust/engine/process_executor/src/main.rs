@@ -1,3 +1,4 @@
+#[macro_use]
 extern crate clap;
 extern crate env_logger;
 extern crate fs;
@@ -68,6 +69,14 @@ fn main() {
         .takes_value(true)
         .help("The host:port of the gRPC CAS server to connect to."),
     )
+      .arg(
+        Arg::with_name("upload-chunk-bytes")
+            .help("Number of bytes to include per-chunk when uploading bytes. grpc imposes a hard message-size limit of around 4MB.")
+            .takes_value(true)
+            .long("chunk-bytes")
+            .required(false)
+            .default_value("3145728") // 3MB
+      )
     .arg(
       Arg::with_name("env")
         .long("env")
@@ -109,14 +118,19 @@ fn main() {
   let pool = Arc::new(fs::ResettablePool::new("process-executor-".to_owned()));
   let server_arg = args.value_of("server");
   let store = match (server_arg, args.value_of("cas-server")) {
-    (Some(_server), Some(cas_server)) => fs::Store::with_remote(
-      local_store_path,
-      pool.clone(),
-      cas_server.to_owned(),
-      1,
-      10 * 1024 * 1024,
-      Duration::from_secs(30),
-    ),
+    (Some(_server), Some(cas_server)) => {
+      let chunk_size =
+        value_t!(args.value_of("upload-chunk-bytes"), usize).expect("Bad upload-chunk-bytes flag");
+
+      fs::Store::with_remote(
+        local_store_path,
+        pool.clone(),
+        cas_server.to_owned(),
+        1,
+        chunk_size,
+        Duration::from_secs(30),
+      )
+    }
     (None, None) => fs::Store::local_only(local_store_path, pool.clone()),
     _ => panic!("Must specify either both --server and --cas-server or neither."),
   }.expect("Error making store");
@@ -140,6 +154,7 @@ fn main() {
     output_directories: BTreeSet::new(),
     timeout: Duration::new(15 * 60, 0),
     description: "process_executor".to_string(),
+    jdk_home: None,
   };
 
   let runner: Box<process_execution::CommandRunner> = match server_arg {

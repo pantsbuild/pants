@@ -126,7 +126,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
     self.assert_success(pants_run)
 
   def test_self(self):
-    self.assertEquals([t for s in range(0, self._SHARDS)
+    self.assertEqual([t for s in range(0, self._SHARDS)
                        for t in self.targets_for_shard(s)],
                       self.targets)
 

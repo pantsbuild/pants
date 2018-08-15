@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import json
 import os
+from builtins import open, str
 from xml.dom import minidom
 
 from pants.backend.project_info.tasks.idea_plugin_gen import IDEA_PLUGIN_VERSION, IdeaPluginGen
@@ -56,9 +57,9 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
                                 for p in actual_properties
                                 if p.getAttribute('name') == 'incremental_import']
     if incremental_import is None:
-      self.assertEquals(incremental_import_props, [])
+      self.assertEqual(incremental_import_props, [])
     else:
-      self.assertEquals([str(incremental_import)], [p.getAttribute('value')
+      self.assertEqual([str(incremental_import)], [p.getAttribute('value')
                                                     for p in incremental_import_props])
 
   def _get_project_dir(self, output_file):

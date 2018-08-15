@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import re
 import time
+from builtins import open
 from textwrap import dedent
 
 from twitter.common.dirutil.fileset import Fileset
@@ -81,12 +82,12 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
 
     actual_sources = [s for s in Fileset.rglobs('*.java', root=target_workdir)]
     expected_sources = syn_target.sources_relative_to_source_root()
-    self.assertEquals(set(expected_sources), set(actual_sources))
+    self.assertEqual(set(expected_sources), set(actual_sources))
 
     # Check that the synthetic target has a valid source root and the generated sources have the
     # expected java package
     def get_package(path):
-      with open(path) as fp:
+      with open(path, 'r') as fp:
         for line in fp:
           match = self.PACKAGE_RE.match(line)
           if match:

@@ -6,5 +6,7 @@ python_library(
   sources=[
     'cpp_toolchain.py',
   ],
-  dependencies=[],
+  dependencies=[
+    '3rdparty/python:future',
+  ],
 )

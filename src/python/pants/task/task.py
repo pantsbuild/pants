@@ -7,9 +7,12 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import sys
 from abc import abstractmethod
+from builtins import filter, map, object, str, zip
 from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
+
+from future.utils import PY3
 
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
@@ -171,10 +174,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
     self._force_invalidated = False
 
-  @memoized_method
-  def _build_invalidator(self, root=False):
-    build_task = None if root else self.fingerprint
-    return BuildInvalidator.Factory.create(build_task=build_task)
+  @memoized_property
+  def _build_invalidator(self):
+    return BuildInvalidator.Factory.create(build_task=self.fingerprint)
 
   def get_options(self):
     """Returns the option values for this task's scope.
@@ -231,7 +233,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :API: public
     """
     return (self.context.targets(predicate) if self.act_transitively
-            else filter(predicate, self.context.target_roots))
+            else list(filter(predicate, self.context.target_roots)))
 
   @memoized_property
   def workdir(self):
@@ -247,15 +249,15 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   def _options_fingerprint(self, scope):
     options_hasher = sha1()
-    options_hasher.update(scope)
+    options_hasher.update(scope.encode('utf-8'))
     options_fp = OptionsFingerprinter.combined_options_fingerprint_for_scope(
       scope,
       self.context.options,
       build_graph=self.context.build_graph,
       include_passthru=self.supports_passthru_args(),
     )
-    options_hasher.update(options_fp)
-    return options_hasher.hexdigest()
+    options_hasher.update(options_fp.encode('utf-8'))
+    return options_hasher.hexdigest() if PY3 else options_hasher.hexdigest().decode('utf-8')
 
   @memoized_property
   def fingerprint(self):
@@ -268,13 +270,13 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     A task's fingerprint is only valid afer the task has been fully initialized.
     """
     hasher = sha1()
-    hasher.update(self.stable_name())
-    hasher.update(self._options_fingerprint(self.options_scope))
-    hasher.update(self.implementation_version_str())
+    hasher.update(self.stable_name().encode('utf-8'))
+    hasher.update(self._options_fingerprint(self.options_scope).encode('utf-8'))
+    hasher.update(self.implementation_version_str().encode('utf-8'))
     # TODO: this is not recursive, but should be: see #2739
     for dep in self.subsystem_dependencies_iter():
-      hasher.update(self._options_fingerprint(dep.options_scope()))
-    return str(hasher.hexdigest())
+      hasher.update(self._options_fingerprint(dep.options_scope()).encode('utf-8'))
+    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def artifact_cache_reads_enabled(self):
     return self._cache_factory.read_cache_available()
@@ -284,7 +286,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   def invalidate(self):
     """Invalidates all targets for this task."""
-    self._build_invalidator().force_invalidate_all()
+    self._build_invalidator.force_invalidate_all()
 
   @property
   def create_target_dirs(self):
@@ -461,7 +463,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     cache_manager = InvalidationCacheManager(self.workdir,
                                              cache_key_generator,
-                                             self._build_invalidator(),
+                                             self._build_invalidator,
                                              invalidate_dependents,
                                              fingerprint_strategy=fingerprint_strategy,
                                              invalidation_report=self.context.invalidation_report,

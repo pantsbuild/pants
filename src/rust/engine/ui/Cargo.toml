@@ -1,0 +1,17 @@
+[package]
+name = "ui"
+version = "0.0.1"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+
+[lib]
+name = "engine_display"
+path = "src/display.rs"
+
+[[bin]]
+name = "ui"
+path = "src/main.rs"
+
+[dependencies]
+rand = "0.5.1"
+termion = "1.5.1"
+unicode-segmentation = "1.2.1"

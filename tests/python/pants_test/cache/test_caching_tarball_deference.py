@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.base.payload import Payload
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -18,7 +19,7 @@ from pants_test.task_test_base import TaskTestBase
 
 SYMLINK_NAME = 'link'
 DUMMY_FILE_NAME = 'dummy'
-DUMMY_FILE_CONTENT = 'dummy_content'
+DUMMY_FILE_CONTENT = b'dummy_content'
 
 
 class DummyCacheLibrary(Target):
@@ -136,7 +137,7 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
           os.path.islink(file_path)
           , "{} in artifact {} should not be a symlink but it is.".format(SYMLINK_NAME, artifact_address)
         )
-        with open(file_path, 'r') as f:
+        with open(file_path, 'rb') as f:
           self.assertEqual(DUMMY_FILE_CONTENT, f.read())
 
   # Cache creation should fail because the symlink destination is non-existent.
@@ -165,7 +166,7 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
         )
         # The destination of the symlink should be non-existent, hence IOError.
         with self.assertRaises(IOError):
-          with open(file_path, 'r') as f:
+          with open(file_path, 'rb') as f:
             f.read()
 
   # Symlink in cache should stay as a symlink, and so does the dst file.
@@ -186,7 +187,7 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
           os.path.islink(file_path),
           "{} in artifact {} should be a symlink but it is not.".format(SYMLINK_NAME, artifact_address)
         )
-        with open(file_path, 'r') as f:
+        with open(file_path, 'rb') as f:
           self.assertEqual(DUMMY_FILE_CONTENT, f.read())
 
   def test_cache_dereference_file_inside_results_dir(self):

@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import os
+from builtins import object, str
 from hashlib import sha1
 
 from six import string_types
@@ -118,7 +119,7 @@ class Target(AbstractTarget):
         if 'sources' in payload.as_dict():
           deprecated_conditional(
             lambda: True,
-            '1.10.0.dev0',
+            '1.11.0.dev0',
             ('The source argument is deprecated - it gets automatically promoted to sources.'
              'Target {} should just use a sources argument. No BUILD files need changing. '
              'The source argument will stop being populated -').format(target.type_alias),
@@ -449,7 +450,7 @@ class Target(AbstractTarget):
 
       dep_hashes = sorted(list(dep_hash_iter()))
       for dep_hash in dep_hashes:
-        hasher.update(dep_hash)
+        hasher.update(dep_hash.encode('utf-8'))
       target_hash = self.invalidation_hash(fingerprint_strategy)
       if target_hash is None and not dep_hashes:
         return None
@@ -872,7 +873,7 @@ class Target(AbstractTarget):
       if (key_arg is None or key_arg == 'sources') and self.supports_default_sources():
         deprecated_conditional(
           lambda: True,
-          '1.10.0.dev0',
+          '1.11.0.dev0',
           'Default sources should always be parsed through the engine not by create_sources_field. '
           'This code should be unreachable, and this message should never be displayed. '
           'If you see this message, please contact pants-dev. '
@@ -886,7 +887,7 @@ class Target(AbstractTarget):
         # Received a literal sources list: convert to a FilesetWithSpec via Files.
         deprecated_conditional(
           lambda: True,
-          '1.10.0.dev0',
+          '1.11.0.dev0',
           ('Passing collections as the value of the sources argument to create_sources_field is '
            'deprecated, and now takes a slow path. Instead, class {} should have its sources '
            'argument populated by the engine, either by using the standard parsing pipeline, or by '
@@ -902,7 +903,7 @@ class Target(AbstractTarget):
     elif not isinstance(sources, EagerFilesetWithSpec):
       deprecated_conditional(
         lambda: True,
-        '1.10.0.dev0',
+        '1.11.0.dev0',
         ('FilesetWithSpec sources values are deprecated except for EagerFilesetWithSpec values. '
          'Saw value of type {}').format(type(sources))
       )

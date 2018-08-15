@@ -107,5 +107,5 @@ class GeneratePantsReference(Task):
     self.context.log.info('Generating {}'.format(output_path))
     html = renderer.render_name(filename, args)
     with safe_open(output_path, 'w') as outfile:
-      outfile.write(html.encode('utf8'))
+      outfile.write(html)
     return output_path

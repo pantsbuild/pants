@@ -18,6 +18,7 @@ Organizations
 - [Clover Health](http://www.cloverhealth.com/)
 - [QuizUp](https://www.quizup.com/)
 - [Grapeshot](https://www.grapeshot.com)
+- [Sigma](https://sig.ma)
 
 Open Source Projects
 --------------------

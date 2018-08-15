@@ -5,6 +5,7 @@ python_library(
   name = 'dependency_context',
   sources = ['dependency_context.py'],
   dependencies = [
+    '3rdparty/python:future',
     ':java',
     ':scala_platform',
     'src/python/pants/backend/codegen/thrift/java',
@@ -18,6 +19,7 @@ python_library(
   name = 'jvm_tool_mixin',
   sources = ['jvm_tool_mixin.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/base:exceptions',
     'src/python/pants/java/distribution',
     'src/python/pants/option',
@@ -75,6 +77,7 @@ python_library(
   name = 'jvm_platform',
   sources = ['jvm_platform.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:revision',
     'src/python/pants/option',
@@ -88,6 +91,7 @@ python_library(
   name = 'jar_dependency_management',
   sources = ['jar_dependency_management.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:revision',
     'src/python/pants/build_graph',
@@ -115,6 +119,7 @@ python_library(
   name = 'shader',
   sources = ['shader.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
@@ -131,6 +136,7 @@ python_library(
   name = 'zinc',
   sources = ['zinc.py'],
   dependencies = [
+    '3rdparty/python:future',
     ':dependency_context',
     ':jvm_tool_mixin',
     ':shader',
@@ -142,6 +148,7 @@ python_library(
   name = 'zinc_language_mixin',
   sources = ['zinc_language_mixin.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/subsystem',
   ]
 )

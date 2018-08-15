@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import re
+from builtins import open
 
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -159,7 +160,7 @@ class AntlrJavaGen(SimpleCodegenTask, NailgunTask):
       for filename in filenames:
         source = os.path.join(root, filename)
 
-        with open(source) as f:
+        with open(source, 'r') as f:
           lines = f.readlines()
         if len(lines) < 1:
           return

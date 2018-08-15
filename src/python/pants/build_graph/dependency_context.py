@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import object
+
 from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.target import Target
 

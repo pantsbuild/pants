@@ -8,10 +8,13 @@ import itertools
 import logging
 import os
 import unittest
+from builtins import object, open
 from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
+
+from future.utils import PY2
 
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -141,7 +144,7 @@ class TestBase(unittest.TestCase):
     relative_symlink(src, dst)
     self._invalidate_for(reldst)
 
-  def create_file(self, relpath, contents='', mode='wb'):
+  def create_file(self, relpath, contents='', mode='w'):
     """Writes to a file under the buildroot.
 
     :API: public
@@ -167,7 +170,7 @@ class TestBase(unittest.TestCase):
     for f in files:
       self.create_file(os.path.join(path, f), contents=f)
 
-  def create_workdir_file(self, relpath, contents='', mode='wb'):
+  def create_workdir_file(self, relpath, contents='', mode='w'):
     """Writes to a file under the work directory.
 
     :API: public
@@ -216,7 +219,7 @@ class TestBase(unittest.TestCase):
     if make_missing_sources and 'sources' in kwargs:
       for source in kwargs['sources']:
         if '*' not in source:
-          self.create_file(os.path.join(address.spec_path, source), mode='a')
+          self.create_file(os.path.join(address.spec_path, source), mode='a', contents='')
       kwargs['sources'] = self.sources_for(kwargs['sources'], address.spec_path)
 
     target = target_type(name=address.target_name,
@@ -269,9 +272,15 @@ class TestBase(unittest.TestCase):
     return BuildFileAliases(targets={'target': Target})
 
   @classmethod
+  def rules(cls):
+    # Required for sources_for:
+    return [RootRule(SourcesField)]
+
+  @classmethod
   def build_config(cls):
     build_config = BuildConfiguration()
     build_config.register_aliases(cls.alias_groups())
+    build_config.register_rules(cls.rules())
     return build_config
 
   def setUp(self):
@@ -368,8 +377,6 @@ class TestBase(unittest.TestCase):
       native=init_native(),
       build_configuration=cls.build_config(),
       build_ignore_patterns=None,
-      # Required for sources_for:
-      rules=[RootRule(SourcesField)],
     ).new_session()
     cls._scheduler = graph_session.scheduler_session
     cls._build_graph, cls._address_mapper = graph_session.create_build_graph(
@@ -434,11 +441,13 @@ class TestBase(unittest.TestCase):
       # If task is expected to inherit goal-level options, register those directly on the task,
       # by subclassing the goal options registrar and settings its scope to the task scope.
       if issubclass(task_type, GoalOptionsMixin):
-        subclass_name = b'test_{}_{}_{}'.format(
+        subclass_name = 'test_{}_{}_{}'.format(
           task_type.__name__, task_type.goal_options_registrar_cls.options_scope,
           task_type.options_scope)
+        if PY2:
+          subclass_name = subclass_name.encode('utf-8')
         optionables.add(type(subclass_name, (task_type.goal_options_registrar_cls, ),
-                             {b'options_scope': task_type.options_scope}))
+                             {'options_scope': task_type.options_scope}))
 
     # Now expand to all deps.
     all_optionables = set()
@@ -541,8 +550,7 @@ class TestBase(unittest.TestCase):
                    sources=('sources=%s,' % repr(sources)
                               if sources else ''),
                    java_sources=('java_sources=[%s],'
-                                 % ','.join(map(lambda str_target: '"%s"' % str_target,
-                                                kwargs.get('java_sources')))
+                                 % ','.join('"%s"' % str_target for str_target in kwargs.get('java_sources'))
                                  if 'java_sources' in kwargs else ''),
                    provides=('provides=%s,' % kwargs.get('provides')
                               if 'provides' in kwargs else ''),
@@ -578,7 +586,7 @@ class TestBase(unittest.TestCase):
     :API: public
     """
 
-    with open(file_path) as f:
+    with open(file_path, 'r') as f:
       content = f.read()
       self.assertIn(string, content, '"{}" is not in the file {}:\n{}'.format(string, f.name, content))
 

@@ -92,6 +92,8 @@ impl super::CommandRunner for CommandRunner {
   /// Loops until the server gives a response, either successful or error. Does not have any
   /// timeout: polls in a tight loop.
   ///
+  /// TODO: Request jdk_home be created if set.
+  ///
   fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let operations_client = self.operations_client.clone();
 
@@ -182,6 +184,9 @@ impl super::CommandRunner for CommandRunner {
                               operations_client
                                 .get()
                                 .get_operation(&operation_request)
+                                .or_else(move |err| {
+                                  rpcerror_recover_cancelled(operation_request.take_name(), err)
+                                })
                                 .map_err(rpcerror_to_string),
                             ).map(move |operation| {
                               future::Loop::Continue((operation, iter_num + 1))
@@ -465,6 +470,40 @@ impl CommandRunner {
     &self,
     execute_response: &bazel_protos::remote_execution::ExecuteResponse,
   ) -> BoxFuture<Digest, ExecutionError> {
+    // Get Digests of output Directories.
+    // Then we'll make a Directory for the output files, and merge them.
+    let mut directory_digests =
+      Vec::with_capacity(execute_response.get_result().get_output_directories().len() + 1);
+    // TODO: Maybe take rather than clone
+    let output_directories = execute_response
+      .get_result()
+      .get_output_directories()
+      .to_owned();
+    for dir in output_directories {
+      let digest_result: Result<Digest, String> = dir.get_tree_digest().into();
+      let mut digest = future::done(digest_result).to_boxed();
+      for component in dir.get_path().rsplit('/') {
+        let component = component.to_owned();
+        let store = self.store.clone();
+        digest = digest
+          .and_then(move |digest| {
+            let mut directory = bazel_protos::remote_execution::Directory::new();
+            directory.mut_directories().push({
+              let mut node = bazel_protos::remote_execution::DirectoryNode::new();
+              node.set_name(component);
+              node.set_digest((&digest).into());
+              node
+            });
+            store.record_directory(&directory, true)
+          })
+          .to_boxed();
+      }
+      directory_digests.push(digest.map_err(|err| {
+        ExecutionError::Fatal(format!("Error saving remote output directory: {}", err))
+      }));
+    }
+
+    // Make a directory for the files
     let mut path_map = HashMap::new();
     let path_stats_result: Result<Vec<PathStat>, String> = execute_response
       .get_result()
@@ -511,6 +550,7 @@ impl CommandRunner {
       }
     }
 
+    let store = self.store.clone();
     fs::Snapshot::digest_from_path_stats(
       self.store.clone(),
       StoreOneOffRemoteDigest::new(path_map),
@@ -521,6 +561,16 @@ impl CommandRunner {
         error
       ))
     })
+      .join(future::join_all(directory_digests))
+      .and_then(|(files_digest, mut directory_digests)| {
+        directory_digests.push(files_digest);
+        fs::Snapshot::merge_directories(store, directory_digests).map_err(|err| {
+          ExecutionError::Fatal(format!(
+            "Error when merging output files and directories: {}",
+            err
+          ))
+        })
+      })
       .to_boxed()
   }
 }
@@ -553,7 +603,19 @@ fn make_execute_request(
     })
     .collect::<Result<Vec<String>, String>>()?;
   output_files.sort();
-  command.set_output_files(protobuf::repeated::RepeatedField::from_vec(output_files));
+  command.set_output_files(protobuf::RepeatedField::from_vec(output_files));
+
+  let mut output_directories = req
+    .output_directories
+    .iter()
+    .map(|p| {
+      p.to_str()
+        .map(|s| s.to_owned())
+        .ok_or_else(|| format!("Non-UTF8 output directory path: {:?}", p))
+    })
+    .collect::<Result<Vec<String>, String>>()?;
+  output_directories.sort();
+  command.set_output_directories(protobuf::RepeatedField::from_vec(output_directories));
 
   let mut action = bazel_protos::remote_execution::Action::new();
   action.set_command_digest(digest(&command)?);
@@ -572,6 +634,27 @@ fn format_error(error: &bazel_protos::status::Status) -> String {
     None => format!("{:?}", error.get_code()),
   };
   format!("{}: {}", error_code, error.get_message())
+}
+
+///
+/// If the given operation represents a cancelled request, recover it into
+/// ExecutionError::NotFinished.
+///
+fn rpcerror_recover_cancelled(
+  operation_name: String,
+  err: grpcio::Error,
+) -> Result<bazel_protos::operations::Operation, grpcio::Error> {
+  // If the error represented cancellation, return an Operation for the given Operation name.
+  match &err {
+    &grpcio::Error::RpcFailure(ref rs) if rs.status == grpcio::RpcStatusCode::Cancelled => {
+      let mut next_operation = bazel_protos::operations::Operation::new();
+      next_operation.set_name(operation_name);
+      return Ok(next_operation);
+    }
+    _ => {}
+  }
+  // Did not represent cancellation.
+  Err(err)
 }
 
 fn rpcerror_to_string(error: grpcio::Error) -> String {
@@ -614,6 +697,7 @@ mod tests {
 
   use super::super::CommandRunner as CommandRunnerTrait;
   use super::{CommandRunner, ExecuteProcessRequest, ExecutionError, FallibleExecuteProcessResult};
+  use mock::execution_server::MockOperation;
   use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
   use std::ops::Sub;
@@ -645,11 +729,15 @@ mod tests {
       // Intentionally poorly sorted:
       output_files: vec!["path/to/file", "other/file"]
         .into_iter()
-        .map(|p| PathBuf::from(p))
+        .map(PathBuf::from)
         .collect(),
-      output_directories: BTreeSet::new(),
+      output_directories: vec!["directory/name"]
+        .into_iter()
+        .map(PathBuf::from)
+        .collect(),
       timeout: Duration::from_millis(1000),
       description: "some description".to_owned(),
+      jdk_home: None,
     };
     let result = super::make_execute_request(&req);
 
@@ -668,14 +756,17 @@ mod tests {
     want_command
       .mut_output_files()
       .push("path/to/file".to_owned());
+    want_command
+      .mut_output_directories()
+      .push("directory/name".to_owned());
 
     let mut want_action = bazel_protos::remote_execution::Action::new();
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "fb09aa134e9d84aed9c35a9dadb128ab6924285fbcb7e4bec0f65b5c08988a5f",
+          "cc4ddd3085aaffbe0abce22f53b30edbb59896bb4a4f0d76219e48070cd0afe1",
         ).unwrap(),
-        56,
+        72,
       )).into(),
     );
     want_action.set_input_root_digest((&input_directory.digest()).into());
@@ -684,7 +775,7 @@ mod tests {
     want_execute_request.set_action_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "736c7aca28d63a5b09c4549e0e70bf8cb1645070a038a51abd7283f611cbd6c6",
+          "844c929423444f3392e0dcc89ebf1febbfdf3a2e2fcab7567cc474705a5385e4",
         ).unwrap(),
         140,
       )).into(),
@@ -711,6 +802,7 @@ mod tests {
           output_directories: BTreeSet::new(),
           timeout: Duration::from_millis(1000),
           description: "wrong command".to_string(),
+          jdk_home: None,
         }).unwrap()
           .2,
         vec![],
@@ -771,7 +863,8 @@ mod tests {
           StdoutType::Digest(testdata.digest()),
           StderrType::Raw(testdata_empty.string()),
           0,
-        ).0
+        ).op
+          .unwrap()
       ),
       Ok(FallibleExecuteProcessResult {
         stdout: testdata.bytes(),
@@ -794,7 +887,8 @@ mod tests {
           StdoutType::Raw(testdata_empty.string()),
           StderrType::Digest(testdata.digest()),
           0,
-        ).0
+        ).op
+          .unwrap()
       ),
       Ok(FallibleExecuteProcessResult {
         stdout: testdata_empty.bytes(),
@@ -923,6 +1017,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: request_timeout,
       description: "echo-a-foo".to_string(),
+      jdk_home: None,
     };
 
     let mock_server = {
@@ -945,6 +1040,42 @@ mod tests {
   }
 
   #[test]
+  fn retry_for_canceled_channel() {
+    let execute_request = echo_foo_request();
+
+    let mock_server = {
+      let op_name = "gimme-foo".to_string();
+
+      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
+        op_name.clone(),
+        super::make_execute_request(&execute_request).unwrap().2,
+        vec![
+          make_incomplete_operation(&op_name),
+          make_canceled_operation(Some(Duration::from_millis(100))),
+          make_successful_operation(
+            &op_name,
+            StdoutType::Raw("foo".to_owned()),
+            StderrType::Raw("".to_owned()),
+            0,
+          ),
+        ],
+      ))
+    };
+
+    let result = run_command_remote(mock_server.address(), execute_request).unwrap();
+
+    assert_eq!(
+      result,
+      FallibleExecuteProcessResult {
+        stdout: as_bytes("foo"),
+        stderr: as_bytes(""),
+        exit_code: 0,
+        output_directory: fs::EMPTY_DIGEST,
+      }
+    );
+  }
+
+  #[test]
   fn bad_result_bytes() {
     let execute_request = echo_foo_request();
 
@@ -954,23 +1085,26 @@ mod tests {
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
         super::make_execute_request(&execute_request).unwrap().2,
-        vec![make_incomplete_operation(&op_name), {
-          let mut op = bazel_protos::operations::Operation::new();
-          op.set_name(op_name.clone());
-          op.set_done(true);
-          op.set_response({
-            let mut response_wrapper = protobuf::well_known_types::Any::new();
-            response_wrapper.set_type_url(format!(
-              "type.googleapis.com/{}",
-              bazel_protos::remote_execution::ExecuteResponse::new()
-                .descriptor()
-                .full_name()
-            ));
-            response_wrapper.set_value(vec![0x00, 0x00, 0x00]);
-            response_wrapper
-          });
-          (op, None)
-        }],
+        vec![
+          make_incomplete_operation(&op_name),
+          MockOperation::new({
+            let mut op = bazel_protos::operations::Operation::new();
+            op.set_name(op_name.clone());
+            op.set_done(true);
+            op.set_response({
+              let mut response_wrapper = protobuf::well_known_types::Any::new();
+              response_wrapper.set_type_url(format!(
+                "type.googleapis.com/{}",
+                bazel_protos::remote_execution::ExecuteResponse::new()
+                  .descriptor()
+                  .full_name()
+              ));
+              response_wrapper.set_value(vec![0x00, 0x00, 0x00]);
+              response_wrapper
+            });
+            op
+          }),
+        ],
       ))
     };
 
@@ -987,7 +1121,7 @@ mod tests {
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
         super::make_execute_request(&execute_request).unwrap().2,
-        vec![{
+        vec![MockOperation::new({
           let mut op = bazel_protos::operations::Operation::new();
           op.set_name(op_name.to_string());
           op.set_done(true);
@@ -997,8 +1131,8 @@ mod tests {
             error.set_message("Something went wrong".to_string());
             error
           });
-          (op, None)
-        }],
+          op
+        })],
       ))
     };
 
@@ -1017,18 +1151,21 @@ mod tests {
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
         super::make_execute_request(&execute_request).unwrap().2,
-        vec![make_incomplete_operation(&op_name), {
-          let mut op = bazel_protos::operations::Operation::new();
-          op.set_name(op_name.to_string());
-          op.set_done(true);
-          op.set_error({
-            let mut error = bazel_protos::status::Status::new();
-            error.set_code(bazel_protos::code::Code::INTERNAL.value());
-            error.set_message("Something went wrong".to_string());
-            error
-          });
-          (op, None)
-        }],
+        vec![
+          make_incomplete_operation(&op_name),
+          MockOperation::new({
+            let mut op = bazel_protos::operations::Operation::new();
+            op.set_name(op_name.to_string());
+            op.set_done(true);
+            op.set_error({
+              let mut error = bazel_protos::status::Status::new();
+              error.set_code(bazel_protos::code::Code::INTERNAL.value());
+              error.set_message("Something went wrong".to_string());
+              error
+            });
+            op
+          }),
+        ],
       ))
     };
 
@@ -1047,12 +1184,12 @@ mod tests {
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
         super::make_execute_request(&execute_request).unwrap().2,
-        vec![{
+        vec![MockOperation::new({
           let mut op = bazel_protos::operations::Operation::new();
           op.set_name(op_name.to_string());
           op.set_done(true);
-          (op, None)
-        }],
+          op
+        })],
       ))
     };
 
@@ -1071,12 +1208,15 @@ mod tests {
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
         super::make_execute_request(&execute_request).unwrap().2,
-        vec![make_incomplete_operation(&op_name), {
-          let mut op = bazel_protos::operations::Operation::new();
-          op.set_name(op_name.to_string());
-          op.set_done(true);
-          (op, None)
-        }],
+        vec![
+          make_incomplete_operation(&op_name),
+          MockOperation::new({
+            let mut op = bazel_protos::operations::Operation::new();
+            op.set_name(op_name.to_string());
+            op.set_done(true);
+            op
+          }),
+        ],
       ))
     };
 
@@ -1100,7 +1240,7 @@ mod tests {
         vec![
           make_incomplete_operation(&op_name),
           make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
-            &roland.digest()
+            &roland.digest(),
           )]),
           make_successful_operation(
             "cat2",
@@ -1266,7 +1406,7 @@ mod tests {
       .map(missing_preconditionfailure_violation)
       .collect();
 
-    let (operation, _duration) = make_precondition_failure_operation(missing);
+    let operation = make_precondition_failure_operation(missing).op.unwrap();
 
     assert_eq!(
       extract_execute_response(operation),
@@ -1286,7 +1426,7 @@ mod tests {
       },
     ];
 
-    let (operation, _duration) = make_precondition_failure_operation(missing);
+    let operation = make_precondition_failure_operation(missing).op.unwrap();
 
     match extract_execute_response(operation) {
       Err(ExecutionError::Fatal(err)) => assert_contains(&err, "monkeys"),
@@ -1302,7 +1442,7 @@ mod tests {
       violation
     }];
 
-    let (operation, _duration) = make_precondition_failure_operation(missing);
+    let operation = make_precondition_failure_operation(missing).op.unwrap();
 
     match extract_execute_response(operation) {
       Err(ExecutionError::Fatal(err)) => assert_contains(&err, "OUT_OF_CAPACITY"),
@@ -1314,7 +1454,7 @@ mod tests {
   fn extract_execute_response_missing_without_list() {
     let missing = vec![];
 
-    let (operation, _duration) = make_precondition_failure_operation(missing);
+    let operation = make_precondition_failure_operation(missing).op.unwrap();
 
     match extract_execute_response(operation) {
       Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_lowercase(), "precondition"),
@@ -1519,6 +1659,77 @@ mod tests {
     )
   }
 
+  #[test]
+  fn extract_output_files_from_response_just_directory() {
+    let mut output_directory = bazel_protos::remote_execution::OutputDirectory::new();
+    output_directory.set_path("cats".into());
+    output_directory.set_tree_digest((&TestDirectory::containing_roland().digest()).into());
+    let mut output_directories = protobuf::RepeatedField::new();
+    output_directories.push(output_directory);
+
+    let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
+    execute_response.set_result({
+      let mut result = bazel_protos::remote_execution::ActionResult::new();
+      result.set_exit_code(0);
+      result.set_output_directories(output_directories);
+      result
+    });
+
+    assert_eq!(
+      extract_output_files_from_response(&execute_response),
+      Ok(TestDirectory::nested().digest())
+    )
+  }
+
+  #[test]
+  fn extract_output_files_from_response_directories_and_files() {
+    // /catnip
+    // /pets/cats/roland
+    // /pets/dogs/robin
+
+    let mut output_directories = protobuf::RepeatedField::new();
+    output_directories.push({
+      let mut output_directory = bazel_protos::remote_execution::OutputDirectory::new();
+      output_directory.set_path("pets/cats".into());
+      output_directory.set_tree_digest((&TestDirectory::containing_roland().digest()).into());
+      output_directory
+    });
+    output_directories.push({
+      let mut output_directory = bazel_protos::remote_execution::OutputDirectory::new();
+      output_directory.set_path("pets/dogs".into());
+      output_directory.set_tree_digest((&TestDirectory::containing_robin().digest()).into());
+      output_directory
+    });
+
+    let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
+    execute_response.set_result({
+      let mut result = bazel_protos::remote_execution::ActionResult::new();
+      result.set_exit_code(0);
+      result.set_output_directories(output_directories);
+      result.set_output_files({
+        let mut output_files = protobuf::RepeatedField::new();
+        output_files.push({
+          let mut output_file = bazel_protos::remote_execution::OutputFile::new();
+          output_file.set_path("treats".into());
+          output_file.set_digest((&TestData::catnip().digest()).into());
+          output_file
+        });
+        output_files
+      });
+      result
+    });
+
+    assert_eq!(
+      extract_output_files_from_response(&execute_response),
+      Ok(Digest(
+        Fingerprint::from_hex_string(
+          "639b4b84bb58a9353d49df8122e7987baf038efe54ed035e67910846c865b1e2"
+        ).unwrap(),
+        159
+      ))
+    )
+  }
+
   fn echo_foo_request() -> ExecuteProcessRequest {
     ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
@@ -1528,31 +1739,29 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(5000),
       description: "echo a foo".to_string(),
+      jdk_home: None,
     }
   }
 
-  // NB: The following helper functions return tuples of Operation and an optional Duration in
-  // order to make setting up the operations for a test execution server easier to read.
-  // The test execution server uses the duration to introduce a delay so that we can test
-  // timeouts.
-
-  fn make_incomplete_operation(
-    operation_name: &str,
-  ) -> (bazel_protos::operations::Operation, Option<Duration>) {
-    let mut op = bazel_protos::operations::Operation::new();
-    op.set_name(operation_name.to_string());
-    op.set_done(false);
-    (op, None)
+  fn make_canceled_operation(duration: Option<Duration>) -> MockOperation {
+    MockOperation { op: None, duration }
   }
 
-  fn make_delayed_incomplete_operation(
-    operation_name: &str,
-    delay: Duration,
-  ) -> (bazel_protos::operations::Operation, Option<Duration>) {
+  fn make_incomplete_operation(operation_name: &str) -> MockOperation {
     let mut op = bazel_protos::operations::Operation::new();
     op.set_name(operation_name.to_string());
     op.set_done(false);
-    (op, Some(delay))
+    MockOperation::new(op)
+  }
+
+  fn make_delayed_incomplete_operation(operation_name: &str, delay: Duration) -> MockOperation {
+    let mut op = bazel_protos::operations::Operation::new();
+    op.set_name(operation_name.to_string());
+    op.set_done(false);
+    MockOperation {
+      op: Some(op),
+      duration: Some(delay),
+    }
   }
 
   fn make_successful_operation(
@@ -1560,7 +1769,7 @@ mod tests {
     stdout: StdoutType,
     stderr: StderrType,
     exit_code: i32,
-  ) -> (bazel_protos::operations::Operation, Option<Duration>) {
+  ) -> MockOperation {
     let mut op = bazel_protos::operations::Operation::new();
     op.set_name(operation_name.to_string());
     op.set_done(true);
@@ -1597,12 +1806,12 @@ mod tests {
       response_wrapper.set_value(response_proto_bytes);
       response_wrapper
     });
-    (op, None)
+    MockOperation::new(op)
   }
 
   fn make_precondition_failure_operation(
     violations: Vec<bazel_protos::error_details::PreconditionFailure_Violation>,
-  ) -> (bazel_protos::operations::Operation, Option<Duration>) {
+  ) -> MockOperation {
     let mut operation = bazel_protos::operations::Operation::new();
     operation.set_name("cat".to_owned());
     operation.set_done(true);
@@ -1622,7 +1831,7 @@ mod tests {
       });
       response
     }));
-    (operation, None)
+    MockOperation::new(operation)
   }
 
   fn run_command_remote(
@@ -1705,6 +1914,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "cat a roland".to_string(),
+      jdk_home: None,
     }
   }
 
@@ -1717,6 +1927,7 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "unleash a roaring meow".to_string(),
+      jdk_home: None,
     }
   }
 }

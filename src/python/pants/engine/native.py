@@ -10,15 +10,16 @@ import os
 import sys
 import sysconfig
 import traceback
+from builtins import bytes, object, open, str
 from contextlib import closing
 
 import cffi
 import pkg_resources
-import six
+from future.utils import PY2, binary_type, text_type
 
 from pants.engine.selectors import Get, constraint_for
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_mkdtemp
+from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 
@@ -110,6 +111,7 @@ typedef _Bool               (*extern_ptr_satisfied_by)(ExternContext*, Handle*, 
 typedef _Bool               (*extern_ptr_satisfied_by_type)(ExternContext*, Handle*, TypeId*);
 typedef Handle              (*extern_ptr_store_tuple)(ExternContext*, Handle**, uint64_t);
 typedef Handle              (*extern_ptr_store_bytes)(ExternContext*, uint8_t*, uint64_t);
+typedef Handle              (*extern_ptr_store_utf8)(ExternContext*, uint8_t*, uint64_t);
 typedef Handle              (*extern_ptr_store_i64)(ExternContext*, int64_t);
 typedef HandleBuffer        (*extern_ptr_project_multi)(ExternContext*, Handle*, uint8_t*, uint64_t);
 typedef Handle              (*extern_ptr_project_ignoring_type)(ExternContext*, Handle*, uint8_t*, uint64_t);
@@ -155,6 +157,7 @@ void externs_set(ExternContext*,
                  extern_ptr_satisfied_by_type,
                  extern_ptr_store_tuple,
                  extern_ptr_store_bytes,
+                 extern_ptr_store_utf8,
                  extern_ptr_store_i64,
                  extern_ptr_project_ignoring_type,
                  extern_ptr_project_multi,
@@ -264,10 +267,55 @@ extern "Python" {
   _Bool               extern_satisfied_by_type(ExternContext*, Handle*, TypeId*);
   Handle              extern_store_tuple(ExternContext*, Handle**, uint64_t);
   Handle              extern_store_bytes(ExternContext*, uint8_t*, uint64_t);
+  Handle              extern_store_utf8(ExternContext*, uint8_t*, uint64_t);
   Handle              extern_store_i64(ExternContext*, int64_t);
   Handle              extern_project_ignoring_type(ExternContext*, Handle*, uint8_t*, uint64_t);
   HandleBuffer        extern_project_multi(ExternContext*, Handle*, uint8_t*, uint64_t);
   Handle              extern_create_exception(ExternContext*, uint8_t*, uint64_t);
+}
+'''
+
+# NB: This is a "patch" applied to CFFI's generated sources to remove the ifdefs that would
+# usually cause only one of the two module definition functions to be defined. Instead, we define
+# both. Since `patch` is not available in all relevant environments (notably, many docker images),
+# this is accomplished using string replacement. To (re)-generate this patch, fiddle with the
+# unmodified output of `ffibuilder.emit_c_code`.
+CFFI_C_PATCH_BEFORE = '''
+#  ifdef _MSC_VER
+     PyMODINIT_FUNC
+#  if PY_MAJOR_VERSION >= 3
+     PyInit_native_engine(void) { return NULL; }
+#  else
+     initnative_engine(void) { }
+#  endif
+#  endif
+#elif PY_MAJOR_VERSION >= 3
+PyMODINIT_FUNC
+PyInit_native_engine(void)
+{
+  return _cffi_init("native_engine", 0x2601, &_cffi_type_context);
+}
+#else
+PyMODINIT_FUNC
+initnative_engine(void)
+{
+  _cffi_init("native_engine", 0x2601, &_cffi_type_context);
+}
+#endif
+'''
+CFFI_C_PATCH_AFTER = '''
+#endif
+
+PyObject* // PyMODINIT_FUNC for PY3
+wrapped_PyInit_native_engine(void)
+{
+  return _cffi_init("native_engine", 0x2601, &_cffi_type_context);
+}
+
+void // PyMODINIT_FUNC for PY2
+wrapped_initnative_engine(void)
+{
+  _cffi_init("native_engine", 0x2601, &_cffi_type_context);
 }
 '''
 
@@ -290,6 +338,8 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
     temp_output_prefix = os.path.join(tempdir, module_name)
     real_output_prefix = os.path.join(output_dir, module_name)
     temp_c_file = '{}.c'.format(temp_output_prefix)
+    if PY2:
+      temp_c_file = temp_c_file.encode('utf-8')
     c_file = '{}.c'.format(real_output_prefix)
     env_script = '{}.cflags'.format(real_output_prefix)
 
@@ -298,7 +348,7 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
     ffibuilder.cdef(CFFI_HEADERS)
     ffibuilder.cdef(CFFI_EXTERNS)
     ffibuilder.set_source(module_name, CFFI_TYPEDEFS + CFFI_HEADERS)
-    ffibuilder.emit_c_code(six.binary_type(temp_c_file))
+    ffibuilder.emit_c_code(temp_c_file)
 
     # Work around https://github.com/rust-lang/rust/issues/36342 by renaming initnative_engine to
     # wrapped_initnative_engine so that the rust code can define the symbol initnative_engine.
@@ -308,14 +358,15 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
     # (it kept the binary working) but inconvenient (it was relying on unspecified behavior, it meant
     # our binaries couldn't be stripped which inflated them by 2~3x, and it reduced the amount of LTO
     # we could use, which led to unmeasured performance hits).
-    def rename_symbol_in_file(f):
-      with open(f, 'rb') as fh:
-        for line in fh:
-          if line.startswith(b'init{}'.format(module_name)):
-            yield 'wrapped_' + line
-          else:
-            yield line
-    file_content = ''.join(rename_symbol_in_file(temp_c_file))
+    #
+    # We additionally remove the ifdefs that apply conditional `init` logic for Py2 vs Py3, in order
+    # to define a module that is loadable by either 2 or 3.
+    # TODO: Because PyPy uses the same `init` function name regardless of the python version, this
+    # trick does not work there: we leave its conditional in place.
+    file_content = read_file(temp_c_file).decode('utf-8')
+    if CFFI_C_PATCH_BEFORE not in file_content:
+      raise Exception('The patch for the CFFI generated code will not apply cleanly.')
+    file_content = file_content.replace(CFFI_C_PATCH_BEFORE, CFFI_C_PATCH_AFTER)
 
   _replace_file(c_file, file_content)
 
@@ -328,12 +379,12 @@ def _replace_file(path, content):
 
   This is useful because cargo uses timestamps to decide whether to compile things."""
   if os.path.exists(path):
-    with open(path, 'rb') as f:
+    with open(path, 'r') as f:
       if content == f.read():
         print("Not overwriting {} because it is unchanged".format(path), file=sys.stderr)
         return
 
-  with open(path, 'wb') as f:
+  with open(path, 'w') as f:
     f.write(content)
 
 
@@ -391,13 +442,16 @@ def _initialize_externs(ffi):
   def extern_type_to_str(context_handle, type_id):
     """Given a TypeId, write type.__name__ and return it."""
     c = ffi.from_handle(context_handle)
-    return c.utf8_buf(six.text_type(c.from_id(type_id.id_).__name__))
+    return c.utf8_buf(text_type(c.from_id(type_id.id_).__name__))
 
   @ffi.def_extern()
   def extern_val_to_str(context_handle, val):
     """Given a Handle for `obj`, write str(obj) and return it."""
     c = ffi.from_handle(context_handle)
-    return c.utf8_buf(six.text_type(c.from_value(val[0])))
+    v = c.from_value(val[0])
+    # Consistently use the empty string to indicate None.
+    v_str = '' if v is None else text_type(v)
+    return c.utf8_buf(v_str)
 
   @ffi.def_extern()
   def extern_satisfied_by(context_handle, constraint_val, val):
@@ -422,7 +476,13 @@ def _initialize_externs(ffi):
   def extern_store_bytes(context_handle, bytes_ptr, bytes_len):
     """Given a context and raw bytes, return a new Handle to represent the content."""
     c = ffi.from_handle(context_handle)
-    return c.to_value(bytes(ffi.buffer(bytes_ptr, bytes_len)))
+    return c.to_value(binary_type(ffi.buffer(bytes_ptr, bytes_len)))
+
+  @ffi.def_extern()
+  def extern_store_utf8(context_handle, utf8_ptr, utf8_len):
+    """Given a context and UTF8 bytes, return a new Handle to represent the content."""
+    c = ffi.from_handle(context_handle)
+    return c.to_value(ffi.string(utf8_ptr, utf8_len).decode('utf-8'))
 
   @ffi.def_extern()
   def extern_store_i64(context_handle, i64):
@@ -633,8 +693,8 @@ class Native(object):
     with closing(pkg_resources.resource_stream(__name__, lib_name)) as input_fp:
       # NB: The header stripping code here must be coordinated with header insertion code in
       #     build-support/bin/native/bootstrap_code.sh
-      engine_version = input_fp.readline().strip()
-      repo_version = input_fp.readline().strip()
+      engine_version = input_fp.readline().decode('utf-8').strip()
+      repo_version = input_fp.readline().decode('utf-8').strip()
       logger.debug('using {} built at {}'.format(engine_version, repo_version))
       with open(lib_path, 'wb') as output_fp:
         output_fp.write(input_fp.read())
@@ -687,6 +747,7 @@ class Native(object):
                            self.ffi_lib.extern_satisfied_by_type,
                            self.ffi_lib.extern_store_tuple,
                            self.ffi_lib.extern_store_bytes,
+                           self.ffi_lib.extern_store_utf8,
                            self.ffi_lib.extern_store_i64,
                            self.ffi_lib.extern_project_ignoring_type,
                            self.ffi_lib.extern_project_multi,
@@ -788,8 +849,8 @@ class Native(object):
         tc(constraint_process_result),
         tc(constraint_generator),
         # Types.
-        TypeId(self.context.to_id(six.text_type)),
-        TypeId(self.context.to_id(six.binary_type)),
+        TypeId(self.context.to_id(text_type)),
+        TypeId(self.context.to_id(binary_type)),
         # Project tree.
         self.context.utf8_buf(build_root),
         self.context.utf8_buf(work_dir),
@@ -808,7 +869,7 @@ class Native(object):
     return self.gc(scheduler, self.lib.scheduler_destroy)
 
   def set_panic_handler(self):
-    if os.getenv("RUST_BACKTRACE", "0") != "1":
+    if os.getenv("RUST_BACKTRACE", "0") == "0":
       # The panic handler hides a lot of rust tracing which may be useful.
       # Don't activate it when the user explicitly asks for rust backtraces.
       self.lib.set_panic_handler()

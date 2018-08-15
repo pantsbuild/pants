@@ -7,9 +7,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import unittest
 import uuid
+from builtins import open, str
 from contextlib import closing, contextmanager
-
-import six
+from io import StringIO
 
 from pants.init.logging import setup_logging
 from pants.util.contextutil import temporary_dir
@@ -27,7 +27,7 @@ class SetupTest(unittest.TestCase):
   @contextmanager
   def logger(self, level, file_logging=False):
     logger = logging.getLogger(str(uuid.uuid4()))
-    with closing(six.StringIO()) as stream:
+    with closing(StringIO()) as stream:
       with self.log_dir(file_logging) as log_dir:
         log_file = setup_logging(level, console_stream=stream, log_dir=log_dir, scope=logger.name)
         yield logger, stream, log_file.log_filename
@@ -62,7 +62,7 @@ class SetupTest(unittest.TestCase):
       stream.seek(0)
       self.assertWarnInfoOutput(stream.read().splitlines())
 
-      with open(log_file) as fp:
+      with open(log_file, 'r') as fp:
         loglines = fp.read().splitlines()
         self.assertEqual(2, len(loglines))
         glog_format = r'\d{4} \d{2}:\d{2}:\d{2}.\d{6} \d+ \w+\.py:\d+] '

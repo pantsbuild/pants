@@ -2,6 +2,7 @@
 version = "0.0.1"
 name = "graph"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
 
 [dependencies]
 boxfuture = { path = "../boxfuture" }

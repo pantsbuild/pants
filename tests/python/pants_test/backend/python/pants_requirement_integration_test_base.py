@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import shutil
 import uuid
+from builtins import open
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot, pants_version
@@ -19,11 +20,11 @@ class PantsRequirementIntegrationTestBase(PantsRunIntegrationTest):
   @contextmanager
   def _unstable_pants_version(self):
     stable_version = pants_version()
-    unstable_version = b'{}+{}'.format(stable_version, uuid.uuid4().hex)
+    unstable_version = '{}+{}'.format(stable_version, uuid.uuid4().hex)
     version_dir = os.path.join(get_buildroot(), 'src/python/pants')
 
     with self.file_renamed(version_dir, 'VERSION', 'VERSION.orig'):
-      with open(os.path.join(version_dir, 'VERSION'), 'wb') as fp:
+      with open(os.path.join(version_dir, 'VERSION'), 'w') as fp:
         fp.write(unstable_version)
 
       pants_run = self.run_pants(['--version'])

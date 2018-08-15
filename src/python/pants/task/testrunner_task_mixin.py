@@ -8,6 +8,7 @@ import os
 import re
 import xml.etree.ElementTree as ET
 from abc import abstractmethod
+from builtins import filter, next, object, str
 
 from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.build_graph.files import Files
@@ -460,8 +461,12 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
       for partition in sorted(results):
         rv = results[partition]
         failed_targets = set(rv.failed_targets)
+        pre_execution_error = not failed_targets and not rv.success
         for target in partition:
-          if target in failed_targets:
+          if pre_execution_error:
+            log = self.context.log.warn
+            result = 'NOT RUN'
+          elif target in failed_targets:
             log = self.context.log.error
             result = rv
           else:

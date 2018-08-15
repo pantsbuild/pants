@@ -28,14 +28,14 @@ class OptionableTest(unittest.TestCase):
 
     class StringScope(Optionable):
       options_scope = 'good'
-    self.assertEquals('good', StringScope.options_scope)
+    self.assertEqual('good', StringScope.options_scope)
 
     class Intermediate(Optionable):
       pass
 
     class Indirect(Intermediate):
       options_scope = 'good'
-    self.assertEquals('good', Indirect.options_scope)
+    self.assertEqual('good', Indirect.options_scope)
 
   def test_is_valid_scope_name_component(self):
     def check_true(s):

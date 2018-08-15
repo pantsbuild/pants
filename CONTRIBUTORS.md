@@ -48,6 +48,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Ebube Chuba
 + Eitan Adler
 + Emily Caveness
++ Eric Arellano
 + Eric Ayers
 + Eric Danielson
 + Eric Lindvall
@@ -59,6 +60,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Gabriel Gonzalez
 + Garrett Malmquist
 + Gary M. Josack
++ Guy Marom
 + Harley Cooper
 + Hwasung Lee
 + Ian Tabolt
@@ -81,6 +83,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Joe Ennever
 + Joe Smith
 + Johan Oskarsson
++ John Barry
 + John Chee
 + John Gallagher
 + John Ioannidis
@@ -136,18 +139,21 @@ Created by running `./build-support/bin/contributors.sh`.
 + Ny Saechao
 + Oliver Gould
 + Oliver Seemann
++ Omer Zach
 + Pankaj Gupta
 + Patrick Lawson
 + Paul Groudas
 + Peiyu Wang
 + Peter Seibel
 + Qicheng Ma
++ Robert Stapenhurst
 + Roger Jiang
 + Ryan Williams
 + Sameer Brenn
 + Sara Solano
 + Senthil Kumaran
 + Sergey Serebryakov
++ Shuo Li
 + Simeon Franklin
 + Stefan Sauer
 + Stu Hood
@@ -166,6 +172,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Troy Howard
 + Ugo Di Girolamo
 + Wei An
++ Wilhelmina Drengwitz
 + Wolfram Arnold
 + Xaelias
 + Yi Cheng

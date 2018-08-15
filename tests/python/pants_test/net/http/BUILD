@@ -3,10 +3,10 @@
 
 python_tests(
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:mock',
     '3rdparty/python:requests',
     '3rdparty/python:pyopenssl',
-    '3rdparty/python:six',
     'src/python/pants/net',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

@@ -4,9 +4,11 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import object
+
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.base.payload import Payload
-from pants.base.payload_field import PrimitiveField
+from pants.base.payload_field import PrimitiveField, PrimitivesSetField
 
 from pants.contrib.scalajs.subsystems.scala_js_platform import ScalaJSPlatform
 
@@ -23,6 +25,7 @@ class ScalaJSTarget(object):
     payload = payload or Payload()
     payload.add_fields({
       'platform': PrimitiveField(None),
+      'compiler_option_sets': PrimitivesSetField(None)
     })
     super(ScalaJSTarget, self).__init__(address=address, payload=payload, **kwargs)
 
@@ -40,6 +43,15 @@ class ScalaJSTarget(object):
   @property
   def fatal_warnings(self):
     return False
+
+  @property
+  def compiler_option_sets(self):
+    """For every element in this list, enable the corresponding flags on compilation
+    of targets.
+    :return: See constructor.
+    :rtype: list
+    """
+    return self.payload.compiler_option_sets
 
   @property
   def zinc_file_manager(self):

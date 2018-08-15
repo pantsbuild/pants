@@ -4,6 +4,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import object
+
+from future.utils import PY2
+
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 
@@ -24,7 +28,10 @@ class GoalOptionsRegistrar(Optionable):
     Allows reuse of the same registrar for multiple goals, and also allows us to decouple task
     code from knowing which goal(s) the task is to be registered in.
     """
-    return type(b'{}_{}'.format(cls.__name__, goal), (cls, ), {b'options_scope': goal})
+    type_name = '{}_{}'.format(cls.__name__, goal)
+    if PY2:
+      type_name = type_name.encode('utf-8')
+    return type(type_name, (cls, ), {'options_scope': goal})
 
 
 class GoalOptionsMixin(object):

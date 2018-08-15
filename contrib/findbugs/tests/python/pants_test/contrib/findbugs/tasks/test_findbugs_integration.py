@@ -79,7 +79,7 @@ class FindBugsTest(PantsRunIntegrationTest):
 
   def test_exclude(self):
     cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs::']
-    with temporary_file(root_dir=get_buildroot()) as exclude_file:
+    with temporary_file(root_dir=get_buildroot(), binary_mode=False) as exclude_file:
       exclude_file.write(dedent("""\
         <?xml version="1.0" encoding="UTF-8"?>
         <FindBugsFilter>
@@ -102,7 +102,7 @@ class FindBugsTest(PantsRunIntegrationTest):
 
   def test_error(self):
     cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs:high']
-    with temporary_file(root_dir=get_buildroot()) as exclude_file:
+    with temporary_file(root_dir=get_buildroot(), binary_mode=False) as exclude_file:
       exclude_file.write(dedent("""\
         <?xml version="1.0" encoding="UTF-8"?>
         <FindBugsFilter>

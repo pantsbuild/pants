@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open, str
 from contextlib import contextmanager
 
 import requests
@@ -78,10 +79,10 @@ class ArtifactCacheStatsTest(TestBase):
     with temporary_dir() as tmp_dir:
       artifact_cache_stats = ArtifactCacheStats(tmp_dir)
       yield artifact_cache_stats
-      self.assertEquals(expected_stats, artifact_cache_stats.get_all())
+      self.assertEqual(expected_stats, artifact_cache_stats.get_all())
 
-      self.assertEquals(sorted(list(expected_hit_or_miss_files.keys())),
+      self.assertEqual(sorted(list(expected_hit_or_miss_files.keys())),
                         sorted(os.listdir(tmp_dir)))
       for hit_or_miss_file in expected_hit_or_miss_files.keys():
-        with open(os.path.join(tmp_dir, hit_or_miss_file)) as hit_or_miss_saved:
-          self.assertEquals(expected_hit_or_miss_files[hit_or_miss_file], hit_or_miss_saved.read())
+        with open(os.path.join(tmp_dir, hit_or_miss_file), 'r') as hit_or_miss_saved:
+          self.assertEqual(expected_hit_or_miss_files[hit_or_miss_file], hit_or_miss_saved.read())

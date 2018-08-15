@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import object
 from collections import namedtuple
 from contextlib import contextmanager
 
@@ -67,7 +68,7 @@ class TestFSEventService(TestBase):
 
   def test_run_raise_on_failure_isalive(self):
     self.mock_watchman.is_alive.return_value = False
-    with self.mocked_run(False), self.assertRaises(self.service.ServiceError):
+    with self.mocked_run(False), self.assertRaises(FSEventService.ServiceError):
       self.service.run()
 
   def test_run(self):

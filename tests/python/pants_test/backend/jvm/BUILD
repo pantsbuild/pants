@@ -5,6 +5,7 @@ python_tests(
   name = 'jar_dependency_utils',
   sources = ['test_jar_dependency_utils.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/java/jar',
   ]
 )

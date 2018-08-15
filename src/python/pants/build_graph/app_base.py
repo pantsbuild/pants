@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import map, object, open
 from collections import OrderedDict, namedtuple
 from hashlib import sha1
 
@@ -175,18 +176,18 @@ class BundleField(tuple, PayloadField):
     hasher = sha1()
     hasher.update(bundle.rel_path)
     for abs_path in sorted(bundle.filemap.keys()):
-      buildroot_relative_path = os.path.relpath(abs_path, get_buildroot())
+      buildroot_relative_path = os.path.relpath(abs_path, get_buildroot()).encode('utf-8')
       hasher.update(buildroot_relative_path)
-      hasher.update(bundle.filemap[abs_path])
+      hasher.update(bundle.filemap[abs_path].encode('utf-8'))
       if os.path.isfile(abs_path):
         # Update with any additional string to differentiate empty file with non-existing file.
-        hasher.update('e')
+        hasher.update(b'e')
         with open(abs_path, 'rb') as f:
           hasher.update(f.read())
     return hasher.hexdigest()
 
   def _compute_fingerprint(self):
-    return combine_hashes(map(BundleField._hash_bundle, self))
+    return combine_hashes(list(map(BundleField._hash_bundle, self)))
 
 
 class AppBase(Target):

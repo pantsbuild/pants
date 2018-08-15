@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import object
 from collections import defaultdict
 
 from pants.option.global_options import GlobalOptionsRegistrar
@@ -53,20 +54,20 @@ def _options_registration_function(defaults, fingerprintables):
   def register(*args, **kwargs):
     option_name = Parser.parse_dest(*args, **kwargs)
 
-    default = kwargs.get(b'default')
+    default = kwargs.get('default')
     if default is None:
-      if kwargs.get(b'type') == bool:
+      if kwargs.get('type') == bool:
         default = False
-      if kwargs.get(b'type') == list:
+      if kwargs.get('type') == list:
         default = []
     defaults[option_name] = RankedValue(RankedValue.HARDCODED, default)
 
-    fingerprint = kwargs.get(b'fingerprint', False)
+    fingerprint = kwargs.get('fingerprint', False)
     if fingerprint:
       if is_list_option(kwargs):
-        val_type = kwargs.get(b'member_type', str)
+        val_type = kwargs.get('member_type', str)
       else:
-        val_type = kwargs.get(b'type', str)
+        val_type = kwargs.get('type', str)
       fingerprintables[option_name] = val_type
 
   return register
@@ -110,7 +111,7 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
       return passthru_args or []
 
     def items(self):
-      return options.items()
+      return list(options.items())
 
     @property
     def scope_to_flags(self):

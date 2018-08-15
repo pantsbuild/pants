@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import sys
+from builtins import filter, object
 from collections import defaultdict
 from contextlib import contextmanager
 
@@ -332,7 +333,7 @@ class Context(object):
         synthetics.add(self.build_graph.get_target(synthetic_address))
     target_set.update(self._collect_targets(synthetics, **kwargs))
 
-    return filter(predicate, target_set)
+    return list(filter(predicate, target_set))
 
   def _collect_targets(self, root_targets, **kwargs):
     return Target.closure_for_targets(

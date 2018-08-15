@@ -3,6 +3,15 @@
 
 This document describes releases leading up to the ``1.8.x`` ``stable`` series.
 
+1.8.0 (07/19/2018)
+------------------
+
+The first stable release of the 1.8.x series, with no changes since `rc1`.
+
+Includes helpful new features like the `--owner-of` option for selecting targets by owned filename,
+and warnings/errors for unmatched globs. Additionally, updates Pants' usage of the zinc incremental
+Scala compiler to a 1.0.x release.
+
 1.8.0rc1 (06/29/2018)
 ---------------------
 

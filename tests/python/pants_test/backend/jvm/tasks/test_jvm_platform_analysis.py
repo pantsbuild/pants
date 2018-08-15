@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import filter, object
+
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_platform_analysis import JvmPlatformExplain, JvmPlatformValidate
 from pants.build_graph.target import Target
@@ -151,7 +153,7 @@ class JvmPlatformValidateTest(JvmPlatformAnalysisTestMixin, TaskTestBase):
                        .format(target, deps, got, '\n'.join(
         '{}: {}'.format(key, val) for key, val in sorted(jvm_deps.items())
       )))
-    self.assertEqual(len(filter(expected.get, expected)), len(filter(jvm_deps.get, jvm_deps)))
+    self.assertEqual(len(list(filter(expected.get, expected))), len(list(filter(jvm_deps.get, jvm_deps))))
 
   def test_non_jvm_transitivity(self):
     """Tests the behavior of jvm_dependency_map."""

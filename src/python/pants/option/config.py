@@ -4,14 +4,15 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import configparser
 import getpass
 import io
 import itertools
 import os
+from builtins import open
 from contextlib import contextmanager
 
 import six
-from six.moves import configparser
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
@@ -85,7 +86,7 @@ class Config(AbstractClass):
     for config_item in config_items:
       parser = cls._create_parser(seed_values)
       with open_ctx(config_item) as ini:
-        parser.readfp(ini)
+        parser.read_file(ini)
       config_path = config_item.path if hasattr(config_item, 'path') else config_item
       single_file_configs.append(_SingleFileConfig(config_path, parser))
 
@@ -120,7 +121,7 @@ class Config(AbstractClass):
     update_dir_from_seed_values('pants_supportdir', 'build-support')
     update_dir_from_seed_values('pants_distdir', 'dist')
 
-    return configparser.SafeConfigParser(all_seed_values)
+    return configparser.ConfigParser(all_seed_values)
 
   def get(self, section, option, type_=six.string_types, default=None):
     """Retrieves option from the specified section (or 'DEFAULT') and attempts to parse it as type.

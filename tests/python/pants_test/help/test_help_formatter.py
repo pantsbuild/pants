@@ -20,29 +20,29 @@ class OptionHelpFormatterTest(unittest.TestCase):
     ohi = ohi._replace(**kwargs)
     lines = HelpFormatter(scope='', show_recursive=False, show_advanced=False,
                           color=False).format_option(ohi)
-    self.assertEquals(len(lines), 2)
+    self.assertEqual(len(lines), 2)
     self.assertIn('help for foo', lines[1])
     return lines[0]
 
   def test_format_help(self):
     line = self.format_help_for_foo(default='MYDEFAULT')
-    self.assertEquals('--foo (default: MYDEFAULT)', line)
+    self.assertEqual('--foo (default: MYDEFAULT)', line)
 
   def test_format_help_fromfile(self):
     line = self.format_help_for_foo(fromfile=True)
-    self.assertEquals('--foo (@fromfile value supported) (default: None)', line)
+    self.assertEqual('--foo (@fromfile value supported) (default: None)', line)
 
   def test_suppress_advanced(self):
     args = ['--foo']
     kwargs = {'advanced': True}
     lines = HelpFormatter(scope='', show_recursive=False, show_advanced=False,
                           color=False).format_options('', '', [(args, kwargs)])
-    self.assertEquals(0, len(lines))
+    self.assertEqual(0, len(lines))
     lines = HelpFormatter(scope='', show_recursive=True, show_advanced=True,
                           color=False).format_options('', '', [(args, kwargs)])
     print(lines)
-    self.assertEquals(5, len(lines))
+    self.assertEqual(5, len(lines))
 
   def test_format_help_choices(self):
     line = self.format_help_for_foo(typ=str, default='kiwi', choices='apple, banana, kiwi')
-    self.assertEquals('--foo (one of: [apple, banana, kiwi] default: kiwi)', line)
+    self.assertEqual('--foo (one of: [apple, banana, kiwi] default: kiwi)', line)

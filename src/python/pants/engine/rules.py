@@ -5,12 +5,14 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
+import functools
 import inspect
 import logging
 from abc import abstractproperty
+from builtins import bytes, str
 from collections import OrderedDict
-from types import TypeType
 
+from future.utils import PY2
 from twitter.common.collections import OrderedSet
 
 from pants.engine.selectors import Get, type_or_constraint_repr
@@ -32,13 +34,39 @@ class _RuleVisitor(ast.NodeVisitor):
     self.gets.append(Get.extract_constraints(node))
 
 
-def rule(output_type, input_selectors):
+class _GoalProduct(object):
+  """GoalProduct is a factory for anonymous singleton types representing the execution of goals.
+
+  The created types are returned by `@console_rule` instances, which may not have any outputs
+  of their own.
+  """
+  PRODUCT_MAP = {}
+
+  @staticmethod
+  def _synthesize_goal_product(name):
+    product_type_name = '{}GoalExecution'.format(name.capitalize())
+    if PY2:
+      product_type_name = product_type_name.encode('utf-8')
+    return type(product_type_name, (datatype([]),), {})
+
+  @classmethod
+  def for_name(cls, name):
+    assert isinstance(name, (bytes, str))
+    if name is bytes:
+      name = name.decode('utf-8')
+    if name not in cls.PRODUCT_MAP:
+      cls.PRODUCT_MAP[name] = cls._synthesize_goal_product(name)
+    return cls.PRODUCT_MAP[name]
+
+
+def _make_rule(output_type, input_selectors, for_goal=None):
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
   :param Constraint output_type: The return/output type for the Rule. This may be either a
     concrete Python type, or an instance of `Exactly` representing a union of multiple types.
   :param list input_selectors: A list of Selector instances that matches the number of arguments
     to the @decorated function.
+  :param str for_goal: If this is a @console_rule, which goal string it's called for.
   """
 
   def wrapper(func):
@@ -50,7 +78,7 @@ def rule(output_type, input_selectors):
 
     def resolve_type(name):
       resolved = caller_frame.f_globals.get(name) or caller_frame.f_builtins.get(name)
-      if not isinstance(resolved, (TypeType, Exactly)):
+      if not isinstance(resolved, (type, Exactly)):
         # TODO: should this say "...or Exactly instance;"?
         raise ValueError('Expected either a `type` constructor or TypeConstraint instance; '
                          'got: {}'.format(name))
@@ -63,9 +91,33 @@ def rule(output_type, input_selectors):
         rule_visitor.visit(node)
         gets.update(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
 
-    func._rule = TaskRule(output_type, input_selectors, func, input_gets=list(gets))
-    return func
+    # For @console_rule, redefine the function to avoid needing a literal return of the output type.
+    if for_goal:
+      def goal_and_return(*args, **kwargs):
+        res = func(*args, **kwargs)
+        if res is not None:
+          raise Exception('A @console_rule should not have a return value.')
+        return output_type()
+      functools.update_wrapper(goal_and_return, func)
+      wrapped_func = goal_and_return
+    else:
+      wrapped_func = func
+
+    wrapped_func._rule = TaskRule(output_type, input_selectors, wrapped_func, input_gets=list(gets))
+    wrapped_func.output_type = output_type
+    wrapped_func.goal = for_goal
+
+    return wrapped_func
   return wrapper
+
+
+def rule(output_type, input_selectors):
+  return _make_rule(output_type, input_selectors)
+
+
+def console_rule(goal_name, input_selectors):
+  output_type = _GoalProduct.for_name(goal_name)
+  return _make_rule(output_type, input_selectors, goal_name)
 
 
 class Rule(AbstractClass):

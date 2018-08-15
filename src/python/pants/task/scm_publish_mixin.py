@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import re
 import traceback
 from abc import abstractmethod
+from builtins import object, range
 
 from pants.base.exceptions import TaskError
 from pants.scm.scm import Scm

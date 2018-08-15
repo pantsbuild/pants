@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -43,12 +44,10 @@ class JavascriptStyleBase(NodeTask):
     raise NotImplementedError()
 
   def get_lintable_node_targets(self, targets):
-    return filter(
-      lambda target: isinstance(target, NodeModule)
+    return [target for target in targets if isinstance(target, NodeModule)
                      and (target.has_sources(self._JS_SOURCE_EXTENSION)
                           or target.has_sources(self._JSX_SOURCE_EXTENSION))
-                     and (not target.is_synthetic),
-      targets)
+                     and (not target.is_synthetic)]
 
   def get_javascript_sources(self, target):
     sources = set()
@@ -112,7 +111,7 @@ class JavascriptStyleBase(NodeTask):
     for source in target.sources_relative_to_buildroot():
       if os.path.basename(source) == target.style_ignore_path:
         root_dir = os.path.join('**', os.path.dirname(source))
-        with open(source) as f:
+        with open(source, 'r') as f:
           return [os.path.join(root_dir, p.strip()) for p in f]
 
   def _run_javascriptstyle(self, target, bootstrap_dir, files, config=None, ignore_path=None,

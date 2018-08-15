@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import json
 import os
+from builtins import open
 
 from pants.util.contextutil import temporary_file_path
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest

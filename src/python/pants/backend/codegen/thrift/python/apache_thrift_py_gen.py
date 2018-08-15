@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.backend.codegen.thrift.lib.apache_thrift_gen_base import ApacheThriftGenBase
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary

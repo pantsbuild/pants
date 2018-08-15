@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import sys
+from builtins import object
 
 from pants.base.build_environment import get_buildroot
 from pants.subsystem.subsystem import Subsystem
@@ -78,7 +79,7 @@ class Repro(object):
         if relpath not in self._ignore:
           tarout.add(os.path.join(self._buildroot, relpath), relpath)
 
-      with temporary_file() as tmpfile:
+      with temporary_file(binary_mode=False) as tmpfile:
         tmpfile.write('# Pants repro captured for the following build:\n')
         for k, v in sorted(run_info_dict.items()):
           tmpfile.write('#  {}: {}\n'.format(k, v))

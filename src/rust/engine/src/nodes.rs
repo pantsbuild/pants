@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{BTreeMap, HashMap};
-use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -23,7 +22,7 @@ use rule_graph;
 use selectors;
 use tasks::{self, Intrinsic, IntrinsicKind};
 
-use graph::{Node, NodeError, NodeTracer, NodeVisualizer};
+use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -510,6 +509,15 @@ impl ExecuteProcess {
 
     let description = externs::project_str(&value, "description");
 
+    let jdk_home = {
+      let val = externs::project_str(&value, "jdk_home");
+      if val.is_empty() {
+        None
+      } else {
+        Some(PathBuf::from(val))
+      }
+    };
+
     Ok(ExecuteProcess(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
@@ -518,6 +526,7 @@ impl ExecuteProcess {
       output_directories: output_directories,
       timeout: Duration::from_millis((timeout_in_seconds * 1000.0) as u64),
       description: description,
+      jdk_home: jdk_home,
     }))
   }
 }
@@ -681,7 +690,7 @@ impl Snapshot {
     externs::unsafe_call(
       &core.types.construct_directory_digest,
       &[
-        externs::store_bytes(item.0.to_hex().as_bytes()),
+        externs::store_utf8(&item.0.to_hex()),
         externs::store_i64(item.1 as i64),
       ],
     )
@@ -703,7 +712,7 @@ impl Snapshot {
   }
 
   fn store_path(item: &Path) -> Value {
-    externs::store_bytes(item.as_os_str().as_bytes())
+    externs::store_utf8_osstr(item.as_os_str())
   }
 
   fn store_dir(core: &Arc<Core>, item: &Dir) -> Value {
@@ -893,9 +902,9 @@ impl NodeVisualizer<NodeKey> for Visualizer {
     "set312"
   }
 
-  fn color(&mut self, node: &NodeKey, result: Option<Result<NodeResult, Failure>>) -> String {
+  fn color(&mut self, entry: &Entry<NodeKey>) -> String {
     let max_colors = 12;
-    match result {
+    match entry.peek() {
       None | Some(Err(Failure::Noop(_))) => "white".to_string(),
       Some(Err(Failure::Throw(..))) => "4".to_string(),
       Some(Err(Failure::Invalidated)) => "12".to_string(),
@@ -903,7 +912,7 @@ impl NodeVisualizer<NodeKey> for Visualizer {
         let viz_colors_len = self.viz_colors.len();
         self
           .viz_colors
-          .entry(node.product_str())
+          .entry(entry.node().product_str())
           .or_insert_with(|| format!("{}", viz_colors_len % max_colors + 1))
           .clone()
       }

@@ -2,15 +2,17 @@
 version = "0.0.1"
 name = "bazel_protos"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
 
 [dependencies]
 bytes = "0.4.5"
 futures = "^0.1.16"
-grpcio = { version = "0.2.0", features = ["secure"] }
+# Pull in https://github.com/pingcap/grpc-rs/pull/211
+grpcio = { git = "https://github.com/illicitonion/grpc-rs.git", rev = "d106c615bc0c289ba6d1ce6871786266d109c31c", features = ["secure"] }
 hashing = { path = "../../hashing" }
-protobuf = { version = "1.4.1", features = ["with-bytes"] }
+protobuf = { version = "2.0.4", features = ["with-bytes"] }
 
 [build-dependencies]
 build_utils = { path = "../../build_utils" }
-grpcio-compiler = "0.2.0"
-protoc-grpcio = "0.1.1"
+grpcio-compiler = "0.3"
+protoc-grpcio = "0.2"

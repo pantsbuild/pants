@@ -6,6 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import os
+from builtins import str
+
+from future.utils import text_type
 
 from pants.backend.jvm import argfile
 from pants.backend.jvm.subsystems.java import Java
@@ -114,9 +117,14 @@ class JavacCompile(JvmCompile):
     if JvmPlatform.global_instance().get_options().compiler == 'javac':
       return super(JavacCompile, self).execute()
 
-  def compile(self, ctx, args, classpath, upstream_analysis,
+  def compile(self, ctx, args, dependency_classpath, upstream_analysis,
               settings, fatal_warnings, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
+    classpath = (ctx.classes_dir,) + tuple(ce.path for ce in dependency_classpath)
+
+    if self.get_options().capture_classpath:
+      self._record_compile_classpath(classpath, ctx.target, ctx.classes_dir)
+
     try:
       distribution = JvmPlatform.preferred_jvm_distribution([settings], strict=True)
     except DistributionLocator.Error:
@@ -208,9 +216,9 @@ class JavacCompile(JvmCompile):
       os.path.relpath(f.path.replace('.java', '.class'), ctx.target.target_base)
       for f in input_snapshot.files if f.path.endswith('.java')
     )
-    exec_process_request = ExecuteProcessRequest.create_from_snapshot(
+    exec_process_request = ExecuteProcessRequest(
       argv=tuple(cmd),
-      snapshot=input_snapshot,
+      input_files=input_snapshot.directory_digest,
       output_files=output_files,
       description='Compiling {} with javac'.format(ctx.target.address.spec),
     )
@@ -223,5 +231,5 @@ class JavacCompile(JvmCompile):
     # Dump the output to the .pants.d directory where it's expected by downstream tasks.
     classes_directory = ctx.classes_dir
     self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(str(classes_directory), exec_result.output_directory_digest),
+      DirectoryToMaterialize(text_type(classes_directory), exec_result.output_directory_digest),
     ))

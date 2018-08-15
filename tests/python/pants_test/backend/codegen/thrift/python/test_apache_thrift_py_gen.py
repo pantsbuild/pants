@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 from textwrap import dedent
 
 import six
@@ -50,8 +51,8 @@ class ApacheThriftPyGenTest(TaskTestBase):
     return os.path.join(self.build_root, target.target_base, package_rel_dir, '__init__.py')
 
   def assert_ns_package(self, target, package_rel_dir):
-    with open(self.init_py_path(target, package_rel_dir)) as fp:
-      self.assertEqual(b"__import__('pkg_resources').declare_namespace(__name__)",
+    with open(self.init_py_path(target, package_rel_dir), 'r') as fp:
+      self.assertEqual("__import__('pkg_resources').declare_namespace(__name__)",
                        fp.read().strip())
 
   def assert_leaf_package(self, target, package_rel_dir, *services):

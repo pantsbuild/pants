@@ -52,7 +52,7 @@ class HelpInfoExtracterTest(unittest.TestCase):
              '{\'key1\':val1,\'key2\':val2,...}, ...]"'],
             ['--foo'])
     do_test(['--foo'], {'type': dict}, ['--foo="{\'key1\':val1,\'key2\':val2,...}"'],
-                                            ['--foo'])
+            ['--foo'])
 
     do_test(['--foo', '--bar'], {}, ['--foo=<str>', '--bar=<str>'], ['--foo', '--bar'])
 
@@ -78,7 +78,7 @@ class HelpInfoExtracterTest(unittest.TestCase):
                       parent_parser=None, option_tracker=OptionTracker())
       parser.register(*args, **kwargs)
       oshi = HelpInfoExtracter.get_option_scope_help_info_from_parser(parser).basic
-      self.assertEquals(1, len(oshi))
+      self.assertEqual(1, len(oshi))
       ohi = oshi[0]
       self.assertEqual(expected_default, ohi.default)
 
@@ -95,8 +95,8 @@ class HelpInfoExtracterTest(unittest.TestCase):
   def test_deprecated(self):
     kwargs = {'removal_version': '999.99.9', 'removal_hint': 'do not use this'}
     ohi = HelpInfoExtracter('').get_option_help_info([], kwargs)
-    self.assertEquals('999.99.9', ohi.removal_version)
-    self.assertEquals('do not use this', ohi.removal_hint)
+    self.assertEqual('999.99.9', ohi.removal_version)
+    self.assertEqual('do not use this', ohi.removal_hint)
     self.assertIsNotNone(ohi.deprecated_message)
 
   def test_fromfile(self):
@@ -117,9 +117,9 @@ class HelpInfoExtracterTest(unittest.TestCase):
         return int(exp)  # True -> 1, False -> 0.
 
       oshi = HelpInfoExtracter('').get_option_scope_help_info([([], kwargs)])
-      self.assertEquals(exp_to_len(expected_basic), len(oshi.basic))
-      self.assertEquals(exp_to_len(expected_recursive), len(oshi.recursive))
-      self.assertEquals(exp_to_len(expected_advanced), len(oshi.advanced))
+      self.assertEqual(exp_to_len(expected_basic), len(oshi.basic))
+      self.assertEqual(exp_to_len(expected_recursive), len(oshi.recursive))
+      self.assertEqual(exp_to_len(expected_advanced), len(oshi.advanced))
 
     do_test({}, expected_basic=True)
     do_test({'advanced': False}, expected_basic=True)

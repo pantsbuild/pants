@@ -9,11 +9,12 @@ import os
 import re
 import time
 import uuid
+from builtins import open, range, str
 from collections import defaultdict, namedtuple
 from textwrap import dedent
 
+from future.moves.itertools import zip_longest
 from six import string_types
-from six.moves import range
 
 from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
@@ -316,7 +317,7 @@ class HtmlReporter(Reporter):
         output_files[path] = f
       else:
         f = output_files[path]
-      f.write(self._htmlify_text(s).encode('utf-8'))
+      f.write(self._htmlify_text(s))
       # We must flush in the same thread as the write.
       f.flush()
 
@@ -381,9 +382,9 @@ class HtmlReporter(Reporter):
       if isinstance(element, string_types):
         element = [element]
 
-      # Map assumes None for missing values, so this will pick the default for those.
-      (text, detail, detail_id, detail_initially_visible) = \
-        map(lambda x, y: x or y, element, ('', None, None, False))
+      # zip_longest assumes None for missing values, so this generator will pick the default for those.
+      default_values = ('', None, None, False)
+      (text, detail, detail_id, detail_initially_visible) = (x or y for x, y in zip_longest(element, default_values))
 
       htmlified_text = self._htmlify_text(text)
 
@@ -453,7 +454,7 @@ class HtmlReporter(Reporter):
 
   def _htmlify_text(self, s):
     """Make text HTML-friendly."""
-    colored = self._handle_ansi_color_codes(cgi.escape(s.decode('utf-8', 'replace')))
+    colored = self._handle_ansi_color_codes(cgi.escape(s))
     return linkify(self._buildroot, colored, self._linkify_memo).replace('\n', '</br>')
 
   _ANSI_COLOR_CODE_RE = re.compile(r'\033\[((?:\d|;)*)m')

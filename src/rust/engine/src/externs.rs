@@ -1,10 +1,11 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::mem;
 use std::os::raw;
-use std::os::unix::ffi::OsStringExt;
+use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
@@ -68,8 +69,27 @@ pub fn store_tuple(values: &[Value]) -> Value {
   with_externs(|e| (e.store_tuple)(e.context, handles.as_ptr(), handles.len() as u64).into())
 }
 
+///
+/// Store an opqaue buffer of bytes to pass to Python. This will end up as a Python `bytes`.
+///
 pub fn store_bytes(bytes: &[u8]) -> Value {
   with_externs(|e| (e.store_bytes)(e.context, bytes.as_ptr(), bytes.len() as u64).into())
+}
+
+///
+/// Store an buffer of utf8 bytes to pass to Python. This will end up as a Python `unicode`.
+///
+pub fn store_utf8(utf8: &str) -> Value {
+  with_externs(|e| (e.store_utf8)(e.context, utf8.as_ptr(), utf8.len() as u64).into())
+}
+
+///
+/// Store a buffer of utf8 bytes to pass to Python. This will end up as a Python `unicode`.
+///
+#[cfg(unix)]
+pub fn store_utf8_osstr(utf8: &OsStr) -> Value {
+  let bytes = utf8.as_bytes();
+  with_externs(|e| (e.store_utf8)(e.context, bytes.as_ptr(), bytes.len() as u64).into())
 }
 
 pub fn store_i64(val: i64) -> Value {
@@ -262,6 +282,7 @@ pub struct Externs {
   pub satisfied_by_type: SatisfiedByTypeExtern,
   pub store_tuple: StoreTupleExtern,
   pub store_bytes: StoreBytesExtern,
+  pub store_utf8: StoreUtf8Extern,
   pub store_i64: StoreI64Extern,
   pub project_ignoring_type: ProjectIgnoringTypeExtern,
   pub project_multi: ProjectMultiExtern,
@@ -296,6 +317,8 @@ pub type StoreTupleExtern =
   extern "C" fn(*const ExternContext, *const *const Handle, u64) -> Handle;
 
 pub type StoreBytesExtern = extern "C" fn(*const ExternContext, *const u8, u64) -> Handle;
+
+pub type StoreUtf8Extern = extern "C" fn(*const ExternContext, *const u8, u64) -> Handle;
 
 pub type StoreI64Extern = extern "C" fn(*const ExternContext, i64) -> Handle;
 

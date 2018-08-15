@@ -9,6 +9,7 @@ import unittest
 from builtins import str
 from contextlib import contextmanager
 
+from future.utils import PY3
 from mock import MagicMock, mock_open, patch
 
 from pants.util.netrc import Netrc
@@ -53,6 +54,7 @@ class TestNetrcUtil(unittest.TestCase):
   @contextmanager
   def netrc(self, netrc_contents):
     m = mock_open(read_data=netrc_contents)
-    with patch('__builtin__.open', m):
+    open_builtin_name = 'builtins.open' if PY3 else '__builtin__.open'
+    with patch(open_builtin_name, m):
       netrc = Netrc()
       yield netrc

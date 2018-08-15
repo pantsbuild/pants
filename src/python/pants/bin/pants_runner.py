@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import sys
+from builtins import object
 
 from pants.bin.remote_pants_runner import RemotePantsRunner
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -42,7 +43,7 @@ class PantsRunner(object):
     # N.B. Inlining this import speeds up the python thin client run by about 100ms.
     from pants.bin.local_pants_runner import LocalPantsRunner
 
-    runner = LocalPantsRunner(
+    runner = LocalPantsRunner.create(
         self._exiter,
         self._args,
         self._env,

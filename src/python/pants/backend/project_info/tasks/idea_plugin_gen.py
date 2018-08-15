@@ -10,6 +10,7 @@ import os
 import pkgutil
 import re
 import shutil
+from builtins import open
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.python.targets.python_target import PythonTarget
@@ -166,8 +167,8 @@ class IdeaPluginGen(ConsoleTask):
   def execute(self):
     # Heuristics to guess whether user tries to load a python project,
     # in which case intellij project sdk has to be set up manually.
-    jvm_target_num = len(filter(lambda x: isinstance(x, JvmTarget), self.context.target_roots))
-    python_target_num = len(filter(lambda x: isinstance(x, PythonTarget), self.context.target_roots))
+    jvm_target_num = len([x for x in self.context.target_roots if isinstance(x, JvmTarget)])
+    python_target_num = len([x for x in self.context.target_roots if isinstance(x, PythonTarget)])
     if python_target_num > jvm_target_num:
       logging.warn('This is likely a python project. Please make sure to '
                    'select the proper python interpreter as Project SDK in IntelliJ.')
@@ -176,7 +177,7 @@ class IdeaPluginGen(ConsoleTask):
     if ide_file and self.get_options().open:
       open_with = self.get_options().open_with
       if open_with:
-        null = open(os.devnull, 'w')
+        null = open(os.devnull, 'wb')
         subprocess.Popen([open_with, ide_file], stdout=null, stderr=null)
       else:
         try:

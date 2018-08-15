@@ -3,6 +3,7 @@
 
 python_tests(
   dependencies=[
+    '3rdparty/python:future',
     '3rdparty/python:mock',
     'src/python/pants/binaries',
     'src/python/pants/net',
@@ -10,5 +11,6 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ]
 )

@@ -13,7 +13,7 @@ import threading
 import time
 from contextlib import closing
 
-from six import string_types
+from future.utils import PY3, string_types
 from twitter.common.collections import maybe_list
 
 from pants.base.build_environment import get_buildroot
@@ -72,11 +72,11 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
   FINGERPRINT_CMD_KEY = b'-Dpants.nailgun.fingerprint'
   _PANTS_NG_ARG_PREFIX = b'-Dpants.buildroot'
   _PANTS_OWNER_ARG_PREFIX = b'-Dpants.nailgun.owner'
-  _PANTS_NG_BUILDROOT_ARG = '='.join((_PANTS_NG_ARG_PREFIX, get_buildroot()))
+  _PANTS_NG_BUILDROOT_ARG = b'='.join((_PANTS_NG_ARG_PREFIX, get_buildroot().encode('utf-8')))
 
   _NAILGUN_SPAWN_LOCK = threading.Lock()
   _SELECT_WAIT = 1
-  _PROCESS_NAME = b'java'
+  _PROCESS_NAME = 'java'
 
   def __init__(self, identity, workdir, nailgun_classpath, distribution,
                connect_timeout=10, connect_attempts=5, metadata_base_dir=None):
@@ -103,10 +103,10 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
 
   def _create_owner_arg(self, workdir):
     # Currently the owner is identified via the full path to the workdir.
-    return '='.join((self._PANTS_OWNER_ARG_PREFIX, workdir))
+    return b'='.join((self._PANTS_OWNER_ARG_PREFIX, workdir))
 
   def _create_fingerprint_arg(self, fingerprint):
-    return '='.join((self.FINGERPRINT_CMD_KEY, fingerprint))
+    return b'='.join((self.FINGERPRINT_CMD_KEY, fingerprint))
 
   @staticmethod
   def _fingerprint(jvm_options, classpath, java_version):
@@ -119,10 +119,10 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
     """
     digest = hashlib.sha1()
     # TODO(John Sirois): hash classpath contents?
-    [digest.update(item) for item in (''.join(sorted(jvm_options)),
-                                      ''.join(sorted(classpath)),
-                                      repr(java_version))]
-    return digest.hexdigest()
+    [digest.update(item) for item in (b''.join(sorted(jvm_options)),
+                                      b''.join(sorted(classpath)),
+                                      repr(java_version).encode('utf-8'))]
+    return digest.hexdigest() if PY3 else digest.hexdigest().decode('utf-8')
 
   def _runner(self, classpath, main, jvm_options, args, cwd=None):
     """Runner factory. Called via Executor.execute()."""
@@ -226,8 +226,8 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
   def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath, stdout, stderr, stdin):
     """Synchronously spawn a new nailgun server."""
     # Truncate the nailguns stdout & stderr.
-    safe_file_dump(self._ng_stdout, '')
-    safe_file_dump(self._ng_stderr, '')
+    safe_file_dump(self._ng_stdout, b'')
+    safe_file_dump(self._ng_stderr, b'')
 
     jvm_options = jvm_options + [self._PANTS_NG_BUILDROOT_ARG,
                                  self._create_owner_arg(self._workdir),

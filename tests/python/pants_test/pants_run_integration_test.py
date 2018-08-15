@@ -4,12 +4,12 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import ConfigParser
+import configparser
 import glob
 import os
 import shutil
 import unittest
-from collections import namedtuple
+from builtins import open
 from contextlib import contextmanager
 from operator import eq, ne
 from threading import Lock
@@ -22,13 +22,26 @@ from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_open
+from pants.util.objects import datatype
 from pants.util.process_handler import SubprocessProcessHandler, subprocess
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
 
-PantsResult = namedtuple(
-  'PantsResult',
-  ['command', 'returncode', 'stdout_data', 'stderr_data', 'workdir'])
+class PantsResult(datatype(['command', 'returncode', 'stdout_data', 'stderr_data', 'workdir'])):
+  pass
+
+
+class PantsJoinHandle(datatype(['command', 'process', 'workdir'])):
+  def join(self, stdin_data=None, tee_output=False):
+    """Wait for the pants process to complete, and return a PantsResult for it."""
+
+    communicate_fn = self.process.communicate
+    if tee_output:
+      communicate_fn = SubprocessProcessHandler(self.process).communicate_teeing_stdout_and_stderr
+    (stdout_data, stderr_data) = communicate_fn(stdin_data)
+
+    return PantsResult(self.command, self.process.returncode, stdout_data.decode("utf-8"),
+                       stderr_data.decode("utf-8"), self.workdir)
 
 
 def ensure_cached(expected_num_artifacts=None):
@@ -129,7 +142,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     try:
       py_path = subprocess.check_output(['python%s' % version,
                                          '-c',
-                                         'import sys; print(sys.executable)']).strip()
+                                         'import sys; print(sys.executable)']).decode('utf-8').strip()
       return os.path.realpath(py_path)
     except OSError:
       return None
@@ -231,7 +244,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
     if config:
       config_data = config.copy()
-      ini = ConfigParser.ConfigParser(defaults=config_data.pop('DEFAULT', None))
+      # TODO(python3port): RawConfigParser is legacy. Investigate updating to modern API.
+      ini = configparser.RawConfigParser(defaults=config_data.pop('DEFAULT', None))
       for section, section_config in config_data.items():
         ini.add_section(section)
         for key, value in section_config.items():
@@ -253,8 +267,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # Only whitelisted entries will be included in the environment if hermetic=True.
     if self.hermetic():
       env = dict()
+      # With an empty environment, we would generally get the true underlying system default
+      # encoding, which is unlikely to be what we want (it's generally ASCII, still). So we
+      # explicitly set an encoding here.
+      env['LC_ALL'] = 'en_US.UTF-8'
       for h in self.hermetic_env_whitelist():
-        env[h] = os.getenv(h) or ''
+        value = os.getenv(h)
+        if value is not None:
+          env[h] = value
       hermetic_env = os.getenv('HERMETIC_ENV')
       if hermetic_env:
         for h in hermetic_env.strip(',').split(','):
@@ -271,23 +291,26 @@ class PantsRunIntegrationTest(unittest.TestCase):
       env['PANTS_PROFILE'] = prof
       # Make a note the subprocess command, so the user can correctly interpret the profile files.
       with open('{}.cmd'.format(prof), 'w') as fp:
-        fp.write(b' '.join(pants_command))
+        fp.write(' '.join(pants_command))
 
-    return pants_command, subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
-      stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+    return PantsJoinHandle(
+        pants_command,
+        subprocess.Popen(
+          pants_command,
+          env=env,
+          stdin=subprocess.PIPE,
+          stdout=subprocess.PIPE,
+          stderr=subprocess.PIPE,
+          **kwargs
+        ),
+        workdir
+      )
 
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, tee_output=False, **kwargs):
     if config:
       kwargs["config"] = config
-    pants_command, proc = self.run_pants_with_workdir_without_waiting(command, workdir, **kwargs)
-
-    communicate_fn = proc.communicate
-    if tee_output:
-      communicate_fn = SubprocessProcessHandler(proc).communicate_teeing_stdout_and_stderr
-    (stdout_data, stderr_data) = communicate_fn(stdin_data)
-
-    return PantsResult(pants_command, proc.returncode, stdout_data.decode("utf-8"),
-                       stderr_data.decode("utf-8"), workdir)
+    handle = self.run_pants_with_workdir_without_waiting(command, workdir, **kwargs)
+    return handle.join(stdin_data=stdin_data, tee_output=tee_output)
 
   def run_pants(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
     """Runs pants in a subprocess.
@@ -384,7 +407,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
         stdout, _ = java_run.communicate()
       java_returncode = java_run.returncode
-      self.assertEquals(java_returncode, 0)
+      self.assertEqual(java_returncode, 0)
       return stdout
 
   def assert_success(self, pants_run, msg=None):
@@ -426,13 +449,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
       os.rename(real_path, test_path)
 
   @contextmanager
-  def temporary_file_content(self, path, content):
+  def temporary_file_content(self, path, content, binary_mode=True):
     """Temporarily write content to a file for the purpose of an integration test."""
     path = os.path.realpath(path)
     assert path.startswith(
       os.path.realpath(get_buildroot())), 'cannot write paths outside of the buildroot!'
     assert not os.path.exists(path), 'refusing to overwrite an existing path!'
-    with open(path, 'wb') as fh:
+    mode = 'wb' if binary_mode else 'w'
+    with open(path, mode) as fh:
       fh.write(content)
     try:
       yield
@@ -442,7 +466,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
   @contextmanager
   def mock_buildroot(self, dirs_to_copy=None):
     """Construct a mock buildroot and return a helper object for interacting with it."""
-    Manager = namedtuple('Manager', 'write_file pushd dir')
+    class Manager(datatype(['write_file', 'pushd', 'new_buildroot'])): pass
     # N.B. BUILD.tools, contrib, 3rdparty needs to be copied vs symlinked to avoid
     # symlink prefix check error in v1 and v2 engine.
     files_to_copy = ('BUILD.tools',)
@@ -469,7 +493,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       def write_file(file_path, contents):
         full_file_path = os.path.join(tmp_dir, *file_path.split(os.pathsep))
         safe_mkdir_for(full_file_path)
-        with open(full_file_path, 'wb') as fh:
+        with open(full_file_path, 'w') as fh:
           fh.write(contents)
 
       @contextmanager

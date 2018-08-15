@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import unittest
+from builtins import object
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -118,7 +119,7 @@ class AddressFamilyTest(unittest.TestCase):
   def test_create_empty(self):
     # Case where directory exists but is empty.
     address_family = AddressFamily.create('name/space', [])
-    self.assertEquals(dict(), address_family.addressables)
+    self.assertEqual(dict(), address_family.addressables)
 
   def test_mismatching_paths(self):
     with self.assertRaises(DifferingFamiliesError):

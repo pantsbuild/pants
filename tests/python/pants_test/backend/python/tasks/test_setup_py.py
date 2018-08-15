@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 from collections import OrderedDict
 from contextlib import contextmanager
 from textwrap import dedent
@@ -118,7 +119,7 @@ class TestSetupPyInterpreter(SetupPyTestBase):
     sdist_srcdir = os.path.join(self.distdir, 'foo-0.0.0', 'src')
     with environment_as(PYTHONPATH=sdist_srcdir):
       with self.run_execute(foo):
-        with open(os.path.join(sdist_srcdir, 'foo', 'commands', 'sys_path.txt')) as fp:
+        with open(os.path.join(sdist_srcdir, 'foo', 'commands', 'sys_path.txt'), 'r') as fp:
           def assert_extra(name, expected_version):
             package = Package.from_href(fp.readline().strip())
             self.assertEqual(name, package.name)
@@ -490,7 +491,7 @@ class TestSetupPy(SetupPyTestBase):
                           path('src/monster/j-function.res')},
                          py_files)
 
-        with open(path('src/monster/j-function.res')) as fp:
+        with open(path('src/monster/j-function.res'), 'r') as fp:
           self.assertEqual('196884', fp.read())
 
   def test_symlinks_issues_2815(self):
@@ -544,7 +545,7 @@ class TestSetupPy(SetupPyTestBase):
                           res_link_path},
                          py_files)
 
-        with open(res_link_path) as fp:
+        with open(res_link_path, 'r') as fp:
           self.assertEqual('196884', fp.read())
 
   def test_prep_command_case(self):

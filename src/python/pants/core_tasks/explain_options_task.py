@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
+from builtins import filter, str
 
 from colors import black, blue, cyan, green, magenta, red, white
 from packaging.version import Version

@@ -10,7 +10,7 @@ import os
 import sys
 from abc import abstractmethod
 
-import future
+from future.utils import PY2, PY3
 
 from pants.util.meta import AbstractClass
 
@@ -19,7 +19,7 @@ from pants.util.meta import AbstractClass
 # NB: As recommended here: https://github.com/google/python-subprocess32/blob/master/README.md
 # which accounts for non-posix, ie: Windows. Although we don't support Windows yet, this sets the
 # pattern up in anticipation.
-if os.name == 'posix' and future.utils.PY2:
+if os.name == 'posix' and PY2:
   import subprocess32 as subprocess3
 else:
   import subprocess as subprocess3
@@ -106,8 +106,8 @@ class SubprocessProcessHandler(ProcessHandler):
 
 def _tee(infile, outfile, return_function):
   accumulator = io.BytesIO()
-  for line in iter(infile.readline, ""):
+  for line in iter(infile.readline, b""):
     accumulator.write(line)
-    outfile.write(line)
+    outfile.buffer.write(line) if PY3 else outfile.write(line)
   infile.close()
   return_function(accumulator.getvalue())

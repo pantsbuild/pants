@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 from glob import glob1
 
 from pants.base.project_tree import Dir, File, Link, ProjectTree

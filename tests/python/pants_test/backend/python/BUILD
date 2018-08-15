@@ -56,6 +56,7 @@ python_library(
   name='pants_requirement_integration_test_base',
   sources=['pants_requirement_integration_test_base.py'],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

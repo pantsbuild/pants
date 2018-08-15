@@ -7,6 +7,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 from hashlib import sha1
 
+from future.utils import PY3
+
 from pants.base.payload_field import PayloadField
 
 
@@ -69,10 +71,11 @@ class PythonArtifact(PayloadField):
     return self.name
 
   def _compute_fingerprint(self):
-    return sha1(json.dumps((self._kw, self._binaries),
-                           ensure_ascii=True,
-                           allow_nan=False,
-                           sort_keys=True)).hexdigest()
+    fingerprint = sha1(json.dumps((self._kw, self._binaries),
+                                  ensure_ascii=True,
+                                  allow_nan=False,
+                                  sort_keys=True)).hexdigest()
+    return fingerprint if PY3 else fingerprint.decode('utf-8')
 
   def with_binaries(self, *args, **kw):
     """Add binaries tagged to this artifact.

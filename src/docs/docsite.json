@@ -58,8 +58,10 @@
     "notes-1.6.x": "dist/markdown/html/src/python/pants/notes/1.6.x.html",
     "notes-1.7.x": "dist/markdown/html/src/python/pants/notes/1.7.x.html",
     "notes-1.8.x": "dist/markdown/html/src/python/pants/notes/1.8.x.html",
+    "notes-1.9.x": "dist/markdown/html/src/python/pants/notes/1.9.x.html",
     "notes-master": "dist/markdown/html/src/python/pants/notes/master.html",
     "notes-master": "dist/markdown/html/src/python/pants/notes/master.html",
+    "orgs": "dist/markdown/html/src/docs/orgs.html",
     "options": "dist/markdown/html/src/docs/options.html",
     "options_reference": "dist/reference/pants_reference_body.html",
     "page": "dist/markdown/html/examples/src/java/org/pantsbuild/example/page.html",
@@ -101,6 +103,9 @@
     "images/intellij-project-structure-project.png": "src/docs/images/intellij-project-structure-project.png",
     "images/intellij-run.png": "src/docs/images/intellij-run.png",
     "images/intellij-select-venv.png": "src/docs/images/intellij-select-venv.png",
+    "images/orgs.png": "src/docs/images/orgs.png",
+    "images/orgs_be.png": "src/docs/images/orgs_be.png",
+    "images/orgs_fe.png": "src/docs/images/orgs_fe.png",
     "images/ossrh-publish-close-staging-repo.png": "src/docs/images/ossrh-publish-close-staging-repo.png",
     "images/ossrh-publish-find-staging-repo.png": "src/docs/images/ossrh-publish-find-staging-repo.png",
     "images/ossrh-publish-release-staging-repo.png": "src/docs/images/ossrh-publish-release-staging-repo.png",
@@ -117,15 +122,15 @@
   "tree": [
     { "page": "index",
       "children": [
-
        {"heading": "Getting Started"},
        {"pages": [
-                     "install", 
+                     "install",
                      "setup_repo",
                      "first_tutorial",
-                     "common_tasks"
+                     "common_tasks",
+                     "orgs"
                 ]
-            
+
        },
        {"heading": "Pants Basics"},
        {"pages" : [
@@ -176,6 +181,7 @@
        },
        {"collapsible_heading": "Release Notes",
         "pages" : [
+                    "notes-1.9.x",
                     "notes-1.8.x",
                     "notes-1.7.x",
                     "notes-1.6.x",

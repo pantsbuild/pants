@@ -41,7 +41,7 @@ class Clean(Task):
       safe_concurrent_rename(pants_wd, tmp_trash)
       safe_concurrent_rename(tmpdir, pants_wd)
 
-      if self.get_options().async:
+      if self.get_options()['async']:
         # The trash directory is deleted in a child process.
         pid = os.fork()
         if pid == 0:

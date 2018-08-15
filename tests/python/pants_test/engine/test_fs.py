@@ -8,11 +8,14 @@ import logging
 import os
 import tarfile
 import unittest
+from builtins import object, open, str
 from contextlib import contextmanager
 
+from future.utils import text_type
+
 from pants.base.project_tree import Dir, Link
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, DirectoryToMaterialize, FilesContent, PathGlobs,
-                             PathGlobsAndRoot, Snapshot, create_fs_rules)
+from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, DirectoryToMaterialize,
+                             FilesContent, PathGlobs, PathGlobsAndRoot, Snapshot, create_fs_rules)
 from pants.util.contextutil import temporary_dir
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -56,7 +59,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
     with self.mk_project_tree(ignore_patterns=ignore_patterns) as project_tree:
       scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
       result = self.execute(scheduler, Snapshot, self.specs(filespecs_or_globs))[0]
-      self.assertEquals(sorted([p.path for p in getattr(result, field)]), sorted(paths))
+      self.assertEqual(sorted([p.path for p in getattr(result, field)]), sorted(paths))
 
   def assert_content(self, filespecs_or_globs, expected_content):
     with self.mk_project_tree() as project_tree:
@@ -64,14 +67,14 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       snapshot = self.execute_expecting_one_result(scheduler, Snapshot, self.specs(filespecs_or_globs)).value
       result = self.execute_expecting_one_result(scheduler, FilesContent, snapshot.directory_digest).value
       actual_content = {f.path: f.content for f in result.dependencies}
-      self.assertEquals(expected_content, actual_content)
+      self.assertEqual(expected_content, actual_content)
 
   def assert_digest(self, filespecs_or_globs, expected_files):
     with self.mk_project_tree() as project_tree:
       scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
       result = self.execute(scheduler, Snapshot, self.specs(filespecs_or_globs))[0]
       # Confirm all expected files were digested.
-      self.assertEquals(set(expected_files), set(f.path for f in result.files))
+      self.assertEqual(set(expected_files), set(f.path for f in result.files))
       self.assertTrue(result.directory_digest.fingerprint is not None)
 
   def assert_fsnodes(self, filespecs_or_globs, subject_product_pairs):
@@ -83,7 +86,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       # request.
       fs_nodes = [n for n, _ in scheduler.product_graph.walk(roots=request.roots)
                   if type(n) is "TODO: need a new way to filter for FS intrinsics"]
-      self.assertEquals(set((n.subject, n.product) for n in fs_nodes), set(subject_product_pairs))
+      self.assertEqual(set((n.subject, n.product) for n in fs_nodes), set(subject_product_pairs))
 
   def test_walk_literal(self):
     self.assert_walk_files(['4.txt'], ['4.txt'])
@@ -206,7 +209,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
     self.assert_walk_dirs(['*', '**'], ['a', 'c.ln', 'd.ln', 'a/b', 'd.ln/b'])
 
   def test_files_content_literal(self):
-    self.assert_content(['4.txt', 'a/4.txt.ln'], {'4.txt': 'four\n', 'a/4.txt.ln': 'four\n'})
+    self.assert_content(['4.txt', 'a/4.txt.ln'], {'4.txt': b'four\n', 'a/4.txt.ln': b'four\n'})
 
   def test_files_content_directory(self):
     with self.assertRaises(Exception):
@@ -215,7 +218,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       self.assert_content(['a/b'], {'a/b': 'nope\n'})
 
   def test_files_content_symlink(self):
-    self.assert_content(['c.ln/../3.txt'], {'c.ln/../3.txt': 'three\n'})
+    self.assert_content(['c.ln/../3.txt'], {'c.ln/../3.txt': b'three\n'})
 
   def test_files_digest_literal(self):
     self.assert_digest(['a/3.txt', '4.txt'], ['a/3.txt', '4.txt'])
@@ -272,9 +275,9 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         f.write("European Burmese")
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       globs = PathGlobs(("*",), ())
-      snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, temp_dir),))[0]
+      snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(temp_dir)),))[0]
       self.assert_snapshot_equals(snapshot, ["roland"], DirectoryDigest(
-        str("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))
 
@@ -286,17 +289,17 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         f.write("I don't know")
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       snapshots = scheduler.capture_snapshots((
-        PathGlobsAndRoot(PathGlobs(("roland",), ()), temp_dir),
-        PathGlobsAndRoot(PathGlobs(("susannah",), ()), temp_dir),
-        PathGlobsAndRoot(PathGlobs(("doesnotexist",), ()), temp_dir),
+        PathGlobsAndRoot(PathGlobs(("roland",), ()), text_type(temp_dir)),
+        PathGlobsAndRoot(PathGlobs(("susannah",), ()), text_type(temp_dir)),
+        PathGlobsAndRoot(PathGlobs(("doesnotexist",), ()), text_type(temp_dir)),
       ))
-      self.assertEquals(3, len(snapshots))
+      self.assertEqual(3, len(snapshots))
       self.assert_snapshot_equals(snapshots[0], ["roland"], DirectoryDigest(
-        str("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))
       self.assert_snapshot_equals(snapshots[1], ["susannah"], DirectoryDigest(
-        str("d3539cfc21eb4bab328ca9173144a8e932c515b1b9e26695454eeedbc5a95f6f"),
+        text_type("d3539cfc21eb4bab328ca9173144a8e932c515b1b9e26695454eeedbc5a95f6f"),
         82
       ))
       self.assert_snapshot_equals(snapshots[2], [], EMPTY_DIRECTORY_DIGEST)
@@ -306,12 +309,12 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       globs = PathGlobs(("*",), ())
       with self.assertRaises(Exception) as cm:
-        scheduler.capture_snapshots((PathGlobsAndRoot(globs, str(os.path.join(temp_dir, "doesnotexist"))),))
+        scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(os.path.join(temp_dir, "doesnotexist"))),))
       self.assertIn("doesnotexist", str(cm.exception))
 
   def assert_snapshot_equals(self, snapshot, files, directory_digest):
-    self.assertEquals([file.path for file in snapshot.files], files)
-    self.assertEquals(snapshot.directory_digest, directory_digest)
+    self.assertEqual([file.path for file in snapshot.files], files)
+    self.assertEqual(snapshot.directory_digest, directory_digest)
 
   def test_merge_zero_directories(self):
     scheduler = self.mk_scheduler(rules=create_fs_rules())
@@ -327,15 +330,15 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       (empty_snapshot, roland_snapshot, susannah_snapshot, both_snapshot) = (
           scheduler.capture_snapshots((
-            PathGlobsAndRoot(PathGlobs(("doesnotmatch",), ()), temp_dir),
-            PathGlobsAndRoot(PathGlobs(("roland",), ()), temp_dir),
-            PathGlobsAndRoot(PathGlobs(("susannah",), ()), temp_dir),
-            PathGlobsAndRoot(PathGlobs(("*",), ()), temp_dir),
+            PathGlobsAndRoot(PathGlobs(("doesnotmatch",), ()), text_type(temp_dir)),
+            PathGlobsAndRoot(PathGlobs(("roland",), ()), text_type(temp_dir)),
+            PathGlobsAndRoot(PathGlobs(("susannah",), ()), text_type(temp_dir)),
+            PathGlobsAndRoot(PathGlobs(("*",), ()), text_type(temp_dir)),
         ))
       )
 
       empty_merged = scheduler.merge_directories((empty_snapshot.directory_digest))
-      self.assertEquals(
+      self.assertEqual(
         empty_snapshot.directory_digest,
         empty_merged,
       )
@@ -344,7 +347,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         roland_snapshot.directory_digest,
         empty_snapshot.directory_digest,
       ))
-      self.assertEquals(
+      self.assertEqual(
         roland_snapshot.directory_digest,
         roland_merged,
       )
@@ -354,7 +357,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         susannah_snapshot.directory_digest,
       ))
 
-      self.assertEquals(both_snapshot.directory_digest, both_merged)
+      self.assertEqual(both_snapshot.directory_digest, both_merged)
 
   def test_materialize_directories(self):
     # I tried passing in the digest of a file, but it didn't make it to the
@@ -364,16 +367,16 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
     with temporary_dir() as temp_dir:
       dir_path = os.path.join(temp_dir, "containing_roland")
       digest = DirectoryDigest(
-        str("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       )
       scheduler = self.mk_scheduler(rules=create_fs_rules())
-      scheduler.materialize_directories((DirectoryToMaterialize(str(dir_path), digest),))
+      scheduler.materialize_directories((DirectoryToMaterialize(text_type(dir_path), digest),))
 
       created_file = os.path.join(dir_path, "roland")
-      with open(created_file) as f:
+      with open(created_file, 'r') as f:
         content = f.read()
-        self.assertEquals(content, "European Burmese")
+        self.assertEqual(content, "European Burmese")
 
   def test_glob_match_error(self):
     with self.assertRaises(ValueError) as cm:
@@ -426,8 +429,8 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         f.write("European Burmese")
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       globs = PathGlobs(("*",), ())
-      snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, temp_dir),))[0]
+      snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(temp_dir)),))[0]
       self.assert_snapshot_equals(snapshot, ["roland"], DirectoryDigest(
-        str("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))

@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import object
 from textwrap import dedent
 
 # TODO: Create a dummy target type in this test and remove this dep.
@@ -52,8 +53,8 @@ class SourceMapperTest(object):
     )
     '''))
 
-    self.assertEquals(['path:target', 'path:buildholder'],
-                      list(a.spec for a in self.get_mapper().target_addresses_for_source('path/BUILD')))
+    self.assertEqual({'path:target', 'path:buildholder'},
+                      set(a.spec for a in self.get_mapper().target_addresses_for_source('path/BUILD')))
 
   def test_joint_ownership(self):
     # A simple target with two sources.

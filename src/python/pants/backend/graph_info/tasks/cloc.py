@@ -5,6 +5,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
+
+from future.utils import text_type
 
 from pants.backend.graph_info.subsystems.cloc_binary import ClocBinary
 from pants.base.workunit import WorkUnitLabel
@@ -45,11 +48,11 @@ class CountLinesOfCode(ConsoleTask):
       with open(list_file, 'w') as list_file_out:
         for input_file in sorted(input_files):
           list_file_out.write(input_file)
-          list_file_out.write(b'\n')
+          list_file_out.write('\n')
       list_file_snapshot = self.context._scheduler.capture_snapshots((
         PathGlobsAndRoot(
           PathGlobs(('input_files_list',)),
-          str(tmpdir),
+          text_type(tmpdir),
         ),
       ))[0]
 
@@ -72,13 +75,10 @@ class CountLinesOfCode(ConsoleTask):
 
     # The cloc script reaches into $PATH to look up perl. Let's assume it's in /usr/bin.
     req = ExecuteProcessRequest(
-      cmd,
-      (),
-      directory_digest,
-      ('ignored', 'report'),
-      (),
-      15 * 60,
-      'cloc'
+      argv=cmd,
+      input_files=directory_digest,
+      output_files=('ignored', 'report'),
+      description='cloc',
     )
     exec_result = self.context.execute_process_synchronously(req, 'cloc', (WorkUnitLabel.TOOL,))
 

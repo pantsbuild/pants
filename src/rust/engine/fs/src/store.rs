@@ -5,7 +5,7 @@ use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use futures::{future, Future};
 use hashing::Digest;
-use protobuf::core::Message;
+use protobuf::Message;
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -96,6 +96,9 @@ impl Store {
     }
   }
 
+  ///
+  /// Store a file locally.
+  ///
   pub fn store_file_bytes(&self, bytes: Bytes, initial_lease: bool) -> BoxFuture<Digest, String> {
     let len = bytes.len();
     self
@@ -106,8 +109,9 @@ impl Store {
   }
 
   ///
-  /// Loads the bytes of the file with the passed fingerprint, and returns the result of applying f
-  /// to that value.
+  /// Loads the bytes of the file with the passed fingerprint from the local store and back-fill
+  /// from remote when necessary and possible (i.e. when remote is configured), and returns the
+  /// result of applying f to that value.
   ///
   pub fn load_file_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
     &self,
@@ -128,8 +132,9 @@ impl Store {
   }
 
   ///
-  /// Save the bytes of the Directory proto, without regard for any of the contents of any FileNodes
-  /// or DirectoryNodes therein (i.e. does not require that its children are already stored).
+  /// Save the bytes of the Directory proto locally, without regard for any of the
+  /// contents of any FileNodes or DirectoryNodes therein (i.e. does not require that its
+  /// children are already stored).
   ///
   pub fn record_directory(
     &self,
@@ -150,6 +155,8 @@ impl Store {
       .to_boxed()
   }
 
+  ///
+  /// Loads a directory proto from the local store, back-filling from remote if necessary.
   ///
   /// Guarantees that if an Ok Some value is returned, it is valid, and canonical, and its
   /// fingerprint exactly matches that which is requested. Will return an Err if it would return a
@@ -190,6 +197,11 @@ impl Store {
     )
   }
 
+  ///
+  /// Loads bytes from remote cas if required and possible (i.e. if remote is configured). Takes
+  /// two functions f_local and f_remote. These functions are any validation or transformations you
+  /// want to perform on the bytes received from the local and remote cas (if remote is configured).
+  ///
   fn load_bytes_with<
     T: Send + 'static,
     FLocal: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
@@ -315,6 +327,44 @@ impl Store {
       .to_boxed()
   }
 
+  ///
+  /// Download a directory from Remote ByteStore recursively to the local one. Called only with the
+  /// Digest of a Directory.
+  ///
+  pub fn ensure_local_has_recursive_directory(&self, dir_digest: Digest) -> BoxFuture<(), String> {
+    let store = self.clone();
+    self
+      .load_directory(dir_digest)
+      .and_then(move |directory_opt| {
+        directory_opt.ok_or_else(|| format!("Could not read dir with digest {:?}", dir_digest))
+      })
+      .and_then(move |directory| {
+        // Traverse the files within directory
+        let file_futures = directory
+          .get_files()
+          .iter()
+          .map(|file_node| {
+            let file_digest = try_future!(file_node.get_digest().into());
+            store.load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
+          })
+          .collect::<Vec<_>>();
+
+        // Recursively call with sub-directories
+        let directory_futures = directory
+          .get_directories()
+          .iter()
+          .map(move |child_dir| {
+            let child_digest = try_future!(child_dir.get_digest().into());
+            store.ensure_local_has_recursive_directory(child_digest)
+          })
+          .collect::<Vec<_>>();
+        future::join_all(file_futures)
+          .join(future::join_all(directory_futures))
+          .map(|_| ())
+      })
+      .to_boxed()
+  }
+
   pub fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(&self, digests: Ds) -> Result<(), String> {
     self.local.lease_all(digests)
   }
@@ -405,15 +455,16 @@ impl Store {
       .to_boxed()
   }
 
+  ///
+  /// Lays out the directory and all of its contents (files and directories) on disk so that a
+  /// process which uses the directory structure can run.
+  ///
   pub fn materialize_directory(
     &self,
     destination: PathBuf,
     digest: Digest,
   ) -> BoxFuture<(), String> {
-    match super::safe_create_dir_all(&destination) {
-      Ok(()) => {}
-      Err(e) => return future::err(e).to_boxed(),
-    };
+    try_future!(super::safe_create_dir_all(&destination));
     let store = self.clone();
     self
       .load_directory(digest)
@@ -2197,6 +2248,51 @@ mod tests {
         testdir.fingerprint(),
       ),
       Ok(Some(testdir.bytes()))
+    );
+  }
+
+  #[test]
+  fn load_recursive_directory() {
+    let dir = TempDir::new().unwrap();
+
+    let roland = TestData::roland();
+    let catnip = TestData::catnip();
+    let testdir = TestDirectory::containing_roland();
+    let testdir_digest = testdir.digest();
+    let testdir_directory = testdir.directory();
+    let recursive_testdir = TestDirectory::recursive();
+    let recursive_testdir_directory = recursive_testdir.directory();
+    let recursive_testdir_digest = recursive_testdir.digest();
+
+    let cas = StubCAS::with_content(
+      1024,
+      vec![roland.clone(), catnip.clone()],
+      vec![testdir, recursive_testdir],
+    );
+    new_store(dir.path(), cas.address())
+      .ensure_local_has_recursive_directory(recursive_testdir_digest)
+      .wait()
+      .expect("Downloading recursive directory should have succeeded.");
+
+    assert_eq!(
+      load_file_bytes(&new_local_store(dir.path()), roland.digest()),
+      Ok(Some(roland.bytes()))
+    );
+    assert_eq!(
+      load_file_bytes(&new_local_store(dir.path()), catnip.digest()),
+      Ok(Some(catnip.bytes()))
+    );
+    assert_eq!(
+      new_local_store(dir.path())
+        .load_directory(testdir_digest)
+        .wait(),
+      Ok(Some(testdir_directory))
+    );
+    assert_eq!(
+      new_local_store(dir.path())
+        .load_directory(recursive_testdir_digest)
+        .wait(),
+      Ok(Some(recursive_testdir_directory))
     );
   }
 

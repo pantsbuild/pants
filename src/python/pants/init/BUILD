@@ -3,6 +3,7 @@
 
 python_library(
   dependencies=[
+    '3rdparty/python:future',
     ':plugins',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
@@ -22,6 +23,7 @@ python_library(
     'src/python/pants/engine/legacy:source_mapper',
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/engine:build_files',
+    'src/python/pants/engine:console',
     'src/python/pants/engine:mapper',
     'src/python/pants/engine:native',
     'src/python/pants/engine:parser',
@@ -30,6 +32,7 @@ python_library(
     'src/python/pants/goal:run_tracker',
     'src/python/pants/option',
     'src/python/pants/process',
+    'src/python/pants/rules/core',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',

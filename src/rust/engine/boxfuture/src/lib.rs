@@ -34,7 +34,8 @@ macro_rules! try_future {
     match $x {
       Ok(value) => value,
       Err(error) => {
-        return future::err(error).to_boxed();
+        use futures::future::err;
+        return err(error).to_boxed();
       }
     }
   }};

@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import unittest
+from builtins import object, str
 
 from mock import Mock
 
@@ -75,7 +76,7 @@ class JarPublishTest(TaskTestBase):
       provides="""artifact(org='com.example', name='horse', repo=internal)""",
       dependencies=c_deps)
 
-    return targets.values()
+    return list(targets.values())
 
   def _prepare_targets_with_duplicates(self):
     targets = list(self._prepare_for_publishing())
@@ -138,12 +139,12 @@ class JarPublishTest(TaskTestBase):
       files = []
       for _, _, filenames in safe_walk(self.push_db_basedir):
         files.extend(filenames)
-      self.assertEquals(0, len(files),
+      self.assertEqual(0, len(files),
                         'Nothing should be written to the pushdb during a dryrun publish')
 
-      self.assertEquals(0, task.confirm_push.call_count,
+      self.assertEqual(0, task.confirm_push.call_count,
                         'Expected confirm_push not to be called')
-      self.assertEquals(0, task.publish.call_count,
+      self.assertEqual(0, task.publish.call_count,
                         'Expected publish not to be called')
 
   def test_publish_local(self):
@@ -161,13 +162,13 @@ class JarPublishTest(TaskTestBase):
         files = []
         for _, _, filenames in safe_walk(self.push_db_basedir):
           files.extend(filenames)
-        self.assertEquals(0, len(files),
+        self.assertEqual(0, len(files),
                           'Nothing should be written to the pushdb during a local publish')
 
         publishable_count = len(targets) - (1 if with_alias else 0)
-        self.assertEquals(publishable_count, task.confirm_push.call_count,
+        self.assertEqual(publishable_count, task.confirm_push.call_count,
                           'Expected one call to confirm_push per artifact')
-        self.assertEquals(publishable_count, task.publish.call_count,
+        self.assertEqual(publishable_count, task.publish.call_count,
                           'Expected one call to publish per artifact')
 
   def test_publish_remote(self):
@@ -182,33 +183,33 @@ class JarPublishTest(TaskTestBase):
     for _, _, filenames in safe_walk(self.push_db_basedir):
       files.extend(filenames)
 
-    self.assertEquals(len(targets), len(files),
+    self.assertEqual(len(targets), len(files),
                       'During a remote publish, one pushdb should be written per target')
-    self.assertEquals(len(targets), task.confirm_push.call_count,
+    self.assertEqual(len(targets), task.confirm_push.call_count,
                       'Expected one call to confirm_push per artifact')
-    self.assertEquals(len(targets), task.publish.call_count,
+    self.assertEqual(len(targets), task.publish.call_count,
                       'Expected one call to publish per artifact')
 
-    self.assertEquals(len(targets), task.scm.commit.call_count,
+    self.assertEqual(len(targets), task.scm.commit.call_count,
                       'Expected one call to scm.commit per artifact')
     args, kwargs = task.scm.commit.call_args
     message = args[0]
     message_lines = message.splitlines()
     self.assertTrue(len(message_lines) > 1,
                     'Expected at least one commit message line in addition to the post script.')
-    self.assertEquals('PS', message_lines[-1])
+    self.assertEqual('PS', message_lines[-1])
 
-    self.assertEquals(len(targets), task.scm.add.call_count,
+    self.assertEqual(len(targets), task.scm.add.call_count,
                       'Expected one call to scm.add per artifact')
 
-    self.assertEquals(len(targets), task.scm.tag.call_count,
+    self.assertEqual(len(targets), task.scm.tag.call_count,
                       'Expected one call to scm.tag per artifact')
     args, kwargs = task.scm.tag.call_args
     tag_name, tag_message = args
     tag_message_splitlines = tag_message.splitlines()
     self.assertTrue(len(tag_message_splitlines) > 1,
                     'Expected at least one tag message line in addition to the post script.')
-    self.assertEquals('PS', tag_message_splitlines[-1])
+    self.assertEqual('PS', tag_message_splitlines[-1])
 
   def test_publish_retry_works(self):
     targets = self._prepare_for_publishing()
@@ -220,7 +221,7 @@ class JarPublishTest(TaskTestBase):
     task.scm.push.side_effect = FailNTimes(2, Scm.RemoteException)
     task.execute()
     # Two failures, one success
-    self.assertEquals(2 + 1, task.scm.push.call_count)
+    self.assertEqual(2 + 1, task.scm.push.call_count)
 
   def test_publish_retry_eventually_fails(self):
     targets = self._prepare_for_publishing()
@@ -247,7 +248,7 @@ class JarPublishTest(TaskTestBase):
 
     with self.assertRaises(Scm.LocalException):
       task.execute()
-    self.assertEquals(1, task.scm.push.call_count)
+    self.assertEqual(1, task.scm.push.call_count)
 
   def test_publish_local_only(self):
     with self.assertRaises(TaskError):

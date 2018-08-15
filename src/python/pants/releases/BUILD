@@ -5,6 +5,7 @@ python_binary(
   name = 'reversion',
   source = 'reversion.py',
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
   ],
 )
@@ -13,6 +14,8 @@ python_binary(
   name = 'packages',
   source = 'packages.py',
   dependencies = [
+    '3rdparty/python:future',
+    '3rdparty/python:configparser',
     '3rdparty/python:beautifulsoup4',
     'src/python/pants/util:process_handler',
   ],

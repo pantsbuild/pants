@@ -11,7 +11,7 @@ from builtins import object
 from pants.engine.rules import SingletonRule
 from pants.util.objects import datatype
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
-from pants.util.strutil import create_path_env_var, safe_shlex_join
+from pants.util.strutil import create_path_env_var
 
 
 class Platform(datatype(['normalized_os_name'])):
@@ -53,14 +53,24 @@ class Executable(object):
 
   @abstractproperty
   def library_dirs(self):
-    """Directories containing shared libraries required for a subprocess to run."""
+    """Directories containing shared libraries that must be on the runtime library search path.
+
+    Note: this is for libraries needed for the current Executable to run -- see LinkerMixin below
+    for libraries that are needed at link time."""
 
   @abstractproperty
   def exe_filename(self):
     """The "entry point" -- which file to invoke when PATH is set to `path_entries()`."""
 
-  def get_invocation_environment_dict(self, platform):
-    lib_env_var = platform.resolve_platform_specific({
+  @property
+  def extra_args(self):
+    return []
+
+  _platform = Platform.create()
+
+  @property
+  def as_invocation_environment_dict(self):
+    lib_env_var = self._platform.resolve_platform_specific({
       'darwin': lambda: 'DYLD_LIBRARY_PATH',
       'linux': lambda: 'LD_LIBRARY_PATH',
     })
@@ -78,35 +88,31 @@ class Assembler(datatype([
   pass
 
 
+class LinkerMixin(Executable):
+
+  @abstractproperty
+  def linking_library_dirs(self):
+    """Directories to search for libraries needed at link time."""
+
+  @property
+  def as_invocation_environment_dict(self):
+    ret = super(LinkerMixin, self).as_invocation_environment_dict.copy()
+
+    ret.update({
+      'LDSHARED': self.exe_filename,
+      'LIBRARY_PATH': create_path_env_var(self.linking_library_dirs),
+    })
+
+    return ret
+
+
 class Linker(datatype([
     'path_entries',
     'exe_filename',
     'library_dirs',
-]), Executable):
-
-  # FIXME(#5951): We need a way to compose executables more hygienically. This could be done
-  # declaratively -- something like: { 'LIBRARY_PATH': DelimitedPathDirectoryEnvVar(...) }.  We
-  # could also just use safe_shlex_join() and create_path_env_var() and keep all the state in the
-  # environment -- but then we have to remember to use those each time we specialize.
-  def get_invocation_environment_dict(self, platform):
-    ret = super(Linker, self).get_invocation_environment_dict(platform).copy()
-
-    # TODO: set all LDFLAGS in here or in further specializations of Linker instead of in individual
-    # tasks.
-    all_ldflags_for_platform = platform.resolve_platform_specific({
-      'darwin': lambda: ['-mmacosx-version-min=10.11'],
-      'linux': lambda: [],
-    })
-    ret.update({
-      'LDSHARED': self.exe_filename,
-      # FIXME: this overloads the meaning of 'library_dirs' to also mean "directories containing
-      # static libraries required for creating an executable" (currently, libc). These concepts
-      # should be distinct.
-      'LIBRARY_PATH': create_path_env_var(self.library_dirs),
-      'LDFLAGS': safe_shlex_join(all_ldflags_for_platform),
-    })
-
-    return ret
+    'linking_library_dirs',
+    'extra_args',
+]), LinkerMixin): pass
 
 
 class CompilerMixin(Executable):
@@ -115,19 +121,12 @@ class CompilerMixin(Executable):
   def include_dirs(self):
     """Directories to search for header files to #include during compilation."""
 
-  # FIXME: LIBRARY_PATH and (DY)?LD_LIBRARY_PATH are used for entirely different purposes, but are
-  # both sourced from the same `self.library_dirs`!
-  def get_invocation_environment_dict(self, platform):
-    ret = super(CompilerMixin, self).get_invocation_environment_dict(platform).copy()
+  @property
+  def as_invocation_environment_dict(self):
+    ret = super(CompilerMixin, self).as_invocation_environment_dict.copy()
 
     if self.include_dirs:
       ret['CPATH'] = create_path_env_var(self.include_dirs)
-
-    all_cflags_for_platform = platform.resolve_platform_specific({
-      'darwin': lambda: ['-mmacosx-version-min=10.11'],
-      'linux': lambda: [],
-    })
-    ret['CFLAGS'] = safe_shlex_join(all_cflags_for_platform)
 
     return ret
 
@@ -137,10 +136,12 @@ class CCompiler(datatype([
     'exe_filename',
     'library_dirs',
     'include_dirs',
+    'extra_args',
 ]), CompilerMixin):
 
-  def get_invocation_environment_dict(self, platform):
-    ret = super(CCompiler, self).get_invocation_environment_dict(platform).copy()
+  @property
+  def as_invocation_environment_dict(self):
+    ret = super(CCompiler, self).as_invocation_environment_dict.copy()
 
     ret['CC'] = self.exe_filename
 
@@ -152,27 +153,38 @@ class CppCompiler(datatype([
     'exe_filename',
     'library_dirs',
     'include_dirs',
+    'extra_args',
 ]), CompilerMixin):
 
-  def get_invocation_environment_dict(self, platform):
-    ret = super(CppCompiler, self).get_invocation_environment_dict(platform).copy()
+  @property
+  def as_invocation_environment_dict(self):
+    ret = super(CppCompiler, self).as_invocation_environment_dict.copy()
 
     ret['CXX'] = self.exe_filename
 
     return ret
 
 
-# TODO(#4020): These classes are performing the work of variants.
-class GCCCCompiler(datatype([('c_compiler', CCompiler)])): pass
+# NB: These wrapper classes for LLVM and GCC toolchains are performing the work of variants. A
+# CToolchain cannot be requested directly, but native_toolchain.py provides an LLVMCToolchain,
+# which contains a CToolchain representing the clang compiler and a linker paired to work with
+# objects compiled by that compiler.
+class CToolchain(datatype([('c_compiler', CCompiler), ('c_linker', Linker)])): pass
 
 
-class LLVMCCompiler(datatype([('c_compiler', CCompiler)])): pass
+class LLVMCToolchain(datatype([('c_toolchain', CToolchain)])): pass
 
 
-class GCCCppCompiler(datatype([('cpp_compiler', CppCompiler)])): pass
+class GCCCToolchain(datatype([('c_toolchain', CToolchain)])): pass
 
 
-class LLVMCppCompiler(datatype([('cpp_compiler', CppCompiler)])): pass
+class CppToolchain(datatype([('cpp_compiler', CppCompiler), ('cpp_linker', Linker)])): pass
+
+
+class LLVMCppToolchain(datatype([('cpp_toolchain', CppToolchain)])): pass
+
+
+class GCCCppToolchain(datatype([('cpp_toolchain', CppToolchain)])): pass
 
 
 # FIXME: make this an @rule, after we can automatically produce LibcDev and other subsystems in the

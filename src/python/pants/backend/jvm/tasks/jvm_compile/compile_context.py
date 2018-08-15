@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import zipfile
+from builtins import object
 from contextlib import contextmanager
 
 from pants.util.contextutil import open_zip

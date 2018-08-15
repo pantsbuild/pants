@@ -147,12 +147,14 @@ feature, you might explore `tests/python/pants_tests/.../BUILD`.
 
 Before [[contributing a change to Pants|pants('src/docs:howto_contribute')]],
 make sure it passes **all** of our continuous integration (CI) tests: everything builds,
-all tests pass. To try all the CI tests in a few configurations, you can run the same script
-that our Travis CI does. This can take a while, but it's a good idea to run it before you
-contribute a change or merge it to master:
+all tests pass. Our tests are hard and slow to run all of locally, so we recommend that you create
+a pull request, and allow travis to run them. You can reproduce failures by running
 
     :::bash
     $ ./build-support/bin/ci.sh
+
+with whatever relevant flags reproduce the failure (`./build-support/bin/ci.sh -h` will list the
+available flags).
 
 To run just Pants' *unit* tests (skipping the can-be-slow integration tests), filter out
 the python tests tagged with 'integration':

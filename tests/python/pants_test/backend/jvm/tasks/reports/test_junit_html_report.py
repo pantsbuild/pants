@@ -5,12 +5,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 from contextlib import contextmanager
 
 from pants.backend.jvm.tasks.reports.junit_html_report import (JUnitHtmlReport, ReportTestCase,
                                                                ReportTestSuite)
 from pants.util.contextutil import temporary_dir
-from pants.util.strutil import ensure_text
 from pants_test.test_base import TestBase
 
 
@@ -85,8 +85,8 @@ class TestJUnitHtmlReport(TestBase):
     self.assertEqual(1, len(testsuites))
     self.assertEqual(2, testsuites[0].tests)
     self.assertEqual(2, len(testsuites[0].testcases))
-    self.assertEquals(u'org.pantsbuild.PåssingTest', testsuites[0].name)
-    self.assertEquals(u'testTwö', testsuites[0].testcases[1].name)
+    self.assertEqual(u'org.pantsbuild.PåssingTest', testsuites[0].name)
+    self.assertEqual(u'testTwö', testsuites[0].testcases[1].name)
     self.assertIn(u'org.pantsbuild.PåssingTest.testTwö', testsuites[0].testcases[1].error)
 
   def test_open_report(self):
@@ -109,16 +109,16 @@ class TestJUnitHtmlReport(TestBase):
 
     with temporary_dir() as output_dir:
       junit_html_report = JUnitHtmlReport.create(xml_dir=self._JUNIT_XML_DIR, open_report=True)
-      with open(junit_html_report.report(output_dir)) as html_file:
-        html_data = ensure_text(html_file.read())
-        self.assertIn(u'</span>&nbsp;org.pantsbuild.PåssingTest', html_data)
-        self.assertIn(u'</span>&nbsp;testTwö</td>', html_data)
-        self.assertIn(u'at org.pantsbuild.PåssingTest.testTwö(ErrorTest.java:29)', html_data)
+      with open(junit_html_report.report(output_dir), 'r') as html_file:
+        html_data = html_file.read()
+        self.assertIn('</span>&nbsp;org.pantsbuild.PåssingTest', html_data)
+        self.assertIn('</span>&nbsp;testTwö</td>', html_data)
+        self.assertIn('at org.pantsbuild.PåssingTest.testTwö(ErrorTest.java:29)', html_data)
 
   def test_merged_no_conflict(self):
     with temporary_dir() as xml_dir:
       def write_xml(name, xml, path=''):
-        with open(os.path.join(xml_dir, path, 'TEST-{}.xml'.format(name)), 'wb') as fp:
+        with open(os.path.join(xml_dir, path, 'TEST-{}.xml'.format(name)), 'w') as fp:
           fp.write(xml)
 
       write_xml('a-1', """
@@ -166,7 +166,7 @@ class TestJUnitHtmlReport(TestBase):
   def merge_conflict(self):
     with temporary_dir() as xml_dir:
       def write_xml(name, xml, path=''):
-        with open(os.path.join(xml_dir, path, 'TEST-{}.xml'.format(name)), 'wb') as fp:
+        with open(os.path.join(xml_dir, path, 'TEST-{}.xml'.format(name)), 'w') as fp:
           fp.write(xml)
 
       write_xml('a-1', """

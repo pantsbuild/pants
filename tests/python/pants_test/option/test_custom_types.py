@@ -9,7 +9,6 @@ from textwrap import dedent
 
 from pants.option.custom_types import ListValueComponent, UnsetBool, dict_option, list_option
 from pants.option.errors import ParseError
-from pants.util.strutil import ensure_binary
 
 
 class CustomTypesTest(unittest.TestCase):
@@ -22,7 +21,7 @@ class CustomTypesTest(unittest.TestCase):
     else:
       raise Exception('Expected value {0} is of unsupported type: {1}'.format(expected_val,
                                                                               type(expected_val)))
-    self.assertEquals(expected_val, val)
+    self.assertEqual(expected_val, val)
 
   def _do_test_dict_error(self, s):
     with self.assertRaises(ParseError):
@@ -116,12 +115,12 @@ class CustomTypesTest(unittest.TestCase):
     """
     self._do_test(
       ['Hi there!', 'This is an element in a list of strings.'],
-      ensure_binary(dedent(u"""
+      dedent("""
       [
         'Hi there!',
         # This is a comment with ‘sneaky‘ unicode characters.
         'This is an element in a list of strings.',
         # This is a comment with an obvious unicode character ☺.
         ]
-      """).strip()),
+      """).strip(),
     )

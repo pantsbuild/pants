@@ -7,11 +7,12 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 from builtins import str
 
+from future.utils import PY2
 from pex.fetcher import Fetcher
 from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
 
-from pants.backend.python.pex_util import get_local_platform
+from pants.backend.python.pex_util import expand_and_maybe_adjust_platform
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -69,6 +70,10 @@ def dump_sources(builder, tgt, log):
   log.debug('  Dumping sources: {}'.format(tgt))
   for relpath in tgt.sources_relative_to_buildroot():
     try:
+      # Necessary to avoid py_compile from trying to decode non-ascii source code into unicode.
+      # Python 3's py_compile can safely handle unicode in source files, meanwhile.
+      if PY2:
+        relpath = relpath.encode('utf-8')
       dump_source(relpath)
     except OSError:
       log.error('Failed to copy {} for target {}'.format(relpath, tgt.address.spec))
@@ -166,7 +171,7 @@ def resolve_multi(interpreter, requirements, platforms, find_links, precedence,
       requirements=[req.requirement for req in requirements],
       interpreter=interpreter,
       fetchers=fetchers,
-      platform=get_local_platform() if platform == 'current' else platform,
+      platform=expand_and_maybe_adjust_platform(interpreter=interpreter, platform=platform),
       context=python_repos.get_network_context(),
       precedence=precedence,
       cache=requirements_cache_dir if cache_distribution else None,

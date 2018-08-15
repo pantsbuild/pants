@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 
 def exact_files(directory, ignore_links=False):
@@ -47,7 +48,7 @@ def check_file_content(path, expected_content):
   :param str path: Path to file.
   :param str expected_content: Expected file content.
   """
-  with open(path) as input:
+  with open(path, 'r') as input:
     return expected_content == input.read()
 
 

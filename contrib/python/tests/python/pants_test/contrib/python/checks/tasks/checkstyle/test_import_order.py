@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import ast
 import textwrap
+from builtins import map
 
 from pants_test.contrib.python.checks.tasks.checkstyle.plugin_test_base import \
   CheckstylePluginTestBase
@@ -48,7 +49,7 @@ IMPORT_CHUNKS = {
 
 
 def strip_newline(stmt):
-  return textwrap.dedent('\n'.join(filter(None, stmt.splitlines())))
+  return textwrap.dedent('\n'.join(_f for _f in stmt.splitlines() if _f))
 
 
 def stitch_chunks(newlines, *chunks):
@@ -125,7 +126,7 @@ class ImportOrderTest(CheckstylePluginTestBase):
     self.assertEqual(1, len(chunk_errors))
     self.assertEqual('T405', chunk_errors[0].code)
     self.assertEqual(Nit.ERROR, chunk_errors[0].severity)
-    self.assertItemsEqual([ImportType.STDLIB, ImportType.TWITTER], module_types)
+    self.assertEqual(sorted([ImportType.STDLIB, ImportType.TWITTER]), sorted(module_types))
 
     io = self.get_plugin("""
       import io, pkg_resources
@@ -134,9 +135,9 @@ class ImportOrderTest(CheckstylePluginTestBase):
     self.assertEqual(1, len(import_chunks))
     module_types, chunk_errors = io.classify_imports(import_chunks[0])
     self.assertEqual(3, len(chunk_errors))
-    self.assertItemsEqual(['T403', 'T405', 'T402'],
-                          [chunk_error.code for chunk_error in chunk_errors])
-    self.assertItemsEqual([ImportType.STDLIB, ImportType.THIRD_PARTY], module_types)
+    self.assertEqual(sorted(['T403', 'T405', 'T402']),
+                     sorted([chunk_error.code for chunk_error in chunk_errors]))
+    self.assertEqual(sorted([ImportType.STDLIB, ImportType.THIRD_PARTY]), sorted(module_types))
 
   def test_import_lexical_order(self):
     imp = """

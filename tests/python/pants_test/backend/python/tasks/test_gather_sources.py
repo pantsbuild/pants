@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from builtins import str
+from builtins import open, str
 
 from pex.interpreter import PythonInterpreter
 
@@ -17,6 +17,7 @@ from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.build_graph.files import Files
 from pants.build_graph.resources import Resources
 from pants.source.source_root import SourceRootConfig
+from pants.util.contextutil import temporary_dir
 from pants_test.task_test_base import TaskTestBase
 
 
@@ -75,9 +76,9 @@ class GatherSourcesTest(TaskTestBase):
     pex_path = pex.path()
     for path in files:
       expected_content = self.filemap[to_filemap_key(path)]
-      with open(os.path.join(pex_path, path)) as infile:
+      with open(os.path.join(pex_path, path), 'r') as infile:
         content = infile.read()
-      self.assertEquals(expected_content, content)
+      self.assertEqual(expected_content, content)
 
   def _assert_content_not_in_pex(self, pex, target):
     _, files = self._extract_files(target)
@@ -106,19 +107,22 @@ class GatherSourcesTest(TaskTestBase):
     self._assert_content_not_in_pex(pex, self.resources)
 
   def _gather_sources(self, target_roots):
-    context = self.context(target_roots=target_roots, for_subsystems=[PythonSetup, PythonRepos])
+    with temporary_dir() as cache_dir:
+      context = self.context(target_roots=target_roots,
+                             for_subsystems=[PythonSetup, PythonRepos],
+                             options={PythonSetup.options_scope: {'interpreter_cache_dir': cache_dir}})
 
-    # We must get an interpreter via the cache, instead of using PythonInterpreter.get() directly,
-    # to ensure that the interpreter has setuptools and wheel support.
-    interpreter = PythonInterpreter.get()
-    interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
-                                               PythonRepos.global_instance(),
-                                               logger=context.log.debug)
-    interpreters = interpreter_cache.setup(paths=[os.path.dirname(interpreter.binary)],
-                                           filters=[str(interpreter.identity.requirement)])
-    context.products.get_data(PythonInterpreter, lambda: interpreters[0])
+      # We must get an interpreter via the cache, instead of using PythonInterpreter.get() directly,
+      # to ensure that the interpreter has setuptools and wheel support.
+      interpreter = PythonInterpreter.get()
+      interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
+                                                PythonRepos.global_instance(),
+                                                logger=context.log.debug)
+      interpreters = interpreter_cache.setup(paths=[os.path.dirname(interpreter.binary)],
+                                            filters=[str(interpreter.identity.requirement)])
+      context.products.get_data(PythonInterpreter, lambda: interpreters[0])
 
-    task = self.create_task(context)
-    task.execute()
+      task = self.create_task(context)
+      task.execute()
 
-    return context.products.get_data(GatherSources.PYTHON_SOURCES)
+      return context.products.get_data(GatherSources.PYTHON_SOURCES)

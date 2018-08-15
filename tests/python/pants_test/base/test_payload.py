@@ -91,17 +91,17 @@ class PayloadTest(TestBase):
     payload = Payload()
     payload.add_field('foo', PrimitiveField('test-value'))
     payload.add_field('bar', PrimitiveField(None))
-    self.assertEquals('test-value', payload.foo);
-    self.assertEquals('test-value', payload.get_field('foo').value)
-    self.assertEquals('test-value', payload.get_field_value('foo'))
-    self.assertEquals(None, payload.bar);
-    self.assertEquals(None, payload.get_field('bar').value)
-    self.assertEquals(None, payload.get_field_value('bar'))
-    self.assertEquals(None, payload.get_field('bar', default='nothing').value)
-    self.assertEquals(None, payload.get_field_value('bar', default='nothing'))
+    self.assertEqual('test-value', payload.foo);
+    self.assertEqual('test-value', payload.get_field('foo').value)
+    self.assertEqual('test-value', payload.get_field_value('foo'))
+    self.assertEqual(None, payload.bar);
+    self.assertEqual(None, payload.get_field('bar').value)
+    self.assertEqual(None, payload.get_field_value('bar'))
+    self.assertEqual(None, payload.get_field('bar', default='nothing').value)
+    self.assertEqual(None, payload.get_field_value('bar', default='nothing'))
     with self.assertRaises(KeyError):
-      self.assertEquals(None, payload.field_doesnt_exist)
-    self.assertEquals(None, payload.get_field('field_doesnt_exist'))
-    self.assertEquals(None, payload.get_field_value('field_doesnt_exist'))
-    self.assertEquals('nothing', payload.get_field('field_doesnt_exist', default='nothing'))
-    self.assertEquals('nothing', payload.get_field_value('field_doesnt_exist', default='nothing'))
+      self.assertEqual(None, payload.field_doesnt_exist)
+    self.assertEqual(None, payload.get_field('field_doesnt_exist'))
+    self.assertEqual(None, payload.get_field_value('field_doesnt_exist'))
+    self.assertEqual('nothing', payload.get_field('field_doesnt_exist', default='nothing'))
+    self.assertEqual('nothing', payload.get_field_value('field_doesnt_exist', default='nothing'))

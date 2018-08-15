@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import open
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -113,7 +114,7 @@ class PrepareServicesTest(TaskTestBase):
 
       def assert_contents(path, services):
         read_services = []
-        with open(os.path.join(chroot, path)) as fp:
+        with open(os.path.join(chroot, path), 'r') as fp:
           for line in fp.readlines():
             line = line.strip()
             if not line.startswith('#'):
