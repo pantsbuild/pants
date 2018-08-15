@@ -609,7 +609,7 @@ function build_pex() {
 
     ./${PEX_PEX} \
       -o "${dest}" \
-      -c pants \
+      --entry-point="pants.bin.pants_loader:main" \
       --no-build \
       --no-pypi \
       --disable-cache \
