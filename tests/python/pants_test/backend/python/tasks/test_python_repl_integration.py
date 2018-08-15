@@ -25,14 +25,14 @@ class PythonReplIntegrationTest(PantsRunIntegrationTest):
   @ensure_daemon
   def test_run_repl_with_2(self):
     # Run a Python 2 repl on a Python 2/3 library target.
-      command = ['repl',
-                'testprojects/src/python/interpreter_selection:echo_interpreter_version_lib',
-                '--python-setup-interpreter-constraints=CPython<3',
-                '--quiet']
-      program = 'from interpreter_selection.echo_interpreter_version import say_hello; say_hello()'
-      pants_run = self.run_pants(command=command, stdin_data=program)
-      version = pants_run.stdout_data.rstrip().split('\n')[0]
-      self.assertRegexpMatches(pants_run.stdout_data, r'2\.\d\.\d')
+    command = ['repl',
+              'testprojects/src/python/interpreter_selection:echo_interpreter_version_lib',
+              '--python-setup-interpreter-constraints=CPython<3',
+              '--quiet']
+    program = 'from interpreter_selection.echo_interpreter_version import say_hello; say_hello()'
+    pants_run = self.run_pants(command=command, stdin_data=program)
+    version = pants_run.stdout_data.rstrip().split('\n')[0]
+    self.assertRegexpMatches(pants_run.stdout_data, r'2\.\d\.\d')
 
   @ensure_daemon
   def test_run_repl_with_3(self):
