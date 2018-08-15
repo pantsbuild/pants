@@ -58,7 +58,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run_3)
 
   def test_run_2_by_option(self):
-    if self.skip_if_no_python('3'):
+    if self.skip_if_no_python('2'):
       return
 
     with temporary_dir() as interpreters_cache:
