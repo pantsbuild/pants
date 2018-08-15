@@ -154,7 +154,7 @@ matrix:
       env:
         - SHARD="Self checks, lint, and JVM tests"
       script:
-        - ./build-support/bin/ci.sh -fkmrjt "${SHARD}"
+        - ./build-support/bin/ci.sh -fkmrjst "${SHARD}"
 
     - <<: *default_test_config
       env:
