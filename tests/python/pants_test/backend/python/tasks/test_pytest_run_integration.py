@@ -153,7 +153,6 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     --python-setup-interpreter-constraints option
     """
     if self.has_python_version('2.7'):
-      py3_path = self.python_interpreter_path('2.7')
       with temporary_dir() as interpreters_cache:
         pants_ini_config = {
           'python-setup': {
@@ -176,7 +175,6 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     --python-setup-interpreter-constraints option
     """
     if self.has_python_version('3'):
-      py3_path = self.python_interpreter_path('3')
       with temporary_dir() as interpreters_cache:
         pants_ini_config = {
           'python-setup': {
