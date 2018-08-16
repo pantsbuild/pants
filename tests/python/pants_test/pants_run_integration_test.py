@@ -24,6 +24,7 @@ from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_open
 from pants.util.objects import datatype
 from pants.util.process_handler import SubprocessProcessHandler, subprocess
+from pants.util.strutil import ensure_binary
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
 
@@ -38,6 +39,8 @@ class PantsJoinHandle(datatype(['command', 'process', 'workdir'])):
     communicate_fn = self.process.communicate
     if tee_output:
       communicate_fn = SubprocessProcessHandler(self.process).communicate_teeing_stdout_and_stderr
+    if stdin_data is not None:
+      stdin_data = ensure_binary(stdin_data)
     (stdout_data, stderr_data) = communicate_fn(stdin_data)
 
     return PantsResult(self.command, self.process.returncode, stdout_data.decode("utf-8"),

@@ -86,7 +86,7 @@ class GoogleJavaFormatCheckFormatTests(TestBase):
     with self.assertRaises(TaskError) as error:
       self.execute(context)
     self.assertEqual(
-      error.exception.message,
+      str(error.exception),
       'google-java-format failed with exit code 1; to fix run: `./pants fmt <targets>`'
     )
 

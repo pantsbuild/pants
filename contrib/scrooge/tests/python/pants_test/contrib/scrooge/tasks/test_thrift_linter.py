@@ -40,8 +40,8 @@ class ThriftLinterTest(TaskTestBase):
     thrift_target = self.create_library('a', 'java_thrift_library', 'a', ['A.thrift'])
     task = self.create_task(self.context(target_roots=thrift_target))
     self._prepare_mocks(task)
-    expected_include_paths = {'src/thrift/tweet', 'src/thrift/users'}
-    expected_paths = {'src/thrift/tweet/a.thrift', 'src/thrift/tweet/b.thrift'}
+    expected_include_paths = ['src/thrift/users', 'src/thrift/tweet']
+    expected_paths = ['src/thrift/tweet/a.thrift', 'src/thrift/tweet/b.thrift']
     mock_calculate_compile_sources.return_value = (expected_include_paths, expected_paths)
     task._lint(thrift_target, task.tool_classpath('scrooge-linter'))
 
@@ -49,6 +49,6 @@ class ThriftLinterTest(TaskTestBase):
       classpath='foo_classpath',
       main='com.twitter.scrooge.linter.Main',
       args=['--ignore-errors', '--include-path', 'src/thrift/users', '--include-path',
-            'src/thrift/tweet', 'src/thrift/tweet/b.thrift', 'src/thrift/tweet/a.thrift'],
+            'src/thrift/tweet', 'src/thrift/tweet/a.thrift', 'src/thrift/tweet/b.thrift'],
       jvm_options=get_default_jvm_options(),
       workunit_labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.SUPPRESS_LABEL])

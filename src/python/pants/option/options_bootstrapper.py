@@ -10,8 +10,6 @@ import os
 import sys
 from builtins import filter, next, object, open
 
-from future.utils import binary_type
-
 from pants.base.build_environment import get_default_pants_config_file
 from pants.engine.fs import FileContent
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
@@ -20,6 +18,7 @@ from pants.option.custom_types import ListValueComponent
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.options import Options
+from pants.util.strutil import ensure_text
 
 
 logger = logging.getLogger(__name__)
@@ -150,8 +149,7 @@ class OptionsBootstrapper(object):
     """Populates the internal bootstrap_options cache."""
     def filecontent_for(path):
       with open(path, 'rb') as fh:
-        if isinstance(path, binary_type):
-          path = path.decode('utf-8')
+        path = ensure_text(path)
         return FileContent(path, fh.read())
 
     # N.B. This adaptor is meant to simulate how we would co-operatively invoke options bootstrap
