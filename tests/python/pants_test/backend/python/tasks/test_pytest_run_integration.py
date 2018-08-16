@@ -164,7 +164,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
             command=[
               'test',
               '{}:test_py2'.format(os.path.join(self.testproject,'python_3_selection_testing')),
-              '--python-setup-interpreter-constraints=CPython<3',
+              '--python-setup-interpreter-constraints=["CPython<3"]',
             ],
             config=pants_ini_config
           )
@@ -186,7 +186,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
             command=[
               'test',
               '{}:test_py3'.format(os.path.join(self.testproject,'python_3_selection_testing')),
-              '--python-setup-interpreter-constraints=CPython>=3',
+              '--python-setup-interpreter-constraints=["CPython>=3"]',
             ],
             config=pants_ini_config
           )

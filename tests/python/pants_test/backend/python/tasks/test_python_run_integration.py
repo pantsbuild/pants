@@ -32,7 +32,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
       pants_run_27 = self.run_pants(
-        command=['run', '{}:echo_interpreter_version_2'.format(self.testproject)],
+        command=['run', '{}:echo_interpreter_version_2.7'.format(self.testproject)],
         config=pants_ini_config
       )
       self.assert_success(pants_run_27)
@@ -66,7 +66,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
       pants_ini_config = {'python-setup': {'interpreter_constraints': ["CPython>=2.7,<4"],
         'interpreter_cache_dir': interpreters_cache}}
       pants_run_2 = self.run_pants(
-        command=['run', '{}:echo_interpreter_version_2'.format(self.testproject),
+        command=['run', '{}:echo_interpreter_version_2.7'.format(self.testproject),
         '--python-setup-interpreter-constraints=["CPython<3"]'],
         config=pants_ini_config
       )
