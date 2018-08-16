@@ -472,7 +472,7 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
           else:
             log = self.context.log.info
             result = self.result_class.successful()
-          log('{0:80}.....{1:>10}'.format(target.address.reference(), result))
+          log('{0:80}.....{1:>10}'.format(target.address.reference(), str(result)))
 
       msgs = [str(_rv) for _rv in results.values() if not _rv.success]
       failed_targets = [target
