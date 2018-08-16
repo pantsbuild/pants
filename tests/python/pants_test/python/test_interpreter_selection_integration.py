@@ -18,7 +18,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
     # Tests that targets with compatibility conflicts collide.
     binary_target = '{}:deliberately_conficting_compatibility'.format(self.testproject)
     pants_run = self._build_pex(binary_target)
-   self.assert_success(pants_run, 'Failed to build {binary}.'.format(binary=binary_target))
+    self.assert_success(pants_run, 'Failed to build {binary}.'.format(binary=binary_target))
 
   def test_conflict_via_config(self):
     # Tests that targets with compatibility conflict with targets with default compatibility.
