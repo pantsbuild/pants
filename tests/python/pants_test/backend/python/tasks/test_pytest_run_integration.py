@@ -158,7 +158,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
         pants_ini_config = {
           'python-setup': {
             'interpreter_constraints': ['CPython>=2.7,<4'],
-            {'interpreter_cache_dir': interpreters_cache}
+            'interpreter_cache_dir': interpreters_cache,
           }
         }
       pants_run_2 = self.run_pants(
@@ -181,7 +181,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
         pants_ini_config = {
           'python-setup': {
             'interpreter_constraints': ['CPython>=2.7,<4'],
-            {'interpreter_cache_dir': interpreters_cache}
+            'interpreter_cache_dir': interpreters_cache,
           }
         }
       pants_run_3 = self.run_pants(
