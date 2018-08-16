@@ -71,14 +71,12 @@ impl EntryWithDeps {
       }) => clause
         .iter()
         .map(|s| SelectKey::JustSelect(s.clone()))
-        .chain(gets.iter().map(|g| SelectKey::JustGet(g.clone())))
+        .chain(gets.iter().map(|g| SelectKey::JustGet(*g)))
         .collect(),
       &EntryWithDeps::Inner(InnerEntry {
         rule: Rule::Intrinsic(Intrinsic { ref input, .. }),
         ..
-      }) => vec![SelectKey::JustSelect(Select::without_variant(
-        input.clone(),
-      ))],
+      }) => vec![SelectKey::JustSelect(Select::without_variant(*input))],
     }
   }
 }
@@ -361,7 +359,7 @@ impl<'t> GraphMaker<'t> {
       Some(RootEntry {
         subject_type: subject_type,
         clause: vec![Select {
-          product: product_type.clone(),
+          product: *product_type,
           variant_key: None,
         }],
         gets: vec![],
@@ -499,10 +497,10 @@ fn task_display(task: &Task) -> String {
     .map(|g| get_str(g))
     .collect::<Vec<_>>()
     .join(", ");
-  get_portion = if !task.gets.is_empty() {
-    format!("[{}], ", get_portion)
-  } else {
+  get_portion = if task.gets.is_empty() {
     "".to_string()
+  } else {
+    format!("[{}], ", get_portion)
   };
   let function_name = function_str(&&task.func);
   format!(
@@ -729,13 +727,13 @@ fn rhs(tasks: &Tasks, subject_type: TypeId, product_type: &TypeConstraint) -> En
     // NB a matching subject is always picked first
     vec![Entry::new_subject_is_product(subject_type)]
   } else if let Some(&(ref key, _)) = tasks.gen_singleton(product_type) {
-    vec![Entry::new_singleton(key.clone(), product_type.clone())]
+    vec![Entry::new_singleton(*key, *product_type)]
   } else {
     let mut entries = Vec::new();
     if let Some(matching_intrinsic) = tasks.gen_intrinsic(product_type) {
       entries.push(Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
         subject_type: subject_type,
-        rule: Rule::Intrinsic(matching_intrinsic.clone()),
+        rule: Rule::Intrinsic(*matching_intrinsic),
       })));
     }
     if let Some(matching_tasks) = tasks.gen_tasks(product_type) {

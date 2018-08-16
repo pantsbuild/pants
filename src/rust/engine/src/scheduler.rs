@@ -286,7 +286,7 @@ impl Scheduler {
       .and_then(|path_stats| {
         fs::Snapshot::from_path_stats(
           store.clone(),
-          fs::OneOffStoreFileByDigest::new(store, posix_fs),
+          &fs::OneOffStoreFileByDigest::new(store, posix_fs),
           path_stats,
         )
       })

@@ -40,12 +40,12 @@ impl Snapshot {
     Error: fmt::Debug + 'static + Send,
   >(
     store: Store,
-    file_digester: S,
+    file_digester: &S,
     path_stats: Vec<PathStat>,
   ) -> BoxFuture<Snapshot, String> {
     let mut sorted_path_stats = path_stats.clone();
     sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-    Snapshot::ingest_directory_from_sorted_path_stats(store, &file_digester, &sorted_path_stats)
+    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &sorted_path_stats)
       .map(|digest| Snapshot { digest, path_stats })
       .to_boxed()
   }
@@ -55,12 +55,12 @@ impl Snapshot {
     Error: fmt::Debug + 'static + Send,
   >(
     store: Store,
-    file_digester: S,
+    file_digester: &S,
     path_stats: &[PathStat],
   ) -> BoxFuture<Digest, String> {
     let mut sorted_path_stats = path_stats.to_owned();
     sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-    Snapshot::ingest_directory_from_sorted_path_stats(store, &file_digester, &sorted_path_stats)
+    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &sorted_path_stats)
   }
 
   fn ingest_directory_from_sorted_path_stats<
@@ -241,7 +241,7 @@ impl Snapshot {
             .get_files()
             .iter()
             .group_by(|f| f.get_name().to_owned());
-          for (file_name, group) in groups.into_iter() {
+          for (file_name, group) in &groups {
             if group.count() > 1 {
               return future::err(format!(
                 "Can only merge Directories with no duplicates, but found duplicate files: {}",
@@ -415,7 +415,7 @@ mod tests {
 
     let path_stats = expand_all_sorted(posix_fs);
     assert_eq!(
-      Snapshot::from_path_stats(store, digester, path_stats.clone())
+      Snapshot::from_path_stats(store, &digester, path_stats.clone())
         .wait()
         .unwrap(),
       Snapshot {
@@ -441,7 +441,7 @@ mod tests {
 
     let path_stats = expand_all_sorted(posix_fs);
     assert_eq!(
-      Snapshot::from_path_stats(store, digester, path_stats.clone())
+      Snapshot::from_path_stats(store, &digester, path_stats.clone())
         .wait()
         .unwrap(),
       Snapshot {
@@ -473,7 +473,7 @@ mod tests {
     let mut unsorted_path_stats = sorted_path_stats.clone();
     unsorted_path_stats.reverse();
     assert_eq!(
-      Snapshot::from_path_stats(store, digester, unsorted_path_stats.clone())
+      Snapshot::from_path_stats(store, &digester, unsorted_path_stats.clone())
         .wait()
         .unwrap(),
       Snapshot {
@@ -596,14 +596,12 @@ mod tests {
     );
 
     let merged = {
-      let snapshot1 = Snapshot::from_path_stats(
-        store.clone(),
-        digester.clone(),
-        vec![dir.clone(), file1.clone()],
-      ).wait()
-        .unwrap();
+      let snapshot1 =
+        Snapshot::from_path_stats(store.clone(), &digester, vec![dir.clone(), file1.clone()])
+          .wait()
+          .unwrap();
       let snapshot2 =
-        Snapshot::from_path_stats(store.clone(), digester, vec![dir.clone(), file2.clone()])
+        Snapshot::from_path_stats(store.clone(), &digester, vec![dir.clone(), file2.clone()])
           .wait()
           .unwrap();
       Snapshot::merge(store.clone(), &[snapshot1, snapshot2])
@@ -648,11 +646,10 @@ mod tests {
     );
 
     let merged_res = {
-      let snapshot1 =
-        Snapshot::from_path_stats(store.clone(), digester.clone(), vec![file.clone()])
-          .wait()
-          .unwrap();
-      let snapshot2 = Snapshot::from_path_stats(store.clone(), digester.clone(), vec![file])
+      let snapshot1 = Snapshot::from_path_stats(store.clone(), &digester, vec![file.clone()])
+        .wait()
+        .unwrap();
+      let snapshot2 = Snapshot::from_path_stats(store.clone(), &digester, vec![file])
         .wait()
         .unwrap();
       Snapshot::merge(store.clone(), &[snapshot1, snapshot2]).wait()

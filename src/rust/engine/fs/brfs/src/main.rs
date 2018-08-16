@@ -1,5 +1,23 @@
+// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  deny(
+    clippy, default_trait_access, expl_impl_clone_on_copy, if_not_else, needless_continue,
+    single_match_else, unseparated_literal_suffix, used_underscore_binding
+  )
+)]
+// It is often more clear to show that nothing is being moved.
+#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+// Subjective style.
+#![cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty, redundant_field_names))]
+// Default isn't as big a deal as people seem to think it is.
+#![cfg_attr(feature = "cargo-clippy", allow(new_without_default, new_without_default_derive))]
+// Arc<Mutex> can be more clear than needing to grok Orderings:
+#![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+
 extern crate bazel_protos;
 extern crate clap;
+extern crate dirs;
 extern crate env_logger;
 extern crate errno;
 extern crate fs;
@@ -53,7 +71,7 @@ fn attr_for(inode: Inode, size: u64, kind: fuse::FileType, perm: u16) -> fuse::F
 }
 
 pub fn digest_from_filepath(str: &str) -> Result<Digest, String> {
-  let mut parts = str.split("-");
+  let mut parts = str.split('-');
   let fingerprint_str = parts
     .next()
     .ok_or_else(|| format!("Invalid digest: {} wasn't of form fingerprint-size", str))?;
@@ -342,16 +360,14 @@ impl BuildResultFS {
 
               Ok(entries)
             }
-            Ok(None) => {
-              return Err(libc::ENOENT);
-            }
+            Ok(None) => Err(libc::ENOENT),
             Err(err) => {
               error!("Error loading directory {:?}: {}", digest, err);
-              return Err(libc::EINVAL);
+              Err(libc::EINVAL)
             }
           }
         }
-        _ => return Err(libc::ENOENT),
+        _ => Err(libc::ENOENT),
       },
     }
   }
@@ -396,11 +412,11 @@ impl fuse::Filesystem for BuildResultFS {
         let maybe_cache_entry = self
           .inode_digest_cache
           .get(&parent)
-          .map(|entry| entry.clone())
+          .cloned()
           .ok_or(libc::ENOENT);
         maybe_cache_entry
           .and_then(|cache_entry| {
-            let parent_digest = cache_entry.digest.clone();
+            let parent_digest = cache_entry.digest;
             self
               .store
               .load_directory(parent_digest)
@@ -499,9 +515,8 @@ impl fuse::Filesystem for BuildResultFS {
             let mut reply = reply.lock().unwrap();
             reply.take().unwrap().data(&bytes.slice(begin, end));
           })
-          .map(|v| match v {
-            Some(_) => {}
-            None => {
+          .map(|v| {
+            if v.is_none() {
               let maybe_reply = reply2.lock().unwrap().take();
               if let Some(reply) = maybe_reply {
                 reply.error(libc::ENOENT);
@@ -585,7 +600,7 @@ pub fn mount<'a, P: AsRef<Path>>(
 }
 
 fn main() {
-  let default_store_path = std::env::home_dir()
+  let default_store_path = dirs::home_dir()
     .expect("Couldn't find homedir")
     .join(".cache")
     .join("pants")
@@ -641,17 +656,25 @@ fn main() {
   }.expect("Error making store");
 
   let _fs = mount(mount_path, store).expect("Error mounting");
-  loop {}
+  loop {
+    std::thread::sleep(std::time::Duration::from_secs(1));
+  }
 }
 
 #[cfg(target_os = "macos")]
 fn unmount(mount_path: &str) -> i32 {
-  unsafe { libc::unmount(CString::new(mount_path).unwrap().as_ptr(), 0) }
+  unsafe {
+    let path = CString::new(mount_path).unwrap();
+    libc::unmount(path.as_ptr(), 0)
+  }
 }
 
 #[cfg(target_os = "linux")]
 fn unmount(mount_path: &str) -> i32 {
-  unsafe { libc::umount(CString::new(mount_path).unwrap().as_ptr()) }
+  unsafe {
+    let path = CString::new(mount_path).unwrap();
+    libc::umount(path.as_ptr())
+  }
 }
 
 #[cfg(test)]

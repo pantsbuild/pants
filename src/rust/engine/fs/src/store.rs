@@ -311,9 +311,7 @@ impl Store {
               let entry_type = digest_entry_types[&digest];
               let remote = remote2.clone();
               local
-                .load_bytes_with(entry_type.clone(), digest.0, move |bytes| {
-                  remote.store_bytes(bytes)
-                })
+                .load_bytes_with(entry_type, digest.0, move |bytes| remote.store_bytes(bytes))
                 .and_then(move |maybe_future| match maybe_future {
                   Some(future) => Ok(future),
                   None => Err(format!("Failed to upload digest {:?}: Not found", digest)),
@@ -709,7 +707,7 @@ mod local {
         let (env, _, lease_database) = self.inner.file_dbs.get()?.get(&digest.0);
         env
           .begin_rw_txn()
-          .and_then(|mut txn| self.lease(&lease_database, &digest.0, until, &mut txn))
+          .and_then(|mut txn| self.lease(lease_database, &digest.0, until, &mut txn))
           .map_err(|err| format!("Error leasing digest {:?}: {}", digest, err))?;
       }
       Ok(())
@@ -724,14 +722,14 @@ mod local {
 
     fn lease(
       &self,
-      database: &Database,
+      database: Database,
       fingerprint: &Fingerprint,
       until_secs_since_epoch: u64,
       txn: &mut RwTransaction,
     ) -> Result<(), lmdb::Error> {
       let mut buf = [0; 8];
       LittleEndian::write_u64(&mut buf, until_secs_since_epoch);
-      txn.put(*database, &fingerprint.as_ref(), &buf, WriteFlags::empty())
+      txn.put(database, &fingerprint.as_ref(), &buf, WriteFlags::empty())
     }
 
     ///
@@ -811,7 +809,7 @@ mod local {
           .open_ro_cursor(*database)
           .map_err(|err| format!("Failed to open lmdb read cursor: {}", err))?;
         for (key, bytes) in cursor.iter() {
-          *used_bytes = *used_bytes + bytes.len();
+          *used_bytes += bytes.len();
 
           // Random access into the lease_database is slower than iterating, but hopefully garbage
           // collection is rare enough that we can get away with this, rather than do two passes
@@ -872,7 +870,7 @@ mod local {
             txn.put(content_database, &fingerprint, &bytes, NO_OVERWRITE)?;
             if initial_lease {
               bytestore.lease(
-                &lease_database,
+                lease_database,
                 &fingerprint,
                 Self::default_lease_until_secs_since_epoch(),
                 &mut txn,
@@ -1691,15 +1689,15 @@ mod remote {
               })
             })
             .and_then(move |received| {
-              if received.get_committed_size() != len as i64 {
+              if received.get_committed_size() == len as i64 {
+                Ok(Digest(fingerprint, len))
+              } else {
                 Err(format!(
                   "Uploading file with fingerprint {}: want commited size {} but got {}",
                   fingerprint,
                   len,
                   received.get_committed_size()
                 ))
-              } else {
-                Ok(Digest(fingerprint, len))
               }
             })
             .to_boxed()

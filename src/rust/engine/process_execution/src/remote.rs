@@ -48,7 +48,7 @@ impl CommandRunner {
   // behavior.
   fn oneshot_execute(
     &self,
-    execute_request: Arc<bazel_protos::remote_execution::ExecuteRequest>,
+    execute_request: &Arc<bazel_protos::remote_execution::ExecuteRequest>,
   ) -> BoxFuture<bazel_protos::operations::Operation, String> {
     let stream = try_future!(
       self
@@ -120,7 +120,7 @@ impl super::CommandRunner for CommandRunner {
               "Executing remotely request: {:?} (command: {:?})",
               execute_request, command
             );
-            command_runner.oneshot_execute(execute_request)
+            command_runner.oneshot_execute(&execute_request)
           })
           .and_then(move |operation| {
             let start_time = Instant::now();
@@ -146,7 +146,7 @@ impl super::CommandRunner for CommandRunner {
                       let execute_request = execute_request2.clone();
                       store.ensure_remote_has_recursive(missing_digests)
                               .and_then(move |()| {
-                                command_runner2.oneshot_execute(execute_request)
+                                command_runner2.oneshot_execute(&execute_request)
                               })
                               // Reset `iter_num` on `MissingDigests`
                               .map(|operation| future::Loop::Continue((operation, 0)))
@@ -541,7 +541,7 @@ impl CommandRunner {
     impl fs::StoreFileByDigest<String> for StoreOneOffRemoteDigest {
       fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
         match self.map_of_paths_to_digests.get(&file.path) {
-          Some(digest) => future::ok(digest.clone()),
+          Some(digest) => future::ok(*digest),
           None => future::err(format!(
             "Didn't know digest for path in remote execution response: {:?}",
             file.path
@@ -553,7 +553,7 @@ impl CommandRunner {
     let store = self.store.clone();
     fs::Snapshot::digest_from_path_stats(
       self.store.clone(),
-      StoreOneOffRemoteDigest::new(path_map),
+      &StoreOneOffRemoteDigest::new(path_map),
       &path_stats,
     ).map_err(move |error| {
       ExecutionError::Fatal(format!(

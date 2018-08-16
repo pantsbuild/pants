@@ -183,37 +183,34 @@ impl MockResponder {
     &self,
     sink: grpcio::UnarySink<super::bazel_protos::operations::Operation>,
   ) {
-    match self
+    if let Some(MockOperation { op, duration }) = self
       .mock_execution
       .operation_responses
       .lock()
       .unwrap()
       .pop_front()
     {
-      Some(MockOperation { op, duration }) => {
-        if let Some(d) = duration {
-          sleep(d);
-        }
-        if let Some(op) = op {
-          // Complete the channel with the op.
-          sink.success(op.clone());
-        } else {
-          // Cancel the request by dropping the sink.
-          drop(sink);
-        }
+      if let Some(d) = duration {
+        sleep(d);
       }
-      None => {
-        sink.fail(grpcio::RpcStatus::new(
-          grpcio::RpcStatusCode::InvalidArgument,
-          Some("Did not expect further requests from client.".to_string()),
-        ));
+      if let Some(op) = op {
+        // Complete the channel with the op.
+        sink.success(op.clone());
+      } else {
+        // Cancel the request by dropping the sink.
+        drop(sink);
       }
+    } else {
+      sink.fail(grpcio::RpcStatus::new(
+        grpcio::RpcStatusCode::InvalidArgument,
+        Some("Did not expect further requests from client.".to_string()),
+      ));
     }
   }
 
   fn send_next_operation_stream(
     &self,
-    ctx: grpcio::RpcContext,
+    ctx: &grpcio::RpcContext,
     sink: grpcio::ServerStreamingSink<super::bazel_protos::operations::Operation>,
   ) {
     match self
@@ -276,7 +273,7 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
       return;
     }
 
-    self.send_next_operation_stream(ctx, sink);
+    self.send_next_operation_stream(&ctx, sink);
   }
 
   fn wait_execution(

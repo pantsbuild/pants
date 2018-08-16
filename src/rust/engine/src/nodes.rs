@@ -269,7 +269,7 @@ impl Select {
     // Compute PathGlobs for the subject.
     let context = context.clone();
     Select::new(
-      context.core.types.path_globs.clone(),
+      context.core.types.path_globs,
       self.subject,
       self.variants.clone(),
       &edges,
@@ -320,7 +320,7 @@ impl Select {
         |entry| match context.core.rule_graph.rule_for_inner(entry) {
           &rule_graph::Rule::Task(ref task) => context.get(Task {
             subject: self.subject,
-            product: self.product().clone(),
+            product: *self.product(),
             variants: self.variants.clone(),
             task: task.clone(),
             entry: Arc::new(entry.clone()),
@@ -507,6 +507,10 @@ impl ExecuteProcess {
       .parse::<f64>()
       .map_err(|err| format!("Timeout was not a float: {:?}", err))?;
 
+    if timeout_in_seconds < 0.0 {
+      return Err(format!("Timeout was negative: {:?}", timeout_in_seconds));
+    }
+
     let description = externs::project_str(&value, "description");
 
     let jdk_home = {
@@ -664,7 +668,7 @@ impl Snapshot {
       .expand(path_globs)
       .map_err(|e| format!("PathGlobs expansion failed: {:?}", e))
       .and_then(move |path_stats| {
-        fs::Snapshot::from_path_stats(context.core.store.clone(), context.clone(), path_stats)
+        fs::Snapshot::from_path_stats(context.core.store.clone(), &context, path_stats)
           .map_err(move |e| format!("Snapshot failed: {}", e))
       })
       .map_err(|e| throw(&e))
@@ -790,7 +794,7 @@ pub struct Task {
 impl Task {
   fn gen_get(
     context: &Context,
-    entry: Arc<rule_graph::Entry>,
+    entry: &Arc<rule_graph::Entry>,
     gets: Vec<externs::Get>,
   ) -> NodeFuture<Vec<Value>> {
     let get_futures = gets
@@ -800,11 +804,11 @@ impl Task {
         let entries = context
           .core
           .rule_graph
-          .edges_for_inner(&entry)
+          .edges_for_inner(entry)
           .expect("edges for task exist.")
           .entries_for(&rule_graph::SelectKey::JustGet(selectors::Get {
             product: product,
-            subject: subject.type_id().clone(),
+            subject: *subject.type_id(),
           }));
         Select::new_with_entries(product, subject, Variants::default(), entries)
           .run(context.clone())
@@ -828,10 +832,10 @@ impl Task {
       let entry = entry.clone();
       future::result(externs::generator_send(&generator, &input)).and_then(move |response| {
         match response {
-          externs::GeneratorResponse::Get(get) => Self::gen_get(&context, entry, vec![get])
+          externs::GeneratorResponse::Get(get) => Self::gen_get(&context, &entry, vec![get])
             .map(|vs| future::Loop::Continue(vs.into_iter().next().unwrap()))
             .to_boxed(),
-          externs::GeneratorResponse::GetMulti(gets) => Self::gen_get(&context, entry, gets)
+          externs::GeneratorResponse::GetMulti(gets) => Self::gen_get(&context, &entry, gets)
             .map(|vs| future::Loop::Continue(externs::store_tuple(&vs)))
             .to_boxed(),
           externs::GeneratorResponse::Break(val) => future::ok(future::Loop::Break(val)).to_boxed(),

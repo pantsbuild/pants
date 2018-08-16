@@ -1,7 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -12,6 +11,7 @@ use futures::Future;
 
 use boxfuture::{BoxFuture, Boxable};
 use core::{Failure, TypeId};
+use dirs;
 use fs::{safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
 use graph::{EntryId, Graph, NodeContext};
 use handles::maybe_drop_handles;
@@ -43,12 +43,13 @@ pub struct Core {
 }
 
 impl Core {
+  #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
   pub fn new(
     root_subject_types: Vec<TypeId>,
     tasks: Tasks,
     types: Types,
     build_root: &Path,
-    ignore_patterns: Vec<String>,
+    ignore_patterns: &[String],
     work_dir: PathBuf,
     remote_store_server: Option<String>,
     remote_execution_server: Option<String>,
@@ -63,7 +64,7 @@ impl Core {
       Arc::new(Runtime::new().unwrap_or_else(|e| panic!("Could not initialize Runtime: {:?}", e)))
     });
 
-    let store_path = match std::env::home_dir() {
+    let store_path = match dirs::home_dir() {
       Some(home_dir) => home_dir.join(".cache").join("pants").join("lmdb_store"),
       None => panic!("Could not find home dir"),
     };

@@ -1,6 +1,23 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  deny(
+    clippy, default_trait_access, expl_impl_clone_on_copy, if_not_else, needless_continue,
+    single_match_else, unseparated_literal_suffix, used_underscore_binding
+  )
+)]
+// It is often more clear to show that nothing is being moved.
+#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+// Subjective style.
+#![cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty, redundant_field_names))]
+// Default isn't as big a deal as people seem to think it is.
+#![cfg_attr(feature = "cargo-clippy", allow(new_without_default, new_without_default_derive))]
+// Arc<Mutex> can be more clear than needing to grok Orderings:
+#![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+
 extern crate boxfuture;
 extern crate fnv;
 extern crate futures;
@@ -163,7 +180,9 @@ impl<N: Node> InnerGraph<N> {
 
     // Clear roots and remove their outbound edges.
     for id in &root_ids {
-      self.pg.node_weight_mut(*id).map(|entry| entry.clear());
+      if let Some(entry) = self.pg.node_weight_mut(*id) {
+        entry.clear();
+      }
     }
     self.pg.retain_edges(|pg, edge| {
       if let Some((src, _)) = pg.edge_endpoints(edge) {
@@ -295,7 +314,7 @@ impl<N: Node> InnerGraph<N> {
       let minimum_path_id = root_ids
         .iter()
         .min_by_key(|root_id| path_weights[root_id.index()] as usize)
-        .ok_or_else(|| format!("Encountered a Node that was not reachable from any roots."))?;
+        .ok_or_else(|| "Encountered a Node that was not reachable from any roots.".to_owned())?;
 
       // Collect the path by walking through the `paths` Vec, which contains the indexes of
       // predecessor Nodes along a path to the bottom Node.
@@ -333,7 +352,7 @@ impl<N: Node> InnerGraph<N> {
     let file = try!(OpenOptions::new().append(true).open(file_path));
     let mut f = BufWriter::new(file);
 
-    let _format = |eid: EntryId, depth: usize, is_last: bool| -> String {
+    let format = |eid: EntryId, depth: usize, is_last: bool| -> String {
       let entry = self.unsafe_entry_for_id(eid);
       let indent = "  ".repeat(depth);
       let output = format!("{}Computing {}", indent, entry.node().format());
@@ -354,7 +373,7 @@ impl<N: Node> InnerGraph<N> {
       try!(writeln!(
         &mut f,
         "{}",
-        _format(*id, depth, path_iter.peek().is_none())
+        format(*id, depth, path_iter.peek().is_none())
       ));
     }
 

@@ -23,7 +23,7 @@ impl RunToken {
     RunToken(0)
   }
 
-  fn next(&self) -> RunToken {
+  fn next(self) -> RunToken {
     RunToken(self.0 + 1)
   }
 }
@@ -45,11 +45,12 @@ impl Generation {
     Generation(0)
   }
 
-  fn next(&self) -> Generation {
+  fn next(self) -> Generation {
     Generation(self.0 + 1)
   }
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(type_complexity))]
 pub(crate) enum EntryState<N: Node> {
   // A node that has either been explicitly cleared, or has not yet started Running. In this state
   // there is no need for a dirty bit because the RunToken is either in its initial state, or has

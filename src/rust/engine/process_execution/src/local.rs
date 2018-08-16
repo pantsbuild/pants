@@ -79,7 +79,7 @@ impl CommandRunner {
 
         fs::Snapshot::from_path_stats(
           store.clone(),
-          fs::OneOffStoreFileByDigest::new(store, posix_fs),
+          &fs::OneOffStoreFileByDigest::new(store, posix_fs),
           paths.into_iter().filter_map(|v| v).collect(),
         )
       })
@@ -156,7 +156,7 @@ impl StreamedHermeticCommand {
           ChildOutput::Exit(
             exit_status
               .code()
-              .or(exit_status.signal().map(Neg::neg))
+              .or_else(|| exit_status.signal().map(Neg::neg))
               .expect("Child process should exit via returned code or signal."),
           )
         });
