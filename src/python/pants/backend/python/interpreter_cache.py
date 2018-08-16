@@ -79,8 +79,6 @@ class PythonInterpreterCache(object):
     filters = set()
 
     if self._python_setup.get_options().is_flagged('interpreter_constraints'):
-      # Pants will append the CLI-supplied constraints after the pants.ini constraints by default
-      # and we want to take only the CLI-supplied constraints in this case.
       filters.update(self._python_setup.get_options().interpreter_constraints)
     else:
       for target in targets:
