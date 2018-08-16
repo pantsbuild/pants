@@ -159,7 +159,8 @@ def ensure_setup_requires_site_dir(reqs_to_resolve, interpreter, site_dir,
   if not reqs_to_resolve:
     return None
 
-  setup_requires_dists = resolve_multi(interpreter, reqs_to_resolve, platforms, None)
+  precedence = PythonSetup.global_instance().resolver_precedence
+  setup_requires_dists = resolve_multi(interpreter, reqs_to_resolve, platforms, None, precedence)
 
   # FIXME: there's no description of what this does or why it's necessary.
   overrides = {
