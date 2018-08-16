@@ -93,7 +93,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
 
       buildroot.write_file(test_src, '')
 
-      # Create a pex from a simple python_binary target and assert it has zip_safe=True (default).
+      # Create a pex from a simple python_binary target and assert it has zip_safe=True (default)
       buildroot.write_file(
         test_build,
         '''
