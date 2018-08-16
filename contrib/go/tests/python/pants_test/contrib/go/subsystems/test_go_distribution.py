@@ -17,6 +17,14 @@ from pants.contrib.go.subsystems.go_distribution import GoDistribution
 
 class GoDistributionTest(unittest.TestCase):
 
+  @staticmethod
+  def _generate_go_command_regex(gopath, final_value):
+    goroot_env = r'GOROOT=[^ ]+'
+    gopath_env = r'GOPATH={}'.format(gopath)
+    # order of env values varies by interpreter and platform
+    env_values = r'({goroot_env} {gopath_env}|{gopath_env} {goroot_env})'.format(goroot_env=goroot_env, gopath_env=gopath_env)
+    return r'^{env_values} .*/go env {final_value}$'.format(env_values=env_values, final_value=final_value)
+
   def distribution(self):
     return global_subsystem_instance(GoDistribution)
 
@@ -48,11 +56,7 @@ class GoDistributionTest(unittest.TestCase):
     self.assertEqual(['env', 'GOPATH'], go_cmd.cmdline[1:])
     self.assertEqual(default_gopath, go_cmd.check_output().decode('utf-8').strip())
 
-    goroot_env = r'GOROOT=[^ ]+'
-    gopath_env = r'GOPATH={}'.format(default_gopath)
-    # order of env values varies by interpreter and platform
-    env_values = r'({goroot_env} {gopath_env}|{gopath_env} {goroot_env})'.format(goroot_env=goroot_env, gopath_env=gopath_env)
-    regex = r'^{env_values} .*/go env GOPATH$'.format(env_values=env_values)
+    regex = GoDistributionTest._generate_go_command_regex(gopath=default_gopath, final_value='GOPATH')
     self.assertRegexpMatches(str(go_cmd), regex)
 
   def test_go_command_no_gopath(self):
@@ -74,9 +78,5 @@ class GoDistributionTest(unittest.TestCase):
     self.assertEqual('go', os.path.basename(go_cmd.cmdline[0]))
     self.assertEqual(['env', 'GOROOT'], go_cmd.cmdline[1:])
 
-    goroot_env = r'GOROOT=[^ ]+'
-    gopath_env = r'GOPATH=/tmp/fred'
-    # order of env values varies by interpreter and platform
-    env_values = r'({goroot_env} {gopath_env}|{gopath_env} {goroot_env})'.format(goroot_env=goroot_env, gopath_env=gopath_env)
-    regex = r'^{env_values} .*/go env GOROOT$'.format(env_values=env_values)
+    regex = GoDistributionTest._generate_go_command_regex(gopath='/tmp/fred', final_value='GOROOT')
     self.assertRegexpMatches(str(go_cmd), regex)
