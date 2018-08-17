@@ -20,7 +20,6 @@ python_tests(
   name='cloc_integration',
   sources=['test_cloc_integration.py'],
   dependencies=[
-    '3rdparty/python:future',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},

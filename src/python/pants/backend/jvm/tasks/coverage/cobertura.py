@@ -219,7 +219,7 @@ class Cobertura(CoverageEngine):
       for pattern in self._exclude_classes:
         args += ["--excludeClasses", pattern]
 
-      with temporary_file() as tmp_file:
+      with temporary_file(binary_mode=False) as tmp_file:
         tmp_file.write("\n".join(unique_files))
         tmp_file.flush()
 

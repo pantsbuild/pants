@@ -86,7 +86,7 @@ class JarTaskTest(BaseJarTaskTest):
 
         with open_zip(existing_jarfile) as jar:
           self.assert_listing(jar, 'f/', 'f/g/', 'f/g/h')
-          self.assertEqual('e', jar.read('f/g/h'))
+          self.assertEqual(b'e', jar.read('f/g/h'))
 
   def test_update_writestr(self):
     def assert_writestr(path, contents, *entries):
@@ -115,7 +115,7 @@ class JarTaskTest(BaseJarTaskTest):
 
         with open_zip(existing_jarfile) as jar:
           self.assert_listing(jar, 'f/', 'f/g/', 'f/g/h')
-          self.assertEqual('e', jar.read('f/g/h'))
+          self.assertEqual(b'e', jar.read('f/g/h'))
 
   def test_overwrite_writestr(self):
     with self.jarfile() as existing_jarfile:
@@ -124,7 +124,7 @@ class JarTaskTest(BaseJarTaskTest):
 
       with open_zip(existing_jarfile) as jar:
         self.assert_listing(jar, 'README')
-        self.assertEqual('42', jar.read('README'))
+        self.assertEqual(b'42', jar.read('README'))
 
   @contextmanager
   def _test_custom_manifest(self):
@@ -136,7 +136,7 @@ class JarTaskTest(BaseJarTaskTest):
 
       with open_zip(existing_jarfile) as jar:
         self.assert_listing(jar, 'README')
-        self.assertEqual('42', jar.read('README'))
+        self.assertEqual(b'42', jar.read('README'))
         self.assertNotEqual(manifest_contents, jar.read('META-INF/MANIFEST.MF'))
 
       with self.jar_task.open_jar(existing_jarfile, overwrite=False) as jar:
@@ -144,7 +144,7 @@ class JarTaskTest(BaseJarTaskTest):
 
       with open_zip(existing_jarfile) as jar:
         self.assert_listing(jar, 'README')
-        self.assertEqual('42', jar.read('README'))
+        self.assertEqual(b'42', jar.read('README'))
         self.assertEqual(manifest_contents, jar.read('META-INF/MANIFEST.MF'))
 
   def test_custom_manifest_str(self):
@@ -173,10 +173,10 @@ class JarTaskTest(BaseJarTaskTest):
 
   def test_classpath(self):
     def manifest_content(classpath):
-      return (b'Manifest-Version: 1.0\r\n' +
-              b'Class-Path: {}\r\n' +
-              b'Created-By: org.pantsbuild.tools.jar.JarBuilder\r\n\r\n').format(
-                ' '.join(maybe_list(classpath)))
+      return ('Manifest-Version: 1.0\r\n' +
+              'Class-Path: {}\r\n' +
+              'Created-By: org.pantsbuild.tools.jar.JarBuilder\r\n\r\n').format(
+                ' '.join(maybe_list(classpath))).encode('utf-8')
 
     def assert_classpath(classpath):
       with self.jarfile() as existing_jarfile:
@@ -269,9 +269,9 @@ class JarBuilderTest(BaseJarTaskTest):
 
       with open_zip(existing_jarfile) as jar:
         self.assert_listing(jar, 'FakeAgent.class')
-        self.assertEqual('0xCAFEBABE', jar.read('FakeAgent.class'))
+        self.assertEqual(b'0xCAFEBABE', jar.read('FakeAgent.class'))
 
-        manifest = jar.read('META-INF/MANIFEST.MF').strip()
+        manifest = jar.read('META-INF/MANIFEST.MF').decode('utf-8').strip()
         all_entries = dict(tuple(re.split(r'\s*:\s*', line, 1)) for line in manifest.splitlines())
         expected_entries = {
             'Agent-Class': 'fred',
@@ -306,7 +306,7 @@ class JarBuilderTest(BaseJarTaskTest):
           jar_builder.add_target(binary_target)
 
       with open_zip(existing_jarfile) as jar:
-        manifest = jar.read('META-INF/MANIFEST.MF').strip()
+        manifest = jar.read('META-INF/MANIFEST.MF').decode('utf-8').strip()
         all_entries = dict(tuple(re.split(r'\s*:\s*', line, 1)) for line in manifest.splitlines())
         expected_entries = {
           'Foo': 'foo-value',
