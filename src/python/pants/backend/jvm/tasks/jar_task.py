@@ -8,7 +8,7 @@ import os
 import shutil
 import tempfile
 from abc import abstractmethod
-from builtins import bytes, object, open, str
+from builtins import bytes, object, open
 from contextlib import contextmanager
 
 from future.utils import iteritems, string_types
