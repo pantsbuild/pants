@@ -40,7 +40,7 @@ class GatherSources(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
-    round_manager.require_data('python')  # For codegen.
+    round_manager.optional_data('python')  # For codegen.
 
   def execute(self):
     targets = self._collect_source_targets()
