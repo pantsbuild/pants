@@ -116,7 +116,6 @@ class Semver(Version):
            (other.major, other.minor, other.patch, other.snapshot)
 
   def __lt__(self, other):
-    # import pdb; pdb.set_trace()
     diff = self.major - other.major
     if diff:
       return self.major < other.major
