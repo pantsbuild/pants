@@ -511,6 +511,10 @@ class SetupPy(Task):
     """
     # NB: several explicit str conversions below force non-unicode strings in order to comply
     # with setuptools expectations.
+    #
+    # Because we rely on pprint to generate the content, we must treat Py2 and Py3 differently. In Py2, unicode strings
+    # have the prefix 'u', and in Py3 byte strings have the prefix 'b'. The goal is to have no prefix displayed, so to
+    # do this we have to use bytes in Py2 and unicode in Py3.
 
     setup_keywords = root_target.provides.setup_py_keywords.copy()
 
