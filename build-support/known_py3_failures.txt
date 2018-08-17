@@ -33,7 +33,6 @@ tests/python/pants_test/help:build_dictionary_info_extracter
 tests/python/pants_test/init:init
 tests/python/pants_test/jvm/subsystems:jvm
 tests/python/pants_test/jvm:test_safeargs
-tests/python/pants_test/option:testing
 tests/python/pants_test/pantsd:pants_daemon
 tests/python/pants_test/pantsd:process_manager
 tests/python/pants_test/pantsd:watchman
