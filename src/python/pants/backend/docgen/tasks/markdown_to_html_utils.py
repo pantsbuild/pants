@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import sys
-from builtins import range
+from builtins import open, range
 
 import markdown
 from docutils.core import publish_parts
@@ -133,7 +133,7 @@ class IncludeExcerptPattern(markdown.inlinepatterns.Pattern):
     source_dir = os.path.dirname(self.source_path)
     include_path = os.path.join(source_dir, rel_include_path)
     try:
-      with open(include_path) as include_file:
+      with open(include_path, 'r') as include_file:
         file_text = include_file.read()
     except IOError as e:
       raise IOError('Markdown file {0} tried to include file {1}, got '

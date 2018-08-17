@@ -3,6 +3,7 @@
 
 python_library(
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/backend/jvm/tasks/reports/templates',
     'src/python/pants/base:mustache',
     'src/python/pants/util:dirutil',

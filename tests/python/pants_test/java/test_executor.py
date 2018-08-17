@@ -42,7 +42,7 @@ class SubprocessExecutorTest(unittest.TestCase):
                                  stderr=subprocess.PIPE)
         _, stderr = process.communicate()
         self.assertEqual(0, process.returncode)
-        self.assertEqual('' if scrubbed else env_value, stderr.strip())
+        self.assertEqual('' if scrubbed else env_value, stderr.decode('utf-8').strip())
 
   def test_not_scrubbed(self):
     self.do_test_jre_env_var('FRED', 'frog', scrubbed=False)

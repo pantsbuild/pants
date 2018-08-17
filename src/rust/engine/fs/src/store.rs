@@ -5,7 +5,7 @@ use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use futures::{future, Future};
 use hashing::Digest;
-use protobuf::core::Message;
+use protobuf::Message;
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -410,10 +410,7 @@ impl Store {
     destination: PathBuf,
     digest: Digest,
   ) -> BoxFuture<(), String> {
-    match super::safe_create_dir_all(&destination) {
-      Ok(()) => {}
-      Err(e) => return future::err(e).to_boxed(),
-    };
+    try_future!(super::safe_create_dir_all(&destination));
     let store = self.clone();
     self
       .load_directory(digest)

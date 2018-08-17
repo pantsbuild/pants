@@ -30,14 +30,14 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     'testprojects/src/python/python_distribution/ctypes_with_third_party:bin_with_third_party'
   )
 
-  def test_run(self):
+  def test_ctypes_run(self):
     pants_run = self.run_pants(command=['run', self._binary_target])
     self.assert_success(pants_run)
 
     # This is the entire output from main.py.
     self.assertIn('x=3, f(x)=17', pants_run.stdout_data)
 
-  def test_binary(self):
+  def test_ctypes_binary(self):
     with temporary_dir() as tmp_dir:
       pants_run = self.run_pants(command=['binary', self._binary_target], config={
         GLOBAL_SCOPE_CONFIG_SECTION: {
@@ -75,7 +75,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
       # Execute the binary and ensure its output is correct.
       binary_run_output = invoke_pex_for_output(pex)
-      self.assertIn('x=3, f(x)=17', binary_run_output)
+      self.assertEqual('x=3, f(x)=17\n', binary_run_output)
 
   def test_ctypes_third_party_integration(self):
     pants_binary = self.run_pants(
@@ -95,3 +95,24 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     )
     self.assert_success(pants_run)
     self.assertIn('Test worked!', pants_run.stdout_data)
+
+  def test_pants_native_source_detection_for_local_ctypes_dists_for_current_platform_only(self):
+    """Test that `./pants run` respects platforms when the closure contains native sources.
+
+    To do this, we need to setup a pants.ini that contains two platform defauts: (1) "current" and
+    (2) a different platform than the one we are currently running on. The python_binary() target
+    below is declared with `platforms="current"`.
+    """
+    # Clean all to rebuild requirements pex.
+    command = [
+      'clean-all',
+      'run',
+      'testprojects/src/python/python_distribution/ctypes:bin'
+    ]
+    pants_run = self.run_pants(command=command, config={
+      'python-setup': {
+        'platforms': ['current', 'this-platform-does_not-exist']
+      },
+    })
+    self.assert_success(pants_run)
+    self.assertIn('x=3, f(x)=17', pants_run.stdout_data)

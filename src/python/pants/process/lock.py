@@ -8,6 +8,7 @@ import errno
 import logging
 import os
 import sys
+from builtins import open
 
 import psutil
 from fasteners import InterProcessLock

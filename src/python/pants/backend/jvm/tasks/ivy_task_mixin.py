@@ -7,12 +7,14 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import hashlib
 import logging
 import os
+from builtins import str
+
+from future.utils import PY3
 
 from pants.backend.jvm.ivy_utils import NO_RESOLVE_RUN_RESULT, IvyFetchStep, IvyResolveStep
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
@@ -49,7 +51,7 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
       return None
 
     hasher = hashlib.sha1()
-    hasher.update(target.payload.fingerprint())
+    hasher.update(target.payload.fingerprint().encode('utf-8'))
 
     for conf in self._confs:
       hasher.update(conf)
@@ -57,7 +59,7 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
     for element in hash_elements_for_target:
       hasher.update(element)
 
-    return hasher.hexdigest()
+    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def __hash__(self):
     return hash((type(self), '-'.join(self._confs)))
@@ -99,19 +101,6 @@ class IvyTaskMixin(TaskBase):
   @classmethod
   def implementation_version(cls):
     return super(IvyTaskMixin, cls).implementation_version() + [('IvyTaskMixin', 4)]
-
-  @memoized_property
-  @deprecated(removal_version='1.10.0.dev0',
-              hint_message='Use ivy_repository_cache_dir or ivy_resolution_cache_dir instead.')
-  def ivy_cache_dir(self):
-    """The path of the ivy cache dir used for resolves.
-
-    :API: public
-
-    :rtype: string
-    """
-    # TODO(John Sirois): Fixup the IvySubsystem to encapsulate its properties.
-    return IvySubsystem.global_instance().get_options().cache_dir
 
   @memoized_property
   def ivy_repository_cache_dir(self):

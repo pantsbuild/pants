@@ -6,8 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import functools
 import os
+from builtins import object, open, str
 from multiprocessing import cpu_count
 
+from future.utils import string_types
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
@@ -17,6 +19,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
+from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
   CLASS_NOT_FOUND_ERROR_PATTERNS
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
@@ -27,6 +30,7 @@ from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (Compi
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
@@ -233,7 +237,7 @@ class JvmCompile(NailgunTaskBase):
   def select_source(self, source_file_path):
     raise NotImplementedError()
 
-  def compile(self, ctx, args, classpath, upstream_analysis,
+  def compile(self, ctx, args, dependency_classpath, upstream_analysis,
               settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     """Invoke the compiler.
@@ -242,7 +246,8 @@ class JvmCompile(NailgunTaskBase):
 
     :param CompileContext ctx: A CompileContext for the target to compile.
     :param list args: Arguments to the compiler (such as javac or zinc).
-    :param list classpath: List of classpath entries.
+    :param list dependency_classpath: List of classpath entries of type ClasspathEntry for
+      dependencies.
     :param upstream_analysis: A map from classpath entry to analysis file for dependencies.
     :param JvmPlatformSettings settings: platform settings determining the -source, -target, etc for
       javac to use.
@@ -257,6 +262,9 @@ class JvmCompile(NailgunTaskBase):
   # ------------------------
   def extra_compile_time_classpath_elements(self):
     """Extra classpath elements common to all compiler invocations.
+
+    These should be of type ClasspathEntry, but strings are also supported for backwards
+    compatibility.
 
     E.g., jars for compiler plugins.
 
@@ -360,11 +368,6 @@ class JvmCompile(NailgunTaskBase):
     # Clone the compile_classpath to the runtime_classpath.
     classpath_product = self.create_runtime_classpath()
 
-    def classpath_for_context(context):
-      if self.get_options().use_classpath_jars:
-        return context.jar_file
-      return context.classes_dir
-
     fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
         classpath_product)
     # Note, JVM targets are validated (`vts.update()`) as they succeed.  As a result,
@@ -375,25 +378,14 @@ class JvmCompile(NailgunTaskBase):
                           fingerprint_strategy=fingerprint_strategy,
                           topological_order=True) as invalidation_check:
 
-
-      # Register runtime classpath products for all targets.
       compile_contexts = {vt.target: self.create_compile_context(vt.target, vt.results_dir)
                           for vt in invalidation_check.all_vts}
-      for ccs in compile_contexts.values():
-        cc = self.select_runtime_context(ccs)
-        classpath_product.add_for_target(cc.target, [(conf, classpath_for_context(cc))
-                                                     for conf in self._confs])
 
-      # Register products for valid targets.
-      valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
-      self.register_extra_products_from_contexts(valid_targets, compile_contexts)
-
-      # Build any invalid targets (which will register products in the background).
-      if invalidation_check.invalid_vts:
-        self.do_compile(
-          invalidation_check,
-          compile_contexts,
-        )
+      self.do_compile(
+        invalidation_check,
+        compile_contexts,
+        classpath_product,
+      )
 
       if not self.get_options().use_classpath_jars:
         # Once compilation has completed, replace the classpath entry for each target with
@@ -403,6 +395,11 @@ class JvmCompile(NailgunTaskBase):
           for conf in self._confs:
             classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
             classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
+
+  def _classpath_for_context(self, context):
+    if self.get_options().use_classpath_jars:
+      return context.jar_file
+    return context.classes_dir
 
   def create_runtime_classpath(self):
     compile_classpath = self.context.products.get_data('compile_classpath')
@@ -414,11 +411,23 @@ class JvmCompile(NailgunTaskBase):
 
     return classpath_product
 
-  def do_compile(self, invalidation_check, compile_contexts):
+  def do_compile(self, invalidation_check, compile_contexts, classpath_product):
     """Executes compilations for the invalid targets contained in a single chunk."""
 
     invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
-    assert invalid_targets, "compile_chunk should only be invoked if there are invalid targets."
+    valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
+
+    # Register classpaths and products for valid targets.
+    for valid_target in valid_targets:
+      cc = self.select_runtime_context(compile_contexts[valid_target])
+      classpath_product.add_for_target(
+        valid_target,
+        [(conf, self._classpath_for_context(cc)) for conf in self._confs],
+      )
+    self.register_extra_products_from_contexts(valid_targets, compile_contexts)
+
+    if not invalid_targets:
+      return
 
     # This ensures the workunit for the worker pool is set before attempting to compile.
     with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self.name())) \
@@ -439,30 +448,30 @@ class JvmCompile(NailgunTaskBase):
     # generated by upstream JVM tasks and our own prepare_compile().
     jobs = self._create_compile_jobs(compile_contexts,
                                      invalid_targets,
-                                     invalidation_check.invalid_vts)
+                                     invalidation_check.invalid_vts,
+                                     classpath_product)
 
-    exec_graph = ExecutionGraph(jobs)
+    exec_graph = ExecutionGraph(jobs, self.get_options().print_exception_stacktrace)
     try:
       exec_graph.execute(worker_pool, self.context.log)
     except ExecutionFailure as e:
       raise TaskError("Compilation failure: {}".format(e))
 
-  def _record_compile_classpath(self, classpath, targets, outdir):
+  def _record_compile_classpath(self, classpath, target, outdir):
     relative_classpaths = [fast_relpath(path, self.get_options().pants_workdir) for path in classpath]
     text = '\n'.join(relative_classpaths)
-    for target in targets:
-      path = os.path.join(outdir, 'compile_classpath', '{}.txt'.format(target.id))
-      safe_mkdir(os.path.dirname(path), clean=False)
-      with open(path, 'w') as f:
-        f.write(text.encode('utf-8'))
+    path = os.path.join(outdir, 'compile_classpath', '{}.txt'.format(target.id))
+    safe_mkdir(os.path.dirname(path), clean=False)
+    with open(path, 'w') as f:
+      f.write(text)
 
-  def _compile_vts(self, vts, ctx, upstream_analysis, classpath, progress_message, settings, 
+  def _compile_vts(self, vts, ctx, upstream_analysis, dependency_classpath, progress_message, settings,
                    compiler_option_sets, zinc_file_manager, counter):
     """Compiles sources for the given vts into the given output dir.
 
     :param vts: VersionedTargetSet with one entry for the target.
     :param ctx: - A CompileContext instance for the target.
-    :param classpath: A list of classpath entries
+    :param dependency_classpath: A list of classpath entries of type ClasspathEntry for dependencies
 
     May be invoked concurrently on independent target sets.
 
@@ -486,14 +495,11 @@ class JvmCompile(NailgunTaskBase):
         progress_message,
         ').')
       with self.context.new_workunit('compile', labels=[WorkUnitLabel.COMPILER]) as compile_workunit:
-        if self.get_options().capture_classpath:
-          self._record_compile_classpath(classpath, vts.targets, ctx.classes_dir)
-
         try:
           self.compile(
             ctx,
             self._args,
-            classpath,
+            dependency_classpath,
             upstream_analysis,
             settings,
             compiler_option_sets,
@@ -598,12 +604,11 @@ class JvmCompile(NailgunTaskBase):
 
         path_to_buildozer = self.get_options().buildozer
         if path_to_buildozer:
-          suggestion_msg += ("\nYou can do this by running {buildozer} "
-                             "'add dependencies {deps}' {target}".format(
-                                 buildozer=path_to_buildozer,
-                                 deps=" ".join(sorted(suggested_deps)),
-                                 target=target.address.spec
-                             )
+          suggestion_msg += ("\nYou can do this by running:\n"
+                             "  {buildozer} 'add dependencies {deps}' {target}".format(
+                               buildozer=path_to_buildozer,
+                               deps=" ".join(sorted(suggested_deps)),
+                               target=target.address.spec)
                             )
 
         self.context.log.info(suggestion_msg)
@@ -624,17 +629,18 @@ class JvmCompile(NailgunTaskBase):
       compile_contexts_by_directory[compile_context.classes_dir] = compile_context
     # If we have a compile context for the target, include it.
     for entry in classpath_entries:
-      if not entry.endswith('.jar'):
-        compile_context = compile_contexts_by_directory.get(entry)
+      path = entry.path
+      if not path.endswith('.jar'):
+        compile_context = compile_contexts_by_directory.get(path)
         if not compile_context:
-          self.context.log.debug('Missing upstream analysis for {}'.format(entry))
+          self.context.log.debug('Missing upstream analysis for {}'.format(path))
         else:
           yield compile_context.classes_dir, compile_context.analysis_file
 
   def exec_graph_key_for_target(self, compile_target):
     return "compile({})".format(compile_target.address.spec)
 
-  def _create_compile_jobs(self, compile_contexts, invalid_targets, invalid_vts):
+  def _create_compile_jobs(self, compile_contexts, invalid_targets, invalid_vts, classpath_product):
     class Counter(object):
       def __init__(self, size, initial=0):
         self.size = size
@@ -658,11 +664,11 @@ class JvmCompile(NailgunTaskBase):
 
       jobs.extend(
         self.create_compile_jobs(compile_target, compile_contexts, invalid_dependencies, ivts,
-          counter))
+          counter, classpath_product))
     return jobs
 
   def create_compile_jobs(self, compile_target, all_compile_contexts, invalid_dependencies, ivts,
-    counter):
+    counter, classpath_product):
 
     def work_for_vts(vts, ctx):
       progress_message = ctx.target.address.spec
@@ -672,9 +678,13 @@ class JvmCompile(NailgunTaskBase):
 
       if not hit_cache:
         # Compute the compile classpath for this target.
-        cp_entries = self._cp_entries_for_ctx(ctx, 'runtime_classpath')
+        dependency_cp_entries = self._zinc.compile_classpath_entries(
+          'runtime_classpath',
+          ctx.target,
+          extra_cp_entries=self._extra_compile_time_classpath,
+        )
 
-        upstream_analysis = dict(self._upstream_analysis(all_compile_contexts, cp_entries))
+        upstream_analysis = dict(self._upstream_analysis(all_compile_contexts, dependency_cp_entries))
 
         is_incremental = self.should_compile_incrementally(vts, ctx)
         if not is_incremental:
@@ -691,14 +701,14 @@ class JvmCompile(NailgunTaskBase):
           self._compile_vts(vts,
                             ctx,
                             upstream_analysis,
-                            cp_entries,
+                            dependency_cp_entries,
                             progress_message,
                             tgt.platform,
                             compiler_option_sets,
                             zinc_file_manager,
                             counter)
         self._record_target_stats(tgt,
-                                  len(cp_entries),
+                                  len(dependency_cp_entries),
                                   len(ctx.sources),
                                   timer.elapsed,
                                   is_incremental,
@@ -711,6 +721,10 @@ class JvmCompile(NailgunTaskBase):
         self._create_context_jar(ctx)
 
       # Update the products with the latest classes.
+      classpath_product.add_for_target(
+        ctx.target,
+        [(conf, self._classpath_for_context(ctx)) for conf in self._confs],
+      )
       self.register_extra_products_from_contexts([ctx.target], all_compile_contexts)
 
     context_for_target = all_compile_contexts[compile_target]
@@ -755,13 +769,6 @@ class JvmCompile(NailgunTaskBase):
     if not self._clear_invalid_analysis:
       return True
     return os.path.exists(ctx.analysis_file)
-
-  def _cp_entries_for_ctx(self, ctx, classpath_product_key):
-    cp_entries = [ctx.classes_dir]
-    cp_entries.extend(self._zinc.compile_classpath(classpath_product_key,
-      ctx.target,
-      extra_cp_entries=self._extra_compile_time_classpath))
-    return cp_entries
 
   def _record_target_stats(self, target, classpath_len, sources_len, compiletime, is_incremental,
     stats_key):
@@ -828,6 +835,14 @@ class JvmCompile(NailgunTaskBase):
     def extra_compile_classpath_iter():
       for conf in self._confs:
         for jar in self.extra_compile_time_classpath_elements():
+          if isinstance(jar, string_types):
+            # Backwards compatibility
+            deprecated_conditional(
+              lambda: True,
+              "1.12.0.dev0",
+              "Extra compile classpath auto-promotion from string to ClasspathEntry",
+            )
+            jar = ClasspathEntry(jar)
           yield (conf, jar)
 
     return list(extra_compile_classpath_iter())

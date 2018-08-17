@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import re
+from builtins import object
 from collections import namedtuple
 from contextlib import contextmanager
 
@@ -399,7 +400,7 @@ class Shader(object):
 
   @contextmanager
   def temporary_rules_file(self, rules):
-    with temporary_file() as fp:
+    with temporary_file(binary_mode=False) as fp:
       for rule in rules:
         fp.write(rule.render())
       fp.close()

@@ -12,6 +12,7 @@ import stat
 import tempfile
 import threading
 import uuid
+from builtins import open
 from collections import defaultdict
 from contextlib import contextmanager
 
@@ -83,24 +84,44 @@ def safe_mkdir_for(path, clean=False):
   safe_mkdir(os.path.dirname(path), clean=clean)
 
 
-def safe_file_dump(filename, payload):
+def safe_mkdir_for_all(paths):
+  """Make directories which would contain all of the passed paths.
+
+  This avoids attempting to re-make the same directories, which may be noticeably expensive if many
+  paths mostly fall in the same set of directories.
+
+  :param list of str paths: The paths for which containing directories should be created.
+  """
+  created_dirs = set()
+  for path in paths:
+    dir_to_make = os.path.dirname(path)
+    if dir_to_make not in created_dirs:
+      safe_mkdir(dir_to_make)
+      created_dirs.add(dir_to_make)
+
+
+def safe_file_dump(filename, payload, binary_mode=True):
   """Write a string to a file.
 
   :param string filename: The filename of the file to write to.
   :param string payload: The string to write to the file.
+  :param bool binary_mode: Write to file as bytes or unicode.
   """
-  with safe_open(filename, 'wb') as f:
+  mode = 'wb' if binary_mode else 'w'
+  with safe_open(filename, mode) as f:
     f.write(payload)
 
 
-def read_file(filename):
+def read_file(filename, binary_mode=True):
   """Read and return the contents of a file in a single file.read().
 
   :param string filename: The filename of the file to read.
+  :param bool binary_mode: Read from file as bytes or unicode.
   :returns: The contents of the file.
   :rtype: string
   """
-  with open(filename, 'rb') as f:
+  mode = 'rb' if binary_mode else 'r'
+  with open(filename, mode) as f:
     return f.read()
 
 

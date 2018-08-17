@@ -7,8 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import unittest
 
-from future.utils import text_type
-
 from pants.base.project_tree import Dir, File
 from pants.base.specs import SiblingAddresses, SingleAddress, Specs
 from pants.build_graph.address import Address
@@ -34,10 +32,10 @@ class ParseAddressFamilyTest(unittest.TestCase):
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
     address_mapper = AddressMapper(JsonParser(TestTable()))
     af = run_rule(parse_address_family, address_mapper, Dir('/dev/null'), {
-        (Snapshot, PathGlobs): lambda _: Snapshot(DirectoryDigest(text_type("abc"), 10), (File('/dev/null/BUILD'),)),
-        (FilesContent, DirectoryDigest): lambda _: FilesContent([FileContent('/dev/null/BUILD', '')]),
+        (Snapshot, PathGlobs): lambda _: Snapshot(DirectoryDigest('abc', 10), (File('/dev/null/BUILD'),)),
+        (FilesContent, DirectoryDigest): lambda _: FilesContent([FileContent('/dev/null/BUILD', b'')]),
       })
-    self.assertEquals(len(af.objects_by_name), 0)
+    self.assertEqual(len(af.objects_by_name), 0)
 
 
 class AddressesFromAddressFamiliesTest(unittest.TestCase):
@@ -45,7 +43,8 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     """Test that matching the same Spec twice succeeds."""
     address = SingleAddress('a', 'a')
     address_mapper = AddressMapper(JsonParser(TestTable()))
-    snapshot = Snapshot(DirectoryDigest(text_type('xx'), 2), (Path('a/BUILD', File('a/BUILD')),))
+    snapshot = Snapshot(DirectoryDigest('xx', 2),
+                        (Path('a/BUILD', File('a/BUILD')),))
     address_family = AddressFamily('a', {'a': ('a/BUILD', 'this is an object!')})
 
     bfas = run_rule(addresses_from_address_families, address_mapper, Specs([address, address]), {
@@ -53,14 +52,15 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         (AddressFamily, Dir): lambda _: address_family,
       })
 
-    self.assertEquals(len(bfas.dependencies), 1)
-    self.assertEquals(bfas.dependencies[0].spec, 'a:a')
+    self.assertEqual(len(bfas.dependencies), 1)
+    self.assertEqual(bfas.dependencies[0].spec, 'a:a')
 
   def test_tag_filter(self):
     """Test that targets are filtered based on `tags`."""
     spec = SiblingAddresses('root')
     address_mapper = AddressMapper(JsonParser(TestTable()))
-    snapshot = Snapshot(DirectoryDigest(text_type('xx'), 2), (Path('root/BUILD', File('root/BUILD')),))
+    snapshot = Snapshot(DirectoryDigest('xx', 2),
+                        (Path('root/BUILD', File('root/BUILD')),))
     address_family = AddressFamily('root',
       {'a': ('root/BUILD', TargetAdaptor()),
        'b': ('root/BUILD', TargetAdaptor(tags={'integration'})),
@@ -74,14 +74,15 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
       (AddressFamily, Dir): lambda _: address_family,
     })
 
-    self.assertEquals(len(targets.dependencies), 1)
-    self.assertEquals(targets.dependencies[0].spec, 'root:b')
+    self.assertEqual(len(targets.dependencies), 1)
+    self.assertEqual(targets.dependencies[0].spec, 'root:b')
 
   def test_exclude_pattern(self):
     """Test that targets are filtered based on exclude patterns."""
     spec = SiblingAddresses('root')
     address_mapper = AddressMapper(JsonParser(TestTable()))
-    snapshot = Snapshot(DirectoryDigest(text_type('xx'), 2), (Path('root/BUILD', File('root/BUILD')),))
+    snapshot = Snapshot(DirectoryDigest('xx', 2),
+                        (Path('root/BUILD', File('root/BUILD')),))
     address_family = AddressFamily('root',
       {'exclude_me': ('root/BUILD', TargetAdaptor()),
        'not_me': ('root/BUILD', TargetAdaptor()),
@@ -92,8 +93,8 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
       (Snapshot, PathGlobs): lambda _: snapshot,
       (AddressFamily, Dir): lambda _: address_family,
     })
-    self.assertEquals(len(targets.dependencies), 1)
-    self.assertEquals(targets.dependencies[0].spec, 'root:not_me')
+    self.assertEqual(len(targets.dependencies), 1)
+    self.assertEqual(targets.dependencies[0].spec, 'root:not_me')
 
 
 class ApacheThriftConfiguration(StructWithDeps):
@@ -164,17 +165,17 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
     request = scheduler.execution_request([TestTable().constraint()], [address])
     root_entries = scheduler.execute(request).root_products
-    self.assertEquals(1, len(root_entries))
+    self.assertEqual(1, len(root_entries))
     return request, root_entries[0][1]
 
   def resolve_failure(self, scheduler, address):
     _, state = self._populate(scheduler, address)
-    self.assertEquals(type(state), Throw, '{} is not a Throw.'.format(state))
+    self.assertEqual(type(state), Throw, '{} is not a Throw.'.format(state))
     return state.exc
 
   def resolve(self, scheduler, address):
     _, state = self._populate(scheduler, address)
-    self.assertEquals(type(state), Return, '{} is not a Return.'.format(state))
+    self.assertEqual(type(state), Return, '{} is not a Return.'.format(state))
     return state.value
 
 
@@ -238,14 +239,14 @@ class InlinedGraphTest(GraphTestBase):
 
     nonstrict_address = Address.parse('graph_test:nonstrict')
     nonstrict = self.resolve(scheduler, nonstrict_address)
-    self.assertEquals(nonstrict, self.resolve(scheduler, nonstrict_address))
+    self.assertEqual(nonstrict, self.resolve(scheduler, nonstrict_address))
 
     # The already resolved `nonstrict` interior node should be re-used by `java1`.
     java1_address = Address.parse('graph_test:java1')
     java1 = self.resolve(scheduler, java1_address)
-    self.assertEquals(nonstrict, java1.configurations[1])
+    self.assertEqual(nonstrict, java1.configurations[1])
 
-    self.assertEquals(java1, self.resolve(scheduler, java1_address))
+    self.assertEqual(java1, self.resolve(scheduler, java1_address))
 
   def do_test_trace_message(self, scheduler, parsed_address, expected_string=None):
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
@@ -310,6 +311,6 @@ class InlinedGraphTest(GraphTestBase):
   def assert_resolve_failure_type(self, expected_type, mismatch, scheduler):
 
     failure = self.resolve_failure(scheduler, mismatch)
-    self.assertEquals(type(failure),
+    self.assertEqual(type(failure),
                       expected_type,
                       'type was not {}. Instead was {}, {!r}'.format(expected_type.__name__, type(failure).__name__, failure))

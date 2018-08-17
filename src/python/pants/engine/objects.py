@@ -70,7 +70,9 @@ class Serializable(AbstractClass):
 
     :rtype: bool
     """
-    return isinstance(obj, Serializable) or (not inspect.isclass(obj) and hasattr(obj, '_asdict'))
+    if inspect.isclass(obj):
+      return Serializable.is_serializable_type(obj)
+    return isinstance(obj, Serializable) or hasattr(obj, '_asdict')
 
   @staticmethod
   def is_serializable_type(type_):
@@ -78,7 +80,9 @@ class Serializable(AbstractClass):
 
     :rtype: bool
     """
-    return issubclass(type_, Serializable) or (inspect.isclass(type_) and hasattr(type_, '_asdict'))
+    if not inspect.isclass(type_):
+      return Serializable.is_serializable(type_)
+    return issubclass(type_, Serializable) or hasattr(type_, '_asdict')
 
   @abstractmethod
   def _asdict(self):

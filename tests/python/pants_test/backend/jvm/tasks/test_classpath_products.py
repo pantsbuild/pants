@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import str
 
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
@@ -539,13 +540,13 @@ class ClasspathProductsTest(TestBase):
       classpath_products, targets, libs_dir, save_classpath_file=True,
       internal_classpath_only=False, excludes=excludes)
     # check canonical path returned
-    self.assertEquals(expected_canonical_classpath,
+    self.assertEqual(expected_canonical_classpath,
                       relativize_paths(canonical_classpath, libs_dir))
 
     # check canonical path created contain the exact set of files, no more, no less
     self.assertTrue(contains_exact_files(libs_dir,
                                          expected_canonical_classpath +
-                                         expected_classspath_files.keys()))
+                                         list(expected_classspath_files.keys())))
 
     # check the content of classpath.txt
     for classpath_file in expected_classspath_files:

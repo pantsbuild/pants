@@ -33,7 +33,7 @@ class MissingDependencyFinderIntegrationTest(PantsRunIntegrationTest):
       '--compile-zinc-buildozer=path/to/buildozer',
     ])
     self.assert_failure(run)
-    self.assertTrue(re.search("path/to/buildozer 'add dependencies 3rdparty:guava' " + target,
+    self.assertTrue(re.search("\n *path/to/buildozer 'add dependencies 3rdparty:guava' " + target,
                               run.stdout_data,
                               re.DOTALL))
 

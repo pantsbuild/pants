@@ -7,10 +7,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import io
 import os
 import shlex
-import tempfile
 import unittest
 import warnings
-from builtins import str
+from builtins import open, str
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -686,7 +685,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(4, options.for_scope('compile.java').c)
 
   def test_file_spec_args(self):
-    with tempfile.NamedTemporaryFile() as tmp:
+    with temporary_file(binary_mode=False) as tmp:
       tmp.write(dedent(
         """
         foo
@@ -812,9 +811,9 @@ class OptionsTest(unittest.TestCase):
       yield w
 
   def assertWarning(self, w, option_string):
-    self.assertEquals(1, len(w))
+    self.assertEqual(1, len(w))
     self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
-    warning_message = str(w[-1].message)
+    warning_message = str(w[-1].message.args)
     self.assertIn("will be removed in version",
                   warning_message)
     self.assertIn(option_string, warning_message)
@@ -822,7 +821,7 @@ class OptionsTest(unittest.TestCase):
   def test_deprecated_options_flag(self):
     with self.warnings_catcher() as w:
       options = self._parse('./pants --global-crufty=crufty1')
-      self.assertEquals('crufty1', options.for_global_scope().global_crufty)
+      self.assertEqual('crufty1', options.for_global_scope().global_crufty)
       self.assertWarning(w, 'global_crufty')
 
     with self.warnings_catcher() as w:
@@ -837,7 +836,7 @@ class OptionsTest(unittest.TestCase):
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants stale --crufty=stale_and_crufty')
-      self.assertEquals('stale_and_crufty', options.for_scope('stale').crufty)
+      self.assertEqual('stale_and_crufty', options.for_scope('stale').crufty)
       self.assertWarning(w, 'crufty')
 
     with self.warnings_catcher() as w:
@@ -863,28 +862,28 @@ class OptionsTest(unittest.TestCase):
     # Make sure the warnings don't come out for regular options.
     with self.warnings_catcher() as w:
       self._parse('./pants stale --pants-foo stale --still-good')
-      self.assertEquals(0, len(w))
+      self.assertEqual(0, len(w))
 
   def test_deprecated_options_env(self):
     with self.warnings_catcher() as w:
       options = self._parse('./pants', env={'PANTS_GLOBAL_CRUFTY':'crufty1'})
-      self.assertEquals('crufty1', options.for_global_scope().global_crufty)
+      self.assertEqual('crufty1', options.for_global_scope().global_crufty)
       self.assertWarning(w, 'global_crufty')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants', env={'PANTS_STALE_CRUFTY':'stale_and_crufty'})
-      self.assertEquals('stale_and_crufty', options.for_scope('stale').crufty)
+      self.assertEqual('stale_and_crufty', options.for_scope('stale').crufty)
       self.assertWarning(w, 'crufty')
 
   def test_deprecated_options_config(self):
     with self.warnings_catcher() as w:
       options = self._parse('./pants', config={'GLOBAL':{'global_crufty':'crufty1'}})
-      self.assertEquals('crufty1', options.for_global_scope().global_crufty)
+      self.assertEqual('crufty1', options.for_global_scope().global_crufty)
       self.assertWarning(w, 'global_crufty')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants', config={'stale':{'crufty':'stale_and_crufty'}})
-      self.assertEquals('stale_and_crufty', options.for_scope('stale').crufty)
+      self.assertEqual('stale_and_crufty', options.for_scope('stale').crufty)
       self.assertWarning(w, 'crufty')
 
   def test_mutually_exclusive_options_flags(self):
@@ -971,42 +970,42 @@ class OptionsTest(unittest.TestCase):
 
     # Short circuit using command line.
     options = self._parse('./pants --a=100 compile --a=99')
-    self.assertEquals(100, options.for_global_scope().a)
-    self.assertEquals(99, options.for_scope('compile').a)
-    self.assertEquals(99, options.for_scope('compile.java').a)
+    self.assertEqual(100, options.for_global_scope().a)
+    self.assertEqual(99, options.for_scope('compile').a)
+    self.assertEqual(99, options.for_scope('compile.java').a)
 
     options = self._parse('./pants',
                           config={
                             'DEFAULT': {'a': 100},
                             'compile': {'a': 99},
                           })
-    self.assertEquals(100, options.for_global_scope().a)
-    self.assertEquals(99, options.for_scope('compile').a)
-    self.assertEquals(99, options.for_scope('compile.java').a)
+    self.assertEqual(100, options.for_global_scope().a)
+    self.assertEqual(99, options.for_scope('compile').a)
+    self.assertEqual(99, options.for_scope('compile.java').a)
 
     options = self._parse('./pants',
                           env={
                             'PANTS_A': 100,
                             'PANTS_COMPILE_A': 99})
-    self.assertEquals(100, options.for_global_scope().a)
-    self.assertEquals(99, options.for_scope('compile').a)
-    self.assertEquals(99, options.for_scope('compile.java').a)
+    self.assertEqual(100, options.for_global_scope().a)
+    self.assertEqual(99, options.for_scope('compile').a)
+    self.assertEqual(99, options.for_scope('compile.java').a)
 
     # Command line has precedence over config.
     options = self._parse('./pants compile --a=99',
                           config={
                             'DEFAULT': {'a': 100},
                           })
-    self.assertEquals(100, options.for_global_scope().a)
-    self.assertEquals(99, options.for_scope('compile').a)
-    self.assertEquals(99, options.for_scope('compile.java').a)
+    self.assertEqual(100, options.for_global_scope().a)
+    self.assertEqual(99, options.for_scope('compile').a)
+    self.assertEqual(99, options.for_scope('compile.java').a)
 
     # Command line has precedence over environment.
     options = self._parse('./pants compile --a=99',
                           env={'PANTS_A': 100}, )
-    self.assertEquals(100, options.for_global_scope().a)
-    self.assertEquals(99, options.for_scope('compile').a)
-    self.assertEquals(99, options.for_scope('compile.java').a)
+    self.assertEqual(100, options.for_global_scope().a)
+    self.assertEqual(99, options.for_scope('compile').a)
+    self.assertEqual(99, options.for_scope('compile.java').a)
 
     # Env has precedence over config.
     options = self._parse('./pants ',
@@ -1014,25 +1013,25 @@ class OptionsTest(unittest.TestCase):
                             'DEFAULT': {'a': 100},
                           },
                           env={'PANTS_COMPILE_A': 99}, )
-    self.assertEquals(100, options.for_global_scope().a)
-    self.assertEquals(99, options.for_scope('compile').a)
-    self.assertEquals(99, options.for_scope('compile.java').a)
+    self.assertEqual(100, options.for_global_scope().a)
+    self.assertEqual(99, options.for_scope('compile').a)
+    self.assertEqual(99, options.for_scope('compile.java').a)
 
     # Command line global overrides the middle scope setting in then env.
     options = self._parse('./pants --a=100',
                           env={'PANTS_COMPILE_A': 99}, )
-    self.assertEquals(100, options.for_global_scope().a)
-    self.assertEquals(100, options.for_scope('compile').a)
-    self.assertEquals(100, options.for_scope('compile.java').a)
+    self.assertEqual(100, options.for_global_scope().a)
+    self.assertEqual(100, options.for_scope('compile').a)
+    self.assertEqual(100, options.for_scope('compile.java').a)
 
     # Command line global overrides the middle scope in config.
     options = self._parse('./pants --a=100 ',
                           config={
                             'compile': {'a': 99},
                           })
-    self.assertEquals(100, options.for_global_scope().a)
-    self.assertEquals(100, options.for_scope('compile').a)
-    self.assertEquals(100, options.for_scope('compile.java').a)
+    self.assertEqual(100, options.for_global_scope().a)
+    self.assertEqual(100, options.for_scope('compile').a)
+    self.assertEqual(100, options.for_scope('compile.java').a)
 
     # Env global overrides the middle scope in config.
     options = self._parse('./pants --a=100 ',
@@ -1040,20 +1039,20 @@ class OptionsTest(unittest.TestCase):
                             'compile': {'a': 99},
                           },
                           env={'PANTS_A': 100}, )
-    self.assertEquals(100, options.for_global_scope().a)
-    self.assertEquals(100, options.for_scope('compile').a)
-    self.assertEquals(100, options.for_scope('compile.java').a)
+    self.assertEqual(100, options.for_global_scope().a)
+    self.assertEqual(100, options.for_scope('compile').a)
+    self.assertEqual(100, options.for_scope('compile.java').a)
 
   def test_complete_scopes(self):
     _global = GlobalOptionsRegistrar.get_scope_info()
-    self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
+    self.assertEqual({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
                       Options.complete_scopes({task('foo.bar.baz')}))
-    self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
+    self.assertEqual({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
                       Options.complete_scopes({GlobalOptionsRegistrar.get_scope_info(),
                                                task('foo.bar.baz')}))
-    self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
+    self.assertEqual({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz')},
                       Options.complete_scopes({intermediate('foo'), task('foo.bar.baz')}))
-    self.assertEquals({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz'),
+    self.assertEqual({_global, intermediate('foo'), intermediate('foo.bar'), task('foo.bar.baz'),
                        intermediate('qux'), task('qux.quux')},
                       Options.complete_scopes({task('foo.bar.baz'), task('qux.quux')}))
 
@@ -1063,7 +1062,7 @@ class OptionsTest(unittest.TestCase):
                           '--modifycompile="blah blah blah" --modifylogs="durrrr" -- -d -v')
 
     pairs = options.get_fingerprintable_for_scope('compile.scala')
-    self.assertEquals([(str, 'blah blah blah'),
+    self.assertEqual([(str, 'blah blah blah'),
                        (bool, True),
                        (int, 77)],
                       pairs)
@@ -1073,7 +1072,7 @@ class OptionsTest(unittest.TestCase):
                           '--modifycompile="blah blah blah" --modifylogs="durrrr" -- -d -v')
 
     pairs = options.get_fingerprintable_for_scope('compile.scala', include_passthru=True)
-    self.assertEquals([(str, '-d'),
+    self.assertEqual([(str, '-d'),
                        (str, '-v'),
                        (str, 'blah blah blah'),
                        (bool, True),
@@ -1116,7 +1115,7 @@ class OptionsTest(unittest.TestCase):
 
   def assert_fromfile(self, parse_func, expected_append=None, append_contents=None):
     def _do_assert_fromfile(dest, expected, contents):
-      with temporary_file() as fp:
+      with temporary_file(binary_mode=False) as fp:
         fp.write(contents)
         fp.close()
         options = parse_func(dest, fp.name)
@@ -1183,8 +1182,8 @@ class OptionsTest(unittest.TestCase):
   def test_ranked_value_equality(self):
     none = RankedValue(RankedValue.NONE, None)
     some = RankedValue(RankedValue.HARDCODED, 'some')
-    self.assertEquals('(NONE, None)', str(none))
-    self.assertEquals('(HARDCODED, some)', str(some))
+    self.assertEqual('(NONE, None)', str(none))
+    self.assertEqual('(HARDCODED, some)', str(some))
     self.assertNotEqual(some, none)
     self.assertEqual(some, RankedValue(RankedValue.HARDCODED, 'some'))
     self.assertNotEqual(some, RankedValue(RankedValue.HARDCODED, 'few'))
@@ -1290,27 +1289,27 @@ class OptionsTest(unittest.TestCase):
       vals1 = options.for_scope(DummyOptionable1.options_scope)
 
     # Check that we got a warning, but not for the inherited option.
-    self.assertEquals(1, len(w))
+    self.assertEqual(1, len(w))
     self.assertTrue(isinstance(w[0].message, DeprecationWarning))
-    self.assertNotIn('inherited', w[0].message)
+    self.assertNotIn('inherited', w[0].message.args)
 
     # Check values.
     # Deprecated scope takes precedence at equal rank.
-    self.assertEquals('yy', vals1.foo)
-    self.assertEquals('zz', vals1.bar)
+    self.assertEqual('yy', vals1.foo)
+    self.assertEqual('zz', vals1.bar)
     # New scope takes precedence at higher rank.
-    self.assertEquals('vv', vals1.baz)
+    self.assertEqual('vv', vals1.baz)
 
     with self.warnings_catcher() as w:
       vals2 = options.for_scope(DummyOptionable2.options_scope)
 
     # Check that we got a warning.
-    self.assertEquals(1, len(w))
+    self.assertEqual(1, len(w))
     self.assertTrue(isinstance(w[0].message, DeprecationWarning))
-    self.assertNotIn('inherited', w[0].message)
+    self.assertNotIn('inherited', w[0].message.args)
 
     # Check values.
-    self.assertEquals('uu', vals2.qux)
+    self.assertEqual('uu', vals2.qux)
 
   def test_scope_deprecation_defaults(self):
     # Confirms that a DEFAULT option does not trigger deprecation warnings for a deprecated scope.
@@ -1341,15 +1340,15 @@ class OptionsTest(unittest.TestCase):
       vals1 = options.for_scope(DummyOptionable1.options_scope)
 
     # Check that we got no warnings and that the actual scope took precedence.
-    self.assertEquals(0, len(w))
-    self.assertEquals('xx', vals1.foo)
+    self.assertEqual(0, len(w))
+    self.assertEqual('xx', vals1.foo)
 
 
 class OptionsTestStringPayloads(OptionsTest):
   """Runs the same tests as OptionsTest, but backed with `Config.loads` vs `Config.load`."""
 
   def _create_config_from_strings(self, config):
-    with io.StringIO('') as fp:
+    with io.BytesIO(b'') as fp:
       self._write_config_to_file(fp, config)
       fp.seek(0)
       payload = fp.read()

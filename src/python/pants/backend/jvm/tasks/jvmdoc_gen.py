@@ -189,7 +189,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
 
   def _handle_create_jvmdoc_result(self, targets, result, command):
     if result != 0:
-      targetlist = ", ".join(map(lambda target: target.address.spec, targets))
+      targetlist = ", ".join(target.address.spec for target in targets)
       message = 'Failed to process {} for {} [{}]: {}'.format(
                 self.jvmdoc().tool_name, targetlist, result, " ".join(command))
       if self.ignore_failure:

@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
+from builtins import chr, object, str
 
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 
@@ -13,31 +14,31 @@ class JarDependencyUtilsTest(unittest.TestCase):
   def test_m2_string_representation(self):
     org_name_ref = M2Coordinate(org='org.example', name='lib', rev='the-rev')
 
-    self.assertEquals('org.example:lib:the-rev', str(org_name_ref))
-    self.assertEquals(org_name_ref, M2Coordinate.from_string(str(org_name_ref)))
+    self.assertEqual('org.example:lib:the-rev', str(org_name_ref))
+    self.assertEqual(org_name_ref, M2Coordinate.from_string(str(org_name_ref)))
 
     org_name_ref_classifier = M2Coordinate(org='org.example', name='lib',
                                            rev='the-rev', classifier='classify')
 
-    self.assertEquals('org.example:lib:jar:classify:the-rev', str(org_name_ref_classifier))
-    self.assertEquals(org_name_ref_classifier, M2Coordinate.from_string(str(org_name_ref_classifier)))
+    self.assertEqual('org.example:lib:jar:classify:the-rev', str(org_name_ref_classifier))
+    self.assertEqual(org_name_ref_classifier, M2Coordinate.from_string(str(org_name_ref_classifier)))
 
     org_name_classifier = M2Coordinate(org='org.example', name='lib', classifier='classify')
 
-    self.assertEquals('org.example:lib:jar:classify:', str(org_name_classifier))
-    self.assertEquals(org_name_classifier, M2Coordinate.from_string(str(org_name_classifier)))
+    self.assertEqual('org.example:lib:jar:classify:', str(org_name_classifier))
+    self.assertEqual(org_name_classifier, M2Coordinate.from_string(str(org_name_classifier)))
 
     org_name_type_classifier = M2Coordinate(org='org.example', name='lib',
                                             classifier='classify', ext='zip')
 
-    self.assertEquals('org.example:lib:zip:classify:', str(org_name_type_classifier))
-    self.assertEquals(org_name_type_classifier, M2Coordinate.from_string(str(org_name_type_classifier)))
+    self.assertEqual('org.example:lib:zip:classify:', str(org_name_type_classifier))
+    self.assertEqual(org_name_type_classifier, M2Coordinate.from_string(str(org_name_type_classifier)))
 
     org_name_type_jar_classifier = M2Coordinate(org='org.example', name='lib',
                                                 classifier='classify', ext='jar')
 
-    self.assertEquals('org.example:lib:jar:classify:', str(org_name_type_jar_classifier))
-    self.assertEquals(org_name_type_jar_classifier, M2Coordinate.from_string(str(org_name_type_jar_classifier)))
+    self.assertEqual('org.example:lib:jar:classify:', str(org_name_type_jar_classifier))
+    self.assertEqual(org_name_type_jar_classifier, M2Coordinate.from_string(str(org_name_type_jar_classifier)))
 
   def test_m2_coordinates_with_same_properties(self):
     coordinate1 = M2Coordinate('org.example', 'lib')
@@ -119,7 +120,7 @@ class JarDependencyUtilsTest(unittest.TestCase):
     coord = CoordinateLike()
     m2 = M2Coordinate.create(coord)
     self.assertNotEqual(m2, coord)
-    self.assertEquals(tuple(getattr(coord, a) for a in attrs),
+    self.assertEqual(tuple(getattr(coord, a) for a in attrs),
                       tuple(getattr(m2, a) for a in attrs))
 
   def test_m2_coordinate_unversioned_noop(self):
@@ -130,5 +131,5 @@ class JarDependencyUtilsTest(unittest.TestCase):
   def test_m2_coordinate_unversioned(self):
     m2 = M2Coordinate(org='a', name='b', rev='c', classifier='d', ext='e')
     m2_un = M2Coordinate.unversioned(m2)
-    self.assertNotEquals(m2, m2_un)
+    self.assertNotEqual(m2, m2_un)
     self.assertTrue(m2_un.rev is None)

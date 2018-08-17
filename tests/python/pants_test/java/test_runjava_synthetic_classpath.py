@@ -47,7 +47,7 @@ class SyntheticClasspathTest(JvmToolTaskTestBase):
       executor = task.create_java_executor()
 
       # Executing the jar as is should work.
-      self.assertEquals(0, util.execute_java(
+      self.assertEqual(0, util.execute_java(
         executor=executor,
         classpath=[temp_path.name],
         main='coursier.echo.Echo',
@@ -59,7 +59,7 @@ class SyntheticClasspathTest(JvmToolTaskTestBase):
       safe_concurrent_rename(temp_path.name, new_path)
 
       # Executing the new path should work.
-      self.assertEquals(0, util.execute_java(
+      self.assertEqual(0, util.execute_java(
         executor=executor,
         classpath=[new_path],
         main='coursier.echo.Echo',

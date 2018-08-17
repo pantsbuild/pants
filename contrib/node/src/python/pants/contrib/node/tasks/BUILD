@@ -15,7 +15,10 @@ target(
 
 python_library(
   name='node_paths',
-  sources=['node_paths.py']
+  sources=['node_paths.py'],
+  dependencies = [
+    '3rdparty/python:future',
+  ],
 )
 
 python_library(
@@ -46,6 +49,7 @@ python_library(
   name='node_repl',
   sources=['node_repl.py'],
   dependencies=[
+    '3rdparty/python:future',
     ':node_paths',
     ':node_task',
     'src/python/pants/base:exceptions',
@@ -58,6 +62,7 @@ python_library(
   name='node_task',
   sources=['node_task.py'],
   dependencies=[
+    '3rdparty/python:future',
     'contrib/node/src/python/pants/contrib/node/subsystems',
     'contrib/node/src/python/pants/contrib/node/targets:node_bundle',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
@@ -110,6 +115,7 @@ python_library(
   name='javascript_style',
   sources=['javascript_style.py'],
   dependencies=[
+    '3rdparty/python:future',
     ':node_paths',
     ':node_task',
     'src/python/pants/base:deprecated',

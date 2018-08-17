@@ -9,7 +9,7 @@ import inspect
 from builtins import object
 from functools import update_wrapper
 
-import future
+from future.utils import string_types
 
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Resolvable, Serializable
@@ -154,7 +154,7 @@ class AddressableDescriptor(object):
     if value is None:
       return None
 
-    if isinstance(value, (future.utils.string_types, Address, Resolvable)):
+    if isinstance(value, (string_types, Address, Resolvable)):
       return value
 
     # Support untyped dicts that we deserialize on-demand here into the required type.

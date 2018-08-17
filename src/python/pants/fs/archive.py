@@ -11,6 +11,8 @@ from collections import OrderedDict
 from contextlib import contextmanager
 from zipfile import ZIP_DEFLATED
 
+from future.utils import PY2
+
 from pants.util.contextutil import open_tar, open_zip, temporary_dir
 from pants.util.dirutil import is_executable, safe_concurrent_rename, safe_walk
 from pants.util.meta import AbstractClass
@@ -67,6 +69,8 @@ class TarArchiver(Archiver):
 
   def _extract(self, path_or_file, outdir, **kwargs):
     with open_tar(path_or_file, errorlevel=1, **kwargs) as tar:
+      if PY2:
+        outdir = outdir.encode('utf-8')
       tar.extractall(outdir)
 
   def __init__(self, mode, extension):
@@ -171,7 +175,7 @@ class ZipArchiver(Archiver):
     with open_zip(path) as archive_file:
       for name in archive_file.namelist():
         # While we're at it, we also perform this safety test.
-        if name.startswith(b'/') or name.startswith(b'..'):
+        if name.startswith('/') or name.startswith('..'):
           raise ValueError('Zip file contains unsafe path: {}'.format(name))
         if (not filter_func or filter_func(name)):
           archive_file.extract(name, outdir)

@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import object
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -127,7 +128,7 @@ class JvmDependencyAnalyzer(object):
       ret = []
       for d in dirs:
         if os.path.isdir(d):
-          ret.extend(filter(lambda s: s.endswith('.jar'), os.listdir(d)))
+          ret.extend(s for s in os.listdir(d) if s.endswith('.jar'))
       return ret
 
     # Note: assumes HotSpot, or some JVM that supports sun.boot.class.path.
@@ -141,7 +142,8 @@ class JvmDependencyAnalyzer(object):
     extension_jars = find_jars_in_dirs(get_path('java.ext.dirs'))
 
     # Note that this order matters: it reflects the classloading order.
-    bootstrap_jars = filter(os.path.isfile, override_jars + boot_classpath + extension_jars)
+    bootstrap_jars = [jar for jar in override_jars + boot_classpath + extension_jars
+                      if os.path.isfile(jar)]
     return bootstrap_jars  # Technically, may include loose class dirs from boot_classpath.
 
   def compute_transitive_deps_by_target(self, targets):

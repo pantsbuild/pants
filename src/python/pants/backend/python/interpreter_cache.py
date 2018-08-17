@@ -7,13 +7,14 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import shutil
 from builtins import map, object, str
+from collections import defaultdict
 
 from pex.interpreter import PythonInterpreter
 from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import resolve
 from pex.variables import Variables
 
-from pants.backend.python.pex_util import create_bare_interpreter, expand_and_maybe_adjust_platform
+from pants.backend.python.pex_util import expand_and_maybe_adjust_platform
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
 from pants.process.lock import OwnerPrintingInterProcessFileLock
@@ -74,29 +75,30 @@ class PythonInterpreterCache(object):
 
   def select_interpreter_for_targets(self, targets):
     """Pick an interpreter compatible with all the specified targets."""
-    tgts_with_compatibilities = []
+    tgts_by_compatibilities = defaultdict(list)
     filters = set()
     for target in targets:
-      if isinstance(target, PythonTarget) and target.compatibility:
-        tgts_with_compatibilities.append(target)
-        filters.update(target.compatibility)
+      if isinstance(target, PythonTarget):
+        c = self._python_setup.compatibility_or_constraints(target)
+        tgts_by_compatibilities[c].append(target)
+        filters.update(c)
 
     allowed_interpreters = set(self.setup(filters=filters))
 
     # Constrain allowed_interpreters based on each target's compatibility requirements.
-    for target in tgts_with_compatibilities:
-      compatible_with_target = set(self._matching(allowed_interpreters, target.compatibility))
+    for compatibility in tgts_by_compatibilities.keys():
+      compatible_with_target = set(self._matching(allowed_interpreters, compatibility))
       allowed_interpreters &= compatible_with_target
 
     if not allowed_interpreters:
       # Create a helpful error message.
-      unique_compatibilities = set(tuple(t.compatibility) for t in tgts_with_compatibilities)
+      unique_compatibilities = set(tuple(c) for c in tgts_by_compatibilities.keys())
       unique_compatibilities_strs = [','.join(x) for x in unique_compatibilities if x]
-      tgts_with_compatibilities_strs = [t.address.spec for t in tgts_with_compatibilities]
+      tgts_by_compatibilities_strs = [t[0].address.spec for t in tgts_by_compatibilities.values()]
       raise self.UnsatisfiableInterpreterConstraintsError(
         'Unable to detect a suitable interpreter for compatibilities: {} '
         '(Conflicting targets: {})'.format(' && '.join(sorted(unique_compatibilities_strs)),
-                                           ', '.join(tgts_with_compatibilities_strs)))
+                                           ', '.join(tgts_by_compatibilities_strs)))
     # Return the lowest compatible interpreter.
     return min(allowed_interpreters)
 
@@ -105,7 +107,7 @@ class PythonInterpreterCache(object):
       executable = os.readlink(os.path.join(path, 'python'))
     except OSError:
       return None
-    interpreter = create_bare_interpreter(executable)
+    interpreter = PythonInterpreter.from_binary(executable, include_site_extras=False)
     if self._matches(interpreter, filters):
       return self._resolve(interpreter)
     return None

@@ -23,8 +23,8 @@ class GoDistributionTest(unittest.TestCase):
   def test_bootstrap(self):
     go_distribution = self.distribution()
     go_cmd = go_distribution.create_go_cmd(cmd='env', args=['GOROOT'])
-    output = go_cmd.check_output()
-    self.assertEqual(go_distribution.goroot, output.strip())
+    output = go_cmd.check_output().decode('utf-8').strip()
+    self.assertEqual(go_distribution.goroot, output)
 
   def assert_no_gopath(self):
     go_distribution = self.distribution()
@@ -39,7 +39,7 @@ class GoDistributionTest(unittest.TestCase):
     cmd = [os.path.join(go_distribution.goroot, 'bin', 'go'), 'env', 'GOPATH']
     env = os.environ.copy()
     env.update(go_env)
-    default_gopath = subprocess.check_output(cmd, env=env).strip()
+    default_gopath = subprocess.check_output(cmd, env=env).decode('utf-8').strip()
 
     go_cmd = go_distribution.create_go_cmd(cmd='env', args=['GOPATH'])
 
@@ -48,7 +48,7 @@ class GoDistributionTest(unittest.TestCase):
     self.assertEqual(['env', 'GOPATH'], go_cmd.cmdline[1:])
     self.assertRegexpMatches(str(go_cmd),
                              r'^GOROOT=[^ ]+ GOPATH={} .*/go env GOPATH'.format(default_gopath))
-    self.assertEqual(default_gopath, go_cmd.check_output().strip())
+    self.assertEqual(default_gopath, go_cmd.check_output().decode('utf-8').strip())
 
   def test_go_command_no_gopath(self):
     self.assert_no_gopath()

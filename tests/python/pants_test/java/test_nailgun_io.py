@@ -43,7 +43,7 @@ class TestNailgunStreamWriter(unittest.TestCase):
     mock_select.return_value = ([], [], [self.in_fd])
     self.writer.run()
     self.assertFalse(self.writer.is_alive())
-    self.assertEquals(mock_select.call_count, 1)
+    self.assertEqual(mock_select.call_count, 1)
 
   @mock.patch('os.read')
   @mock.patch('select.select')
@@ -70,7 +70,7 @@ class TestNailgunStreamWriter(unittest.TestCase):
     self.assertFalse(self.writer.is_alive())
 
     mock_read.assert_called_with(-1, io.DEFAULT_BUFFER_SIZE)
-    self.assertEquals(mock_read.call_count, 2)
+    self.assertEqual(mock_read.call_count, 2)
 
     mock_writer.assert_has_calls([
       mock.call(mock.ANY, ChunkType.STDIN, b'A' * 300),

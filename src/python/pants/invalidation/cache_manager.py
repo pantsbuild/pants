@@ -6,9 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import shutil
-import sys
 from builtins import object
 from hashlib import sha1
+
+from future.utils import raise_from
 
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
@@ -287,8 +288,9 @@ class InvalidationCacheManager(object):
 
     # Create the task-versioned prefix of the results dir, and a stable symlink to it
     # (useful when debugging).
+    task_version_sha = sha1(self._task_version.encode('utf-8')).hexdigest()[:12]
     self._results_dir_prefix = os.path.join(results_dir_root,
-                                            sha1(self._task_version).hexdigest()[:12])
+                                            task_version_sha)
     safe_mkdir(self._results_dir_prefix)
     stable_prefix = os.path.join(results_dir_root, self._STABLE_DIR_NAME)
     safe_delete(stable_prefix)
@@ -389,8 +391,6 @@ class InvalidationCacheManager(object):
     except Exception as e:
       # This is a catch-all for problems we haven't caught up with and given a better diagnostic.
       # TODO(Eric Ayers): If you see this exception, add a fix to catch the problem earlier.
-      exc_info = sys.exc_info()
       new_exception = self.CacheValidationError("Problem validating target {} in {}: {}"
                                                 .format(target.id, target.address.spec_path, e))
-
-      raise self.CacheValidationError, new_exception, exc_info[2]
+      raise_from(self.CacheValidationError(new_exception), e)

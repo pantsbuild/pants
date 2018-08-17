@@ -22,7 +22,7 @@ class TestJvmDependencyUsage(TaskTestBase):
 
   def _setup(self, target_classfiles):
     """Takes a dict mapping targets to lists of classfiles."""
-    context = self.context(target_roots=target_classfiles.keys())
+    context = self.context(target_roots=list(target_classfiles.keys()))
 
     # Create classfiles in a target-specific directory, and add it to the classpath for the target.
     classpath_products = context.products.get_data('runtime_classpath',
@@ -124,9 +124,9 @@ class TestJvmDependencyUsage(TaskTestBase):
     graph = self.create_graph(dep_usage, [a, b, c, alias_a_b, alias_b, nested_alias_b])
     # both `:a` and `:b` are resolved from target aliases, one is used the other is not.
     self.assertTrue(graph._nodes[c].dep_edges[a].is_declared)
-    self.assertEquals({'a.class'}, graph._nodes[c].dep_edges[a].products_used)
+    self.assertEqual({'a.class'}, graph._nodes[c].dep_edges[a].products_used)
     self.assertTrue(graph._nodes[c].dep_edges[b].is_declared)
-    self.assertEquals(set(), graph._nodes[c].dep_edges[b].products_used)
+    self.assertEqual(set(), graph._nodes[c].dep_edges[b].products_used)
 
     # With alias to its resolved targets mapping we can determine which aliases are unused.
     # In this example `nested_alias_b` has none of its resolved dependencies being used.

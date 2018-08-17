@@ -183,7 +183,7 @@ class ArgSplitter(object):
 
     while self._unconsumed_args and not self._at_double_dash():
       arg = self._unconsumed_args.pop()
-      if arg.startswith(b'-'):
+      if arg.startswith('-'):
         # We assume any args here are in global scope.
         if not self._check_for_help_request(arg):
           assign_flag_to_scope(arg, GLOBAL_SCOPE)
@@ -257,11 +257,11 @@ class ArgSplitter(object):
 
   def _at_flag(self):
     return (self._unconsumed_args and
-            self._unconsumed_args[-1].startswith(b'-') and
+            self._unconsumed_args[-1].startswith('-') and
             not self._at_double_dash())
 
   def _at_scope(self):
     return self._unconsumed_args and self._unconsumed_args[-1] in self._known_scopes
 
   def _at_double_dash(self):
-    return self._unconsumed_args and self._unconsumed_args[-1] == b'--'
+    return self._unconsumed_args and self._unconsumed_args[-1] == '--'

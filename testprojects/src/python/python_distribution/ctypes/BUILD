@@ -31,4 +31,5 @@ python_binary(
   dependencies=[
     ':ctypes',
   ],
+  platforms=['current'],
 )

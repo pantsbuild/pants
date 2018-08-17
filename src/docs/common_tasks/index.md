@@ -11,6 +11,7 @@ This section of the Pants documentation describes the most common day-to-day Pan
 * [[Get an Overview of Your Recent Pants Activity|pants('src/docs/common_tasks:server')]]
 * [[Add a Dependency on Another Target|pants('src/docs/common_tasks:dependencies')]]
 * [[Create an Alias for a Target|pants('src/docs/common_tasks:alias')]]
+* [[Create a Target Aggregate|pants('src/docs/common_tasks:target_aggregate')]]
 * [[Pass Command-line Arguments to an Executable|pants('src/docs/common_tasks:cli_args')]]
 * [[Clean Cached Pants Artifacts|pants('src/docs/common_tasks:clean')]]
 * [[Run a Binary Target|pants('src/docs/common_tasks:run')]]

@@ -10,10 +10,10 @@ import json
 import os
 import re
 import shutil
+from builtins import object, open, range
 from datetime import datetime
 
 from pystache import Renderer
-from six.moves import range
 
 from pants.backend.docgen.tasks.generate_pants_reference import GeneratePantsReference
 from pants.backend.docgen.tasks.markdown_to_html import MarkdownToHtml
@@ -71,8 +71,8 @@ class SiteGen(Task):
 
 def load_config(json_path):
   """Load config info from a .json file and return it."""
-  with open(json_path) as json_file:
-    config = json.loads(json_file.read().decode('utf8'))
+  with open(json_path, 'r') as json_file:
+    config = json.loads(json_file.read())
   # sanity-test the config:
   assert(config['tree'][0]['page'] == 'index')
   return config
@@ -82,8 +82,8 @@ def load_soups(config):
   """Generate BeautifulSoup AST for each page listed in config."""
   soups = {}
   for page, path in config['sources'].items():
-    with open(path, 'rb') as orig_file:
-      soups[page] = beautiful_soup(orig_file.read().decode('utf-8'))
+    with open(path, 'r') as orig_file:
+      soups[page] = beautiful_soup(orig_file.read())
   return soups
 
 
@@ -383,8 +383,8 @@ def write_en_pages(config, soups, precomputed, template):
     dst_dir = os.path.dirname(dst_path)
     if not os.path.isdir(dst_dir):
       os.makedirs(dst_dir)
-    with open(dst_path, 'wb') as f:
-      f.write(html.encode('utf-8'))
+    with open(dst_path, 'w') as f:
+      f.write(html)
 
 
 def copy_extras(config):
@@ -400,6 +400,6 @@ def copy_extras(config):
 
 def load_template(config):
   """Return text of template file specified in config"""
-  with open(config['template'], 'rb') as template_file:
-    template = template_file.read().decode('utf-8')
+  with open(config['template'], 'r') as template_file:
+    template = template_file.read()
   return template

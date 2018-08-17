@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import json
 import os
+from builtins import open
 from textwrap import dedent
 
 import mock
@@ -166,7 +167,7 @@ class NodeResolveTest(TaskTestBase):
     for root, _, files in os.walk(node_path):
       for f in files:
         if 'package.json' == f:
-          with open(os.path.join(root, f)) as fp:
+          with open(os.path.join(root, f), 'r') as fp:
             package = json.load(fp)
             if 'typ' == package['name']:
               typ_packages.append(os.path.relpath(os.path.join(root, f), node_path))
@@ -220,7 +221,7 @@ class NodeResolveTest(TaskTestBase):
     self.assertIsNotNone(node_paths.node_path(scripts_project))
 
     package_json_path = os.path.join(node_path, 'package.json')
-    with open(package_json_path) as fp:
+    with open(package_json_path, 'r') as fp:
       package = json.load(fp)
       self.assertEqual('scripts_project', package['name'],
                        'Expected to find package name of `scripts_project`, but found: {}'
@@ -250,7 +251,7 @@ class NodeResolveTest(TaskTestBase):
       console.log("type of boolean is: " + typ.BOOLEAN);
     """))
     # yarn execution path requires yarn.lock
-    self.create_file('src/node/util/yarn.lock', contents='')
+    self.create_file('src/node/util/yarn.lock')
     target = self.make_target(spec='src/node/util',
                               target_type=NodeModule,
                               sources=['util.js', 'package.json', 'yarn.lock'],

@@ -18,27 +18,22 @@ from pex.installer import InstallerBase, Packager
 from pex.interpreter import PythonInterpreter
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
-from wheel.install import WheelFile
 
-from pants.backend.native.config.environment import CCompiler, CppCompiler, Linker, Platform
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks.pex_build_util import is_local_python_dist, resolve_multi
+from pants.backend.python.tasks.pex_build_util import is_local_python_dist
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.specs import SiblingAddresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
-from pants.engine.rules import rule
-from pants.engine.selectors import Select
 from pants.task.task import Task
 from pants.util.dirutil import safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
-from pants.util.strutil import create_path_env_var, safe_shlex_join, safe_shlex_split
+from pants.util.strutil import safe_shlex_split
 
 
 SETUP_BOILERPLATE = """
@@ -78,125 +73,6 @@ class SetupPyRunner(InstallerBase):
 
   def _setup_command(self):
     return self.__setup_command
-
-
-class SetupPyNativeTools(datatype([
-    ('c_compiler', CCompiler),
-    ('cpp_compiler', CppCompiler),
-    ('linker', Linker),
-    ('platform', Platform),
-])):
-  """The native tools needed for a setup.py invocation.
-
-  This class exists because `SetupPyExecutionEnvironment` is created manually, one per target.
-  """
-
-
-@rule(SetupPyNativeTools, [Select(CCompiler), Select(CppCompiler), Select(Linker), Select(Platform)])
-def get_setup_py_native_tools(c_compiler, cpp_compiler, linker, platform):
-  yield SetupPyNativeTools(
-    c_compiler=c_compiler,
-    cpp_compiler=cpp_compiler,
-    linker=linker,
-    platform=platform)
-
-
-class SetupRequiresSiteDir(datatype(['site_dir'])): pass
-
-
-# TODO: This could be formulated as an @rule if targets and `PythonInterpreter` are made available
-# to the v2 engine.
-def ensure_setup_requires_site_dir(reqs_to_resolve, interpreter, site_dir,
-                                   platforms=None):
-  if not reqs_to_resolve:
-    return None
-
-  setup_requires_dists = resolve_multi(interpreter, reqs_to_resolve, platforms, None)
-
-  # FIXME: there's no description of what this does or why it's necessary.
-  overrides = {
-    'purelib': site_dir,
-    'headers': os.path.join(site_dir, 'headers'),
-    'scripts': os.path.join(site_dir, 'bin'),
-    'platlib': site_dir,
-    'data': site_dir
-  }
-
-  # The `python_dist` target builds for the current platform only.
-  # FIXME: why does it build for the current platform only?
-  for obj in setup_requires_dists['current']:
-    wf = WheelFile(obj.location)
-    wf.install(overrides=overrides, force=True)
-
-  return SetupRequiresSiteDir(site_dir)
-
-
-class SetupPyExecutionEnvironment(datatype([
-    # TODO: It might be pretty useful to have an Optional TypeConstraint.
-    'setup_requires_site_dir',
-    # If None, don't execute in the toolchain environment.
-    'setup_py_native_tools',
-])):
-
-  _SHARED_CMDLINE_ARGS = {
-    'darwin': lambda: [
-      '-mmacosx-version-min=10.11',
-      '-Wl,-dylib',
-      '-undefined',
-      'dynamic_lookup',
-    ],
-    'linux': lambda: ['-shared'],
-  }
-
-  def as_environment(self):
-    ret = {}
-
-    if self.setup_requires_site_dir:
-      ret['PYTHONPATH'] = self.setup_requires_site_dir.site_dir
-
-    # FIXME(#5951): the below is a lot of error-prone repeated logic -- we need a way to compose
-    # executables more hygienically. We should probably be composing each datatype's members, and
-    # only creating an environment at the very end.
-    native_tools = self.setup_py_native_tools
-    if native_tools:
-      # TODO: an as_tuple() method for datatypes would make this destructuring cleaner!
-      plat = native_tools.platform
-      cc = native_tools.c_compiler
-      cxx = native_tools.cpp_compiler
-      linker = native_tools.linker
-
-      all_path_entries = cc.path_entries + cxx.path_entries + linker.path_entries
-      ret['PATH'] = create_path_env_var(all_path_entries)
-
-      all_library_dirs = cc.library_dirs + cxx.library_dirs + linker.library_dirs
-      if all_library_dirs:
-        joined_library_dirs = create_path_env_var(all_library_dirs)
-        ret['LIBRARY_PATH'] = joined_library_dirs
-        dynamic_lib_env_var = plat.resolve_platform_specific({
-          'darwin': lambda: 'DYLD_LIBRARY_PATH',
-          'linux': lambda: 'LD_LIBRARY_PATH',
-        })
-        ret[dynamic_lib_env_var] = joined_library_dirs
-
-      all_include_dirs = cc.include_dirs + cxx.include_dirs
-      if all_include_dirs:
-        ret['CPATH'] = create_path_env_var(all_include_dirs)
-
-      all_cflags_for_platform = plat.resolve_platform_specific({
-        'darwin': lambda: ['-mmacosx-version-min=10.11'],
-        'linux': lambda: [],
-      })
-      if all_cflags_for_platform:
-        ret['CFLAGS'] = safe_shlex_join(all_cflags_for_platform)
-
-      ret['CC'] = cc.exe_filename
-      ret['CXX'] = cxx.exe_filename
-      ret['LDSHARED'] = linker.exe_filename
-
-      all_new_ldflags = plat.resolve_platform_specific(self._SHARED_CMDLINE_ARGS)
-      ret['LDFLAGS'] = safe_shlex_join(all_new_ldflags)
-
-    return ret
 
 
 class TargetAncestorIterator(object):
@@ -766,9 +642,3 @@ class SetupPy(Task):
           setup_runner = SetupPyRunner(setup_dir, split_command, interpreter=interpreter)
           setup_runner.run()
           python_dists[exported_python_target] = setup_dir
-
-
-def create_setup_py_rules():
-  return [
-    get_setup_py_native_tools,
-  ]

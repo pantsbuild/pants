@@ -89,6 +89,7 @@ python_library(
   name = 'run_tracker',
   sources = ['run_tracker.py'],
   dependencies = [
+    '3rdparty/python:future',
     ':aggregated_timings',
     ':artifact_cache_stats',
     ':pantsd_stats',

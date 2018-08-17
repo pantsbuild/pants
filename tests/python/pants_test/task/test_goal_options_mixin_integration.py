@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import textwrap
+from builtins import open
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
@@ -41,7 +42,7 @@ class TestGoalOptionsMixinIntegration(PantsRunIntegrationTest):
           if not os.path.exists(path):
             return None
           else:
-            with open(path) as fp:
+            with open(path, 'r') as fp:
               return [os.path.basename(x.strip()) for x in fp.readlines()]
         self.assertEqual(expected_one, get_echo('one'))
         self.assertEqual(expected_two, get_echo('two'))

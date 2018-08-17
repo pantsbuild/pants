@@ -6,6 +6,7 @@ python_library(
   name = 'plugin',
   sources = ['register.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
     'src/python/pants/task',

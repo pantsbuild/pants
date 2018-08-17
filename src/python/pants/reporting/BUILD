@@ -4,6 +4,7 @@
 python_library(
   sources=globs('*.py', exclude=[['report.py']]),
   dependencies=[
+    '3rdparty/python:future',
     '3rdparty/python:ansicolors',
     '3rdparty/python:pystache',
     '3rdparty/python:six',
@@ -34,5 +35,6 @@ python_library(
   name='report',
   sources=['report.py'],
   dependencies=[
+    '3rdparty/python:future',
   ],
 )

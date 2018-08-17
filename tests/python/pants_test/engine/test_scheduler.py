@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import unittest
-from builtins import object, str
+from builtins import object, open, str
 from textwrap import dedent
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -74,13 +74,13 @@ class SchedulerTest(unittest.TestCase):
 
   def assert_root(self, root, subject, return_value):
     """Asserts that the given root has the given result."""
-    self.assertEquals(subject, root[0][0])
-    self.assertEquals(Return(return_value), root[1])
+    self.assertEqual(subject, root[0][0])
+    self.assertEqual(Return(return_value), root[1])
 
   def assert_root_failed(self, root, subject, msg_str):
     """Asserts that the root was a Throw result containing the given msg string."""
-    self.assertEquals(subject, root[0][0])
-    self.assertEquals(Throw, type(root[1]))
+    self.assertEqual(subject, root[0][0])
+    self.assertEqual(Throw, type(root[1]))
     self.assertIn(msg_str, str(root[1].exc))
 
   def test_compile_only_3rdparty(self):
@@ -167,7 +167,7 @@ class SchedulerTest(unittest.TestCase):
                                     variants={'resolve': 'latest-hadoop'})
 
     # Confirm that the produced jars had the appropriate versions.
-    self.assertEquals({Jar('org.apache.hadoop', 'hadoop-common', '2.7.0'),
+    self.assertEqual({Jar('org.apache.hadoop', 'hadoop-common', '2.7.0'),
                        Jar('com.google.guava', 'guava', '18.0')},
                       {ret.value for node, ret in walk
                        if node.product == Jar})
@@ -233,7 +233,7 @@ class SchedulerTest(unittest.TestCase):
     with temporary_dir() as td:
       output_path = os.path.join(td, 'output.dot')
       self.scheduler.visualize_graph_to_file(output_path)
-      with open(output_path, 'rb') as fh:
+      with open(output_path, 'r') as fh:
         graphviz_output = fh.read().strip()
 
     self.assertIn('digraph', graphviz_output)

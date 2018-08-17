@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import open
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import open_zip, temporary_dir
@@ -78,7 +79,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                          'welcome_2.11-0.0.1-SNAPSHOT-sources.jar']}
     self.publish_test('testprojects/src/scala/org/pantsbuild/testproject/publish'
                       ':jvm-run-example-lib',
-                      dict(unique_artifacts.items() + shared_artifacts('0.0.1-SNAPSHOT').items()),
+                      dict(list(unique_artifacts.items()) + list(shared_artifacts('0.0.1-SNAPSHOT').items())),
                       ['org.pantsbuild.testproject.publish/hello-greet/publish.properties',
                        'org.pantsbuild.testproject.publish/jvm-example-lib_2.11/publish.properties',
                        'org.pantsbuild.testproject.publish.hello/welcome_2.11/publish.properties'],
@@ -244,7 +245,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                              'org/pantsbuild/testproject/publish/hello-greet/X/hello-greet-X.jar')
           with open_zip(jar, mode='r') as j:
             with j.open(resource_relative_to_sourceroot) as jar_entry:
-              self.assertEquals(resource_content, jar_entry.read())
+              self.assertEqual(resource_content, jar_entry.read())
 
       # Publish the same target twice with different resource content.
       publish('one')

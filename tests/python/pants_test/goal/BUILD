@@ -39,6 +39,7 @@ python_tests(
     'test_run_tracker_integration.py'
   ],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/goal:run_tracker',
     'tests/python/pants_test:int-test',
   ],

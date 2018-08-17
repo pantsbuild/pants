@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.native.config.environment import CppCompiler
+from pants.backend.native.config.environment import LLVMCppToolchain
 from pants.backend.native.subsystems.native_compile_settings import CppCompileSettings
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import CppLibrary
@@ -14,6 +14,8 @@ from pants.util.objects import SubclassesOf
 
 
 class CppCompile(NativeCompile):
+
+  options_scope = 'cpp-compile'
 
   # Compile only C++ library targets.
   source_target_constraint = SubclassesOf(CppLibrary)
@@ -32,27 +34,15 @@ class CppCompile(NativeCompile):
     )
 
   @memoized_property
-  def _toolchain(self):
+  def _native_toolchain(self):
     return NativeToolchain.scoped_instance(self)
 
   def get_compile_settings(self):
     return CppCompileSettings.scoped_instance(self)
 
+  @memoized_property
+  def _cpp_toolchain(self):
+    return self._request_single(LLVMCppToolchain, self._native_toolchain).cpp_toolchain
+
   def get_compiler(self):
-    return self._request_single(CppCompiler, self._toolchain)
-
-  def _make_compile_argv(self, compile_request):
-    # FIXME: this is a temporary fix, do not do any of this kind of introspection.
-    # https://github.com/pantsbuild/pants/issues/5951
-    prev_argv = super(CppCompile, self)._make_compile_argv(compile_request)
-
-    if compile_request.compiler.exe_filename == 'clang++':
-      new_argv = [prev_argv[0], '-nobuiltininc', '-nostdinc++'] + prev_argv[1:]
-    else:
-      new_argv = prev_argv
-    return new_argv
-
-  # FIXME(#5951): don't have any command-line args in the task or in the subsystem -- rather,
-  # subsystem options should be used to populate an `Executable` which produces its own arguments.
-  def extra_compile_args(self):
-    return ['-x', 'c++', '-std=c++11']
+    return self._cpp_toolchain.cpp_compiler

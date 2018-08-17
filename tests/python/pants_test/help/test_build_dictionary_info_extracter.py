@@ -185,7 +185,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
 
     extracter = BuildDictionaryInfoExtracter(bfa)
     args = BuildDictionaryInfoExtracter.basic_target_args
-    self.assertEquals([BuildSymbolInfo('target1', 'Target1 docstring.', [], args),
+    self.assertEqual([BuildSymbolInfo('target1', 'Target1 docstring.', [], args),
                        BuildSymbolInfo('target2', 'Target2 docstring.', [], args),
                        BuildSymbolInfo('target3', 'Target3 docstring.', [], args)],
                       extracter.get_target_type_info())
@@ -207,7 +207,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       context_aware_object_factories={},
     )
     extracter = BuildDictionaryInfoExtracter(bfa)
-    self.assertEquals([BuildSymbolInfo('foo', 'Foo docstring.', [],
+    self.assertEqual([BuildSymbolInfo('foo', 'Foo docstring.', [],
                                        [FunctionArg('bar', 'Bar details.', False, None),
                                         FunctionArg('baz', 'Baz details.', True, 42)])],
                       extracter.get_object_info())
@@ -229,7 +229,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       }
     )
     extracter = BuildDictionaryInfoExtracter(bfa)
-    self.assertEquals([BuildSymbolInfo('foo', 'Foo docstring.', [],
+    self.assertEqual([BuildSymbolInfo('foo', 'Foo docstring.', [],
                                        [FunctionArg('bar', 'Bar details.', False, None),
                                         FunctionArg('baz', 'Baz details.', True, 42)])],
                       extracter.get_object_factory_info())
@@ -252,7 +252,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       context_aware_object_factories={},
     )
     extracter = BuildDictionaryInfoExtracter(bfa)
-    self.assertEquals([BuildSymbolInfo('foo', 'Foo docstring.', [],
+    self.assertEqual([BuildSymbolInfo('foo', 'Foo docstring.', [],
                                        [FunctionArg('bar', 'Bar details.', False, None),
                                         FunctionArg('baz', 'Baz details.', True, 42)])],
                       extracter.get_object_info())

@@ -4,14 +4,10 @@
 
 package org.pantsbuild.zinc.compiler
 
-import java.io.{File, IOException}
-import java.lang.{ Boolean => JBoolean }
+import java.io.{File}
 import java.util.function.{ Function => JFunction }
-import java.util.{ List => JList, Map => JMap }
 
-import scala.collection.JavaConverters._
 import scala.compat.java8.OptionConverters._
-import scala.util.matching.Regex
 
 import sbt.io.IO
 import sbt.util.Logger

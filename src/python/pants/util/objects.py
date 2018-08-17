@@ -6,8 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import sys
 from abc import abstractmethod
-from builtins import map, object, zip
+from builtins import object, zip
 from collections import OrderedDict, namedtuple
+
+from future.utils import PY2
 
 from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
@@ -100,6 +102,9 @@ def datatype(field_decls, superclass_name=None, **kwargs):
     def __ne__(self, other):
       return not (self == other)
 
+    def __hash__(self):
+      return super(DataType, self).__hash__()
+
     # NB: As datatype is not iterable, we need to override both __iter__ and all of the
     # namedtuple methods that expect self to be iterable.
     def __iter__(self):
@@ -114,17 +119,13 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
     def _replace(_self, **kwds):
       '''Return a new datatype object replacing specified fields with new values'''
-      result = _self._make(map(kwds.pop, _self._fields, _self._super_iter()))
-      if kwds:
-        raise ValueError('Got unexpected field names: %r' % kwds.keys())
-      return result
+      field_dict = _self._asdict()
+      field_dict.update(**kwds)
+      return type(_self)(**field_dict)
 
-    # TODO: would we want to expose a self.as_tuple() method (which just calls __getnewargs__) so we
-    # can tuple assign? E.g.:
-    # class A(datatype(['field'])): pass
-    # x = A(field='asdf')
-    # field_value, = x.as_tuple()
-    # print(field_value) # => 'asdf'
+    copy = _replace
+
+    # NB: it is *not* recommended to rely on the ordering of the tuple returned by this method.
     def __getnewargs__(self):
       '''Return self as a plain tuple.  Used by copy and pickle.'''
       return tuple(self._super_iter())
@@ -329,7 +330,9 @@ class Collection(object):
   @memoized
   def of(cls, *element_types):
     union = '|'.join(element_type.__name__ for element_type in element_types)
-    type_name = b'{}.of({})'.format(cls.__name__, union)
+    type_name = '{}.of({})'.format(cls.__name__, union)
+    if PY2:
+      type_name = type_name.encode('utf-8')
     # TODO: could we allow type checking in the datatype() invocation here?
     supertypes = (cls, datatype(['dependencies'], superclass_name='Collection'))
     properties = {'element_types': element_types}

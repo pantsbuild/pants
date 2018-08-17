@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import glob
 import os
 import re
+from builtins import open
 
 from pants.backend.native.config.environment import Platform
 from pants.base.build_environment import get_buildroot
@@ -146,15 +147,18 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       try:
         output = subprocess.check_output(pex2)
       except subprocess.CalledProcessError as e:
-        self.assertNotEquals(0, e.returncode)
+        self.assertNotEqual(0, e.returncode)
 
   def test_pants_resolves_local_dists_for_current_platform_only(self):
     # Test that pants will override pants.ini platforms config when building
     # or running a target that depends on native (c or cpp) sources.
     with temporary_dir() as tmp_dir:
       pex = os.path.join(tmp_dir, 'main.pex')
-      pants_ini_config = {'python-setup': {'platforms': ['current', 'linux-x86_64']}}
-      # Clean all to rebuild requirements pex.
+      pants_ini_config = {
+        'python-setup': {
+          'platforms': ['current', 'this-platform-does_not-exist'],
+        },
+      }
       command=[
         '--pants-distdir={}'.format(tmp_dir),
         'run',
@@ -171,11 +175,14 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       output = subprocess.check_output(pex)
       self._assert_native_greeting(output)
 
-  def test_pants_tests_local_dists_for_current_platform_only(self):
-    platform_string = Platform.create().resolve_platform_specific({
+  def _get_current_platform_string(self):
+    return Platform.create().resolve_platform_specific({
       'darwin': lambda: 'macosx-10.12-x86_64',
       'linux': lambda: 'linux-x86_64',
     })
+
+  def test_pants_tests_local_dists_for_current_platform_only(self):
+    platform_string = self._get_current_platform_string()
     # Use a platform-specific string for testing because the test goal
     # requires the coverage package and the pex resolver raises an Untranslatable error when
     # attempting to translate the coverage sdist for incompatible platforms.

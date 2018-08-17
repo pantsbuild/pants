@@ -54,20 +54,20 @@ def _options_registration_function(defaults, fingerprintables):
   def register(*args, **kwargs):
     option_name = Parser.parse_dest(*args, **kwargs)
 
-    default = kwargs.get(b'default')
+    default = kwargs.get('default')
     if default is None:
-      if kwargs.get(b'type') == bool:
+      if kwargs.get('type') == bool:
         default = False
-      if kwargs.get(b'type') == list:
+      if kwargs.get('type') == list:
         default = []
     defaults[option_name] = RankedValue(RankedValue.HARDCODED, default)
 
-    fingerprint = kwargs.get(b'fingerprint', False)
+    fingerprint = kwargs.get('fingerprint', False)
     if fingerprint:
       if is_list_option(kwargs):
-        val_type = kwargs.get(b'member_type', str)
+        val_type = kwargs.get('member_type', str)
       else:
-        val_type = kwargs.get(b'type', str)
+        val_type = kwargs.get('type', str)
       fingerprintables[option_name] = val_type
 
   return register

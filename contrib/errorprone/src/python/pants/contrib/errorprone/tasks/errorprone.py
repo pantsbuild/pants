@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
-from builtins import str
+from builtins import open, str
 
 from pants.backend.jvm import argfile
 from pants.backend.jvm.subsystems.shader import Shader

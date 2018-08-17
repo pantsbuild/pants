@@ -60,7 +60,7 @@ class FilesetRelPathWrapperTest(TestBase):
     self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources={})'.format(spec))
     graph = self.context().scan()
     globs = graph.get_target_from_spec('y').globs_relative_to_buildroot()
-    self.assertEquals(expected, globs)
+    self.assertEqual(expected, globs)
 
   def test_glob_to_spec(self):
     self._spec_test('globs("*.java")',
@@ -220,7 +220,7 @@ class FilesetRelPathWrapperTest(TestBase):
     self.add_to_build_file('z/w/BUILD', 'dummy_target(name="w", sources=rglobs("*.java"))')
     graph = self.context().scan()
     relative_sources = set(graph.get_target_from_spec('z/w').sources_relative_to_source_root())
-    self.assertEquals({'y/fleem.java', 'y/morx.java', 'foo.java'}, relative_sources)
+    self.assertEqual({'y/fleem.java', 'y/morx.java', 'foo.java'}, relative_sources)
 
 
 class FilesetWithSpecTest(TestBase):
@@ -252,11 +252,11 @@ class FilesetWithSpecTest(TestBase):
   def test_iter_relative_paths(self):
     self.create_files('test_root', ['a', 'b', 'c'])
     efws = self.sources_for(['a', 'b', 'c'], 'test_root')
-    self.assertEquals(
+    self.assertEqual(
       efws.files_hash,
-      str('cb11a7f0b5a1e22b93c36783608ba531ea831c2f68a5c9f9498417b211bcfea4'),
+      'cb11a7f0b5a1e22b93c36783608ba531ea831c2f68a5c9f9498417b211bcfea4',
     )
-    self.assertEquals(
+    self.assertEqual(
       list(efws.paths_from_buildroot_iter()),
       ['test_root/a', 'test_root/b', 'test_root/c'],
     )

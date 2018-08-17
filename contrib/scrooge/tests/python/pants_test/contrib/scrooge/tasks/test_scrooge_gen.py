@@ -127,17 +127,17 @@ class ScroogeGenTest(NailgunTaskTestBase):
       Context.add_new_target = mock
       task.execute()
 
-      self.assertEquals(1, mock.call_count)
+      self.assertEqual(1, mock.call_count)
       _, call_kwargs = mock.call_args
-      self.assertEquals(call_kwargs['target_type'], library_type)
-      self.assertEquals(call_kwargs['dependencies'], OrderedSet())
-      self.assertEquals(call_kwargs['provides'], None)
-      self.assertEquals(call_kwargs['derived_from'], target)
-      self.assertEquals(call_kwargs['strict_deps'], True)
-      self.assertEquals(call_kwargs['fatal_warnings'], False)
+      self.assertEqual(call_kwargs['target_type'], library_type)
+      self.assertEqual(call_kwargs['dependencies'], OrderedSet())
+      self.assertEqual(call_kwargs['provides'], None)
+      self.assertEqual(call_kwargs['derived_from'], target)
+      self.assertEqual(call_kwargs['strict_deps'], True)
+      self.assertEqual(call_kwargs['fatal_warnings'], False)
 
       sources = call_kwargs['sources']
-      self.assertEquals(sources.files, ())
+      self.assertEqual(sources.files, ())
 
     finally:
       Context.add_new_target = saved_add_new_target
@@ -172,5 +172,5 @@ class ScroogeGenTest(NailgunTaskTestBase):
   def _test_dependencies_help(self, contents, declares_service, declares_exception):
     source = 'test_smoke/a.thrift'
     self.create_file(relpath=source, contents=contents)
-    self.assertEquals(ScroogeGen._declares_service(source), declares_service)
-    self.assertEquals(ScroogeGen._declares_exception(source), declares_exception)
+    self.assertEqual(ScroogeGen._declares_service(source), declares_service)
+    self.assertEqual(ScroogeGen._declares_exception(source), declares_exception)

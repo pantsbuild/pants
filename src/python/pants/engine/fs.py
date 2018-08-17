@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from future.utils import text_type
+from future.utils import binary_type, text_type
 
 from pants.base.project_tree import Dir, File
 from pants.engine.rules import RootRule
@@ -12,7 +12,7 @@ from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.objects import Collection, datatype
 
 
-class FileContent(datatype(['path', 'content'])):
+class FileContent(datatype([('path', text_type), ('content', binary_type)])):
   """The content of a file."""
 
   def __repr__(self):
@@ -22,7 +22,7 @@ class FileContent(datatype(['path', 'content'])):
     return repr(self)
 
 
-class Path(datatype(['path', 'stat'])):
+class Path(datatype([('path', text_type), 'stat'])):
   """A filesystem path, holding both its symbolic path name, and underlying canonical Stat.
 
   Both values are relative to the ProjectTree's buildroot.
@@ -83,7 +83,7 @@ class DirectoryDigest(datatype([('fingerprint', text_type), ('serialized_bytes_l
 
   def __repr__(self):
     return '''DirectoryDigest(fingerprint={}, serialized_bytes_length={})'''.format(
-      self.fingerprint[:8],
+      self.fingerprint,
       self.serialized_bytes_length
     )
 

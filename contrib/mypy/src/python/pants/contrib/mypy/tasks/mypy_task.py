@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from builtins import filter, str
+from builtins import filter, open, str
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_repos import PythonRepos
@@ -15,7 +15,6 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
-from pants.backend.python.tasks.wrapped_pex import WrappedPEX
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -98,7 +97,7 @@ class MypyTask(ResolveRequirementsTaskBase):
     path = os.path.realpath(os.path.join(self.workdir, str(py3_interpreter.identity), mypy_version))
     if not os.path.isdir(path):
       self.merge_pexes(path, pex_info, py3_interpreter, [mypy_requirement_pex])
-    pex = WrappedPEX(PEX(path, py3_interpreter))
+    pex = PEX(path, py3_interpreter)
     return pex.run(mypy_args, **kwargs)
 
   def execute(self):
@@ -119,7 +118,7 @@ class MypyTask(ResolveRequirementsTaskBase):
     with temporary_file_path() as sources_list_path:
       with open(sources_list_path, 'w') as f:
         for source in sources:
-          f.write(b'{}\n'.format(source))
+          f.write('{}\n'.format(source))
 
       # Construct the mypy command line.
       cmd = ['--python-version={}'.format(interpreter_for_targets.identity.python)]

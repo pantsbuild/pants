@@ -39,6 +39,7 @@ members = [
   "resettable",
   "testutil",
   "testutil/mock",
+  "ui"
 ]
 
 # These are the packages which are built/tested when no special selector flags are passed to cargo.
@@ -63,6 +64,7 @@ default-members = [
   "resettable",
   "testutil",
   "testutil/mock",
+  "ui"
 ]
 
 [dependencies]

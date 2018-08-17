@@ -5,10 +5,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
+from builtins import filter, map, object, str
 from collections import defaultdict, namedtuple
 from hashlib import sha1
 
 from colors import red
+from future.utils import PY3
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TaskError
@@ -137,7 +139,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
       hasher = sha1()
       if hasattr(target, 'platform'):
         hasher.update(str(tuple(target.platform)))
-      return hasher.hexdigest()
+      return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
     def __eq__(self, other):
       return type(self) == type(other)
@@ -229,7 +231,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
       for target, deps in invalids:
         for dep in deps:
           dependency_to_dependees[dep].add(target)
-      invalids = dependency_to_dependees.items()
+      invalids = list(dependency_to_dependees.items())
 
     invalids = sorted(invalids)
     individual_errors = '\n'.join(self._create_individual_error_message(target, deps)
@@ -327,7 +329,7 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
     min_allowed_version = {}
 
     def get_versions(targets):
-      return map(self.jvm_version, targets)
+      return list(map(self.jvm_version, targets))
 
     for target in self.jvm_targets:
       if target_dependencies[target]:

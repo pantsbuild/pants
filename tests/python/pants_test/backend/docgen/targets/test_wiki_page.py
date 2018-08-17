@@ -85,14 +85,14 @@ This is the second readme file! Isn't it exciting?
     self.assertTrue(isinstance(p, Page), "%s isn't an instance of Page" % p)
     self.assertTrue(isinstance(p.provides[0], WikiArtifact), "%s isn't an instance of WikiArtifact" % p)
     self.assertTrue(isinstance(p.provides[0].wiki, Wiki), "%s isn't an instance of Wiki" % p)
-    self.assertEquals("~areitz", p.provides[0].config['space'])
-    self.assertEquals("test_page", p.provides[0].config['title'])
+    self.assertEqual("~areitz", p.provides[0].config['space'])
+    self.assertEqual("test_page", p.provides[0].config['title'])
     self.assertFalse('parent' in p.provides[0].config)
 
     # Check to make sure the 'readme2' target has been loaded into the build graph (via parsing of
     # the 'README.md' page)
     address = Address.parse('src/docs:readme2', relative_to=get_buildroot())
-    self.assertEquals(p._build_graph.get_target(address), self.target('src/docs:readme2'))
+    self.assertEqual(p._build_graph.get_target(address), self.target('src/docs:readme2'))
 
   def test_wiki_page_fingerprinting(self):
     def create_page_target(space):

@@ -11,9 +11,11 @@ import os
 import pkgutil
 import shutil
 import sys
+from builtins import input, next, object, open, str
 from collections import OrderedDict, defaultdict, namedtuple
 from copy import copy
 
+from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ossrh_publication_metadata import OSSRHPublicationMetadata
@@ -164,7 +166,7 @@ class PomWriter(object):
 
     target_jar = self._internaldep(self._as_versioned_jar(target), target)
     if target_jar:
-      target_jar = target_jar.extend(dependencies=dependencies.values())
+      target_jar = target_jar.extend(dependencies=list(dependencies.values()))
 
     template_relpath = os.path.join(_TEMPLATES_RELPATH, 'pom.xml.mustache')
     template_text = pkgutil.get_data(__name__, template_relpath)
@@ -472,7 +474,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
       isatty = False
     if not isatty:
       return True
-    push = raw_input('\nPublish {} with revision {} ? [y|N] '.format(
+    push = input('\nPublish {} with revision {} ? [y|N] '.format(
       coord, version
     ))
     print('\n')
@@ -625,8 +627,8 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
         if self.publish_changelog:
           changelog_path = self.artifact_path(jar, version, suffix='-CHANGELOG', extension='txt')
-          with safe_open(changelog_path, 'wb') as changelog_file:
-            changelog_file.write(changelog.encode('utf-8'))
+          with safe_open(changelog_path, 'w') as changelog_file:
+            changelog_file.write(changelog)
           publications.add(self.Publication(name=jar.name, classifier='CHANGELOG', ext='txt'))
 
       # Process any extra jars that might have been previously generated for this target, or a
@@ -867,8 +869,10 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
     def exportable(tgt):
       return tgt in candidates and self._is_exported(tgt)
 
-    return OrderedSet(filter(exportable,
-                             reversed(sort_targets(filter(exportable, candidates)))))
+    return OrderedSet(target for target in
+                      reversed(sort_targets(candidate for candidate in candidates
+                                            if exportable(candidate)))
+                      if exportable(target))
 
   def entry_fingerprint(self, target, fingerprint_internal):
     sha = hashlib.sha1()
@@ -890,11 +894,12 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
       fingerprint = fingerprint_internal(internal_target)
       sha.update(fingerprint)
 
-    return sha.hexdigest()
+    return sha.hexdigest() if PY3 else sha.hexdigest().decode('utf-8')
 
   def changelog(self, target, sha):
     # Filter synthetic files.
-    files = filter(lambda filename: not filename.startswith(os.pardir), target.sources_relative_to_buildroot())
+    files = [filename for filename in target.sources_relative_to_buildroot()
+             if not filename.startswith(os.pardir)]
     return ensure_text(self.scm.changelog(from_commit=sha, files=files))
 
   def fetch_ivysettings(self, ivy):

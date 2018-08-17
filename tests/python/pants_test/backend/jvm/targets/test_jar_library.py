@@ -37,7 +37,7 @@ class JarLibraryTest(TestBase):
     lib = JarLibrary(name='foo', address=Address.parse('//:foo'),
                      build_graph=self.build_graph,
                      jars=[jar1, jar2])
-    self.assertEquals((jar1, jar2), lib.jar_dependencies)
+    self.assertEqual((jar1, jar2), lib.jar_dependencies)
 
   def test_empty_jar_dependencies(self):
     def example():
@@ -48,14 +48,14 @@ class JarLibraryTest(TestBase):
     # TODO(Eric Ayers) There doesn't seem to be any way to set this field at the moment.
     lib = JarLibrary(name='foo', address=Address.parse('//:foo'),
                      build_graph=self.build_graph, jars=[jar1])
-    self.assertEquals([], lib.excludes)
+    self.assertEqual([], lib.excludes)
 
   def test_to_jar_dependencies(self):
     def assert_dep(dep, org, name, rev):
       self.assertTrue(isinstance(dep, JarDependency))
-      self.assertEquals(org, dep.org)
-      self.assertEquals(name, dep.name)
-      self.assertEquals(rev, dep.rev)
+      self.assertEqual(org, dep.org)
+      self.assertEqual(name, dep.name)
+      self.assertEqual(rev, dep.rev)
 
     self.add_to_build_file('BUILD', dedent('''
     jar_library(name='lib1',
@@ -72,19 +72,19 @@ class JarLibraryTest(TestBase):
     '''))
     lib1 = self.target('//:lib1')
     self.assertIsInstance(lib1, JarLibrary)
-    self.assertEquals(1, len(lib1.jar_dependencies))
+    self.assertEqual(1, len(lib1.jar_dependencies))
     assert_dep(lib1.jar_dependencies[0], 'testOrg1', 'testName1', '123')
 
     lib2 = self.target('//:lib2')
     self.assertIsInstance(lib2, JarLibrary)
-    self.assertEquals(2, len(lib2.jar_dependencies))
+    self.assertEqual(2, len(lib2.jar_dependencies))
     assert_dep(lib2.jar_dependencies[0], 'testOrg2', 'testName2', '456')
     assert_dep(lib2.jar_dependencies[1], 'testOrg3', 'testName3', '789')
 
     deps = JarLibrary.to_jar_dependencies(lib1.address,
                                           [':lib1', ':lib2'],
                                           self.build_graph)
-    self.assertEquals(3, len(deps))
+    self.assertEqual(3, len(deps))
     assert_dep(lib1.jar_dependencies[0], 'testOrg1', 'testName1', '123')
     assert_dep(lib2.jar_dependencies[0], 'testOrg2', 'testName2', '456')
     assert_dep(lib2.jar_dependencies[1], 'testOrg3', 'testName3', '789')

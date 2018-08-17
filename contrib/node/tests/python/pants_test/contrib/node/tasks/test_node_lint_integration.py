@@ -20,7 +20,7 @@ class NodeLintIntegrationTest(PantsRunIntegrationTest):
     path = 'contrib/node/examples/src/node/javascriptstyle-empty/index.js'
     content = 'const console = require(\'console\');\nconsole.log("Double Quotes");\n'
 
-    with self.temporary_file_content(path, content):
+    with self.temporary_file_content(path, content, binary_mode=False):
       command = ['lint',
                  'contrib/node/examples/src/node/javascriptstyle-empty']
       pants_run = self.run_pants(command=command)
@@ -31,7 +31,7 @@ class NodeLintIntegrationTest(PantsRunIntegrationTest):
     path = 'contrib/node/examples/src/node/javascriptstyle-empty/not_ignored_index.js'
     content = 'const console = require(\'console\');\nconsole.log("Double Quotes");\n'
 
-    with self.temporary_file_content(path, content):
+    with self.temporary_file_content(path, content, binary_mode=False):
       command = ['lint',
                  'contrib/node/examples/src/node/javascriptstyle-empty']
       pants_run = self.run_pants(command=command)

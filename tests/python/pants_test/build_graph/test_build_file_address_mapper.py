@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import open
 from textwrap import dedent
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -45,7 +46,7 @@ class BuildFileAddressMapperTest(BaseTest):
     subdir_suffix_build_file = self.add_to_build_file('subdir/BUILD.suffix', 'target(name="baz")')
     with open(os.path.join(self.build_root, 'BUILD.invalid.suffix'), 'w') as invalid_build_file:
       invalid_build_file.write('target(name="foobar")')
-    self.assertEquals({BuildFileAddress(build_file=root_build_file, target_name='foo'),
+    self.assertEqual({BuildFileAddress(build_file=root_build_file, target_name='foo'),
                        BuildFileAddress(build_file=subdir_build_file, target_name='bar'),
                        BuildFileAddress(build_file=subdir_suffix_build_file, target_name='baz')},
                       self.address_mapper.scan_addresses())
@@ -55,7 +56,7 @@ class BuildFileAddressMapperTest(BaseTest):
     subdir_build_file = self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
     subdir_suffix_build_file = self.add_to_build_file('subdir/BUILD.suffix', 'target(name="baz")')
     subdir = os.path.join(self.build_root, 'subdir')
-    self.assertEquals({BuildFileAddress(build_file=subdir_build_file, target_name='bar'),
+    self.assertEqual({BuildFileAddress(build_file=subdir_build_file, target_name='bar'),
                        BuildFileAddress(build_file=subdir_suffix_build_file, target_name='baz')},
                       self.address_mapper.scan_addresses(root=subdir))
 
@@ -129,7 +130,7 @@ class BuildFileAddressMapperWithIgnoreTest(BaseTest):
   def test_scan_from_address_mapper(self):
     root_build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
     self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
-    self.assertEquals(
+    self.assertEqual(
       {BuildFileAddress(build_file=root_build_file, target_name='foo')},
       self.address_mapper.scan_addresses())
 
@@ -137,7 +138,7 @@ class BuildFileAddressMapperWithIgnoreTest(BaseTest):
     self.add_to_build_file('BUILD', 'target(name="foo")')
     self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
     graph = self.context().scan()
-    self.assertEquals([target.address.spec for target in graph.targets()], ['//:foo'])
+    self.assertEqual([target.address.spec for target in graph.targets()], ['//:foo'])
 
 
 class BuildFileAddressMapperScanTest(BaseTest):

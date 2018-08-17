@@ -5,14 +5,15 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
-import codecs
 import itertools
 import os
 import re
 import textwrap
 import tokenize
 from abc import abstractmethod
+from builtins import object, open
 from collections import Sequence
+from io import StringIO
 
 import six
 from pants.util.meta import AbstractClass
@@ -90,7 +91,7 @@ class PythonFile(object):
     """
     # Remove the # coding=utf-8 to avoid AST erroneous parse errors
     #   https://bugs.python.org/issue22221
-    lines = blob.split('\n')
+    lines = blob.decode('utf-8').split('\n')
     if lines and 'coding=utf-8' in lines[0]:
       lines[0] = '#remove coding'
     return '\n'.join(lines).encode('ascii', errors='replace')
@@ -98,7 +99,7 @@ class PythonFile(object):
   def __init__(self, blob, tree, filename):
     self._blob = self._remove_coding_header(blob)
     self.tree = tree
-    self.lines = OffByOneList(self._blob.split('\n'))
+    self.lines = OffByOneList(self._blob.decode('utf-8').split('\n'))
     self.filename = filename
     self.logical_lines = dict((start, (start, stop, indent))
         for start, stop, indent in self.iter_logical_lines(self._blob))
@@ -126,7 +127,7 @@ class PythonFile(object):
     else:
       full_filename = filename
 
-    with codecs.open(full_filename, encoding='utf-8') as fp:
+    with open(full_filename, 'rb') as fp:
       blob = fp.read()
 
     tree = cls._parse(blob, filename)
@@ -143,7 +144,7 @@ class PythonFile(object):
     if lines and not lines[0]:  # Remove the initial empty line, which is an artifact of dedent.
       lines = lines[1:]
 
-    blob = '\n'.join(lines)
+    blob = '\n'.join(lines).encode('utf-8')
     tree = cls._parse(blob, filename)
     return cls(blob, tree, filename)
 
@@ -153,7 +154,8 @@ class PythonFile(object):
     :param blob: Input string with python file contents
     :return: token iterator
     """
-    return tokenize.generate_tokens(six.StringIO(blob).readline)
+    readline_func = StringIO(blob.decode('utf-8')).readline
+    return tokenize.generate_tokens(readline_func)
 
   @property
   def tokens(self):
@@ -197,7 +199,7 @@ class PythonFile(object):
         yield self.translate_logical_line(
             line_number_start,
             token_start[0] + (1 if token_type is tokenize.NEWLINE else -1),
-            list(filter(None, contents)),
+            [_f for _f in contents if _f],
             indent_stack,
             endmarker=token_type == tokenize.ENDMARKER)
         contents = []
@@ -270,9 +272,9 @@ class Nit(object):
     self._lines = lines
 
   def __str__(self):
-    """convert ascii for safe terminal output"""
+    """Sanitize to Ascii for safe terminal output"""
     flat = list(self.flatten_lines([self.message], self.lines))
-    return '\n     |'.join(flat).encode('ascii', errors='replace')
+    return '\n     |'.join(flat).encode('ascii', errors='replace').decode('ascii')
 
   @property
   def line_number(self):
@@ -309,7 +311,7 @@ class CheckSyntaxError(Exception):
 
   def as_nit(self):
     line_range = slice(self._syntax_error.lineno, self._syntax_error.lineno + 1)
-    lines = OffByOneList(self._blob.split('\n'))
+    lines = OffByOneList(self._blob.decode('utf-8').split('\n'))
     # NB: E901 is the SyntaxError PEP8 code.
     # See:https://pycodestyle.readthedocs.io/en/latest/intro.html#error-codes
     return Nit('E901', Nit.ERROR, self.filename,

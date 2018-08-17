@@ -6,8 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import object, open
 
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 
 
@@ -17,23 +17,15 @@ class FileExcluder(object):
     if excludes_path:
       if not os.path.exists(excludes_path):
         raise TaskError('Excludes file does not exist: {0}'.format(excludes_path))
-      with open(excludes_path) as fh:
+      with open(excludes_path, 'r') as fh:
         for line in fh.readlines():
           if line and not line.startswith('#') and '::' in line:
             pattern, plugins = line.strip().split('::', 2)
-            plugins = plugins.split()
-
-            deprecated_conditional(
-              lambda: 'pep8' in plugins,
-              '1.10.0.dev0',
-              'The pep8 check has been renamed to pycodestyle. '
-              'Please update your suppression file: "{}". The pep8 option'.format(excludes_path)
-            )
-            map(lambda p:p if p != 'pep8' else 'pycodestyle', plugins)
+            style_plugins = plugins.split()
 
             self.excludes[pattern] = {
               'regex': re.compile(pattern),
-              'plugins': plugins
+              'plugins': style_plugins
             }
             log.debug('Exclude pattern: {pattern}'.format(pattern=pattern))
     else:

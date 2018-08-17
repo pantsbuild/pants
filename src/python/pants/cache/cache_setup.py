@@ -6,10 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import threading
-import urlparse
+from builtins import object, range, str
 from collections import namedtuple
 
-from six.moves import range
+from future.moves.urllib.parse import urlparse
 
 from pants.base.build_environment import get_buildroot
 from pants.cache.artifact_cache import ArtifactCacheError
@@ -242,13 +242,13 @@ class CacheFactory(object):
     return string_spec.startswith('http://') or string_spec.startswith('https://')
 
   def _baseurl(self, url):
-    parsed_url = urlparse.urlparse(url)
+    parsed_url = urlparse(url)
     return '{scheme}://{netloc}'.format(scheme=parsed_url.scheme, netloc=parsed_url.netloc)
 
   def get_available_urls(self, urls):
     """Return reachable urls sorted by their ping times."""
     baseurl_to_urls = {self._baseurl(url): url for url in urls}
-    pingtimes = self._pinger.pings(baseurl_to_urls.keys())  # List of pairs (host, time in ms).
+    pingtimes = self._pinger.pings(list(baseurl_to_urls.keys()))  # List of pairs (host, time in ms).
     self._log.debug('Artifact cache server ping times: {}'
                     .format(', '.join(['{}: {:.6f} secs'.format(*p) for p in pingtimes])))
 

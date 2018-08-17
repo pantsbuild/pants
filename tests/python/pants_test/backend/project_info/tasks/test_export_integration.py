@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 import os
 import re
+from builtins import open
 
 from twitter.common.collections import maybe_list
 
@@ -46,7 +47,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     self.assertTrue(os.path.exists(export_out_file),
                     msg='Could not find export output file in {out_file}'
                         .format(out_file=export_out_file))
-    with open(export_out_file) as json_file:
+    with open(export_out_file, 'r') as json_file:
       json_data = json.load(json_file)
       if not load_libs:
         self.assertIsNone(json_data.get('libraries'))
@@ -192,8 +193,8 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertFalse('python_setup' in json_data)
       target_name = 'examples/src/java/org/pantsbuild/example/hello/simple:simple'
       targets = json_data.get('targets')
-      self.assertEquals('java7', targets[target_name]['platform'])
-      self.assertEquals(
+      self.assertEqual('java7', targets[target_name]['platform'])
+      self.assertEqual(
         {
           'default_platform' : 'java7',
           'platforms': {
@@ -214,8 +215,8 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     with self.temporary_workdir() as workdir:
       test_target = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight-test-platform'
       json_data = self.run_export(test_target, workdir)
-      self.assertEquals('java7', json_data['targets'][test_target]['platform'])
-      self.assertEquals('java8', json_data['targets'][test_target]['test_platform'])
+      self.assertEqual('java7', json_data['targets'][test_target]['platform'])
+      self.assertEqual('java8', json_data['targets'][test_target]['test_platform'])
 
   @ensure_resolver
   def test_intellij_integration(self):
@@ -226,7 +227,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       p.communicate()
       self.assertEqual(p.returncode, 0)
 
-      with open(exported_file) as data_file:
+      with open(exported_file, 'r') as data_file:
         json_data = json.load(data_file)
 
       python_setup = json_data['python_setup']
@@ -241,7 +242,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
 
       python_target = json_data['targets']['src/python/pants/backend/python/targets:targets']
       self.assertIsNotNone(python_target)
-      self.assertEquals(default_interpreter, python_target['python_interpreter'])
+      self.assertEqual(default_interpreter, python_target['python_interpreter'])
 
   @ensure_resolver
   def test_intransitive_and_scope(self):
@@ -251,8 +252,8 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       json_data = self.run_export(test_target, workdir)
       h = hash_target('{}:shadow'.format(test_path), 'provided')
       synthetic_target = '{}:shadow-unstable-provided-{}'.format(test_path, h)
-      self.assertEquals(False, json_data['targets'][synthetic_target]['transitive'])
-      self.assertEquals('compile test', json_data['targets'][synthetic_target]['scope'])
+      self.assertEqual(False, json_data['targets'][synthetic_target]['transitive'])
+      self.assertEqual('compile test', json_data['targets'][synthetic_target]['scope'])
 
   @ensure_resolver
   def test_export_is_target_roots(self):

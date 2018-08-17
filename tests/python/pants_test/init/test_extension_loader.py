@@ -11,6 +11,7 @@ import uuid
 from builtins import object
 from contextlib import contextmanager
 
+from future.utils import PY2
 from pkg_resources import (Distribution, EmptyProvider, VersionConflict, WorkingSet, working_set,
                            yield_lines)
 
@@ -111,13 +112,17 @@ class LoaderTest(unittest.TestCase):
   def create_register(self, build_file_aliases=None, register_goals=None, global_subsystems=None,
                       rules=None, module_name='register'):
 
-    package_name = b'__test_package_{0}'.format(uuid.uuid4().hex)
+    package_name = '__test_package_{0}'.format(uuid.uuid4().hex)
+    if PY2:
+      package_name = package_name.encode('utf-8')
     self.assertFalse(package_name in sys.modules)
 
     package_module = types.ModuleType(package_name)
     sys.modules[package_name] = package_module
     try:
-      register_module_fqn = b'{0}.{1}'.format(package_name, module_name)
+      register_module_fqn = '{0}.{1}'.format(package_name, module_name)
+      if PY2:
+        register_module_fqn = register_module_fqn.encode('utf-8')
       register_module = types.ModuleType(register_module_fqn)
       setattr(package_module, module_name, register_module)
       sys.modules[register_module_fqn] = register_module
@@ -214,10 +219,14 @@ class LoaderTest(unittest.TestCase):
     :param callable after: Optional callable for load_after list entry point
     """
 
-    plugin_pkg = b'demoplugin{0}'.format(uuid.uuid4().hex)
+    plugin_pkg = 'demoplugin{0}'.format(uuid.uuid4().hex)
+    if PY2:
+      plugin_pkg = plugin_pkg.encode('utf-8')
     pkg = types.ModuleType(plugin_pkg)
     sys.modules[plugin_pkg] = pkg
-    module_name = b'{0}.{1}'.format(plugin_pkg, 'demo')
+    module_name = '{0}.{1}'.format(plugin_pkg, 'demo')
+    if PY2:
+      module_name = module_name.encode('utf-8')
     plugin = types.ModuleType(module_name)
     setattr(pkg, 'demo', plugin)
     sys.modules[module_name] = plugin

@@ -24,7 +24,7 @@ class TarballArtifactTest(unittest.TestCase):
       artifact = TarballArtifact(artifact_root, os.path.join(cache_root, 'some.tar'))
       artifact.collect([file_path])
 
-      self.assertEquals([file_path], list(artifact.get_paths()))
+      self.assertEqual([file_path], list(artifact.get_paths()))
 
   def test_does_not_exist_when_no_tar_file(self):
     with temporary_dir() as tmpdir:

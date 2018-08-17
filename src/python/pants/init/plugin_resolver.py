@@ -8,8 +8,9 @@ import hashlib
 import logging
 import os
 import site
-from builtins import object
+from builtins import object, open
 
+from future.utils import PY3
 from pex import resolver
 from pex.base import requirement_is_exact
 from pkg_resources import Requirement
@@ -89,7 +90,7 @@ class PluginResolver(object):
   def _resolve_exact_plugin_locations(self):
     hasher = hashlib.sha1()
     for req in sorted(self._plugin_requirements):
-      hasher.update(req)
+      hasher.update(req.encode('utf-8'))
     resolve_hash = hasher.hexdigest()
     resolved_plugins_list = os.path.join(self.plugin_cache_dir,
                                          'plugins-{}.txt'.format(resolve_hash))
@@ -98,10 +99,10 @@ class PluginResolver(object):
       tmp_plugins_list = resolved_plugins_list + '~'
       with safe_open(tmp_plugins_list, 'w') as fp:
         for plugin in self._resolve_plugins():
-          fp.write(plugin.location)
+          fp.write(plugin.location if PY3 else plugin.location.decode('utf-8'))
           fp.write('\n')
       os.rename(tmp_plugins_list, resolved_plugins_list)
-    with open(resolved_plugins_list) as fp:
+    with open(resolved_plugins_list, 'r') as fp:
       for plugin_location in fp:
         yield plugin_location.strip()
 

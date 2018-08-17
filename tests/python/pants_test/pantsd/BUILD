@@ -1,7 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
+target(
   name = 'test_deps',
   dependencies = [
     '3rdparty/python:mock',
@@ -45,6 +45,7 @@ python_tests(
   sources = ['test_pailgun_server.py'],
   coverage = ['pants.pantsd.pailgun_server'],
   dependencies = [
+    '3rdparty/python:future',
     ':test_deps',
     'src/python/pants/pantsd:pailgun_server'
   ]
@@ -62,16 +63,26 @@ python_tests(
   ]
 )
 
+python_library(
+  name = 'pantsd_integration_test_base',
+  sources = ['pantsd_integration_test_base.py'],
+  dependencies = [
+    '3rdparty/python:ansicolors',
+    'src/python/pants/pantsd:process_manager',
+    'src/python/pants/util:collections',
+    'tests/python/pants_test/testutils:process_test_util',
+    'tests/python/pants_test:int-test',
+  ],
+)
+
 python_tests(
   name = 'pantsd_integration',
   sources = ['test_pantsd_integration.py'],
   dependencies = [
+    ':pantsd_integration_test_base',
     '3rdparty/python:futures',
-    'src/python/pants/pantsd:process_manager',
-    'src/python/pants/util:collections',
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/testutils:process_test_util',
-    '3rdparty/python:ansicolors'
   ],
   tags = {'integration'},
   timeout = 900

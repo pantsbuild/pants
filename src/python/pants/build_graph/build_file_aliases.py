@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import inspect
 from abc import abstractmethod
+from builtins import object
 from collections import defaultdict
 
 import six
@@ -42,7 +43,7 @@ class TargetMacro(object):
                          'produced type; none were registered'.format(context_aware_object_factory))
       deprecated_conditional(
         lambda: len(target_types) > 1,
-        '1.10.0.dev0',
+        '1.12.0.dev0',
         'TargetMacro.Factory instances that construct more than one type are no longer supported. '
         'Consider using a `context_aware_object_factory, which can construct any number of '
         'different objects.'

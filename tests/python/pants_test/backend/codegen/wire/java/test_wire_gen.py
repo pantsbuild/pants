@@ -37,7 +37,7 @@ class WireGenTest(TaskTestBase):
                                           sources=['foo.proto'])
     context = self.context(target_roots=[simple_wire_target])
     task = self.create_task(context)
-    self.assertEquals([
+    self.assertEqual([
       '--java_out={}'.format(self.TARGET_WORKDIR),
       '--proto_path={}/src/wire'.format(self.build_root),
       'foo.proto'],
@@ -50,7 +50,7 @@ class WireGenTest(TaskTestBase):
                                      service_writer='org.pantsbuild.DummyServiceWriter',
                                      service_writer_options=['opt1', 'opt2'])
     task = self.create_task(self.context(target_roots=[wire_targetv1]))
-    self.assertEquals([
+    self.assertEqual([
       '--java_out={}'.format(self.TARGET_WORKDIR),
       '--service_writer=org.pantsbuild.DummyServiceWriter',
       '--service_writer_opt', 'opt1',
@@ -69,7 +69,7 @@ class WireGenTest(TaskTestBase):
                                     roots=['root1', 'root2', 'root3'],
                                     enum_options=['enum1', 'enum2', 'enum3'],)
     task = self.create_task(self.context(target_roots=[kitchen_sink]))
-    self.assertEquals([
+    self.assertEqual([
       '--java_out={}'.format(self.TARGET_WORKDIR),
       '--no_options',
       '--service_writer=org.pantsbuild.DummyServiceWriter',
@@ -90,7 +90,7 @@ class WireGenTest(TaskTestBase):
                                           sources=['foo.proto'], dependencies=[parent_target])
     context = self.context(target_roots=[parent_target, simple_wire_target])
     task = self.create_task(context)
-    self.assertEquals([
+    self.assertEqual([
       '--java_out={}'.format(self.TARGET_WORKDIR),
       '--proto_path={}/src/wire'.format(self.build_root),
       'foo.proto'],

@@ -93,11 +93,11 @@ python_tests(
   sources=['test_isolated_process.py'],
   dependencies=[
     '3rdparty/python:future',
-    ':scheduler_test_base',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:isolated_process',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
+    'tests/python/pants_test:test_base',
     'tests/python/pants_test/engine/examples:fs_test',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
   ]

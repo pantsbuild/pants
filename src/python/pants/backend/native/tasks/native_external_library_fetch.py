@@ -61,30 +61,20 @@ class ConanRequirement(datatype(['pkg_spec'])):
     return args
 
 
+class NativeExternalLibraryFiles(datatype([
+    'include_dir',
+    # TODO: we shouldn't have any `lib_names` if `lib_dir` is not set!
+    'lib_dir',
+    ('lib_names', tuple),
+])): pass
+
+
 class NativeExternalLibraryFetch(Task):
   options_scope = 'native-external-library-fetch'
   native_library_constraint = Exactly(ExternalNativeLibrary)
 
   class NativeExternalLibraryFetchError(TaskError):
     pass
-
-  class NativeExternalLibraryFiles(object):
-    def __init__(self):
-      self.include_dir = None
-      self.lib_dir = None
-      self.lib_names = []
-
-    def add_lib_name(self, lib_name):
-      self.lib_names.append(lib_name)
-
-    def get_third_party_lib_args(self):
-      lib_args = []
-      if self.lib_names:
-        for lib_name in self.lib_names:
-          lib_args.append('-l{}'.format(lib_name))
-        lib_dir_arg = '-L{}'.format(self.lib_dir)
-        lib_args.append(lib_dir_arg)
-      return lib_args
 
   @classmethod
   def _parse_lib_name_from_library_filename(cls, filename):
@@ -105,7 +95,7 @@ class NativeExternalLibraryFetch(Task):
 
   @classmethod
   def product_types(cls):
-    return [cls.NativeExternalLibraryFiles]
+    return [NativeExternalLibraryFiles]
 
   @property
   def cache_target_dirs(self):
@@ -116,9 +106,6 @@ class NativeExternalLibraryFetch(Task):
     return Conan.scoped_instance(self).bootstrap_conan()
 
   def execute(self):
-    task_product = self.context.products.get_data(self.NativeExternalLibraryFiles,
-                                                  self.NativeExternalLibraryFiles)
-
     native_lib_tgts = self.context.targets(self.native_library_constraint.satisfied_by)
     if native_lib_tgts:
       with self.invalidated(native_lib_tgts,
@@ -128,7 +115,10 @@ class NativeExternalLibraryFetch(Task):
         if invalidation_check.invalid_vts or not resolve_vts.valid:
           for vt in invalidation_check.all_vts:
             self._fetch_packages(vt, vts_results_dir)
-        self._populate_task_product(vts_results_dir, task_product)
+
+        native_external_libs_product = self._collect_external_libs(vts_results_dir)
+        self.context.products.register_data(NativeExternalLibraryFiles,
+                                            native_external_libs_product)
 
   def _prepare_vts_results_dir(self, vts):
     """
@@ -138,22 +128,23 @@ class NativeExternalLibraryFetch(Task):
     safe_mkdir(vt_set_results_dir)
     return vt_set_results_dir
 
-  def _populate_task_product(self, results_dir, task_product):
+  def _collect_external_libs(self, results_dir):
     """
     Sets the relevant properties of the task product (`NativeExternalLibraryFiles`) object.
     """
-    lib = os.path.join(results_dir, 'lib')
-    include = os.path.join(results_dir, 'include')
+    lib_dir = os.path.join(results_dir, 'lib')
+    include_dir = os.path.join(results_dir, 'include')
 
-    if os.path.exists(lib):
-      task_product.lib_dir = lib
-      for filename in os.listdir(lib):
+    lib_names = []
+    if os.path.isdir(lib_dir):
+      for filename in os.listdir(lib_dir):
         lib_name = self._parse_lib_name_from_library_filename(filename)
         if lib_name:
-          task_product.add_lib_name(lib_name)
+          lib_names.append(lib_name)
 
-    if os.path.exists(include):
-      task_product.include_dir = include
+    return NativeExternalLibraryFiles(include_dir=include_dir,
+                                      lib_dir=lib_dir,
+                                      lib_names=tuple(lib_names))
 
   def _get_conan_data_dir_path_for_package(self, pkg_dir_path, pkg_sha):
     return os.path.join(self.workdir,
@@ -188,9 +179,7 @@ class NativeExternalLibraryFetch(Task):
     # and replace it with Pants-controlled remotes.
     remove_conan_center_remote_cmdline = self._remove_conan_center_remote_cmdline(conan_binary)
     try:
-      # Slice the command line because subprocess errors when the first element in the
-      # list of command strings is the setting of an environment variable.
-      stdout = subprocess.check_output(remove_conan_center_remote_cmdline.split()[1:])
+      stdout = subprocess.check_output(remove_conan_center_remote_cmdline)
       self.context.log.debug(stdout)
     except subprocess.CalledProcessError as e:
       if not "'conan-center' not found in remotes" in e.output:
@@ -206,7 +195,7 @@ class NativeExternalLibraryFetch(Task):
                                                                             index_num,
                                                                             remote_url)
       try:
-        stdout = subprocess.check_output(add_pants_conan_remote_cmdline.split()[1:])
+        stdout = subprocess.check_output(add_pants_conan_remote_cmdline)
         self.context.log.debug(stdout)
       except subprocess.CalledProcessError as e:
         if not "already exists in remotes" in e.output:
@@ -261,7 +250,7 @@ class NativeExternalLibraryFetch(Task):
 
         # Invoke conan to pull package from remote.
         try:
-          stdout = subprocess.check_output(cmdline.split()[1:])
+          stdout = subprocess.check_output(cmdline)
         except subprocess.CalledProcessError as e:
           raise self.NativeExternalLibraryFetchError(
             "Error invoking conan for fetch task: {}\n".format(e.output)

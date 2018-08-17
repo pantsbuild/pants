@@ -35,10 +35,10 @@ class FakeFile(object):
 
 class TestNailgunClientSession(unittest.TestCase):
   BAD_CHUNK_TYPE = b';'
-  TEST_PAYLOAD = 't e s t'
+  TEST_PAYLOAD = b't e s t'
   TEST_WORKING_DIR = '/test_working_dir'
   TEST_MAIN_CLASS = 'test_main_class'
-  TEST_ARGUMENTS = ['t', 'e', 's', 't']
+  TEST_ARGUMENTS = [b't', b'e', b's', b't']
   TEST_ENVIRON = dict(TEST_ENV_VAR='xyz')
 
   def setUp(self):
@@ -83,12 +83,12 @@ class TestNailgunClientSession(unittest.TestCase):
     NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDOUT, self.TEST_PAYLOAD)
     NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDERR, self.TEST_PAYLOAD)
     NailgunProtocol.write_chunk(self.server_sock, ChunkType.EXIT, b'1729')
-    self.assertEquals(self.nailgun_client_session._process_session(), 1729)
-    self.assertEquals(self.fake_stdout.content, self.TEST_PAYLOAD * 2)
-    self.assertEquals(self.fake_stderr.content, self.TEST_PAYLOAD * 3)
+    self.assertEqual(self.nailgun_client_session._process_session(), 1729)
+    self.assertEqual(self.fake_stdout.content, self.TEST_PAYLOAD * 2)
+    self.assertEqual(self.fake_stderr.content, self.TEST_PAYLOAD * 3)
     self.mock_stdin_reader.start.assert_called_once_with()
     self.mock_stdin_reader.stop.assert_called_once_with()
-    self.assertEquals(self.nailgun_client_session.remote_pid, 31337)
+    self.assertEqual(self.nailgun_client_session.remote_pid, 31337)
 
   def test_process_session_bad_chunk(self):
     NailgunProtocol.write_chunk(self.server_sock, ChunkType.PID, b'31337')
@@ -110,7 +110,7 @@ class TestNailgunClientSession(unittest.TestCase):
       *self.TEST_ARGUMENTS,
       **self.TEST_ENVIRON
     )
-    self.assertEquals(out, self.TEST_PAYLOAD)
+    self.assertEqual(out, self.TEST_PAYLOAD)
     mock_process_session.assert_called_once_with(self.nailgun_client_session)
 
 
@@ -123,9 +123,9 @@ class TestNailgunClient(unittest.TestCase):
     mock_socket = mock.Mock()
     mock_socket_cls.return_value = mock_socket
 
-    self.assertEquals(self.nailgun_client.try_connect(), mock_socket)
+    self.assertEqual(self.nailgun_client.try_connect(), mock_socket)
 
-    self.assertEquals(mock_socket_cls.call_count, 1)
+    self.assertEqual(mock_socket_cls.call_count, 1)
     mock_socket.connect.assert_called_once_with(
       (NailgunClient.DEFAULT_NG_HOST, NailgunClient.DEFAULT_NG_PORT)
     )
@@ -143,8 +143,8 @@ class TestNailgunClient(unittest.TestCase):
   @mock.patch('pants.java.nailgun_client.NailgunClientSession', **PATCH_OPTS)
   def test_execute(self, mock_session, mock_try_connect):
     self.nailgun_client.execute('test')
-    self.assertEquals(mock_try_connect.call_count, 1)
-    self.assertEquals(mock_session.call_count, 1)
+    self.assertEqual(mock_try_connect.call_count, 1)
+    self.assertEqual(mock_session.call_count, 1)
 
   @mock.patch.object(NailgunClient, 'try_connect', **PATCH_OPTS)
   @mock.patch('pants.java.nailgun_client.NailgunClientSession', **PATCH_OPTS)

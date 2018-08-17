@@ -18,7 +18,7 @@ class ClocIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     # Strip out the header which is non-deterministic because it has speed information in it.
     stdout = str('\n'.join(pants_run.stdout_data.split('\n')[1:]))
-    self.assertEquals(stdout, str("""-------------------------------------------------------------------------------
+    self.assertEqual(stdout, str("""-------------------------------------------------------------------------------
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
 Python                           1              3              3              4

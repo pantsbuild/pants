@@ -13,7 +13,7 @@ class ListOwnersIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.do_command('--owner-of=testprojects/tests/python/pants/dummies/test_pass.py',
                                 'list',
                                 success=True)
-    self.assertEquals(
+    self.assertEqual(
       pants_run.stdout_data.strip(),
       'testprojects/tests/python/pants/dummies:passing_target'
     )

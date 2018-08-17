@@ -8,6 +8,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from builtins import open, str
 from multiprocessing import Manager, Process
 from threading import Thread
 
@@ -54,7 +55,7 @@ class TestOwnerPrintingInterProcessFileLock(unittest.TestCase):
     self.lock_process.start()
     self.lock_held.wait()
     self.assertTrue(os.path.exists(self.lock.message_path))
-    with open(self.lock.message_path, 'rb') as f:
+    with open(self.lock.message_path, 'r') as f:
       message_content = f.read()
     self.assertIn(str(self.lock_process.pid), message_content)
 

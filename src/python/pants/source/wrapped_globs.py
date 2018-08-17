@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from abc import abstractmethod, abstractproperty
+from builtins import open
 from hashlib import sha1
 
 from six import string_types
@@ -136,7 +137,7 @@ class LazyFilesetWithSpec(FilesetWithSpec):
   def files_hash(self):
     h = sha1()
     for path in sorted(self.files):
-      h.update(path)
+      h.update(path.encode('utf-8'))
       with open(os.path.join(get_buildroot(), self.rel_root, path), 'rb') as f:
         h.update(f.read())
     return h.digest()
@@ -269,7 +270,7 @@ class Files(FilesetRelPathWrapper):
 
   @staticmethod
   def _literal_files(*args, **kwargs):
-    if kwargs.keys() != ['root']:
+    if list(kwargs.keys()) != ['root']:
       raise ValueError('Literal file globs do not support kwargs other than `root`: {}'.format(kwargs))
     return args
 

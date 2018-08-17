@@ -9,21 +9,21 @@ import java.io.File
 
 import scala.collection.mutable
 
-import sbt.internal.inc.{Analysis, FileAnalysisStore, Locate}
+import sbt.internal.inc.{Analysis, Locate}
 
-import xsbti.compile.CompileAnalysis
+import xsbti.compile.AnalysisContents
 
 import org.pantsbuild.zinc.analysis.AnalysisMap
 
 /**
  * Class to encapsulate extracting information from zinc analysis.
  */
-class Extractor(
+case class Extractor(
   classpath: Seq[File],
-  analysis: CompileAnalysis,
+  analysis: AnalysisContents,
   analysisMap: AnalysisMap
 ) {
-  private val relations = analysis.asInstanceOf[Analysis].relations
+  private val relations = analysis.getAnalysis.asInstanceOf[Analysis].relations
 
   // A lookup from classname to defining classpath entry File.
   private val definesClass = Locate.entry(classpath, analysisMap.getPCELookup)

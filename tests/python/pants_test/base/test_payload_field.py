@@ -12,6 +12,7 @@ from pants.base.payload_field import (ExcludesField, FingerprintedField, Fingerp
                                       PythonRequirementsField)
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
+from pants.util.strutil import ensure_binary
 from pants_test.test_base import TestBase
 
 
@@ -72,7 +73,7 @@ class PayloadTest(TestBase):
     )
     self.assertEqual(
       PrimitiveField('foo').fingerprint(),
-      PrimitiveField(b'foo').fingerprint(),
+      PrimitiveField('foo').fingerprint(),
     )
     self.assertNotEqual(
       PrimitiveField('foo').fingerprint(),
@@ -105,20 +106,21 @@ class PayloadTest(TestBase):
 
       def fingerprint(self):
         hasher = sha1()
+        self.test_value = ensure_binary(self.test_value)
         hasher.update(self.test_value)
         return hasher.hexdigest()
 
     field1 = TestValue('field1')
     field1_same = TestValue('field1')
     field2 = TestValue('field2')
-    self.assertEquals(field1.fingerprint(), field1_same.fingerprint())
-    self.assertNotEquals(field1.fingerprint(), field2.fingerprint())
+    self.assertEqual(field1.fingerprint(), field1_same.fingerprint())
+    self.assertNotEqual(field1.fingerprint(), field2.fingerprint())
 
     fingerprinted_field1 = FingerprintedField(field1)
     fingerprinted_field1_same = FingerprintedField(field1_same)
     fingerprinted_field2 = FingerprintedField(field2)
-    self.assertEquals(fingerprinted_field1.fingerprint(), fingerprinted_field1_same.fingerprint())
-    self.assertNotEquals(fingerprinted_field1.fingerprint(), fingerprinted_field2.fingerprint())
+    self.assertEqual(fingerprinted_field1.fingerprint(), fingerprinted_field1_same.fingerprint())
+    self.assertNotEqual(fingerprinted_field1.fingerprint(), fingerprinted_field2.fingerprint())
 
   def test_set_of_primitives_field(self):
     # Should preserve `None` values.

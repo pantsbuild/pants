@@ -6,6 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from hashlib import sha1
 
+from future.utils import PY3
+
 from pants.base.payload_field import PayloadField
 from pants.util.objects import datatype
 
@@ -27,4 +29,4 @@ class NativeArtifact(datatype(['lib_name']), PayloadField):
 
   def _compute_fingerprint(self):
     # FIXME: can we just use the __hash__ method here somehow?
-    return sha1(self.lib_name).hexdigest()
+    return sha1(self.lib_name).hexdigest() if PY3 else sha1(self.lib_name).hexdigest().decode('utf-8')

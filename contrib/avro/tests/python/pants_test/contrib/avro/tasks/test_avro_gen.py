@@ -77,11 +77,11 @@ class AvroJavaGenTest(NailgunTaskTestBase):
     '''))
 
     task = self._test_avro('avro-build:avro-schema')
-    self.assertEquals(len(task._test_cmd_log), 1)
-    self.assertEquals(task._test_cmd_log[0][:-1], ['compile', 'schema', 'avro-build/src/avro/schema.avsc'])
+    self.assertEqual(len(task._test_cmd_log), 1)
+    self.assertEqual(task._test_cmd_log[0][:-1], ['compile', 'schema', 'avro-build/src/avro/schema.avsc'])
 
     task = self._test_avro('avro-build:avro-idl')
-    self.assertEquals(len(task._test_cmd_log), 2)
-    self.assertEquals(task._test_cmd_log[0][:-1], ['idl', 'avro-build/src/avro/record.avdl'])
+    self.assertEqual(len(task._test_cmd_log), 2)
+    self.assertEqual(task._test_cmd_log[0][:-1], ['idl', 'avro-build/src/avro/record.avdl'])
     generated_protocol_json_file = task._test_cmd_log[0][-1]
-    self.assertEquals(task._test_cmd_log[1][:-1], ['compile', 'protocol', generated_protocol_json_file])
+    self.assertEqual(task._test_cmd_log[1][:-1], ['compile', 'protocol', generated_protocol_json_file])

@@ -5,8 +5,11 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import str
 from collections import namedtuple
 from textwrap import dedent
+
+from future.utils import PY3
 
 from pants.base.build_file import BuildFile
 from pants.base.file_system_project_tree import FileSystemProjectTree
@@ -15,7 +18,6 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.target import Target
-from pants.util.strutil import ensure_binary
 from pants_test.base_test import BaseTest
 
 
@@ -69,8 +71,10 @@ class BuildFileParserBasicsTest(BaseTestWithParser):
   def test_addressable_exceptions(self):
     self.add_to_build_file('b/BUILD', 'java_library(name="foo", "bad_arg")')
     build_file_b = self.create_buildfile('b/BUILD')
-    self.assert_parser_error(build_file_b,
-                             'non-keyword arg after keyword arg')
+    expected_msg = ('positional argument follows keyword argument'
+                    if PY3 else
+                    'non-keyword arg after keyword arg')
+    self.assert_parser_error(build_file_b, expected_msg)
 
     self.add_to_build_file('d/BUILD', dedent(
       """
@@ -94,27 +98,27 @@ class BuildFileParserBasicsTest(BaseTestWithParser):
 
   def test_invalid_unicode_in_build_file(self):
     """Demonstrate that unicode characters causing parse errors raise real parse errors."""
-    self.add_to_build_file('BUILD', ensure_binary(dedent(
+    self.add_to_build_file('BUILD', dedent(
       """
       jvm_binary(name = ‘hello’,  # Parse error due to smart quotes (non ascii characters)
         source = 'HelloWorld.java'
         main = 'foo.HelloWorld',
       )
       """
-    )))
+    ))
     build_file = self.create_buildfile('BUILD')
-    self.assert_parser_error(build_file, 'invalid syntax')
+    self.assert_parser_error(build_file, 'invalid character' if PY3 else 'invalid syntax')
 
   def test_unicode_string_in_build_file(self):
     """Demonstrates that a string containing unicode should work in a BUILD file."""
-    self.add_to_build_file('BUILD', ensure_binary(dedent(
+    self.add_to_build_file('BUILD', dedent(
         """
         java_library(
           name='foo',
           sources=['א.java']
         )
         """
-    )))
+    ))
     build_file = self.create_buildfile('BUILD')
     self.build_file_parser.parse_build_file(build_file)
 

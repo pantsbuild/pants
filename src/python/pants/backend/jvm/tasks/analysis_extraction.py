@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import json
 import os
+from builtins import open
 from collections import defaultdict
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
@@ -85,7 +86,7 @@ class AnalysisExtraction(NailgunTask):
     fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
         classpath_product)
 
-    targets = zinc_analysis.keys()
+    targets = list(zinc_analysis.keys())
     with self.invalidated(targets,
                           fingerprint_strategy=fingerprint_strategy,
                           invalidate_dependents=True) as invalidation_check:
@@ -148,5 +149,5 @@ class AnalysisExtraction(NailgunTask):
       product_deps_by_src[target] = summary_json['dependencies']
 
   def _parse_summary_json(self, summary_json_file):
-    with open(summary_json_file) as f:
+    with open(summary_json_file, 'r') as f:
       return json.load(f, encoding='utf-8')

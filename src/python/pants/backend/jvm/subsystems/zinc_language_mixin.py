@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import object
+
 from pants.base.deprecated import deprecated
 
 
@@ -56,7 +58,7 @@ class ZincLanguageMixin(object):
     :rtype: list
     """
     option_sets = self.get_options().compiler_option_sets
-    if 'fatal_warnings' not in option_sets and self.fatal_warnings:
+    if 'fatal_warnings' not in option_sets and self.get_options().fatal_warnings:
       option_sets.append('fatal_warnings')
     return option_sets
 

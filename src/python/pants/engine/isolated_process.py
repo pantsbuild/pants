@@ -46,7 +46,7 @@ class ExecuteProcessRequest(datatype([
       env = ()
     else:
       cls._verify_env_is_dict(env)
-      env = tuple(env.items())
+      env = tuple(item for pair in env.items() for item in pair)
 
     return ExecuteProcessRequest(
       argv=argv,

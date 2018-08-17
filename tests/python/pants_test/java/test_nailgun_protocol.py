@@ -68,10 +68,10 @@ class TestNailgunProtocol(unittest.TestCase):
       NailgunProtocol.parse_request(self.server_sock)
 
   def test_read_until(self):
-    recv_chunks = ['1', '234', '56', '789', '0']
+    recv_chunks = [b'1', b'234', b'56', b'789', b'0']
     mock_socket = mock.Mock()
     mock_socket.recv.side_effect = recv_chunks
-    self.assertEqual(NailgunProtocol._read_until(mock_socket, 10), '1234567890')
+    self.assertEqual(NailgunProtocol._read_until(mock_socket, 10), b'1234567890')
     self.assertEqual(mock_socket.recv.call_count, len(recv_chunks))
 
   def test_read_until_truncated_recv(self):
@@ -184,10 +184,10 @@ class TestNailgunProtocol(unittest.TestCase):
     )
 
   def test_isatty_from_empty_env(self):
-    self.assertEquals(NailgunProtocol.isatty_from_env({}), (False, False, False))
+    self.assertEqual(NailgunProtocol.isatty_from_env({}), (False, False, False))
 
   def test_isatty_from_env(self):
-    self.assertEquals(
+    self.assertEqual(
       NailgunProtocol.isatty_from_env({
         'NAILGUN_TTY_0': '1',
         'NAILGUN_TTY_1': '0',
@@ -197,7 +197,7 @@ class TestNailgunProtocol(unittest.TestCase):
     )
 
   def test_isatty_from_env_mixed(self):
-    self.assertEquals(
+    self.assertEqual(
       NailgunProtocol.isatty_from_env({
         'NAILGUN_TTY_0': '0',
         'NAILGUN_TTY_1': '1'
@@ -220,7 +220,7 @@ class TestNailgunProtocol(unittest.TestCase):
     mock_stdout = self._make_mock_stream(True, 1)
     mock_stderr = self._make_mock_stream(True, 2)
 
-    self.assertEquals(
+    self.assertEqual(
       NailgunProtocol.isatty_to_env(mock_stdin, mock_stdout, mock_stderr),
       {
         'NAILGUN_TTY_0': b'1',
@@ -236,7 +236,7 @@ class TestNailgunProtocol(unittest.TestCase):
     mock_stdout = self._make_mock_stream(False, 1)
     mock_stderr = self._make_mock_stream(False, 2)
 
-    self.assertEquals(
+    self.assertEqual(
       NailgunProtocol.isatty_to_env(mock_stdin, mock_stdout, mock_stderr),
       {
         'NAILGUN_TTY_0': b'0',

@@ -36,7 +36,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
                                   cwd=out_path)
       java_retcode = java_run.wait()
       java_out = java_run.stdout.read()
-      self.assertEquals(java_retcode, 0)
+      self.assertEqual(java_retcode, 0)
       self.assertIn("parsec", java_out)
 
   def test_bundle_protobuf_imports(self):
@@ -55,7 +55,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
         cwd=out_path)
       java_retcode = java_run.wait()
       java_out = java_run.stdout.read()
-      self.assertEquals(java_retcode, 0)
+      self.assertEqual(java_retcode, 0)
       self.assertIn("very test", java_out)
 
   def test_bundle_protobuf_unpacked_jars(self):
@@ -63,7 +63,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
                          '--deployjar',
                          'examples/src/java/org/pantsbuild/example/protobuf/unpacked_jars']
                         ) as pants_run:
-      self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
+      self.assertEqual(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                         "goal bundle run expected success, got {0}\n"
                         "got stderr:\n{1}\n"
                         "got stdout:\n{2}\n".format(pants_run.returncode,
@@ -77,7 +77,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
       java_run = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=out_path)
       java_retcode = java_run.wait()
       java_out = java_run.stdout.read()
-      self.assertEquals(java_retcode, 0)
+      self.assertEqual(java_retcode, 0)
       self.assertIn("Message is: Hello World!", java_out)
 
   def test_source_ordering(self):
@@ -105,7 +105,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
     all_blocks = list(find_protoc_blocks([l.strip() for l in pants_run.stdout_data.split('\n')]))
     block_text = '\n\n'.join('[block {0}]\n{1}'.format(index, '\n'.join(block))
                               for index, block in enumerate(all_blocks))
-    self.assertEquals(len(all_blocks), 3,
+    self.assertEqual(len(all_blocks), 3,
         'Expected there to be exactly {expected} protoc compilation group! (Were {count}.)'
         '\n{out}\n\nBLOCKS:\n{blocks}'
         .format(expected=3, count=len(all_blocks),
@@ -134,4 +134,4 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
           last_proto = number
       if last_proto > biggest_proto:
         biggest_proto = last_proto
-    self.assertEquals(biggest_proto, 6, 'Not all protos were seen!\n{}'.format(block_text))
+    self.assertEqual(biggest_proto, 6, 'Not all protos were seen!\n{}'.format(block_text))

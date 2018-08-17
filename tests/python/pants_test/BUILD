@@ -4,6 +4,7 @@
 python_library(
   name='test_infra',
   dependencies=[
+    '3rdparty/python:future',
     ':base_test',
     'tests/python/pants_test:int-test-for-export',
     'tests/python/pants_test:test_base',
@@ -27,6 +28,7 @@ python_library(
   name = 'base_test',
   sources = ['base_test.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/base:build_file',
     'src/python/pants/base:build_root',
     'src/python/pants/base:cmd_line_spec_parser',
@@ -50,6 +52,8 @@ python_library(
     'pants_run_integration_test.py'
   ],
   dependencies = [
+    '3rdparty/python:future',
+    '3rdparty/python:configparser',
     '3rdparty/python:ansicolors',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
@@ -81,6 +85,7 @@ python_library(
   name = 'test_base',
   sources = ['test_base.py'],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/base:build_root',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:exceptions',

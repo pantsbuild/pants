@@ -8,10 +8,13 @@ import itertools
 import logging
 import os
 import unittest
+from builtins import object, open
 from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
+
+from future.utils import PY2
 
 from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
@@ -37,7 +40,7 @@ from pants_test.base.context_utils import create_context_from_options
 from pants_test.option.util.fakes import create_options_for_optionables
 
 
-deprecated_module('1.10.0.dev0', 'Use pants_test.test_base instead')
+deprecated_module('1.12.0.dev0', 'Use pants_test.test_base instead')
 
 
 class TestGenerator(object):
@@ -111,7 +114,7 @@ class BaseTest(unittest.TestCase):
     safe_mkdir(path)
     return path
 
-  def create_file(self, relpath, contents='', mode='wb'):
+  def create_file(self, relpath, contents='', mode='w'):
     """Writes to a file under the buildroot.
 
     :API: public
@@ -125,7 +128,7 @@ class BaseTest(unittest.TestCase):
       fp.write(contents)
     return path
 
-  def create_workdir_file(self, relpath, contents='', mode='wb'):
+  def create_workdir_file(self, relpath, contents='', mode='w'):
     """Writes to a file under the work directory.
 
     :API: public
@@ -302,11 +305,13 @@ class BaseTest(unittest.TestCase):
       # If task is expected to inherit goal-level options, register those directly on the task,
       # by subclassing the goal options registrar and settings its scope to the task scope.
       if issubclass(task_type, GoalOptionsMixin):
-        subclass_name = b'test_{}_{}_{}'.format(
+        subclass_name = 'test_{}_{}_{}'.format(
           task_type.__name__, task_type.goal_options_registrar_cls.options_scope,
           task_type.options_scope)
+        if PY2:
+          subclass_name = subclass_name.encode('utf-8')
         optionables.add(type(subclass_name, (task_type.goal_options_registrar_cls, ),
-                             {b'options_scope': task_type.options_scope}))
+                             {'options_scope': task_type.options_scope}))
 
     # Now expand to all deps.
     all_optionables = set()
@@ -413,8 +418,7 @@ class BaseTest(unittest.TestCase):
                    sources=('sources=%s,' % repr(sources)
                               if sources else ''),
                    java_sources=('java_sources=[%s],'
-                                 % ','.join(map(lambda str_target: '"%s"' % str_target,
-                                                kwargs.get('java_sources')))
+                                 % ','.join('"%s"' % str_target for str_target in kwargs.get('java_sources'))
                                  if 'java_sources' in kwargs else ''),
                    provides=('provides=%s,' % kwargs.get('provides')
                               if 'provides' in kwargs else ''),
@@ -450,7 +454,7 @@ class BaseTest(unittest.TestCase):
     :API: public
     """
 
-    with open(file_path) as f:
+    with open(file_path, 'r') as f:
       content = f.read()
       self.assertIn(string, content, '"{}" is not in the file {}:\n{}'.format(string, f.name, content))
 

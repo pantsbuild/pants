@@ -91,7 +91,7 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       # The resulting binary should not contain any guava classes
       with open_zip(jar_filename) as jar_file:
-        self.assertEquals({'META-INF/',
+        self.assertEqual({'META-INF/',
                            'META-INF/MANIFEST.MF',
                            'org/',
                            'org/pantsbuild/',
@@ -131,7 +131,7 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
                                cwd=cwd)
     stdout, stderr = process.communicate()
 
-    self.assertEquals(expected_returncode, process.returncode,
+    self.assertEqual(expected_returncode, process.returncode,
                       ('Expected exit code {} from command `{}` but got {}:\n'
                        'stdout:\n{}\n'
                        'stderr:\n{}'

@@ -22,6 +22,7 @@ python_tests(
   name = 'build_ignore_integration',
   sources = [ 'test_build_ignore_integration.py' ],
   dependencies = [
+    '3rdparty/python:future',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
@@ -68,7 +69,7 @@ python_tests(
   name = 'console_rule_integration',
   sources = [ 'test_console_rule_integration.py' ],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'tests/python/pants_test/pantsd:pantsd_integration_test_base',
   ],
   tags = {'integration'},
   timeout = 300,

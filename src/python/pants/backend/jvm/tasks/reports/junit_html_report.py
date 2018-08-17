@@ -11,6 +11,7 @@ import logging
 import os
 import xml.etree.ElementTree as ET
 from abc import abstractmethod
+from builtins import map, next, object, open
 from functools import total_ordering
 
 from pants.base.mustache import MustacheRenderer
@@ -18,7 +19,6 @@ from pants.util.dirutil import safe_mkdir_for, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
-from pants.util.strutil import ensure_binary
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -141,7 +141,7 @@ class ReportTestSuite(object):
                                                 self.skipped)
     d['icon_class'] = ReportTestSuite.icon_class(self.tests, self.errors, self.failures,
                                                  self.skipped)
-    d['testcases'] = map(lambda tc: tc.as_dict(), self.testcases)
+    d['testcases'] = [tc.as_dict() for tc in self.testcases]
     return d
 
 
@@ -213,8 +213,8 @@ class JUnitHtmlReport(JUnitHtmlReportInterface):
     testsuites = self._parse_xml_files()
     report_file_path = os.path.join(output_dir, 'reports', 'junit-report.html')
     safe_mkdir_for(report_file_path)
-    with open(report_file_path, 'wb') as fp:
-      fp.write(ensure_binary(self._generate_html(testsuites)))
+    with open(report_file_path, 'w') as fp:
+      fp.write(self._generate_html(testsuites))
     self._logger.debug('JUnit HTML report generated to {}'.format(report_file_path))
     if self._open_report:
       return report_file_path
@@ -293,7 +293,7 @@ class JUnitHtmlReport(JUnitHtmlReportInterface):
                                                               values['total_errors'],
                                                               values['total_failures'],
                                                               values['total_skipped'])
-    values['testsuites'] = map(lambda ts: ts.as_dict(), testsuites)
+    values['testsuites'] = [ts.as_dict() for ts in testsuites]
 
     package_name, _, _ = __name__.rpartition('.')
     renderer = MustacheRenderer(package_name=package_name)

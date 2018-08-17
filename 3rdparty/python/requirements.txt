@@ -1,20 +1,20 @@
 ansicolors==1.0.2
-beautifulsoup4>=4.3.2,<4.4
+beautifulsoup4>=4.6.0,<4.7
 cffi==1.11.1
 configparser==3.5.0
 contextlib2==0.5.5
 coverage>=4.5,<4.6
 docutils>=0.12,<0.13
 fasteners==0.14.1
-faulthandler==2.6
+faulthandler==2.6 ; python_version<'3'
 future==0.16.0
-futures==3.0.5
+futures==3.0.5 ; python_version<'3'
 Markdown==2.1.1
 mock==2.0.0
 packaging==16.8
 parameterized==0.6.1
 pathspec==0.5.0
-pex==1.4.3
+pex==1.4.5
 psutil==4.3.0
 pycodestyle==2.4.0
 pyflakes==2.0.0
@@ -27,7 +27,7 @@ pywatchman==1.4.1
 requests[security]>=2.5.0,<2.19
 scandir==1.2
 setproctitle==1.1.10
-setuptools==30.0.0
+setuptools==33.1.1
 six>=1.9.0,<2
 subprocess32==3.2.7 ; python_version<'3'
 thrift>=0.9.1

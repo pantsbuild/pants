@@ -201,7 +201,8 @@ class NailgunClient(object):
     :param dict environment: an env mapping made available to native nails via the nail context
     :returns: the exit code of the main_class.
     """
-    environment = dict(self.ENV_DEFAULTS.items() + environment.items())
+    environment = dict(**environment)
+    environment.update(self.ENV_DEFAULTS)
     cwd = cwd or self._workdir
 
     # N.B. This can throw NailgunConnectionError (catchable via NailgunError).

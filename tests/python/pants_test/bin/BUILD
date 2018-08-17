@@ -5,6 +5,7 @@ python_tests(
   name='loader_integration',
   sources=['test_loader_integration.py'],
   dependencies=[
+    'src/python/pants/bin',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},

@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.native.config.environment import CCompiler
+from pants.backend.native.config.environment import LLVMCToolchain
 from pants.backend.native.subsystems.native_compile_settings import CCompileSettings
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import CLibrary
@@ -14,6 +14,8 @@ from pants.util.objects import SubclassesOf
 
 
 class CCompile(NativeCompile):
+
+  options_scope = 'c-compile'
 
   # Compile only C library targets.
   source_target_constraint = SubclassesOf(CLibrary)
@@ -32,16 +34,15 @@ class CCompile(NativeCompile):
     )
 
   @memoized_property
-  def _toolchain(self):
+  def _native_toolchain(self):
     return NativeToolchain.scoped_instance(self)
 
   def get_compile_settings(self):
     return CCompileSettings.scoped_instance(self)
 
-  def get_compiler(self):
-    return self._request_single(CCompiler, self._toolchain)
+  @memoized_property
+  def _c_toolchain(self):
+    return self._request_single(LLVMCToolchain, self._native_toolchain).c_toolchain
 
-  # FIXME(#5951): don't have any command-line args in the task or in the subsystem -- rather,
-  # subsystem options should be used to populate an `Executable` which produces its own arguments.
-  def extra_compile_args(self):
-    return ['-x', 'c', '-std=c11']
+  def get_compiler(self):
+    return self._c_toolchain.c_compiler

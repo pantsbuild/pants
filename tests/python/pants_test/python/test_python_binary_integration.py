@@ -34,7 +34,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
   def assert_pex_attribute(self, pex, attr, value):
     self.assertTrue(os.path.exists(pex))
     pex_info = PexInfo.from_pex(pex)
-    self.assertEquals(getattr(pex_info, attr), value)
+    self.assertEqual(getattr(pex_info, attr), value)
 
   def test_zipsafe_caching(self):
     test_project = 'testprojects/src/python/cache_fields'

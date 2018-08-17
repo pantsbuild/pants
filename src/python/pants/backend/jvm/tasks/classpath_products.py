@@ -6,11 +6,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import object
 
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.tasks.classpath_entry import ArtifactClasspathEntry, ClasspathEntry
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_graph import BuildGraph
@@ -19,127 +21,10 @@ from pants.java.jar.exclude import Exclude
 from pants.util.dirutil import safe_delete, safe_open
 
 
-class ClasspathEntry(object):
-  """Represents a java classpath entry.
-
-  :API: public
-  """
-
-  def __init__(self, path):
-    self._path = path
-
-  @property
-  def path(self):
-    """Returns the pants internal path of this classpath entry.
-
-    Suitable for use in constructing classpaths for pants executions and pants generated artifacts.
-
-    :API: public
-
-    :rtype: string
-    """
-    return self._path
-
-  def is_excluded_by(self, excludes):
-    """Returns `True` if this classpath entry should be excluded given the `excludes` in play.
-
-    :param excludes: The excludes to check this classpath entry against.
-    :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
-    :rtype: bool
-    """
-    return False
-
-  def __hash__(self):
-    return hash(self.path)
-
-  def __eq__(self, other):
-    return isinstance(other, ClasspathEntry) and self.path == other.path
-
-  def __ne__(self, other):
-    return not self == other
-
-  def __repr__(self):
-    return 'ClasspathEntry(path={!r})'.format(self.path)
-
-  @classmethod
-  def is_artifact_classpath_entry(cls, classpath_entry):
-    """
-    :API: public
-    """
-    return isinstance(classpath_entry, ArtifactClasspathEntry)
-
-  @classmethod
-  def is_internal_classpath_entry(cls, classpath_entry):
-    """
-    :API: public
-    """
-    return not cls.is_artifact_classpath_entry(classpath_entry)
-
-
-class ArtifactClasspathEntry(ClasspathEntry):
-  """Represents a resolved third party classpath entry.
-
-  :API: public
-  """
-
-  def __init__(self, path, coordinate, cache_path):
-    super(ArtifactClasspathEntry, self).__init__(path)
-    self._coordinate = coordinate
-    self._cache_path = cache_path
-
-  @property
-  def coordinate(self):
-    """Returns the maven coordinate that used to resolve this classpath entry's artifact.
-
-    :rtype: :class:`pants.java.jar.M2Coordinate`
-    """
-    return self._coordinate
-
-  @property
-  def cache_path(self):
-    """Returns the external cache path of this classpath entry.
-
-    For example, the `~/.m2/repository` or `~/.ivy2/cache` location of the resolved artifact for
-    maven and ivy resolvers respectively.
-
-    Suitable for use in constructing classpaths for external tools that should not be subject to
-    potential volatility in pants own internal caches.
-
-    :API: public
-
-    :rtype: string
-    """
-    return self._cache_path
-
-  def is_excluded_by(self, excludes):
-    return any(_matches_exclude(self.coordinate, exclude) for exclude in excludes)
-
-  def __hash__(self):
-    return hash((self.path, self.coordinate, self.cache_path))
-
-  def __eq__(self, other):
-    return (isinstance(other, ArtifactClasspathEntry) and
-            self.path == other.path and
-            self.coordinate == other.coordinate and
-            self.cache_path == other.cache_path)
-
-  def __ne__(self, other):
-    return not self == other
-
-  def __repr__(self):
-    return ('ArtifactClasspathEntry(path={!r}, coordinate={!r}, cache_path={!r})'
-            .format(self.path, self.coordinate, self.cache_path))
-
-
-def _matches_exclude(coordinate, exclude):
-  if not coordinate.org == exclude.org:
-    return False
-
-  if not exclude.name:
-    return True
-  if coordinate.name == exclude.name:
-    return True
-  return False
+# Re-export for backwards compatibility
+ClasspathEntry = ClasspathEntry
+# Re-export for backwards compatibility
+ArtifactClasspathEntry = ArtifactClasspathEntry
 
 
 def _not_excluded_filter(excludes):
@@ -237,8 +122,8 @@ class ClasspathProducts(object):
     processed_entries = set()
     for target, classpath_entries_for_target in target_to_classpath.items():
       if internal_classpath_only:
-        classpath_entries_for_target = filter(ClasspathEntry.is_internal_classpath_entry,
-                                              classpath_entries_for_target)
+        classpath_entries_for_target = [entry for entry in classpath_entries_for_target
+                                        if ClasspathEntry.is_internal_classpath_entry(entry)]
       if len(classpath_entries_for_target) > 0:
         classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
 
@@ -272,8 +157,8 @@ class ClasspathProducts(object):
 
         if save_classpath_file:
           classpath = [entry.path for entry in classpath_entries_for_target]
-          with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'wb') as classpath_file:
-            classpath_file.write(os.pathsep.join(classpath).encode('utf-8'))
+          with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'w') as classpath_file:
+            classpath_file.write(os.pathsep.join(classpath))
             classpath_file.write('\n')
 
     return canonical_classpath
@@ -433,7 +318,8 @@ class ClasspathProducts(object):
     # set of targets was included here, their closure must be included.
     closure = BuildGraph.closure(root_targets, bfs=True)
     excludes = self._excludes.get_for_targets(closure)
-    return filter(_not_excluded_filter(excludes), classpath_target_tuples)
+    return [target_tuple for target_tuple in classpath_target_tuples
+            if _not_excluded_filter(excludes)(target_tuple)]
 
   def _add_excludes_for_target(self, target):
     if isinstance(target, ExportableJvmLibrary) and target.provides:

@@ -28,6 +28,9 @@ python_library(
 python_library(
   name = 'debug',
   sources = ['debug.py'],
+  dependencies = [
+    '3rdparty/python:future',
+  ],
 )
 
 python_library(
@@ -44,6 +47,7 @@ python_library(
   sources = ['dirutil.py'],
   dependencies = [
     ':strutil',
+    '3rdparty/python:future',
   ],
 )
 
@@ -59,6 +63,7 @@ python_library(
   name = 'fileutil',
   sources = ['fileutil.py'],
   dependencies = [
+    '3rdparty/python:future',
     ':contextutil',
   ],
 )
