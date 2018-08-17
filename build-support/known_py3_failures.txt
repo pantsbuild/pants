@@ -50,6 +50,7 @@ tests/python/pants_test/backend/project_info/tasks:filedeps
 tests/python/pants_test/backend/python/tasks:isort_run
 tests/python/pants_test/backend/python/tasks:tasks
 tests/python/pants_test/backend/python:interpreter_cache
+tests/python/pants_test/backend/python:pants_requirement
 tests/python/pants_test/binaries:binaries
 tests/python/pants_test/build_graph:build_file_parser
 tests/python/pants_test/build_graph:build_graph
