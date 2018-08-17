@@ -34,7 +34,7 @@ class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, Finge
       return None
     hasher = hashlib.sha1()
     for element in hash_elements_for_target:
-      hasher.update(element)
+      hasher.update(element.encode('utf-8'))
     return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
 

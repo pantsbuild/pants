@@ -601,7 +601,7 @@ class TestSetupPy(SetupPyTestBase):
 
 def test_detect_namespace_packages():
   def has_ns(stmt):
-    with temporary_file() as fp:
+    with temporary_file(binary_mode=False) as fp:
       fp.write(stmt)
       fp.flush()
       return SetupPy.declares_namespace_package(fp.name)

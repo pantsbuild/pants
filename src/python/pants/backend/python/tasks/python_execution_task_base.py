@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 from builtins import str
 
+from future.utils import binary_type, text_type
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 
@@ -46,7 +47,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     """
     return ()
 
-  class ExtraFile(datatype(['path', 'content'])):
+  class ExtraFile(datatype([('path', text_type), ('content', binary_type)])):
     """Models an extra file to place in a PEX."""
 
     @classmethod
@@ -56,7 +57,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
       :param str path: The path this extra file should have when added to a PEX.
       :rtype: :class:`ExtraFile`
       """
-      return cls(path=path, content='')
+      return cls(path=path, content=b'')
 
     def add_to(self, builder):
       """Adds this extra file to a PEX builder.

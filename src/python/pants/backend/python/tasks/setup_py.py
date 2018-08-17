@@ -13,7 +13,7 @@ from abc import abstractmethod
 from builtins import map, object, str, zip
 from collections import OrderedDict, defaultdict
 
-from pex.compatibility import string, to_bytes
+from future.utils import PY2, PY3
 from pex.installer import InstallerBase, Packager
 from pex.interpreter import PythonInterpreter
 from twitter.common.collections import OrderedSet
@@ -300,7 +300,7 @@ class ExportedTargetDependencyCalculator(AbstractClass):
 class SetupPy(Task):
   """Generate setup.py-based Python projects."""
 
-  SOURCE_ROOT = b'src'
+  SOURCE_ROOT = 'src' if PY3 else b'src'
 
   PYTHON_DISTS_PRODUCT = 'python_dists'
 
@@ -514,18 +514,23 @@ class SetupPy(Task):
 
     setup_keywords = root_target.provides.setup_py_keywords.copy()
 
-    package_dir = {b'': self.SOURCE_ROOT}
+    package_dir = {'' if PY3 else b'': self.SOURCE_ROOT}
     packages, namespace_packages, resources = self.find_packages(chroot, self.context.log)
 
     if namespace_packages:
       setup_keywords['namespace_packages'] = list(sorted(namespace_packages))
 
     if packages:
+      normalized_package_data = (
+        resources.items()
+        if PY3 else
+        ((package.encode('utf-8'), [v.encode('utf-8') for v in rs])
+         for (package, rs) in resources.items())
+      )
       setup_keywords.update(
           package_dir=package_dir,
           packages=list(sorted(packages)),
-          package_data=dict((str(package), list(map(str, rs)))
-                            for (package, rs) in resources.items()))
+          package_data=dict(normalized_package_data))
 
     setup_keywords['install_requires'] = list(self.install_requires(reduced_dependencies))
 
@@ -546,8 +551,8 @@ class SetupPy(Task):
         return out
       elif isinstance(input, list):
         return [convert(element) for element in input]
-      elif isinstance(input, string):
-        return to_bytes(input)
+      elif PY2 and isinstance(input, str):
+        return input.encode('utf-8')
       else:
         return input
 
@@ -571,7 +576,7 @@ class SetupPy(Task):
     chroot.write(self._setup_boilerplate().format(
       setup_dict=pprint.pformat(convert(setup_keywords), indent=4),
       setup_target=repr(root_target)
-    ), 'setup.py')
+    ).encode('utf-8'), 'setup.py')
 
     # make sure that setup.py is included
     chroot.write('include *.py'.encode('utf8'), 'MANIFEST.in')
