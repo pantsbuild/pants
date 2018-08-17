@@ -332,7 +332,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
     # Once all services are started, write our pid.
     self.write_pid()
-    self.write_metadata_by_name('pantsd', self.FINGERPRINT_KEY, self.options_fingerprint.decode('utf-8'))
+    self.write_metadata_by_name('pantsd', self.FINGERPRINT_KEY, self.options_fingerprint)
 
     # Monitor services.
     while not self.is_killed:

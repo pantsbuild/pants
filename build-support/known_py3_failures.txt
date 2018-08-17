@@ -23,6 +23,3 @@ tests/python/pants_test/engine:test_round_engine
 tests/python/pants_test/goal:artifact_cache_stats
 tests/python/pants_test/goal:other
 tests/python/pants_test/help:build_dictionary_info_extracter
-tests/python/pants_test/pantsd:pants_daemon
-tests/python/pants_test/pantsd:process_manager
-tests/python/pants_test/pantsd:watchman
