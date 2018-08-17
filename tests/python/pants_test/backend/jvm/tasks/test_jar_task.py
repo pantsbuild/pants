@@ -10,7 +10,6 @@ from builtins import open, range
 from contextlib import contextmanager
 from textwrap import dedent
 
-from future.utils import PY2
 from twitter.common.collections import maybe_list
 
 from pants.backend.jvm.targets.java_agent import JavaAgent
@@ -161,8 +160,6 @@ class JarTaskTest(BaseJarTaskTest):
   def test_custom_manifest_dir(self):
     with self._test_custom_manifest() as (jar, manifest_contents):
       basedir = safe_mkdtemp()
-      if PY2:
-        basedir = basedir.decode('utf-8')
       with safe_open(os.path.join(basedir, 'META-INF/MANIFEST.MF'), 'wb') as fp:
         fp.write(manifest_contents)
       jar.write(basedir)
@@ -170,8 +167,6 @@ class JarTaskTest(BaseJarTaskTest):
   def test_custom_manifest_dir_custom_dest(self):
     with self._test_custom_manifest() as (jar, manifest_contents):
       basedir = safe_mkdtemp()
-      if PY2:
-        basedir = basedir.decode('utf-8')
       with safe_open(os.path.join(basedir, 'MANIFEST.MF'), 'wb') as fp:
         fp.write(manifest_contents)
       jar.write(basedir, dest='META-INF')

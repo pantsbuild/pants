@@ -11,7 +11,7 @@ from abc import abstractmethod
 from builtins import bytes, object, open, str
 from contextlib import contextmanager
 
-from future.utils import iteritems
+from future.utils import iteritems, string_types
 from twitter.common.collections import maybe_list
 
 from pants.backend.jvm.argfile import safe_args
@@ -144,7 +144,7 @@ class Jar(object):
 
     :param string main: a fully qualified class name
     """
-    if not main or not isinstance(main, str):
+    if not main or not isinstance(main, string_types):
       raise ValueError('The main entry must be a non-empty string')
     self._main = main
 
@@ -169,10 +169,10 @@ class Jar(object):
     :param string src: the path to the pre-existing source file or directory
     :param string dest: the path the source file or directory should have in this jar
     """
-    if not src or not isinstance(src, str):
+    if not src or not isinstance(src, string_types):
       raise ValueError('The src path must be a non-empty string, got {} of type {}.'.format(
         src, type(src)))
-    if dest and not isinstance(dest, str):
+    if dest and not isinstance(dest, string_types):
       raise ValueError('The dest entry path must be a non-empty string, got {} of type {}.'.format(
         dest, type(dest)))
     if not os.path.isdir(src) and not dest:
@@ -186,7 +186,7 @@ class Jar(object):
     :param string path: the path to write the contents to in this jar
     :param string contents: the raw byte contents of the file to write to ``path``
     """
-    if not path or not isinstance(path, str):
+    if not path or not isinstance(path, string_types):
       raise ValueError('The path must be a non-empty string')
 
     if contents is None or not isinstance(contents, bytes):
@@ -206,7 +206,7 @@ class Jar(object):
 
     :param string jar: the path to the pre-existing jar to graft into this jar
     """
-    if not jar or not isinstance(jar, str):
+    if not jar or not isinstance(jar, string_types):
       raise ValueError('The jar path must be a non-empty string')
 
     self._jars.append(jar)
