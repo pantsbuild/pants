@@ -11,12 +11,13 @@ from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.subsystems.python_repos import PythonRepos
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_sources,
+from pants.backend.python.tasks.pex_build_util import (PexBuildUtil, dump_sources,
                                                        has_python_requirements, has_python_sources,
-                                                       has_resources, is_python_target,
-                                                       subsystems_used)
+                                                       has_resources, is_python_target)
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
@@ -32,7 +33,11 @@ class PythonBinaryCreate(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PythonBinaryCreate, cls).subsystem_dependencies() + (PythonNativeCode.scoped(cls),) + subsystems_used()
+    return super(PythonBinaryCreate, cls).subsystem_dependencies() + (
+      PythonNativeCode.scoped(cls),
+      PythonRepos,
+      PythonSetup,
+    )
 
   @memoized_property
   def _python_native_code_settings(self):
@@ -141,7 +146,8 @@ class PythonBinaryCreate(Task):
       # We need to ensure that we are resolving for only the current platform if we are
       # including local python dist targets that have native extensions.
       self._python_native_code_settings.check_build_for_current_platform_only(self.context.targets())
-      dump_requirement_libs(builder, interpreter, req_tgts, self.context.log,
+      pex_build_util = PexBuildUtil(PythonRepos.global_instance(), PythonSetup.global_instance())
+      pex_build_util.dump_requirement_libs(builder, interpreter, req_tgts, self.context.log,
                             platforms=binary_tgt.platforms)
 
       # Build the .pex file.

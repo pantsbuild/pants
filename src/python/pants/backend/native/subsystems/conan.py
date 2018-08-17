@@ -15,7 +15,7 @@ from pex.pex_info import PexInfo
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.backend.python.tasks.pex_build_util import dump_requirements
+from pants.backend.python.tasks.pex_build_util import PexBuildUtil
 from pants.base.build_environment import get_pants_cachedir
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_concurrent_creation
@@ -73,7 +73,10 @@ class Conan(Subsystem):
       with safe_concurrent_creation(conan_pex_path) as safe_path:
         builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
         reqs = [PythonRequirement(req) for req in self.get_options().conan_requirements]
-        dump_requirements(builder, interpreter, reqs, logger)
+        pex_builder_util = PexBuildUtil(
+          PythonRepos.global_instance(),
+          PythonSetup.global_instance())
+        pex_builder_util.dump_requirements(builder, interpreter, reqs, logger)
         builder.freeze()
     conan_binary = PEX(conan_pex_path, interpreter)
     return self.ConanBinary(pex=conan_binary)

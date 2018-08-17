@@ -15,7 +15,7 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_sources,
+from pants.backend.python.tasks.pex_build_util import (PexBuildUtil, dump_sources,
                                                        has_python_requirements, has_python_sources)
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.base.exceptions import TaskError
@@ -218,7 +218,8 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
       req_libs =  [t for t in vt.target.closure() if has_python_requirements(t)]
       with safe_concurrent_creation(reqs_pex_path) as safe_path:
         builder = PEXBuilder(safe_path, interpreter=interpreter, copy=True)
-        dump_requirement_libs(builder, interpreter, req_libs, self.context.log)
+        pex_build_util = PexBuildUtil(PythonRepos.global_instance(), PythonSetup.global_instance())
+        pex_build_util.dump_requirement_libs(builder, interpreter, req_libs, self.context.log)
         builder.freeze()
     return PEX(reqs_pex_path, interpreter=interpreter)
 

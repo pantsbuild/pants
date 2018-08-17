@@ -97,8 +97,8 @@ def dump_requirement_libs(builder, interpreter, req_libs, log, platforms=None):
   :param platforms: A list of :class:`Platform`s to resolve requirements for.
                     Defaults to the platforms specified by PythonSetup.
   """
-  reqs = [req for req_lib in req_libs for req in req_lib.requirements]
-  dump_requirements(builder, interpreter, reqs, log, platforms=platforms)
+  pex_build_util = PexBuildUtil(PythonRepos.global_instance(), PythonSetup.global_instance())
+  pex_build_util.dump_requirement_libs(builder, interpreter, req_libs, log, platforms)
 
 
 def dump_requirements(builder, interpreter, reqs, log, platforms=None):
@@ -111,34 +111,10 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None):
   :param platforms: A list of :class:`Platform`s to resolve requirements for.
                     Defaults to the platforms specified by PythonSetup.
   """
-  deduped_reqs = OrderedSet(reqs)
-  find_links = OrderedSet()
-  blacklist = PythonSetup.global_instance().resolver_blacklist
-  for req in deduped_reqs:
-    log.debug('  Dumping requirement: {}'.format(req))
-    if not (req.key in blacklist and interpreter.identity.matches(blacklist[req.key])):
-      builder.add_requirement(req.requirement)
-    if req.repository:
-      find_links.add(req.repository)
-
-  # Resolve the requirements into distributions.
-  distributions = resolve_multi(interpreter, deduped_reqs, platforms, find_links)
-  locations = set()
-  for platform, dists in distributions.items():
-    for dist in dists:
-      if dist.location not in locations:
-        log.debug('  Dumping distribution: .../{}'.format(os.path.basename(dist.location)))
-        builder.add_distribution(dist)
-      locations.add(dist.location)
-
-
-def subsystems_used():
-  """The subsystems used by the utility functions.
-
-  This function is provided so that consuming tasks can call it in their
-  subsystem_dependencies implementations.
-  """
-  return (PythonRepos, PythonSetup)
+  pex_build_util = PexBuildUtil(
+    PythonRepos.global_instance(),
+    PythonSetup.global_instance())
+  pex_build_util.dump_requirements(builder, interpreter, reqs, log, platforms)
 
 
 def resolve_multi(interpreter, requirements, platforms, find_links):
@@ -156,25 +132,92 @@ def resolve_multi(interpreter, requirements, platforms, find_links):
   """
   python_setup = PythonSetup.global_instance()
   python_repos = PythonRepos.global_instance()
-  platforms = platforms or python_setup.platforms
-  find_links = find_links or []
-  distributions = {}
-  fetchers = python_repos.get_fetchers()
-  fetchers.extend(Fetcher([path]) for path in find_links)
+  pex_build_util = PexBuildUtil(python_repos, python_setup)
+  pex_build_util.resolve_multi(interpreter, requirements, platforms, find_links)
 
-  for platform in platforms:
-    requirements_cache_dir = os.path.join(python_setup.resolver_cache_dir,
-                                          str(interpreter.identity))
-    distributions[platform] = resolve(
-      requirements=[req.requirement for req in requirements],
-      interpreter=interpreter,
-      fetchers=fetchers,
-      platform=expand_and_maybe_adjust_platform(interpreter=interpreter, platform=platform),
-      context=python_repos.get_network_context(),
-      cache=requirements_cache_dir,
-      cache_ttl=python_setup.resolver_cache_ttl,
-      allow_prereleases=python_setup.resolver_allow_prereleases,
-      pkg_blacklist=python_setup.resolver_blacklist,
-      use_manylinux=python_setup.use_manylinux)
 
-  return distributions
+class PexBuildUtil(object):
+  def __init__(self, python_repos_subsystem, python_setup_subsystem):
+    self._python_repos_subsystem = python_repos_subsystem
+    self._python_setup_subsystem = python_setup_subsystem
+
+  def dump_requirement_libs(self, builder, interpreter, req_libs, log, platforms=None):
+    """Multi-platform dependency resolution for PEX files.
+
+    :param builder: Dump the requirements into this builder.
+    :param interpreter: The :class:`PythonInterpreter` to resolve requirements for.
+    :param req_libs: A list of :class:`PythonRequirementLibrary` targets to resolve.
+    :param log: Use this logger.
+    :param platforms: A list of :class:`Platform`s to resolve requirements for.
+                      Defaults to the platforms specified by PythonSetup.
+    """
+    reqs = [req for req_lib in req_libs for req in req_lib.requirements]
+    self.dump_requirements(builder, interpreter, reqs, log, platforms=platforms)
+
+  def dump_requirements(self, builder, interpreter, reqs, log, platforms=None):
+    """Multi-platform dependency resolution for PEX files.
+
+    :param builder: Dump the requirements into this builder.
+    :param interpreter: The :class:`PythonInterpreter` to resolve requirements for.
+    :param reqs: A list of :class:`PythonRequirement` to resolve.
+    :param log: Use this logger.
+    :param platforms: A list of :class:`Platform`s to resolve requirements for.
+                      Defaults to the platforms specified by PythonSetup.
+    """
+    deduped_reqs = OrderedSet(reqs)
+    find_links = OrderedSet()
+    blacklist = self._python_setup_subsystem.resolver_blacklist
+    for req in deduped_reqs:
+      log.debug('  Dumping requirement: {}'.format(req))
+      if not (req.key in blacklist and interpreter.identity.matches(blacklist[req.key])):
+        builder.add_requirement(req.requirement)
+      if req.repository:
+        find_links.add(req.repository)
+
+    # Resolve the requirements into distributions.
+    distributions = self.resolve_multi(interpreter, deduped_reqs, platforms, find_links)
+    locations = set()
+    for platform, dists in distributions.items():
+      for dist in dists:
+        if dist.location not in locations:
+          log.debug('  Dumping distribution: .../{}'.format(os.path.basename(dist.location)))
+          builder.add_distribution(dist)
+        locations.add(dist.location)
+
+  def resolve_multi(self, interpreter, requirements, platforms, find_links):
+    """Multi-platform dependency resolution for PEX files.
+
+    Returns a list of distributions that must be included in order to satisfy a set of requirements.
+    That may involve distributions for multiple platforms.
+
+    :param interpreter: The :class:`PythonInterpreter` to resolve for.
+    :param requirements: A list of :class:`PythonRequirement` objects to resolve.
+    :param platforms: A list of :class:`Platform`s to resolve for.
+    :param find_links: Additional paths to search for source packages during resolution.
+    :return: Map of platform name -> list of :class:`pkg_resources.Distribution` instances needed
+             to satisfy the requirements on that platform.
+    """
+    python_setup = self._python_setup_subsystem
+    python_repos = self._python_repos_subsystem
+    platforms = platforms or python_setup.platforms
+    find_links = find_links or []
+    distributions = {}
+    fetchers = python_repos.get_fetchers()
+    fetchers.extend(Fetcher([path]) for path in find_links)
+
+    for platform in platforms:
+      requirements_cache_dir = os.path.join(python_setup.resolver_cache_dir,
+                                            str(interpreter.identity))
+      distributions[platform] = resolve(
+        requirements=[req.requirement for req in requirements],
+        interpreter=interpreter,
+        fetchers=fetchers,
+        platform=expand_and_maybe_adjust_platform(interpreter=interpreter, platform=platform),
+        context=python_repos.get_network_context(),
+        cache=requirements_cache_dir,
+        cache_ttl=python_setup.resolver_cache_ttl,
+        allow_prereleases=python_setup.resolver_allow_prereleases,
+        pkg_blacklist=python_setup.resolver_blacklist,
+        use_manylinux=python_setup.use_manylinux)
+
+    return distributions

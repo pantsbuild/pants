@@ -8,11 +8,10 @@ import functools
 import os
 from contextlib import contextmanager
 from textwrap import dedent
-from zipfile import ZipFile
 
 from pex.pex_info import PexInfo
 
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import open_zip, temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -108,13 +107,13 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       config['python-setup']['platforms'] = ['linux-x86_64']
       build()
 
-      with self._open_zip(test_pex) as z:
+      with open_zip(test_pex) as z:
         namelist = z.namelist()
         self.assertIn(
           numpy_manylinux_dep,
           namelist)
         self.assertNotIn(
-          numpy_manylinux_dep,
+          numpy_macos_dep,
           namelist)
 
       # When both linux and macosx platforms are requested,
@@ -124,7 +123,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
         'macosx-10.13-x86_64']
       build()
 
-      with self._open_zip(test_pex) as z:
+      with open_zip(test_pex) as z:
         namelist = z.namelist()
         self.assertIn(
           numpy_manylinux_dep,
@@ -132,10 +131,3 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
         self.assertIn(
           numpy_macos_dep,
           namelist)
-
-  def _open_zip(self, path):
-    try:
-      z = ZipFile(path)
-      yield z
-    finally:
-      z.close()

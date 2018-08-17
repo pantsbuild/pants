@@ -14,7 +14,7 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.pex_build_util import dump_requirement_libs
+from pants.backend.python.tasks.pex_build_util import PexBuildUtil
 from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
@@ -55,7 +55,8 @@ class IsortPrep(Task):
       def build_isort_pex(cls, context, interpreter, pex_path, requirements_lib):
         with safe_concurrent_creation(pex_path) as chroot:
           builder = PEXBuilder(path=chroot, interpreter=interpreter)
-          dump_requirement_libs(builder=builder,
+          pex_build_util = PexBuildUtil(PythonRepos.global_instance(), PythonSetup.global_instance())
+          pex_build_util.dump_requirement_libs(builder=builder,
                                 interpreter=interpreter,
                                 req_libs=[requirements_lib],
                                 log=context.log)
