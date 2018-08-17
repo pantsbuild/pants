@@ -163,6 +163,8 @@ class RunTracker(Subsystem):
       raise AssertionError('RunTracker.initialize must not be called multiple times.')
 
     # Initialize the run.
+
+    # Select a globally unique ID for the run, that sorts by time.
     millis = int((self._run_timestamp * 1000) % 1000)
     run_id = 'pants_run_{}_{}_{}'.format(
       time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self._run_timestamp)),

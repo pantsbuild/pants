@@ -535,7 +535,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   def do_check_artifact_cache(self, vts, post_process_cached_vts=None):
     """Checks the artifact cache for the specified list of VersionedTargetSets.
 
-    Returns a pair (cached, uncached) of VersionedTargets that were
+    Returns a tuple (cached, uncached, uncached_causes) of VersionedTargets that were
     satisfied/unsatisfied from the cache.
     """
     if not vts:
