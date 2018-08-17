@@ -37,4 +37,3 @@ tests/python/pants_test/option:testing
 tests/python/pants_test/pantsd:pants_daemon
 tests/python/pants_test/pantsd:process_manager
 tests/python/pants_test/pantsd:watchman
-tests/python/pants_test/source:source_root
