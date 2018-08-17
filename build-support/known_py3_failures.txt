@@ -44,5 +44,3 @@ tests/python/pants_test/task:console_task
 tests/python/pants_test/task:simple_codegen_task
 tests/python/pants_test/task:task
 tests/python/pants_test/task:testrunner_task_mixin
-tests/python/pants_test/util:contextutil
-tests/python/pants_test/util:dirutil
