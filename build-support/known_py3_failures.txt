@@ -6,9 +6,6 @@ tests/python/pants_test/backend/jvm/tasks:junit_run
 tests/python/pants_test/backend/jvm/tasks:resources_task
 tests/python/pants_test/backend/python/tasks:tasks
 tests/python/pants_test/backend/python:pants_requirement
-tests/python/pants_test/build_graph:build_file_parser
-tests/python/pants_test/build_graph:build_graph
-tests/python/pants_test/build_graph:target
 tests/python/pants_test/cache:artifact_cache
 tests/python/pants_test/cache:cache_setup
 tests/python/pants_test/cache:caching
