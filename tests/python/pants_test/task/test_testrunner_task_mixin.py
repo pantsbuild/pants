@@ -263,7 +263,7 @@ class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
 
   @contextmanager
   def mock_timer(self):
-    with patch('threading._Timer') as timer_class:
+    with patch('threading.Timer') as timer_class:
       timer = Mock()
 
       def start():
@@ -289,11 +289,11 @@ class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
 
     # Ensure that all the calls we want to kill the process gracefully are made.
     self.assertEqual(self.process_handler.call_list,
-                     [[u'process_handler.wait'],
-                      [u'process_handler.poll'],
-                      [u'process_handler.terminate'],
-                      [u'process_handler.wait'],
-                      [u'process_handler.kill']])
+                     [['process_handler.wait'],
+                      ['process_handler.poll'],
+                      ['process_handler.terminate'],
+                      ['process_handler.wait'],
+                      ['process_handler.kill']])
 
   def test_graceful_terminate(self):
     self.process_handler = self.create_process_handler(poll_returns=[None],
@@ -308,10 +308,10 @@ class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
 
     # Ensure that we only call terminate, and not kill.
     self.assertEqual(self.process_handler.call_list,
-                     [[u'process_handler.wait'],
-                      [u'process_handler.poll'],
-                      [u'process_handler.terminate'],
-                      [u'process_handler.wait']])
+                     [['process_handler.wait'],
+                      ['process_handler.poll'],
+                      ['process_handler.terminate'],
+                      ['process_handler.wait']])
 
 
 class TestRunnerTaskMixinMultipleTargets(TaskTestBase):
