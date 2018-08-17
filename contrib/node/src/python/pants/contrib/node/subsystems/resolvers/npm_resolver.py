@@ -19,6 +19,7 @@ from pants.contrib.node.subsystems.package_managers import (PACKAGE_MANAGER_NPM,
 from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.tasks.node_resolve import NodeResolve
+from pants.contrib.node.tasks.node_resolve_local import NodeResolveLocal
 
 
 class NpmResolver(Subsystem, NodeResolverBase):
@@ -31,9 +32,11 @@ class NpmResolver(Subsystem, NodeResolverBase):
       '--install-optional', type=bool, default=False, fingerprint=True,
       help='If enabled, install optional dependencies.')
     NodeResolve.register_resolver_for_type(NodeModule, cls)
+    NodeResolveLocal.register_resolver_for_type(NodeModule, cls)
 
-  def resolve_target(self, node_task, target, results_dir, node_paths):
-    self._copy_sources(target, results_dir)
+  def resolve_target(self, node_task, target, results_dir, node_paths, resolve_locally=False):
+    if not resolve_locally:
+      self._copy_sources(target, results_dir)
     with pushd(results_dir):
       if not os.path.exists('package.json'):
         raise TaskError(
@@ -41,6 +44,8 @@ class NpmResolver(Subsystem, NodeResolverBase):
       # TODO: remove/remodel the following section when node_module dependency is fleshed out.
       package_manager = node_task.get_package_manager(target=target).name
       if package_manager == PACKAGE_MANAGER_NPM:
+        if resolve_locally:
+          raise TaskError('Resolving node package modules locally is not supported for NPM.')
         if os.path.exists('npm-shrinkwrap.json'):
           node_task.context.log.info('Found npm-shrinkwrap.json, will not inject package.json')
         else:

@@ -18,6 +18,7 @@ from pants.util.contextutil import temporary_dir
 from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
 from pants.contrib.node.tasks.node_resolve import NodeResolve
+from pants.contrib.node.tasks.node_resolve_local import NodeResolveLocal
 
 
 class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
@@ -29,8 +30,9 @@ class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
              help='Timeout the fetch if the connection is idle for longer than this value.')
     super(NodePreinstalledModuleResolver, cls).register_options(register)
     NodeResolve.register_resolver_for_type(NodePreinstalledModule, cls)
+    NodeResolveLocal.register_resolver_for_type(NodePreinstalledModule, cls)
 
-  def resolve_target(self, node_task, target, results_dir, node_paths):
+  def resolve_target(self, node_task, target, results_dir, node_paths, resolve_locally=False):
     self._copy_sources(target, results_dir)
 
     with temporary_dir() as temp_dir:
