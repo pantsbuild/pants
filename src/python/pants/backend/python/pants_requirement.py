@@ -32,7 +32,14 @@ class PantsRequirement(object):
     :param string name: The name to use for the target, defaults to the parent dir name.
     """
     name = name or os.path.basename(self._parse_context.rel_path)
-    requirement = PythonRequirement(requirement='pantsbuild.pants=={}'.format(pants_version()))
+
+    # TODO(John Sirois): Modify to constraint to >=3.5,<4 as part of
+    # https://github.com/pantsbuild/pants/issues/6062
+    env_marker = "python_version>='2.7' and python_version<'3'"
+
+    requirement = PythonRequirement(requirement="pantsbuild.pants=={version} ; {env_marker}"
+                                    .format(version=pants_version(), env_marker=env_marker))
+
     self._parse_context.create_object('python_requirement_library',
                                       name=name,
                                       requirements=[requirement])
