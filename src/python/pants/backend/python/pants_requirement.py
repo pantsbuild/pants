@@ -9,6 +9,9 @@ from builtins import object
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.build_environment import pants_version
+from pants.base.exceptions import TargetDefinitionException
+from pants.build_graph.address import Address
+from pants.util.meta import classproperty
 
 
 class PantsRequirement(object):
@@ -24,21 +27,37 @@ class PantsRequirement(object):
   :API: public
   """
 
+  @classproperty
+  def alias(self):
+    return 'pants_requirement'
+
   def __init__(self, parse_context):
     self._parse_context = parse_context
 
-  def __call__(self, name=None):
+  def __call__(self, name=None, dist=None):
     """
-    :param string name: The name to use for the target, defaults to the parent dir name.
+    :param string name: The name to use for the target, defaults to the dist name if specified and
+                        otherwise the parent dir name.
+    :param string dist: The pants dist to create a requirement for. This must be a
+                        'pantsbuild.pants*' distribution; eg:
+                        'pantsbuild.pants.contrib.python.checks'.
     """
-    name = name or os.path.basename(self._parse_context.rel_path)
+    name = name or dist or os.path.basename(self._parse_context.rel_path)
+    dist = dist or 'pantsbuild.pants'
+    if not (dist == 'pantsbuild.pants' or dist.startswith('pantsbuild.pants.')):
+      target = Address(spec_path=self._parse_context.rel_path, target_name=name)
+      raise TargetDefinitionException(target=target,
+                                      msg='The {} target only works for pantsbuild.pants '
+                                          'distributions, given {}'.format(self.alias, dist))
 
     # TODO(John Sirois): Modify to constraint to >=3.5,<4 as part of
     # https://github.com/pantsbuild/pants/issues/6062
     env_marker = "python_version>='2.7' and python_version<'3'"
 
-    requirement = PythonRequirement(requirement="pantsbuild.pants=={version} ; {env_marker}"
-                                    .format(version=pants_version(), env_marker=env_marker))
+    requirement = PythonRequirement(requirement="{key}=={version} ; {env_marker}"
+                                    .format(key=dist,
+                                            version=pants_version(),
+                                            env_marker=env_marker))
 
     self._parse_context.create_object('python_requirement_library',
                                       name=name,
