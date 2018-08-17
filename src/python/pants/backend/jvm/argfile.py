@@ -53,7 +53,7 @@ def safe_args(args,
         if delete and os.path.exists(argfile):
           os.unlink(argfile)
     else:
-      with temporary_file(cleanup=delete) as fp:
+      with temporary_file(cleanup=delete, binary_mode=False) as fp:
         yield create_argfile(fp)
   else:
     yield args

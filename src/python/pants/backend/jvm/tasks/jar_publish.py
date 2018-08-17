@@ -876,7 +876,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   def entry_fingerprint(self, target, fingerprint_internal):
     sha = hashlib.sha1()
-    sha.update(target.invalidation_hash())
+    sha.update(target.invalidation_hash().encode('utf-8'))
 
     # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
     if isinstance(target, ScalaLibrary):
@@ -892,7 +892,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
     internal_dependencies = sorted(target_internal_dependencies(target), key=lambda t: t.id)
     for internal_target in internal_dependencies:
       fingerprint = fingerprint_internal(internal_target)
-      sha.update(fingerprint)
+      sha.update(fingerprint.encode('utf-8'))
 
     return sha.hexdigest() if PY3 else sha.hexdigest().decode('utf-8')
 

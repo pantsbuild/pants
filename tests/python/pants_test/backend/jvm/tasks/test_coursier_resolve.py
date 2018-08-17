@@ -8,6 +8,7 @@ import os
 from builtins import str
 from contextlib import contextmanager
 
+from future.utils import PY3
 from mock import MagicMock
 from psutil.tests import safe_remove
 
@@ -130,7 +131,9 @@ class CoursierResolveTest(JvmToolTaskTestBase):
 
       self.resolve([lib])
     self.assertEqual(
-      'Undefined revs for jars unsupported by Coursier. "jar(org=u\'com.google.guava\', name=u\'guava\', rev=None, classifier=None, ext=u\'jar\')"',
+      "Undefined revs for jars unsupported by Coursier. "
+      "\"jar(org={unicode_literal}'com.google.guava', name={unicode_literal}'guava', "
+      "rev=None, classifier=None, ext={unicode_literal}'jar')\"".format(unicode_literal='' if PY3 else 'u'),
       str(cm.exception))
 
   def test_resolve_multiple_artifacts(self):

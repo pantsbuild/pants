@@ -723,7 +723,7 @@ class CoursierResolveFingerprintStrategy(FingerprintStrategy):
     hasher.update(target.payload.fingerprint().encode('utf-8'))
 
     for conf in self._confs:
-      hasher.update(conf)
+      hasher.update(conf.encode('utf-8'))
 
     for element in hash_elements_for_target:
       hasher.update(element.encode('utf-8'))

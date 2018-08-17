@@ -539,8 +539,8 @@ class IvyModuleRef(object):
   # TODO(python3port): Return NotImplemented if other does not have attributes
   def __lt__(self, other):
     # We can't just re-use __repr__ or __str_ because we want to order rev last
-    return ((self.org, self.name, self.classifier, self.ext, self.rev) <
-            (other.org, other.name, other.classifier, other.ext, other.rev))
+    return ((self.org, self.name, self.classifier or '', self.ext, self.rev) <
+            (other.org, other.name, other.classifier or '', other.ext, other.rev))
 
   def __hash__(self):
     return hash(self._id)

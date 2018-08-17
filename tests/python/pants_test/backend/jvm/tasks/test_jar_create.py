@@ -133,7 +133,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
           for content in content_set:
             if not content.endswith('/'):
               with closing(jar.open(content)) as fp:
-                self.assertEqual(os.path.basename(content), fp.read())
+                self.assertEqual(os.path.basename(content), fp.read().decode('utf-8'))
 
   @ensure_cached(JarCreate)
   def test_classfile_jar_contents(self):

@@ -29,7 +29,7 @@ class SimpleRESTHandler(http.server.SimpleHTTPRequestHandler):
 
   def do_PUT(self):
     path = self.translate_path(self.path)
-    content_length = int(self.headers.getheader('content-length'))
+    content_length = int(self.headers.get('content-length'))
     content = self.rfile.read(content_length)
     safe_mkdir(os.path.dirname(path))
     with open(path, 'wb') as outfile:
