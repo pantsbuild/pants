@@ -7,5 +7,4 @@ tests/python/pants_test/backend/jvm/tasks:resources_task
 tests/python/pants_test/backend/python/tasks:tasks
 tests/python/pants_test/backend/python:pants_requirement
 tests/python/pants_test/cache:pinger
-tests/python/pants_test/goal:artifact_cache_stats
 tests/python/pants_test/goal:other
