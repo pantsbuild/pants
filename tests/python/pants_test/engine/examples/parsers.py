@@ -19,6 +19,7 @@ from pants.build_graph.address import Address
 from pants.engine.objects import Resolvable, Serializable
 from pants.engine.parser import ParseError, Parser
 from pants.util.memo import memoized, memoized_property
+from pants.util.strutil import ensure_text
 
 
 @memoized
@@ -79,7 +80,7 @@ class JsonParser(Parser):
     This includes `namedtuple` subtypes as well as any custom class with an `_asdict` method defined;
     see :class:`pants.engine.serializable.Serializable`.
     """
-    json = filecontent
+    json = ensure_text(filecontent)
 
     decoder = self._decoder
 
@@ -196,9 +197,10 @@ def encode_json(obj, inline=False, **kwargs):
   :rtype: string
   :raises: :class:`ParseError` if there were any problems encoding the given `obj` in json.
   """
-  encoder = JSONEncoder(encoding='UTF-8',
-                        default=functools.partial(_object_encoder, inline=inline),
-                        **kwargs)
+  kwargs.update({'default': functools.partial(_object_encoder, inline=inline)})
+  if PY2:
+    kwargs.update({'encoding': 'utf-8'})
+  encoder = JSONEncoder(**kwargs)
   return encoder.encode(obj)
 
 
