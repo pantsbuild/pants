@@ -25,12 +25,14 @@ class ExecutablePexTool(Subsystem):
   base_requirements = []
 
   def bootstrap(self, interpreter, pex_file_path, extra_reqs=None):
-    pex_info = PexInfo.default()
-    if self.entry_point is not None:
-      pex_info.entry_point = self.entry_point
+    # Caching is done just by checking if the file at the specified path is already executable.
     if is_executable(pex_file_path):
       return PEX(pex_file_path, interpreter)
     else:
+      pex_info = PexInfo.default()
+      if self.entry_point is not None:
+        pex_info.entry_point = self.entry_point
+
       with safe_concurrent_creation(pex_file_path) as safe_path:
         builder = PEXBuilder(interpreter=interpreter, pex_info=pex_info)
         all_reqs = list(self.base_requirements) + list(extra_reqs or [])
