@@ -327,11 +327,11 @@ class Options(object):
           removal_version='1.13.0.dev0',
           deprecated_entity_description="Using the -q or --quiet option recursively "
                                         "(after a goal name on the command line)",
-          hint="The -q or --quiet flags can be specified globally by providing them on the "
+          hint="The -q or --quiet flags should be specified globally by providing them on the "
           "command line before any other goals. This will silence all pants logging "
-          "for all tasks and only produce the output from e.g. ./pants run.\nThe flag provided "
-          "was '{}' in scope '{}'."
-          .format(found_flag, scope),
+          "for all tasks and only produce the output from e.g. ./pants run.\n"
+          "The flag provided was {flag!r}, in scope {scope!r}."
+          .format(flag=found_flag, scope=scope),
           frame_info=get_frame_info(stacklevel=2),
           ensure_stderr=True)
 
