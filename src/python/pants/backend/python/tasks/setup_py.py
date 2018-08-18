@@ -52,13 +52,23 @@ setup(**
 
 
 class SetupPyRunner(InstallerBase):
+  # FIXME: this doesn't seem to work at all! We still fail with "Could not open - in the
+  # environment"!
+  @memoized_property
+  def SETUP_BOOTSTRAP_FOOTER(self):
+    interpreter_path = self._interpreter.binary
+    return """
+__file__ = 'setup.py'
+if len(sys.argv) >= 2 and sys.argv[1] == '-':
+  sys.argv[1] = 'setup.py'
+exec(compile(open(__file__, 'rb').read(), __file__, 'exec'))
+"""
+
   _EXTRAS = ('setuptools', 'wheel')
 
-  class SetupPyRunnerError(Exception): pass
-
-  def __init__(self, source_dir, setup_command, file_input=None, **kw):
+  # `interpreter` is one of the kwargs often passed to this constructor.
+  def __init__(self, source_dir, setup_command, **kw):
     self.__setup_command = setup_command
-    self._file_input = file_input
     super(SetupPyRunner, self).__init__(source_dir, **kw)
 
   def mixins(self):
@@ -79,42 +89,6 @@ class SetupPyRunner(InstallerBase):
 
   def _setup_command(self):
     return self.__setup_command
-
-  def run(self):
-    """???/ripped from the pex installer class
-
-    Used so we can control the command line, and raise an exception on failure.
-    """
-    if self._installed is not None:
-      return self._installed
-
-    if self._file_input is None:
-      stdin_payload = self.bootstrap_script.encode('ascii')
-      init_args = [self._interpreter.binary, '-']
-    else:
-      stdin_payload = None
-      init_args = [self._interpreter.binary, self._file_input, '--']
-
-    full_command = init_args + self._setup_command()
-
-    with TRACER.timed('Installing %s' % self._install_tmp, V=2):
-      try:
-        Executor.execute(full_command,
-                         env=self._interpreter.sanitized_environment(),
-                         cwd=self._source_dir,
-                         stdin_payload=stdin_payload)
-        self._installed = True
-      except Executor.NonZeroExit as e:
-        self._installed = False
-        name = os.path.basename(self._source_dir)
-        raise self.SetupPyRunnerError(
-          '**** Failed to install {name} (caused by: {error}\n):'
-          'stdout:\n{stdout}\nstderr:\n{stderr}\n'
-          .format(name=name,
-                  error=e,
-                  stdout=e.stdout,
-                  stderr=e.stderr))
-        return self._installed
 
 
 class TargetAncestorIterator(object):

@@ -298,29 +298,30 @@ class BuildLocalPythonDistributions(Task):
     setup_runner = SetupPyRunner(
       source_dir=dist_target_dir,
       setup_command=setup_py_snapshot_version_argv,
-      file_input='setup.py',
       interpreter=setup_requires_interpreter)
 
     setup_py_env = setup_py_execution_environment.as_environment()
     with environment_as(**setup_py_env):
-      # Build a whl using SetupPyRunner. If the install was unsuccessful,
-      # SetupPyRunner.SetupPyRunnerError will be thrown.
-      try:
-        setup_runner.run()
-      except SetupPyRunner.SetupPyRunnerError as e:
+      # Build a whl using SetupPyRunner. The pex installer class's run() instance method performs
+      # the install, returns whether the install was successful, and if not, displays the stdout and
+      # stderr of the setup.py invocation directly to stderr.
+      # TODO: Would an upstream pex change make sense to allow more control of the output printed to
+      # stderr when using pex as a library (because pex prints directly to the parent process's
+      # stderr on failure)? Or is there a canonical way to just capture stderr in a with statement?
+      was_installed = setup_runner.run()
+      if not was_installed:
         raise self.BuildLocalPythonDistributionsError(
           "Installation of python distribution from target {target} into directory {into_dir} "
-          "failed.\n"
+          "failed (return value of run() was: {rc!r}).\n"
           "The chosen interpreter was: {interpreter}.\n"
           "The execution environment was: {env}.\n"
-          "The setup command was: {command}.\n{err}"
+          "The setup command was: {command}."
           .format(target=dist_tgt,
                   into_dir=dist_target_dir,
+                  rc=was_installed,
                   interpreter=setup_requires_interpreter,
                   env=setup_py_env,
-                  command=setup_py_snapshot_version_argv,
-                  err=e),
-          e)
+                  command=setup_py_snapshot_version_argv))
 
   def _inject_synthetic_dist_requirements(self, dist, req_lib_addr):
     """Inject a synthetic requirements library that references a local wheel.
