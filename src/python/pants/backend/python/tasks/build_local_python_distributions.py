@@ -307,7 +307,8 @@ class BuildLocalPythonDistributions(Task):
 
     setup_py_env = setup_py_execution_environment.as_environment()
     with environment_as(**setup_py_env):
-      # Build a whl using SetupPyRunner and return its absolute path.
+      # Build a whl using SetupPyRunner. If the install was unsuccessful,
+      # SetupPyRunner.SetupPyRunnerError will be thrown.
       try:
         setup_runner.run()
       except SetupPyRunner.SetupPyRunnerError as e:
