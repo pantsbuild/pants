@@ -10,6 +10,8 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
+from pants.backend.python.subsystems.python_repos import PythonRepos
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.tasks.pex_build_util import dump_requirements
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_executable, safe_concurrent_creation
@@ -23,6 +25,13 @@ class ExecutablePexTool(Subsystem):
   entry_point = None
 
   base_requirements = []
+
+  # NB: The `dump_requirements` method uses PythonSetup and PythonRepos (the global instances)
+  # behind your back - you need to declare subsystem dependencies on these two as things stand to be
+  # safe.
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(ExecutablePexTool, cls).subsystem_dependencies() + (PythonRepos, PythonSetup)
 
   def bootstrap(self, interpreter, pex_file_path, extra_reqs=None):
     # Caching is done just by checking if the file at the specified path is already executable.
