@@ -15,7 +15,6 @@ from pants.backend.native.tasks.c_compile import CCompile
 from pants.backend.native.tasks.cpp_compile import CppCompile
 from pants.backend.native.tasks.link_shared_libraries import LinkSharedLibraries
 from pants.backend.python.targets.python_distribution import PythonDistribution
-from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants_test.backend.python.tasks.python_task_test_base import check_wheel_platform_matches_host
 from pants_test.backend.python.tasks.util.build_local_dists_test_base import \
   BuildLocalPythonDistributionsTestBase

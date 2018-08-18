@@ -13,7 +13,6 @@ from pex.interpreter import PythonInterpreter
 from pants.backend.native.config.environment import Platform
 from pants.backend.native.subsystems.conan import Conan
 from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
-from pants.backend.python.tasks.wrapped_pex import WrappedPEX
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.exceptions import TaskError
 from pants.invalidation.cache_manager import VersionedTargetSet
@@ -120,10 +119,9 @@ class NativeExternalLibraryFetch(Task):
 
   @memoized_property
   def _conan_binary(self):
-    conan_pex = Conan.scoped_instance(self).bootstrap(
+    return Conan.scoped_instance(self).bootstrap(
       self._conan_python_interpreter,
       self._conan_pex_path)
-    return WrappedPEX(conan_pex)
 
   def execute(self):
     native_lib_tgts = self.context.targets(self.native_library_constraint.satisfied_by)

@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
 from builtins import str
 from collections import defaultdict
 
@@ -22,7 +23,7 @@ from pants.binaries.executable_pex_tool import ExecutablePexTool
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.objects import SubclassesOf, datatype
-from pants.util.strutil import create_path_env_var, safe_shlex_join
+from pants.util.strutil import create_path_env_var
 
 
 class PythonNativeCode(Subsystem):
@@ -199,7 +200,6 @@ class SetupPyExecutionEnvironment(datatype([
       # An as_tuple() method for datatypes could make this destructuring cleaner!  Alternatively,
       # constructing this environment could be done more compositionally instead of requiring all of
       # these disparate fields together at once.
-      plat = native_tools.platform
       c_toolchain = native_tools.c_toolchain
       c_compiler = c_toolchain.c_compiler
       c_linker = c_toolchain.c_linker
