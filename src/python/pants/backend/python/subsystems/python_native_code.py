@@ -47,7 +47,11 @@ class PythonNativeCode(Subsystem):
   def subsystem_dependencies(cls):
     return super(PythonNativeCode, cls).subsystem_dependencies() + (
       NativeToolchain.scoped(cls),
-      PythonSetup.scoped(cls),
+      # We generally have to use PythonSetup's global instance, as methods such as
+      # `dump_requirements` will use it directly.
+      # TODO: when subsystems are more easily requestable from the v2 engine, this restriction could
+      # be removed!
+      PythonSetup,
     )
 
   @memoized_property
@@ -60,7 +64,7 @@ class PythonNativeCode(Subsystem):
 
   @memoized_property
   def _python_setup(self):
-    return PythonSetup.scoped_instance(self)
+    return PythonSetup.global_instance()
 
   def pydist_has_native_sources(self, target):
     return target.has_sources(extension=tuple(self._native_source_extensions))
@@ -142,20 +146,14 @@ class PythonNativeCode(Subsystem):
 class BuildSetupRequiresPex(ExecutablePexTool):
   options_scope = 'build-setup-requires-pex'
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(BuildSetupRequiresPex, cls).subsystem_dependencies() + (PythonSetup.scoped(cls),)
-
   @property
   def base_requirements(self):
+    # TODO: would we ever want to configure these requirement versions separately from the global
+    # PythonSetup values?
     return [
-      PythonRequirement('setuptools'),
-      PythonRequirement('wheel'),
+      PythonRequirement('setuptools=={}'.format(self.python_setup.setuptools_version)),
+      PythonRequirement('wheel=={}'.format(self.python_setup.wheel_version)),
     ]
-
-  @memoized_property
-  def _python_setup(self):
-    return PythonSetup.scoped_instance(self)
 
 
 class SetupPyNativeTools(datatype([

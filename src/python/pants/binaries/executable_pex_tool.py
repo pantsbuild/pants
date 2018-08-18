@@ -15,6 +15,7 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.tasks.pex_build_util import dump_requirements
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_executable, safe_concurrent_creation
+from pants.util.memo import memoized_property
 
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,10 @@ class ExecutablePexTool(Subsystem):
   @classmethod
   def subsystem_dependencies(cls):
     return super(ExecutablePexTool, cls).subsystem_dependencies() + (PythonRepos, PythonSetup)
+
+  @memoized_property
+  def python_setup(self):
+    return PythonSetup.global_instance()
 
   def bootstrap(self, interpreter, pex_file_path, extra_reqs=None):
     # Caching is done just by checking if the file at the specified path is already executable.
