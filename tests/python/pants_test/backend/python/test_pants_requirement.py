@@ -8,7 +8,6 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.register import build_file_aliases
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_environment import pants_version
-from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants_test.test_base import TestBase
 
