@@ -7,10 +7,6 @@ tests/python/pants_test/backend/jvm/tasks:resources_task
 tests/python/pants_test/backend/python/tasks:tasks
 tests/python/pants_test/backend/python:pants_requirement
 tests/python/pants_test/cache:pinger
-tests/python/pants_test/core_tasks:bash_completion
-tests/python/pants_test/core_tasks:list_goals
-tests/python/pants_test/core_tasks:roots
-tests/python/pants_test/core_tasks:run_prep_command
 tests/python/pants_test/engine/legacy:structs
 tests/python/pants_test/engine:build_files
 tests/python/pants_test/engine:engine
