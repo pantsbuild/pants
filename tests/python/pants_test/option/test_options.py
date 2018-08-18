@@ -49,7 +49,7 @@ def subsystem(scope):
   return ScopeInfo(scope, ScopeInfo.SUBSYSTEM)
 
 
-class OptionsTestBase(unittest.TestCase):
+class OptionsTest(unittest.TestCase):
 
   @contextmanager
   def _write_config_to_file(self, fp, config):
@@ -75,11 +75,6 @@ class OptionsTestBase(unittest.TestCase):
     self._register(options)
     return options
 
-  @abstractmethod
-  def _register(self, options): pass
-
-
-class OptionsTest(OptionsTestBase):
   _known_scope_infos = [intermediate('compile'),
                         task('compile.java'),
                         task('compile.scala'),
