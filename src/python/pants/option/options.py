@@ -18,7 +18,6 @@ from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
 from pants.option.scope import ScopeInfo
 from pants.util.memo import memoized_property
-from pants.util.objects import datatype
 
 
 def make_flag_regex(long_name, short_name=None):

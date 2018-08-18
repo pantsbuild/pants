@@ -9,7 +9,6 @@ import os
 import shlex
 import unittest
 import warnings
-from abc import abstractmethod
 from builtins import open, str
 from contextlib import contextmanager
 from textwrap import dedent
