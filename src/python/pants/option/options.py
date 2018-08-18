@@ -20,42 +20,6 @@ from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 
 
-class CallableWrapper(datatype(['callable_object'])):
-  def __call__(self, *args, **kwargs):
-    return self.callable_object(*args, **kwargs)
-
-  def __new__(cls, callable_object):
-    if isinstance(callable_object, cls):
-      return callable_object
-    # `callable()` was deprecated in Python 3.0, then undeprecated in 3.2.
-    if not callable(callable_object):
-      cls.make_type_error("{!r} must be callable".format(callable_object))
-    return super(CallableWrapper, cls).__new__(cls, callable_object)
-
-
-class DeprecatedFlagMatcher(datatype([('scope_flags_fun', CallableWrapper)])):
-
-  @classmethod
-  def for_static_kwargs(cls, predicate, **kw):
-    callable_predicate = CallableWrapper(predicate)
-    def generated_callable(*args, **kwargs):
-      if callable_predicate(*args, **kwargs):
-        return kw
-    return cls(CallableWrapper(generated_callable))
-
-  def __new__(cls, scope_flags_fun):
-    return super(DeprecatedFlagMatcher, cls).__new__(cls, CallableWrapper(scope_flags_fun))
-
-  def evaluate(self, scope, flags, values):
-    maybe_deprecation_warning_kwargs = self.scope_flags_fun(scope, flags, values)
-    if maybe_deprecation_warning_kwargs is not None:
-      if not isinstance(maybe_deprecation_warning_kwargs, dict):
-        raise self.make_type_error("scope_flags_fun must return a dict, or None (was: {!r})"
-                                   .format(maybe_deprecation_warning_kwargs))
-
-      warn_or_error(**maybe_deprecation_warning_kwargs)
-
-
 class Options(object):
   """The outward-facing API for interacting with options.
 
@@ -349,6 +313,7 @@ class Options(object):
 
   _quiet_flag_regex = re.compile(r'\A(\-q|\-\-([^=]+\-)?quiet(=.*)?)\Z')
 
+  # NB: This method can be removed entirely after the deprecation period is complete.
   def _match_recursive_quiet_flag(self, scope, flags):
     if scope != GLOBAL_SCOPE:
       found_flag = None
@@ -359,7 +324,7 @@ class Options(object):
 
       if found_flag:
         return dict(
-          removal_version='1.13.0.dev.0',
+          removal_version='1.13.0.dev0',
           deprecated_entity_description="Using the -q or --quiet option recursively "
                                         "(after a goal name on the command line)",
           hint="The -q or --quiet flags can be specified globally by providing them on the "
@@ -373,15 +338,19 @@ class Options(object):
   @memoized_property
   def flag_matchers(self):
     return [
-      DeprecatedFlagMatcher(
-        lambda scope, _, values: self._check_deprecated_scope(scope, values)),
-      DeprecatedFlagMatcher(
-        lambda scope, flags, _: self._match_recursive_quiet_flag(scope, flags)),
+      lambda scope, _, values: self._check_deprecated_scope(scope, values),
+      lambda scope, flags, _: self._match_recursive_quiet_flag(scope, flags),
     ]
 
   def _check_deprecations(self, scope, flags, values):
     for flag_matcher in self.flag_matchers:
-      flag_matcher.evaluate(scope, flags, values)
+      maybe_deprecation_warning_kwargs = flag_matcher(scope, flags, values)
+
+      if maybe_deprecation_warning_kwargs is not None:
+        if not isinstance(maybe_deprecation_warning_kwargs, dict):
+          raise TypeError("scope_flags_fun must return a dict, or None (was: {!r})"
+                          .format(maybe_deprecation_warning_kwargs))
+        warn_or_error(**maybe_deprecation_warning_kwargs)
 
   # TODO: Eagerly precompute backing data for this?
   def for_scope(self, scope, inherit_from_enclosing_scope=True):

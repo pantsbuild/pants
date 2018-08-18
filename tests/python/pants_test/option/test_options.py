@@ -27,7 +27,7 @@ from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, Im
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.optionable import Optionable
-from pants.option.options import DeprecatedFlagMatcher, Options
+from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
 from pants.option.ranked_value import RankedValue
@@ -829,13 +829,13 @@ class OptionsTest(OptionsTestBase):
     self.assertIn(option_string, warning_message)
 
   def test_arbitrary_deprecation_matcher(self):
+    def _matcher(_scope, flags, _values):
+      if any(f.startswith('--int-choices') for f in flags):
+        return dict(removal_version='9999.9.9.dev0',
+                    deprecated_entity_description='int choices test option')
+
     class OptionsWithDeprecation(Options):
-      flag_matchers = [
-        DeprecatedFlagMatcher.for_static_kwargs(
-          lambda _scope, flags, _values: any(f.startswith('--int-choices') for f in flags),
-          removal_version='9999.9.9.dev0',
-          deprecated_entity_description='int choices test option'),
-      ]
+      flag_matchers = [_matcher]
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants --int-choices=42', options_cls=OptionsWithDeprecation)
