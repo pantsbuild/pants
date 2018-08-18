@@ -236,7 +236,7 @@ class JUnitHtmlReport(JUnitHtmlReportInterface):
     root = ET.parse(xml_file).getroot()
 
     testcases = []
-    for testcase in root.iter('testcase'):
+    for testcase in sorted(root.iter('testcase')):
       failure = None
       for f in testcase.iter('failure'):
         failure = f.text
