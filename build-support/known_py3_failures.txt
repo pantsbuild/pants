@@ -22,4 +22,3 @@ tests/python/pants_test/engine:selectors
 tests/python/pants_test/engine:test_round_engine
 tests/python/pants_test/goal:artifact_cache_stats
 tests/python/pants_test/goal:other
-tests/python/pants_test/help:build_dictionary_info_extracter
