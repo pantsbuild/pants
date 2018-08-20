@@ -10,6 +10,7 @@ target(
     ':node_run',
     ':node_test',
     ':javascript_style',
+    ':node_install',
   ]
 )
 

@@ -50,6 +50,5 @@ class NodeResolveLocal(NodeResolve):
           if not vt.valid:
             resolver_for_target_type = self._resolver_for_target(target).global_instance()
             results_dir = os.path.abspath(target.address.spec_path)
-            import pdb; pdb.set_trace()
             resolver_for_target_type.resolve_target(self, target, results_dir, node_paths, resolve_locally=True)
           node_paths.resolved(target, results_dir)
