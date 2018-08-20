@@ -17,6 +17,7 @@ class NodeResolveLocal(NodeResolve):
 
   @classmethod
   def product_types(cls):
+    # NodePathsLocal contain Node Paths that are local to the source target root.
     return [NodePathsLocal]
 
   @property
@@ -27,7 +28,7 @@ class NodeResolveLocal(NodeResolve):
   def artifact_cache_reads_enabled(self):
     # Artifact caching is not necessary for local installation.
     # Just depend on the local cache provided by the package manager.
-    return self._cache_factory.read_cache_available()
+    return False
 
   def execute(self):
     targets = self.context.targets(predicate=self._can_resolve_target)
