@@ -19,6 +19,9 @@ New features
 Bugfixes
 ~~~~~~~~
 
+* Fix Single Address Exclude (#6366)
+  `PR #6366 <https://github.com/pantsbuild/pants/pull/6366>`_
+
 * Add an environment marker to `pants_requirement`. (#6361)
   `PR #6361 <https://github.com/pantsbuild/pants/pull/6361>`_
 
