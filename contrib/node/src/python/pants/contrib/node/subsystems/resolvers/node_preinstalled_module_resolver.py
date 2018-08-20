@@ -33,7 +33,8 @@ class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
     NodeResolveLocal.register_resolver_for_type(NodePreinstalledModule, cls)
 
   def resolve_target(self, node_task, target, results_dir, node_paths, resolve_locally=False):
-    self._copy_sources(target, results_dir)
+    if not resolve_locally:
+      self._copy_sources(target, results_dir)
 
     with temporary_dir() as temp_dir:
       archive_file_name = urllib_parse.urlsplit(target.dependencies_archive_url).path.split('/')[-1]
