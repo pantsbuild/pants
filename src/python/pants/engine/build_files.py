@@ -235,13 +235,17 @@ def addresses_from_address_families(address_mapper, specs):
   include_target = wrap_filters(create_filters(specs.tags if specs.tags else '', filter_for_tag))
 
   addresses = []
+  addresses_to_exclude = []
   included = set()
   def include(address_families, predicate=None):
     matched = False
     for af in address_families:
       for (a, t) in af.addressables.items():
         if (predicate is None or predicate(a)):
-          if include_target(t) and (not exclude_address(a.spec)):
+          should_exclude_address = exclude_address(a.spec)
+          if should_exclude_address:
+            addresses_to_exclude.append(a)
+          if include_target(t) and (not should_exclude_address):
             matched = True
             if a not in included:
               addresses.append(a)
@@ -270,7 +274,7 @@ def addresses_from_address_families(address_mapper, specs):
       # spec.name here is generally the root node specified on commandline. equality here implies
       # a root node i.e. node specified on commandline.
       if not include([address_family], predicate=lambda a: a.target_name == spec.name):
-        if len(addresses) == 0:
+        if len(addresses) == 0 and len(addresses_to_exclude) == 0:
           _raise_did_you_mean(address_family, spec.name)
     elif type(spec) is AscendantAddresses:
       include(
