@@ -47,7 +47,7 @@ def register_goals():
 
   task(name='node', action=NodeRepl).install('repl')
   task(name='node', action=NodeResolve).install('resolve')
-  task(name='node-install', action=NodeResolveLocal).install('resolve')
+  task(name='node', action=NodeResolveLocal).install('node-resolve-local')
   task(name='node', action=NodeRun).install('run')
   task(name='node', action=NodeBuild).install('compile', first=True)
   task(name='node', action=NodeTestTask).install('test')
