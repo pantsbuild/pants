@@ -411,7 +411,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
         stdout, _ = java_run.communicate()
       java_returncode = java_run.returncode
       self.assertEqual(java_returncode, 0)
-      return stdout
+      return stdout.decode('utf-8')
 
   def assert_success(self, pants_run, msg=None):
     self.assert_result(pants_run, self.PANTS_SUCCESS_CODE, expected=True, msg=msg)

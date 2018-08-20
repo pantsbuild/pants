@@ -30,8 +30,8 @@ class BootstrapJvmToolsTestBase(JvmToolTaskTestBase):
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = process.communicate()
     self.assertEqual(0, process.returncode)
-    self.assertEqual('', err.strip())
-    yield out
+    self.assertEqual('', err.strip().decode('utf-8'))
+    yield out.decode('utf-8')
 
 
 class BootstrapJvmToolsShadingTest(BootstrapJvmToolsTestBase):

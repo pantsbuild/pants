@@ -41,7 +41,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       # Check that the pex was built.
       self.assertTrue(os.path.isfile(pex))
       # Check that the pex runs.
-      output = subprocess.check_output(pex)
+      output = subprocess.check_output(pex).decode('utf-8')
       self._assert_native_greeting(output)
       # Check that we have exact one wheel output
       self.assertEqual(len(glob.glob(wheel_glob)), 1)
@@ -141,11 +141,11 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(os.path.isfile(pex1))
       self.assertTrue(os.path.isfile(pex2))
       # Check that the pex 1 runs.
-      output = subprocess.check_output(pex1)
+      output = subprocess.check_output(pex1).decode('utf-8')
       self._assert_native_greeting(output)
       # Check that the pex 2 fails due to no python_dists leaked into it.
       try:
-        output = subprocess.check_output(pex2)
+        subprocess.check_output(pex2)
       except subprocess.CalledProcessError as e:
         self.assertNotEqual(0, e.returncode)
 
@@ -172,7 +172,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       # Check that the pex was built.
       self.assertTrue(os.path.isfile(pex))
       # Check that the pex runs.
-      output = subprocess.check_output(pex)
+      output = subprocess.check_output(pex).decode('utf-8')
       self._assert_native_greeting(output)
 
   def _get_current_platform_string(self):
@@ -229,7 +229,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       # Check that the pex was built.
       self.assertTrue(os.path.isfile(pex))
       # Check that the pex runs.
-      output = subprocess.check_output(pex)
+      output = subprocess.check_output(pex).decode('utf-8')
       self.assertIn('Hello, world!', output)
     finally:
       if os.path.exists(pex):
