@@ -4,6 +4,81 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.10.0.dev3 (08/20/2018)
+------------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add contrib dist support to pants_requirement. (#6365)
+  `PR #6365 <https://github.com/pantsbuild/pants/pull/6365>`_
+
+* Allow pex download path to be overridden (#6348)
+  `PR #6348 <https://github.com/pantsbuild/pants/pull/6348>`_
+
+Bugfixes
+~~~~~~~~
+
+* Add an environment marker to `pants_requirement`. (#6361)
+  `PR #6361 <https://github.com/pantsbuild/pants/pull/6361>`_
+
+* Make requirements on codegen products optional. (#6357)
+  `PR #6357 <https://github.com/pantsbuild/pants/pull/6357>`_
+
+* Use --entry-point not -c when building pex (#6349)
+  `PR #6349 <https://github.com/pantsbuild/pants/pull/6349>`_
+  `PR #6267 <https://github.com/pantsbuild/pants/pull/6267>`_
+
+* Recover from cancelled remote execution RPCs (#6188)
+  `PR #6188 <https://github.com/pantsbuild/pants/pull/6188>`_
+
+* Use forked version of grpcio (#6344)
+  `PR #6344 <https://github.com/pantsbuild/pants/pull/6344>`_
+  `PR #211 <https://github.com/pingcap/grpc-rs/pull/211>`_
+
+* added fullpath to fix path concat issue with files when not in git root (#6331)
+  `PR #6331 <https://github.com/pantsbuild/pants/pull/6331>`_
+
+* Log test targets that failed to run. (#6335)
+  `PR #6335 <https://github.com/pantsbuild/pants/pull/6335>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Run clippy with nightly rust on CI (#6347)
+  `PR #6347 <https://github.com/pantsbuild/pants/pull/6347>`_
+
+* Fix formatting of store.rs (#6350)
+  `PR #6350 <https://github.com/pantsbuild/pants/pull/6350>`_
+  `PR #6336 <https://github.com/pantsbuild/pants/pull/6336>`_
+
+* Download Directory recursively from remote CAS  (#6336)
+  `PR #6336 <https://github.com/pantsbuild/pants/pull/6336>`_
+
+* Process execution: Create symlink to JDK on demand (#6346)
+  `PR #6346 <https://github.com/pantsbuild/pants/pull/6346>`_
+
+* Simplify ExecuteProcessRequest construction (#6345)
+  `PR #6345 <https://github.com/pantsbuild/pants/pull/6345>`_
+
+* ci.sh uses positive rather than negative flags (#6342)
+  `PR #6342 <https://github.com/pantsbuild/pants/pull/6342>`_
+
+* Merge directories with identical files (#6343)
+  `PR #6343 <https://github.com/pantsbuild/pants/pull/6343>`_
+
+* Set chunk size in process_executor (#6337)
+  `PR #6337 <https://github.com/pantsbuild/pants/pull/6337>`_
+
+Migration to Python3 compatibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Python 3 - fixes to get backend mostly green (#6360)
+  `PR #6360 <https://github.com/pantsbuild/pants/pull/6360>`_
+
+* Python 3 - fixes to get green contrib (#6340)
+  `PR #6340 <https://github.com/pantsbuild/pants/pull/6340>`_
+
 1.10.0.dev2 (08/10/2018)
 ------------------------
 
