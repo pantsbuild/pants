@@ -44,9 +44,10 @@ def register_goals():
   Goal.register('node-install', 'Installs a node_module target.')
 
   # Register tasks.
-
   task(name='node', action=NodeRepl).install('repl')
   task(name='node', action=NodeResolve).install('resolve')
+  # Because of execution order, resolve.node is always executed before node-resolve-local
+  # This means that installation occurs twice, once in the working dir and again in the local dir
   task(name='node', action=NodeResolveLocal).install('node-resolve-local')
   task(name='node', action=NodeRun).install('run')
   task(name='node', action=NodeBuild).install('compile', first=True)
