@@ -233,10 +233,14 @@ class BinaryUtilTest(TestBase):
       "name=name, platform_dependent=True, external_url_generator=None, archiver=None): "
       "Pants could not resolve binaries for the current host: platform 'vms' was not recognized. "
       "Recognized platforms are: ")
-    expected_msg = expected_msg_prefix + ("dict_keys(['darwin', 'linux'])."
-                                          if PY3 else
-                                          "[u'darwin', u'linux'].")
-    self.assertIn(expected_msg, the_raised_exception_message)
+    if PY3:
+      try:
+        self.assertIn(expected_msg_prefix + "dict_keys(['darwin', 'linux']).", the_raised_exception_message)
+      except AssertionError:
+        # Py3.4 - 3.5 is non-deterministic in ordering of dict_keys
+        self.assertIn(expected_msg_prefix + "dict_keys(['linux', 'darwin']).", the_raised_exception_message)
+    else:
+      self.assertIn(expected_msg_prefix + "[u'darwin', u'linux'].", the_raised_exception_message)
 
   def test_select_binary_base_path_missing_version(self):
     def uname_func():
