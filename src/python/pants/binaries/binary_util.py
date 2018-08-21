@@ -311,8 +311,8 @@ class BinaryUtil(object):
     self._uname_func = uname_func or os.uname
 
   _ID_BY_OS = {
-    'linux': lambda release, machine: ('linux', machine),
     'darwin': lambda release, machine: ('darwin', release.split('.')[0]),
+    'linux': lambda release, machine: ('linux', machine),
   }
 
   # FIXME(cosmicexplorer): we create a HostPlatform in this class instead of in the constructor
