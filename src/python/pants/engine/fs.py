@@ -63,8 +63,7 @@ class PathGlobs(datatype([
     return PathGlobs(
       include=self.include,
       exclude=self.exclude,
-      glob_match_error_behavior=glob_match_error_behavior,
-    )
+      glob_match_error_behavior=glob_match_error_behavior)
 
 
 class PathGlobsAndRoot(datatype([('path_globs', PathGlobs), ('root', text_type)])):
