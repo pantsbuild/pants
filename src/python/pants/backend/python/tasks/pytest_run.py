@@ -296,7 +296,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
           return packages()
 
-      coverage_morfs = set(itertools.chain(*[compute_coverage_pkgs(t) for t in test_targets]))
+      coverage_morfs = {itertools.chain(*[compute_coverage_pkgs(t) for t in test_targets])}
     else:
       coverage_morfs = []
       for morf in coverage.split(','):

@@ -94,7 +94,7 @@ class Duplicate(JarRule):
   encountered.
   """
 
-  _VALID_ACTIONS = frozenset((SKIP, REPLACE, CONCAT, CONCAT_TEXT, FAIL))
+  _VALID_ACTIONS = frozenset({SKIP, REPLACE, CONCAT, CONCAT_TEXT, FAIL})
 
   @classmethod
   def validate_action(cls, action):

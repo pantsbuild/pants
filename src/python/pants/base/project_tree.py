@@ -175,7 +175,7 @@ class ProjectTree(AbstractClass):
     selector = selector or (lambda x: x)
     prefixed_entries = [(self._append_slash_if_dir_path(selector(entry)), entry)
                           for entry in entries]
-    ignored_paths = set(self.ignore.match_files(path for path, _ in prefixed_entries))
+    ignored_paths = {self.ignore.match_files(path for path, _ in prefixed_entries)}
     return [entry for path, entry in prefixed_entries if path not in ignored_paths]
 
   def _relpath_no_dot(self, relpath):

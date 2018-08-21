@@ -67,7 +67,7 @@ class OffByOneList(Sequence):
 
 class PythonFile(object):
   """Checkstyle wrapper for Python source files."""
-  SKIP_TOKENS = frozenset((tokenize.COMMENT, tokenize.NL, tokenize.DEDENT))
+  SKIP_TOKENS = frozenset({tokenize.COMMENT, tokenize.NL, tokenize.DEDENT})
 
   @classmethod
   def _parse(cls, blob, filename):

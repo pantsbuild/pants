@@ -74,7 +74,7 @@ class ResolveRequirementsTest(TaskTestBase):
       parts = os.path.splitext(whl)[0].split('-')
       return '{}-{}'.format(parts[0], parts[1]), parts[-1]
 
-    names_and_platforms = set(name_and_platform(w) for w in wheels)
+    names_and_platforms = {name_and_platform(w) for w in wheels}
     expected_name_and_platforms = {
       # Note that we don't check for 'current' because if there's no published wheel for the
       # current platform we may end up with a wheel for a compatible platform (e.g., if there's no

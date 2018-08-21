@@ -116,9 +116,9 @@ class GoFetchTest(TaskTestBase):
     if root_target.name not in dep_map:
       return
 
-    expected_spec_paths = set('3rdparty/go/localzip/{}'.format(name)
-                              for name in dep_map[root_target.name])
-    actual_spec_paths = set(dep.address.spec_path for dep in root_target.dependencies)
+    expected_spec_paths = {'3rdparty/go/localzip/{}'.format(name)
+                           for name in dep_map[root_target.name]}
+    actual_spec_paths = {dep.address.spec_path for dep in root_target.dependencies}
     self.assertEqual(actual_spec_paths, expected_spec_paths)
 
     dep_map = dep_map.copy()

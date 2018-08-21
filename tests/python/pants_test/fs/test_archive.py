@@ -42,7 +42,7 @@ class ArchiveTest(unittest.TestCase):
             archiver.extract(archive, todir, concurrency_safe=concurrency_safe)
             fromlisting = self._listtree(fromdir, empty_dirs)
             if prefix:
-              fromlisting = set(os.path.join(prefix, x) for x in fromlisting)
+              fromlisting = {os.path.join(prefix, x) for x in fromlisting}
               if empty_dirs:
                 fromlisting.add(prefix)
             self.assertEqual(fromlisting, self._listtree(todir, empty_dirs))

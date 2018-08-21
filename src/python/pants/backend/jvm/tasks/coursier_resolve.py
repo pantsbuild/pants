@@ -77,7 +77,7 @@ class CoursierMixin(NailgunTask):
     if artifact_set is None:
       artifact_set = PinnedJarArtifactSet()
 
-    untouched_pinned_artifact = set(M2Coordinate.create(x) for x in artifact_set)
+    untouched_pinned_artifact = {M2Coordinate.create(x) for x in artifact_set}
     jar_list = list(raw_jars)
     for i, dep in enumerate(jar_list):
       direct_coord = M2Coordinate.create(dep)

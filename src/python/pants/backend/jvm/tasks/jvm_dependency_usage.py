@@ -233,7 +233,7 @@ class JvmDependencyUsage(Task):
                             targets_by_file,
                             transitive_deps):
     declared_deps_with_aliases = set(analyzer.resolve_aliases(target))
-    eligible_unused_deps = set(d for d, _ in analyzer.resolve_aliases(target, scope=Scopes.DEFAULT))
+    eligible_unused_deps = {d for d, _ in analyzer.resolve_aliases(target, scope=Scopes.DEFAULT)}
     concrete_target = target.concrete_derived_from
     declared_deps = [resolved for resolved, _ in declared_deps_with_aliases]
     products_total = analyzer.count_products(target)
