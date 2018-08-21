@@ -14,7 +14,6 @@ from builtins import map, object, str, zip
 from collections import OrderedDict, defaultdict
 
 from future.utils import PY2, PY3
-from pex.compatibility import string, to_bytes
 from pex.executor import Executor
 from pex.installer import InstallerBase, Packager
 from pex.interpreter import PythonInterpreter
@@ -52,18 +51,6 @@ setup(**
 
 
 class SetupPyRunner(InstallerBase):
-  # FIXME: this doesn't seem to work at all! We still fail with "Could not open - in the
-  # environment"!
-  @memoized_property
-  def SETUP_BOOTSTRAP_FOOTER(self):
-    interpreter_path = self._interpreter.binary
-    return """
-__file__ = 'setup.py'
-if len(sys.argv) >= 2 and sys.argv[1] == '-':
-  sys.argv[1] = 'setup.py'
-exec(compile(open(__file__, 'rb').read(), __file__, 'exec'))
-"""
-
   _EXTRAS = ('setuptools', 'wheel')
 
   # `interpreter` is one of the kwargs often passed to this constructor.
@@ -89,6 +76,31 @@ exec(compile(open(__file__, 'rb').read(), __file__, 'exec'))
 
   def _setup_command(self):
     return self.__setup_command
+
+  class SetupPyError(TaskError): pass
+
+  def run(self):
+    if self._installed is not None:
+      return self._installed
+
+    with TRACER.timed('Installing {}'.format(self._install_tmp), V=2):
+      command = [self._interpreter.binary, 'setup.py'] + self._setup_command()
+      try:
+        Executor.execute(command,
+                         env=self._interpreter.sanitized_environment(),
+                         cwd=self._source_dir,
+                         stdin_payload=self.bootstrap_script.encode('ascii'))
+        self._installed = True
+      except Executor.NonZeroExit as e:
+        self._installed = False
+        name = os.path.basename(self._source_dir)
+        raise self.SetupPyError(
+          "**** Failed to install {} (caused by: {!r}\n):\n"
+          "stdout:\n{}\nstderr:\n{}\n"
+          .format(name, e, e.stdout, e.stderr))
+
+    self._postprocess()
+    return self._installed
 
 
 class TargetAncestorIterator(object):
