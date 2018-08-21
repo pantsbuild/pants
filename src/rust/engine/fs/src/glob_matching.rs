@@ -322,7 +322,8 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
           } else {
             // TODO(#5683): this doesn't have any useful context (the stack trace) without
             // being thrown -- this needs to be provided, otherwise this is unusable.
-            // TODO: explain why warn!() here doesn't work!
+            // NB: warn!() is blocked when using a console task e.g. list, so we print
+            // unconditionally to stderr here.
             eprintln!("WARN] {}", msg);
           }
         }

@@ -27,8 +27,6 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
   }
 
   _WARN_FMT = """WARN] Globs did not match. Excludes were: {excludes}. Unmatched globs were: {unmatched}.\n\n"""
-  # _WARN_FMT = "WARN] In target {base}:{name} with {desc}={glob}: glob pattern '{as_zsh_glob}' did
-  # not match any files."
 
   _BUNDLE_ERR_MSGS = [
     ['*.aaaa'],

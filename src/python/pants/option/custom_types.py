@@ -309,4 +309,6 @@ class DictValueComponent(object):
     return '{} {}'.format(self.action, self.val)
 
 
-class Conjunction(enum('conjunction', ['or', 'and'])): pass
+class Conjunction(enum('conjunction', ['or', 'and'])):
+
+  default_option_value = 'or'
