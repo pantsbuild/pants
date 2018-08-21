@@ -8,7 +8,7 @@ from future.utils import binary_type, text_type
 
 from pants.base.project_tree import Dir, File
 from pants.engine.rules import RootRule
-from pants.option.custom_types import Conjunction
+from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.objects import Collection, datatype
 
@@ -34,7 +34,7 @@ class PathGlobs(datatype([
     'include',
     'exclude',
     ('glob_match_error_behavior', GlobMatchErrorBehavior),
-    ('conjunction', Conjunction),
+    ('conjunction', GlobExpansionConjunction),
 ])):
   """A wrapper around sets of filespecs to include and exclude.
 
@@ -57,13 +57,7 @@ class PathGlobs(datatype([
       include=tuple(include),
       exclude=tuple(exclude),
       glob_match_error_behavior=GlobMatchErrorBehavior.create(glob_match_error_behavior),
-      conjunction=Conjunction.create(conjunction))
-
-  def with_match_error_behavior(self, glob_match_error_behavior):
-    return PathGlobs(
-      include=self.include,
-      exclude=self.exclude,
-      glob_match_error_behavior=glob_match_error_behavior)
+      conjunction=GlobExpansionConjunction.create(conjunction))
 
 
 class PathGlobsAndRoot(datatype([('path_globs', PathGlobs), ('root', text_type)])):

@@ -12,8 +12,8 @@ use glob::Pattern;
 use indexmap::{map::Entry::Occupied, IndexMap, IndexSet};
 
 use {
-  Conjunction, Dir, GitignoreStyleExcludes, GlobParsedSource, GlobSource, GlobWithSource, Link,
-  PathGlob, PathGlobs, PathStat, Stat, VFS,
+  Dir, GitignoreStyleExcludes, GlobExpansionConjunction, GlobParsedSource, GlobSource,
+  GlobWithSource, Link, PathGlob, PathGlobs, PathStat, Stat, VFS,
 };
 
 pub trait GlobMatching<E: Send + Sync + 'static>: VFS<E> {
@@ -301,9 +301,9 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
 
         let match_failed = match conjunction {
           // All must match.
-          Conjunction::And => !non_matching_inputs.is_empty(),
+          GlobExpansionConjunction::AllMatch => !non_matching_inputs.is_empty(),
           // Only one needs to match.
-          Conjunction::Or => &include.len() <= &non_matching_inputs.len(),
+          GlobExpansionConjunction::AnyMatch => &include.len() <= &non_matching_inputs.len(),
         };
 
         if match_failed {

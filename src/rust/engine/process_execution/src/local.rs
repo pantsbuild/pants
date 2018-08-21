@@ -3,7 +3,8 @@ extern crate tempfile;
 
 use boxfuture::{BoxFuture, Boxable};
 use fs::{
-  self, Conjunction, GlobMatching, PathGlobs, PathStatGetter, Snapshot, StrictGlobMatching,
+  self, GlobExpansionConjunction, GlobMatching, PathGlobs, PathStatGetter, Snapshot,
+  StrictGlobMatching,
 };
 use futures::{future, Future, Stream};
 use std::collections::BTreeSet;
@@ -64,7 +65,7 @@ impl CommandRunner {
         &try_future!(output_dirs_glob_strings),
         &[],
         StrictGlobMatching::Ignore,
-        Conjunction::And,
+        GlobExpansionConjunction::AllMatch,
       )))
       .map_err(|e| format!("Error stating output dirs: {}", e));
 

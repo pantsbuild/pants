@@ -443,16 +443,16 @@ impl StrictGlobMatching {
 }
 
 #[derive(Debug)]
-pub enum Conjunction {
-  And,
-  Or,
+pub enum GlobExpansionConjunction {
+  AllMatch,
+  AnyMatch,
 }
 
-impl Conjunction {
+impl GlobExpansionConjunction {
   pub fn create(spec: &str) -> Result<Self, String> {
     match spec {
-      "and" => Ok(Conjunction::And),
-      "or" => Ok(Conjunction::Or),
+      "all_match" => Ok(GlobExpansionConjunction::AllMatch),
+      "any_match" => Ok(GlobExpansionConjunction::AnyMatch),
       _ => Err(format!("Unrecognized conjunction: {}.", spec)),
     }
   }
@@ -463,7 +463,7 @@ pub struct PathGlobs {
   include: Vec<PathGlobIncludeEntry>,
   exclude: Arc<GitignoreStyleExcludes>,
   strict_match_behavior: StrictGlobMatching,
-  conjunction: Conjunction,
+  conjunction: GlobExpansionConjunction,
 }
 
 impl PathGlobs {
@@ -471,7 +471,7 @@ impl PathGlobs {
     include: &[String],
     exclude: &[String],
     strict_match_behavior: StrictGlobMatching,
-    conjunction: Conjunction,
+    conjunction: GlobExpansionConjunction,
   ) -> Result<PathGlobs, String> {
     let include = PathGlob::spread_filespecs(include)?;
     Self::create_with_globs_and_match_behavior(include, exclude, strict_match_behavior, conjunction)
@@ -481,7 +481,7 @@ impl PathGlobs {
     include: Vec<PathGlobIncludeEntry>,
     exclude: &[String],
     strict_match_behavior: StrictGlobMatching,
-    conjunction: Conjunction,
+    conjunction: GlobExpansionConjunction,
   ) -> Result<PathGlobs, String> {
     let gitignore_excludes = GitignoreStyleExcludes::create(exclude)?;
     Ok(PathGlobs {
@@ -505,7 +505,7 @@ impl PathGlobs {
       include,
       &[],
       StrictGlobMatching::Ignore,
-      Conjunction::And,
+      GlobExpansionConjunction::AllMatch,
     )
   }
 }

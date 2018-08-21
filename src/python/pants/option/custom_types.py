@@ -309,6 +309,9 @@ class DictValueComponent(object):
     return '{} {}'.format(self.action, self.val)
 
 
-class Conjunction(enum('conjunction', ['or', 'and'])):
+class GlobExpansionConjunction(enum('conjunction', ['any_match', 'all_match'])):
 
-  default_option_value = 'or'
+  # NB: The `default_value` is automatically the first element of the value list, but can be
+  # overridden or made more explicit in the body of the class. We want to be explicit here about
+  # which behavior we have when merging globs, as that can affect performance.
+  default_value = 'any_match'

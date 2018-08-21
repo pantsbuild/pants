@@ -13,8 +13,8 @@ use context::{Context, Core};
 use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
 use fs::{
-  self, Conjunction, Dir, DirectoryListing, File, FileContent, GlobMatching, Link, PathGlobs,
-  PathStat, StoreFileByDigest, StrictGlobMatching, VFS,
+  self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
+  PathGlobs, PathStat, StoreFileByDigest, StrictGlobMatching, VFS,
 };
 use hashing;
 use process_execution::{self, CommandRunner};
@@ -686,7 +686,7 @@ impl Snapshot {
 
     let conjunction_obj = externs::project_ignoring_type(item, "conjunction");
     let conjunction_string = externs::project_str(&conjunction_obj, "conjunction");
-    let conjunction = Conjunction::create(&conjunction_string)?;
+    let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
 
     PathGlobs::create(&include, &exclude, strict_glob_matching, conjunction).map_err(|e| {
       format!(
