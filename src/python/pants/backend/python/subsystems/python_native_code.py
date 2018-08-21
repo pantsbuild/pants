@@ -14,10 +14,11 @@ from pants.backend.native.config.environment import CppToolchain, CToolchain, Pl
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.subsystems.xcode_cli_tools import MIN_OSX_VERSION_ARG
 from pants.backend.native.targets.native_library import NativeLibrary
+from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
-from pants.backend.python.tasks.pex_build_util import resolve_multi
+from pants.backend.python.tasks.pex_build_util import PexBuildUtil
 from pants.base.exceptions import IncompatiblePlatformsError
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -47,6 +48,7 @@ class PythonNativeCode(Subsystem):
     return super(PythonNativeCode, cls).subsystem_dependencies() + (
       NativeToolchain.scoped(cls),
       PythonSetup.scoped(cls),
+      PythonRepos,
     )
 
   @memoized_property
@@ -159,7 +161,8 @@ def ensure_setup_requires_site_dir(reqs_to_resolve, interpreter, site_dir,
   if not reqs_to_resolve:
     return None
 
-  setup_requires_dists = resolve_multi(interpreter, reqs_to_resolve, platforms, None)
+  pex_build_util = PexBuildUtil(PythonRepos.global_instance(), PythonSetup.global_instance())
+  setup_requires_dists = pex_build_util.resolve_multi(interpreter, reqs_to_resolve, platforms, None)
 
   # FIXME: there's no description of what this does or why it's necessary.
   overrides = {

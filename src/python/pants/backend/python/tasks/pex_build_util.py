@@ -21,6 +21,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
 
@@ -97,6 +98,8 @@ def dump_requirement_libs(builder, interpreter, req_libs, log, platforms=None):
   :param platforms: A list of :class:`Platform`s to resolve requirements for.
                     Defaults to the platforms specified by PythonSetup.
   """
+  deprecated('1.11.0.dev0',
+    'This function has been moved onto the PexBuildUtil class.')
   pex_build_util = PexBuildUtil(PythonRepos.global_instance(), PythonSetup.global_instance())
   pex_build_util.dump_requirement_libs(builder, interpreter, req_libs, log, platforms)
 
@@ -111,6 +114,8 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None):
   :param platforms: A list of :class:`Platform`s to resolve requirements for.
                     Defaults to the platforms specified by PythonSetup.
   """
+  deprecated('1.11.0.dev0',
+    'This function has been moved onto the PexBuildUtil class.')
   pex_build_util = PexBuildUtil(
     PythonRepos.global_instance(),
     PythonSetup.global_instance())
@@ -130,13 +135,17 @@ def resolve_multi(interpreter, requirements, platforms, find_links):
   :return: Map of platform name -> list of :class:`pkg_resources.Distribution` instances needed
            to satisfy the requirements on that platform.
   """
+  deprecated('1.11.0.dev0',
+    'This function has been moved onto the PexBuildUtil class.')
   python_setup = PythonSetup.global_instance()
   python_repos = PythonRepos.global_instance()
   pex_build_util = PexBuildUtil(python_repos, python_setup)
-  pex_build_util.resolve_multi(interpreter, requirements, platforms, find_links)
+  return pex_build_util.resolve_multi(interpreter, requirements, platforms, find_links)
 
 
 class PexBuildUtil(object):
+  """Encapsulates requirements resolution utilities."""
+
   def __init__(self, python_repos_subsystem, python_setup_subsystem):
     self._python_repos_subsystem = python_repos_subsystem
     self._python_setup_subsystem = python_setup_subsystem
