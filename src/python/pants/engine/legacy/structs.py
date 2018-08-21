@@ -234,7 +234,7 @@ class AppAdaptor(TargetAdaptor):
       # something set on the target. Should we move --glob-expansion-failure to be a bootstrap
       # option? See #5864.
       # FIXME: get the right value for `conjunction`!
-      path_globs = base_globs.to_path_globs(rel_root)
+      path_globs = base_globs.to_path_globs(rel_root, Conjunction('and'))
 
       filespecs_list.append(base_globs.filespecs)
       path_globs_list.append(path_globs)
@@ -263,7 +263,7 @@ class PythonTargetAdaptor(TargetAdaptor):
         return field_adaptors
       base_globs = BaseGlobs.from_sources_field(self.resources, self.address.spec_path)
       # FIXME: get the right value for `conjunction`!
-      path_globs = base_globs.to_path_globs(self.address.spec_path)
+      path_globs = base_globs.to_path_globs(self.address.spec_path, Conjunction('and'))
       sources_field = SourcesField(self.address,
                                    'resources',
                                    base_globs.filespecs,

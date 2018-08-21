@@ -322,7 +322,8 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
           } else {
             // TODO(#5683): this doesn't have any useful context (the stack trace) without
             // being thrown -- this needs to be provided, otherwise this is unusable.
-            warn!("{}", msg);
+            // TODO: explain why warn!() here doesn't work!
+            eprintln!("WARN] {}", msg);
           }
         }
       }
