@@ -54,8 +54,9 @@ class SetupPyRunner(InstallerBase):
   _EXTRAS = ('setuptools', 'wheel')
 
   # `interpreter` is one of the kwargs often passed to this constructor.
-  def __init__(self, source_dir, setup_command, **kw):
+  def __init__(self, source_dir, setup_command, explicit_setup_filename=None, **kw):
     self.__setup_command = setup_command
+    self.explicit_setup_filename = explicit_setup_filename
     super(SetupPyRunner, self).__init__(source_dir, **kw)
 
   def mixins(self):
@@ -84,7 +85,10 @@ class SetupPyRunner(InstallerBase):
       return self._installed
 
     with TRACER.timed('Installing {}'.format(self._install_tmp), V=2):
-      command = [self._interpreter.binary, 'setup.py'] + self._setup_command()
+      if self.explicit_setup_filename:
+        command = [self._interpreter.binary, self.explicit_setup_filename] + self._setup_command()
+      else:
+        command = [self._interpreter.binary, '-'] + self._setup_command()
       try:
         Executor.execute(command,
                          env=self._interpreter.sanitized_environment(),
