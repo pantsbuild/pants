@@ -67,6 +67,7 @@ class TargetAdaptor(StructWithDeps):
                       exclude=self.default_sources_exclude_globs or [])
         conjunction_globs = GlobsWithConjunction(globs, Conjunction('or'))
       else:
+        globs = None
         conjunction_globs = None
     else:
       globs = BaseGlobs.from_sources_field(sources, self.address.spec_path)
@@ -263,7 +264,7 @@ class PythonTargetAdaptor(TargetAdaptor):
         return field_adaptors
       base_globs = BaseGlobs.from_sources_field(self.resources, self.address.spec_path)
       # FIXME: get the right value for `conjunction`!
-      path_globs = base_globs.to_path_globs(self.address.spec_path, Conjunction('and'))
+      path_globs = base_globs.to_path_globs(self.address.spec_path)
       sources_field = SourcesField(self.address,
                                    'resources',
                                    base_globs.filespecs,

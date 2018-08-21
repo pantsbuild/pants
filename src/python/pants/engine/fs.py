@@ -8,8 +8,9 @@ from future.utils import binary_type, text_type
 
 from pants.base.project_tree import Dir, File
 from pants.engine.rules import RootRule
+from pants.option.custom_types import Conjunction
 from pants.option.global_options import GlobMatchErrorBehavior
-from pants.util.objects import Collection, datatype, enum
+from pants.util.objects import Collection, datatype
 
 
 class FileContent(datatype([('path', text_type), ('content', binary_type)])):
@@ -27,9 +28,6 @@ class Path(datatype([('path', text_type), 'stat'])):
 
   Both values are relative to the ProjectTree's buildroot.
   """
-
-
-class Conjunction(enum('conjunction', ['and', 'or'])): pass
 
 
 class PathGlobs(datatype([
@@ -65,7 +63,8 @@ class PathGlobs(datatype([
     return PathGlobs(
       include=self.include,
       exclude=self.exclude,
-      glob_match_error_behavior=glob_match_error_behavior)
+      glob_match_error_behavior=glob_match_error_behavior,
+    )
 
 
 class PathGlobsAndRoot(datatype([('path_globs', PathGlobs), ('root', text_type)])):

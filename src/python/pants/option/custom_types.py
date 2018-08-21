@@ -12,6 +12,7 @@ import six
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
 from pants.util.memo import memoized_method
+from pants.util.objects import enum
 from pants.util.strutil import ensure_text
 
 
@@ -306,3 +307,6 @@ class DictValueComponent(object):
 
   def __repr__(self):
     return '{} {}'.format(self.action, self.val)
+
+
+class Conjunction(enum('conjunction', ['or', 'and'])): pass
