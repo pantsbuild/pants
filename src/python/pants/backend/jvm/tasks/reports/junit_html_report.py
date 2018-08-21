@@ -101,7 +101,7 @@ class ReportTestSuite(object):
     self.failures = int(failures)
     self.skipped = int(skipped)
     self.time = float(time)
-    self.testcases = testcases
+    self.testcases = sorted(testcases)  # Ensures a consistent reporting order.
     self.file = file
 
   def __lt__(self, other):
@@ -236,7 +236,7 @@ class JUnitHtmlReport(JUnitHtmlReportInterface):
     root = ET.parse(xml_file).getroot()
 
     testcases = []
-    for testcase in sorted(root.iter('testcase'), key=lambda tc: tc.attrib['name']):
+    for testcase in root.iter('testcase'):
       failure = None
       for f in testcase.iter('failure'):
         failure = f.text
