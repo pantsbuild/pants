@@ -71,10 +71,12 @@ class BuildFileParserBasicsTest(BaseTestWithParser):
   def test_addressable_exceptions(self):
     self.add_to_build_file('b/BUILD', 'java_library(name="foo", "bad_arg")')
     build_file_b = self.create_buildfile('b/BUILD')
-    expected_msg = ('positional argument follows keyword argument'
-                    if PY3 else
-                    'non-keyword arg after keyword arg')
-    self.assert_parser_error(build_file_b, expected_msg)
+    try:
+      # Python 3.5+ message
+      self.assert_parser_error(build_file_b, 'positional argument follows keyword argument')
+    except AssertionError:
+      # Python 2.7-3.4 message
+      self.assert_parser_error(build_file_b, 'non-keyword arg after keyword arg')
 
     self.add_to_build_file('d/BUILD', dedent(
       """
