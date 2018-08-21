@@ -296,54 +296,33 @@ class JsonEncoderTest(unittest.TestCase):
 
     self.bob = Bob(name='bob', relative=resolvable_bill, friend=bill)
 
-  def _assert_self_bob_equals(self, expected_json_format_string, relative_json_value, is_inline):
-    expected_json = expected_json_format_string.format(name_json=self.NAME_JSON,
-                                                       relative_json=relative_json_value,
-                                                       friend_json=self.FRIEND_JSON,
-                                                       type_alias_json=self.TYPE_ALIAS_JSON).strip()
-    self.assertEqual(json.dumps(json.loads(expected_json)),
-                     parsers.encode_json(self.bob, inline=is_inline))
+  def _assert_valid_output(self, relative_json_value, is_inline):
+    expected = json.dumps(json.loads(dedent("""
+        {{
+          {name_json},
+          {relative_json},
+          {friend_json},
+          {type_alias_json}
+        }}
+        """.format(
+      name_json=self.NAME_JSON,
+      relative_json=relative_json_value,
+      friend_json=self.FRIEND_JSON,
+      type_alias_json=self.TYPE_ALIAS_JSON).strip()
+    ))).split('\n')
+    output = parsers.encode_json(self.bob, inline=is_inline).split('\n')
+    try:
+      self.assertEqual(expected, output)
+    except AssertionError:
+      # Python 3.3-3.5 have non-deterministic dictionary order, meaning the outputted json may vary in order.
+      self.assertEqual(set(expected), set(output))
 
   def test_shallow_encoding(self):
     opaque_relative_json = r'"relative": "::an opaque address::"'
-    try:
-      self._assert_self_bob_equals(dedent("""
-        {{
-          {name_json},
-          {relative_json},
-          {friend_json},
-          {type_alias_json}
-        }}
-        """), relative_json_value=opaque_relative_json, is_inline=False)
-    except AssertionError:
-      self._assert_self_bob_equals(dedent("""
-        {{
-          {name_json},
-          {type_alias_json},
-          {friend_json},
-          {relative_json}
-        }}
-        """), relative_json_value=opaque_relative_json, is_inline=False)
+    self._assert_valid_output(relative_json_value=opaque_relative_json, is_inline=False)
 
   def test_inlined_encoding(self):
-    try:
-      self._assert_self_bob_equals(dedent("""
-        {{
-          {name_json},
-          {relative_json},
-          {friend_json},
-          {type_alias_json}
-        }}
-        """), relative_json_value=self.RELATIVE_JSON, is_inline=True)
-    except AssertionError:
-      self._assert_self_bob_equals(dedent("""
-        {{
-          {name_json},
-          {type_alias_json},
-          {friend_json},
-          {relative_json}
-        }}
-        """), relative_json_value=self.RELATIVE_JSON, is_inline=True)
+    self._assert_valid_output(relative_json_value=self.RELATIVE_JSON, is_inline=True)
 
 
 class PythonAssignmentsParserTest(unittest.TestCase):
