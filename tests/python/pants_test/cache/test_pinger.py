@@ -4,8 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import unittest
-
 from future.moves.urllib.parse import urlparse
 from requests import RequestException
 
@@ -15,8 +13,6 @@ from pants_test.test_base import TestBase
 
 
 class TestPinger(TestBase):
-  # NB(gmalmquist): The tests in this file pass locally, but are decorated with expectedFailure
-  # because CI is usually too slow to run them before they timeout.
 
   resolution = 1
   fast_delay_seconds = 0
@@ -36,7 +32,6 @@ class TestPinger(TestBase):
     self.unreachable_netloc = 'http://localhost:{}'.format(unreachable.socket.getsockname()[1])
     self.https_external_netlock = 'https://github.com'
 
-  @unittest.expectedFailure
   def test_pinger_times_correct(self):
     test = Pinger(timeout=self.slow_timeout_seconds, tries=2)
     netlocs = [self.fast_netloc, self.slow_netloc, self.unreachable_netloc]
@@ -45,7 +40,6 @@ class TestPinger(TestBase):
     self.assertLess(ping_results[self.fast_netloc], ping_results[self.slow_netloc])
     self.assertEqual(ping_results[self.unreachable_netloc], Pinger.UNREACHABLE, msg=self.message)
 
-  @unittest.expectedFailure
   def test_pinger_timeout_config(self):
     test = Pinger(timeout=self.fast_timeout_seconds, tries=2)
     netlocs = [self.fast_netloc, self.slow_netloc]
@@ -54,7 +48,6 @@ class TestPinger(TestBase):
     self.assertEqual(
       ping_results[self.slow_netloc], Pinger.UNREACHABLE, msg=self.message)
 
-  @unittest.expectedFailure
   def test_global_pinger_memo(self):
     fast_pinger = Pinger(timeout=self.fast_timeout_seconds, tries=2)
     slow_pinger = Pinger(timeout=self.slow_timeout_seconds, tries=2)
@@ -63,7 +56,6 @@ class TestPinger(TestBase):
     self.assertNotEqual(
       slow_pinger.pings([self.slow_netloc])[0][1], Pinger.UNREACHABLE, msg=self.message)
 
-  @unittest.expectedFailure
   def test_https_external_pinger(self):
     # NB(gmalmquist): I spent quite some time trying to spin up an HTTPS server and get it to work
     # with this test, but it appears to be more trouble than it's worth. If you're feeling
