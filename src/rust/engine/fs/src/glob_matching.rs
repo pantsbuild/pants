@@ -324,7 +324,7 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
             // being thrown -- this needs to be provided, otherwise this is unusable.
             // NB: warn!() is blocked when using a console task e.g. list, so we print
             // unconditionally to stderr here.
-            eprintln!("WARN] {}", msg);
+            warn!("{}", msg);
           }
         }
       }
