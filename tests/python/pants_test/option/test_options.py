@@ -13,6 +13,8 @@ from builtins import open, str
 from contextlib import contextmanager
 from textwrap import dedent
 
+from future.utils import text_type
+
 from pants.base.deprecated import CodeRemovedError
 from pants.engine.fs import FileContent
 from pants.option.arg_splitter import GLOBAL_SCOPE
@@ -819,8 +821,8 @@ class OptionsTest(unittest.TestCase):
     single_warning = assert_single_element(w)
     self.assertEqual(single_warning.category, DeprecationWarning)
     warning_message = single_warning.message
-    self.assertIn("will be removed in version", warning_message)
-    self.assertIn(option_string, warning_message)
+    self.assertIn("will be removed in version", text_type(warning_message))
+    self.assertIn(option_string, text_type(warning_message))
 
   def test_arbitrary_deprecation_matcher(self):
     def _matcher(_scope, flags, _values):
