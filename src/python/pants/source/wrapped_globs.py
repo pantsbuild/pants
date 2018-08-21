@@ -147,7 +147,7 @@ class LazyFilesetWithSpec(FilesetWithSpec):
 
 
 class FilesetRelPathWrapper(AbstractClass):
-  KNOWN_PARAMETERS = frozenset(['exclude', 'follow_links'])
+  KNOWN_PARAMETERS = frozenset({'exclude', 'follow_links'})
 
   @abstractproperty
   def wrapped_fn(cls):

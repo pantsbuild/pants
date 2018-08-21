@@ -46,7 +46,7 @@ class FileDeps(ConsoleTask):
     output_globs = self.get_options().globs
 
     # Filter out any synthetic targets, which will not have a build_file attr.
-    concrete_targets = set([target for target in concrete_targets if not target.is_synthetic])
+    concrete_targets = {target for target in concrete_targets if not target.is_synthetic}
     for target in concrete_targets:
       files.add(self._full_path(target.address.rel_path))
       if output_globs or target.has_sources():

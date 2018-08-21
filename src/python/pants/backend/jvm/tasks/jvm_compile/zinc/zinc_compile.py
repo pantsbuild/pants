@@ -466,7 +466,7 @@ class BaseZincCompile(JvmCompile):
     since SBT doesn't support plugins with dependencies anyway).
     """
     # Allow multiple flags and also comma-separated values in a single flag.
-    plugin_names = set([p for val in scalac_plugins for p in val.split(',')])
+    plugin_names = {p for val in scalac_plugins for p in val.split(',')}
     if not plugin_names:
       return {}
 
