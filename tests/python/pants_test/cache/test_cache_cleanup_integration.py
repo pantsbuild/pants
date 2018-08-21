@@ -149,15 +149,15 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       # <workdir>/compile/zinc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/
       target_dir_in_pantsd = os.path.dirname(os.path.dirname(jar_path_in_pantsd))
 
-      old_cache_dirnames = set([
+      old_cache_dirnames = {
         'old_cache_test1_dir/',
         'old_cache_test2_dir/',
         'old_cache_test3_dir/',
-      ])
-      new_cache_dirnames = set([
+      }
+      new_cache_dirnames = {
         'old_cache_test4_dir/',
         'old_cache_test5_dir/',
-      ])
+      }
       old_cache_entries = {os.path.join(target_dir_in_pantsd, subdir) for subdir in old_cache_dirnames}
       new_cache_entries = {os.path.join(target_dir_in_pantsd, subdir) for subdir in new_cache_dirnames}
       for old_entry in old_cache_entries:
@@ -166,7 +166,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       time.sleep(1.1)
       for new_entry in new_cache_entries:
         safe_mkdir(new_entry)
-      expected_dirs = set([os.path.join(target_dir_in_pantsd, 'current/')]) | old_cache_entries | new_cache_entries
+      expected_dirs = {os.path.join(target_dir_in_pantsd, 'current/')} | old_cache_entries | new_cache_entries
 
       # stable symlink, current version directory, and synthetically created directories.
       remaining_cache_dir_fingerprinted = self.get_cache_subdir(target_dir_in_pantsd, other_dirs=expected_dirs)

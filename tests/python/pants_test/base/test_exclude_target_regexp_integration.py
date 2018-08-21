@@ -142,5 +142,5 @@ class ExcludeTargetRegexpIntegrationTest(PantsRunIntegrationTest):
           '{}:{}'.format(Bundles.phrase_path, Bundles.there_was_a_duck.spec),
           '--exclude-target-regexp={}:{}'.format(Bundles.phrase_path, Bundles.trusty_companion),
         ],
-        set([Bundles.there_was_a_duck]),
+        {Bundles.there_was_a_duck},
     )
