@@ -142,7 +142,12 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None, sta
         msg, DeprecationWarning, filename, line_number, line=context_lines)
       print(warning_msg, file=sys.stderr)
     else:
-      warnings.showwarning(msg, DeprecationWarning, filename, line_number, line=context_lines)
+      warnings.showwarning(
+        DeprecationWarning(msg),
+        DeprecationWarning,
+        filename,
+        line_number,
+        line=context_lines)
   else:
     raise CodeRemovedError(msg)
 
