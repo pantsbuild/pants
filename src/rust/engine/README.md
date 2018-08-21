@@ -33,7 +33,7 @@ You should now be able to compile and run Rust code and tests using IntelliJ.
 
 ## Building fs_util
 
-`fs_util` is a utility that enables you to interact with snapshots from the commandline. You can use it to help debug issues with snapshoted files.
+`fs_util` is a utility that enables you to interact with snapshots from the commandline. You can use it to help debug issues with snapshotted files.
 
 To build it run the following from root of the pants repository.
 
