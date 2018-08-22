@@ -1,4 +1,3 @@
-tests/python/pants_test/backend/codegen/thrift/java:java
 tests/python/pants_test/backend/codegen/thrift/python:python
 tests/python/pants_test/backend/jvm/tasks:jar_publish
 tests/python/pants_test/backend/jvm/tasks:junit_run
