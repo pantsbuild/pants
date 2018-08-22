@@ -3,7 +3,6 @@ tests/python/pants_test/backend/codegen/thrift/python:python
 tests/python/pants_test/backend/jvm/tasks:coursier_resolve
 tests/python/pants_test/backend/jvm/tasks:jar_publish
 tests/python/pants_test/backend/jvm/tasks:junit_run
-tests/python/pants_test/backend/jvm/tasks:resources_task
 tests/python/pants_test/backend/python/tasks:tasks
 tests/python/pants_test/backend/python:pants_requirement
 tests/python/pants_test/cache:pinger
