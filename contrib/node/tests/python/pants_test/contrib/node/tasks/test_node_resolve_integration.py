@@ -26,3 +26,15 @@ class NodeResolveIntegrationTest(PantsRunIntegrationTest):
                'contrib/node/examples/src/node/preinstalled-project:unit']
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
+
+  def test_resolve_with_prepublish_local(self):
+    command = ['node-resolve-local',
+               'contrib/node/examples/src/node/server-project']
+    pants_run = self.run_pants(command=command)
+    self.assert_success(pants_run)
+
+  def test_resolve_preinstalled_node_module_project_local(self):
+    command = ['node-resolve-local',
+               'contrib/node/examples/src/node/preinstalled-project:unit']
+    pants_run = self.run_pants(command=command)
+    self.assert_success(pants_run)

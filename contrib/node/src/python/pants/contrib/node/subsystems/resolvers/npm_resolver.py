@@ -31,10 +31,36 @@ class NpmResolver(Subsystem, NodeResolverBase):
     register(
       '--install-optional', type=bool, default=False, fingerprint=True,
       help='If enabled, install optional dependencies.')
+    register(
+      '--production-only', type=bool, default=False, fingerprint=True,
+      help='If enabled, only install production dependencies')
+    register(
+      '--force', type=bool, default=False, fingerprint=True,
+      help='If enabled, re-download dependencies.')
+    register(
+      '--frozen-lockfile', type=bool, default=True, fingerprint=True,
+      help='If enabled, disallow automatic update of lock files.')
+    register(
+      '--force-option-override', type=bool, default=False, fingerprint=True,
+      help='If enabled, options will override hard-coded values')
+
     NodeResolve.register_resolver_for_type(NodeModule, cls)
     NodeResolveLocal.register_resolver_for_type(NodeModule, cls)
 
-  def resolve_target(self, node_task, target, results_dir, node_paths, resolve_locally=False):
+  def resolve_target(self, node_task, target, results_dir, node_paths, resolve_locally=False,
+                     install_optional=None, production_only=None, force=None, frozen_lockfile=None,
+                     **kwargs):
+    if self.get_options().force_option_override:
+      install_optional = self.get_options().install_optional
+      production_only = self.get_options().production_only
+      force = self.get_options().force
+      frozen_lockfile = self.get_options().frozen_lockfile
+    else:
+      install_optional = install_optional if install_optional is not None else self.get_options().install_optional
+      production_only = production_only if production_only is not None else self.get_options().production_only
+      force = force if force is not None else self.get_options().force
+      frozen_lockfile = frozen_lockfile if frozen_lockfile is not None else self.get_options().frozen_lockfile
+
     if not resolve_locally:
       self._copy_sources(target, results_dir)
     with pushd(results_dir):
@@ -56,12 +82,13 @@ class NpmResolver(Subsystem, NodeResolverBase):
             'not fully supported.')
           self._emit_package_descriptor(node_task, target, results_dir, node_paths)
       elif package_manager == PACKAGE_MANAGER_YARNPKG:
-        if not os.path.exists('yarn.lock'):
+        if not os.path.exists('yarn.lock') and frozen_lockfile:
           raise TaskError(
             'Cannot find yarn.lock. Did you forget to put it in target sources?')
 
       result, command = node_task.install_module(
-        target=target, install_optional=self.get_options().install_optional,
+        target=target, install_optional=install_optional,
+        production_only=production_only, force=force, frozen_lockfile=frozen_lockfile,
         workunit_name=target.address.reference(),
         workunit_labels=[WorkUnitLabel.COMPILER])
       if result != 0:

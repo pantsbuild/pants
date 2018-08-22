@@ -10,7 +10,7 @@
   "main": "dist/Server.js",
   "scripts": {
     "prepublish": "babel src --out-dir dist",
-    "pretest": "npm run prepublish && babel test --out-dir testdist",
+    "pretest": "yarn prepublish && babel test --out-dir testdist",
     "test": "mocha ./testdist/unit.js",
     "checkarg": "bash checkarg"
   }

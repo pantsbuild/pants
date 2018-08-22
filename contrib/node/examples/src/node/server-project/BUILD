@@ -4,11 +4,6 @@
 
 node_module(
   sources=globs('package.json', 'checkarg', 'src/*.js', 'test/*.js', 'yarn.lock'),
-  dependencies=[
-    'contrib/node/examples/3rdparty/node/babel-core',
-    'contrib/node/examples/3rdparty/node/babel-cli',
-    'contrib/node/examples/3rdparty/node/mocha',
-  ],
   package_manager='yarn',
 )
 

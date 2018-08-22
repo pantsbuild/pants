@@ -87,7 +87,11 @@ class NodeResolveTest(TaskTestBase):
                               dependencies=[typ])
 
     context = self.context(target_roots=[target], options={
-      'npm-resolver': {'install_optional': False}
+      'npm-resolver': {'install_optional': False,
+                       'force_option_override': False,
+                       'production_only': False,
+                       'force': False,
+                       'frozen_lockfile': True}
     })
     task = self.create_task(context)
     task.execute()
@@ -144,7 +148,11 @@ class NodeResolveTest(TaskTestBase):
                             sources=['leaf.js', 'package.json'],
                             dependencies=[util, typ2])
     context = self.context(target_roots=[leaf], options={
-      'npm-resolver': {'install_optional': False}
+      'npm-resolver': {'install_optional': False,
+                       'force_option_override': False,
+                       'production_only': False,
+                       'force': False,
+                       'frozen_lockfile': True}
     })
     task = self.create_task(context)
     task.execute()
@@ -211,7 +219,11 @@ class NodeResolveTest(TaskTestBase):
                                        sources=['package.json'],
                                        dependencies=[util])
     context = self.context(target_roots=[scripts_project], options={
-      'npm-resolver': {'install_optional': False}
+      'npm-resolver': {'install_optional': False,
+                       'force_option_override': False,
+                       'production_only': False,
+                       'force': False,
+                       'frozen_lockfile': True}
     })
     task = self.create_task(context)
     task.execute()
@@ -238,8 +250,9 @@ class NodeResolveTest(TaskTestBase):
       self.assertNotIn('peerDependencies', package)
       self.assertNotIn('optionalDependencies', package)
 
-  def _test_resolve_optional_install_helper(
-      self, install_optional, package_manager, expected_params):
+  def _test_resolve_options_helper(
+      self, install_optional, force_option_override, production_only, force, frozen_lockfile,
+      package_manager, expected_params):
     self.create_file('src/node/util/package.json', contents=dedent("""
       {
         "name": "util",
@@ -259,7 +272,11 @@ class NodeResolveTest(TaskTestBase):
                               package_manager=package_manager)
 
     context = self.context(target_roots=[target], options={
-      'npm-resolver': {'install_optional': install_optional}
+      'npm-resolver': {'install_optional': install_optional,
+                       'force_option_override': force_option_override,
+                       'production_only': production_only,
+                       'force': force,
+                       'frozen_lockfile': frozen_lockfile}
     })
     task = self.create_task(context)
 
@@ -271,26 +288,42 @@ class NodeResolveTest(TaskTestBase):
         args=expected_params,
         node_paths=None)
 
-  def test_resolve_default_no_optional_install_npm(self):
-    self._test_resolve_optional_install_helper(
+  def test_resolve_default_no_options_npm(self):
+    self._test_resolve_options_helper(
       install_optional=False,
+      force_option_override=False,
+      production_only=False,
+      force=False,
+      frozen_lockfile=True,
       package_manager='npm',
       expected_params=['install', '--no-optional'])
 
-  def test_resolve_optional_install_npm(self):
-    self._test_resolve_optional_install_helper(
+  def test_resolve_options_npm(self):
+    self._test_resolve_options_helper(
       install_optional=True,
+      force_option_override=True,
+      production_only=True,
+      force=True,
+      frozen_lockfile=False,
       package_manager='npm',
-      expected_params=['install'])
+      expected_params=['install', '--production', '--force'])
 
-  def test_resolve_default_no_optional_install_yarn(self):
-    self._test_resolve_optional_install_helper(
+  def test_resolve_default_no_options_yarn(self):
+    self._test_resolve_options_helper(
       install_optional=False,
+      force_option_override=False,
+      production_only=False,
+      force=False,
+      frozen_lockfile=True,
       package_manager='yarnpkg',
       expected_params=['--non-interactive', '--ignore-optional', '--frozen-lockfile'])
 
-  def test_resolve_optional_install_yarn(self):
-    self._test_resolve_optional_install_helper(
+  def test_resolve_options_yarn(self):
+    self._test_resolve_options_helper(
       install_optional=True,
+      force_option_override=True,
+      production_only=True,
+      force=True,
+      frozen_lockfile=False,
       package_manager='yarnpkg',
-      expected_params=['--non-interactive', '--frozen-lockfile'])
+      expected_params=['--non-interactive', '--production=true', '--force'])

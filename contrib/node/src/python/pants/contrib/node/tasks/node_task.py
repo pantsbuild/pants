@@ -98,7 +98,7 @@ class NodeTask(Task):
   def install_module(
     self, target=None, package_manager=None, 
     install_optional=False, production_only=False, force=False, 
-    node_paths=None, workunit_name=None, workunit_labels=None):
+    node_paths=None, frozen_lockfile=None, workunit_name=None, workunit_labels=None):
     """Installs node module using requested package_manager."""
     package_manager = package_manager or self.get_package_manager(target=target)
     command = package_manager.install_module(
@@ -106,6 +106,7 @@ class NodeTask(Task):
       force=force,
       production_only=production_only,
       node_paths=node_paths,
+      frozen_lockfile=frozen_lockfile
     )
     return self._execute_command(
       command, workunit_name=workunit_name, workunit_labels=workunit_labels)

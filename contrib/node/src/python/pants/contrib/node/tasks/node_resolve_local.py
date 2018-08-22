@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
+from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
 
 from pants.contrib.node.tasks.node_paths_local import NodePathsLocal
@@ -50,6 +51,10 @@ class NodeResolveLocal(NodeResolve):
           target = vt.target
           if not vt.valid:
             resolver_for_target_type = self._resolver_for_target(target).global_instance()
-            results_dir = os.path.abspath(target.address.spec_path)
-            resolver_for_target_type.resolve_target(self, target, results_dir, node_paths, resolve_locally=True)
+            results_dir = os.path.join(get_buildroot(), target.address.spec_path)
+            resolver_for_target_type.resolve_target(self, target, results_dir, node_paths,
+                                                    resolve_locally=True,
+                                                    force=True,
+                                                    install_optional=True,
+                                                    frozen_lockfile=False)
           node_paths.resolved(target, results_dir)
