@@ -32,6 +32,7 @@ from pants.pantsd.watchman_launcher import WatchmanLauncher
 from pants.util.collections import combined_dict
 from pants.util.contextutil import stdio_as
 from pants.util.memo import memoized_property
+from pants.util.strutil import ensure_text
 
 
 class _LoggerStream(object):
@@ -332,7 +333,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
     # Once all services are started, write our pid.
     self.write_pid()
-    self.write_metadata_by_name('pantsd', self.FINGERPRINT_KEY, self.options_fingerprint)
+    self.write_metadata_by_name('pantsd', self.FINGERPRINT_KEY, ensure_text(self.options_fingerprint))
 
     # Monitor services.
     while not self.is_killed:
