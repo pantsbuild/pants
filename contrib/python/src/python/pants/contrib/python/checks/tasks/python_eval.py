@@ -203,7 +203,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     return modules
 
   def _get_executable_file_content(self, exec_pex_parent, modules):
-    generator = Generator(pkgutil.get_data(__name__, self._EVAL_TEMPLATE_PATH),
+    generator = Generator(pkgutil.get_data(__name__, self._EVAL_TEMPLATE_PATH).decode('utf-8'),
                           chroot_parent=exec_pex_parent, modules=modules)
     return generator.render()
 

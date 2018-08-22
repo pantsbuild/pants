@@ -6,8 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from textwrap import dedent
 
-import pytest
-from future.utils import PY3
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
@@ -15,8 +13,6 @@ from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTest
 from pants.contrib.python.checks.tasks.python_eval import PythonEval
 
 
-# TODO(python3port): https://github.com/pantsbuild/pants/issues/6354. Fix before switching fully to Py3.
-@pytest.mark.skipif(PY3, reason='PEX issue when using Python 3. https://github.com/pantsbuild/pants/issues/6354')
 class PythonEvalTest(PythonTaskTestBase):
 
   @classmethod
