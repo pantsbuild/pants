@@ -3253,12 +3253,64 @@ mod tests {
     let test_bytes = test_data.iter().sum();
     assert_eq!(
       summary,
-      UploadSummary {
-        ingested_file_count: test_data.len(),
-        ingested_file_bytes: test_bytes,
-        uploaded_file_count: test_data.len(),
-        uploaded_file_bytes: test_bytes
-      }
+      UploadSummary::new(
+        test_data.len(), test_bytes,
+        test_data.len(), test_bytes
+      )
+    );
+  }
+
+  #[test]
+  fn summary_does_not_count_things_in_cas() {
+    let dir = TempDir::new().unwrap();
+    let cas = StubCAS::empty();
+
+    let testroland = TestData::roland();
+    let testcatnip = TestData::catnip();
+    let testdir = TestDirectory::containing_roland_and_treats();
+
+    // Store everything locally
+    let local_store = new_local_store(dir.path());
+    local_store.record_directory(&testdir.directory(), false)
+        .wait()
+        .expect("Error storing directory locally");
+    local_store
+        .store_file_bytes(testroland.bytes(), false)
+        .wait()
+        .expect("Error storing file locally");
+    local_store
+        .store_file_bytes(testcatnip.bytes(), false)
+        .wait()
+        .expect("Error storing file locally");
+
+    // Store testdata first, which should return a summary of one file
+    let data_summary = new_store(dir.path(), cas.address())
+        .ensure_remote_has_recursive(vec![testroland.digest()])
+        .wait()
+        .expect("Error uploading file");
+
+    assert_eq!(
+      data_summary,
+      UploadSummary::new(
+        1, testroland.digest().1, // Ingested
+        1, testroland.digest().1 // Uploaded
+      )
+    );
+
+    // Store the directory and catnip.
+    // It should see the digest of testroland already in cas,
+    // and not report it in uploads.
+    let dir_summary = new_store(dir.path(), cas.address())
+        .ensure_remote_has_recursive(vec![testdir.digest()])
+        .wait()
+        .expect("Error uploading directory");
+
+    assert_eq!(
+      dir_summary,
+      UploadSummary::new(
+        3, testdir.digest().1 + testroland.digest().1 + testcatnip.digest().1, // Ingested
+        2, testdir.digest().1 + testcatnip.digest().1  // Uploaded
+      )
     );
   }
 }
