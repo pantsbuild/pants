@@ -14,10 +14,8 @@ from builtins import map, object, str, zip
 from collections import OrderedDict, defaultdict
 
 from future.utils import PY2, PY3
-from pex.executor import Executor
 from pex.installer import InstallerBase, Packager
 from pex.interpreter import PythonInterpreter
-from pex.tracer import TRACER
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
@@ -53,10 +51,8 @@ setup(**
 class SetupPyRunner(InstallerBase):
   _EXTRAS = ('setuptools', 'wheel')
 
-  # `interpreter` is one of the kwargs often passed to this constructor.
-  def __init__(self, source_dir, setup_command, explicit_setup_filename=None, **kw):
+  def __init__(self, source_dir, setup_command, **kw):
     self.__setup_command = setup_command
-    self.explicit_setup_filename = explicit_setup_filename
     super(SetupPyRunner, self).__init__(source_dir, **kw)
 
   def mixins(self):
@@ -77,34 +73,6 @@ class SetupPyRunner(InstallerBase):
 
   def _setup_command(self):
     return self.__setup_command
-
-  class SetupPyError(TaskError): pass
-
-  def run(self):
-    if self._installed is not None:
-      return self._installed
-
-    with TRACER.timed('Installing {}'.format(self._install_tmp), V=2):
-      if self.explicit_setup_filename:
-        command = [self._interpreter.binary, self.explicit_setup_filename] + self._setup_command()
-      else:
-        command = [self._interpreter.binary, '-'] + self._setup_command()
-      try:
-        Executor.execute(command,
-                         env=self._interpreter.sanitized_environment(),
-                         cwd=self._source_dir,
-                         stdin_payload=self.bootstrap_script.encode('ascii'))
-        self._installed = True
-      except Executor.NonZeroExit as e:
-        self._installed = False
-        name = os.path.basename(self._source_dir)
-        raise self.SetupPyError(
-          "**** Failed to install {} (caused by: {!r}\n):\n"
-          "stdout:\n{}\nstderr:\n{}\n"
-          .format(name, e, e.stdout, e.stderr))
-
-    self._postprocess()
-    return self._installed
 
 
 class TargetAncestorIterator(object):

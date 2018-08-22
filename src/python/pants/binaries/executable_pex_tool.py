@@ -43,7 +43,7 @@ class ExecutablePexTool(Subsystem):
     if is_executable(pex_file_path):
       return PEX(pex_file_path, interpreter)
     else:
-      pex_info = PexInfo.default()
+      pex_info = PexInfo.default(interpreter=interpreter)
       if self.entry_point is not None:
         pex_info.entry_point = self.entry_point
 
