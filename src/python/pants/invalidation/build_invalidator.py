@@ -223,7 +223,7 @@ class BuildInvalidator(object):
   def _read_sha_by_id(self, id):
     try:
       with open(self._sha_file_by_id(id), 'rb') as fd:
-        return fd.read().strip()
+        return fd.read().strip().decode('utf-8')
     except IOError as e:
       if e.errno != errno.ENOENT:
         raise
