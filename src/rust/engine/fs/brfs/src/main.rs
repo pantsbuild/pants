@@ -688,8 +688,7 @@ mod test {
   use hashing;
   use std::sync::Arc;
   use testutil::{
-    data::{TestData, TestDirectory},
-    file,
+    data::{TestData, TestDirectory}, file,
   };
 
   #[test]
@@ -702,13 +701,11 @@ mod test {
     ).expect("Error creating local store");
 
     let _fs = mount(mount_dir.path(), store).expect("Mounting");
-    assert!(
-      !&mount_dir
-        .path()
-        .join("digest")
-        .join(digest_to_filepath(&TestData::roland().digest()))
-        .exists()
-    );
+    assert!(!&mount_dir
+      .path()
+      .join("digest")
+      .join(digest_to_filepath(&TestData::roland().digest()))
+      .exists());
   }
 
   #[test]
