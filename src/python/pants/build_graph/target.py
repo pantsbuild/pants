@@ -111,7 +111,7 @@ class Target(AbstractTarget):
       """
       :API: public
       """
-      ignore_params = {(self.get_options().ignored or {}).get(target.type_alias, ())}
+      ignore_params = set((self.get_options().ignored or {}).get(target.type_alias, ()))
       unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
       if 'source' in unknown_args and 'sources' in payload.as_dict():
         unknown_args.pop('source')

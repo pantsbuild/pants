@@ -38,7 +38,7 @@ class SourceMapperTest(object):
     raise NotImplementedError
 
   def owner(self, owner, f):
-    self.assertEqual({owner}, {i.spec for i in self.get_mapper().target_addresses_for_source(f)})
+    self.assertEqual(set(owner), {i.spec for i in self.get_mapper().target_addresses_for_source(f)})
 
   def test_target_address_for_source_yields_unique_addresses(self):
     # NB If the mapper returns more than one copy of an address, it may cause other code to do

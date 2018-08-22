@@ -74,7 +74,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
       result = self.execute(scheduler, Snapshot, self.specs(filespecs_or_globs))[0]
       # Confirm all expected files were digested.
-      self.assertEqual({expected_files}, {f.path for f in result.files})
+      self.assertEqual(set(expected_files), {f.path for f in result.files})
       self.assertTrue(result.directory_digest.fingerprint is not None)
 
   def assert_fsnodes(self, filespecs_or_globs, subject_product_pairs):
