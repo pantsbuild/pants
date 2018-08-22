@@ -29,3 +29,25 @@ and set the `Standard library` to:
     build-support/bin/native/src
 
 You should now be able to compile and run Rust code and tests using IntelliJ.
+
+
+## Building fs_util
+
+`fs_util` is a utility that enables you to interact with snapshots from the commandline. You can use it to help debug issues with snapshotted files.
+
+To build it run the following from root of the pants repository.
+
+    cd src/rust/engine && ../../../build-support/bin/native/cargo build -p fs_util
+
+That will produce `src/rust/engine/target/debug/fs_util`. You can then use that binary to inspect snapshots.
+
+To inspect a particular snapshot, you'll need to tell fs_util where the storage is and the digest and length of the snapshot to inspect. You can use the `--local-store-path` flag for that.
+
+
+For example, this command pretty prints the recursive file list of a directory through the directory subcommand.
+
+    src/rust/engine/target/debug/fs_util --local-store-path=${HOME}/.cache/pants/lmdb_store directory cat-proto --output-format=recursive-file-list <digesh> <len>
+
+There are a number of ways to use `fs_util` and its subcommands to inspect snapshots. To see more about them pass the `--help` flag.
+
+Each of the subcommands may also have subcommands. You can also pass `--help` to each subcommand.
