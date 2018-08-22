@@ -293,7 +293,7 @@ class PythonTestsAdaptor(PythonTargetAdaptor):
 
 class PantsPluginAdaptor(PythonTargetAdaptor):
   def get_sources(self):
-    return GlobsWithConjunction.for_literal_files(['register.py'], self.target_base)
+    return GlobsWithConjunction.for_literal_files(['register.py'], self.address.spec_path)
 
 
 class BaseGlobs(Locatable, AbstractClass):
