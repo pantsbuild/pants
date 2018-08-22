@@ -9,6 +9,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class BackendIndependenceTest(PantsRunIntegrationTest):
   """Verifies that this backend works with no other backends present."""
+
   @classmethod
   def hermetic(cls):
     return True
