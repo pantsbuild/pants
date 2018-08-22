@@ -1240,7 +1240,7 @@ mod tests {
         vec![
           make_incomplete_operation(&op_name),
           make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
-            &roland.digest(),
+            &roland.digest()
           )]),
           make_successful_operation(
             "cat2",

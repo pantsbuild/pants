@@ -68,4 +68,5 @@ SUPPORTED_PLATFORM_NORMALIZED_NAMES = {
   ('darwin', '15'): ('mac', '10.11'),
   ('darwin', '16'): ('mac', '10.12'),
   ('darwin', '17'): ('mac', '10.13'),
+  ('darwin', '18'): ('mac', '10.14'),
 }

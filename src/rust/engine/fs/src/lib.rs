@@ -316,10 +316,8 @@ impl PathGlob {
 
       // NB: Because the filespec is a String input, calls to `to_str_lossy` are not lossy; the
       // use of `Path` is strictly for os-independent Path parsing.
-      parts.push(
-        Pattern::new(&part.to_string_lossy())
-          .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", filespec, e))?,
-      );
+      parts.push(Pattern::new(&part.to_string_lossy())
+        .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", filespec, e))?);
     }
 
     PathGlob::parse_globs(canonical_dir, symbolic_path, &parts)
@@ -839,12 +837,11 @@ mod posixfs_test {
       0o600,
     );
     let fs = new_posixfs(&dir.path());
-    let file_content =
-      fs.read_file(&File {
-        path: path.clone(),
-        is_executable: false,
-      }).wait()
-        .unwrap();
+    let file_content = fs.read_file(&File {
+      path: path.clone(),
+      is_executable: false,
+    }).wait()
+      .unwrap();
     assert_eq!(file_content.path, path);
     assert_eq!(file_content.content, content);
   }

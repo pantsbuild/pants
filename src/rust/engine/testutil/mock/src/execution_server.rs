@@ -137,14 +137,12 @@ impl Drop for TestServer {
           .unwrap()
           .clone(),
       )),
-      MockResponder::display_all(
-        &self
-          .mock_responder
-          .received_messages
-          .deref()
-          .lock()
-          .unwrap()
-      )
+      MockResponder::display_all(&self
+        .mock_responder
+        .received_messages
+        .deref()
+        .lock()
+        .unwrap())
     )
   }
 }
