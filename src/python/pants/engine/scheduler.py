@@ -543,7 +543,7 @@ class SchedulerSession(object):
     # TODO: See https://github.com/pantsbuild/pants/issues/3912
     throw_root_states = tuple(state for root, state in result.root_products if type(state) is Throw)
     if throw_root_states:
-      unique_exceptions = tuple(set(t.exc for t in throw_root_states))
+      unique_exceptions = tuple({t.exc for t in throw_root_states})
       exception_noun = pluralize(len(unique_exceptions), 'Exception')
 
       if self._scheduler.include_trace_on_error:

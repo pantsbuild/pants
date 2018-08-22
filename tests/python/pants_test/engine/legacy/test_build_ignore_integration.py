@@ -17,7 +17,7 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
   def test_build_ignore_patterns_pants_ini(self):
     def output_to_list(output_filename):
       with open(output_filename, 'r') as results_file:
-        return set([line.rstrip() for line in results_file.readlines()])
+        return {line.rstrip() for line in results_file.readlines()}
 
     tempdir = tempfile.mkdtemp()
     tmp_output = os.path.join(tempdir, 'minimize-output1.txt')

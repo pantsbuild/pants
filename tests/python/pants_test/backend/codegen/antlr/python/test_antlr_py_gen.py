@@ -63,7 +63,7 @@ class AntlrPyGenTest(NailgunTaskTestBase):
 
     # Generate code, then create a synthetic target.
     task.execute_codegen(target, target_workdir)
-    actual_sources = set(s for s in Fileset.rglobs('*.py', root=target_workdir))
+    actual_sources = {s for s in Fileset.rglobs('*.py', root=target_workdir)}
     self.assertSetEqual({
       'foo/__init__.py',
       'foo/bar/__init__.py',

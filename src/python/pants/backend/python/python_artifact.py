@@ -18,12 +18,12 @@ class PythonArtifact(PayloadField):
 
   class UnsupportedArgument(Exception): pass
 
-  UNSUPPORTED_ARGS = frozenset([
+  UNSUPPORTED_ARGS = frozenset({
     'data_files',
     'package_dir',
     'package_data',
     'packages',
-  ])
+  })
 
   def __init__(self, **kwargs):
     """

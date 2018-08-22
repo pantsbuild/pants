@@ -92,7 +92,7 @@ class PythonInterpreterCache(object):
 
     if not allowed_interpreters:
       # Create a helpful error message.
-      unique_compatibilities = set(tuple(c) for c in tgts_by_compatibilities.keys())
+      unique_compatibilities = {tuple(c) for c in tgts_by_compatibilities.keys()}
       unique_compatibilities_strs = [','.join(x) for x in unique_compatibilities if x]
       tgts_by_compatibilities_strs = [t[0].address.spec for t in tgts_by_compatibilities.values()]
       raise self.UnsatisfiableInterpreterConstraintsError(

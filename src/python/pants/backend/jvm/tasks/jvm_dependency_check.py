@@ -228,7 +228,7 @@ class JvmDependencyCheck(Task):
     # Warn or error for unused.
     def joined_dep_msg(deps):
       return '\n  '.join('\'{}\','.format(dep.address.spec) for dep in sorted(deps))
-    flat_replacements = set(r for replacements in replacement_deps.values() for r in replacements)
+    flat_replacements = {r for replacements in replacement_deps.values() for r in replacements}
     replacements_msg = ''
     if flat_replacements:
       replacements_msg = 'Suggested replacements:\n  {}\n'.format(joined_dep_msg(flat_replacements))

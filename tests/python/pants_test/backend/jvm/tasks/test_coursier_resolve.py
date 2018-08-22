@@ -188,7 +188,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
       Get the simple coords that are going to be on the classpath
       """
       conf_art_tuples_ex = cp.get_classpath_entries_for_targets(targets)
-      simple_coords = set(x[1].coordinate.simple_coord for x in conf_art_tuples_ex)
+      simple_coords = {x[1].coordinate.simple_coord for x in conf_art_tuples_ex}
       return simple_coords
 
     # If we grab the transitive closure of the coordinates just for junit, then

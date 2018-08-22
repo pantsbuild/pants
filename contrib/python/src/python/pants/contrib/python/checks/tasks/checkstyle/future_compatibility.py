@@ -30,9 +30,9 @@ from pants.contrib.python.checks.tasks.checkstyle.common import CheckstylePlugin
 #   __metaclass__
 class FutureCompatibility(CheckstylePlugin):
   """Warns about behavior that will likely break when moving to Python 3.x"""
-  BAD_ITERS = frozenset(('iteritems', 'iterkeys', 'itervalues'))
-  BAD_FUNCTIONS = frozenset(('xrange',))
-  BAD_NAMES = frozenset(('basestring', 'unicode'))
+  BAD_ITERS = frozenset({'iteritems', 'iterkeys', 'itervalues'})
+  BAD_FUNCTIONS = frozenset({'xrange'})
+  BAD_NAMES = frozenset({'basestring', 'unicode'})
 
   def nits(self):
     for call in self.iter_ast_types(ast.Call):

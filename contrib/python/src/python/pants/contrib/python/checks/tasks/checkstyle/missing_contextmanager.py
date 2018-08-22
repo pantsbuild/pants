@@ -24,10 +24,10 @@ class MissingContextManager(CheckstylePlugin):
     with_contexts = set(self.iter_ast_types(ast.With))
     # Grammar changed between Python 2 vs Python 3 to access the with statement's surrounding expressions.
     # Refer to http://joao.npimentel.net/2015/07/23/python-2-vs-python-3-ast-differences/.
-    with_context_exprs = (set(node.context_expr for with_context in with_contexts for node in with_context.items)
+    with_context_exprs = ({node.context_expr for with_context in with_contexts for node in with_context.items}
                           if PY3 else
-                          set(node.context_expr for node in with_contexts))
-    with_context_calls = set(expr for expr in with_context_exprs if isinstance(expr, ast.Call))
+                          {node.context_expr for node in with_contexts})
+    with_context_calls = {expr for expr in with_context_exprs if isinstance(expr, ast.Call)}
 
     for call in self.iter_ast_types(ast.Call):
       if isinstance(call.func, ast.Name) and call.func.id == 'open' \

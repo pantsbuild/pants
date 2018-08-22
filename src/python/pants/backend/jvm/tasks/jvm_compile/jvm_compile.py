@@ -553,7 +553,7 @@ class JvmCompile(NailgunTaskBase):
       tuple((getattr(target, plugins_key, []) or []))
     )
     # Allow multiple flags and also comma-separated values in a single flag.
-    requested_plugins = set([p for val in requested_plugins for p in val.split(',')])
+    requested_plugins = {p for val in requested_plugins for p in val.split(',')}
 
     plugin_args_key = '{}_plugin_args'.format(compiler)
     available_plugin_args = {}
