@@ -50,6 +50,6 @@ class ExecutablePexTool(Subsystem):
       with safe_concurrent_creation(pex_file_path) as safe_path:
         builder = PEXBuilder(interpreter=interpreter, pex_info=pex_info)
         all_reqs = list(self.base_requirements) + list(extra_reqs or [])
-        dump_requirements(builder, interpreter, all_reqs, logger)
+        dump_requirements(builder, interpreter, all_reqs, logger, platforms=['current'])
         builder.build(safe_path)
       return PEX(pex_file_path, interpreter)
