@@ -208,10 +208,13 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     binary_target = '{}:{}'.format(self.testproject, binary_name)
     # Build a pex.
     # Avoid some known-to-choke-on interpreters.
+    if version == '3':
+      constraint = '["CPython>=3.3"]'
+    else:
+      constraint = '["CPython>=2.7,<3"]'
     command = ['run',
                binary_target,
-               '--python-setup-interpreter-constraints=CPython>=2.7,<3',
-               '--python-setup-interpreter-constraints=CPython>=3.3',
+               '--python-setup-interpreter-constraints={}'.format(constraint),
                '--quiet']
     pants_run = self.run_pants(command=command)
     return pants_run.stdout_data.rstrip().split('\n')[-1]

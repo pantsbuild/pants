@@ -62,7 +62,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
       }
       binary_name = 'echo_interpreter_version_{}'.format(version)
       binary_target = '{}:{}'.format(self.testproject, binary_name)
-      pants_run = self._build_pex(binary_target, config)
+      pants_run = self._build_pex(binary_target, version, config)
       self.assert_success(pants_run, 'Failed to build {binary}.'.format(binary=binary_target))
 
       # Run the built pex.
@@ -71,11 +71,14 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
       (stdout_data, _) = proc.communicate()
       return stdout_data
 
-  def _build_pex(self, binary_target, config=None, args=None):
+  def _build_pex(self, binary_target, version, config=None, args=None):
     # By default, Avoid some known-to-choke-on interpreters.
+    if version == '3':
+      constraint = '["CPython>=3.3"]'
+    else:
+      constraint = '["CPython>=2.7,<3"]'
     args = list(args) if args is not None else [
-          '--python-setup-interpreter-constraints=CPython>=2.7,<3',
-          '--python-setup-interpreter-constraints=CPython>=3.3',
+          '--python-setup-interpreter-constraints={}'.format(constraint)
         ]
     command = ['binary', binary_target] + args
     return self.run_pants(command=command, config=config)
