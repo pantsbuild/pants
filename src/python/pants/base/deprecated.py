@@ -10,6 +10,7 @@ import warnings
 from functools import wraps
 
 import six
+from future.utils import PY2
 from packaging.version import InvalidVersion, Version
 
 from pants.util.memo import memoized_method
@@ -143,7 +144,7 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None, sta
       print(warning_msg, file=sys.stderr)
     else:
       warnings.showwarning(
-        msg,
+        DeprecationWarning(msg) if PY2 else msg,
         DeprecationWarning,
         filename,
         line_number,
