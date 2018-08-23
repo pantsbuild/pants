@@ -309,7 +309,9 @@ class DaemonPantsRunner(ProcessManager):
           runner.run()
         except KeyboardInterrupt:
           self._exiter.exit(1, msg='Interrupted by user.\n')
+        except Exception:
+          self._exiter.handle_unhandled_exception(add_newline=True)
+        else:
+          self._exiter.exit(0)
     except Exception:
       self._exiter.handle_unhandled_exception(add_newline=True)
-    else:
-      self._exiter.exit(0)
