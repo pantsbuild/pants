@@ -73,7 +73,6 @@ class PailgunService(PantsService):
     finally:
       self._logger.info('pailgun service on port {} shutting down'.format(self.pailgun_port))
 
-
   def terminate(self):
     """Override of PantsService.terminate() that cleans up when the Pailgun server is terminated."""
     # Tear down the Pailgun TCPServer.
