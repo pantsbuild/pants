@@ -67,9 +67,12 @@ class PailgunService(PantsService):
       # Manually call handle_request() in a loop vs serve_forever() for interruptability.
       while not self.is_killed:
         self.pailgun.handle_request()
-    except select.error:
+    except select.error as e:
       # SocketServer can throw `error: (9, 'Bad file descriptor')` on teardown. Ignore it.
-      self._logger.warning('pailgun service shutting down')
+      self._logger.warning('pailgun service shutting down due to an error: {}'.format(e))
+    finally:
+      self._logger.info('pailgun service on port {} shutting down'.format(self.pailgun_port))
+
 
   def terminate(self):
     """Override of PantsService.terminate() that cleans up when the Pailgun server is terminated."""
