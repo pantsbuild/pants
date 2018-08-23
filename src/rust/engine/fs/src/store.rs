@@ -25,7 +25,6 @@ const MAX_LOCAL_STORE_SIZE_BYTES: usize = 1024 * 1024 * 1024 * 1024 / 10;
 // after garbage collection. We almost certainly want to make this configurable.
 const LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * 1024 * 1024 * 1024;
 
-
 // Summary of the files and directories uploaded with an operation
 // ingested_file_{count, bytes}: Number and combined size of processed files
 // uploaded_file_{count, bytes}: Number and combined size of files uploaded to the remote
@@ -34,31 +33,7 @@ pub struct UploadSummary {
   ingested_file_count: usize,
   ingested_file_bytes: usize,
   uploaded_file_count: usize,
-  uploaded_file_bytes: usize
-}
-
-impl UploadSummary {
-  pub fn new(
-    ingested_file_count: usize,
-    ingested_file_bytes: usize,
-    uploaded_file_count: usize,
-    uploaded_file_bytes: usize) -> UploadSummary {
-    UploadSummary{
-      ingested_file_count,
-      ingested_file_bytes,
-      uploaded_file_count,
-      uploaded_file_bytes
-    }
-  }
-
-  pub fn empty() -> UploadSummary {
-    UploadSummary {
-      ingested_file_count: 0,
-      ingested_file_bytes: 0,
-      uploaded_file_count: 0,
-      uploaded_file_bytes: 0
-    }
-  }
+  uploaded_file_bytes: usize,
 }
 
 ///
@@ -299,7 +274,10 @@ impl Store {
   ///
   /// Returns a structure with the summary of operations.
   ///
-  pub fn ensure_remote_has_recursive(&self, digests: Vec<Digest>) -> BoxFuture<UploadSummary, String> {
+  pub fn ensure_remote_has_recursive(
+    &self,
+    digests: Vec<Digest>,
+  ) -> BoxFuture<UploadSummary, String> {
     let remote = match self.remote {
       Some(ref remote) => remote,
       None => {
@@ -361,33 +339,20 @@ impl Store {
                   None => Err(format!("Failed to upload digest {:?}: Not found", digest)),
                 })
             })
-            .collect::<Vec<_>>()
-        )
-            .and_then(future::join_all)
-            .map(|uploaded_digests| (uploaded_digests, ingested_digests))
+            .collect::<Vec<_>>(),
+        ).and_then(future::join_all)
+          .map(|uploaded_digests| (uploaded_digests, ingested_digests))
       })
       .map(|(uploaded_digests, ingested_digests)| {
-        let ingested_file_sizes = ingested_digests
-            .iter()
-            /* TODO Do we want to consider files, or only dirs?
-            .filter(|(_, digest_type)| match digest_type {
-              EntryType::File => true,
-              _ => false,
-            })
-            */
-            .map(|(digest, _)| digest.1);
-        let uploaded_file_sizes = uploaded_digests
-            .iter()
-            .map(|digest| digest.1);
+        let ingested_file_sizes = ingested_digests.iter().map(|(digest, _)| digest.1);
+        let uploaded_file_sizes = uploaded_digests.iter().map(|digest| digest.1);
 
-        let a = ingested_digests.iter().map(|(digest, typ)| {println!("Ingested digest: {:?} {:?} {:?}", typ, digest.1, digest.0)});
-
-        UploadSummary::new(
-          ingested_file_sizes.clone().count(),
-          ingested_file_sizes.sum(),
-          uploaded_file_sizes.clone().count(),
-          uploaded_file_sizes.sum()
-        )
+        UploadSummary {
+          ingested_file_count: ingested_file_sizes.clone().count(),
+          ingested_file_bytes: ingested_file_sizes.sum(),
+          uploaded_file_count: uploaded_file_sizes.clone().count(),
+          uploaded_file_bytes: uploaded_file_sizes.sum(),
+        }
       })
       .to_boxed()
   }
@@ -2222,7 +2187,7 @@ mod tests {
   }
 
   ///
-  /// Create a StubCas with a file and a directory
+  /// Create a StubCas with a file and a directory inside
   ///
   pub fn new_cas(chunk_size_bytes: usize) -> StubCAS {
     StubCAS::with_content(
@@ -2233,7 +2198,7 @@ mod tests {
   }
 
   ///
-  /// Create a new empty local store
+  /// Create a new local store with whatever was already serialized in dir
   ///
   fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
     Store::local_only(dir, Arc::new(ResettablePool::new("test-pool-".to_string())))
@@ -3214,10 +3179,6 @@ mod tests {
       .mode() & 0o100 == 0o100
   }
 
-  ///
-  /// If we want to test new_store (with CAS), we need to store our data
-  /// in a local_store first
-  ///
   #[test]
   fn returns_upload_summary_on_empty_cas() {
     let dir = TempDir::new().unwrap();
@@ -3228,17 +3189,18 @@ mod tests {
     let testdir = TestDirectory::containing_roland_and_treats();
 
     let local_store = new_local_store(dir.path());
-    local_store.record_directory(&testdir.directory(), false)
-        .wait()
-        .expect("Error storing directory locally");
     local_store
-        .store_file_bytes(testroland.bytes(), false)
-        .wait()
-        .expect("Error storing file locally");
+      .record_directory(&testdir.directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
     local_store
-        .store_file_bytes(testcatnip.bytes(), false)
-        .wait()
-        .expect("Error storing file locally");
+      .store_file_bytes(testroland.bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
+    local_store
+      .store_file_bytes(testcatnip.bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
     let summary = new_store(dir.path(), cas.address())
       .ensure_remote_has_recursive(vec![testdir.digest()])
       .wait()
@@ -3248,15 +3210,17 @@ mod tests {
     let test_data = vec![
       testdir.digest().1,
       testroland.digest().1,
-      testcatnip.digest().1
+      testcatnip.digest().1,
     ];
     let test_bytes = test_data.iter().sum();
     assert_eq!(
       summary,
-      UploadSummary::new(
-        test_data.len(), test_bytes,
-        test_data.len(), test_bytes
-      )
+      UploadSummary {
+        ingested_file_count: test_data.len(),
+        ingested_file_bytes: test_bytes,
+        uploaded_file_count: test_data.len(),
+        uploaded_file_bytes: test_bytes
+      }
     );
   }
 
@@ -3271,46 +3235,51 @@ mod tests {
 
     // Store everything locally
     let local_store = new_local_store(dir.path());
-    local_store.record_directory(&testdir.directory(), false)
-        .wait()
-        .expect("Error storing directory locally");
     local_store
-        .store_file_bytes(testroland.bytes(), false)
-        .wait()
-        .expect("Error storing file locally");
+      .record_directory(&testdir.directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
     local_store
-        .store_file_bytes(testcatnip.bytes(), false)
-        .wait()
-        .expect("Error storing file locally");
+      .store_file_bytes(testroland.bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
+    local_store
+      .store_file_bytes(testcatnip.bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
 
-    // Store testdata first, which should return a summary of one file
+    // Store testroland first, which should return a summary of one file
     let data_summary = new_store(dir.path(), cas.address())
-        .ensure_remote_has_recursive(vec![testroland.digest()])
-        .wait()
-        .expect("Error uploading file");
+      .ensure_remote_has_recursive(vec![testroland.digest()])
+      .wait()
+      .expect("Error uploading file");
 
     assert_eq!(
       data_summary,
-      UploadSummary::new(
-        1, testroland.digest().1, // Ingested
-        1, testroland.digest().1 // Uploaded
-      )
+      UploadSummary {
+        ingested_file_count: 1,
+        ingested_file_bytes: testroland.digest().1,
+        uploaded_file_count: 1,
+        uploaded_file_bytes: testroland.digest().1
+      }
     );
 
     // Store the directory and catnip.
     // It should see the digest of testroland already in cas,
     // and not report it in uploads.
     let dir_summary = new_store(dir.path(), cas.address())
-        .ensure_remote_has_recursive(vec![testdir.digest()])
-        .wait()
-        .expect("Error uploading directory");
+      .ensure_remote_has_recursive(vec![testdir.digest()])
+      .wait()
+      .expect("Error uploading directory");
 
     assert_eq!(
       dir_summary,
-      UploadSummary::new(
-        3, testdir.digest().1 + testroland.digest().1 + testcatnip.digest().1, // Ingested
-        2, testdir.digest().1 + testcatnip.digest().1  // Uploaded
-      )
+      UploadSummary {
+        ingested_file_count: 3,
+        ingested_file_bytes: testdir.digest().1 + testroland.digest().1 + testcatnip.digest().1,
+        uploaded_file_count: 2,
+        uploaded_file_bytes: testdir.digest().1 + testcatnip.digest().1
+      }
     );
   }
 }
