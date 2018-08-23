@@ -374,8 +374,8 @@ mod tests {
   use testutil::make_file;
 
   use super::super::{
-    Conjunction, Dir, File, GlobMatching, Path, PathGlobs, PathStat, PosixFS, ResettablePool,
-    Snapshot, Store, StrictGlobMatching,
+    Dir, File, GlobExpansionConjunction, GlobMatching, Path, PathGlobs, PathStat, PosixFS,
+    ResettablePool, Snapshot, Store, StrictGlobMatching,
   };
   use super::OneOffStoreFileByDigest;
 
@@ -692,7 +692,7 @@ mod tests {
           &["**".to_owned()],
           &[],
           StrictGlobMatching::Ignore,
-          Conjunction::And,
+          GlobExpansionConjunction::AllMatch,
         ).unwrap(),
       )
       .wait()

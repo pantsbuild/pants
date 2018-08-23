@@ -303,7 +303,7 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
           // All must match.
           GlobExpansionConjunction::AllMatch => !non_matching_inputs.is_empty(),
           // Only one needs to match.
-          GlobExpansionConjunction::AnyMatch => &include.len() <= &non_matching_inputs.len(),
+          GlobExpansionConjunction::AnyMatch => include.len() <= non_matching_inputs.len(),
         };
 
         if match_failed {
