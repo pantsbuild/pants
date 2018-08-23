@@ -20,9 +20,13 @@
 
 extern crate digest;
 extern crate hex;
+extern crate serde;
 extern crate sha2;
+#[macro_use]
+extern crate serde_derive;
 
 use digest::{Digest as DigestTrait, FixedOutput};
+use serde::{Serialize, Serializer};
 use sha2::Sha256;
 
 use std::fmt;
@@ -84,6 +88,15 @@ impl AsRef<[u8]> for Fingerprint {
   }
 }
 
+impl Serialize for Fingerprint {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer,
+  {
+    serializer.serialize_str(self.to_hex().as_str())
+  }
+}
+
 ///
 /// A Digest is a fingerprint, as well as the size in bytes of the plaintext for which that is the
 /// fingerprint.
@@ -91,7 +104,7 @@ impl AsRef<[u8]> for Fingerprint {
 /// It is equivalent to a Bazel Remote Execution Digest, but without the overhead (and awkward API)
 /// of needing to create an entire protobuf to pass around the two fields.
 ///
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize)]
 pub struct Digest(pub Fingerprint, pub usize);
 
 ///
@@ -134,6 +147,23 @@ impl<W: Write> Write for WriterHasher<W> {
 #[cfg(test)]
 mod fingerprint_tests {
   use super::Fingerprint;
+  extern crate serde_test;
+  use self::serde_test::{assert_ser_tokens, Token};
+
+  #[test]
+  fn serialize_to_str() {
+    let fingerprint = Fingerprint([
+      0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32,
+      0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+      0xff, 0xff,
+    ]);
+    assert_ser_tokens(
+      &fingerprint,
+      &[Token::Str(
+        "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
+      )],
+    );
+  }
 
   #[test]
   fn from_bytes_unsafe() {

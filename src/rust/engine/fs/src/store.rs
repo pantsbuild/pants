@@ -28,7 +28,7 @@ const LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * 1024 * 1024 * 1024;
 // Summary of the files and directories uploaded with an operation
 // ingested_file_{count, bytes}: Number and combined size of processed files
 // uploaded_file_{count, bytes}: Number and combined size of files uploaded to the remote
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize)]
 pub struct UploadSummary {
   ingested_file_count: usize,
   ingested_file_bytes: usize,

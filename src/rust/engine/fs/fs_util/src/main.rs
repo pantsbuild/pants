@@ -25,11 +25,15 @@ extern crate fs;
 extern crate futures;
 extern crate hashing;
 extern crate protobuf;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{App, Arg, SubCommand};
-use fs::{GlobMatching, ResettablePool, Snapshot, Store, StoreFileByDigest};
+use fs::{GlobMatching, ResettablePool, Snapshot, Store, StoreFileByDigest, UploadSummary};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use protobuf::Message;
@@ -52,6 +56,12 @@ impl From<String> for ExitError {
   fn from(s: String) -> Self {
     ExitError(s, ExitCode::UnknownError)
   }
+}
+
+#[derive(Serialize)]
+struct SummaryWithDigest {
+  digest: Digest,
+  summary: Option<UploadSummary>,
 }
 
 fn main() {
@@ -254,10 +264,19 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                 .store_by_digest(f)
                 .wait()
                 .unwrap();
-              if store_has_remote {
-                store.ensure_remote_has_recursive(vec![digest]).wait()?;
-              }
-              println!("{} {}", digest.0, digest.1);
+              let report = if store_has_remote {
+                let summary = store.ensure_remote_has_recursive(vec![digest]).wait()?;
+                SummaryWithDigest {
+                  digest,
+                  summary: Some(summary),
+                }
+              } else {
+                SummaryWithDigest {
+                  digest,
+                  summary: None,
+                }
+              };
+              println!("{}", serde_json::to_string_pretty(&report).unwrap());
               Ok(())
             }
             o => Err(
@@ -317,10 +336,21 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           })
           .map(|snapshot| snapshot.digest)
           .wait()?;
-        if store_has_remote {
-          store.ensure_remote_has_recursive(vec![digest]).wait()?;
-        }
-        println!("{} {}", digest.0, digest.1);
+
+        let report = if store_has_remote {
+          let summary = store.ensure_remote_has_recursive(vec![digest]).wait()?;
+          SummaryWithDigest {
+            digest,
+            summary: Some(summary),
+          }
+        } else {
+          SummaryWithDigest {
+            digest,
+            summary: None,
+          }
+        };
+        println!("{}", serde_json::to_string_pretty(&report).unwrap());
+
         Ok(())
       }
       ("cat-proto", Some(args)) => {
