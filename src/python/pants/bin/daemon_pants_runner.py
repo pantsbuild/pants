@@ -283,13 +283,13 @@ class DaemonPantsRunner(ProcessManager):
     NailgunProtocol.send_pid(self._socket, pid)
 
     try:
-      # Setup the Exiter's finalizer.
-      self._exiter.set_finalizer(finalizer)
-
       # Invoke a Pants run with stdio redirected and a proxied environment.
       with self.nailgunned_stdio(self._socket, self._env) as finalizer,\
            hermetic_environment_as(**self._env):
         try:
+          # Setup the Exiter's finalizer.
+          self._exiter.set_finalizer(finalizer)
+
           # Clean global state.
           clean_global_runtime_state(reset_subsystem=True)
 
