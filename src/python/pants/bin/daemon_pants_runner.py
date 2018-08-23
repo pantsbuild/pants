@@ -282,33 +282,34 @@ class DaemonPantsRunner(ProcessManager):
     pid = str(os.getpgrp() * -1).encode('ascii')
     NailgunProtocol.send_pid(self._socket, pid)
 
-    # Invoke a Pants run with stdio redirected and a proxied environment.
-    with self.nailgunned_stdio(self._socket, self._env) as finalizer,\
-         hermetic_environment_as(**self._env):
-      try:
-        # Setup the Exiter's finalizer.
-        self._exiter.set_finalizer(finalizer)
+    try:
+      # Setup the Exiter's finalizer.
+      self._exiter.set_finalizer(finalizer)
 
-        # Clean global state.
-        clean_global_runtime_state(reset_subsystem=True)
+      # Invoke a Pants run with stdio redirected and a proxied environment.
+      with self.nailgunned_stdio(self._socket, self._env) as finalizer,\
+           hermetic_environment_as(**self._env):
+        try:
+          # Clean global state.
+          clean_global_runtime_state(reset_subsystem=True)
 
-        # Re-raise any deferred exceptions, if present.
-        self._raise_deferred_exc()
+          # Re-raise any deferred exceptions, if present.
+          self._raise_deferred_exc()
 
-        # Otherwise, conduct a normal run.
-        runner = LocalPantsRunner.create(
-          self._exiter,
-          self._args,
-          self._env,
-          self._target_roots,
-          self._graph_helper,
-          self._options_bootstrapper
-        )
-        runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
-        runner.run()
-      except KeyboardInterrupt:
-        self._exiter.exit(1, msg='Interrupted by user.\n')
-      except Exception:
-        self._exiter.handle_unhandled_exception(add_newline=True)
-      else:
-        self._exiter.exit(0)
+          # Otherwise, conduct a normal run.
+          runner = LocalPantsRunner.create(
+            self._exiter,
+            self._args,
+            self._env,
+            self._target_roots,
+            self._graph_helper,
+            self._options_bootstrapper
+          )
+          runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
+          runner.run()
+        except KeyboardInterrupt:
+          self._exiter.exit(1, msg='Interrupted by user.\n')
+    except Exception:
+      self._exiter.handle_unhandled_exception(add_newline=True)
+    else:
+      self._exiter.exit(0)
