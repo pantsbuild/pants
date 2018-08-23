@@ -128,6 +128,9 @@ directory, relative to the root.",
                 .arg(Arg::with_name("root").long("root").required(true).takes_value(true).help(
                   "Root under which the globs live. The Directory proto produced will be relative \
 to this directory.",
+            ))
+                .arg(Arg::with_name("json").long("json").multiple(false).takes_value(true).help(
+                  "Set --json=true to display a JSON report of the ingested and uploaded files."
                 )),
           )
           .subcommand(
@@ -276,7 +279,12 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                   summary: None,
                 }
               };
-              println!("{}", serde_json::to_string_pretty(&report).unwrap());
+
+              match args.value_of("json") {
+                Some("true") => println!("{}", serde_json::to_string_pretty(&report).unwrap()),
+                _ => println!("{} {}", digest.0, digest.1),
+              };
+
               Ok(())
             }
             o => Err(
@@ -349,7 +357,11 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             summary: None,
           }
         };
-        println!("{}", serde_json::to_string_pretty(&report).unwrap());
+
+        match args.value_of("json") {
+          Some("true") => println!("{}", serde_json::to_string_pretty(&report).unwrap()),
+          _ => println!("{} {}", digest.0, digest.1),
+        };
 
         Ok(())
       }
