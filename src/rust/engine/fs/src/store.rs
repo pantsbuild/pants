@@ -95,7 +95,7 @@ impl Store {
   {
     self.local.with_reset(|| {
       if let Some(ref remote) = self.remote {
-        remote.with_reset(|| f())
+        remote.with_reset(f)
       } else {
         f()
       }
@@ -671,7 +671,7 @@ mod local {
       self
         .inner
         .file_dbs
-        .with_reset(|| self.inner.directory_dbs.with_reset(|| f()))
+        .with_reset(|| self.inner.directory_dbs.with_reset(f))
     }
 
     // Note: This performs IO on the calling thread. Hopefully the IO is small enough not to matter.
@@ -1641,7 +1641,7 @@ mod remote {
         self.env.with_reset(|| {
           self
             .cas_client
-            .with_reset(|| self.byte_stream_client.with_reset(|| f()))
+            .with_reset(|| self.byte_stream_client.with_reset(f))
         })
       })
     }
