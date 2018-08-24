@@ -7,6 +7,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 from builtins import object
 
+from future.utils import PY3
+
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.build_environment import pants_version
 from pants.base.exceptions import TargetDefinitionException
@@ -50,9 +52,7 @@ class PantsRequirement(object):
                                       msg='The {} target only works for pantsbuild.pants '
                                           'distributions, given {}'.format(self.alias, dist))
 
-    # TODO(John Sirois): Modify to constraint to >=3.5,<4 as part of
-    # https://github.com/pantsbuild/pants/issues/6062
-    env_marker = "python_version>='2.7' and python_version<'3'"
+    env_marker = "python_version>='3.4'" if PY3 else "python_version>='2.7' and python_version<'3'"
 
     requirement = PythonRequirement(requirement="{key}=={version} ; {env_marker}"
                                     .format(key=dist,

@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from future.utils import PY3
+
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.register import build_file_aliases
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -35,9 +37,24 @@ class PantsRequirementTest(TestBase):
     self.assertIsNotNone(req.requirement.marker)
     self.assertTrue(req.requirement.marker.evaluate(),
                     'pants_requirement() should always work in the current test environment')
-    self.assertFalse(req.requirement.marker.evaluate({'python_version': '3.5'}))
-    self.assertFalse(req.requirement.marker.evaluate({'python_version': '2.6'}))
-    self.assertTrue(req.requirement.marker.evaluate({'python_version': '2.7'}))
+
+    def evaluate_version(version):
+      return req.requirement.marker.evaluate({'python_version': version})
+
+    py3_used = any({
+      evaluate_version('3.4'),
+      evaluate_version('3.5'),
+      evaluate_version('3.6'),
+      evaluate_version('3.7')
+    })
+
+    self.assertFalse(evaluate_version('2.6'))
+    if PY3:
+      self.assertFalse(evaluate_version('2.7'))
+      self.assertTrue(py3_used)
+    else:
+      self.assertTrue(evaluate_version('2.7'))
+      self.assertFalse(py3_used)
 
   def test_default_name(self):
     self.add_to_build_file('3rdparty/python/pants', 'pants_requirement()')
