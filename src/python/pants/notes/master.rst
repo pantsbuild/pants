@@ -1,8 +1,39 @@
 Master Pre-Releases
 ===================
 
+1.10.0.dev4 (08/24/2018)
+------------------------
+
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Requirements on language-specific sources should be optional. (#6375)
+  `PR #6375 <https://github.com/pantsbuild/pants/pull/6375>`_
+
+* Deprecate --quiet recursive option (#6156)
+  `PR #6156 <https://github.com/pantsbuild/pants/pull/6156>`_
+
+* Decode python_eval template resource as utf-8. (#6379)
+  `PR #6379 <https://github.com/pantsbuild/pants/pull/6379>`_
+
+* Use set literals & set comprehensions where possible (#6376)
+  `PR #6376 <https://github.com/pantsbuild/pants/pull/6376>`_
+
+* [engine] Add note to readme about fs_util (#6377)
+  `PR #6377 <https://github.com/pantsbuild/pants/pull/6377>`_
+
+* Stabilize test case sorting in suites. (#6371)
+  `PR #6371 <https://github.com/pantsbuild/pants/pull/6371>`_
+
+Migration to Python3 compatibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Pin interpreter <3.7 in ci. (#6364)
+  `PR #6364 <https://github.com/pantsbuild/pants/pull/6364>`_
+
 
 1.10.0.dev3 (08/20/2018)
 ------------------------
