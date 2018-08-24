@@ -263,23 +263,6 @@ class JsonParserTest(unittest.TestCase):
 
 
 class JsonEncoderTest(unittest.TestCase):
-  # Py3.6+ guarantees order of dictionaries by insertion order, resulting in
-  # a different order than <Py3.6.
-  # The tests support both ordering, rather than us modifying the source code to
-  # guarantee a consistent order, because this does not impact actual code, only the tests.
-
-  NAME_JSON = r'"name": "bob"'
-  TYPE_ALIAS_JSON = r'"type_alias": "pants_test.engine.test_parsers.Bob"'
-  FRIEND_JSON = dedent('''
-    "friend": {
-      "name": "bill",
-      "type_alias": "pants_test.engine.test_parsers.Bob"
-    }''')
-  RELATIVE_JSON = dedent('''
-    "relative": {
-        "name": "bill",
-        "type_alias": "pants_test.engine.test_parsers.Bob"
-    }''')
 
   def setUp(self):
     bill = Bob(name='bill')
@@ -297,32 +280,38 @@ class JsonEncoderTest(unittest.TestCase):
     self.bob = Bob(name='bob', relative=resolvable_bill, friend=bill)
 
   def _assert_valid_output(self, relative_json_value, is_inline):
+    # Py3.6+ guarantees order of dictionaries by insertion order, but Py 3.3-3.5 have non-deterministic dictionary
+    # order. So, we first try to assert the order is the same, and then fall back to ignoring order to get the test
+    # working on all interpreters.
     expected = json.dumps(json.loads(dedent("""
         {{
-          {name_json},
-          {relative_json},
-          {friend_json},
-          {type_alias_json}
+          "name": "bob",
+          {},
+          "friend": {{
+            "name": "bill",
+            "type_alias": "pants_test.engine.test_parsers.Bob"
+          }},
+          "type_alias": "pants_test.engine.test_parsers.Bob"
         }}
-        """.format(
-      name_json=self.NAME_JSON,
-      relative_json=relative_json_value,
-      friend_json=self.FRIEND_JSON,
-      type_alias_json=self.TYPE_ALIAS_JSON).strip()
-    ))).split('\n')
-    output = parsers.encode_json(self.bob, inline=is_inline).split('\n')
+        """.format(relative_json_value).strip()
+    ))).split(',')
+    output = parsers.encode_json(self.bob, inline=is_inline).split(',')
     try:
       self.assertEqual(expected, output)
     except AssertionError:
-      # Python 3.3-3.5 have non-deterministic dictionary order, meaning the outputted json may vary in order.
       self.assertEqual(set(expected), set(output))
 
   def test_shallow_encoding(self):
-    opaque_relative_json = r'"relative": "::an opaque address::"'
-    self._assert_valid_output(relative_json_value=opaque_relative_json, is_inline=False)
+    relative_json_value = '"relative": "::an opaque address::"'
+    self._assert_valid_output(relative_json_value=relative_json_value, is_inline=False)
 
   def test_inlined_encoding(self):
-    self._assert_valid_output(relative_json_value=self.RELATIVE_JSON, is_inline=True)
+    relative_json_value = dedent('''
+      "relative": {
+          "name": "bill",
+          "type_alias": "pants_test.engine.test_parsers.Bob"
+      }''')
+    self._assert_valid_output(relative_json_value=relative_json_value, is_inline=True)
 
 
 class PythonAssignmentsParserTest(unittest.TestCase):
