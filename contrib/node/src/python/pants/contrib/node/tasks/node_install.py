@@ -9,7 +9,20 @@ from pants.contrib.node.tasks.node_task import NodeTask
 
 
 class NodeInstall(NodeTask):
-  """Installs a node_module target into the source directory"""
+  """Installs a node_module target into the source directory
+
+  Note:
+    Running the node install on an example_project will install into the local source dir
+    rather than in the typical .pants.d working directory.
+
+    This task is intended to set up the environment for development purposes rather than
+    to run tests or other isolated tasks.
+
+  Example:
+    ./pants node-install src/node/example_project:example_project
+
+    This will produce a node_modules dir in `src/node/example_project/node_modules`
+  """
 
   @classmethod
   def prepare(cls, options, round_manager):
