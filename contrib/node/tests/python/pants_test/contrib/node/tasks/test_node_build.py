@@ -126,7 +126,7 @@ class TestNodeBuild(TaskTestBase):
       os.path.realpath(target_paths[0]),
       os.path.realpath(os.path.join(target_classpaths[0][1], 'build_test')))
     self.assertTrue(os.path.realpath(target_paths[0]).endswith('myOutput'))
-    self.assertEqual(set(os.listdir(target_paths[0])), set(['output_file']))
+    self.assertEqual(set(os.listdir(target_paths[0])), {'output_file'})
     with open(os.path.join(target_paths[0], 'output_file'), 'r') as f:
       self.assertEqual(f.read(), 'Hello, world!\n')
 

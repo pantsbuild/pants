@@ -13,6 +13,8 @@ from builtins import open, str
 from contextlib import contextmanager
 from textwrap import dedent
 
+from future.utils import text_type
+
 from pants.base.deprecated import CodeRemovedError
 from pants.engine.fs import FileContent
 from pants.option.arg_splitter import GLOBAL_SCOPE
@@ -31,6 +33,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
 
@@ -48,6 +51,31 @@ def subsystem(scope):
 
 
 class OptionsTest(unittest.TestCase):
+
+  @contextmanager
+  def _write_config_to_file(self, fp, config):
+    for section, options in config.items():
+      fp.write('[{}]\n'.format(section))
+      for key, value in options.items():
+        fp.write('{}: {}\n'.format(key, value))
+
+  def _create_config(self, config):
+    with open(os.path.join(safe_mkdtemp(), 'test_config.ini'), 'w') as fp:
+      self._write_config_to_file(fp, config)
+    return Config.load(config_paths=[fp.name])
+
+  def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None, options_cls=None):
+    args = shlex.split(str(args_str))
+    options_type = options_cls or Options
+    options = options_type.create(env=env or {},
+                                  config=self._create_config(config or {}),
+                                  known_scope_infos=OptionsTest._known_scope_infos,
+                                  args=args,
+                                  bootstrap_option_values=bootstrap_option_values,
+                                  option_tracker=OptionTracker())
+    self._register(options)
+    return options
+
   _known_scope_infos = [intermediate('compile'),
                         task('compile.java'),
                         task('compile.scala'),
@@ -158,29 +186,6 @@ class OptionsTest(unittest.TestCase):
     options.register('fingerprinting', '--definitely-not-inverted', daemon=False)
     options.register('fingerprinting', '--fingerprinted', fingerprint=True)
     options.register('fingerprinting', '--definitely-not-fingerprinted', fingerprint=False)
-
-  @contextmanager
-  def _write_config_to_file(self, fp, config):
-    for section, options in config.items():
-      fp.write('[{}]\n'.format(section))
-      for key, value in options.items():
-        fp.write('{}: {}\n'.format(key, value))
-
-  def _create_config(self, config):
-    with open(os.path.join(safe_mkdtemp(), 'test_config.ini'), 'w') as fp:
-      self._write_config_to_file(fp, config)
-    return Config.load(config_paths=[fp.name])
-
-  def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None):
-    args = shlex.split(str(args_str))
-    options = Options.create(env=env or {},
-                             config=self._create_config(config or {}),
-                             known_scope_infos=OptionsTest._known_scope_infos,
-                             args=args,
-                             bootstrap_option_values=bootstrap_option_values,
-                             option_tracker=OptionTracker())
-    self._register(options)
-    return options
 
   def test_env_type_int(self):
     options = Options.create(env={'PANTS_FOO_BAR': "['123','456']"},
@@ -792,6 +797,8 @@ class OptionsTest(unittest.TestCase):
 
   def test_deprecated_option_past_removal(self):
     """Ensure that expired options raise CodeRemovedError on attempted use."""
+    # NB: these exceptions are triggered by the `Parser#parse_args()` method, not
+    # `Options#for_scope()`!
     # Test option past removal from flag
     with self.assertRaises(CodeRemovedError):
       self._parse('./pants --global-crufty-expired=way2crufty').for_global_scope()
@@ -811,12 +818,25 @@ class OptionsTest(unittest.TestCase):
       yield w
 
   def assertWarning(self, w, option_string):
-    self.assertEqual(1, len(w))
-    self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
-    warning_message = str(w[-1].message.args)
-    self.assertIn("will be removed in version",
-                  warning_message)
-    self.assertIn(option_string, warning_message)
+    single_warning = assert_single_element(w)
+    self.assertEqual(single_warning.category, DeprecationWarning)
+    warning_message = single_warning.message
+    self.assertIn("will be removed in version", text_type(warning_message))
+    self.assertIn(option_string, text_type(warning_message))
+
+  def test_arbitrary_deprecation_matcher(self):
+    def _matcher(_scope, flags, _values):
+      if any(f.startswith('--int-choices') for f in flags):
+        return dict(removal_version='9999.9.9.dev0',
+                    deprecated_entity_description='int choices test option')
+
+    class OptionsWithDeprecation(Options):
+      flag_matchers = [_matcher]
+
+    with self.warnings_catcher() as w:
+      options = self._parse('./pants --int-choices=42', options_cls=OptionsWithDeprecation)
+      self.assertEqual(options.for_global_scope().int_choices, [42])
+      self.assertWarning(w, 'int choices')
 
   def test_deprecated_options_flag(self):
     with self.warnings_catcher() as w:
@@ -1289,9 +1309,9 @@ class OptionsTest(unittest.TestCase):
       vals1 = options.for_scope(DummyOptionable1.options_scope)
 
     # Check that we got a warning, but not for the inherited option.
-    self.assertEqual(1, len(w))
-    self.assertTrue(isinstance(w[0].message, DeprecationWarning))
-    self.assertNotIn('inherited', w[0].message.args)
+    single_warning_dummy1 = assert_single_element(w)
+    self.assertEqual(single_warning_dummy1.category, DeprecationWarning)
+    self.assertNotIn('inherited', single_warning_dummy1.message)
 
     # Check values.
     # Deprecated scope takes precedence at equal rank.
@@ -1304,9 +1324,9 @@ class OptionsTest(unittest.TestCase):
       vals2 = options.for_scope(DummyOptionable2.options_scope)
 
     # Check that we got a warning.
-    self.assertEqual(1, len(w))
-    self.assertTrue(isinstance(w[0].message, DeprecationWarning))
-    self.assertNotIn('inherited', w[0].message.args)
+    single_warning_dummy2 = assert_single_element(w)
+    self.assertEqual(single_warning_dummy2.category, DeprecationWarning)
+    self.assertNotIn('inherited', single_warning_dummy2.message)
 
     # Check values.
     self.assertEqual('uu', vals2.qux)

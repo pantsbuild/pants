@@ -211,7 +211,7 @@ def addresses_from_address_families(address_mapper, specs):
   """
   # Capture a Snapshot covering all paths for these Specs, then group by directory.
   snapshot = yield Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
-  dirnames = set(dirname(f.stat.path) for f in snapshot.files)
+  dirnames = {dirname(f.stat.path) for f in snapshot.files}
   address_families = yield [Get(AddressFamily, Dir(d)) for d in dirnames]
 
   # NB: `@memoized` does not work on local functions.

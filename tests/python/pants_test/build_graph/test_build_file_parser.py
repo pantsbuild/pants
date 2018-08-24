@@ -174,9 +174,9 @@ class BuildFileParserTargetTest(BaseTestWithParser):
       BuildFile.get_build_files_family(FileSystemProjectTree(self.build_root), "."))
     addresses = address_map.keys()
     self.assertEqual({bar_build_file.relpath, base_build_file.relpath, foo_build_file.relpath},
-                     set([address.rel_path for address in addresses]))
+                     {address.rel_path for address in addresses})
     self.assertEqual({'//:base', '//:foo', '//:bat'},
-                     set([address.spec for address in addresses]))
+                     {address.spec for address in addresses})
 
   def test_build_file_duplicates(self):
     # This workspace has two targets in the same file with the same name.

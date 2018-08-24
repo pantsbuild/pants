@@ -399,7 +399,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
     def root_package_prefix(source_file):
       source = os.path.dirname(source_file)
       return os.path.join(get_buildroot(), target.target_base, source), source.replace(os.sep, '.')
-    return set(root_package_prefix(source) for source in target.sources_relative_to_source_root())
+    return {root_package_prefix(source) for source in target.sources_relative_to_source_root()}
 
 
 class Export(ExportTask, ConsoleTask):

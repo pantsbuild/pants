@@ -93,7 +93,7 @@ class ArgSplitter(object):
     # TODO: Get rid of our reliance on known scopes here. We don't really need it now
     # that we heuristically identify target specs based on it containing /, : or being
     # a top-level directory.
-    self._known_scopes = (set([si.scope for si in known_scope_infos]) |
+    self._known_scopes = ({si.scope for si in known_scope_infos} |
                           {'help', 'help-advanced', 'help-all'})
     self._unknown_scopes = []
     self._unconsumed_args = []  # In reverse order, for efficient popping off the end.
