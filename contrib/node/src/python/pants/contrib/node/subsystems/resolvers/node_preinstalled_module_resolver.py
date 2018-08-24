@@ -18,8 +18,7 @@ from pants.util.dirutil import safe_rmtree
 
 from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
-from pants.contrib.node.tasks.node_resolve import NodeResolve
-from pants.contrib.node.tasks.node_resolve_local import NodeResolveLocal
+from pants.contrib.node.tasks.node_resolve import NodeResolve, NodeResolveLocal
 
 
 class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):

@@ -16,9 +16,7 @@ target(
 
 python_library(
   name='node_paths',
-  sources=[
-    'node_paths.py',
-    'node_paths_local.py'],
+  sources=['node_paths.py'],
   dependencies = [
     '3rdparty/python:future',
   ],
@@ -80,9 +78,7 @@ python_library(
 
 python_library(
   name='node_resolve',
-  sources=[
-   'node_resolve.py',
-   'node_resolve_local.py'],
+  sources=['node_resolve.py'],
   dependencies=[
     ':node_paths',
     ':node_task',

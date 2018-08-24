@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.contrib.node.tasks.node_paths_local import NodePathsLocal
+from pants.contrib.node.tasks.node_paths import NodePathsLocal
 from pants.contrib.node.tasks.node_task import NodeTask
 
 

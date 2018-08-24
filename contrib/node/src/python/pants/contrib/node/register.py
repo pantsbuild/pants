@@ -21,8 +21,7 @@ from pants.contrib.node.tasks.node_build import NodeBuild
 from pants.contrib.node.tasks.node_bundle import NodeBundle as NodeBundleTask
 from pants.contrib.node.tasks.node_install import NodeInstall
 from pants.contrib.node.tasks.node_repl import NodeRepl
-from pants.contrib.node.tasks.node_resolve import NodeResolve
-from pants.contrib.node.tasks.node_resolve_local import NodeResolveLocal
+from pants.contrib.node.tasks.node_resolve import NodeResolve, NodeResolveLocal
 from pants.contrib.node.tasks.node_run import NodeRun
 from pants.contrib.node.tasks.node_test import NodeTest as NodeTestTask
 

@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from textwrap import dedent
 
 import mock
+from pants.base.exceptions import TaskError
 from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver import \
@@ -14,8 +15,8 @@ from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver i
 from pants.contrib.node.subsystems.resolvers.npm_resolver import NpmResolver
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
-from pants.contrib.node.tasks.node_paths_local import NodePathsLocal
-from pants.contrib.node.tasks.node_resolve_local import NodeResolveLocal
+from pants.contrib.node.tasks.node_paths import NodePathsLocal
+from pants.contrib.node.tasks.node_resolve import NodeResolveLocal
 
 
 class NodeResolveLocalTest(TaskTestBase):
@@ -145,12 +146,14 @@ class NodeResolveLocalTest(TaskTestBase):
       expected_params=['--non-interactive', '--ignore-optional', '--production=true'])
 
   def test_resolve_default_no_options_npm(self):
-    self._test_resolve_options_helper(
-      install_optional=False,
-      force_option_override=False,
-      production_only=False,
-      force=False,
-      frozen_lockfile=True,
-      package_manager='npm',
-      has_lock_file=True,
-      expected_params=['--non-interactive', '--force'])
+    unsupported = 'not supported for NPM'
+    with self.assertRaisesRegexp(TaskError, unsupported):
+      self._test_resolve_options_helper(
+        install_optional=False,
+        force_option_override=False,
+        production_only=False,
+        force=False,
+        frozen_lockfile=True,
+        package_manager='npm',
+        has_lock_file=True,
+        expected_params=['--non-interactive', '--force'])

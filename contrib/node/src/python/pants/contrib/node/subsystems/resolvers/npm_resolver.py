@@ -18,8 +18,7 @@ from pants.contrib.node.subsystems.package_managers import (PACKAGE_MANAGER_NPM,
                                                             PACKAGE_MANAGER_YARNPKG)
 from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 from pants.contrib.node.targets.node_module import NodeModule
-from pants.contrib.node.tasks.node_resolve import NodeResolve
-from pants.contrib.node.tasks.node_resolve_local import NodeResolveLocal
+from pants.contrib.node.tasks.node_resolve import NodeResolve, NodeResolveLocal
 
 
 class NpmResolver(Subsystem, NodeResolverBase):
