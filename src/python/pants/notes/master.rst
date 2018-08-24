@@ -1,11 +1,12 @@
 Master Pre-Releases
 ===================
 
-1.10.0.dev4 (08/24/2018)
-------------------------
-
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
+
+
+1.10.0.dev4 (08/24/2018)
+------------------------
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -22,9 +23,6 @@ Refactoring, Improvements, and Tooling
 * Use set literals & set comprehensions where possible (#6376)
   `PR #6376 <https://github.com/pantsbuild/pants/pull/6376>`_
 
-* [engine] Add note to readme about fs_util (#6377)
-  `PR #6377 <https://github.com/pantsbuild/pants/pull/6377>`_
-
 * Stabilize test case sorting in suites. (#6371)
   `PR #6371 <https://github.com/pantsbuild/pants/pull/6371>`_
 
@@ -33,6 +31,12 @@ Migration to Python3 compatibility
 
 * Pin interpreter <3.7 in ci. (#6364)
   `PR #6364 <https://github.com/pantsbuild/pants/pull/6364>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* [engine] Add note to readme about fs_util (#6377)
+  `PR #6377 <https://github.com/pantsbuild/pants/pull/6377>`_
 
 
 1.10.0.dev3 (08/20/2018)
