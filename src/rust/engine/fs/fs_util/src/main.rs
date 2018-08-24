@@ -280,11 +280,11 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                 }
               };
 
-              match args.value_of("json") {
-                Some("true") => println!("{}", serde_json::to_string_pretty(&report).unwrap()),
-                _ => println!("{} {}", digest.0, digest.1),
+              if let Some("true") = args.value_of("json") {
+                println!("{}", serde_json::to_string_pretty(&report).unwrap());
+              } else {
+                println!("{} {}", report.digest.0, report.digest.1);
               };
-
               Ok(())
             }
             o => Err(
@@ -358,9 +358,10 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           }
         };
 
-        match args.value_of("json") {
-          Some("true") => println!("{}", serde_json::to_string_pretty(&report).unwrap()),
-          _ => println!("{} {}", digest.0, digest.1),
+        if let Some("true") = args.value_of("json") {
+          println!("{}", serde_json::to_string_pretty(&report).unwrap());
+        } else {
+          println!("{} {}", report.digest.0, report.digest.1);
         };
 
         Ok(())
