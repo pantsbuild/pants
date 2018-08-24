@@ -120,8 +120,8 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
   def prepare(cls, options, round_manager):
     super(ExportTask, cls).prepare(options, round_manager)
     if options.libraries or options.libraries_sources or options.libraries_javadocs:
-      round_manager.require_data('java')
-      round_manager.require_data('scala')
+      round_manager.optional_data('java')
+      round_manager.optional_data('scala')
 
   @memoized_property
   def _interpreter_cache(self):

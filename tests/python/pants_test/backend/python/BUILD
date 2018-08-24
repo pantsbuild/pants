@@ -48,6 +48,7 @@ python_tests(
   dependencies=[
     ':pants_requirement_integration_test_base',
     'src/python/pants/base:build_environment',
+    'tests/python/pants_test:int-test',
   ],
   tags={'integration'},
 )

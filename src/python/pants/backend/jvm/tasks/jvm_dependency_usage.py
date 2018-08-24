@@ -75,9 +75,9 @@ class JvmDependencyUsage(Task):
       round_manager.require_data('product_deps_by_src')
     else:
       # We want to have synthetic targets in build graph to deserialize nodes properly.
-      round_manager.require_data('java')
-      round_manager.require_data('scala')
-      round_manager.require_data('deferred_sources')
+      round_manager.optional_data('java')
+      round_manager.optional_data('scala')
+      round_manager.optional_data('deferred_sources')
 
   @classmethod
   def skip(cls, options):
