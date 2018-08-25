@@ -19,20 +19,19 @@ class JavaAntlrLibraryTest(TestBase):
     return BuildFileAliases(targets={'java_antlr_library': JavaAntlrLibrary})
 
   def test_empty(self):
-    with self.assertRaises(TargetDefinitionException) as cm:
+    with self.assertRaisesRegexp(TargetDefinitionException,
+                                 "the sources parameter.*contains an empty snapshot."):
       self.add_to_build_file('BUILD', dedent('''
         java_antlr_library(name='foo',
           sources=[],
         )'''))
       self.foo = self.target('//:foo')
-    expected_msg = (
-      "Invalid target JavaAntlrLibrary(address not yet set): the sources parameter EagerFilesetWithSpec(rel_root=u'', snapshot=Snapshot(directory_digest=DirectoryDigest(fingerprint=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855, serialized_bytes_length=0), path_stats=())) contains an empty snapshot.")
-    self.assertEqual(expected_msg, str(cm.exception))
 
   def test_valid(self):
+    self.create_file(self.build_path('something.txt'), contents='asdf', mode='w')
     self.add_to_build_file('BUILD', dedent('''
       java_antlr_library(name='foo',
-        sources=['foo'],
+        sources=['something.txt'],
       )'''))
     self.foo = self.target('//:foo')
     self.assertIsInstance(self.foo, JavaAntlrLibrary)

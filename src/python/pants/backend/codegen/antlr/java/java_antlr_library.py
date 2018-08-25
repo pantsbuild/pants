@@ -31,6 +31,8 @@ class JavaAntlrLibrary(JvmTarget):
         the sources are spread among different files, this must be set as the package cannot be
         inferred.
     """
+    if compiler not in ('antlr3', 'antlr4'):
+      raise TargetDefinitionException(self, "Illegal value for 'compiler': {}.".format(compiler))
 
     if isinstance(sources, EagerFilesetWithSpec):
       if sources.snapshot.is_empty:
@@ -38,8 +40,6 @@ class JavaAntlrLibrary(JvmTarget):
                                         .format(sources))
     elif not sources:
       raise TargetDefinitionException(self, "Missing required 'sources' parameter.")
-    elif compiler not in ('antlr3', 'antlr4'):
-      raise TargetDefinitionException(self, "Illegal value for 'compiler': {}.".format(compiler))
 
     super(JavaAntlrLibrary, self).__init__(name=name,
                                            sources=sources,
