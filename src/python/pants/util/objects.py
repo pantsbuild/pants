@@ -181,9 +181,10 @@ def enum(field_name, all_values):
                      NB: `all_values` must be a finite, non-empty iterable with unique values!
   """
 
-  # `OrderedSet` maintains the order of the input iterable, and will eagerly evaluate any input
-  # which would otherwise be lazy, such as a generator.
+  # This call to list() will eagerly evaluate any `all_values` which would otherwise be lazy, such
+  # as a generator.
   all_values_realized = list(all_values)
+  # `OrderedSet` maintains the order of the input iterable, but is faster to check membership.
   allowed_values_set = OrderedSet(all_values_realized)
 
   if len(allowed_values_set) < len(all_values_realized):
@@ -197,7 +198,7 @@ def enum(field_name, all_values):
 
     @memoized_classproperty
     def _singletons(cls):
-      """Generate memoized instances this enum wrapping each of this enum's allowed values."""
+      """Generate memoized instances of this enum wrapping each of this enum's allowed values."""
       return { value: cls(value) for value in cls.allowed_values }
 
     @classmethod
