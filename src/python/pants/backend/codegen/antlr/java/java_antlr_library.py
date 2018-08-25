@@ -5,6 +5,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.base.exceptions import TargetDefinitionException
+from pants.source.wrapped_globs import EagerFilesetWithSpec
 
 
 class JavaAntlrLibrary(JvmTarget):
@@ -30,16 +32,21 @@ class JavaAntlrLibrary(JvmTarget):
         inferred.
     """
 
+    if isinstance(sources, EagerFilesetWithSpec):
+      if sources.snapshot.is_empty:
+        raise TargetDefinitionException(self, "the sources parameter {} contains an empty snapshot."
+                                        .format(sources))
+    elif not sources:
+      raise TargetDefinitionException(self, "Missing required 'sources' parameter.")
+    elif compiler not in ('antlr3', 'antlr4'):
+      raise TargetDefinitionException(self, "Illegal value for 'compiler': {}.".format(compiler))
+
     super(JavaAntlrLibrary, self).__init__(name=name,
                                            sources=sources,
                                            provides=provides,
                                            excludes=excludes,
                                            **kwargs)
-    if not sources:
-      raise ValueError("Missing required 'sources' parameter.")
-    self.sources = sources
 
-    if compiler not in ('antlr3', 'antlr4'):
-      raise ValueError("Illegal value for 'compiler': {}".format(compiler))
+    self.sources = sources
     self.compiler = compiler
     self.package = package

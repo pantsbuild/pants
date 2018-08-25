@@ -97,6 +97,10 @@ class Snapshot(datatype([('directory_digest', DirectoryDigest), ('path_stats', t
   """
 
   @property
+  def is_empty(self):
+    return self == EMPTY_SNAPSHOT
+
+  @property
   def dirs(self):
     return [p for p in self.path_stats if type(p.stat) == Dir]
 
