@@ -52,7 +52,7 @@ class PantsRequirement(object):
                                       msg='The {} target only works for pantsbuild.pants '
                                           'distributions, given {}'.format(self.alias, dist))
 
-    env_marker = "python_version>='3.4'" if PY3 else "python_version>='2.7' and python_version<'3'"
+    env_marker = "python_version>='3.4' or (python_version>='2.7' and python_version<'3')"
 
     requirement = PythonRequirement(requirement="{key}=={version} ; {env_marker}"
                                     .format(key=dist,

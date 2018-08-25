@@ -41,20 +41,10 @@ class PantsRequirementTest(TestBase):
     def evaluate_version(version):
       return req.requirement.marker.evaluate({'python_version': version})
 
-    py3_used = any({
-      evaluate_version('3.4'),
-      evaluate_version('3.5'),
-      evaluate_version('3.6'),
-      evaluate_version('3.7')
-    })
+    allowed_versions = {'2.7', '3.4', '3.5', '3.6', '3.7'}
 
     self.assertFalse(evaluate_version('2.6'))
-    if PY3:
-      self.assertFalse(evaluate_version('2.7'))
-      self.assertTrue(py3_used)
-    else:
-      self.assertTrue(evaluate_version('2.7'))
-      self.assertFalse(py3_used)
+    self.assertTrue(all(evaluate_version(v) for v in allowed_versions))
 
   def test_default_name(self):
     self.add_to_build_file('3rdparty/python/pants', 'pants_requirement()')
