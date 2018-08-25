@@ -7,8 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 from builtins import object
 
-from future.utils import PY3
-
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.build_environment import pants_version
 from pants.base.exceptions import TargetDefinitionException
