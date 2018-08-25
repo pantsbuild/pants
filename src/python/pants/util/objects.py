@@ -181,26 +181,48 @@ def enum(field_name, all_values):
                      NB: `all_values` must be a finite, non-empty iterable with unique values!
   """
 
-  class ChoiceDatatype(datatype([field_name])):
+  # `OrderedSet` maintains the order of the input iterable, and will eagerly evaluate any input
+  # which would otherwise be lazy, such as a generator.
+  all_values_realized = list(all_values)
+  allowed_values_set = OrderedSet(all_values_realized)
 
-    # `OrderedSet` maintains the order of the input iterable, and will eagerly evaluate any input
-    # which would otherwise be lazy, such as a generator.
-    allowed_values = OrderedSet(all_values)
-    default_value = iter(allowed_values).next()
+  if len(allowed_values_set) < len(all_values_realized):
+    raise ValueError("When converting all_values ({}) to a set, at least one duplicate "
+                     "was detected. The unique elements of all_values were: {}."
+                     .format(all_values_realized, allowed_values_set))
+
+  class ChoiceDatatype(datatype([field_name])):
+    allowed_values = allowed_values_set
+    default_value = next(iter(allowed_values))
 
     @memoized_classproperty
     def _singletons(cls):
       """Generate memoized instances this enum wrapping each of this enum's allowed values."""
-      return {
-        value: cls(value) for value in cls.allowed_values
-      }
+      return { value: cls(value) for value in cls.allowed_values }
+
+    @classmethod
+    def _check_value(cls, value):
+      if value not in cls.allowed_values:
+        raise cls.make_type_error(
+          "Value {!r} for '{}' must be one of: {!r}."
+          .format(value, field_name, cls.allowed_values))
 
     @classmethod
     def create(cls, value=None):
+      # If we get an instance of this enum class, just return it. This means you can call .create()
+      # on None, an allowed value for the enum, or an existing instance of the enum.
       if isinstance(value, cls):
         return value
-      if not value:
+
+      # Providing an explicit value that is not None will *not* use the default value!
+      if value is None:
         value = cls.default_value
+
+      # We actually circumvent the constructor in this method due to the cls._singletons
+      # memoized_classproperty, but we want to raise the same error, so we move checking into a
+      # common method.
+      cls._check_value(value)
+
       return cls._singletons[value]
 
     def __new__(cls, *args, **kwargs):
@@ -208,10 +230,7 @@ def enum(field_name, all_values):
 
       field_value = getattr(this_object, field_name)
 
-      if field_value not in cls.allowed_values:
-        raise cls.make_type_error(
-          "Value {!r} for '{}' must be one of: {!r}."
-          .format(field_value, field_name, cls.allowed_values))
+      cls._check_value(field_value)
 
       return this_object
 
