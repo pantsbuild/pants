@@ -6,6 +6,7 @@
     "3rdparty_py": "dist/markdown/html/examples/src/python/example/3rdparty_py.html",
     "announce_201409": "dist/markdown/html/src/docs/announce_201409.html",
     "blog": "dist/markdown/html/src/docs/blog/blog.html",
+    "coursier_migration": "dist/markdown/html/src/docs/blog/coursier_migration.html",
     "build_dictionary": "dist/reference/build_dictionary_body.html",
     "build_files": "dist/markdown/html/src/docs/build_files.html",
     "alias": "dist/markdown/html/src/docs/common_tasks/alias.html",

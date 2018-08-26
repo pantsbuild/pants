@@ -22,7 +22,7 @@ In some cases build tools (such as Gradle and Maven) implement their own 3rdpart
 
 For a common project with relatively few 3rdparty dependencies (<20), the resolve time for Ivy is rather minimal, typically a few seconds to resolve and a few more to download the artifacts with reasonable network speed.
 
-However, Ivy is not so scalable with a large set of 3rdparty dependencies. The table below shows the measurement in the initial investigation on cacheless resolve. We did so by manually converting the XML passed to Ivy to the rough command line equivalent for Coursier [1] [2].
+However, Ivy is not so scalable with a large set of 3rdparty dependencies. The table below shows the measurement in the initial investigation on cacheless resolve. We did so by manually converting the XML passed to Ivy to the rough command line equivalent for Coursier [[\[1\]|#1-example-of-translation-for-pants-jar_library-target-to-coursier-command-line]] [[\[2\]|#2-why-3rdparty-resolve-caching-wasnt-too-great]].
 
 | Project | # of root level 3rdparty dependencies | # of transitive 3rdparty dependencies (obtained later for this blogpost) | Ivy   | Coursier (20 concurrent connections) |
 |---------|---------------------------------------|--------------------------------------------------------------------------|-------|--------------------------------------|
@@ -71,7 +71,7 @@ The actual migration was done in two major phases
 ### Phase 1: IDE Only
 
 There are two reasons to use IDE as the initial testing ground.
-Being less critical. Twitter developers only use IDE for code assistance such as syntax highlighting and code navigation. Whereas releasing and test running will still use Ivy code path. Therefore, any bug encountered initially in IDE will not affect production [3].
+Being less critical. Twitter developers only use IDE for code assistance such as syntax highlighting and code navigation. Whereas releasing and test running will still use Ivy code path. Therefore, any bug encountered initially in IDE will not affect production [[\[3\]|#3-example-intellij-pants-plugin-issue]].
 To further prove out the performance impact at scale. This provided early feedback of Coursier usage at scale as opposed to the sampling in the initial investigation.
 
 The process was done by having IntelliJ Pants Plugin to recognize a special config .ij.import.rc under the repo root (https://github.com/pantsbuild/intellij-pants-plugin/pull/324) which overwrites the default resolver Ivy to Coursier. Additionally, developers were always given the option to fall back to Ivy in case they were blocked by Coursier.
@@ -80,7 +80,7 @@ The process was done by having IntelliJ Pants Plugin to recognize a special conf
 
 Switching to Coursier for all Pants commands was much riskier because that was what developers used every day for the actual compilation and what CI infrastructure used for testing and deployment. To reduce the risk, we broke it down further:
 Experimentally turn on Coursier for a percentage of developer laptops and increase enrollment percentage slowly over 2-3 weeks. If any blocking issue was observed, we immediately tuned it back to 0.
-Aggregating all the deployment targets, and compare the resolution differences between Ivy and Coursier [4], i.e A/B testing.
+Aggregating all the deployment targets, and compare the resolution differences between Ivy and Coursier [[\[4\]|#4-resolve-difference-investigation]], i.e A/B testing.
 
 #### Issues to notice
 
@@ -88,7 +88,7 @@ Aggregating all the deployment targets, and compare the resolution differences b
 
 Different resolves for the same set of 3rdparty dependencies can occur between Ivy and Coursier for various reasons. In the end, they are separate tools, so their implementations or bugs are different even though they are supposed to respect the same maven specification.
 
-In multiple instances, we found that Ivy does not resolve correctly accordingly to Maven's “standard” [5]. Although Coursier's resolves may be more correct, it DOES NOT mean applications will always work as intended with the correct but different resolve. Sometimes it works accidentally with the wrong resolve. That is why we need to be careful.
+In multiple instances, we found that Ivy does not resolve correctly accordingly to Maven's “standard” [[\[5\]|#5-resolve-differenceserrors-between-ivy-and-coursier]]. Although Coursier's resolves may be more correct, it DOES NOT mean applications will always work as intended with the correct but different resolve. Sometimes it works accidentally with the wrong resolve. That is why we need to be careful.
 
 That said, if the resolves are the same between Ivy and Coursier, then it is normally safe. In some edge cases, the order of JVM class loading would make a difference.
 
@@ -203,9 +203,15 @@ Coursier:
 
 ### 5. Resolve differences/errors between Ivy and Coursier
 
-#### Platform dependent resolve: https://github.com/coursier/coursier/issues/700
+#### Platform dependent resolve
+
+https://github.com/coursier/coursier/issues/700
+
 * It turned out that the build was previously working accidentally with Ivy resolve. The should-be platform dependent jar was used by our build in both linux and MacOS builds because Ivy ignored the platform specific requirement. Hence switching to Coursier broke the build. The solution was to force fetching the platform dependent jar regardless of the platform.
 * This also caused complication in caching, because of 3rdparty jars are part of the compile cache key, so if a 3rdparty jar is platform dependent, that means cache populated by CI on linux cannot be reused on MacOS.
 
-#### Dependency management via parent pom: https://github.com/coursier/coursier/issues/809
+#### Dependency management via parent pom
+
+https://github.com/coursier/coursier/issues/809
+
 * org.apache.httpcomponents:httpcore:4.2.5 (Ivy) -> org.apache.httpcomponents:httpcore:4.2.4 (Coursier). The difference is harmless, but the correct one should be 4.2.4.
