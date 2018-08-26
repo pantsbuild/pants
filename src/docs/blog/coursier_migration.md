@@ -37,30 +37,36 @@ Usability
 ### JSON Report
 
 Since Pants is written in Python, it needs to call Coursier via command line, so a JSON report from Coursier was implemented to facilitate this as the main API.
-https://github.com/coursier/coursier/pull/692
+
+[[https://github.com/coursier/coursier/pull/692]]
 
 There was also a follow up patch to further improve the JSON report to support more detailed coordinate specification.
-https://github.com/coursier/coursier/pull/782
+
+[[https://github.com/coursier/coursier/pull/782]]
 
 ### Granularity
 
 Previously Coursier’s command line could only specify exclusions and classifiers on a global level, so we made it more granular: to the module level.
-https://github.com/coursier/coursier/pull/735
-https://github.com/coursier/coursier/pull/692
+
+[[https://github.com/coursier/coursier/pull/735]]
+
+[[https://github.com/coursier/coursier/pull/692]]
 
 ### Direct URL Fetching
 
 We also added support for fetching an artifact with an arbitrary URL, which is commonly used to iterate against a jar that’s not published.
-https://github.com/coursier/coursier/pull/774
+
+[[https://github.com/coursier/coursier/pull/774]]
 
 ### Reliability
 
 Some artifacts are rather large (on the scale of 100-200MB), so there’s a chance the download may fail. Previously this would cause a bad artifact corrupting the local cache, which was later removed with the patch.
-https://github.com/coursier/coursier/pull/797
+
+[[https://github.com/coursier/coursier/pull/797]]
 
 ### Visibility
 
-To better help with the migration, such as comparing the result with Ivy and sanity check, we needed Coursier to print out the resolve graph correctly. https://github.com/coursier/coursier/pull/671
+To better help with the migration, such as comparing the result with Ivy and sanity check, we needed Coursier to print out the resolve graph correctly. [[https://github.com/coursier/coursier/pull/671]]
 
 ## The Migration Process
 
@@ -74,7 +80,7 @@ There are two reasons to use IDE as the initial testing ground.
 Being less critical. Twitter developers only use IDE for code assistance such as syntax highlighting and code navigation. Whereas releasing and test running will still use Ivy code path. Therefore, any bug encountered initially in IDE will not affect production [[\[3\]|#3-example-intellij-pants-plugin-issue]].
 To further prove out the performance impact at scale. This provided early feedback of Coursier usage at scale as opposed to the sampling in the initial investigation.
 
-The process was done by having IntelliJ Pants Plugin to recognize a special config .ij.import.rc under the repo root (https://github.com/pantsbuild/intellij-pants-plugin/pull/324) which overwrites the default resolver Ivy to Coursier. Additionally, developers were always given the option to fall back to Ivy in case they were blocked by Coursier.
+The process was done by having IntelliJ Pants Plugin to recognize a special config .ij.import.rc under the repo root ([[https://github.com/pantsbuild/intellij-pants-plugin/pull/324]]) which overwrites the default resolver Ivy to Coursier. Additionally, developers were always given the option to fall back to Ivy in case they were blocked by Coursier.
 
 ### Phase 2: All Pants Commands
 
@@ -155,7 +161,7 @@ Since Pants command can involve an arbitrary number of targets. Given n targets 
 There is also the practical aspect in terms of implementation and maintenance cost vs benefit.
 
 ### 3. Example IntelliJ Pants Plugin issue
-Exclude jars imported into the project for IntelliJ Junit/Scala runner https://github.com/pantsbuild/intellij-pants-plugin/pull/331
+Exclude jars imported into the project for IntelliJ Junit/Scala runner [[https://github.com/pantsbuild/intellij-pants-plugin/pull/331]]
 
 ### 4. Resolve difference investigation
 
@@ -205,13 +211,13 @@ Coursier:
 
 #### Platform dependent resolve
 
-https://github.com/coursier/coursier/issues/700
+[[https://github.com/coursier/coursier/issues/700]]
 
 * It turned out that the build was previously working accidentally with Ivy resolve. The should-be platform dependent jar was used by our build in both linux and MacOS builds because Ivy ignored the platform specific requirement. Hence switching to Coursier broke the build. The solution was to force fetching the platform dependent jar regardless of the platform.
 * This also caused complication in caching, because of 3rdparty jars are part of the compile cache key, so if a 3rdparty jar is platform dependent, that means cache populated by CI on linux cannot be reused on MacOS.
 
 #### Dependency management via parent pom
 
-https://github.com/coursier/coursier/issues/809
+[[https://github.com/coursier/coursier/issues/809]]
 
 * org.apache.httpcomponents:httpcore:4.2.5 (Ivy) -> org.apache.httpcomponents:httpcore:4.2.4 (Coursier). The difference is harmless, but the correct one should be 4.2.4.
