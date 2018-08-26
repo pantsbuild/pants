@@ -6,7 +6,7 @@ Author: Twitter Engineering Effectiveness - Build
 
 Abstract: This blog post discusses the motivation, preparation work, deployment processes, and results of replacing Ivy with Coursier in Pants.
 
-Dates: Twitter's Coursier migration happened Q1 2018. This post is published on Aug 2018.
+Dates: Twitter's Coursier migration happened during Q1 2018. This post is published in August 2018.
 
 Tags: 3rdparty, JVM, productivity
 
