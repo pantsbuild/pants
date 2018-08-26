@@ -199,7 +199,7 @@ Gives a simpler version of the diff is captured below. For example:
 To examine the difference in detail, we need to obtain the reports from Ivy and Coursier, then compare them manually.
 Ivy:
 ```
-./pants --no-cache-resolve-Ivy-read --resolver-resolver=ivy invalidate resolve.Ivy --open --report <target>
+./pants --no-cache-resolve-ivy-read --resolver-resolver=ivy invalidate resolve.ivy --open --report <target>
 ```
 
 Coursier:
