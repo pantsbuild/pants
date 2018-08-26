@@ -301,9 +301,3 @@ page(
   name='why_use_pants',
   source='why_use_pants.md'
 )
-
-page(
-  name='coursier_migration',
-  source='coursier_migration.md'
-)
-

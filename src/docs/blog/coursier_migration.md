@@ -4,7 +4,7 @@
 
 Author: Twitter Engineering Effectiveness - Build
 
-Abstract: This blog discusses the motivation, preparation work, deployment processes, and results of replacing Ivy with Coursier in Pants.
+Abstract: This blog post discusses the motivation, preparation work, deployment processes, and results of replacing Ivy with Coursier in Pants.
 
 Dates: Twitter's Coursier migration happened Q1 2018. This post is published on Aug 2018.
 
