@@ -1,8 +1,6 @@
 page(
-  source='index.md',
-  links=[
-    ':coursier_migration',
-  ]
+  name='blog',
+  source='blog.md'
 )
 
 page(

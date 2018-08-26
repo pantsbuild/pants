@@ -5,6 +5,7 @@
     "3rdparty_jvm": "dist/markdown/html/examples/src/java/org/pantsbuild/example/3rdparty_jvm.html",
     "3rdparty_py": "dist/markdown/html/examples/src/python/example/3rdparty_py.html",
     "announce_201409": "dist/markdown/html/src/docs/announce_201409.html",
+    "blog": "dist/markdown/html/src/docs/blog/blog.html",
     "build_dictionary": "dist/reference/build_dictionary_body.html",
     "build_files": "dist/markdown/html/src/docs/build_files.html",
     "alias": "dist/markdown/html/src/docs/common_tasks/alias.html",
@@ -176,7 +177,8 @@
        {"heading": "Reference"},
        {"pages" : [
                     "build_dictionary",
-                    "options_reference"
+                    "options_reference",
+                    "blog"
                 ]
        },
        {"collapsible_heading": "Release Notes",
