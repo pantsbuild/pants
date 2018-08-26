@@ -75,19 +75,22 @@ The actual migration was done in two major phases
 1) Coursier only for IDE project import
 2) Coursier for all Pants commands
 
-### Phase 1: IDE Only
+### Phase 1 - IDE Only
 
 There are two reasons to use IDE as the initial testing ground.
-Being less critical. Twitter developers only use IDE for code assistance such as syntax highlighting and code navigation. Whereas releasing and test running will still use Ivy code path. Therefore, any bug encountered initially in IDE will not affect production [[\[3\]|#3-example-intellij-pants-plugin-issue]].
-To further prove out the performance impact at scale. This provided early feedback of Coursier usage at scale as opposed to the sampling in the initial investigation.
+
+* Being less critical. Twitter developers only use IDE for code assistance such as syntax highlighting and code navigation. Whereas releasing and test running will still use Ivy code path. Therefore, any bug encountered initially in IDE will not affect production [[\[3\]|#3-example-intellij-pants-plugin-issue]].
+
+* To further prove out the performance impact at scale. This provided early feedback of Coursier usage at scale as opposed to the sampling in the initial investigation.
 
 The process was done by having IntelliJ Pants Plugin to recognize a special config .ij.import.rc under the repo root ([[https://github.com/pantsbuild/intellij-pants-plugin/pull/324]]) which overwrites the default resolver Ivy to Coursier. Additionally, developers were always given the option to fall back to Ivy in case they were blocked by Coursier.
 
-### Phase 2: All Pants Commands
+### Phase 2 - All Pants Commands
 
 Switching to Coursier for all Pants commands was much riskier because that was what developers used every day for the actual compilation and what CI infrastructure used for testing and deployment. To reduce the risk, we broke it down further:
-Experimentally turn on Coursier for a percentage of developer laptops and increase enrollment percentage slowly over 2-3 weeks. If any blocking issue was observed, we immediately tuned it back to 0.
-Aggregating all the deployment targets, and compare the resolution differences between Ivy and Coursier [[\[4\]|#4-resolve-difference-investigation]], i.e A/B testing.
+
+* Experimentally turn on Coursier for a percentage of developer laptops and increase enrollment percentage slowly over 2-3 weeks. If any blocking issue was observed, we immediately tuned it back to 0.
+* Aggregating all the deployment targets, and compare the resolution differences between Ivy and Coursier [[\[4\]|#4-resolve-difference-investigation]], i.e A/B testing.
 
 #### Issues to notice
 
@@ -101,11 +104,11 @@ That said, if the resolves are the same between Ivy and Coursier, then it is nor
 
 ##### Caching Discrepancy
 
-Between Ivy and Coursier. With the expected resolve differences explained above, cache keys for compilation will be different between Ivy and Coursier since 3rdparty dependencies are part of the cache key. We rely on CI infrastructure to populate caches, so it needs to populate the compile cache resulting from both Ivy and Coursier until the migration is completed.
-Some resolves are platform dependent, meaning that even if two builds have the same resolver, one cannot reuse the cache from another if they are built on different platforms, e.g. MacOS and Linux. For this very reason, we turned off Coursier enrollment before finding and resolving the difference between platforms [5].
+* Between Ivy and Coursier. With the expected resolve differences explained above, cache keys for compilation will be different between Ivy and Coursier since 3rdparty dependencies are part of the cache key. We rely on CI infrastructure to populate caches, so it needs to populate the compile cache resulting from both Ivy and Coursier until the migration is completed.
+* Some resolves are platform dependent, meaning that even if two builds have the same resolver, one cannot reuse the cache from the other if they are built on different platforms, e.g. MacOS and Linux. For this very reason, we turned off Coursier enrollment before finding and settling the difference between platforms [5].
 
 ## Limitation
-At the end of the day, unit tests typically would only run part of the 3rdparty dependencies code that the application depends on, so there is no way to fully validate whether any transitive 3rdparty dependencies are functioning correctly. Hence the recommendation we provided to the owners of all JVM applications which had different resolves was to have it go through any integration test or staging environment if applicable.
+At the end of the day, unit tests typically would only run part of the 3rdparty dependencies' code that an application depends on, so there is no way to fully validate whether any transitive 3rdparty dependencies are functioning correctly. Hence the recommendation we provided for the owners of all JVM applications with different resolves was to have them go through any integration tests or staging environment if applicable.
 
 ## Result
 
