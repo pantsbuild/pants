@@ -68,7 +68,7 @@ The actual migration was done in two major phases
 1) Coursier only for IDE project import
 2) Coursier for all Pants commands
 
-### Phase 1: IDE only
+### Phase 1: IDE Only
 
 There are two reasons to use IDE as the initial testing ground.
 Being less critical. Twitter developers only use IDE for code assistance such as syntax highlighting and code navigation. Whereas releasing and test running will still use Ivy code path. Therefore, any bug encountered initially in IDE will not affect production [3].
@@ -84,7 +84,7 @@ Aggregating all the deployment targets, and compare the resolution differences b
 
 #### Issues to notice
 
-##### Resolve differences and Safety
+##### Resolve Differences and Safety
 
 Different resolves for the same set of 3rdparty dependencies can occur between Ivy and Coursier for various reasons. In the end, they are separate tools, so their implementations or bugs are different even though they are supposed to respect the same maven specification.
 
@@ -92,7 +92,7 @@ In multiple instances, we found that Ivy does not resolve correctly accordingly 
 
 That said, if the resolves are the same between Ivy and Coursier, then it is normally safe. In some edge cases, the order of JVM class loading would make a difference.
 
-##### Caching discrepancy
+##### Caching Discrepancy
 
 Between Ivy and Coursier. With the expected resolve differences explained above, cache keys for compilation will be different between Ivy and Coursier since 3rdparty dependencies are part of the cache key. We rely on CI infrastructure to populate caches, so it needs to populate the compile cache resulting from both Ivy and Coursier until the migration is completed.
 Some resolves are platform dependent, meaning that even if two builds have the same resolver, one cannot reuse the cache from another if they are built on different platforms, e.g. MacOS and Linux. For this very reason, we turned off Coursier enrollment before finding and resolving the difference between platforms [5].
