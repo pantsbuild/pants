@@ -32,9 +32,10 @@ However, Ivy is not so scalable with a large set of 3rdparty dependencies. The t
 ## Pre-Migration - Changes Made to Coursier
 
 The initial investigation gave us the motivation to pursue Coursier. However, there were still some gaps before Pants could fully utilize it. It was important to test the changes made to Coursier, i.e. testing all JVM targets in CI environment in our case. All changes below were iterated with this process to assure quality.
-Usability
 
-### JSON Report
+### Usability
+
+#### JSON Report
 
 Since Pants is written in Python, it needs to call Coursier via command line, so a JSON report from Coursier was implemented to facilitate this as the main API.
 
@@ -44,7 +45,7 @@ There was also a follow up patch to further improve the JSON report to support m
 
 [[https://github.com/coursier/coursier/pull/782]]
 
-### Granularity
+#### Granularity
 
 Previously Coursier’s command line could only specify exclusions and classifiers on a global level, so we made it more granular: to the module level.
 
@@ -52,7 +53,7 @@ Previously Coursier’s command line could only specify exclusions and classifie
 
 [[https://github.com/coursier/coursier/pull/692]]
 
-### Direct URL Fetching
+#### Direct URL Fetching
 
 We also added support for fetching an artifact with an arbitrary URL, which is commonly used to iterate against a jar that’s not published.
 
