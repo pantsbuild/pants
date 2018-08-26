@@ -1,6 +1,9 @@
 page(
   name='blog',
-  source='blog.md'
+  source='blog.md',
+  dependencies = [
+    ':coursier_migration'
+  ]
 )
 
 page(

@@ -29,7 +29,7 @@ However, Ivy is not so scalable with a large set of 3rdparty dependencies. The t
 | A       | 140                                   | 231                                                                      | 290s  | 80s                                  |
 | B       | 330                                   | 480                                                                      | 1468s | 132s                                 |
 
-## Pre-Migration: Changes Made to Coursier
+## Pre-Migration - Changes Made to Coursier
 
 The initial investigation gave us the motivation to pursue Coursier. However, there were still some gaps before Pants could fully utilize it. It was important to test the changes made to Coursier, i.e. testing all JVM targets in CI environment in our case. All changes below were iterated with this process to assure quality.
 Usability
