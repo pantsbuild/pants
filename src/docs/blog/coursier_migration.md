@@ -178,7 +178,17 @@ Gives a simpler version of the diff is captured below. For example:
 
 `>` means what Ivy has
 
-================================================
+```
+<   "asm:asm:3.1",
+---
+>   "asm:asm:3.2",
+128d127
+<   "org.apache.hadoop:hadoop-yarn-server-nodemanager:2.6.0.t01",
+130c129
+<   "org.apache.httpcomponents:httpcore:4.2.4",
+---
+>   "org.apache.httpcomponents:httpcore:4.2.5",
+```
 
 To examine the difference in detail, we need to obtain the reports from Ivy and Coursier, then compare them manually.
 Ivy:
