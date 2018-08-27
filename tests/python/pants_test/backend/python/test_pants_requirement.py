@@ -4,8 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from future.utils import PY3
-
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.register import build_file_aliases
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
