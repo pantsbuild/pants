@@ -9,7 +9,6 @@ import signal
 
 from pex.pex_info import PexInfo
 
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_execution_task_base import PythonExecutionTaskBase
