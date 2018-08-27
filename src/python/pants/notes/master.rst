@@ -11,6 +11,9 @@ not undergo the vetting associated with ``stable`` releases.
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Fix CI (#6402)
+  `PR #6402 <https://github.com/pantsbuild/pants/pull/6402>`_
+
 * Requirements on language-specific sources should be optional. (#6375)
   `PR #6375 <https://github.com/pantsbuild/pants/pull/6375>`_
 
@@ -28,6 +31,9 @@ Refactoring, Improvements, and Tooling
 
 Migration to Python3 compatibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* No longer expect failure from test_pinger (#6373)
+  `PR #6373 <https://github.com/pantsbuild/pants/pull/6373>`_
 
 * Pin interpreter <3.7 in ci. (#6364)
   `PR #6364 <https://github.com/pantsbuild/pants/pull/6364>`_
