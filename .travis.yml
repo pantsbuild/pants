@@ -159,7 +159,7 @@ matrix:
         - sudo chmod 666 /dev/fuse
         - sudo chown root:$USER /etc/fuse.conf
       script:
-        - ./build-support/bin/ci.sh -fkmrjst "${SHARD}"
+        - ./build-support/bin/ci.sh -fkmrjt "${SHARD}"
 
     - <<: *default_test_config
       env:
