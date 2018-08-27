@@ -93,6 +93,7 @@ python_tests(
     'tests/python/pants_test:test_base',
     'tests/python/pants_test/cache:delay_server',
   ],
+  timeout = 90
 )
 
 python_tests(
