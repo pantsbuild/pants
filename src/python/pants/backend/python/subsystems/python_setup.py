@@ -133,7 +133,12 @@ class PythonSetup(Subsystem):
     return os.path.join(self.get_options().pants_workdir, *self.options_scope.split('.'))
 
   def compatibility_or_constraints(self, target):
-    """Return either the compatibility of the given target, or the interpreter constraints."""
+    """
+    Return either the compatibility of the given target, or the interpreter constraints.
+    If interpreter constraints are supplied by the CLI flag, return those only.
+    """
+    if self.get_options().is_flagged('interpreter_constraints'):
+      return tuple(self.interpreter_constraints)
     return tuple(target.compatibility or self.interpreter_constraints)
 
   def setuptools_requirement(self):

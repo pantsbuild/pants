@@ -149,8 +149,9 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
       self.skipTest('Missing neccesary Python interpreters on system.')
 
   def test_pants_test_interpreter_selection_with_option_2(self):
-    """Test that the pants test goal with an interpreter constrainted by the
-    --python-setup-interpreter-constraints option
+    """
+    Test that the pants test goal properly constrains the SelectInterpreter task to Python 2
+    using the '--python-setup-interpreter-constraints' option.
     """
     if self.has_python_version('2.7'):
       with temporary_dir() as interpreters_cache:
@@ -161,18 +162,19 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
           }
         }
       pants_run_2 = self.run_pants(
-            command=[
-              'test',
-              '{}:test_py2'.format(os.path.join(self.testproject,'python_3_selection_testing')),
-              '--python-setup-interpreter-constraints=["CPython<3"]',
-            ],
-            config=pants_ini_config
-          )
+        command=[
+          'test',
+          '{}:test_py2'.format(os.path.join(self.testproject,'python_3_selection_testing')),
+          '--python-setup-interpreter-constraints=["CPython<3"]',
+        ],
+        config=pants_ini_config
+      )
       self.assert_success(pants_run_2)
 
   def test_pants_test_interpreter_selection_with_option_3(self):
-    """Test that the pants test goal with an interpreter constrainted by the
-    --python-setup-interpreter-constraints option
+    """
+    Test that the pants test goal properly constrains the SelectInterpreter task to Python 3
+    using the '--python-setup-interpreter-constraints' option.
     """
     if self.has_python_version('3'):
       with temporary_dir() as interpreters_cache:

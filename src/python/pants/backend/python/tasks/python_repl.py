@@ -49,11 +49,6 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
       entry_point = 'code:interact'
     pex_info = PexInfo.default()
     pex_info.entry_point = entry_point
-    python_setup = PythonSetup.global_instance()
-    if python_setup.get_options().is_flagged('interpreter_constraints'):
-      setup_constraints = python_setup.interpreter_constraints
-      for constraint in setup_constraints:
-        pex_info.add_interpreter_constraint(constraint)
     return self.create_pex(pex_info)
 
   # N.B. **pex_run_kwargs is used by tests only.
