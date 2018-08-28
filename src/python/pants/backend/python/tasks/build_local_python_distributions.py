@@ -58,7 +58,7 @@ class BuildLocalPythonDistributions(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
-    round_manager.require(SharedLibrary)
+    round_manager.optional_product(SharedLibrary)
 
   @classmethod
   def implementation_version(cls):
