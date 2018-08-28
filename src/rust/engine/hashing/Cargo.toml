@@ -5,6 +5,6 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-digest = "0.6.2"
+digest = "0.7"
 hex = "0.3.1"
-sha2 = "0.6.0"
+sha2 = "0.7"
