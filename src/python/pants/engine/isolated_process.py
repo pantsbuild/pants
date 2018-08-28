@@ -71,7 +71,8 @@ class ExecuteProcessRequest(datatype([
 
 class ExecuteProcessResult(datatype([('stdout', binary_type),
                                      ('stderr', binary_type),
-                                     'output_directory_digest'])):
+                                     ('output_directory_digest', DirectoryDigest)
+                                     ])):
   """Result of successfully executing a process.
 
   Requesting one of these will raise an exception if the exit code is non-zero."""
@@ -79,8 +80,9 @@ class ExecuteProcessResult(datatype([('stdout', binary_type),
 
 class FallibleExecuteProcessResult(datatype([('stdout', binary_type),
                                              ('stderr', binary_type),
-                                             'exit_code',
-                                             'output_directory_digest'])):
+                                             ('exit_code', int),
+                                             ('output_directory_digest', DirectoryDigest)
+                                             ])):
   """Result of executing a process.
 
   Requesting one of these will not raise an exception if the exit code is non-zero."""
