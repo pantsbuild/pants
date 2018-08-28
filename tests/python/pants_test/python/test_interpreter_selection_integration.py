@@ -14,14 +14,11 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
   testproject = 'testprojects/src/python/interpreter_selection'
 
-  def test_conflict_via_compatibility(self):
+  def test_cli_option_wins_compatibility_conflict(self):
     # Tests that targets with compatibility conflicts collide.
     binary_target = '{}:deliberately_conficting_compatibility'.format(self.testproject)
     pants_run = self._build_pex(binary_target)
-    self.assert_failure(pants_run,
-                        'Unexpected successful build of {binary}.'.format(binary=binary_target))
-    self.assertIn('Unable to detect a suitable interpreter for compatibilities',
-                  pants_run.stdout_data)
+    self.assert_success(pants_run, 'Failed to build {binary}.'.format(binary=binary_target))
 
   def test_conflict_via_config(self):
     # Tests that targets with compatibility conflict with targets with default compatibility.
@@ -65,7 +62,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
       }
       binary_name = 'echo_interpreter_version_{}'.format(version)
       binary_target = '{}:{}'.format(self.testproject, binary_name)
-      pants_run = self._build_pex(binary_target, config)
+      pants_run = self._build_pex(binary_target, config, version=version)
       self.assert_success(pants_run, 'Failed to build {binary}.'.format(binary=binary_target))
 
       # Run the built pex.
@@ -74,11 +71,14 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
       (stdout_data, _) = proc.communicate()
       return stdout_data
 
-  def _build_pex(self, binary_target, config=None, args=None):
+  def _build_pex(self, binary_target, config=None, args=None, version='2.7'):
     # By default, Avoid some known-to-choke-on interpreters.
+    if version == '3':
+      constraint = '["CPython>=3.3"]'
+    else:
+      constraint = '["CPython>=2.7,<3"]'
     args = list(args) if args is not None else [
-          '--python-setup-interpreter-constraints=CPython>=2.7,<3',
-          '--python-setup-interpreter-constraints=CPython>=3.3',
+          '--python-setup-interpreter-constraints={}'.format(constraint)
         ]
     command = ['binary', binary_target] + args
     return self.run_pants(command=command, config=config)
