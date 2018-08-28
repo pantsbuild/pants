@@ -48,7 +48,6 @@ class PailgunService(PantsService):
         sock,
         arguments,
         environment,
-        self.fork_lock,
         self._scheduler_service
       )
 
