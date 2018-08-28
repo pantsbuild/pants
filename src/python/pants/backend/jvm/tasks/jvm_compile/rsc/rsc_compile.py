@@ -1,0 +1,603 @@
+# coding=utf-8
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+import functools
+import json
+import logging
+import os
+import re
+
+from six import text_type
+
+from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
+from pants.backend.jvm.tasks.jvm_compile.execution_graph import Job
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import BaseZincCompile, ZincCompile
+from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnitLabel
+from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
+from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
+from pants.java.jar.jar_dependency import JarDependency
+from pants.util.contextutil import Timer
+from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_rmtree
+
+
+#
+# This is a subclass of zinc compile that uses both Rsc and Zinc to do
+# compilation.
+# It uses Rsc and the associated tools to outline scala targets. It then
+# passes those outlines to zinc to produce the final compile artifacts.
+#
+#
+logger = logging.getLogger(__name__)
+
+
+def relpathify(collection):
+  # Converts a list of paths into relpath'd paths.
+  buildroot = get_buildroot()
+  def relpath(p):
+    if p[0] != '/':
+      raise ValueError('Unexpected non-absolute path {}'.format(p))
+    return fast_relpath(p, buildroot)
+  return [relpath(c) for c in collection]
+
+
+def relpathalone(path):
+  # Converts a single path to a relpath
+  return relpathify([path])[0]
+
+
+def stdout_contents(wu):
+  if isinstance(wu, FallibleExecuteProcessResult):
+    return wu.stdout.rstrip()
+  with open(wu.output_paths()['stdout']) as f:
+    return f.read().rstrip()
+
+
+class RscCompileContext(CompileContext):
+  def __init__(self,
+               target,
+               analysis_file,
+               classes_dir,
+               rsc_mjar_file,
+               jar_file,
+               log_dir,
+               zinc_args_file,
+               sources,
+               rsc_outline_dir,
+               outline_dir):
+    super(RscCompileContext, self).__init__(target, analysis_file, classes_dir, jar_file,
+                                               log_dir, zinc_args_file, sources)
+    self.rsc_mjar_file = rsc_mjar_file
+    self.rsc_outline_dir = rsc_outline_dir
+    self.outline_dir = outline_dir
+
+  def ensure_output_dirs_exist(self):
+    safe_mkdir(os.path.dirname(self.rsc_mjar_file))
+    safe_mkdir(self.rsc_outline_dir) # NB: figure a better way to collapse these.
+    safe_mkdir(self.outline_dir)
+
+
+class RscCompile(ZincCompile):
+  """Compile Scala and Java code to classfiles using Rsc."""
+
+  _name = 'rsc_outline' # noqa
+
+  @classmethod
+  def implementation_version(cls):
+    return super(RscCompile, cls).implementation_version() + [('RscCompile', 7)]
+
+  @classmethod
+  def register_options(cls, register):
+    super(RscCompile, cls).register_options(register)
+
+    rsc_outline_version = '0.0.0-294-d7114447'
+    scalameta_version = '4.0.0-M10'
+
+    # TODO: it would be better to have a less adhoc approach to handling
+    #       optional dependencies. See: https://github.com/pantsbuild/pants/issues/6390
+    cls.register_jvm_tool(
+      register,
+      'workaround-metacp-dependency-classpath',
+      classpath=[
+        JarDependency(org = 'org.scala-lang', name = 'scala-compiler', rev = '2.11.12'),
+        JarDependency(org = 'org.scala-lang', name = 'scala-library', rev = '2.11.12'),
+        JarDependency(org = 'org.scala-lang', name = 'scala-reflect', rev = '2.11.12'),
+        JarDependency(org = 'org.scala-lang.modules', name = 'scala-partest_2.11', rev = '1.0.18'),
+        JarDependency(org = 'jline', name = 'jline', rev = '2.14.6'),
+        JarDependency(org = 'org.apache.commons', name = 'commons-lang3', rev = '3.3.2'),
+        JarDependency(org = 'org.apache.ant', name = 'ant', rev = '1.8.2'),
+        JarDependency(org = 'org.pegdown', name = 'pegdown', rev = '1.4.2'),
+        JarDependency(org = 'org.testng', name = 'testng', rev = '6.8.7'),
+        JarDependency(org = 'org.scalacheck', name = 'scalacheck_2.11', rev = '1.13.1'),
+        JarDependency(org = 'org.jmock', name = 'jmock-legacy', rev = '2.5.1'),
+        JarDependency(org = 'org.easymock', name = 'easymockclassextension', rev = '3.1'),
+        JarDependency(org = 'org.seleniumhq.selenium', name = 'selenium-java', rev = '2.35.0'),
+      ],
+      custom_rules=[
+        Shader.exclude_package('*', recursive=True),]
+    )
+    cls.register_jvm_tool(
+      register,
+      'rsc_outline',
+      classpath=[
+          JarDependency(
+              org='com.twitter',
+              name='rsc_2.11',
+              rev=rsc_outline_version,
+          ),
+          JarDependency(
+              org='com.twitter',
+              name='mjar_2.11',
+              rev=rsc_outline_version,
+          ),
+          JarDependency(
+            org='org.scalameta',
+            name='metacp_2.11',
+            rev=scalameta_version,
+          ),
+          JarDependency(
+            org='org.scalameta',
+            name='metai_2.11',
+            rev=scalameta_version,
+          ),
+      ],
+      custom_rules=[
+        Shader.exclude_package('scala', recursive=True),
+        Shader.exclude_package('rsc', recursive=True),
+      ]
+      )
+
+  def register_extra_products_from_contexts(self, targets, compile_contexts):
+    super(RscCompile, self).register_extra_products_from_contexts(targets, compile_contexts)
+    # TODO when digests are added, if the target is valid,
+    # the digest should be loaded in from the cc somehow.
+    for target in targets:
+      rsc_outline_cc, compile_cc = compile_contexts[target]
+      if target.has_sources('.java'):
+        self.context.products.get_data('rsc_outline_classpath').add_for_target(
+          compile_cc.target,
+          [(conf, compile_cc.jar_file) for conf in self._confs])
+      elif target.has_sources('.scala'):
+        self.context.products.get_data('rsc_outline_classpath').add_for_target(
+          rsc_outline_cc.target,
+          [(conf, rsc_outline_cc.rsc_mjar_file) for conf in self._confs])
+      else:
+        pass
+
+  def create_empty_extra_products(self):
+    super(RscCompile, self).create_empty_extra_products()
+
+    compile_classpath = self.context.products.get_data('compile_classpath')
+    classpath_product = self.context.products.get_data('rsc_outline_classpath')
+    if not classpath_product:
+      self.context.products.get_data('rsc_outline_classpath', compile_classpath.copy)
+    else:
+      classpath_product.update(compile_classpath)
+
+  def execute(self):
+    if JvmPlatform.global_instance().get_options().compiler == 'rsc':
+      # Calling BaseZincCompile directly because ZincCompile won't run a compile if
+      # rsc_outline is specified.
+      return BaseZincCompile.execute(self)
+
+  def rsc_outline_key_for_target(self, compile_target):
+    if compile_target.has_sources('.java'):
+      # rsc_outline dependencies on java depends on compile.
+      return self.compile_against_rsc_outline_key_for_target(compile_target)
+    elif compile_target.has_sources('.scala'):
+      return "rsc_outline({})".format(compile_target.address.spec)
+    else:
+      raise TaskError('unexpected target for compiling with rsc_outline .... {}'.format(compile_target))
+
+  def compile_against_rsc_outline_key_for_target(self, compile_target):
+    return "compile_against_rsc_outline({})".format(compile_target.address.spec)
+
+  def create_compile_jobs(self,
+                          compile_target,
+                          compile_contexts,
+                          invalid_dependencies,
+                          ivts,
+                          counter,
+                          runtime_classpath_product):
+    def work_for_vts(vts, ctx, key, classpath_product_key):
+      progress_message = ctx.target.address.spec
+
+      # Double check the cache before beginning compilation
+      hit_cache = self.check_cache(vts, counter)
+
+      if not hit_cache:
+        # Compute the compile classpath for this target.
+        cp_entries = self._zinc.compile_classpath_entries(
+          classpath_product_key,
+          ctx.target,
+          extra_cp_entries=self._extra_compile_time_classpath,
+        )
+        upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
+
+        is_incremental = self.should_compile_incrementally(vts, ctx)
+        if not is_incremental:
+          # Purge existing analysis file in non-incremental mode.
+          safe_delete(ctx.analysis_file)
+          # Work around https://github.com/pantsbuild/pants/issues/3670
+          safe_rmtree(ctx.classes_dir)
+
+        dep_context = DependencyContext.global_instance()
+        tgt, = vts.targets
+        compiler_option_sets = dep_context.defaulted_property(tgt, lambda x: x.compiler_option_sets)
+        zinc_file_manager = dep_context.defaulted_property(tgt, lambda x: x.zinc_file_manager)
+        with Timer() as timer:
+          self._compile_vts(vts,
+                            ctx,
+                            upstream_analysis,
+                            cp_entries,
+                            progress_message,
+                            tgt.platform,
+                            compiler_option_sets,
+                            zinc_file_manager,
+                            counter)
+        self._record_target_stats(tgt,
+                                  len(cp_entries),
+                                  len(ctx.sources),
+                                  timer.elapsed,
+                                  is_incremental,
+                                  'compile'
+                                  )
+
+        # Write any additional resources for this target to the target workdir.
+        self.write_extra_resources(ctx)
+
+        # Jar the compiled output.
+        self._create_context_jar(ctx)
+
+      # Update the products with the latest classes.
+      self.register_extra_products_from_contexts([ctx.target], compile_contexts)
+
+    def work_for_vts_rsc_outline(vts, ctx, key):
+      # Double check the cache before beginning compilation
+      hit_cache = self.check_cache(vts, counter)
+
+      if not hit_cache:
+        is_incremental = self.should_compile_incrementally(vts, ctx)
+        if not is_incremental:
+          # Purge existing analysis file in non-incremental mode.
+          safe_delete(ctx.analysis_file)
+          # Work around https://github.com/pantsbuild/pants/issues/3670
+          safe_rmtree(ctx.classes_dir)
+
+        cp_entries = []
+
+        # Include the current machine's jdk lib jars. This'll blow up remotely.
+        # We need a solution for that.
+        # Probably something to do with https://github.com/pantsbuild/pants/pull/6346
+        distribution = JvmPlatform.preferred_jvm_distribution([ctx.target.platform], strict=True)
+        jvm_lib_jars_abs = distribution.find_libs(['rt.jar', 'dt.jar', 'tools.jar'])
+        cp_entries.extend(jvm_lib_jars_abs)
+
+        classpath_abs = self._zinc.compile_classpath(
+          'rsc_outline_classpath',
+          ctx.target,
+          extra_cp_entries=self._extra_compile_time_classpath)
+        classpath_rel = relpathify(classpath_abs)
+        cp_entries.extend(classpath_rel)
+
+        ctx.ensure_output_dirs_exist()
+        
+        tgt, = vts.targets
+        with Timer() as timer:
+          # Step 1: Convert classpath to SemanticDB
+          # ---------------------------------------
+          scalac_classpath_path_entries_abs = self.tool_classpath('workaround-metacp-dependency-classpath')
+          scalac_classpath_path_entries = relpathify(scalac_classpath_path_entries_abs)
+          rsc_outline_dir = relpathalone(ctx.rsc_outline_dir)
+          args = [
+            # NB: Without this setting, rsc will be missing some symbols
+            #     from the scala library.
+            '--include-scala-library-synthetics', # TODO generate these once and cache them
+            # NB: We need to add these extra dependencies in order to be able
+            #     to find symbols used by the scalac jars.
+            '--dependency-classpath', os.pathsep.join(scalac_classpath_path_entries),
+            # NB: The directory to dump the semanticdb jars generated by metacp.
+            # TODO: break this out into a separate job so that we can apply
+            #       it once per 3rdparty target.
+            '--out', rsc_outline_dir,
+            os.pathsep.join(cp_entries),
+          ]
+          metacp_wu = self._runtool(
+            'scala.meta.cli.Metacp',
+            'metacp',
+            args,
+            distribution,
+            tgt=tgt,
+            input_files=(scalac_classpath_path_entries + classpath_rel),
+            output_dir=rsc_outline_dir)
+          metacp_stdout = stdout_contents(metacp_wu)
+          metacp_result = json.loads(metacp_stdout)
+          metai_classpath = []
+          
+          def desandboxify_pantsd_loc(path):
+            # TODO come up with a cleaner way to maybe relpath paths.
+            try:
+              path = relpathalone(path)
+            except Exception:
+              pass
+            pattern = 'process-execution[^{}]+/'.format(re.escape(os.path.sep))
+            return re.split(pattern, path)[-1]
+
+          # TODO when these are generated once, we won't need to collect them here.  
+          metai_classpath.append(desandboxify_pantsd_loc(metacp_result["scalaLibrarySynthetics"]))
+          # NB The json is absolute pathed pointing into either the buildroot or
+          #    the temp directory of the hermetic build. This relativizes the keys.
+          status_elements = {
+            desandboxify_pantsd_loc(k): v
+            for k,v in metacp_result["status"].items()
+          }
+
+          for cp_entry in classpath_rel:
+            metai_classpath.append(desandboxify_pantsd_loc(status_elements[cp_entry]))
+          for cp_entry in jvm_lib_jars_abs:
+            metai_classpath.append(desandboxify_pantsd_loc(status_elements[cp_entry]))
+
+          metacp_classpath_entries = metai_classpath
+
+          # Step 1.5: metai Index the semanticdbs
+          # -------------------------------------
+          # TODO have metai write to a different spot than metacp
+          # Currently, the metai step depends on the fact that materializing
+          # ignores existing files. It should write the files to a different
+          # location, either by providing inputs from a different location,
+          # or invoking a script that does the copying
+          args = [
+            '--verbose',
+            os.pathsep.join(metacp_classpath_entries)
+          ]
+          self._runtool(
+            'scala.meta.cli.Metai',
+            'metai',
+            args,
+            distribution,
+            tgt=tgt,
+            input_files=metacp_classpath_entries,
+            output_dir=rsc_outline_dir
+          )
+
+          # Step 2: Outline Scala sources into SemanticDB
+          # ---------------------------------------------
+          outline_dir = relpathalone(ctx.outline_dir)
+          rsc_out = os.path.join(outline_dir, 'META-INF/semanticdb/out.semanticdb')
+          safe_mkdir(os.path.join(outline_dir, 'META-INF/semanticdb'))
+          target_sources = ctx.sources
+          args = [
+            '-cp', os.pathsep.join(metacp_classpath_entries),
+            '-out', rsc_out,
+          ] + target_sources
+          self._runtool(
+            'rsc.cli.Main',
+            'rsc',
+            args,
+            distribution,
+            tgt=tgt,
+            # TODO pass the input files from the target snapshot instead of the below
+            # input_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
+            input_files=target_sources + metacp_classpath_entries,
+            output_dir=outline_dir)
+          rsc_classpath = [outline_dir]
+
+          # Step 2.5: Postprocess the rsc outputs
+          # TODO: This is only necessary as a workaround for https://github.com/twitter/rsc/issues/199.
+          # Ideally, Rsc would do this on its own.
+          args = [
+            '--verbose',
+            os.pathsep.join(rsc_classpath)
+          ]
+          self._runtool(
+            'scala.meta.cli.Metai',
+            'metai',
+            args,
+            distribution,
+            tgt=tgt,
+            input_files=[rsc_out],
+            output_dir=rsc_outline_dir
+          )
+
+          # Step 3: Convert SemanticDB into an mjar
+          # ---------------------------------------
+          rsc_mjar_file = relpathalone(ctx.rsc_mjar_file)
+          args = [
+            '-out', rsc_mjar_file,
+            os.pathsep.join(rsc_classpath),
+          ]
+          self._runtool(
+            'scala.meta.cli.Mjar',
+            'mjar',
+            args,
+            distribution,
+            tgt=tgt,
+            input_files=[
+              rsc_out,
+              os.path.join(outline_dir, 'META-INF', 'semanticdb.semanticdbx')
+            ],
+            output_dir=os.path.dirname(rsc_mjar_file)
+            )
+
+        self._record_target_stats(tgt,
+                                  len(cp_entries),
+                                  len(target_sources),
+                                  timer.elapsed,
+                                  is_incremental,
+                                  'rsc_outline'
+                                  )
+        # Write any additional resources for this target to the target workdir.
+        self.write_extra_resources(ctx)
+
+      # Update the products with the latest classes.
+      self.register_extra_products_from_contexts([ctx.target], compile_contexts)
+
+    rsc_outline_jobs = []
+    zinc_compile_jobs = []
+
+    # Invalidated targets are a subset of relevant targets: get the context for this one.
+    compile_target = ivts.target
+    compile_context_pair = compile_contexts[compile_target]
+
+    # Create the rsc_outline job.
+    # Currently, rsc_outline only supports outlining scala.
+    if compile_target.has_sources('.java'):
+      pass
+    elif compile_target.has_sources('.scala'):
+      rsc_outline_key = self.rsc_outline_key_for_target(compile_target)
+      rsc_outline_jobs.append(
+        Job(
+          rsc_outline_key,
+          functools.partial(
+            work_for_vts_rsc_outline,
+            ivts,
+            compile_context_pair[0],
+            rsc_outline_key),
+          [self.rsc_outline_key_for_target(target) for target in invalid_dependencies],
+          self._size_estimator(compile_context_pair[0].sources),
+        )
+      )
+
+    # Create the zinc compile jobs.
+    # - Scala zinc compile jobs depend on the results of running rsc_outline on the scala target.
+    # - Java zinc compile jobs depend on the zinc compiles of their dependencies, because we can't
+    #   generate mjars that make javac happy at this point.
+    if compile_target.has_sources('.scala'):
+      full_key = self.compile_against_rsc_outline_key_for_target(compile_target)
+      zinc_compile_jobs.append(
+        Job(
+          full_key,
+          functools.partial(
+            work_for_vts,
+            ivts,
+            compile_context_pair[1],
+            full_key,
+            'rsc_outline_classpath'),
+          [self.rsc_outline_key_for_target(compile_target)] + [self.rsc_outline_key_for_target(target)
+                                                           for target in invalid_dependencies],
+          self._size_estimator(compile_context_pair[1].sources),
+          # NB: right now, only the last job will write to the cache, because we don't
+          #     do multiple cache entries per target-task tuple.
+          on_success=ivts.update,
+          on_failure=ivts.force_invalidate,
+        )
+      )
+    elif compile_target.has_sources('.java'):
+      full_key = self.compile_against_rsc_outline_key_for_target(compile_target)
+      zinc_compile_jobs.append(
+        Job(
+          full_key,
+          functools.partial(
+            work_for_vts,
+            ivts,
+            compile_context_pair[1],
+            full_key,
+            'runtime_classpath'),
+          [self.compile_against_rsc_outline_key_for_target(target) for target in invalid_dependencies],
+          self._size_estimator(compile_context_pair[1].sources),
+          # NB: right now, only the last job will write to the cache, because we don't
+          #     do multiple cache entries per target-task tuple.
+          on_success=ivts.update,
+          on_failure=ivts.force_invalidate,
+        )
+      )
+
+    return rsc_outline_jobs + zinc_compile_jobs
+
+  def select_runtime_context(self, ccs):
+    return ccs[1]
+
+  def create_compile_context(self, target, target_workdir):
+    sources = self._compute_sources_for_target(target)
+    return [
+      RscCompileContext(
+        target,
+        os.path.join(dir, 'z.analysis'),
+        os.path.join(dir, 'classes'),
+        os.path.join(dir, 'mjar.jar'),
+        os.path.join(dir, 'z.jar'),
+        os.path.join(dir, 'logs'),
+        os.path.join(dir, 'zinc_args'),
+        sources,
+        os.path.join(dir, 'semanticdbs'),
+        os.path.join(dir, 'rsc'),
+      )
+      for dir in [os.path.join(target_workdir, "mjar"),
+                  os.path.join(target_workdir, "zinc_compile")]
+    ]
+
+  def _runtool(self, main, tool_name, args, distribution, tgt=None, input_files=tuple(), output_dir=None):
+    if self.execution_strategy == self.HERMETIC:
+      # TODO: accept input_digests as well as files.
+      with self.context.new_workunit(tool_name) as wu:
+        rsc_outline_tool_path_abs = self.tool_classpath('rsc_outline')
+        rsc_outline_tool_path = relpathify(rsc_outline_tool_path_abs)
+
+        pathglobs = list(rsc_outline_tool_path)
+        pathglobs.extend(input_files)
+        root = PathGlobsAndRoot(
+          PathGlobs(tuple(pathglobs)),
+          text_type(get_buildroot()))
+
+        tool_snapshots = self.context._scheduler.capture_snapshots((root,))
+        input_files_directory_digest = tool_snapshots[0].directory_digest
+        classpath_for_cmd = os.pathsep.join(rsc_outline_tool_path)
+        cmd = [
+          distribution.java,
+        ]
+        cmd.extend(self.get_options().jvm_options)
+        cmd.extend(['-cp', classpath_for_cmd])
+        cmd.extend([main])
+        cmd.extend(args)
+
+        epr = ExecuteProcessRequest(
+          argv=tuple(cmd),
+          env=dict(),
+          input_files=input_files_directory_digest,
+          output_files=tuple(),
+          output_directories=(output_dir,),
+          timeout_seconds=15*60,
+          description='run {} for {}'.format(tool_name, tgt)
+        )
+        res = self.context.execute_process_synchronously(
+          epr,
+          self.name(),
+          [WorkUnitLabel.TOOL])
+
+        if res.exit_code != 0:
+          raise TaskError(res.stderr)
+
+        if output_dir:
+          self.context._scheduler.materialize_directories((
+            DirectoryToMaterialize(
+              # NB the first element here is the root to materialize into, not the dir to snapshot
+              text_type(get_buildroot()),
+              res.output_directory_digest),
+          ))
+          # TODO drop a file containing the digest, named maybe output_dir.digest
+        return res
+    else:
+      with self.context.new_workunit(tool_name) as wu:
+        result = self.runjava(classpath=self.tool_classpath('rsc_outline'),
+                              main=main,
+                              jvm_options=self.get_options().jvm_options,
+                              args=args,
+                              workunit_name=tool_name,
+                              workunit_labels=[WorkUnitLabel.TOOL])
+        if result != 0:
+          raise TaskError('Running {} failed'.format(tool_name))
+        runjava_wu = None
+        for c in wu.children:
+          if c.name is tool_name:
+            runjava_wu = c
+            break
+        if runjava_wu is None:
+          raise Exception('couldnt find work unit for underlying execution')
+        return runjava_wu

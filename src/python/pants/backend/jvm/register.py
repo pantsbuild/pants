@@ -49,6 +49,7 @@ from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun
 from pants.backend.jvm.tasks.jvm_compile.javac.javac_compile import JavacCompile
 from pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher import RuntimeClasspathPublisher
+from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import RscCompile
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.backend.jvm.tasks.jvm_dependency_check import JvmDependencyCheck
 from pants.backend.jvm.tasks.jvm_dependency_usage import JvmDependencyUsage
@@ -158,6 +159,7 @@ def register_goals():
   task(name='provide-tools-jar', action=ProvideToolsJar).install('bootstrap')
 
   # Compile
+  task(name='rsc', action=RscCompile).install('compile')
   task(name='zinc', action=ZincCompile).install('compile')
   task(name='javac', action=JavacCompile).install('compile')
 
