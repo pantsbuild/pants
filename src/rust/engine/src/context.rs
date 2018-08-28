@@ -120,11 +120,25 @@ impl Core {
     }
   }
 
-  pub fn pre_fork(&self) {
-    self.fs_pool.reset();
-    self.store.reset_prefork();
-    self.runtime.reset();
-    self.command_runner.reset_prefork();
+  pub fn fork_context<F, T>(&self, f: F) -> T
+  where
+    F: Fn() -> T,
+  {
+    self.fs_pool.with_shutdown(|| {
+      self.runtime.with_reset(|| {
+        self.graph.with_exclusive(|| {
+          // TODO: In order for `CommandRunner` to be "object safe" (which it must be in order to
+          // be `Box`ed for use in the `Core` struct without generic parameters), it cannot have
+          // a generic return type. Rather than giving it a return type like `void*`, we set a
+          // mutable field here.
+          let mut res: Option<T> = None;
+          self.command_runner.with_shutdown(&mut || {
+            res = Some(f());
+          });
+          res.expect("with_shutdown method did not call its argument function.")
+        })
+      })
+    })
   }
 }
 

@@ -201,11 +201,14 @@ impl super::CommandRunner for CommandRunner {
     }
   }
 
-  fn reset_prefork(&self) {
-    self.channel.reset();
-    self.env.reset();
-    self.execution_client.reset();
-    self.operations_client.reset();
+  fn with_shutdown(&self, f: &mut FnMut() -> ()) {
+    self.channel.with_reset(|| {
+      self.env.with_reset(|| {
+        self
+          .execution_client
+          .with_reset(|| self.operations_client.with_reset(|| f()))
+      })
+    })
   }
 }
 
