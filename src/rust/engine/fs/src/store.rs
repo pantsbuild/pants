@@ -1637,12 +1637,10 @@ mod remote {
     where
       F: FnOnce() -> (),
     {
-      self.channel.with_reset(|| {
-        self.env.with_reset(|| {
-          self
-            .cas_client
-            .with_reset(|| self.byte_stream_client.with_reset(f))
-        })
+      self.cas_client.with_reset(|| {
+        self
+          .byte_stream_client
+          .with_reset(|| self.channel.with_reset(|| self.env.with_reset(f)))
       })
     }
 
