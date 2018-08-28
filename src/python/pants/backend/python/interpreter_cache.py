@@ -77,18 +77,23 @@ class PythonInterpreterCache(object):
     """Pick an interpreter compatible with all the specified targets."""
     tgts_by_compatibilities = defaultdict(list)
     filters = set()
-    for target in targets:
-      if isinstance(target, PythonTarget):
-        c = self._python_setup.compatibility_or_constraints(target)
-        tgts_by_compatibilities[c].append(target)
-        filters.update(c)
+
+    if self._python_setup.get_options().is_flagged('interpreter_constraints'):
+      filters.update(self._python_setup.get_options().interpreter_constraints)
+    else:
+      for target in targets:
+        if isinstance(target, PythonTarget):
+          c = self._python_setup.compatibility_or_constraints(target)
+          tgts_by_compatibilities[c].append(target)
+          filters.update(c)
 
     allowed_interpreters = set(self.setup(filters=filters))
 
-    # Constrain allowed_interpreters based on each target's compatibility requirements.
-    for compatibility in tgts_by_compatibilities.keys():
-      compatible_with_target = set(self._matching(allowed_interpreters, compatibility))
-      allowed_interpreters &= compatible_with_target
+    if not self._python_setup.get_options().is_flagged('interpreter_constraints'):
+      # Constrain allowed_interpreters based on each target's compatibility requirements.
+      for compatibility in tgts_by_compatibilities:
+        compatible_with_target = set(self._matching(allowed_interpreters, compatibility))
+        allowed_interpreters &= compatible_with_target
 
     if not allowed_interpreters:
       # Create a helpful error message.
