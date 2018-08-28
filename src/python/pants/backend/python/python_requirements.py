@@ -58,9 +58,16 @@ class PythonRequirements(object):
                   raise ValueError('Only 1 --find-links url is supported per requirements file')
                 repository = value
 
+    requirements_file_target_name = requirements_relpath
+    self._parse_context.create_object('files',
+                                      name=requirements_file_target_name,
+                                      sources=[requirements_relpath])
+    requirements_dep = ':{}'.format(requirements_file_target_name)
+
     for requirement in requirements:
       req = self._parse_context.create_object('python_requirement', requirement,
                                               repository=repository)
       self._parse_context.create_object('python_requirement_library',
                                         name=req.project_name,
-                                        requirements=[req])
+                                        requirements=[req],
+                                        dependencies=[requirements_dep])
