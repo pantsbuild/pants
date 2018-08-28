@@ -10,6 +10,7 @@ from unittest import skipIf
 
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
+from pants.util.contextutil import temporary_dir
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
 
@@ -218,3 +219,38 @@ class ZincCompileIntegrationTest(BaseCompileIT):
       with self.temporary_cachedir() as cachedir:
         pants_run = self.run_test_compile(workdir, cachedir, target_spec, clean_all=True)
         self.assertEqual(0, pants_run.returncode)
+
+  def test_hermetic_binary_with_dependencies(self):
+    with temporary_dir() as cache_dir:
+      config = {
+        'cache.compile.zinc': {'write_to': [cache_dir]},
+        'compile.zinc': {
+          'execution_strategy': 'hermetic',
+          'use_classpath_jars': False,
+        }
+      }
+
+      with self.temporary_workdir(cleanup=False) as workdir:
+        pants_run = self.run_pants_with_workdir(
+          [
+            '-q',
+            'run',
+            'examples/src/scala/org/pantsbuild/example/hello/exe',
+          ],
+          workdir,
+          config,
+        )
+        self.assert_success(pants_run)
+        self.assertIn(
+          'Num args passed: 0. Stand by for welcome...\nHello, Resource World!',
+          pants_run.stdout_data,
+        )
+
+        compile_dir = os.path.join(workdir, 'compile', 'zinc', 'current')
+
+        for path_suffix in [
+          'examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/org/pantsbuild/example/hello/exe/Exe.class',
+          'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
+        ]:
+          path = os.path.join(compile_dir, path_suffix)
+          self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))
