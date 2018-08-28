@@ -35,9 +35,14 @@ class PantsRequirementTest(TestBase):
     self.assertIsNotNone(req.requirement.marker)
     self.assertTrue(req.requirement.marker.evaluate(),
                     'pants_requirement() should always work in the current test environment')
-    self.assertFalse(req.requirement.marker.evaluate({'python_version': '3.5'}))
-    self.assertFalse(req.requirement.marker.evaluate({'python_version': '2.6'}))
-    self.assertTrue(req.requirement.marker.evaluate({'python_version': '2.7'}))
+
+    def evaluate_version(version):
+      return req.requirement.marker.evaluate({'python_version': version})
+
+    allowed_versions = {'2.7', '3.4', '3.5', '3.6', '3.7'}
+
+    self.assertFalse(evaluate_version('2.6'))
+    self.assertTrue(all(evaluate_version(v) for v in allowed_versions))
 
   def test_default_name(self):
     self.add_to_build_file('3rdparty/python/pants', 'pants_requirement()')
