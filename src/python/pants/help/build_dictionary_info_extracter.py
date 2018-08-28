@@ -176,7 +176,7 @@ class BuildDictionaryInfoExtracter(object):
     arg_descriptions = cls.get_arg_descriptions_from_docstring(func)
     argspec = inspect.getargspec(func)
     arg_names = argspec.args
-    if 'self' in arg_names or 'cls' in arg_names:
+    if arg_names and arg_names[0] in {'self', 'cls'}:
       arg_names = arg_names[1:]
     num_defaulted_args = len(argspec.defaults) if argspec.defaults is not None else 0
     first_defaulted_arg = len(arg_names) - num_defaulted_args
