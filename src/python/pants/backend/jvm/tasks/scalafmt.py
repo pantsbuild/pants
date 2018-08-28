@@ -32,7 +32,7 @@ class ScalaFmt(RewriteBase):
                           classpath=[
                           JarDependency(org='com.geirsson',
                                         name='scalafmt-cli_2.11',
-                                        rev='1.0.0-RC4')
+                                        rev='1.5.1')
                           ])
 
   @classmethod
