@@ -234,11 +234,7 @@ class BinaryUtilTest(TestBase):
       "Pants could not resolve binaries for the current host: platform 'vms' was not recognized. "
       "Recognized platforms are: ")
     if PY3:
-      try:
-        self.assertIn(expected_msg_prefix + "dict_keys(['darwin', 'linux']).", the_raised_exception_message)
-      except AssertionError:
-        # Py3.4 - 3.5 is non-deterministic in ordering of dict_keys
-        self.assertIn(expected_msg_prefix + "dict_keys(['linux', 'darwin']).", the_raised_exception_message)
+      self.assertIn(expected_msg_prefix + "dict_keys(['darwin', 'linux']).", the_raised_exception_message)
     else:
       self.assertIn(expected_msg_prefix + "[u'darwin', u'linux'].", the_raised_exception_message)
 
