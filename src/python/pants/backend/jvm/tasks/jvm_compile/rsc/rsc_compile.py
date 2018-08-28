@@ -80,7 +80,7 @@ class RscCompileContext(CompileContext):
 
   def ensure_output_dirs_exist(self):
     safe_mkdir(os.path.dirname(self.rsc_mjar_file))
-    safe_mkdir(self.rsc_outline_dir) # NB: figure a better way to collapse these.
+    safe_mkdir(self.rsc_outline_dir)
     safe_mkdir(self.outline_dir)
 
 
@@ -184,7 +184,7 @@ class RscCompile(ZincCompile):
   def execute(self):
     if JvmPlatform.global_instance().get_options().compiler == 'rsc':
       # Calling BaseZincCompile directly because ZincCompile won't run a compile if
-      # rsc_outline is specified.
+      # rsc is specified.
       return BaseZincCompile.execute(self)
 
   def rsc_outline_key_for_target(self, compile_target):

@@ -43,6 +43,6 @@ class RscCompileIntegration(BaseCompileIT):
         self.assert_success(pants_run)
         path = os.path.join(
           workdir,
-          'compile/rsc/current/testprojects.src.scala.org.pantsbuild.testproject.mutual.mutual/current',
+          'compile/rsc/current/testprojects.src.scala.org.pantsbuild.testproject.mutual.mutual/current/zinc_compile',
           'classes/org/pantsbuild/testproject/mutual/A.class')
         self.assertTrue(os.path.exists(path))
