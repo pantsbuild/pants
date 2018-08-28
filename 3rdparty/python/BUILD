@@ -25,9 +25,3 @@ python_requirement_library(
     python_requirement('s3-log-parse==0.1.1')
   ]
 )
-
-# NB: Needed only for tests: tests/python/pants_test/engine/legacy:graph.
-files(
-  name='requirements_files',
-  sources=rglobs('**/requirements.txt'),
-)

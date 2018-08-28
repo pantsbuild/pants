@@ -226,9 +226,6 @@ class PantsDaemon(FingerprintedProcessManager):
     # A lock to guard the service thread lifecycles. This can be used by individual services
     # to safeguard daemon-synchronous sections that should be protected from abrupt teardown.
     self._lifecycle_lock = threading.RLock()
-    # A lock to guard pantsd->runner forks. This can be used by services to safeguard resources
-    # held by threads at fork time, so that we can fork without deadlocking.
-    self._fork_lock = threading.RLock()
     # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
     self._kill_switch = threading.Event()
     self._exiter = Exiter()
@@ -303,10 +300,9 @@ class PantsDaemon(FingerprintedProcessManager):
 
   def _setup_services(self, services):
     assert self._lifecycle_lock is not None, 'PantsDaemon lock has not been set!'
-    assert self._fork_lock is not None, 'PantsDaemon fork lock has not been set!'
     for service in services:
       self._logger.info('setting up service {}'.format(service))
-      service.setup(self._lifecycle_lock, self._fork_lock)
+      service.setup(self._lifecycle_lock)
 
   @staticmethod
   def _make_thread(target):

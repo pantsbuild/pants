@@ -35,21 +35,17 @@ class StoreGCService(PantsService):
 
   def _extend_lease(self):
     while 1:
-      # Use the fork lock to ensure this thread isn't cloned via fork while holding the graph lock.
-      with self.fork_lock:
-        self._logger.debug('Extending leases')
-        self._scheduler.lease_files_in_graph()
-        self._logger.debug('Done extending leases')
+      self._logger.debug('Extending leases')
+      self._scheduler.lease_files_in_graph()
+      self._logger.debug('Done extending leases')
       time.sleep(self._LEASE_EXTENSION_INTERVAL_SECONDS)
 
   def _garbage_collect(self):
     while 1:
       time.sleep(self._GARBAGE_COLLECTION_INTERVAL_SECONDS)
-      # Grab the fork lock in case lmdb internally isn't fork-without-exec-safe.
-      with self.fork_lock:
-        self._logger.debug('Garbage collecting store')
-        self._scheduler.garbage_collect_store()
-        self._logger.debug('Done garbage collecting store')
+      self._logger.debug('Garbage collecting store')
+      self._scheduler.garbage_collect_store()
+      self._logger.debug('Done garbage collecting store')
 
   def run(self):
     """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""

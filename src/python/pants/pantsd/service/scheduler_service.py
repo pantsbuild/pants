@@ -64,9 +64,9 @@ class SchedulerService(PantsService):
   def _combined_invalidating_fileset_from_globs(glob_strs, root):
     return set.union(*(Fileset.globs(glob_str, root=root)() for glob_str in glob_strs))
 
-  def setup(self, lifecycle_lock, fork_lock):
+  def setup(self, lifecycle_lock):
     """Service setup."""
-    super(SchedulerService, self).setup(lifecycle_lock, fork_lock)
+    super(SchedulerService, self).setup(lifecycle_lock)
     # Register filesystem event handlers on an FSEventService instance.
     self._fs_event_service.register_all_files_handler(self._enqueue_fs_event)
 
@@ -121,10 +121,9 @@ class SchedulerService(PantsService):
 
     self._maybe_invalidate_scheduler_batch(files)
 
-    with self.fork_lock:
-      invalidated = self._scheduler.invalidate_files(files)
-      if invalidated:
-        self._loop_condition.notify_all()
+    invalidated = self._scheduler.invalidate_files(files)
+    if invalidated:
+      self._loop_condition.notify_all()
 
   def _process_event_queue(self):
     """File event notification queue processor."""
@@ -198,27 +197,26 @@ class SchedulerService(PantsService):
     return target_roots
 
   def _prefork_body(self, session, options):
-    with self.fork_lock:
-      global_options = options.for_global_scope()
-      target_roots = TargetRootsCalculator.create(
-        options=options,
-        session=session.scheduler_session,
-        symbol_table=session.symbol_table,
-        exclude_patterns=tuple(global_options.exclude_target_regexp) if global_options.exclude_target_regexp else tuple(),
-        tags=tuple(global_options.tag) if global_options.tag else tuple()
-      )
+    global_options = options.for_global_scope()
+    target_roots = TargetRootsCalculator.create(
+      options=options,
+      session=session.scheduler_session,
+      symbol_table=session.symbol_table,
+      exclude_patterns=tuple(global_options.exclude_target_regexp) if global_options.exclude_target_regexp else tuple(),
+      tags=tuple(global_options.tag) if global_options.tag else tuple()
+    )
 
-      if global_options.v1:
-        session.warm_product_graph(target_roots)
+    if global_options.v1:
+      session.warm_product_graph(target_roots)
 
-      if global_options.v2:
-        if not global_options.v1:
-          session.validate_goals(options.goals)
+    if global_options.v2:
+      if not global_options.v1:
+        session.validate_goals(options.goals)
 
-        # N.B. @console_rules run pre-fork in order to cache the products they request during execution.
-        session.run_console_rules(options.goals, target_roots)
+      # N.B. @console_rules run pre-fork in order to cache the products they request during execution.
+      session.run_console_rules(options.goals, target_roots)
 
-      return target_roots
+    return target_roots
 
   def run(self):
     """Main service entrypoint."""
