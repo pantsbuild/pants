@@ -445,7 +445,7 @@ class BaseZincCompile(JvmCompile):
       req = ExecuteProcessRequest(
         argv=argv,
         # TODO: https://github.com/pantsbuild/pants/issues/6160
-        env={'PATH': '/bin'},
+        # env={'PATH': '/bin'},
         input_files=merged_input_digest,
         output_files=(analysis_cache,),
         output_directories=(classes_dir,),
