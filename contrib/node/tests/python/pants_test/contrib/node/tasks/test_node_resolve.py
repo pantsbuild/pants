@@ -10,6 +10,7 @@ from builtins import open
 from textwrap import dedent
 
 import mock
+from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
 from pants_test.task_test_base import TaskTestBase
 
@@ -19,7 +20,7 @@ from pants.contrib.node.subsystems.resolvers.npm_resolver import NpmResolver
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
-from pants.contrib.node.tasks.node_paths import NodePaths
+from pants.contrib.node.tasks.node_paths import NodePaths, NodePathsLocal
 from pants.contrib.node.tasks.node_resolve import NodeResolve
 
 
@@ -37,6 +38,10 @@ class NodeResolveTest(TaskTestBase):
   def tearDown(self):
     super(NodeResolveTest, self).tearDown()
     NodeResolve._clear_resolvers()
+
+  def wrap_context(self, context, product_types):
+    for product_type in product_types:
+      context.products.require_data(product_type)
 
   def test_register_resolver_for_type(self):
     NodeResolve._clear_resolvers()
@@ -58,7 +63,7 @@ class NodeResolveTest(TaskTestBase):
                      NodeResolve._resolver_for_target(node_module_target))
 
   def test_product_types(self):
-    self.assertEqual([NodePaths], NodeResolve.product_types())
+    self.assertEqual([NodePaths, NodePathsLocal], NodeResolve.product_types())
 
   def test_noop(self):
     task = self.create_task(self.context())
@@ -93,6 +98,7 @@ class NodeResolveTest(TaskTestBase):
                        'force': False,
                        'frozen_lockfile': True}
     })
+    self.wrap_context(context, [NodePaths])
     task = self.create_task(context)
     task.execute()
 
@@ -154,10 +160,12 @@ class NodeResolveTest(TaskTestBase):
                        'force': False,
                        'frozen_lockfile': True}
     })
+    self.wrap_context(context, [NodePaths])
     task = self.create_task(context)
     task.execute()
 
     node_paths = context.products.get_data(NodePaths)
+
     self.assertIsNotNone(node_paths.node_path(util))
 
     node_path = node_paths.node_path(leaf)
@@ -225,6 +233,7 @@ class NodeResolveTest(TaskTestBase):
                        'force': False,
                        'frozen_lockfile': True}
     })
+    self.wrap_context(context, [NodePaths])
     task = self.create_task(context)
     task.execute()
 
@@ -252,7 +261,7 @@ class NodeResolveTest(TaskTestBase):
 
   def _test_resolve_options_helper(
       self, install_optional, force_option_override, production_only, force, frozen_lockfile,
-      package_manager, expected_params):
+      package_manager, product_types, has_lock_file, expected_params):
     self.create_file('src/node/util/package.json', contents=dedent("""
       {
         "name": "util",
@@ -263,11 +272,15 @@ class NodeResolveTest(TaskTestBase):
       var typ = require('typ');
       console.log("type of boolean is: " + typ.BOOLEAN);
     """))
-    # yarn execution path requires yarn.lock
+    sources = ['util.js', 'package.json']
+    # yarn execution path requires yarn.lock unless it's installing locally
     self.create_file('src/node/util/yarn.lock')
+    if has_lock_file:
+      self.create_file('src/node/util/yarn.lock')
+      sources.append('yarn.lock')
     target = self.make_target(spec='src/node/util',
                               target_type=NodeModule,
-                              sources=['util.js', 'package.json', 'yarn.lock'],
+                              sources=sources,
                               dependencies=[],
                               package_manager=package_manager)
 
@@ -278,6 +291,7 @@ class NodeResolveTest(TaskTestBase):
                        'force': force,
                        'frozen_lockfile': frozen_lockfile}
     })
+    self.wrap_context(context, product_types)
     task = self.create_task(context)
 
     package_manager_obj = task.get_package_manager(target=target)
@@ -296,6 +310,8 @@ class NodeResolveTest(TaskTestBase):
       force=False,
       frozen_lockfile=True,
       package_manager='npm',
+      product_types=[NodePaths],
+      has_lock_file=False,
       expected_params=['install', '--no-optional'])
 
   def test_resolve_options_npm(self):
@@ -306,6 +322,8 @@ class NodeResolveTest(TaskTestBase):
       force=True,
       frozen_lockfile=False,
       package_manager='npm',
+      product_types=[NodePaths],
+      has_lock_file=False,
       expected_params=['install', '--production', '--force'])
 
   def test_resolve_default_no_options_yarn(self):
@@ -316,6 +334,8 @@ class NodeResolveTest(TaskTestBase):
       force=False,
       frozen_lockfile=True,
       package_manager='yarnpkg',
+      product_types=[NodePaths],
+      has_lock_file=True,
       expected_params=['--non-interactive', '--ignore-optional', '--frozen-lockfile'])
 
   def test_resolve_options_yarn(self):
@@ -326,4 +346,68 @@ class NodeResolveTest(TaskTestBase):
       force=True,
       frozen_lockfile=False,
       package_manager='yarnpkg',
+      product_types=[NodePaths],
+      has_lock_file=True,
       expected_params=['--non-interactive', '--production=true', '--force'])
+
+  def test_resolve_default_no_options_yarn_local(self):
+    self._test_resolve_options_helper(
+      install_optional=False,
+      force_option_override=False,
+      production_only=False,
+      force=False,
+      frozen_lockfile=True,
+      package_manager='yarnpkg',
+      product_types=[NodePathsLocal],
+      has_lock_file=True,
+      expected_params=['--non-interactive', '--force'])
+
+    def test_resolve_default_no_options_yarn_no_lock_local(self):
+      self._test_resolve_options_helper(
+        install_optional=False,
+        force_option_override=False,
+        production_only=False,
+        force=False,
+        frozen_lockfile=True,
+        package_manager='yarnpkg',
+        product_types=[NodePathsLocal],
+        has_lock_file=False,
+        expected_params=['--non-interactive', '--force'])
+
+    def test_resolve_options_yarn_local(self):
+      self._test_resolve_options_helper(
+        install_optional=True,
+        force_option_override=False,
+        production_only=True,
+        force=True,
+        frozen_lockfile=False,
+        package_manager='yarnpkg',
+        product_types=[NodePathsLocal],
+        has_lock_file=True,
+        expected_params=['--non-interactive', '--production=true', '--force'])
+
+    def test_resolve_options_yarn_force_override_local(self):
+      self._test_resolve_options_helper(
+        install_optional=False,
+        force_option_override=True,
+        production_only=True,
+        force=False,
+        frozen_lockfile=False,
+        package_manager='yarnpkg',
+        product_types=[NodePathsLocal],
+        has_lock_file=True,
+        expected_params=['--non-interactive', '--ignore-optional', '--production=true'])
+
+    def test_resolve_default_no_options_npm_local(self):
+      unsupported = 'not supported for NPM'
+      with self.assertRaisesRegexp(TaskError, unsupported):
+        self._test_resolve_options_helper(
+          install_optional=False,
+          force_option_override=False,
+          production_only=False,
+          force=False,
+          frozen_lockfile=True,
+          package_manager='npm',
+          product_types=[NodePathsLocal],
+          has_lock_file=True,
+          expected_params=['--non-interactive', '--force'])

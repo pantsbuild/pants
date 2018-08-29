@@ -21,7 +21,7 @@ from pants.contrib.node.tasks.node_build import NodeBuild
 from pants.contrib.node.tasks.node_bundle import NodeBundle as NodeBundleTask
 from pants.contrib.node.tasks.node_install import NodeInstall
 from pants.contrib.node.tasks.node_repl import NodeRepl
-from pants.contrib.node.tasks.node_resolve import NodeResolve, NodeResolveLocal
+from pants.contrib.node.tasks.node_resolve import NodeResolve
 from pants.contrib.node.tasks.node_run import NodeRun
 from pants.contrib.node.tasks.node_test import NodeTest as NodeTestTask
 
@@ -47,7 +47,6 @@ def register_goals():
   task(name='node', action=NodeResolve).install('resolve')
   # Because of execution order, resolve.node is always executed before node-resolve-local
   # This means that installation occurs twice, once in the working dir and again in the local dir
-  task(name='node', action=NodeResolveLocal).install('node-resolve-local')
   task(name='node', action=NodeRun).install('run')
   task(name='node', action=NodeBuild).install('compile', first=True)
   task(name='node', action=NodeTestTask).install('test')

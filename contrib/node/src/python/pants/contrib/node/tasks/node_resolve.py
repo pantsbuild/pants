@@ -8,25 +8,27 @@ import os
 
 from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
+from pants.invalidation.build_invalidator import UncacheableCacheKeyGenerator
+from pants.invalidation.cache_manager import InvalidationCacheManager
 from pants.util.meta import AbstractClass
 
 from pants.contrib.node.tasks.node_paths import NodePaths, NodePathsLocal
 from pants.contrib.node.tasks.node_task import NodeTask
 
 
-class NodeResolveBase(NodeTask, AbstractClass):
+class NodeResolve(NodeTask, AbstractClass):
   """Resolves node_package targets to their node paths using different registered resolvers."""
 
   _resolver_by_type = dict()
 
   @classmethod
   def product_types(cls):
-    return [NodePaths]
+    return [NodePaths, NodePathsLocal]
 
   @classmethod
   def prepare(cls, options, round_manager):
     """Allow each resolver to declare additional product requirements."""
-    super(NodeResolveBase, cls).prepare(options, round_manager)
+    super(NodeResolve, cls).prepare(options, round_manager)
     for resolver in cls._resolver_by_type.values():
       resolver.prepare(options, round_manager)
 
@@ -70,80 +72,58 @@ class NodeResolveBase(NodeTask, AbstractClass):
     """
     return self.is_node_package(target) and self._resolver_for_target(target) != None
 
-  def execute(self):
-    pass
+  def _do_local_invalidation_check(self,
+                                   targets,
+                                   invalidate_dependents=True,
+                                   topological_order=True):
+    """Returns an invalidation_check with all targets invalidated.
+    """
+    # Generate a cache_key that never matches to ensure work is always done.
+    cache_key_generator = UncacheableCacheKeyGenerator()
+    cache_manager = InvalidationCacheManager(self.workdir,
+                                             cache_key_generator,
+                                             self._build_invalidator,
+                                             invalidate_dependents,
+                                             fingerprint_strategy=None,
+                                             invalidation_report=self.context.invalidation_report,
+                                             task_name=self._task_name,
+                                             task_version=self.implementation_version_str())
 
-
-class NodeResolve(NodeResolveBase):
-  """Resolves node_package targets to isolated chroots using different registered resolvers."""
-
-  def execute(self):
-    targets = self.context.targets(predicate=self._can_resolve_target)
-    if not targets:
-      return
-
-    node_paths = self.context.products.get_data(NodePaths, init_func=NodePaths)
-
-    # We must have copied local sources into place and have node_modules directories in place for
-    # internal dependencies before installing dependees, so `topological_order=True` is critical.
-    with self.invalidated(targets,
-                          topological_order=True,
-                          invalidate_dependents=True) as invalidation_check:
-
-      with self.context.new_workunit(name='install', labels=[WorkUnitLabel.MULTITOOL]):
-        for vt in invalidation_check.all_vts:
-          target = vt.target
-          if not vt.valid:
-            resolver_for_target_type = self._resolver_for_target(target).global_instance()
-            resolver_for_target_type.resolve_target(self, target, vt.results_dir, node_paths)
-          node_paths.resolved(target, vt.results_dir)
-
-
-class NodeResolveLocal(NodeResolveBase):
-  """Resolves node_package targets to source chroots using different registered resolvers.
-
-  This task sets up the development environment
-  """
-
-  @classmethod
-  def product_types(cls):
-    # NodePathsLocal contain Node Paths that are local to the source target root.
-    return [NodePathsLocal]
-
-  @property
-  def cache_target_dirs(self):
-    # Do not create a results_dir for this task
-    return True
-
-  def artifact_cache_reads_enabled(self):
-    # Artifact caching is not necessary for local installation.
-    # Just depend on the local cache provided by the package manager.
-    return False
+    return cache_manager.check(targets, topological_order=topological_order)
 
   def execute(self):
     targets = self.context.targets(predicate=self._can_resolve_target)
     if not targets:
       return
-
-    node_paths = self.context.products.get_data(NodePathsLocal, init_func=NodePathsLocal)
-    # Invalidate all targets for this task, and use invalidated() check
-    # to build topologically sorted target graph. This is probably not the best way
-    # to do this, but it works.
-    self.invalidate()
-    with self.invalidated(targets,
-                          # This is necessary to ensure that transitive dependencies are installed first
-                          topological_order=True,
-                          invalidate_dependents=True,
-                          silent=True) as invalidation_check:
+    if self.context.products.is_required_data(NodePaths):
+      node_paths = self.context.products.get_data(NodePaths, init_func=NodePaths)
+      # We must have copied local sources into place and have node_modules directories in place for
+      # internal dependencies before installing dependees, so `topological_order=True` is critical.
+      with self.invalidated(targets,
+                            topological_order=True,
+                            invalidate_dependents=True) as invalidation_check:
+        with self.context.new_workunit(name='install', labels=[WorkUnitLabel.MULTITOOL]):
+          for vt in invalidation_check.all_vts:
+            target = vt.target
+            if not vt.valid:
+              resolver_for_target_type = self._resolver_for_target(target).global_instance()
+              resolver_for_target_type.resolve_target(self, target, vt.results_dir, node_paths)
+            node_paths.resolved(target, vt.results_dir)
+    if self.context.products.is_required_data(NodePathsLocal):
+      node_paths_local = self.context.products.get_data(NodePathsLocal, init_func=NodePathsLocal)
+      # Always resolve targets if NodePathsLocal is required.
+      # This is crucial for `node-install` goal which builds against source code and relies on
+      # latest and nothing from the pants cache. The caching is done locally via the node_modules
+      # directory within source and managed by the underlying package manager.
+      invalidation_check = self._do_local_invalidation_check(targets)
       with self.context.new_workunit(name='node-install', labels=[WorkUnitLabel.MULTITOOL]):
         for vt in invalidation_check.all_vts:
           target = vt.target
-          if not vt.valid:
-            resolver_for_target_type = self._resolver_for_target(target).global_instance()
-            results_dir = os.path.join(get_buildroot(), target.address.spec_path)
-            resolver_for_target_type.resolve_target(self, target, results_dir, node_paths,
-                                                    resolve_locally=True,
-                                                    force=True,
-                                                    install_optional=True,
-                                                    frozen_lockfile=False)
-          node_paths.resolved(target, results_dir)
+          resolver_for_target_type = self._resolver_for_target(target).global_instance()
+          results_dir = os.path.join(get_buildroot(), target.address.spec_path)
+          resolver_for_target_type.resolve_target(self, target, results_dir, node_paths_local,
+                                                  resolve_locally=True,
+                                                  force=True,
+                                                  install_optional=True,
+                                                  frozen_lockfile=False)
+          node_paths_local.resolved(target, results_dir)

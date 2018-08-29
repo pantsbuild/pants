@@ -18,7 +18,7 @@ from pants.util.dirutil import safe_rmtree
 
 from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
-from pants.contrib.node.tasks.node_resolve import NodeResolve, NodeResolveLocal
+from pants.contrib.node.tasks.node_resolve import NodeResolve
 
 
 class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
@@ -30,7 +30,6 @@ class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
              help='Timeout the fetch if the connection is idle for longer than this value.')
     super(NodePreinstalledModuleResolver, cls).register_options(register)
     NodeResolve.register_resolver_for_type(NodePreinstalledModule, cls)
-    NodeResolveLocal.register_resolver_for_type(NodePreinstalledModule, cls)
 
   def resolve_target(self, node_task, target, results_dir, node_paths, resolve_locally=False, **kwargs):
     if not resolve_locally:

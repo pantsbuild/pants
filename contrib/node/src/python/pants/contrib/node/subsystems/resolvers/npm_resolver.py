@@ -18,7 +18,7 @@ from pants.contrib.node.subsystems.package_managers import (PACKAGE_MANAGER_NPM,
                                                             PACKAGE_MANAGER_YARNPKG)
 from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 from pants.contrib.node.targets.node_module import NodeModule
-from pants.contrib.node.tasks.node_resolve import NodeResolve, NodeResolveLocal
+from pants.contrib.node.tasks.node_resolve import NodeResolve
 
 
 class NpmResolver(Subsystem, NodeResolverBase):
@@ -44,7 +44,6 @@ class NpmResolver(Subsystem, NodeResolverBase):
       help='If enabled, options will override hard-coded values')
 
     NodeResolve.register_resolver_for_type(NodeModule, cls)
-    NodeResolveLocal.register_resolver_for_type(NodeModule, cls)
 
   def resolve_target(self, node_task, target, results_dir, node_paths, resolve_locally=False,
                      install_optional=None, production_only=None, force=None, frozen_lockfile=None,
