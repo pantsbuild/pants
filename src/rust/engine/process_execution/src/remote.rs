@@ -145,7 +145,7 @@ impl super::CommandRunner for CommandRunner {
                       );
                       let execute_request = execute_request2.clone();
                       store.ensure_remote_has_recursive(missing_digests)
-                              .and_then(move |()| {
+                              .and_then(move |_| {
                                 command_runner2.oneshot_execute(&execute_request)
                               })
                               // Reset `iter_num` on `MissingDigests`

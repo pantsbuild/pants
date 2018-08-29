@@ -19,7 +19,8 @@ class JavaAntlrLibraryTest(TestBase):
     return BuildFileAliases(targets={'java_antlr_library': JavaAntlrLibrary})
 
   def test_empty(self):
-    with self.assertRaisesRegexp(TargetDefinitionException, "Missing required 'sources' parameter"):
+    with self.assertRaisesRegexp(TargetDefinitionException,
+                                 "the sources parameter.*contains an empty snapshot."):
       self.add_to_build_file('BUILD', dedent('''
         java_antlr_library(name='foo',
           sources=[],
@@ -27,9 +28,10 @@ class JavaAntlrLibraryTest(TestBase):
       self.foo = self.target('//:foo')
 
   def test_valid(self):
+    self.create_file(self.build_path('something.txt'), contents='asdf', mode='w')
     self.add_to_build_file('BUILD', dedent('''
       java_antlr_library(name='foo',
-        sources=['foo'],
+        sources=['something.txt'],
       )'''))
     self.foo = self.target('//:foo')
     self.assertIsInstance(self.foo, JavaAntlrLibrary)

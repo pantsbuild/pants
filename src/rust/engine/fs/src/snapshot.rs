@@ -374,8 +374,8 @@ mod tests {
   use testutil::make_file;
 
   use super::super::{
-    Dir, File, GlobMatching, Path, PathGlobs, PathStat, PosixFS, ResettablePool, Snapshot, Store,
-    StrictGlobMatching,
+    Dir, File, GlobExpansionConjunction, GlobMatching, Path, PathGlobs, PathStat, PosixFS,
+    ResettablePool, Snapshot, Store, StrictGlobMatching,
   };
   use super::OneOffStoreFileByDigest;
 
@@ -688,7 +688,12 @@ mod tests {
     let mut v = posix_fs
       .expand(
         // Don't error or warn if there are no paths matched -- that is a valid state.
-        PathGlobs::create(&["**".to_owned()], &[], StrictGlobMatching::Ignore).unwrap(),
+        PathGlobs::create(
+          &["**".to_owned()],
+          &[],
+          StrictGlobMatching::Ignore,
+          GlobExpansionConjunction::AllMatch,
+        ).unwrap(),
       )
       .wait()
       .unwrap();
