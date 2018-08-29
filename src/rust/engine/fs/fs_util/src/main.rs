@@ -88,8 +88,8 @@ fn main() {
 Outputs a fingerprint of its contents and its size in bytes, separated by a space.",
               )
               .arg(Arg::with_name("path").required(true).takes_value(true))
-              .arg(Arg::with_name("output-mode").long("output-mode").multiple(false).takes_value(true).help(
-                "Set --output-mode=(json|simple) manipulate the way a report is displayed. Default is simple."
+              .arg(Arg::with_name("output-mode").long("output-mode").possible_values(&["json", "simple"]).default_value("simple").multiple(false).takes_value(true).help(
+                "Set to manipulate the way a report is displayed."
               )),
           ),
       )
@@ -132,8 +132,8 @@ directory, relative to the root.",
                   "Root under which the globs live. The Directory proto produced will be relative \
 to this directory.",
             ))
-                .arg(Arg::with_name("output-mode").long("output-mode").multiple(false).takes_value(true).help(
-                  "Set --output-mode=(json|simple) manipulate the way a report is displayed. Default is simple."
+                .arg(Arg::with_name("output-mode").long("output-mode").possible_values(&["json", "simple"]).default_value("simple").multiple(false).takes_value(true).help(
+                  "Set to manipulate the way a report is displayed."
                 )),
           )
           .subcommand(
@@ -500,6 +500,7 @@ fn print_upload_summary(mode: Option<&str>, report: &SummaryWithDigest) {
   match mode {
     Some("json") => println!("{}", serde_json::to_string_pretty(&report).unwrap()),
     Some("simple") => println!("{} {}", report.digest.0, report.digest.1),
-    _ => println!("{} {}", report.digest.0, report.digest.1),
+    // This should never be reached, as clap should error with unknown formats.
+    _ => eprintln!("Unknown summary format."),
   };
 }
