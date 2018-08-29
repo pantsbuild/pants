@@ -5,34 +5,36 @@ extern crate mock;
 
 use clap::{App, Arg};
 use mock::StubCAS;
+use std::io;
+use std::io::prelude::*;
 use std::process::exit;
 
-/// TODO:
-///   - Implement custom ports as flags
-///   - Remove the while(true)
-///   - Better logging
-///   - Proper error handling
-
-fn main() {
+fn main() -> Result<(), String> {
   env_logger::init();
+  let mut stdin = io::stdin();
 
-  match execute(
-    &App::new("local_cas")
-      .about("")
-      .arg(Arg::with_name("port").required(false).takes_value(true))
-      .get_matches(),
-  ) {
-    Ok(_) => {}
-    Err(err) => {
-      eprintln!("{}", err);
-      exit(1)
-    }
-  };
-}
+  let matches = &App::new("local_cas")
+    .about("An in-memory implementation of a CAS, to test remote execution utilities.")
+    .arg(
+      Arg::with_name("port")
+        .long("port")
+        .short("p")
+        .required(false)
+        .takes_value(true)
+        .help("Port that the CAS should listen to.")
+        .default_value("0"),
+    )
+    .get_matches();
 
-fn execute(top_match: &clap::ArgMatches) -> Result<(), String> {
-  let cas = StubCAS::empty();
+  let cas = StubCAS::empty_with_port(
+    matches
+      .value_of("port")
+      .unwrap()
+      .parse::<u16>()
+      .expect("port must be a non-negative number"),
+  );
   println!("Started CAS at address: {}", cas.address());
-  while true {}
+  println!("Press submit to exit.");
+  let _ = stdin.read(&mut [0u8]).unwrap();
   Ok(())
 }
