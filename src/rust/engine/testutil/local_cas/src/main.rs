@@ -1,4 +1,3 @@
-#[macro_use(value_t)]
 extern crate clap;
 extern crate env_logger;
 extern crate mock;
@@ -6,8 +5,7 @@ extern crate mock;
 use clap::{App, Arg};
 use mock::StubCAS;
 use std::io;
-use std::io::prelude::*;
-use std::process::exit;
+use std::io::Read;
 
 fn main() -> Result<(), String> {
   env_logger::init();
@@ -34,7 +32,7 @@ fn main() -> Result<(), String> {
       .expect("port must be a non-negative number"),
   );
   println!("Started CAS at address: {}", cas.address());
-  println!("Press submit to exit.");
+  println!("Press enter to exit.");
   let _ = stdin.read(&mut [0u8]).unwrap();
   Ok(())
 }
