@@ -108,13 +108,23 @@ class RESTfulArtifactCache(ArtifactCache):
       logger.debug('Sending {0} request to {1}'.format(method, url))
       try:
         if 'PUT' == method:
-          response = session.put(url, data=body, timeout=self._write_timeout_secs)
+          response = session.put(url,
+                                 data=body,
+                                 timeout=self._write_timeout_secs,
+                                 allow_redirects=True)
         elif 'GET' == method:
-          response = session.get(url, timeout=self._read_timeout_secs, stream=True)
+          response = session.get(url,
+                                 timeout=self._read_timeout_secs,
+                                 stream=True,
+                                 allow_redirects=True)
         elif 'HEAD' == method:
-          response = session.head(url, timeout=self._read_timeout_secs)
+          response = session.head(url,
+                                  timeout=self._read_timeout_secs,
+                                  allow_redirects=True)
         elif 'DELETE' == method:
-          response = session.delete(url, timeout=self._write_timeout_secs)
+          response = session.delete(url,
+                                    timeout=self._write_timeout_secs,
+                                    allow_redirects=True)
         else:
           raise ValueError('Unknown request method {0}'.format(method))
       except RequestException as e:
