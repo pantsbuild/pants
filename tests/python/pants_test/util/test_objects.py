@@ -618,6 +618,7 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
       SomeEnum(x=3)
 
     expected_rx_falsy_value = re.escape(
-      "Value u'' for 'x' must be one of: OrderedSet([1, 2]).")
+      "Value {}'' for 'x' must be one of: OrderedSet([1, 2])."
+      .format('u' if PY2 else ''))
     with self.assertRaisesRegexp(TypeCheckError, expected_rx_falsy_value):
       SomeEnum(x='')
