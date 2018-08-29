@@ -41,7 +41,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
       help='If enabled, disallow automatic update of lock files.')
     register(
       '--force-option-override', type=bool, default=False, fingerprint=True,
-      help='If enabled, options will override hard-coded values')
+      help='ADVANCED option. If enabled, options will override hard-coded values.')
 
     NodeResolve.register_resolver_for_type(NodeModule, cls)
 
