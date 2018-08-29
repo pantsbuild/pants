@@ -38,6 +38,16 @@ impl StubCAS {
   }
 
   ///
+  /// Wrapper around with_unverified_content_and_port
+  ///
+  pub fn with_unverified_content(
+    chunk_size_bytes: i64,
+    blobs: HashMap<Fingerprint, Bytes>,
+  ) -> StubCAS {
+    StubCAS::with_unverified_content_and_port(chunk_size_bytes, blobs, 0)
+  }
+
+  ///
   /// # Arguments
   /// * `chunk_size_bytes` - The maximum number of bytes of content to include per streamed message.
   ///                        Messages will saturate until the last one, which may be smaller than
@@ -45,9 +55,11 @@ impl StubCAS {
   ///                        If a negative value is given, all requests will receive an error.
   /// * `blobs`            - Known Fingerprints and their content responses. These are not checked
   ///                        for correctness.
-  pub fn with_unverified_content(
+  /// * `port`             - The port for the CAS to listen to.
+  pub fn with_unverified_content_and_port(
     chunk_size_bytes: i64,
     blobs: HashMap<Fingerprint, Bytes>,
+    port: u16,
   ) -> StubCAS {
     let env = Arc::new(grpcio::Environment::new(1));
     let read_request_count = Arc::new(Mutex::new(0));
@@ -66,7 +78,7 @@ impl StubCAS {
       .register_service(
         bazel_protos::remote_execution_grpc::create_content_addressable_storage(responder.clone()),
       )
-      .bind("localhost", 0)
+      .bind("localhost", port)
       .build()
       .unwrap();
     server_transport.start();
@@ -89,6 +101,10 @@ impl StubCAS {
 
   pub fn empty() -> StubCAS {
     StubCAS::with_unverified_content(1024, HashMap::new())
+  }
+
+  pub fn empty_with_port(port: u16) -> StubCAS {
+    StubCAS::with_unverified_content_and_port(1024, HashMap::new(), port)
   }
 
   pub fn always_errors() -> StubCAS {

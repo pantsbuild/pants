@@ -1,0 +1,11 @@
+[package]
+name = "local_cas"
+version = "0.0.1"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
+
+[dependencies]
+mock = { path = "../mock" }
+clap = "2"
+env_logger = "0.5.4"
+
