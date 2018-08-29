@@ -10,6 +10,8 @@ import os
 from builtins import object, open, str
 from hashlib import sha1
 
+from future.moves import collections
+
 from pants.base.build_environment import get_buildroot
 from pants.base.hash_utils import stable_json_hash
 from pants.option.custom_types import (UnsetBool, dict_with_files_option, dir_option, file_option,
@@ -22,21 +24,14 @@ class Encoder(json.JSONEncoder):
   def _encode_dict_wrapping_keys(self, d):
     return {self.encode(k):v for k, v in d.items()}
 
-  def encode(self, o):
-    if isinstance(o, (tuple, set)):
-      o = list(o)
-    elif isinstance(o, dict):
-      o = self._encode_dict_wrapping_keys(o)
-    elif len(o) == 1:
-      only_element = next(iter(o))
-      if isinstance(only_element, dict):
-        o = [self._encode_dict_wrapping_keys(only_element)]
-
-    return super(Encoder, self).encode(o)
-
   def default(self, o):
     if o is UnsetBool:
       return '_UNSET_BOOL_ENCODING'
+    elif isinstance(o, collections.Iterable):
+      if isinstance(o, collections.Mapping):
+        return self._encode_dict_wrapping_keys(o)
+      else:
+        return list(o)
     return super(Encoder, self).default(o)
 
 

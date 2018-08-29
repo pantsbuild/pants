@@ -30,8 +30,8 @@ class JsonEncodingTest(unittest.TestCase):
     self.assertEqual(stable_json_sha1(set([])), '97d170e1550eee4afc0af065b78cda302a97674c')
     self.assertEqual(stable_json_sha1([{}]), '4e9950a1f2305f56d358cad23f28203fb3aacbef')
     self.assertEqual(stable_json_sha1([('a', 3)]), 'd6abed2e53c1595fb3075ecbe020365a47af1f6f')
-    self.assertEqual(stable_json_sha1({'a': 3}), 'ee3442062f5b26c8555c60ff36f7e75eb1a236c5')
-    self.assertEqual(stable_json_sha1([{'a': 3}]), '4d33c5e3a9de12e87aa05e2adfd12e9598d016ac')
+    self.assertEqual(stable_json_sha1({'a': 3}), '9e0e6d8a99c72daf40337183358cbef91bba7311')
+    self.assertEqual(stable_json_sha1([{'a': 3}]), '8f4e36849a0b8fbe9c4a822c80fbee047c65458a')
     self.assertEqual(stable_json_sha1(set([1])), 'f629ae44b7b3dcfed444d363e626edf411ec69a8')
 
 
