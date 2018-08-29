@@ -34,7 +34,6 @@ class RunTrackerTest(TestBase):
           handler.send_response(400)  # Ensure the main thread knows the test failed.
           raise
 
-
     server_address = ('', 0)
     server = http.server.HTTPServer(server_address, Handler)
     host, port = server.server_address

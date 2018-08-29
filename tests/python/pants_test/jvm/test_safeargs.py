@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import unittest
+from builtins import open
 
 from pants.backend.jvm import argfile
 
@@ -18,7 +19,7 @@ class SafeArgTest(unittest.TestCase):
       self.assertEqual(1, len(safe_args))
       arg_file = safe_args[0]
       self.assertTrue(os.path.isfile(arg_file))
-      with open(arg_file) as f:
+      with open(arg_file, 'r') as f:
         self.assertEqual(['1234'], f.readlines())
 
   def test_safe_args_below_max_arg(self):

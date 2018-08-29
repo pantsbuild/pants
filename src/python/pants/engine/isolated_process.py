@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 
-from future.utils import text_type
+from future.utils import binary_type, text_type
 
 from pants.engine.fs import DirectoryDigest
 from pants.engine.rules import RootRule, rule
@@ -69,13 +69,20 @@ class ExecuteProcessRequest(datatype([
     )
 
 
-class ExecuteProcessResult(datatype(['stdout', 'stderr', 'output_directory_digest'])):
+class ExecuteProcessResult(datatype([('stdout', binary_type),
+                                     ('stderr', binary_type),
+                                     ('output_directory_digest', DirectoryDigest)
+                                     ])):
   """Result of successfully executing a process.
 
   Requesting one of these will raise an exception if the exit code is non-zero."""
 
 
-class FallibleExecuteProcessResult(datatype(['stdout', 'stderr', 'exit_code', 'output_directory_digest'])):
+class FallibleExecuteProcessResult(datatype([('stdout', binary_type),
+                                             ('stderr', binary_type),
+                                             ('exit_code', int),
+                                             ('output_directory_digest', DirectoryDigest)
+                                             ])):
   """Result of executing a process.
 
   Requesting one of these will not raise an exception if the exit code is non-zero."""
