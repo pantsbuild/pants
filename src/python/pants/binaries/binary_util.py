@@ -330,8 +330,8 @@ class BinaryUtil(object):
       # TODO: test this!
       raise self.MissingMachineInfo(
         "Pants could not resolve binaries for the current host: platform '{}' was not recognized. "
-        "Recognized platforms are: {}."
-        .format(os_id_key, sorted(self._ID_BY_OS.keys())))
+        "Recognized platforms are: [{}]."
+        .format(os_id_key, ', '.join(sorted(self._ID_BY_OS.keys()))))
     try:
       os_name, arch_or_version = self._path_by_id[os_id_tuple]
       host_platform = HostPlatform(os_name, arch_or_version)
