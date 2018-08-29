@@ -12,8 +12,8 @@ use glob::Pattern;
 use indexmap::{map::Entry::Occupied, IndexMap, IndexSet};
 
 use {
-  Dir, GitignoreStyleExcludes, GlobParsedSource, GlobSource, GlobWithSource, Link, PathGlob,
-  PathGlobs, PathStat, Stat, VFS,
+  Dir, GitignoreStyleExcludes, GlobExpansionConjunction, GlobParsedSource, GlobSource,
+  GlobWithSource, Link, PathGlob, PathGlobs, PathStat, Stat, VFS,
 };
 
 pub trait GlobMatching<E: Send + Sync + 'static>: VFS<E> {
@@ -148,6 +148,7 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
       include,
       exclude,
       strict_match_behavior,
+      conjunction,
     } = path_globs;
 
     if include.is_empty() {
@@ -292,12 +293,20 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
 
         // Get all the inputs which didn't transitively expand to any files.
         let non_matching_inputs: Vec<GlobParsedSource> = include
+          .clone()
           .into_iter()
           .map(|entry| entry.input)
           .filter(|parsed_source| !inputs_with_matches.contains(parsed_source))
           .collect();
 
-        if !non_matching_inputs.is_empty() {
+        let match_failed = match conjunction {
+          // All must match.
+          GlobExpansionConjunction::AllMatch => !non_matching_inputs.is_empty(),
+          // Only one needs to match.
+          GlobExpansionConjunction::AnyMatch => include.len() <= non_matching_inputs.len(),
+        };
+
+        if match_failed {
           // TODO(#5684): explain what global and/or target-specific option to set to
           // modify this behavior!
           let msg = format!(
@@ -312,7 +321,7 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
             return future::err(Self::mk_error(&msg));
           } else {
             // TODO(#5683): this doesn't have any useful context (the stack trace) without
-            // being thrown -- this needs to be provided, otherwise this is unusable.
+            // being thrown -- this needs to be provided, otherwise this is far less useful.
             warn!("{}", msg);
           }
         }
