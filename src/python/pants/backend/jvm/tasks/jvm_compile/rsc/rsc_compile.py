@@ -97,8 +97,8 @@ class RscCompile(ZincCompile):
   def register_options(cls, register):
     super(RscCompile, cls).register_options(register)
 
-    rsc_outline_version = '0.0.0-294-d7114447'
-    scalameta_version = '4.0.0-M10'
+    rsc_toolchain_version = '0.0.0-294-d7114447'
+    scalameta_toolchain_version = '4.0.0-M10'
 
     # TODO: it would be better to have a less adhoc approach to handling
     #       optional dependencies. See: https://github.com/pantsbuild/pants/issues/6390
@@ -125,49 +125,71 @@ class RscCompile(ZincCompile):
     )
     cls.register_jvm_tool(
       register,
-      'rsc_outline',
+      'rsc',
       classpath=[
           JarDependency(
               org='com.twitter',
               name='rsc_2.11',
-              rev=rsc_outline_version,
+              rev=rsc_toolchain_version,
           ),
+      ],
+      custom_rules=[
+        Shader.exclude_package('rsc', recursive=True),
+      ])
+    cls.register_jvm_tool(
+      register,
+      'mjar',
+      classpath=[
           JarDependency(
               org='com.twitter',
               name='mjar_2.11',
-              rev=rsc_outline_version,
-          ),
-          JarDependency(
-            org='org.scalameta',
-            name='metacp_2.11',
-            rev=scalameta_version,
-          ),
-          JarDependency(
-            org='org.scalameta',
-            name='metai_2.11',
-            rev=scalameta_version,
+              rev=rsc_toolchain_version,
           ),
       ],
       custom_rules=[
         Shader.exclude_package('scala', recursive=True),
-        Shader.exclude_package('rsc', recursive=True),
-      ]
-      )
+      ])
+    cls.register_jvm_tool(
+      register,
+      'metacp',
+      classpath=[
+          JarDependency(
+            org='org.scalameta',
+            name='metacp_2.11',
+            rev=scalameta_toolchain_version,
+          ),
+      ],
+      custom_rules=[
+        Shader.exclude_package('scala', recursive=True),
+      ])
+    cls.register_jvm_tool(
+      register,
+      'metai',
+      classpath=[
+          JarDependency(
+            org='org.scalameta',
+            name='metai_2.11',
+            rev=scalameta_toolchain_version,
+          ),
+      ],
+      custom_rules=[
+        Shader.exclude_package('scala', recursive=True),
+      ])
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super(RscCompile, self).register_extra_products_from_contexts(targets, compile_contexts)
     # TODO when digests are added, if the target is valid,
     # the digest should be loaded in from the cc somehow.
     for target in targets:
-      rsc_outline_cc, compile_cc = compile_contexts[target]
+      rsc_cc, compile_cc = compile_contexts[target]
       if target.has_sources('.java'):
-        self.context.products.get_data('rsc_outline_classpath').add_for_target(
+        self.context.products.get_data('rsc_classpath').add_for_target(
           compile_cc.target,
           [(conf, compile_cc.jar_file) for conf in self._confs])
       elif target.has_sources('.scala'):
-        self.context.products.get_data('rsc_outline_classpath').add_for_target(
-          rsc_outline_cc.target,
-          [(conf, rsc_outline_cc.rsc_mjar_file) for conf in self._confs])
+        self.context.products.get_data('rsc_classpath').add_for_target(
+          rsc_cc.target,
+          [(conf, rsc_cc.rsc_mjar_file) for conf in self._confs])
       else:
         pass
 
@@ -175,9 +197,9 @@ class RscCompile(ZincCompile):
     super(RscCompile, self).create_empty_extra_products()
 
     compile_classpath = self.context.products.get_data('compile_classpath')
-    classpath_product = self.context.products.get_data('rsc_outline_classpath')
+    classpath_product = self.context.products.get_data('rsc_classpath')
     if not classpath_product:
-      self.context.products.get_data('rsc_outline_classpath', compile_classpath.copy)
+      self.context.products.get_data('rsc_classpath', compile_classpath.copy)
     else:
       classpath_product.update(compile_classpath)
 
@@ -187,17 +209,17 @@ class RscCompile(ZincCompile):
       # rsc is specified.
       return BaseZincCompile.execute(self)
 
-  def rsc_outline_key_for_target(self, compile_target):
+  def _rsc_key_for_target(self, compile_target):
     if compile_target.has_sources('.java'):
       # rsc_outline dependencies on java depends on compile.
-      return self.compile_against_rsc_outline_key_for_target(compile_target)
+      return self._compile_against_rsc_key_for_target(compile_target)
     elif compile_target.has_sources('.scala'):
-      return "rsc_outline({})".format(compile_target.address.spec)
+      return "rsc({})".format(compile_target.address.spec)
     else:
       raise TaskError('unexpected target for compiling with rsc_outline .... {}'.format(compile_target))
 
-  def compile_against_rsc_outline_key_for_target(self, compile_target):
-    return "compile_against_rsc_outline({})".format(compile_target.address.spec)
+  def _compile_against_rsc_key_for_target(self, compile_target):
+    return "compile_against_rsc({})".format(compile_target.address.spec)
 
   def create_compile_jobs(self,
                           compile_target,
@@ -259,7 +281,7 @@ class RscCompile(ZincCompile):
       # Update the products with the latest classes.
       self.register_extra_products_from_contexts([ctx.target], compile_contexts)
 
-    def work_for_vts_rsc_outline(vts, ctx, key):
+    def work_for_vts_rsc(vts, ctx, key):
       # Double check the cache before beginning compilation
       hit_cache = self.check_cache(vts, counter)
 
@@ -281,7 +303,7 @@ class RscCompile(ZincCompile):
         cp_entries.extend(jvm_lib_jars_abs)
 
         classpath_abs = self._zinc.compile_classpath(
-          'rsc_outline_classpath',
+          'rsc_classpath',
           ctx.target,
           extra_cp_entries=self._extra_compile_time_classpath)
         classpath_rel = relpathify(classpath_abs)
@@ -451,16 +473,16 @@ class RscCompile(ZincCompile):
     if compile_target.has_sources('.java'):
       pass
     elif compile_target.has_sources('.scala'):
-      rsc_outline_key = self.rsc_outline_key_for_target(compile_target)
+      rsc_key = self._rsc_key_for_target(compile_target)
       rsc_outline_jobs.append(
         Job(
-          rsc_outline_key,
+          rsc_key,
           functools.partial(
-            work_for_vts_rsc_outline,
+            work_for_vts_rsc,
             ivts,
             compile_context_pair[0],
-            rsc_outline_key),
-          [self.rsc_outline_key_for_target(target) for target in invalid_dependencies],
+            rsc_key),
+          [self._rsc_key_for_target(target) for target in invalid_dependencies],
           self._size_estimator(compile_context_pair[0].sources),
         )
       )
@@ -470,7 +492,7 @@ class RscCompile(ZincCompile):
     # - Java zinc compile jobs depend on the zinc compiles of their dependencies, because we can't
     #   generate mjars that make javac happy at this point.
     if compile_target.has_sources('.scala'):
-      full_key = self.compile_against_rsc_outline_key_for_target(compile_target)
+      full_key = self._compile_against_rsc_key_for_target(compile_target)
       zinc_compile_jobs.append(
         Job(
           full_key,
@@ -479,8 +501,8 @@ class RscCompile(ZincCompile):
             ivts,
             compile_context_pair[1],
             full_key,
-            'rsc_outline_classpath'),
-          [self.rsc_outline_key_for_target(compile_target)] + [self.rsc_outline_key_for_target(target)
+            'rsc_classpath'),
+          [self._rsc_key_for_target(compile_target)] + [self._rsc_key_for_target(target)
                                                            for target in invalid_dependencies],
           self._size_estimator(compile_context_pair[1].sources),
           # NB: right now, only the last job will write to the cache, because we don't
@@ -490,7 +512,7 @@ class RscCompile(ZincCompile):
         )
       )
     elif compile_target.has_sources('.java'):
-      full_key = self.compile_against_rsc_outline_key_for_target(compile_target)
+      full_key = self._compile_against_rsc_key_for_target(compile_target)
       zinc_compile_jobs.append(
         Job(
           full_key,
@@ -500,7 +522,7 @@ class RscCompile(ZincCompile):
             compile_context_pair[1],
             full_key,
             'runtime_classpath'),
-          [self.compile_against_rsc_outline_key_for_target(target) for target in invalid_dependencies],
+          [self._compile_against_rsc_key_for_target(target) for target in invalid_dependencies],
           self._size_estimator(compile_context_pair[1].sources),
           # NB: right now, only the last job will write to the cache, because we don't
           #     do multiple cache entries per target-task tuple.
@@ -537,10 +559,10 @@ class RscCompile(ZincCompile):
     if self.execution_strategy == self.HERMETIC:
       # TODO: accept input_digests as well as files.
       with self.context.new_workunit(tool_name) as wu:
-        rsc_outline_tool_path_abs = self.tool_classpath('rsc_outline')
-        rsc_outline_tool_path = relpathify(rsc_outline_tool_path_abs)
+        tool_classpath_abs = self.tool_classpath(tool_name)
+        tool_classpath = relpathify(tool_classpath_abs)
 
-        pathglobs = list(rsc_outline_tool_path)
+        pathglobs = list(tool_classpath)
         pathglobs.extend(input_files)
         root = PathGlobsAndRoot(
           PathGlobs(tuple(pathglobs)),
@@ -548,7 +570,7 @@ class RscCompile(ZincCompile):
 
         tool_snapshots = self.context._scheduler.capture_snapshots((root,))
         input_files_directory_digest = tool_snapshots[0].directory_digest
-        classpath_for_cmd = os.pathsep.join(rsc_outline_tool_path)
+        classpath_for_cmd = os.pathsep.join(tool_classpath)
         cmd = [
           distribution.java,
         ]
@@ -585,7 +607,7 @@ class RscCompile(ZincCompile):
         return res
     else:
       with self.context.new_workunit(tool_name) as wu:
-        result = self.runjava(classpath=self.tool_classpath('rsc_outline'),
+        result = self.runjava(classpath=self.tool_classpath(tool_name),
                               main=main,
                               jvm_options=self.get_options().jvm_options,
                               args=args,
