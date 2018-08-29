@@ -112,7 +112,7 @@ impl Serialize for Digest {
   {
     let mut obj = serializer.serialize_struct("digest", 2)?;
     obj.serialize_field("fingerprint", &self.0)?;
-    obj.serialize_field("size", &self.1)?;
+    obj.serialize_field("size_bytes", &self.1)?;
     obj.end()
   }
 }
@@ -268,7 +268,7 @@ mod digest_tests {
         },
         Token::Str("fingerprint"),
         Token::Str("0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff"),
-        Token::Str("size"),
+        Token::Str("size_bytes"),
         Token::U64(1),
         Token::StructEnd,
       ],
