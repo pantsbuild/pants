@@ -348,9 +348,9 @@ impl Store {
         let uploaded_file_sizes = uploaded_digests.iter().map(|digest| digest.1);
 
         UploadSummary {
-          ingested_file_count: ingested_file_sizes.clone().count(),
+          ingested_file_count: ingested_file_sizes.len(),
           ingested_file_bytes: ingested_file_sizes.sum(),
-          uploaded_file_count: uploaded_file_sizes.clone().count(),
+          uploaded_file_count: uploaded_file_sizes.len(),
           uploaded_file_bytes: uploaded_file_sizes.sum(),
         }
       })
@@ -1793,7 +1793,7 @@ mod remote {
 
     ///
     /// Given a collection of Digests (digests),
-    /// returns the set of digests from that collection not currently present in the CAS
+    /// returns the set of digests from that collection not present in the CAS.
     ///
     pub fn list_missing_digests<'a, Digests: Iterator<Item = &'a Digest>>(
       &self,
@@ -2187,7 +2187,7 @@ mod tests {
   }
 
   ///
-  /// Create a StubCas with a file and a directory inside
+  /// Create a StubCas with a file and a directory inside.
   ///
   pub fn new_cas(chunk_size_bytes: usize) -> StubCAS {
     StubCAS::with_content(
@@ -2198,7 +2198,7 @@ mod tests {
   }
 
   ///
-  /// Create a new local store with whatever was already serialized in dir
+  /// Create a new local store with whatever was already serialized in dir.
   ///
   fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
     Store::local_only(dir, Arc::new(ResettablePool::new("test-pool-".to_string())))
@@ -2206,7 +2206,7 @@ mod tests {
   }
 
   ///
-  /// Create a new store with a remote CAS
+  /// Create a new store with a remote CAS.
   ///
   fn new_store<P: AsRef<Path>>(dir: P, cas_address: String) -> Store {
     Store::with_remote(

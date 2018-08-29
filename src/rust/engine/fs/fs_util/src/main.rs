@@ -87,7 +87,10 @@ fn main() {
                 "Ingest a file by path, which allows it to be used in Directories/Snapshots. \
 Outputs a fingerprint of its contents and its size in bytes, separated by a space.",
               )
-              .arg(Arg::with_name("path").required(true).takes_value(true)),
+              .arg(Arg::with_name("path").required(true).takes_value(true))
+              .arg(Arg::with_name("output-mode").long("output-mode").multiple(false).takes_value(true).help(
+                "Set --output-mode=(json|simple) manipulate the way a report is displayed. Default is simple."
+              )),
           ),
       )
       .subcommand(
@@ -129,8 +132,8 @@ directory, relative to the root.",
                   "Root under which the globs live. The Directory proto produced will be relative \
 to this directory.",
             ))
-                .arg(Arg::with_name("json").long("json").multiple(false).takes_value(true).help(
-                  "Set --json=true to display a JSON report of the ingested and uploaded files."
+                .arg(Arg::with_name("output-mode").long("output-mode").multiple(false).takes_value(true).help(
+                  "Set --output-mode=(json|simple) manipulate the way a report is displayed. Default is simple."
                 )),
           )
           .subcommand(
@@ -267,24 +270,10 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                 .store_by_digest(f)
                 .wait()
                 .unwrap();
-              let report = if store_has_remote {
-                let summary = store.ensure_remote_has_recursive(vec![digest]).wait()?;
-                SummaryWithDigest {
-                  digest,
-                  summary: Some(summary),
-                }
-              } else {
-                SummaryWithDigest {
-                  digest,
-                  summary: None,
-                }
-              };
 
-              if let Some("true") = args.value_of("json") {
-                println!("{}", serde_json::to_string_pretty(&report).unwrap());
-              } else {
-                println!("{} {}", report.digest.0, report.digest.1);
-              };
+              let report = ensure_uploaded_to_remote(&store, store_has_remote, digest);
+              print_upload_summary(args.value_of("output-mode"), &report);
+
               Ok(())
             }
             o => Err(
@@ -345,24 +334,8 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           .map(|snapshot| snapshot.digest)
           .wait()?;
 
-        let report = if store_has_remote {
-          let summary = store.ensure_remote_has_recursive(vec![digest]).wait()?;
-          SummaryWithDigest {
-            digest,
-            summary: Some(summary),
-          }
-        } else {
-          SummaryWithDigest {
-            digest,
-            summary: None,
-          }
-        };
-
-        if let Some("true") = args.value_of("json") {
-          println!("{}", serde_json::to_string_pretty(&report).unwrap());
-        } else {
-          println!("{} {}", report.digest.0, report.digest.1);
-        };
+        let report = ensure_uploaded_to_remote(&store, store_has_remote, digest);
+        print_upload_summary(args.value_of("output-mode"), &report);
 
         Ok(())
       }
@@ -503,4 +476,30 @@ fn expand_files_helper(
 
 fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::PosixFS {
   fs::PosixFS::new(&root, pool, &[]).unwrap()
+}
+
+fn ensure_uploaded_to_remote(
+  store: &Store,
+  store_has_remote: bool,
+  digest: Digest,
+) -> SummaryWithDigest {
+  let summary = if store_has_remote {
+    Some(
+      store
+        .ensure_remote_has_recursive(vec![digest])
+        .wait()
+        .unwrap(),
+    )
+  } else {
+    None
+  };
+  SummaryWithDigest { digest, summary }
+}
+
+fn print_upload_summary(mode: Option<&str>, report: &SummaryWithDigest) {
+  match mode {
+    Some("json") => println!("{}", serde_json::to_string_pretty(&report).unwrap()),
+    Some("simple") => println!("{} {}", report.digest.0, report.digest.1),
+    _ => println!("{} {}", report.digest.0, report.digest.1),
+  };
 }
