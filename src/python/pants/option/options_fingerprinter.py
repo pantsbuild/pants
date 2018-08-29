@@ -23,12 +23,12 @@ class Encoder(json.JSONEncoder):
     return {self.encode(k):v for k, v in d.items()}
 
   def encode(self, o):
-    if isinstance(o, tuple):
+    if isinstance(o, (tuple, set)):
       o = list(o)
     elif isinstance(o, dict):
       o = self._encode_dict_wrapping_keys(o)
     elif len(o) == 1:
-      only_element = o[0]
+      only_element = next(iter(o))
       if isinstance(only_element, dict):
         o = [self._encode_dict_wrapping_keys(only_element)]
 
