@@ -294,12 +294,17 @@ class JsonEncoderTest(unittest.TestCase):
           "type_alias": "pants_test.engine.test_parsers.Bob"
         }}
         """.format(relative_json_value).strip()
-    ))).split(',')
-    output = parsers.encode_json(self.bob, inline=is_inline).split(',')
+    )))
+    output = parsers.encode_json(self.bob, inline=is_inline)
     try:
       self.assertEqual(expected, output)
     except AssertionError:
-      self.assertEqual(set(expected), set(output))
+      def convert_to_stripped_set(json_str):
+        no_brackets = json_str.replace('{', '').replace('}', '')
+        distinct_lines = no_brackets.split(',')
+        return set(distinct_lines)
+
+      self.assertEqual(convert_to_stripped_set(expected), convert_to_stripped_set(output))
 
   def test_shallow_encoding(self):
     relative_json_value = '"relative": "::an opaque address::"'
