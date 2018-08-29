@@ -16,7 +16,24 @@ from pants.option.custom_types import (UnsetBool, dict_with_files_option, dir_op
                                        target_option)
 
 
+# TODO: this class's methods could be wrapped in @memoized_method -- we would have to manage the
+# cache size somehow if this is done or it might blow up.
 class Encoder(json.JSONEncoder):
+  def _encode_dict_wrapping_keys(self, d):
+    return {self.encode(k):v for k, v in d.items()}
+
+  def encode(self, o):
+    if isinstance(o, tuple):
+      o = list(o)
+    elif isinstance(o, dict):
+      o = self._encode_dict_wrapping_keys(o)
+    elif len(o) == 1:
+      only_element = o[0]
+      if isinstance(only_element, dict):
+        o = [self._encode_dict_wrapping_keys(only_element)]
+
+    return super(Encoder, self).encode(o)
+
   def default(self, o):
     if o is UnsetBool:
       return '_UNSET_BOOL_ENCODING'
