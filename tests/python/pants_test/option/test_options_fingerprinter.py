@@ -5,15 +5,32 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import unittest
 from builtins import range, zip
 
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.option.custom_types import (UnsetBool, dict_option, dir_option, file_option, list_option,
                                        target_option)
-from pants.option.options_fingerprinter import OptionsFingerprinter
+from pants.option.options_fingerprinter import OptionsFingerprinter, stable_json_sha1
 from pants.util.contextutil import temporary_dir
 from pants_test.test_base import TestBase
+
+
+class JsonEncodingTest(unittest.TestCase):
+  def test_known_checksums(self):
+    """Check a laundry list of supported inputs to stable_json_sha1().
+
+    This checks both that the method can successfully handle the type of input object, but also that
+    the hash of specific objects remains stable.
+    """
+    self.assertEqual(stable_json_sha1({}), 'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f')
+    self.assertEqual(stable_json_sha1(()), '97d170e1550eee4afc0af065b78cda302a97674c')
+    self.assertEqual(stable_json_sha1([]), '97d170e1550eee4afc0af065b78cda302a97674c')
+    self.assertEqual(stable_json_sha1([{}]), '4e9950a1f2305f56d358cad23f28203fb3aacbef')
+    self.assertEqual(stable_json_sha1([('a', 3)]), 'd6abed2e53c1595fb3075ecbe020365a47af1f6f')
+    self.assertEqual(stable_json_sha1({'a': 3}), 'ee3442062f5b26c8555c60ff36f7e75eb1a236c5')
+    self.assertEqual(stable_json_sha1([{'a': 3}]), '4d33c5e3a9de12e87aa05e2adfd12e9598d016ac')
 
 
 class OptionsFingerprinterTest(TestBase):
