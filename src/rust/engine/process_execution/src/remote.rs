@@ -759,7 +759,6 @@ mod tests {
       description: "some description".to_owned(),
       jdk_home: None,
     };
-    let result = super::make_execute_request(&req);
 
     let mut want_command = bazel_protos::remote_execution::Command::new();
     want_command.mut_arguments().push("/bin/echo".to_owned());
@@ -802,7 +801,7 @@ mod tests {
     );
 
     assert_eq!(
-      result,
+      super::make_execute_request(&req),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -820,7 +819,6 @@ mod tests {
       description: "some description".to_owned(),
       jdk_home: Some(PathBuf::from("/tmp")),
     };
-    let result = super::make_execute_request(&req);
 
     let mut want_command = bazel_protos::remote_execution::Command::new();
     want_command.mut_arguments().push("/bin/echo".to_owned());
@@ -831,18 +829,6 @@ mod tests {
       property.set_value(".jdk".to_owned());
       property
     });
-
-    assert_eq!(
-      Ok(
-        (&Digest(
-          Fingerprint::from_hex_string(
-            "f373f421b328ddeedfba63542845c0423d7730f428dd8e916ec6a38243c98448"
-          ).unwrap(),
-          38
-        )).into()
-      ),
-      super::digest(&want_command)
-    );
 
     let mut want_action = bazel_protos::remote_execution::Action::new();
     want_action.set_command_digest(
@@ -866,7 +852,7 @@ mod tests {
     );
 
     assert_eq!(
-      result,
+      super::make_execute_request(&req),
       Ok((want_action, want_command, want_execute_request))
     );
   }
