@@ -17,7 +17,7 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import Job
-from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import BaseZincCompile, ZincCompile
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
@@ -77,7 +77,8 @@ class RscCompileContext(CompileContext):
 class RscCompile(ZincCompile):
   """Compile Scala and Java code to classfiles using Rsc."""
 
-  _name = 'rsc_outline' # noqa
+  _name = 'rsc' # noqa
+  compiler_name = 'rsc'
 
   @classmethod
   def implementation_version(cls):
@@ -193,15 +194,9 @@ class RscCompile(ZincCompile):
     else:
       classpath_product.update(compile_classpath)
 
-  def execute(self):
-    if JvmPlatform.global_instance().get_options().compiler == 'rsc':
-      # Calling BaseZincCompile directly because ZincCompile won't run a compile if
-      # rsc is specified.
-      return BaseZincCompile.execute(self)
-
   def _rsc_key_for_target(self, compile_target):
     if compile_target.has_sources('.java'):
-      # rsc_outline dependencies on java depends on compile.
+      # rsc outlining with java dependencies depend on the java's zinc compile
       return self._compile_against_rsc_key_for_target(compile_target)
     elif compile_target.has_sources('.scala'):
       return "rsc({})".format(compile_target.address.spec)
@@ -383,7 +378,7 @@ class RscCompile(ZincCompile):
                                   len(target_sources),
                                   timer.elapsed,
                                   False,
-                                  'rsc_outline'
+                                  'rsc'
                                   )
         # Write any additional resources for this target to the target workdir.
         self.write_extra_resources(ctx)

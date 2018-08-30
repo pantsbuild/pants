@@ -169,6 +169,8 @@ class JvmCompile(NailgunTaskBase):
   # Subclasses must implement.
   # --------------------------
   _name = None
+  # The name used in JvmPlatform to refer to this compiler task.
+  compiler_name = None
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -357,6 +359,11 @@ class JvmCompile(NailgunTaskBase):
                           self._compute_sources_for_target(target))
 
   def execute(self):
+    if JvmPlatform.global_instance().get_options().compiler != self.compiler_name:
+      # If the requested compiler is not the one supported by this task,
+      # bail early.
+      return
+
     # In case we have no relevant targets and return early, create the requested product maps.
     self.create_empty_extra_products()
 
