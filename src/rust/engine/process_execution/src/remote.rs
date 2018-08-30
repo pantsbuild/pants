@@ -211,7 +211,7 @@ impl super::CommandRunner for CommandRunner {
       self.env.with_reset(|| {
         self
           .execution_client
-          .with_reset(|| self.operations_client.with_reset(|| f()))
+          .with_reset(|| self.operations_client.with_reset(f))
       })
     })
   }

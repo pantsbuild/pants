@@ -389,7 +389,7 @@ impl<N: Node> InnerGraph<N> {
     let queue_entry = |id| {
       self
         .entry_for_id(id)
-        .and_then(|entry| entry.current_running_duration(&now))
+        .and_then(|entry| entry.current_running_duration(now))
         .map(|d| (d, id))
     };
 

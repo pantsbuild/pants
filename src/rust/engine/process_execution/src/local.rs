@@ -319,7 +319,7 @@ impl super::CommandRunner for CommandRunner {
     // will (and attempting to shut things down twice guarantees a deadlock because Resettable is
     // not reentrant). This is fragile, and it would be nice to have type safety to prevent that
     // case.
-    self.store.with_reset(|| f())
+    self.store.with_reset(f)
   }
 }
 
