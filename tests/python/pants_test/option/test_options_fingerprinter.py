@@ -8,6 +8,8 @@ import os
 import unittest
 from builtins import range, zip
 
+from future.utils import PY2
+
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.option.custom_types import (UnsetBool, dict_option, dir_option, file_option, list_option,
@@ -35,7 +37,8 @@ class JsonEncodingTest(unittest.TestCase):
     self.assertEqual(stable_json_sha1(set([1])), 'f629ae44b7b3dcfed444d363e626edf411ec69a8')
 
   def test_non_string_dict_key(self):
-    with self.assertRaisesRegexp(TypeError, r'key \(\) is not a string'):
+    error_regex_str = r'key \(\) is not a string' if PY2 else r'keys must be a string'
+    with self.assertRaisesRegexp(TypeError, error_regex_str):
       stable_json_sha1({():()})
 
 
@@ -57,7 +60,7 @@ class OptionsFingerprinterTest(TestBase):
   def test_fingerprint_dict_with_non_string_keys(self):
     d = {('a', 2): (3, 4)}
     fp = self.options_fingerprinter.fingerprint(dict_option, d)
-    self.assertEqual(fp, '9d99b841440f599bf957dcc91a18d235df800b08')
+    self.assertEqual(fp, 'ba3b9319e9477f14dcea56ae1836ae5e73a73a2c')
 
   def test_fingerprint_list(self):
     l1 = [1, 2, 3]

@@ -81,8 +81,8 @@ class OptionsFingerprinter(object):
 
     # The python documentation (https://docs.python.org/2/library/json.html#json.dumps) states that
     # dict keys are coerced to strings in json.dumps, but this appears to be incorrect.
-    if isinstance(option_val, dict):
-      option_val = {str(k):v for k, v in option_val.items()}
+    if isinstance(option_val, collections.Mapping):
+      option_val = {stable_json_sha1(k):v for k, v in option_val.items()}
 
     # For simplicity, we always fingerprint a list.  For non-list-valued options,
     # this will be a singleton list.
@@ -175,6 +175,10 @@ class OptionsFingerprinter(object):
     contents rather than by its path.
 
     This assumes the files are small enough to be read into memory.
+
+    NB: The keys of the dict are assumed to be strings -- if they are not, the dict should be
+    converted to encode its keys with `stable_json_sha1()`, as is done in the `fingerprint()`
+    method.
     """
     # Dicts are wrapped in singleton lists. See the "For simplicity..." comment in `fingerprint()`.
     option_val = option_val[0]
