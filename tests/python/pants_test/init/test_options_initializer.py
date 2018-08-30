@@ -26,4 +26,4 @@ class OptionsInitializerTest(unittest.TestCase):
     build_config = BuildConfigInitializer.get(ob)
     with self.assertRaises(OptionsError) as exc:
       OptionsInitializer.create(ob, build_config)
-    self.assertIn('loop option only works with', exc.exception.message)
+    self.assertIn('loop option only works with', str(exc.exception))

@@ -79,10 +79,10 @@ class PEP8VariableNames(CheckstylePlugin):
      GLOBAL_LEVEL_CONSTANTS = {}
   """
 
-  CLASS_GLOBAL_BUILTINS = frozenset((
+  CLASS_GLOBAL_BUILTINS = frozenset({
     '__slots__',
     '__metaclass__',
-  ))
+  })
 
   def iter_class_methods(self, class_node):
     for node in class_node.body:
@@ -104,8 +104,8 @@ class PEP8VariableNames(CheckstylePlugin):
 
   def nits(self):
     class_methods = set()
-    all_methods = set(function_def for function_def in ast.walk(self.python_file.tree)
-        if isinstance(function_def, ast.FunctionDef))
+    all_methods = {function_def for function_def in ast.walk(self.python_file.tree)
+                   if isinstance(function_def, ast.FunctionDef)}
 
     for class_def in self.iter_ast_types(ast.ClassDef):
       if not is_upper_camel(class_def.name):

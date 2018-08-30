@@ -53,7 +53,7 @@ def build_file_aliases():
     },
     context_aware_object_factories={
       'python_requirements': PythonRequirements,
-      'pants_requirement': PantsRequirement,
+      PantsRequirement.alias: PantsRequirement,
     }
   )
 

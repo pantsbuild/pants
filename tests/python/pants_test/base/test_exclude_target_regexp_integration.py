@@ -71,7 +71,7 @@ class ExcludeTargetRegexpIntegrationTest(PantsRunIntegrationTest):
         .format(missing=', '.join(missing)))
 
   def _test_bundle_existences(self, args, bundles, config=None):
-    all_bundles = set(bundle.spec for bundle in Bundles.all_bundles)
+    all_bundles = {bundle.spec for bundle in Bundles.all_bundles}
     all_paths = [self._bundle_path(bundle) for bundle in all_bundles]
 
     names = [bundle.spec for bundle in bundles]
@@ -142,5 +142,5 @@ class ExcludeTargetRegexpIntegrationTest(PantsRunIntegrationTest):
           '{}:{}'.format(Bundles.phrase_path, Bundles.there_was_a_duck.spec),
           '--exclude-target-regexp={}:{}'.format(Bundles.phrase_path, Bundles.trusty_companion),
         ],
-        set([Bundles.there_was_a_duck]),
+        {Bundles.there_was_a_duck},
     )

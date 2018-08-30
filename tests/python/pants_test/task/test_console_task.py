@@ -31,7 +31,7 @@ class ConsoleTaskTest(TaskTestBase):
 
   def test_sigpipe(self):
     r, w = os.pipe()
-    outstream = os.fdopen(w, 'w')
+    outstream = os.fdopen(w, 'wb')
     task = self.create_task(self.context(console_outstream=outstream))
     raised = Queue(maxsize=1)
 
@@ -46,7 +46,7 @@ class ConsoleTaskTest(TaskTestBase):
     execution.start()
     try:
       data = os.read(r, 5)
-      self.assertEqual('jake\n', data)
+      self.assertEqual(b'jake\n', data)
       os.close(r)
     finally:
       task.stop()

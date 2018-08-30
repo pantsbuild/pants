@@ -25,10 +25,10 @@ from pants_test.test_base import TestBase
 class Concatted(datatype([('value', text_type)])): pass
 
 
-class BinaryLocation(datatype(['bin_path'])):
+class BinaryLocation(datatype([('bin_path', text_type)])):
 
   def __new__(cls, bin_path):
-    this_object = super(BinaryLocation, cls).__new__(cls, str(bin_path))
+    this_object = super(BinaryLocation, cls).__new__(cls, text_type(bin_path))
 
     bin_path = this_object.bin_path
 
@@ -79,7 +79,7 @@ def cat_files_process_result_concatted(cat_exe_req):
     description='cat some files',
   )
   cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
-  yield Concatted(text_type(cat_process_result.stdout))
+  yield Concatted(cat_process_result.stdout.decode('utf-8'))
 
 
 def create_cat_stdout_rules():
@@ -290,7 +290,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
     )
 
     concatted = self.scheduler.product_request(Concatted, [cat_exe_req])[0]
-    self.assertEqual(Concatted(text_type('one\ntwo\n')), concatted)
+    self.assertEqual(Concatted('one\ntwo\n'), concatted)
 
   def test_javac_version_example(self):
     request = JavacVersionExecutionRequest(BinaryLocation('/usr/bin/javac'))
@@ -386,7 +386,7 @@ class Broken {
     self.assertIsInstance(e, ProcessExecutionFailure)
     self.assertEqual(1, e.exit_code)
     self.assertIn('javac compilation', str(e))
-    self.assertIn("NOT VALID JAVA", e.stderr)
+    self.assertIn(b"NOT VALID JAVA", e.stderr)
 
   def test_jdk(self):
     with temporary_dir() as temp_dir:
@@ -399,7 +399,7 @@ class Broken {
         jdk_home=temp_dir,
       )
       result = self.scheduler.product_request(ExecuteProcessResult, [request])[0]
-      self.assertEqual(result.stdout, 'European Burmese')
+      self.assertEqual(result.stdout, b'European Burmese')
 
   def test_fallible_failing_command_returns_exited_result(self):
     request = ExecuteProcessRequest(

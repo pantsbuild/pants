@@ -154,7 +154,7 @@ class ApacheThriftPyGenTest(TaskTestBase):
     # TODO(John Sirois): We really should be emitting setuptools in a
     # `synthetic_target_extra_dependencies` override in `ApacheThriftPyGen`:
     #   https://github.com/pantsbuild/pants/issues/5975
-    pythonpath = interpreter.extras.values()
+    pythonpath = list(interpreter.extras.values())
     pythonpath.extend(os.path.join(get_buildroot(), t.target_base) for t in targets)
     for dist in resolve(['thrift=={}'.format(self.get_thrift_version(apache_thrift_gen))],
                         interpreter=interpreter,

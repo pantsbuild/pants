@@ -9,6 +9,7 @@ from builtins import str
 from contextlib import contextmanager
 
 import mock
+from future.utils import PY3
 from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import Unsatisfiable, resolve
 
@@ -28,7 +29,7 @@ class TestInterpreterCache(TestBase):
 
     E.g. 'CPython==2.7.5' becomes 'CPython==99.7.5'
     """
-    return str(requirement).replace('==2.', '==99.')
+    return str(requirement).replace('==3', '==99') if PY3 else str(requirement).replace('==2.', '==99')
 
   def setUp(self):
     super(TestInterpreterCache, self).setUp()

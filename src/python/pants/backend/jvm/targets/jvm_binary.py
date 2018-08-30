@@ -94,7 +94,7 @@ class Duplicate(JarRule):
   encountered.
   """
 
-  _VALID_ACTIONS = frozenset((SKIP, REPLACE, CONCAT, CONCAT_TEXT, FAIL))
+  _VALID_ACTIONS = frozenset({SKIP, REPLACE, CONCAT, CONCAT_TEXT, FAIL})
 
   @classmethod
   def validate_action(cls, action):
@@ -238,9 +238,9 @@ class JarRules(FingerprintedMixin):
 
   def fingerprint(self):
     hasher = sha1()
-    hasher.update(self.payload.fingerprint())
+    hasher.update(self.payload.fingerprint().encode('utf-8'))
     for rule in self.rules:
-      hasher.update(rule.fingerprint())
+      hasher.update(rule.fingerprint().encode('utf-8'))
     return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   @property

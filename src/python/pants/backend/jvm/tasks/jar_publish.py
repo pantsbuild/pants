@@ -169,7 +169,7 @@ class PomWriter(object):
       target_jar = target_jar.extend(dependencies=list(dependencies.values()))
 
     template_relpath = os.path.join(_TEMPLATES_RELPATH, 'pom.xml.mustache')
-    template_text = pkgutil.get_data(__name__, template_relpath)
+    template_text = pkgutil.get_data(__name__, template_relpath).decode('utf-8')
     generator = Generator(template_text, project=target_jar)
     with safe_open(path, 'w') as output:
       generator.write(output)
@@ -741,7 +741,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
             if no_changes:
               print(changelog)
             else:
-              # The changelog may contain non-ascii text, but the print function can, under certain
+              # The changelog may contain non-ascii text, but in Py2 the print function can, under certain
               # circumstances, incorrectly detect the output encoding to be ascii and thus blow up
               # on non-ascii changelog characters.  Here we explicitly control the encoding to avoid
               # the print function's mis-interpretation.
@@ -750,8 +750,8 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
                   coordinate(jar.org, jar.name), oldentry.version(), oldentry.sha, changelog)
               # The stdout encoding can be detected as None when running without a tty (common in
               # tests), in which case we want to force encoding with a unicode-supporting codec.
-              encoding = sys.stdout.encoding or 'utf-8'
-              sys.stdout.write(message.encode(encoding))
+              # In Py3, sys.stdout is a unicode stream.
+              sys.stdout.write(message) if PY3 else sys.stdout.write(message.encode('utf-8'))
           if not self.confirm_push(coordinate(jar.org, jar.name), newentry.version()):
             raise TaskError('User aborted push')
 
@@ -876,7 +876,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   def entry_fingerprint(self, target, fingerprint_internal):
     sha = hashlib.sha1()
-    sha.update(target.invalidation_hash())
+    sha.update(target.invalidation_hash().encode('utf-8'))
 
     # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
     if isinstance(target, ScalaLibrary):
@@ -892,7 +892,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
     internal_dependencies = sorted(target_internal_dependencies(target), key=lambda t: t.id)
     for internal_target in internal_dependencies:
       fingerprint = fingerprint_internal(internal_target)
-      sha.update(fingerprint)
+      sha.update(fingerprint.encode('utf-8'))
 
     return sha.hexdigest() if PY3 else sha.hexdigest().decode('utf-8')
 
@@ -913,7 +913,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   def generate_ivysettings(self, ivy, publishedjars, publish_local=None):
     template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivysettings.xml.mustache')
-    template_text = pkgutil.get_data(__name__, template_relpath)
+    template_text = pkgutil.get_data(__name__, template_relpath).decode('utf-8')
 
     published = [TemplateData(org=jar.org, name=jar.name) for jar in publishedjars]
 
@@ -930,7 +930,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   def generate_ivy(self, jar, version, publications):
     template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivy.xml.mustache')
-    template_text = pkgutil.get_data(__name__, template_relpath)
+    template_text = pkgutil.get_data(__name__, template_relpath).decode('utf-8')
 
     pubs = [TemplateData(name=None if p.name == jar.name else p.name,
                          classifier=p.classifier,

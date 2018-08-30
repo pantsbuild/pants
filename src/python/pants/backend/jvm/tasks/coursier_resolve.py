@@ -77,7 +77,7 @@ class CoursierMixin(NailgunTask):
     if artifact_set is None:
       artifact_set = PinnedJarArtifactSet()
 
-    untouched_pinned_artifact = set(M2Coordinate.create(x) for x in artifact_set)
+    untouched_pinned_artifact = {M2Coordinate.create(x) for x in artifact_set}
     jar_list = list(raw_jars)
     for i, dep in enumerate(jar_list):
       direct_coord = M2Coordinate.create(dep)
@@ -661,8 +661,10 @@ class CoursierResolve(CoursierMixin):
   @classmethod
   def prepare(cls, options, round_manager):
     super(CoursierResolve, cls).prepare(options, round_manager)
-    round_manager.require_data('java')
-    round_manager.require_data('scala')
+    # Codegen may inject extra resolvable deps, so make sure we have a product dependency
+    # on relevant codegen tasks, if any.
+    round_manager.optional_data('java')
+    round_manager.optional_data('scala')
 
   @classmethod
   def register_options(cls, register):
@@ -721,7 +723,7 @@ class CoursierResolveFingerprintStrategy(FingerprintStrategy):
     hasher.update(target.payload.fingerprint().encode('utf-8'))
 
     for conf in self._confs:
-      hasher.update(conf)
+      hasher.update(conf.encode('utf-8'))
 
     for element in hash_elements_for_target:
       hasher.update(element.encode('utf-8'))

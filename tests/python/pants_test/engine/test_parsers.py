@@ -263,6 +263,7 @@ class JsonParserTest(unittest.TestCase):
 
 
 class JsonEncoderTest(unittest.TestCase):
+
   def setUp(self):
     bill = Bob(name='bill')
 
@@ -278,38 +279,44 @@ class JsonEncoderTest(unittest.TestCase):
 
     self.bob = Bob(name='bob', relative=resolvable_bill, friend=bill)
 
+  def _assert_valid_output(self, relative_json_value, is_inline):
+    # Py3.6+ guarantees order of dictionaries by insertion order, but Py 3.3-3.5 have non-deterministic dictionary
+    # order. So, we first try to assert the order is the same, and then fall back to ignoring order to get the test
+    # working on all interpreters.
+    expected = json.dumps(json.loads(dedent("""
+        {{
+          "name": "bob",
+          {},
+          "friend": {{
+            "name": "bill",
+            "type_alias": "pants_test.engine.test_parsers.Bob"
+          }},
+          "type_alias": "pants_test.engine.test_parsers.Bob"
+        }}
+        """.format(relative_json_value).strip()
+    )))
+    output = parsers.encode_json(self.bob, inline=is_inline)
+    try:
+      self.assertEqual(expected, output)
+    except AssertionError:
+      def convert_to_stripped_set(json_str):
+        no_brackets = json_str.replace('{', '').replace('}', '')
+        distinct_lines = no_brackets.split(',')
+        return set(distinct_lines)
+
+      self.assertEqual(convert_to_stripped_set(expected), convert_to_stripped_set(output))
+
   def test_shallow_encoding(self):
-    expected_json = dedent("""
-    {
-      "name": "bob",
-      "type_alias": "pants_test.engine.test_parsers.Bob",
-      "friend": {
-        "name": "bill",
-        "type_alias": "pants_test.engine.test_parsers.Bob"
-      },
-      "relative": "::an opaque address::"
-    }
-    """).strip()
-    self.assertEqual(json.dumps(json.loads(expected_json)),
-                     parsers.encode_json(self.bob, inline=False))
+    relative_json_value = '"relative": "::an opaque address::"'
+    self._assert_valid_output(relative_json_value=relative_json_value, is_inline=False)
 
   def test_inlined_encoding(self):
-    expected_json = dedent("""
-    {
-      "name": "bob",
-      "type_alias": "pants_test.engine.test_parsers.Bob",
-      "friend": {
-        "name": "bill",
-        "type_alias": "pants_test.engine.test_parsers.Bob"
-      },
+    relative_json_value = dedent('''
       "relative": {
-        "name": "bill",
-        "type_alias": "pants_test.engine.test_parsers.Bob"
-      }
-    }
-    """).strip()
-    self.assertEqual(json.dumps(json.loads(expected_json)),
-                     parsers.encode_json(self.bob, inline=True))
+          "name": "bill",
+          "type_alias": "pants_test.engine.test_parsers.Bob"
+      }''')
+    self._assert_valid_output(relative_json_value=relative_json_value, is_inline=True)
 
 
 class PythonAssignmentsParserTest(unittest.TestCase):

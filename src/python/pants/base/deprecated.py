@@ -5,10 +5,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import inspect
+import sys
 import warnings
 from functools import wraps
 
 import six
+from future.utils import PY2
 from packaging.version import InvalidVersion, Version
 
 from pants.util.memo import memoized_method
@@ -81,7 +83,24 @@ def validate_removal_semver(removal_version):
                                  '{}'.format(removal_version, e))
 
 
-def warn_or_error(removal_version, deprecated_entity_description, hint=None, stacklevel=3):
+def get_frame_info(stacklevel, context=1):
+  """Get a Traceback for the given `stacklevel`.
+
+  For example:
+  `stacklevel=0` means this function's frame (get_frame_info()).
+  `stacklevel=1` means the calling function's frame.
+  See https://docs.python.org/2/library/inspect.html#inspect.getouterframes for more info.
+
+  NB: If `stacklevel` is greater than the number of actual frames, the outermost frame is used
+  instead.
+  """
+  frame_list = inspect.getouterframes(inspect.currentframe(), context=context)
+  frame_stack_index = stacklevel if stacklevel < len(frame_list) else len(frame_list) - 1
+  return frame_list[frame_stack_index]
+
+
+def warn_or_error(removal_version, deprecated_entity_description, hint=None, stacklevel=3,
+                  frame_info=None, ensure_stderr=False):
   """Check the removal_version against the current pants version.
 
   Issues a warning if the removal version is > current pants version, or an error otherwise.
@@ -92,7 +111,12 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None, sta
                                             we can embed in warning/error messages.
   :param string hint: A message describing how to migrate from the removed entity.
   :param int stacklevel: The stacklevel to pass to warnings.warn.
+  :param FrameInfo frame_info: If provided, use this frame info instead of getting one from
+                               `stacklevel`.
+  :param bool ensure_stderr: Whether use warnings.warn, or use warnings.showwarning to print
+                             directly to stderr.
   :raises DeprecationApplicationError: if the removal_version parameter is invalid.
+  :raises CodeRemovedError: if the current version is later than the version marked for removal.
   """
   removal_semver = validate_removal_semver(removal_version)
 
@@ -101,8 +125,30 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None, sta
   if hint:
     msg += '\n  {}'.format(hint)
 
+  # We need to have filename and line_number for warnings.formatwarning, which appears to be the only
+  # way to get a warning message to display to stderr. We get that from frame_info -- it's too bad
+  # we have to reconstruct the `stacklevel` logic ourselves, but we do also gain the ability to have
+  # multiple lines of context, which is neat.
+  if frame_info is None:
+    frame_info = get_frame_info(stacklevel)
+  _, filename, line_number, _, code_context, _ = frame_info
+  if code_context:
+    context_lines = ''.join(code_context)
+  else:
+    context_lines = '<no code context available>'
+
   if removal_semver > PANTS_SEMVER:
-    warnings.warn(msg, DeprecationWarning, stacklevel=stacklevel)
+    if ensure_stderr:
+      warning_msg = warnings.formatwarning(
+        msg, DeprecationWarning, filename, line_number, line=context_lines)
+      print(warning_msg, file=sys.stderr)
+    else:
+      warnings.showwarning(
+        DeprecationWarning(msg) if PY2 else msg,
+        DeprecationWarning,
+        filename,
+        line_number,
+        line=context_lines)
   else:
     raise CodeRemovedError(msg)
 
@@ -129,7 +175,7 @@ def deprecated_conditional(predicate,
     warn_or_error(removal_version, entity_description, hint_message, stacklevel=stacklevel)
 
 
-def deprecated(removal_version, hint_message=None, subject=None):
+def deprecated(removal_version, hint_message=None, subject=None, ensure_stderr=False):
   """Marks a function or method as deprecated.
 
   A removal version must be supplied and it must be greater than the current 'pantsbuild.pants'
@@ -147,6 +193,7 @@ def deprecated(removal_version, hint_message=None, subject=None):
   :param str hint_message: An optional hint pointing to alternatives to the deprecation.
   :param str subject: The name of the subject that has been deprecated for logging clarity. Defaults
                       to the name of the decorated function/method.
+  :param bool ensure_stderr: Forwarded to `ensure_stderr` in warn_or_error().
   :raises DeprecationApplicationError if the @deprecation is applied improperly.
   """
   validate_removal_semver(removal_version)
@@ -159,7 +206,8 @@ def deprecated(removal_version, hint_message=None, subject=None):
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-      warn_or_error(removal_version, subject or func_full_name, hint_message)
+      warn_or_error(removal_version, subject or func_full_name, hint_message,
+                    ensure_stderr=ensure_stderr)
       return func(*args, **kwargs)
     return wrapper
   return decorator

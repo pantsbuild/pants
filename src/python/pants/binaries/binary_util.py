@@ -311,8 +311,8 @@ class BinaryUtil(object):
     self._uname_func = uname_func or os.uname
 
   _ID_BY_OS = {
-    'linux': lambda release, machine: ('linux', machine),
     'darwin': lambda release, machine: ('darwin', release.split('.')[0]),
+    'linux': lambda release, machine: ('linux', machine),
   }
 
   # FIXME(cosmicexplorer): we create a HostPlatform in this class instead of in the constructor
@@ -330,8 +330,8 @@ class BinaryUtil(object):
       # TODO: test this!
       raise self.MissingMachineInfo(
         "Pants could not resolve binaries for the current host: platform '{}' was not recognized. "
-        "Recognized platforms are: {}."
-        .format(os_id_key, self._ID_BY_OS.keys()))
+        "Recognized platforms are: [{}]."
+        .format(os_id_key, ', '.join(sorted(self._ID_BY_OS.keys()))))
     try:
       os_name, arch_or_version = self._path_by_id[os_id_tuple]
       host_platform = HostPlatform(os_name, arch_or_version)

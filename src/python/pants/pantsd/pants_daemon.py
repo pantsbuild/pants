@@ -32,6 +32,7 @@ from pants.pantsd.watchman_launcher import WatchmanLauncher
 from pants.util.collections import combined_dict
 from pants.util.contextutil import stdio_as
 from pants.util.memo import memoized_property
+from pants.util.strutil import ensure_text
 
 
 class _LoggerStream(object):
@@ -225,9 +226,6 @@ class PantsDaemon(FingerprintedProcessManager):
     # A lock to guard the service thread lifecycles. This can be used by individual services
     # to safeguard daemon-synchronous sections that should be protected from abrupt teardown.
     self._lifecycle_lock = threading.RLock()
-    # A lock to guard pantsd->runner forks. This can be used by services to safeguard resources
-    # held by threads at fork time, so that we can fork without deadlocking.
-    self._fork_lock = threading.RLock()
     # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
     self._kill_switch = threading.Event()
     self._exiter = Exiter()
@@ -302,10 +300,9 @@ class PantsDaemon(FingerprintedProcessManager):
 
   def _setup_services(self, services):
     assert self._lifecycle_lock is not None, 'PantsDaemon lock has not been set!'
-    assert self._fork_lock is not None, 'PantsDaemon fork lock has not been set!'
     for service in services:
       self._logger.info('setting up service {}'.format(service))
-      service.setup(self._lifecycle_lock, self._fork_lock)
+      service.setup(self._lifecycle_lock)
 
   @staticmethod
   def _make_thread(target):
@@ -332,7 +329,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
     # Once all services are started, write our pid.
     self.write_pid()
-    self.write_metadata_by_name('pantsd', self.FINGERPRINT_KEY, self.options_fingerprint.decode('utf-8'))
+    self.write_metadata_by_name('pantsd', self.FINGERPRINT_KEY, ensure_text(self.options_fingerprint))
 
     # Monitor services.
     while not self.is_killed:

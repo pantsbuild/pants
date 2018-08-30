@@ -76,7 +76,7 @@ class DaemonPantsRunner(ProcessManager):
   """
 
   @classmethod
-  def create(cls, sock, args, env, fork_lock, scheduler_service):
+  def create(cls, sock, args, env, scheduler_service):
     try:
       # N.B. This will temporarily redirect stdio in the daemon's pre-fork context
       # to the nailgun session. We'll later do this a second time post-fork, because
@@ -100,7 +100,6 @@ class DaemonPantsRunner(ProcessManager):
       sock,
       args,
       env,
-      fork_lock,
       graph_helper,
       target_roots,
       subprocess_dir,
@@ -108,13 +107,12 @@ class DaemonPantsRunner(ProcessManager):
       deferred_exc
     )
 
-  def __init__(self, socket, args, env, fork_lock, graph_helper, target_roots,
+  def __init__(self, socket, args, env, graph_helper, target_roots,
                metadata_base_dir, options_bootstrapper, deferred_exc):
     """
     :param socket socket: A connected socket capable of speaking the nailgun protocol.
     :param list args: The arguments (i.e. sys.argv) for this run.
     :param dict env: The environment (i.e. os.environ) for this run.
-    :param threading.RLock fork_lock: A lock to use during forking for thread safety.
     :param LegacyGraphSession graph_helper: The LegacyGraphSession instance to use for BuildGraph
                                             construction. In the event of an exception, this will be
                                             None.
@@ -131,7 +129,6 @@ class DaemonPantsRunner(ProcessManager):
     self._socket = socket
     self._args = args
     self._env = env
-    self._fork_lock = fork_lock
     self._graph_helper = graph_helper
     self._target_roots = target_roots
     self._options_bootstrapper = options_bootstrapper
@@ -252,19 +249,14 @@ class DaemonPantsRunner(ProcessManager):
     return None if client_start_time is None else float(client_start_time)
 
   def run(self):
-    """Fork, daemonize and invoke self.post_fork_child() (via ProcessManager)."""
-    with self._fork_lock:
-      self.daemonize(write_pid=False)
-
-  def pre_fork(self):
-    """Pre-fork callback executed via ProcessManager.daemonize().
+    """Fork, daemonize and invoke self.post_fork_child() (via ProcessManager).
 
     The scheduler has thread pools which need to be re-initialized after a fork: this ensures that
     when the pantsd-runner forks from pantsd, there is a working pool for any work that happens
     in that child process.
     """
-    if self._graph_helper:
-      self._graph_helper.scheduler_session.pre_fork()
+    fork_context = self._graph_helper.scheduler_session.with_fork_context if self._graph_helper else None
+    self.daemonize(write_pid=False, fork_context=fork_context)
 
   def post_fork_child(self):
     """Post-fork child process callback executed via ProcessManager.daemonize()."""

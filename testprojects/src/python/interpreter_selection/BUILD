@@ -9,7 +9,9 @@ python_library(
   sources = ['echo_interpreter_version.py'],
   dependencies = [],
   # Play with this to test interpreter selection in the pex machinery.
-  compatibility = ['CPython>=2.7,<4']
+  # TODO(John Sirois): Allow `<4` when the issues with `3.7` are fixed. See:
+  #   https://github.com/pantsbuild/pants/issues/6363
+  compatibility = ['CPython>=2.7,<3.7']
 )
 
 python_binary(

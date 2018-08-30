@@ -479,7 +479,7 @@ python_tests(
       PytestRun._add_plugin_config(cp,
                                    src_chroot_path=src_chroot_path,
                                    src_to_target_base=src_to_target_base)
-      with temporary_file() as fp:
+      with temporary_file(binary_mode=False) as fp:
         cp.write(fp)
         fp.close()
 

@@ -313,8 +313,10 @@ class Scheduler(object):
     metrics_val = self._native.lib.scheduler_metrics(self._scheduler, session)
     return {k: v for k, v in self._from_value(metrics_val)}
 
-  def pre_fork(self):
-    self._native.lib.scheduler_pre_fork(self._scheduler)
+  def with_fork_context(self, func):
+    """See the rustdocs for `scheduler_fork_context` for more information."""
+    res = self._native.lib.scheduler_fork_context(self._scheduler, Function(self._to_key(func)))
+    return self._raise_or_return(res)
 
   def _run_and_return_roots(self, session, execution_request):
     raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
@@ -473,8 +475,8 @@ class SchedulerSession(object):
     """Returns metrics for this SchedulerSession as a dict of metric name to metric value."""
     return self._scheduler._metrics(self._session)
 
-  def pre_fork(self):
-    self._scheduler.pre_fork()
+  def with_fork_context(self, func):
+    return self._scheduler.with_fork_context(func)
 
   def _maybe_visualize(self):
     if self._scheduler.visualize_to_dir() is not None:
@@ -543,7 +545,7 @@ class SchedulerSession(object):
     # TODO: See https://github.com/pantsbuild/pants/issues/3912
     throw_root_states = tuple(state for root, state in result.root_products if type(state) is Throw)
     if throw_root_states:
-      unique_exceptions = tuple(set(t.exc for t in throw_root_states))
+      unique_exceptions = tuple({t.exc for t in throw_root_states})
       exception_noun = pluralize(len(unique_exceptions), 'Exception')
 
       if self._scheduler.include_trace_on_error:

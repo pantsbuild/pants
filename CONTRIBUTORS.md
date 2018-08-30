@@ -143,6 +143,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Pankaj Gupta
 + Patrick Lawson
 + Paul Groudas
++ Paul Yau
 + Peiyu Wang
 + Peter Seibel
 + Qicheng Ma

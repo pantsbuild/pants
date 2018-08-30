@@ -160,11 +160,11 @@ class JvmCompile(NailgunTaskBase):
     # predicate to filter the full build graph is exposed, the requirement can be made automatic
     # and in turn codegen tasks could denote the labels they produce automating wiring of the
     # produce side
-    round_manager.require_data('java')
-    round_manager.require_data('scala')
+    round_manager.optional_data('java')
+    round_manager.optional_data('scala')
 
     # Allow the deferred_sources_mapping to take place first
-    round_manager.require_data('deferred_sources')
+    round_manager.optional_data('deferred_sources')
 
   # Subclasses must implement.
   # --------------------------
@@ -553,7 +553,7 @@ class JvmCompile(NailgunTaskBase):
       tuple((getattr(target, plugins_key, []) or []))
     )
     # Allow multiple flags and also comma-separated values in a single flag.
-    requested_plugins = set([p for val in requested_plugins for p in val.split(',')])
+    requested_plugins = {p for val in requested_plugins for p in val.split(',')}
 
     plugin_args_key = '{}_plugin_args'.format(compiler)
     available_plugin_args = {}

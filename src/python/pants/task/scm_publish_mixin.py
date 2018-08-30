@@ -8,6 +8,7 @@ import re
 import traceback
 from abc import abstractmethod
 from builtins import object, range
+from functools import total_ordering
 
 from pants.base.exceptions import TaskError
 from pants.scm.scm import Scm
@@ -28,6 +29,7 @@ class Version(object):
     """Returns the string representation of this Version."""
 
 
+@total_ordering
 class Namedver(Version):
   """A less restrictive versioning scheme that does not conflict with Semver
 
@@ -65,13 +67,14 @@ class Namedver(Version):
   def __eq__(self, other):
     return self._version == other._version
 
-  def __cmp__(self, other):
+  def __lt__(self, other):
     raise ValueError("{0} is not comparable to {1}".format(self, other))
 
   def __repr__(self):
     return 'Namedver({0})'.format(self.version())
 
 
+@total_ordering
 class Semver(Version):
   """Semantic versioning. See http://semver.org"""
 
@@ -109,22 +112,17 @@ class Semver(Version):
                              ('{}-SNAPSHOT'.format(self.patch)) if self.snapshot else self.patch)
 
   def __eq__(self, other):
-    return self.__cmp__(other) == 0
+    return (self.major, self.minor, self.patch, self.snapshot) == \
+           (other.major, other.minor, other.patch, other.snapshot)
 
-  def __cmp__(self, other):
+  def __lt__(self, other):
     diff = self.major - other.major
-    if not diff:
-      diff = self.minor - other.minor
-      if not diff:
-        diff = self.patch - other.patch
-        if not diff:
-          if self.snapshot and not other.snapshot:
-            diff = 1
-          elif not self.snapshot and other.snapshot:
-            diff = -1
-          else:
-            diff = 0
-    return diff
+    if diff:
+      return self.major < other.major
+    diff = self.minor - other.minor
+    if diff:
+      return self.patch < other.patch
+    return self.snapshot < other.snapshot
 
   def __repr__(self):
     return 'Semver({})'.format(self.version())
@@ -231,13 +229,14 @@ class ScmPublishMixin(object):
 
   @staticmethod
   def _push_with_retry(scm, log, attempts):
-    scm_exception = None
+    global_scm_exception = None
     for attempt in range(attempts):
       try:
         log.debug("Trying scm push")
         scm.push()
         break  # success
       except Scm.RemoteException as scm_exception:
+        global_scm_exception = scm_exception
         log.debug("Scm push failed, trying to refresh.")
         # This might fail in the event that there is a real conflict, throwing
         # a Scm.LocalException (in case of a rebase failure) or a Scm.RemoteException
@@ -249,9 +248,9 @@ class ScmPublishMixin(object):
         try:
           scm.refresh(leave_clean=True)
         except Scm.LocalException as local_exception:
-          exc = traceback.format_exc(scm_exception)
+          exc = traceback.format_exc()
           log.debug("SCM exception while pushing: {}".format(exc))
           raise local_exception
 
-    else:
-      raise scm_exception
+    else:  # no more retries
+      raise global_scm_exception

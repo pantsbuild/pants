@@ -96,6 +96,24 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     self.assertEqual(len(targets.dependencies), 1)
     self.assertEqual(targets.dependencies[0].spec, 'root:not_me')
 
+  def test_exclude_pattern_with_single_address(self):
+    """Test that single address targets are filtered based on exclude patterns."""
+    spec = SingleAddress('root', 'not_me')
+    address_mapper = AddressMapper(JsonParser(TestTable()))
+    snapshot = Snapshot(DirectoryDigest('xx', 2),
+                        (Path('root/BUILD', File('root/BUILD')),))
+    address_family = AddressFamily('root',
+      {
+       'not_me': ('root/BUILD', TargetAdaptor()),
+      }
+    )
+    targets = run_rule(
+      addresses_from_address_families, address_mapper, Specs([spec], exclude_patterns=tuple(['root.*'])),{
+      (Snapshot, PathGlobs): lambda _: snapshot,
+      (AddressFamily, Dir): lambda _: address_family,
+    })
+    self.assertEqual(len(targets.dependencies), 0)
+
 
 class ApacheThriftConfiguration(StructWithDeps):
   # An example of a mixed-mode object - can be directly embedded without a name or else referenced

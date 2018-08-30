@@ -159,7 +159,7 @@ matrix:
         - sudo chmod 666 /dev/fuse
         - sudo chown root:$USER /etc/fuse.conf
       script:
-        - ./build-support/bin/ci.sh -fkmrjst "${SHARD}"
+        - ./build-support/bin/ci.sh -fkmrjt "${SHARD}"
 
     - <<: *default_test_config
       env:
@@ -234,10 +234,6 @@ matrix:
       stage: Test Pants
       language: python
       python: "2.7.13"
-      addons:
-        apt:
-          packages:
-            - cmake
       before_install:
         - sudo apt-get install -y pkg-config fuse libfuse-dev
         - sudo modprobe fuse
@@ -271,6 +267,31 @@ matrix:
       script:
         # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and set -z to run the platform-specific tests.
         - ./build-support/bin/ci.sh -ez
+
+    # Rust Clippy on Linux with nightly Rust
+    - name: rust-clippy
+      os: linux
+      dist: trusty
+      sudo: required
+      stage: Test Pants
+      language: python
+      python: "2.7.13"
+      before_install:
+        - sudo apt-get install -y pkg-config fuse libfuse-dev
+        - sudo modprobe fuse
+        - sudo chmod 666 /dev/fuse
+        - sudo chown root:$USER /etc/fuse.conf
+      env:
+        - SHARD="Rust Clippy on Linux with nightly Rust"
+      before_script:
+        - ulimit -c unlimited
+        - ulimit -n 8192
+      script:
+        - ./build-support/bin/ci.sh -bs
+
+  allow_failures:
+    - name: rust-clippy
+
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/s3/
   provider: s3
