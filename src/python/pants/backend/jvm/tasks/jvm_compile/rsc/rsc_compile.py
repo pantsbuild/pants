@@ -25,7 +25,7 @@ from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import Timer
-from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_rmtree
+from pants.util.dirutil import fast_relpath, safe_mkdir
 
 
 #
@@ -38,19 +38,9 @@ from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_rmtre
 logger = logging.getLogger(__name__)
 
 
-def relpathify(collection):
-  # Converts a list of paths into relpath'd paths.
+def fast_relpath_collection(collection):
   buildroot = get_buildroot()
-  def relpath(p):
-    if p[0] != '/':
-      raise ValueError('Unexpected non-absolute path {}'.format(p))
-    return fast_relpath(p, buildroot)
-  return [relpath(c) for c in collection]
-
-
-def relpathalone(path):
-  # Converts a single path to a relpath
-  return relpathify([path])[0]
+  return [fast_relpath(c, buildroot) for c in collection]
 
 
 def stdout_contents(wu):
@@ -228,60 +218,8 @@ class RscCompile(ZincCompile):
                           ivts,
                           counter,
                           runtime_classpath_product):
-    def work_for_vts(vts, ctx, key, classpath_product_key):
-      progress_message = ctx.target.address.spec
 
-      # Double check the cache before beginning compilation
-      hit_cache = self.check_cache(vts, counter)
-
-      if not hit_cache:
-        # Compute the compile classpath for this target.
-        cp_entries = self._zinc.compile_classpath_entries(
-          classpath_product_key,
-          ctx.target,
-          extra_cp_entries=self._extra_compile_time_classpath,
-        )
-        upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
-
-        is_incremental = self.should_compile_incrementally(vts, ctx)
-        if not is_incremental:
-          # Purge existing analysis file in non-incremental mode.
-          safe_delete(ctx.analysis_file)
-          # Work around https://github.com/pantsbuild/pants/issues/3670
-          safe_rmtree(ctx.classes_dir)
-
-        dep_context = DependencyContext.global_instance()
-        tgt, = vts.targets
-        compiler_option_sets = dep_context.defaulted_property(tgt, lambda x: x.compiler_option_sets)
-        zinc_file_manager = dep_context.defaulted_property(tgt, lambda x: x.zinc_file_manager)
-        with Timer() as timer:
-          self._compile_vts(vts,
-                            ctx,
-                            upstream_analysis,
-                            cp_entries,
-                            progress_message,
-                            tgt.platform,
-                            compiler_option_sets,
-                            zinc_file_manager,
-                            counter)
-        self._record_target_stats(tgt,
-                                  len(cp_entries),
-                                  len(ctx.sources),
-                                  timer.elapsed,
-                                  is_incremental,
-                                  'compile'
-                                  )
-
-        # Write any additional resources for this target to the target workdir.
-        self.write_extra_resources(ctx)
-
-        # Jar the compiled output.
-        self._create_context_jar(ctx)
-
-      # Update the products with the latest classes.
-      self.register_extra_products_from_contexts([ctx.target], compile_contexts)
-
-    def work_for_vts_rsc(vts, ctx, key):
+    def work_for_vts_rsc(vts, ctx):
       # Double check the cache before beginning compilation
       hit_cache = self.check_cache(vts, counter)
 
@@ -299,7 +237,7 @@ class RscCompile(ZincCompile):
           'rsc_classpath',
           ctx.target,
           extra_cp_entries=self._extra_compile_time_classpath)
-        classpath_rel = relpathify(classpath_abs)
+        classpath_rel = fast_relpath_collection(classpath_abs)
         cp_entries.extend(classpath_rel)
 
         ctx.ensure_output_dirs_exist()
@@ -309,9 +247,10 @@ class RscCompile(ZincCompile):
           # Step 1: Convert classpath to SemanticDB
           # ---------------------------------------
           scalac_classpath_path_entries_abs = self.tool_classpath('workaround-metacp-dependency-classpath')
-          scalac_classpath_path_entries = relpathify(scalac_classpath_path_entries_abs)
-          index_dir = relpathalone(ctx.index_dir)
+          scalac_classpath_path_entries = fast_relpath_collection(scalac_classpath_path_entries_abs)
+          index_dir = fast_relpath(ctx.index_dir, get_buildroot())
           args = [
+            '--verbose',
             # NB: Without this setting, rsc will be missing some symbols
             #     from the scala library.
             '--include-scala-library-synthetics', # TODO generate these once and cache them
@@ -339,7 +278,7 @@ class RscCompile(ZincCompile):
           def desandboxify_pantsd_loc(path):
             # TODO come up with a cleaner way to maybe relpath paths.
             try:
-              path = relpathalone(path)
+              path = fast_relpath(path, get_buildroot())
             except Exception:
               pass
             pattern = 'process-execution[^{}]+/'.format(re.escape(os.path.sep))
@@ -359,8 +298,6 @@ class RscCompile(ZincCompile):
           for cp_entry in jvm_lib_jars_abs:
             metai_classpath.append(desandboxify_pantsd_loc(status_elements[cp_entry]))
 
-          metacp_classpath_entries = metai_classpath
-
           # Step 1.5: metai Index the semanticdbs
           # -------------------------------------
           # TODO have metai write to a different spot than metacp
@@ -370,7 +307,7 @@ class RscCompile(ZincCompile):
           # or invoking a script that does the copying
           args = [
             '--verbose',
-            os.pathsep.join(metacp_classpath_entries)
+            os.pathsep.join(metai_classpath)
           ]
           self._runtool(
             'scala.meta.cli.Metai',
@@ -378,18 +315,18 @@ class RscCompile(ZincCompile):
             args,
             distribution,
             tgt=tgt,
-            input_files=metacp_classpath_entries,
+            input_files=metai_classpath,
             output_dir=index_dir
           )
 
           # Step 2: Outline Scala sources into SemanticDB
           # ---------------------------------------------
-          outline_dir = relpathalone(ctx.outline_dir)
+          outline_dir = fast_relpath(ctx.outline_dir, get_buildroot())
           rsc_out = os.path.join(outline_dir, 'META-INF/semanticdb/out.semanticdb')
           safe_mkdir(os.path.join(outline_dir, 'META-INF/semanticdb'))
           target_sources = ctx.sources
           args = [
-            '-cp', os.pathsep.join(metacp_classpath_entries),
+            '-cp', os.pathsep.join(metai_classpath),
             '-out', rsc_out,
           ] + target_sources
           self._runtool(
@@ -400,7 +337,7 @@ class RscCompile(ZincCompile):
             tgt=tgt,
             # TODO pass the input files from the target snapshot instead of the below
             # input_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
-            input_files=target_sources + metacp_classpath_entries,
+            input_files=target_sources + metai_classpath,
             output_dir=outline_dir)
           rsc_classpath = [outline_dir]
 
@@ -423,7 +360,7 @@ class RscCompile(ZincCompile):
 
           # Step 3: Convert SemanticDB into an mjar
           # ---------------------------------------
-          rsc_mjar_file = relpathalone(ctx.rsc_mjar_file)
+          rsc_mjar_file = fast_relpath(ctx.rsc_mjar_file, get_buildroot())
           args = [
             '-out', rsc_mjar_file,
             os.pathsep.join(rsc_classpath),
@@ -473,8 +410,7 @@ class RscCompile(ZincCompile):
           functools.partial(
             work_for_vts_rsc,
             ivts,
-            compile_context_pair[0],
-            rsc_key),
+            compile_context_pair[0]),
           [self._rsc_key_for_target(target) for target in invalid_dependencies],
           self._size_estimator(compile_context_pair[0].sources),
         )
@@ -490,11 +426,13 @@ class RscCompile(ZincCompile):
         Job(
           full_key,
           functools.partial(
-            work_for_vts,
+            self._default_work_for_vts,
             ivts,
             compile_context_pair[1],
-            full_key,
-            'rsc_classpath'),
+            'rsc_classpath',
+            counter,
+            compile_contexts,
+            runtime_classpath_product),
           [self._rsc_key_for_target(compile_target)] + [self._rsc_key_for_target(target)
                                                            for target in invalid_dependencies],
           self._size_estimator(compile_context_pair[1].sources),
@@ -510,11 +448,13 @@ class RscCompile(ZincCompile):
         Job(
           full_key,
           functools.partial(
-            work_for_vts,
+            self._default_work_for_vts,
             ivts,
             compile_context_pair[1],
-            full_key,
-            'runtime_classpath'),
+            'runtime_classpath',
+            counter,
+            compile_contexts,
+            runtime_classpath_product),
           [self._compile_against_rsc_key_for_target(target) for target in invalid_dependencies],
           self._size_estimator(compile_context_pair[1].sources),
           # NB: right now, only the last job will write to the cache, because we don't
@@ -572,7 +512,7 @@ class RscCompile(ZincCompile):
       # TODO: accept input_digests as well as files.
       with self.context.new_workunit(tool_name) as wu:
         tool_classpath_abs = self.tool_classpath(tool_name)
-        tool_classpath = relpathify(tool_classpath_abs)
+        tool_classpath = fast_relpath_collection(tool_classpath_abs)
 
         pathglobs = list(tool_classpath)
         pathglobs.extend(input_files)

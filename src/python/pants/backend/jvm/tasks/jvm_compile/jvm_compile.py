@@ -670,68 +670,11 @@ class JvmCompile(NailgunTaskBase):
   def create_compile_jobs(self, compile_target, all_compile_contexts, invalid_dependencies, ivts,
     counter, classpath_product):
 
-    def work_for_vts(vts, ctx):
-      progress_message = ctx.target.address.spec
-
-      # Double check the cache before beginning compilation
-      hit_cache = self.check_cache(vts, counter)
-
-      if not hit_cache:
-        # Compute the compile classpath for this target.
-        dependency_cp_entries = self._zinc.compile_classpath_entries(
-          'runtime_classpath',
-          ctx.target,
-          extra_cp_entries=self._extra_compile_time_classpath,
-        )
-
-        upstream_analysis = dict(self._upstream_analysis(all_compile_contexts, dependency_cp_entries))
-
-        is_incremental = self.should_compile_incrementally(vts, ctx)
-        if not is_incremental:
-          # Purge existing analysis file in non-incremental mode.
-          safe_delete(ctx.analysis_file)
-          # Work around https://github.com/pantsbuild/pants/issues/3670
-          safe_rmtree(ctx.classes_dir)
-
-        dep_context = DependencyContext.global_instance()
-        tgt, = vts.targets
-        compiler_option_sets = dep_context.defaulted_property(tgt, lambda x: x.compiler_option_sets)
-        zinc_file_manager = dep_context.defaulted_property(tgt, lambda x: x.zinc_file_manager)
-        with Timer() as timer:
-          self._compile_vts(vts,
-                            ctx,
-                            upstream_analysis,
-                            dependency_cp_entries,
-                            progress_message,
-                            tgt.platform,
-                            compiler_option_sets,
-                            zinc_file_manager,
-                            counter)
-        self._record_target_stats(tgt,
-                                  len(dependency_cp_entries),
-                                  len(ctx.sources),
-                                  timer.elapsed,
-                                  is_incremental,
-                                  'compile')
-
-        # Write any additional resources for this target to the target workdir.
-        self.write_extra_resources(ctx)
-
-        # Jar the compiled output.
-        self._create_context_jar(ctx)
-
-      # Update the products with the latest classes.
-      classpath_product.add_for_target(
-        ctx.target,
-        [(conf, self._classpath_for_context(ctx)) for conf in self._confs],
-      )
-      self.register_extra_products_from_contexts([ctx.target], all_compile_contexts)
-
     context_for_target = all_compile_contexts[compile_target]
     compile_context = self.select_runtime_context(context_for_target)
 
     job = Job(self.exec_graph_key_for_target(compile_target),
-              functools.partial(work_for_vts, ivts, compile_context),
+              functools.partial(self._default_work_for_vts, ivts, compile_context, counter, all_compile_contexts),
               [self.exec_graph_key_for_target(target) for target in invalid_dependencies],
               self._size_estimator(compile_context.sources),
               # If compilation and analysis work succeeds, validate the vts.
@@ -858,3 +801,60 @@ class JvmCompile(NailgunTaskBase):
       raise TaskError('Unknown JVM compiler: {}'.format(compiler))
     plugin_tgts = self.context.targets(predicate=lambda t: isinstance(t, plugin_cls))
     return {t.plugin: t.closure() for t in plugin_tgts}
+
+  def _default_work_for_vts(self, vts, ctx, classpath_product_key, counter, all_compile_contexts, classpath_product):
+    progress_message = ctx.target.address.spec
+
+    # Double check the cache before beginning compilation
+    hit_cache = self.check_cache(vts, counter)
+
+    if not hit_cache:
+      # Compute the compile classpath for this target.
+      dependency_cp_entries = self._zinc.compile_classpath_entries(
+        classpath_product_key,
+        ctx.target,
+        extra_cp_entries=self._extra_compile_time_classpath,
+      )
+
+      upstream_analysis = dict(self._upstream_analysis(all_compile_contexts, dependency_cp_entries))
+
+      is_incremental = self.should_compile_incrementally(vts, ctx)
+      if not is_incremental:
+        # Purge existing analysis file in non-incremental mode.
+        safe_delete(ctx.analysis_file)
+        # Work around https://github.com/pantsbuild/pants/issues/3670
+        safe_rmtree(ctx.classes_dir)
+
+      dep_context = DependencyContext.global_instance()
+      tgt, = vts.targets
+      compiler_option_sets = dep_context.defaulted_property(tgt, lambda x: x.compiler_option_sets)
+      zinc_file_manager = dep_context.defaulted_property(tgt, lambda x: x.zinc_file_manager)
+      with Timer() as timer:
+        self._compile_vts(vts,
+                          ctx,
+                          upstream_analysis,
+                          dependency_cp_entries,
+                          progress_message,
+                          tgt.platform,
+                          compiler_option_sets,
+                          zinc_file_manager,
+                          counter)
+      self._record_target_stats(tgt,
+                                len(dependency_cp_entries),
+                                len(ctx.sources),
+                                timer.elapsed,
+                                is_incremental,
+                                'compile')
+
+      # Write any additional resources for this target to the target workdir.
+      self.write_extra_resources(ctx)
+
+      # Jar the compiled output.
+      self._create_context_jar(ctx)
+
+    # Update the products with the latest classes.
+    classpath_product.add_for_target(
+      ctx.target,
+      [(conf, self._classpath_for_context(ctx)) for conf in self._confs],
+    )
+    self.register_extra_products_from_contexts([ctx.target], all_compile_contexts)
