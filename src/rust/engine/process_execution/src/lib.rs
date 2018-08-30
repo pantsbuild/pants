@@ -85,7 +85,11 @@ pub struct ExecuteProcessRequest {
 
   ///
   /// If present, a symlink will be created at .jdk which points to this directory for local
+  /// execution, or a system-installed JDK (ignoring the value of the present Some) for remote
   /// execution.
+  ///
+  /// This is some technical debt we should clean up;
+  /// see https://github.com/pantsbuild/pants/issues/6416.
   ///
   pub jdk_home: Option<PathBuf>,
 }

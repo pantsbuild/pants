@@ -620,6 +620,23 @@ fn make_execute_request(
   output_directories.sort();
   command.set_output_directories(protobuf::RepeatedField::from_vec(output_directories));
 
+  // Ideally, the JDK would be brought along as part of the input directory, but we don't currently
+  // have support for that. The platform with which we're experimenting for remote execution
+  // supports this property, and will symlink .jdk to a system-installed JDK:
+  // https://github.com/twitter/scoot/pull/391
+  if req.jdk_home.is_some() {
+    command.set_platform({
+      let mut platform = bazel_protos::remote_execution::Platform::new();
+      platform.mut_properties().push({
+        let mut property = bazel_protos::remote_execution::Platform_Property::new();
+        property.set_name("JDK_SYMLINK".to_owned());
+        property.set_value(".jdk".to_owned());
+        property
+      });
+      platform
+    });
+  }
+
   let mut action = bazel_protos::remote_execution::Action::new();
   action.set_command_digest(digest(&command)?);
   action.set_input_root_digest((&req.input_files).into());
@@ -779,6 +796,70 @@ mod tests {
       (&Digest(
         Fingerprint::from_hex_string(
           "844c929423444f3392e0dcc89ebf1febbfdf3a2e2fcab7567cc474705a5385e4",
+        ).unwrap(),
+        140,
+      )).into(),
+    );
+
+    assert_eq!(
+      result,
+      Ok((want_action, want_command, want_execute_request))
+    );
+  }
+
+  #[test]
+  fn make_execute_request_with_jdk() {
+    let input_directory = TestDirectory::containing_roland();
+    let req = ExecuteProcessRequest {
+      argv: owned_string_vec(&["/bin/echo", "yo"]),
+      env: BTreeMap::new(),
+      input_files: input_directory.digest(),
+      output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
+      timeout: Duration::from_millis(1000),
+      description: "some description".to_owned(),
+      jdk_home: Some(PathBuf::from("/tmp")),
+    };
+    let result = super::make_execute_request(&req);
+
+    let mut want_command = bazel_protos::remote_execution::Command::new();
+    want_command.mut_arguments().push("/bin/echo".to_owned());
+    want_command.mut_arguments().push("yo".to_owned());
+    want_command.mut_platform().mut_properties().push({
+      let mut property = bazel_protos::remote_execution::Platform_Property::new();
+      property.set_name("JDK_SYMLINK".to_owned());
+      property.set_value(".jdk".to_owned());
+      property
+    });
+
+    assert_eq!(
+      Ok(
+        (&Digest(
+          Fingerprint::from_hex_string(
+            "f373f421b328ddeedfba63542845c0423d7730f428dd8e916ec6a38243c98448"
+          ).unwrap(),
+          38
+        )).into()
+      ),
+      super::digest(&want_command)
+    );
+
+    let mut want_action = bazel_protos::remote_execution::Action::new();
+    want_action.set_command_digest(
+      (&Digest(
+        Fingerprint::from_hex_string(
+          "f373f421b328ddeedfba63542845c0423d7730f428dd8e916ec6a38243c98448",
+        ).unwrap(),
+        38,
+      )).into(),
+    );
+    want_action.set_input_root_digest((&input_directory.digest()).into());
+
+    let mut want_execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
+    want_execute_request.set_action_digest(
+      (&Digest(
+        Fingerprint::from_hex_string(
+          "b1fb7179ce496995a4e3636544ec000dca1b951f1f6216493f6c7608dc4dd910",
         ).unwrap(),
         140,
       )).into(),
