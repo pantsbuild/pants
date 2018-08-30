@@ -5,7 +5,6 @@
     "3rdparty_jvm": "dist/markdown/html/examples/src/java/org/pantsbuild/example/3rdparty_jvm.html",
     "3rdparty_py": "dist/markdown/html/examples/src/python/example/3rdparty_py.html",
     "announce_201409": "dist/markdown/html/src/docs/announce_201409.html",
-    "blog": "dist/markdown/html/src/docs/blog/blog.html",
     "coursier_migration": "dist/markdown/html/src/docs/blog/coursier_migration.html",
     "build_dictionary": "dist/reference/build_dictionary_body.html",
     "build_files": "dist/markdown/html/src/docs/build_files.html",
@@ -178,8 +177,7 @@
        {"heading": "Reference"},
        {"pages" : [
                     "build_dictionary",
-                    "options_reference",
-                    "blog"
+                    "options_reference"
                 ]
        },
        {"collapsible_heading": "Release Notes",
@@ -195,6 +193,11 @@
                     "notes-1.1.x",
                     "notes-1.0.x",
                     "notes-master"
+                ]
+       },
+       {"heading": "Blogs"},
+       {"pages" : [
+                    "coursier_migration"
                 ]
        },
        {"heading": "Developer"},

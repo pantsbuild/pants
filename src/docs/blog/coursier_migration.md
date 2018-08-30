@@ -1,4 +1,4 @@
-# Coursier Migration
+# Twitter's Coursier Migration
 
 ## Meta Info
 
