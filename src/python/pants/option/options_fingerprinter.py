@@ -11,6 +11,7 @@ from builtins import object, str
 from hashlib import sha1
 
 import six
+from future.moves import collections
 
 from pants.base.build_environment import get_buildroot
 from pants.base.hash_utils import stable_json_hash
@@ -22,9 +23,14 @@ class Encoder(json.JSONEncoder):
   def default(self, o):
     if o is UnsetBool:
       return '_UNSET_BOOL_ENCODING'
+    elif isinstance(o, collections.Iterable) and not isinstance(o, collections.Mapping):
+      # For things like sets which JSONEncoder doesn't handle, and raises a TypeError on.
+      return list(o)
     return super(Encoder, self).default(o)
 
 
+# TODO: this function could be wrapped in @memoized -- we would have to manage the cache size
+# somehow if this is done or it might blow up.
 stable_json_sha1 = functools.partial(stable_json_hash, encoder=Encoder)
 
 
@@ -73,6 +79,11 @@ class OptionsFingerprinter(object):
     """
     if option_val is None:
       return None
+
+    # The python documentation (https://docs.python.org/2/library/json.html#json.dumps) states that
+    # dict keys are coerced to strings in json.dumps, but this appears to be incorrect.
+    if isinstance(option_val, collections.Mapping):
+      option_val = {stable_json_sha1(k):v for k, v in option_val.items()}
 
     # For simplicity, we always fingerprint a list.  For non-list-valued options,
     # this will be a singleton list.
@@ -165,6 +176,10 @@ class OptionsFingerprinter(object):
     contents rather than by its path.
 
     This assumes the files are small enough to be read into memory.
+
+    NB: The keys of the dict are assumed to be strings -- if they are not, the dict should be
+    converted to encode its keys with `stable_json_sha1()`, as is done in the `fingerprint()`
+    method.
     """
     # Dicts are wrapped in singleton lists. See the "For simplicity..." comment in `fingerprint()`.
     option_val = option_val[0]
