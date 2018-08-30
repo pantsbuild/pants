@@ -14,7 +14,7 @@ dirs = "1"
 futures = "^0.1.16"
 futures-cpupool = "0.1"
 glob = "0.2.11"
-grpcio = { version = "0.3", features = ["secure"] }
+grpcio = { git = "https://github.com/illicitonion/grpc-rs.git", rev = "59f7f52658617ebf8eff8a72b1f69fef2162c936", features = ["secure"] }
 hashing = { path = "../hashing" }
 ignore = "0.3.1"
 indexmap = "1"

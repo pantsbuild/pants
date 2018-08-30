@@ -12,7 +12,7 @@ bytes = "0.4.5"
 digest = "0.7"
 fs = { path = "../fs" }
 futures = "^0.1.16"
-grpcio = { version = "0.3", features = ["secure"] }
+grpcio = { git = "https://github.com/illicitonion/grpc-rs.git", rev = "59f7f52658617ebf8eff8a72b1f69fef2162c936", features = ["secure"] }
 hashing = { path = "../hashing" }
 log = "0.4"
 protobuf = { version = "2.0.4", features = ["with-bytes"] }
