@@ -34,6 +34,10 @@ class JsonEncodingTest(unittest.TestCase):
     self.assertEqual(stable_json_sha1([{'a': 3}]), '8f4e36849a0b8fbe9c4a822c80fbee047c65458a')
     self.assertEqual(stable_json_sha1(set([1])), 'f629ae44b7b3dcfed444d363e626edf411ec69a8')
 
+  def test_non_string_dict_key(self):
+    with self.assertRaisesRegexp(TypeError, r'key \(\) is not a string'):
+      stable_json_sha1({():()})
+
 
 class OptionsFingerprinterTest(TestBase):
 
@@ -49,6 +53,11 @@ class OptionsFingerprinterTest(TestBase):
                      for d in (d1, d2, d3))
     self.assertEqual(fp1, fp2)
     self.assertNotEqual(fp1, fp3)
+
+  def test_fingerprint_dict_with_non_string_keys(self):
+    d = {('a', 2): (3, 4)}
+    fp = self.options_fingerprinter.fingerprint(dict_option, d)
+    self.assertEqual(fp, '9d99b841440f599bf957dcc91a18d235df800b08')
 
   def test_fingerprint_list(self):
     l1 = [1, 2, 3]
