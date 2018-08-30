@@ -18,13 +18,12 @@ class RscCompileIntegration(BaseCompileIT):
         'jvm-platform': {'compiler': 'rsc'}
       }
 
-      with self.temporary_workdir() as workdir:
-        pants_run = self.run_pants_with_workdir(
-          ['compile',
-           'testprojects/src/scala/org/pantsbuild/testproject/mutual:bin',
-           ],
-          workdir, config)
-        self.assert_success(pants_run)
+      pants_run = self.run_pants(
+        ['compile',
+         'testprojects/src/scala/org/pantsbuild/testproject/mutual:bin',
+         ],
+        config)
+      self.assert_success(pants_run)
 
   def test_basic_binary_hermetic(self):
     with temporary_dir() as cache_dir:
@@ -51,3 +50,19 @@ class RscCompileIntegration(BaseCompileIT):
           'compile/rsc/current/testprojects.src.scala.org.pantsbuild.testproject.mutual.mutual/current/rsc',
           'outline/META-INF/semanticdb/out.semanticdb')
         self.assertTrue(os.path.exists(path))
+
+  def test_executing_multi_target_binary_built_hermeticly(self):
+    with temporary_dir() as cache_dir:
+      config = {
+        'cache.compile.rsc': {'write_to': [cache_dir]},
+        'jvm-platform': {'compiler': 'rsc'},
+        'compile.rsc': {'execution_strategy': 'hermetic'}
+      }
+
+      pants_run = self.run_pants(
+        ['run',
+         'examples/src/scala/org/pantsbuild/example/hello/exe',
+         ],
+        config)
+      self.assert_success(pants_run)
+      self.assertIn('Hello, Resource World!', pants_run.stdout_data)

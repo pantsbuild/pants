@@ -386,8 +386,8 @@ class RscCompile(ZincCompile):
       # Update the products with the latest classes.
       self.register_extra_products_from_contexts([ctx.target], compile_contexts)
 
-    rsc_outline_jobs = []
-    zinc_compile_jobs = []
+    rsc_jobs = []
+    zinc_jobs = []
 
     # Invalidated targets are a subset of relevant targets: get the context for this one.
     compile_target = ivts.target
@@ -399,7 +399,7 @@ class RscCompile(ZincCompile):
       pass
     elif compile_target.has_sources('.scala'):
       rsc_key = self._rsc_key_for_target(compile_target)
-      rsc_outline_jobs.append(
+      rsc_jobs.append(
         Job(
           rsc_key,
           functools.partial(
@@ -417,7 +417,7 @@ class RscCompile(ZincCompile):
     #   generate mjars that make javac happy at this point.
     if compile_target.has_sources('.scala'):
       full_key = self._compile_against_rsc_key_for_target(compile_target)
-      zinc_compile_jobs.append(
+      zinc_jobs.append(
         Job(
           full_key,
           functools.partial(
@@ -439,7 +439,7 @@ class RscCompile(ZincCompile):
       )
     elif compile_target.has_sources('.java'):
       full_key = self._compile_against_rsc_key_for_target(compile_target)
-      zinc_compile_jobs.append(
+      zinc_jobs.append(
         Job(
           full_key,
           functools.partial(
@@ -459,7 +459,7 @@ class RscCompile(ZincCompile):
         )
       )
 
-    return rsc_outline_jobs + zinc_compile_jobs
+    return rsc_jobs + zinc_jobs
 
   def select_runtime_context(self, ccs):
     return ccs[1]
