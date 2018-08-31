@@ -1,16 +1,16 @@
 # Twitter's Coursier Migration
 
-### Dates
+## Dates
 
 Twitter's Coursier migration happened during Q1 2018.
 
 This post is published in August 2018.
 
-### Authors and Contributors
+## Authors and Contributors
 
-Yi Cheng, Nora Howard, and Dorothy Ordogh at Twitter Engineering Effectiveness - Build.
+[[Yi Cheng|https://twitter.com/yidcheng]], [[Nora Howard|https://twitter.com/baroquebobcat]], and [[Dorothy Ordogh|https://twitter.com/dordogh]] at Twitter Engineering Effectiveness - Build.
 
-### Tl;dr
+## Tl;dr
 
 This blog post discusses the motivation, preparation work, deployment processes, and results of replacing Ivy with Coursier in Pants.
 
