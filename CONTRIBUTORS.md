@@ -13,6 +13,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Benjy Weinberger
 + Bill Farner
 + Billy "Hyun Joon" Seol
++ Borja Lorente
 + Brandon Milton
 + Brian Larson
 + Brian Wickman
@@ -154,6 +155,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Sara Solano
 + Senthil Kumaran
 + Sergey Serebryakov
++ Shane Delmore
 + Shuo Li
 + Simeon Franklin
 + Stefan Sauer
