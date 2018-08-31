@@ -5,6 +5,84 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.10.0.dev5 (08/31/2018)
+------------------------
+
+New features
+~~~~~~~~~~~~
+
+* Support HEAD redirects in RESTfulArtifactCache. (#6412)
+  `PR #6412 <https://github.com/pantsbuild/pants/pull/6412>`_
+
+* Add json upload summary to `fs_util` (#6318) (#6389)
+  `PR #6318 <https://github.com/pantsbuild/pants/pull/6318>`_
+
+* Override interpreter constraints if global option is passed down (#6387)
+  `PR #6387 <https://github.com/pantsbuild/pants/pull/6387>`_
+  `PR #6250 <https://github.com/pantsbuild/pants/pull/6250>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix --binaries-path-by-id fingerprinting error (#6413)
+  `PR #6413 <https://github.com/pantsbuild/pants/pull/6413>`_
+
+* Remove false positive glob expansion failure warnings (#6278)
+  `PR #6278 <https://github.com/pantsbuild/pants/pull/6278>`_
+
+* Change zinc logging so it doesn't error out (#6409)
+  `PR #6409 <https://github.com/pantsbuild/pants/pull/6409>`_
+
+* Move fork context management to rust (#5521)
+  `PR #5521 <https://github.com/pantsbuild/pants/pull/5521>`_
+
+* Link requirements targets to their source. (#6405)
+  `PR #6405 <https://github.com/pantsbuild/pants/pull/6405>`_
+
+* Fix pants_requirement by allowing Python 3 (#6391)
+  `PR #6391 <https://github.com/pantsbuild/pants/pull/6391>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix clippy errors (#6420)
+  `PR #6420 <https://github.com/pantsbuild/pants/pull/6420>`_
+
+* Re-enable rust clippy on its own shard (#6419)
+  `PR #6419 <https://github.com/pantsbuild/pants/pull/6419>`_
+
+* Set JDK properties for remote execution (#6417)
+  `PR #6417 <https://github.com/pantsbuild/pants/pull/6417>`_
+  `PR #391 <https://github.com/twitter/scoot/pull/391>`_
+
+* s/size/size_bytes/ for consistency (#6410)
+  `PR #6410 <https://github.com/pantsbuild/pants/pull/6410>`_
+
+* Update rust deps (#6399)
+  `PR #6399 <https://github.com/pantsbuild/pants/pull/6399>`_
+
+* Update scalafmt to 1.5.1 (#6403)
+  `PR #6403 <https://github.com/pantsbuild/pants/pull/6403>`_
+
+Migration to Python3 compatibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Python 3 - fixes to get most of src unit tests green (#6372)
+  `PR #6372 <https://github.com/pantsbuild/pants/pull/6372>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Clarify release docs for stable branches. (#6427)
+  `PR #6427 <https://github.com/pantsbuild/pants/pull/6427>`_
+
+* Coursier Migration Blogpost (#6400)
+  `PR #6400 <https://github.com/pantsbuild/pants/pull/6400>`_
+
+* add 1.9.0rc2 notes (#6425)
+  `PR #6425 <https://github.com/pantsbuild/pants/pull/6425>`_
+
+
 1.10.0.dev4 (08/24/2018)
 ------------------------
 
