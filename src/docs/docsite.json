@@ -5,6 +5,7 @@
     "3rdparty_jvm": "dist/markdown/html/examples/src/java/org/pantsbuild/example/3rdparty_jvm.html",
     "3rdparty_py": "dist/markdown/html/examples/src/python/example/3rdparty_py.html",
     "announce_201409": "dist/markdown/html/src/docs/announce_201409.html",
+    "coursier_migration": "dist/markdown/html/src/docs/blog/coursier_migration.html",
     "build_dictionary": "dist/reference/build_dictionary_body.html",
     "build_files": "dist/markdown/html/src/docs/build_files.html",
     "alias": "dist/markdown/html/src/docs/common_tasks/alias.html",
@@ -198,6 +199,11 @@
        {"pages" : [
                     "dev",
                     "export"
+                ]
+       },
+       {"heading": "Blogs"},
+       {"pages" : [
+                    "coursier_migration"
                 ]
        }
 
