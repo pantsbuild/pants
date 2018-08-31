@@ -175,8 +175,6 @@ class SetupPyExecutionEnvironment(datatype([
     'setup_py_native_tools',
 ])):
 
-
-
   _SHARED_CMDLINE_ARGS = {
     'darwin': lambda: [
       MIN_OSX_VERSION_ARG,
@@ -211,6 +209,9 @@ class SetupPyExecutionEnvironment(datatype([
         c_linker.path_entries +
         cpp_compiler.path_entries +
         cpp_linker.path_entries)
+      # TODO(#6273): We prepend our toolchain to the PATH instead of overwriting it -- we need
+      # better control of the distutils compilation environment if we want to actually isolate the
+      # PATH (distutils does lots of sneaky things).
       ret['PATH'] = create_path_env_var(all_path_entries, env=os.environ.copy(), prepend=True)
 
       # GCC will output smart quotes in a variety of situations (leading to decoding errors

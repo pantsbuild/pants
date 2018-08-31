@@ -22,12 +22,11 @@ from pants_test.backend.python.tasks.util.build_local_dists_test_base import \
 
 class TestBuildLocalDistsWithCtypesNativeSources(BuildLocalPythonDistributionsTestBase):
 
-  _extra_relevant_task_types = (
-    [
-      CCompile,
-      CppCompile,
-      LinkSharedLibraries,
-    ] + BuildLocalPythonDistributionsTestBase._extra_relevant_task_types)
+  _extra_relevant_task_types = ([
+    CCompile,
+    CppCompile,
+    LinkSharedLibraries,
+  ] + BuildLocalPythonDistributionsTestBase._extra_relevant_task_types)
 
   _dist_specs = OrderedDict([
 
