@@ -35,19 +35,34 @@ class NpmResolver(Subsystem, NodeResolverBase):
       help='If enabled, only install production dependencies')
     register(
       '--force', type=bool, default=False, fingerprint=True,
-      help='If enabled, re-download dependencies.')
+      help='If enabled, rebuild dependencies even if they are already built.')
     register(
       '--frozen-lockfile', type=bool, default=True, fingerprint=True,
       help='If enabled, disallow automatic update of lock files.')
+    # There are cases where passed through options does not override hard-coded options.
+    # One example is for node-install, --frozen-lockfile=False is the dominate configuration
+    # as it allows the user to modify dependencies and generate a new lockfile.
+    # By turning on --force-option-override, the user accepts full responsibilities.
     register(
-      '--force-option-override', type=bool, default=False, fingerprint=True,
-      help='ADVANCED option. If enabled, options will override hard-coded values.')
+      '--force-option-override', type=bool, default=False, fingerprint=True, advanced=True,
+      help='If enabled, options will override hard-coded values.')
 
     NodeResolve.register_resolver_for_type(NodeModule, cls)
 
   def resolve_target(self, node_task, target, results_dir, node_paths, resolve_locally=False,
                      install_optional=None, production_only=None, force=None, frozen_lockfile=None,
                      **kwargs):
+    """Installs the node_package target in the results directory copying sources if necessary.
+
+    :param Task node_task: The task executing this method.
+    :param Target target: The target being resolve.
+    :param String results_dir: The output location where this target will be resolved.
+    :param NodePaths node_paths: A mapping of targets and their resolved location, if resolved.
+    :param Boolean resolve_locally: If true, the sources do not have to be copied.
+    :param Boolean install_optional: If true, install optional dependencies.
+    :param Boolean force: If true, rebuild dependencies even if already built.
+    :param Boolean frozen_lockfile: Preserve lock file and fails if a change is detected.
+    """
     if self.get_options().force_option_override:
       install_optional = self.get_options().install_optional
       production_only = self.get_options().production_only

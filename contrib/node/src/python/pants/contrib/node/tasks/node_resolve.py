@@ -8,16 +8,27 @@ import os
 
 from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
-from pants.invalidation.build_invalidator import UncacheableCacheKeyGenerator
-from pants.invalidation.cache_manager import InvalidationCacheManager
-from pants.util.meta import AbstractClass
+from pants.build_graph.build_graph import sort_targets
 
 from pants.contrib.node.tasks.node_paths import NodePaths, NodePathsLocal
 from pants.contrib.node.tasks.node_task import NodeTask
 
 
-class NodeResolve(NodeTask, AbstractClass):
-  """Resolves node_package targets to their node paths using different registered resolvers."""
+class NodeResolve(NodeTask):
+  """Resolves node_package targets to their node paths using different registered resolvers.
+
+  This task exposes two products NodePaths and NodePathsLocal. Both products are handled
+  optionally allowing the consumer to choose.
+
+  NodePaths contain a mapping of targets and their resolved location in the virtualized
+  pants working directory.
+
+  NodePathsLocal is similar to NodePaths with the difference that the resolved location
+  is local to the target source root.
+
+  A node path is considered resolved if the source files are present, installed all dependencies,
+  and have executed their build scripts if defined.
+  """
 
   _resolver_by_type = dict()
 
@@ -72,24 +83,11 @@ class NodeResolve(NodeTask, AbstractClass):
     """
     return self.is_node_package(target) and self._resolver_for_target(target) != None
 
-  def _do_local_invalidation_check(self,
-                                   targets,
-                                   invalidate_dependents=True,
-                                   topological_order=True):
-    """Returns an invalidation_check with all targets invalidated.
-    """
-    # Generate a cache_key that never matches to ensure work is always done.
-    cache_key_generator = UncacheableCacheKeyGenerator()
-    cache_manager = InvalidationCacheManager(self.workdir,
-                                             cache_key_generator,
-                                             self._build_invalidator,
-                                             invalidate_dependents,
-                                             fingerprint_strategy=None,
-                                             invalidation_report=self.context.invalidation_report,
-                                             task_name=self._task_name,
-                                             task_version=self.implementation_version_str())
+  def _topological_sort(self, targets):
+    """Topologically order a list of targets"""
 
-    return cache_manager.check(targets, topological_order=topological_order)
+    target_set = set(targets)
+    return [t for t in reversed(sort_targets(targets)) if t in target_set]
 
   def execute(self):
     targets = self.context.targets(predicate=self._can_resolve_target)
@@ -115,10 +113,9 @@ class NodeResolve(NodeTask, AbstractClass):
       # This is crucial for `node-install` goal which builds against source code and relies on
       # latest and nothing from the pants cache. The caching is done locally via the node_modules
       # directory within source and managed by the underlying package manager.
-      invalidation_check = self._do_local_invalidation_check(targets)
+      sorted_targets = self._topological_sort(targets)
       with self.context.new_workunit(name='node-install', labels=[WorkUnitLabel.MULTITOOL]):
-        for vt in invalidation_check.all_vts:
-          target = vt.target
+        for target in sorted_targets:
           resolver_for_target_type = self._resolver_for_target(target).global_instance()
           results_dir = os.path.join(get_buildroot(), target.address.spec_path)
           resolver_for_target_type.resolve_target(self, target, results_dir, node_paths_local,
