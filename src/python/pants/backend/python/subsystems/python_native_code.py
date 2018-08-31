@@ -188,7 +188,7 @@ class SetupPyExecutionEnvironment(datatype([
   def as_environment(self):
     ret = {}
 
-    # FIXME(#5951): the below is a lot of error-prone repeated logic -- we need a way to compose
+    # TODO(#5951): the below is a lot of error-prone repeated logic -- we need a way to compose
     # executables more hygienically. We should probably be composing each datatype's members, and
     # only creating an environment at the very end.
     native_tools = self.setup_py_native_tools

@@ -88,7 +88,7 @@ class BuildLocalPythonDistributions(Task):
   def _build_setup_requires_pex_settings(self):
     return BuildSetupRequiresPex.scoped_instance(self)
 
-  # FIXME(#5869): delete this and get Subsystems from options, when that is possible.
+  # TODO(#5869): delete this and get Subsystems from options, when that is possible.
   def _request_single(self, product, subject):
     # NB: This is not supposed to be exposed to Tasks yet -- see #4769 to track the status of
     # exposing v2 products in v1 tasks.
