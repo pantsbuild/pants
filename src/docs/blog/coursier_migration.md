@@ -1,14 +1,18 @@
 # Twitter's Coursier Migration
 
-## Meta Info
+### Dates
 
-Author: Twitter Engineering Effectiveness - Build
+Twitter's Coursier migration happened during Q1 2018.
 
-Abstract: This blog post discusses the motivation, preparation work, deployment processes, and results of replacing Ivy with Coursier in Pants.
+This post is published in August 2018.
 
-Dates: Twitter's Coursier migration happened during Q1 2018. This post is published in August 2018.
+### Authors and Contributors
 
-Tags: 3rdparty, JVM, productivity
+Yi Cheng, Nora Howard, and Dorothy Ordogh at Twitter Engineering Effectiveness - Build.
+
+### Tl;dr
+
+This blog post discusses the motivation, preparation work, deployment processes, and results of replacing Ivy with Coursier in Pants.
 
 ## Background
 
@@ -225,3 +229,9 @@ Coursier:
 [[https://github.com/coursier/coursier/issues/809]]
 
 * org.apache.httpcomponents:httpcore:4.2.5 (Ivy) -> org.apache.httpcomponents:httpcore:4.2.4 (Coursier). The difference is harmless, but the correct one should be 4.2.4.
+
+## Related links
+
+[[How to use Coursier in Pants|pants('examples/src/java/org/pantsbuild/example:readme')#toolchain]]
+
+[[Coursier repo|https://github.com/coursier/coursier]]
