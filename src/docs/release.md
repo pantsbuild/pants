@@ -141,7 +141,7 @@ whether a release is needed from a stable branch.
 
 A dry run is not strictly required since CI includes one, but you might
 like to try one anyway. To do so, switch to your release branch (which will either be `master` for
-a unstable weekly release, or a release branch like `1.9.x` for a stable release), and ensure that
+an unstable weekly release, or a release branch like `1.9.x` for a stable release), and ensure that
 your version number commit is present. After confirming this, run:
 
     :::bash
