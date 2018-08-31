@@ -152,7 +152,6 @@ fn main() {
         cas_server.to_owned(),
         1,
         chunk_size,
-        Duration::from_secs(30),
       )
     }
     (None, None) => fs::Store::local_only(local_store_path, pool.clone()),

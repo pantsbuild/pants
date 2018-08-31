@@ -59,7 +59,6 @@ use std::mem;
 use std::os::raw;
 use std::panic;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use context::Core;
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
@@ -246,7 +245,6 @@ pub extern "C" fn scheduler_create(
   remote_execution_server: Buffer,
   remote_store_thread_count: u64,
   remote_store_chunk_bytes: u64,
-  remote_store_chunk_upload_timeout_seconds: u64,
   process_execution_parallelism: u64,
   process_execution_cleanup_local_dirs: bool,
 ) -> *const Scheduler {
@@ -308,7 +306,6 @@ pub extern "C" fn scheduler_create(
     },
     remote_store_thread_count as usize,
     remote_store_chunk_bytes as usize,
-    Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
     process_execution_parallelism as usize,
     process_execution_cleanup_local_dirs as bool,
   ))))

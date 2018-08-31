@@ -644,14 +644,9 @@ fn main() {
 
   let pool = Arc::new(fs::ResettablePool::new("brfs-".to_owned()));
   let store = match args.value_of("server-address") {
-    Some(address) => fs::Store::with_remote(
-      &store_path,
-      pool,
-      address.to_owned(),
-      1,
-      4 * 1024 * 1024,
-      std::time::Duration::from_secs(5 * 60),
-    ),
+    Some(address) => {
+      fs::Store::with_remote(&store_path, pool, address.to_owned(), 1, 4 * 1024 * 1024)
+    }
     None => fs::Store::local_only(&store_path, pool),
   }.expect("Error making store");
 

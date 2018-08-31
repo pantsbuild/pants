@@ -41,7 +41,6 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 #[derive(Debug)]
 enum ExitCode {
@@ -216,7 +215,6 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             cas_address.to_owned(),
             1,
             chunk_size,
-            Duration::from_secs(30),
           ),
           true,
         )

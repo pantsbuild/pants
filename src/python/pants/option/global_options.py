@@ -34,7 +34,6 @@ class ExecutionOptions(datatype([
   'remote_store_thread_count',
   'remote_execution_server',
   'remote_store_chunk_bytes',
-  'remote_store_chunk_upload_timeout_seconds',
   'process_execution_parallelism',
   'process_execution_cleanup_local_dirs',
 ])):
@@ -51,7 +50,6 @@ class ExecutionOptions(datatype([
       remote_execution_server=bootstrap_options.remote_execution_server,
       remote_store_thread_count=bootstrap_options.remote_store_thread_count,
       remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
-      remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
       process_execution_parallelism=bootstrap_options.process_execution_parallelism,
       process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
     )
@@ -62,7 +60,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_thread_count=1,
     remote_execution_server=None,
     remote_store_chunk_bytes=1024*1024,
-    remote_store_chunk_upload_timeout_seconds=60,
     process_execution_parallelism=multiprocessing.cpu_count()*2,
     process_execution_cleanup_local_dirs=True,
   )
@@ -276,8 +273,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_bytes,
              help='Size in bytes of chunks transferred to/from the remote file store.')
     register('--remote-store-chunk-upload-timeout-seconds', type=int, advanced=True,
-             default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_upload_timeout_seconds,
-             help='Timeout (in seconds) for uploads of individual chunks to the remote file store.')
+             default=0, help='Deprecated and ignored.')
 
     # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
     # lookups via CacheSetup in TaskBase.

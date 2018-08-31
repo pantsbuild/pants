@@ -13,7 +13,6 @@ use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use pool::ResettablePool;
 
@@ -80,7 +79,6 @@ impl Store {
     cas_address: String,
     thread_count: usize,
     chunk_size_bytes: usize,
-    timeout: Duration,
   ) -> Result<Store, String> {
     Ok(Store {
       local: local::ByteStore::new(path, pool)?,
@@ -88,7 +86,6 @@ impl Store {
         cas_address,
         thread_count,
         chunk_size_bytes,
-        timeout,
       )),
     })
   }
@@ -1621,7 +1618,6 @@ mod remote {
   use std::cmp::min;
   use std::collections::HashSet;
   use std::sync::Arc;
-  use std::time::Duration;
 
   #[derive(Clone)]
   pub struct ByteStore {
@@ -1629,18 +1625,12 @@ mod remote {
     cas_client:
       Resettable<Arc<bazel_protos::remote_execution_grpc::ContentAddressableStorageClient>>,
     chunk_size_bytes: usize,
-    upload_timeout: Duration,
     env: Resettable<Arc<grpcio::Environment>>,
     channel: Resettable<grpcio::Channel>,
   }
 
   impl ByteStore {
-    pub fn new(
-      cas_address: String,
-      thread_count: usize,
-      chunk_size_bytes: usize,
-      upload_timeout: Duration,
-    ) -> ByteStore {
+    pub fn new(cas_address: String, thread_count: usize, chunk_size_bytes: usize) -> ByteStore {
       let env = Resettable::new(move || Arc::new(grpcio::Environment::new(thread_count)));
       let env2 = env.clone();
       let channel =
@@ -1661,7 +1651,6 @@ mod remote {
         byte_stream_client,
         cas_client,
         chunk_size_bytes,
-        upload_timeout,
         env,
         channel,
       }
@@ -1690,11 +1679,7 @@ mod remote {
         fingerprint,
         bytes.len()
       );
-      match self
-        .byte_stream_client
-        .get()
-        .write_opt(grpcio::CallOption::default().timeout(self.upload_timeout))
-      {
+      match self.byte_stream_client.get().write() {
         Err(err) => future::err(format!(
           "Error attempting to connect to upload fingerprint {}: {:?}",
           fingerprint, err
@@ -1840,7 +1825,6 @@ mod remote {
     use hashing::Digest;
     use mock::StubCAS;
     use std::collections::HashSet;
-    use std::time::Duration;
     use testutil::data::{TestData, TestDirectory};
 
     use super::super::tests::{big_file_bytes, big_file_digest, big_file_fingerprint, new_cas};
@@ -1979,7 +1963,7 @@ mod remote {
     fn write_file_multiple_chunks() {
       let cas = StubCAS::empty();
 
-      let store = ByteStore::new(cas.address(), 1, 10 * 1024, Duration::from_secs(5));
+      let store = ByteStore::new(cas.address(), 1, 10 * 1024);
 
       let all_the_henries = big_file_bytes();
 
@@ -2046,12 +2030,7 @@ mod remote {
 
     #[test]
     fn write_connection_error() {
-      let store = ByteStore::new(
-        "doesnotexist.example".to_owned(),
-        1,
-        10 * 1024 * 1024,
-        Duration::from_secs(1),
-      );
+      let store = ByteStore::new("doesnotexist.example".to_owned(), 1, 10 * 1024 * 1024);
       let error = store
         .store_bytes(TestData::roland().bytes())
         .wait()
@@ -2106,7 +2085,7 @@ mod remote {
     }
 
     fn new_byte_store(cas: &StubCAS) -> ByteStore {
-      ByteStore::new(cas.address(), 1, 10 * 1024 * 1024, Duration::from_secs(1))
+      ByteStore::new(cas.address(), 1, 10 * 1024 * 1024)
     }
 
     pub fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
@@ -2150,7 +2129,6 @@ mod tests {
   use std::os::unix::fs::PermissionsExt;
   use std::path::{Path, PathBuf};
   use std::sync::Arc;
-  use std::time::Duration;
   use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
 
@@ -2223,7 +2201,6 @@ mod tests {
       cas_address,
       1,
       10 * 1024 * 1024,
-      Duration::from_secs(1),
     ).unwrap()
   }
 

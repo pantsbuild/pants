@@ -1001,7 +1001,6 @@ mod tests {
       cas.address(),
       1,
       10 * 1024 * 1024,
-      Duration::from_secs(1),
     ).expect("Failed to make store");
 
     let cmd_runner = CommandRunner::new(mock_server.address(), 1, store);
@@ -1330,7 +1329,6 @@ mod tests {
       cas.address(),
       1,
       10 * 1024 * 1024,
-      Duration::from_secs(1),
     ).expect("Failed to make store");
     store
       .store_file_bytes(roland.bytes(), false)
@@ -1384,7 +1382,6 @@ mod tests {
       cas.address(),
       1,
       10 * 1024 * 1024,
-      Duration::from_secs(1),
     ).expect("Failed to make store");
 
     let error = CommandRunner::new(mock_server.address(), 1, store)
@@ -1921,7 +1918,6 @@ mod tests {
       cas.address(),
       1,
       10 * 1024 * 1024,
-      Duration::from_secs(1),
     ).expect("Failed to make store");
 
     CommandRunner::new(address, 1, store)

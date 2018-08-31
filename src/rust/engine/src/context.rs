@@ -3,7 +3,6 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
 
 use tokio::runtime::Runtime;
 
@@ -54,7 +53,6 @@ impl Core {
     remote_execution_server: Option<String>,
     remote_store_thread_count: usize,
     remote_store_chunk_bytes: usize,
-    remote_store_chunk_upload_timeout: Duration,
     process_execution_parallelism: usize,
     process_execution_cleanup_local_dirs: bool,
   ) -> Core {
@@ -74,7 +72,6 @@ impl Core {
           address,
           remote_store_thread_count,
           remote_store_chunk_bytes,
-          remote_store_chunk_upload_timeout,
         ),
         None => Store::local_only(store_path, fs_pool.clone()),
       })
