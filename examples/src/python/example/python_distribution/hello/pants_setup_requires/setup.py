@@ -10,7 +10,6 @@ from pants.version import VERSION as pants_version
 
 setup(
   name='hello_again',
-  # FIXME: test the wheel version in a unit test!
   version=pants_version,
   packages=find_packages(),
 )

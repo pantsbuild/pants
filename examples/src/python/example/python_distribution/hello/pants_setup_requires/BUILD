@@ -6,7 +6,6 @@ main_file = 'main.py'
 python_dist(
   sources=rglobs('*.py', exclude=[main_file]),
   setup_requires=[
-    # FIXME: this currently fails because setup_requires doesn't fetch transitive deps!
     'testprojects/pants-plugins/3rdparty/python/pants',
   ],
 )
