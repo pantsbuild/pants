@@ -71,9 +71,7 @@ To better help with the migration, such as comparing the result with Ivy and san
 
 ## The Migration Process
 
-The actual migration was done in two major phases
-1) Coursier only for IDE project import
-2) Coursier for all Pants commands
+The actual migration was done in two major phases: 1) Coursier only for IDE project import, and then 2) Coursier for all Pants commands
 
 ### Phase 1 - IDE Only
 
@@ -149,9 +147,11 @@ Translation to Coursier CLI:
 ```
 
 ### 2. Why 3rdparty resolve caching wasn’t too great?
+
 Two major steps are involved when doing 3rdparty resolve
-Figure out what artifacts are needed
-Download them
+
+* Figure out what artifacts are needed
+* Download them
 
 The goal and benefit of caching 3rdparty resolve is to reuse the result from step 1, likely from another machine, thus only needing to do step 2 because not all artifacts are present.
 

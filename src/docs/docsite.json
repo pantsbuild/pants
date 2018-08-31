@@ -195,15 +195,15 @@
                     "notes-master"
                 ]
        },
-       {"heading": "Blogs"},
-       {"pages" : [
-                    "coursier_migration"
-                ]
-       },
        {"heading": "Developer"},
        {"pages" : [
                     "dev",
                     "export"
+                ]
+       },
+       {"heading": "Blogs"},
+       {"pages" : [
+                    "coursier_migration"
                 ]
        }
 
