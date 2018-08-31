@@ -210,10 +210,12 @@ class BaseZincCompile(JvmCompile):
     ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args,
                                    self._args)
     if self.execution_strategy == self.HERMETIC:
-      if fast_relpath(self.get_options().pants_workdir, get_buildroot()).startswith('..'):
+      try:
+        fast_relpath(self.get_options().pants_workdir, get_buildroot())
+      except ValueError:
         raise TaskError(
-          "Hermetic zinc execution currently requires the workdir to be a child of the buildroot but "
-          "workdir was {} and buildroot was {}".format(
+          "Hermetic zinc execution currently requires the workdir to be a child of the buildroot "
+          "but workdir was {} and buildroot was {}".format(
             self.get_options().pants_workdir,
             get_buildroot(),
           )
@@ -222,6 +224,7 @@ class BaseZincCompile(JvmCompile):
       if self.get_options().use_classpath_jars:
         # TODO: Make this work by capturing the correct DirectoryDigest and passing them around the
         # right places.
+        # See https://github.com/pantsbuild/pants/issues/6432
         raise TaskError("Hermetic zinc execution currently doesn't work with classpath jars")
 
   def select(self, target):
@@ -300,7 +303,9 @@ class BaseZincCompile(JvmCompile):
     if self.get_options().capture_classpath:
       self._record_compile_classpath(absolute_classpath, ctx.target, ctx.classes_dir)
 
-    # TODO: Allow use of absolute classpath entries with hermetic execution, specifically by putting in $JAVA_HOME placeholders
+    # TODO: Allow use of absolute classpath entries with hermetic execution,
+    # specifically by using .jdk dir for Distributions:
+    # https://github.com/pantsbuild/pants/issues/6430
     self._verify_zinc_classpath(absolute_classpath, allow_dist=(self.execution_strategy != self.HERMETIC))
     # TODO: Investigate upstream_analysis for hermetic compiles
     self._verify_zinc_classpath(upstream_analysis.keys())
@@ -428,6 +433,8 @@ class BaseZincCompile(JvmCompile):
             )
 
       if scala_path:
+        # TODO: ScalaPlatform._tool_classpath should capture this and memoize it.
+        # See https://github.com/pantsbuild/pants/issues/6435
         snapshots.append(
           self.context._scheduler.capture_snapshots((PathGlobsAndRoot(
             PathGlobs(scala_path),
@@ -444,8 +451,6 @@ class BaseZincCompile(JvmCompile):
       argv = tuple(['.jdk/bin/java'] + jvm_options + ['-cp', zinc_relpath, Zinc.ZINC_COMPILE_MAIN] + zinc_args)
       req = ExecuteProcessRequest(
         argv=argv,
-        # TODO: https://github.com/pantsbuild/pants/issues/6160
-        env={'PATH': '/bin'},
         input_files=merged_input_digest,
         output_files=(analysis_cache,),
         output_directories=(classes_dir,),

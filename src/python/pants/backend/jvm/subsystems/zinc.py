@@ -62,7 +62,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_COMPILER_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.5'),
+                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.7'),
                             ],
                             main=Zinc.ZINC_COMPILE_MAIN,
                             custom_rules=shader_rules)
@@ -120,7 +120,6 @@ class Zinc(object):
   def __init__(self, zinc_factory, products):
     self._zinc_factory = zinc_factory
     self._products = products
-    self._snapshot = None
 
   @memoized_property
   def zinc(self):
@@ -154,23 +153,23 @@ class Zinc(object):
     """
     return self._zinc_factory._compiler_interface(self._products)
 
+  @memoized_method
   def snapshot(self, scheduler):
-    if self._snapshot is None:
-      buildroot = get_buildroot()
-      self._snapshot = scheduler.capture_snapshots((
-        PathGlobsAndRoot(
-          PathGlobs(
-            tuple(
-              fast_relpath(a, buildroot)
-              for a in (self.zinc, self.compiler_bridge, self.compiler_interface)
-            )
-          ),
-          buildroot,
+    buildroot = get_buildroot()
+    return scheduler.capture_snapshots((
+      PathGlobsAndRoot(
+        PathGlobs(
+          tuple(
+            fast_relpath(a, buildroot)
+            for a in (self.zinc, self.compiler_bridge, self.compiler_interface)
+          )
         ),
-      ))[0]
-    return self._snapshot
+        buildroot,
+      ),
+    ))[0]
 
-  # TODO: Relativise (and sort)
+  # TODO: Make rebase map work without needing to pass in absolute paths:
+  # https://github.com/pantsbuild/pants/issues/6434
   @memoized_property
   def rebase_map_args(self):
     """We rebase known stable paths in zinc analysis to make it portable across machines."""

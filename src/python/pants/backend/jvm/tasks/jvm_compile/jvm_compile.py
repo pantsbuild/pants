@@ -388,6 +388,7 @@ class JvmCompile(NailgunTaskBase):
       )
 
       # TODO: Pass around DirectoryDigests in these ClasspathEntries
+      # See https://github.com/pantsbuild/pants/issues/6429
       if not self.get_options().use_classpath_jars:
         # Once compilation has completed, replace the classpath entry for each target with
         # its jar'd representation.
@@ -421,6 +422,7 @@ class JvmCompile(NailgunTaskBase):
     # Register classpaths and products for valid targets.
     # TODO: Store the DirectoryDigest for successful compiles in the target workdir as text,
     # and hydrate them into the ClasspathEntries here when we get cache hits.
+    # See https://github.com/pantsbuild/pants/issues/6429
     for valid_target in valid_targets:
       cc = self.select_runtime_context(compile_contexts[valid_target])
       classpath_product.add_for_target(

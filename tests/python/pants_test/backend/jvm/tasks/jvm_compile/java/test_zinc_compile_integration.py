@@ -230,7 +230,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         }
       }
 
-      with self.temporary_workdir(cleanup=False) as workdir:
+      with self.temporary_workdir() as workdir:
         pants_run = self.run_pants_with_workdir(
           [
             '-q',
