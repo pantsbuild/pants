@@ -1,14 +1,10 @@
 # Twitter's Coursier Migration
 
-## Dates
+**[[Yi Cheng|https://twitter.com/yidcheng]], [[Nora Howard|https://twitter.com/baroquebobcat]], and [[Dorothy Ordogh|https://twitter.com/dordogh]] at Twitter Engineering Effectiveness - Build.**
 
-Twitter's Coursier migration happened during Q1 2018.
+**Twitter migrated to Coursier from Ivy during Q1 2018.**
 
-This post is published in August 2018.
-
-## Authors and Contributors
-
-[[Yi Cheng|https://twitter.com/yidcheng]], [[Nora Howard|https://twitter.com/baroquebobcat]], and [[Dorothy Ordogh|https://twitter.com/dordogh]] at Twitter Engineering Effectiveness - Build.
+**08/31/2018**
 
 ## Tl;dr
 
