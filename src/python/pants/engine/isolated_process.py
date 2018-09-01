@@ -8,7 +8,7 @@ import logging
 
 from future.utils import binary_type, text_type
 
-from pants.engine.fs import DirectoryDigest
+from pants.engine.fs import EMPTY_SNAPSHOT, DirectoryDigest
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
 from pants.util.objects import Exactly, TypeCheckError, datatype
@@ -67,6 +67,16 @@ class ExecuteProcessRequest(datatype([
       timeout_seconds=timeout_seconds,
       jdk_home=jdk_home,
     )
+
+  @classmethod
+  def create_from_input_snapshot(cls, argv, snapshot, description, **kwargs):
+    return cls(argv=argv, input_files=snapshot.directory_digest, description=text_type(description),
+               **kwargs)
+
+  @classmethod
+  def create_with_empty_snapshot(cls, argv, description, **kwargs):
+    return cls.create_from_input_snapshot(
+      argv=argv, snapshot=EMPTY_SNAPSHOT, description=description, **kwargs)
 
 
 class ExecuteProcessResult(datatype([('stdout', binary_type),
