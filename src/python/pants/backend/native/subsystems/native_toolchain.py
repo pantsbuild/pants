@@ -80,7 +80,7 @@ class DirCollectionRequest(datatype([('dir_paths', tuple)])): pass
 class ExistingDirCollection(datatype([('dirs', tuple)])): pass
 
 
-# FIXME: use snapshots for this!!!
+# TODO: use snapshots for this!!!
 @rule(ExistingDirCollection, [Select(DirCollectionRequest)])
 def filter_existing_dirs(dir_collection_request):
   real_dirs = OrderedSet()
@@ -107,14 +107,7 @@ _search_dirs_libraries_regex = re.compile('^libraries: =(.*)$', flags=re.MULTILI
 
 @rule(LibDirsFromCompiler, [Select(CompilerSearchRequest)])
 def parse_known_lib_dirs(compiler_search_request):
-  # FIXME: convert this to using `copy()` when #6269 is merged.
-  cmplr = compiler_search_request.compiler
-  print_search_dirs_exe = type(cmplr)(path_entries=cmplr.path_entries,
-                                      exe_filename=cmplr.exe_filename,
-                                      runtime_library_dirs=cmplr.runtime_library_dirs,
-                                      include_dirs=cmplr.include_dirs,
-                                      extra_args=['-print-search-dirs'])
-  # print_search_dirs_exe = compiler_search_request.compiler.copy(extra_args=['-print-search-dirs'])
+  print_search_dirs_exe = compiler_search_request.compiler.copy(extra_args=['-print-search-dirs'])
   exe_response = yield Get(
     ExecuteProcessResult,
     ExecuteProcessRequest,
@@ -145,14 +138,7 @@ _include_dir_paths_end_line = 'End of search list.'
 
 @rule(IncludeDirsFromCompiler, [Select(CompilerSearchRequest)])
 def parse_known_include_dirs(compiler_search_request):
-  # FIXME: convert this to using `copy()` when #6269 is merged.
-  cmplr = compiler_search_request.compiler
-  print_include_search_exe = type(cmplr)(path_entries=cmplr.path_entries,
-                                      exe_filename=cmplr.exe_filename,
-                                      runtime_library_dirs=cmplr.runtime_library_dirs,
-                                      include_dirs=cmplr.include_dirs,
-                                      extra_args=['-E', '-Wp,-v', '-'])
-  # print_include_search_exe = compiler_search_request.compiler.copy(extra_args=['-E', '-Wp,-v', '-'])
+  print_include_search_exe = compiler_search_request.compiler.copy(extra_args=['-E', '-Wp,-v', '-'])
   exe_response = yield Get(
     ExecuteProcessResult,
     ExecuteProcessRequest,
@@ -208,22 +194,9 @@ def resolve_c_toolchain(c_toolchain_request):
     CompilerSearchRequest,
     CompilerSearchRequest(compiler=c_compiler))
 
-  # FIXME: convert these to using `copy()` when #6269 is merged.
-  # resolved_c_toolchain = CToolchain(
-  #   c_compiler=c_compiler.copy(include_dirs=compiler_search_output.include_dirs.dirs),
-  #   c_linker=c_linker.copy(linking_library_dirs=compiler_search_output.lib_dirs.dirs)))
   resolved_c_toolchain = CToolchain(
-    c_compiler=CCompiler(path_entries=c_compiler.path_entries,
-                         exe_filename=c_compiler.exe_filename,
-                         runtime_library_dirs=c_compiler.runtime_library_dirs,
-                         include_dirs=compiler_search_output.include_dirs.dirs,
-                         extra_args=c_compiler.extra_args),
-    c_linker=Linker(
-      path_entries=c_linker.path_entries,
-      exe_filename=c_linker.exe_filename,
-      runtime_library_dirs=c_linker.runtime_library_dirs,
-      linking_library_dirs=compiler_search_output.lib_dirs.dirs,
-      extra_args=c_linker.extra_args))
+    c_compiler=c_compiler.copy(include_dirs=compiler_search_output.include_dirs.dirs),
+    c_linker=c_linker.copy(linking_library_dirs=compiler_search_output.lib_dirs.dirs))
 
   yield resolved_c_toolchain
 
@@ -243,22 +216,9 @@ def resolve_cpp_toolchain(cpp_toolchain_request):
     CompilerSearchRequest,
     CompilerSearchRequest(compiler=cpp_compiler))
 
-  # FIXME: convert these to using `copy()` when #6269 is merged.
-  # resolved_cpp_toolchain = CppToolchain(
-  #   cpp_compiler=cpp_compiler.copy(include_dirs=compiler_search_output.include_dirs.dirs),
-  #   cpp_linker=cpp_linker.copy(linking_library_dirs=compiler_search_output.lib_dirs.dirs)))
   resolved_cpp_toolchain = CppToolchain(
-    cpp_compiler=CppCompiler(path_entries=cpp_compiler.path_entries,
-                         exe_filename=cpp_compiler.exe_filename,
-                         runtime_library_dirs=cpp_compiler.runtime_library_dirs,
-                         include_dirs=compiler_search_output.include_dirs.dirs,
-                         extra_args=cpp_compiler.extra_args),
-    cpp_linker=Linker(
-      path_entries=cpp_linker.path_entries,
-      exe_filename=cpp_linker.exe_filename,
-      runtime_library_dirs=cpp_linker.runtime_library_dirs,
-      linking_library_dirs=compiler_search_output.lib_dirs.dirs,
-      extra_args=cpp_linker.extra_args))
+    cpp_compiler=cpp_compiler.copy(include_dirs=compiler_search_output.include_dirs.dirs),
+    cpp_linker=cpp_linker.copy(linking_library_dirs=compiler_search_output.lib_dirs.dirs))
 
   yield resolved_cpp_toolchain
 
