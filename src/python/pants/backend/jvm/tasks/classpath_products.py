@@ -329,7 +329,7 @@ class ClasspathProducts(object):
       self._excludes.add_for_target(target, target.excludes)
 
   def _wrap_path_elements(self, classpath_elements):
-    return [(element[0], ClasspathEntry(element[1])) for element in classpath_elements]
+    return [(element[0], ClasspathEntry(*element[1:])) for element in classpath_elements]
 
   def _add_elements_for_target(self, target, elements):
     self._validate_classpath_tuples(elements, target)
