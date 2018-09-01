@@ -10,6 +10,8 @@ python_dist(
   ],
 )
 
+# TODO: add another python_binary() with compatibility=['CPython>=3.5'] once pants is released using
+# python 3.
 python_binary(
   name='bin',
   sources=[main_file],
