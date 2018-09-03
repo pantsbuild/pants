@@ -682,6 +682,9 @@ class JvmCompile(NailgunTaskBase):
       # Double check the cache before beginning compilation
       hit_cache = self.check_cache(vts, counter)
 
+      # TODO: Load from store when https://github.com/pantsbuild/pants/issues/6429 is complete.
+      directory_digest = None
+
       if not hit_cache:
         # Compute the compile classpath for this target.
         dependency_cp_entries = self._zinc.compile_classpath_entries(
