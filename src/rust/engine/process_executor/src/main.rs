@@ -99,6 +99,13 @@ fn main() {
         .multiple(true)
         .help("Environment variables with which the process should be run."),
     )
+      .arg(
+        Arg::with_name("jdk")
+            .long("jdk")
+            .takes_value(true)
+            .required(false)
+            .help("Symlink a JDK from .jdk in the working directory. For local execution, symlinks to the value of this flag. For remote execution, just requests that some JDK is symlinked if this flag has any value.")
+      )
     .setting(AppSettings::TrailingVarArg)
     .arg(
       Arg::with_name("argv")
@@ -169,7 +176,7 @@ fn main() {
     output_directories: BTreeSet::new(),
     timeout: Duration::new(15 * 60, 0),
     description: "process_executor".to_string(),
-    jdk_home: None,
+    jdk_home: args.value_of("jdk").map(PathBuf::from),
   };
 
   let runner: Box<process_execution::CommandRunner> = match server_arg {
