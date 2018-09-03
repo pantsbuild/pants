@@ -11,7 +11,6 @@ use futures::Future;
 
 use boxfuture::{BoxFuture, Boxable};
 use core::{Failure, TypeId};
-use dirs;
 use fs::{safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
 use graph::{EntryId, Graph, NodeContext};
 use handles::maybe_drop_handles;
@@ -64,10 +63,7 @@ impl Core {
       Arc::new(Runtime::new().unwrap_or_else(|e| panic!("Could not initialize Runtime: {:?}", e)))
     });
 
-    let store_path = match dirs::home_dir() {
-      Some(home_dir) => home_dir.join(".cache").join("pants").join("lmdb_store"),
-      None => panic!("Could not find home dir"),
-    };
+    let store_path = Store::default_path();
 
     let store = safe_create_dir_all_ioerror(&store_path)
       .map_err(|e| format!("Error making directory {:?}: {:?}", store_path, e))
