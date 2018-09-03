@@ -24,8 +24,8 @@ function bootstrap_rust() {
     "rust-src"
   )
 
-  if [[ "$#" -eq 1 && "$1" == "+nightly" ]]; then
-    RUST_TOOLCHAIN="nightly"
+  if [[ "$#" -eq 1 && "$1" == "+beta" ]]; then
+    RUST_TOOLCHAIN="beta"
     RUST_COMPONENTS=("${RUST_COMPONENTS[@]}" "clippy-preview")
   fi
 
