@@ -143,9 +143,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param version: A python version string, such as 2.7, 3.
     """
     try:
-      py_path = subprocess.check_output(['python%s' % version,
-                                         '-c',
-                                         'import sys; print(sys.executable)']).decode('utf-8').strip()
+      command = ['python{}'.format(version), '-c', 'import sys; print(sys.executable)']
+      py_path = subprocess.check_output(command).decode('utf-8').strip()
       return os.path.realpath(py_path)
     except OSError:
       return None
