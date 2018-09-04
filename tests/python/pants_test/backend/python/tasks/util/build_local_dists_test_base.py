@@ -8,9 +8,12 @@ import re
 from builtins import next
 
 from pants.backend.native.register import rules as native_backend_rules
+from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
+from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.util.collections import assert_single_element
+from pants.util.memo import memoized_property
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
@@ -30,7 +33,14 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, SchedulerTestBas
   # By default, we just use a `BuildLocalPythonDistributions` task. When testing with C/C++ targets,
   # we want to compile and link them as well to get the resulting dist to build, so we add those
   # task types here and execute them beforehand.
-  _extra_relevant_task_types = None
+  _extra_relevant_task_types = [SelectInterpreter]
+
+  @memoized_property
+  def _all_other_synthesized_task_types(self):
+    return [
+      self.synthesize_task_subtype(tsk, '__tmp_{}'.format(tsk.__name__))
+      for tsk in self._extra_relevant_task_types
+    ]
 
   def setUp(self):
     super(BuildLocalPythonDistributionsTestBase, self).setUp()
@@ -94,26 +104,36 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, SchedulerTestBas
     return task_type(context, self.test_workdir)
 
   def _create_distribution_synthetic_target(self, python_dist_target, extra_targets=[]):
+
+    python_create_distributions_task_type = self._testing_task_type
+    all_synthesized_task_types = self._all_other_synthesized_task_types + [
+      python_create_distributions_task_type,
+    ]
+
     context = self._scheduling_context(
       target_roots=([python_dist_target] + extra_targets),
-      for_task_types=([self.task_type()] + self._extra_relevant_task_types))
+      for_task_types=(all_synthesized_task_types),
+      for_subsystems=[PythonRepos])
     self.assertEqual(set(self._all_specified_targets()), set(context.build_graph.targets()))
 
-    python_create_distributions_task = self.create_task(context)
-    extra_tasks = [
+    all_other_task_instances = [
       self._create_task(task_type, context)
-      for task_type in self._extra_relevant_task_types
+      for task_type in self._all_other_synthesized_task_types
     ]
-    for tsk in extra_tasks:
+    python_create_distributions_task_instance = self._create_task(
+      python_create_distributions_task_type,
+      context)
+
+    for tsk in all_other_task_instances:
       tsk.execute()
 
-    python_create_distributions_task.execute()
+    python_create_distributions_task_instance.execute()
 
     synthetic_tgts = set(context.build_graph.targets()) - set(self._all_specified_targets())
     self.assertEqual(1, len(synthetic_tgts))
     synthetic_target = next(iter(synthetic_tgts))
 
     snapshot_version = self._get_dist_snapshot_version(
-      python_create_distributions_task, python_dist_target)
+      python_create_distributions_task_instance, python_dist_target)
 
     return context, synthetic_target, snapshot_version
