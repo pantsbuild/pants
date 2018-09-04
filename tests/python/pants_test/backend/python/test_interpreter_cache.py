@@ -66,7 +66,7 @@ class TestInterpreterCache(TestBase):
       self.assertEqual([], cache.setup())
 
   def test_cache_setup_with_no_filters_uses_repo_default(self):
-    with self._setup_cache() as (cache, _):
+    with self._setup_cache(constraints=['']) as (cache, _):
       self.assertIn(self._interpreter, cache.setup())
 
   def test_cache_setup_with_filter_overrides_repo_default(self):
