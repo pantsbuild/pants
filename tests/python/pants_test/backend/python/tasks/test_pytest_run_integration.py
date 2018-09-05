@@ -6,9 +6,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import time
-from unittest import skipIf
 
 from pants.util.contextutil import temporary_dir
+from pants_test.backend.python.interpreter_selection_utils import (PY_3, PY_27,
+                                                                   python_interpreter_path,
+                                                                   skip_unless_python3,
+                                                                   skip_unless_python27,
+                                                                   skip_unless_python27_and_python3)
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
@@ -118,18 +122,12 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
       # current process started.
       self.assertTrue(os.path.exists('{}.0'.format(prof)))
 
-  py27 = '2.7'
-  py3 = '3'
-
-  @skipIf(not (PantsRunIntegrationTest.has_python_version(py27) and
-               PantsRunIntegrationTest.has_python_version(py3)),
-          'Could not find both python {} and python {} on system. Skipping.'.format(py27, py3))
+  @skip_unless_python27_and_python3
   def test_pants_test_interpreter_selection_with_pexrc(self):
     """Test the pants test goal with intepreters selected from a PEX_PYTHON_PATH
     defined in a pexrc file on disk.
     """
-    py27_path = self.python_interpreter_path(self.py27)
-    py3_path = self.python_interpreter_path(self.py3)
+    py27_path, py3_path = python_interpreter_path(PY_27), python_interpreter_path(PY_3)
     with setup_pexrc_with_pex_python_path([py27_path, py3_path]):
       with temporary_dir() as interpreters_cache:
         pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
@@ -146,8 +144,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
         )
         self.assert_success(pants_run_3)
 
-  @skipIf(not PantsRunIntegrationTest.has_python_version(py27),
-          'Could not find python {} on system. Skipping.'.format(py27))
+  @skip_unless_python27
   def test_pants_test_interpreter_selection_with_option_2(self):
     """
     Test that the pants test goal properly constrains the SelectInterpreter task to Python 2
@@ -170,8 +167,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
       )
       self.assert_success(pants_run_2)
 
-  @skipIf(not PantsRunIntegrationTest.has_python_version(py3),
-          'Could not find python {} on system. Skipping.'.format(py3))
+  @skip_unless_python3
   def test_pants_test_interpreter_selection_with_option_3(self):
     """
     Test that the pants test goal properly constrains the SelectInterpreter task to Python 3

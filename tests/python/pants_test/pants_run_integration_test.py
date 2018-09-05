@@ -128,27 +128,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
         'PANTS_PROFILE',
       ]
 
-  @classmethod
-  def has_python_version(cls, version):
-    """Returns true if the current system has the specified version of python.
-
-    :param version: A python version string, such as 2.7, 3.
-    """
-    return cls.python_interpreter_path(version) is not None
-
-  @classmethod
-  def python_interpreter_path(cls, version):
-    """Returns the interpreter path if the current system has the specified version of python.
-
-    :param version: A python version string, such as 2.7, 3.
-    """
-    try:
-      command = ['python{}'.format(version), '-c', 'import sys; print(sys.executable)']
-      py_path = subprocess.check_output(command).decode('utf-8').strip()
-      return os.path.realpath(py_path)
-    except OSError:
-      return None
-
   def setUp(self):
     super(PantsRunIntegrationTest, self).setUp()
     # Some integration tests rely on clean subsystem state (e.g., to set up a DistributionLocator).

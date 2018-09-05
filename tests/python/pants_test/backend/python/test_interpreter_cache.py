@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 from builtins import str
 from contextlib import contextmanager
-from unittest import skipIf
 
 import mock
 from future.utils import PY3
@@ -19,8 +18,9 @@ from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.backend.python.interpreter_selection_utils import (PY_27, PY_36,
+                                                                   python_interpreter_path,
+                                                                   skip_unless_python27_and_python36)
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 from pants_test.test_base import TestBase
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
@@ -148,28 +148,19 @@ class TestInterpreterCache(TestBase):
       self.assertFalse('.tmp.' in ' '.join(os.listdir(cache_path)),
                        'interpreter cache path contains tmp dirs!')
 
-  py27 = '2.7'
-  py36 = '3.6'
-
-  @skipIf(not (PantsRunIntegrationTest.has_python_version(py27) and
-               PantsRunIntegrationTest.has_python_version(py36)),
-          'Could not find both python {} and python {} on system. Skipping.'.format(py27, py36))
+  @skip_unless_python27_and_python36
   def test_pex_python_paths(self):
     """Test pex python path helper method of PythonInterpreterCache."""
-    py27_path = PantsRunIntegrationTest.python_interpreter_path(self.py27)
-    py3_path = PantsRunIntegrationTest.python_interpreter_path(self.py36)
-    with setup_pexrc_with_pex_python_path([py27_path, py3_path]):
+    py27_path, py36_path = python_interpreter_path(PY_27), python_interpreter_path(PY_36)
+    with setup_pexrc_with_pex_python_path([py27_path, py36_path]):
       with self._setup_cache() as (cache, _):
         pex_python_paths = cache.pex_python_paths()
-        self.assertEqual(pex_python_paths, [py27_path, py3_path])
+        self.assertEqual(pex_python_paths, [py27_path, py36_path])
 
-  @skipIf(not (PantsRunIntegrationTest.has_python_version(py27) and
-               PantsRunIntegrationTest.has_python_version(py36)),
-          'Skipping test, both python {} and {} arge needed.'.format(py27, py36))
+  @skip_unless_python27_and_python36
   def test_interpereter_cache_setup_using_pex_python_paths(self):
     """Test cache setup using interpreters from a mocked PEX_PYTHON_PATH."""
-    py27_path = PantsRunIntegrationTest.python_interpreter_path(self.py27)
-    py36_path = PantsRunIntegrationTest.python_interpreter_path(self.py36)
+    py27_path, py36_path = python_interpreter_path(PY_27), python_interpreter_path(PY_36)
     with setup_pexrc_with_pex_python_path([py27_path, py36_path]):
       with self._setup_cache(constraints=['CPython>=2.7,<3']) as (cache, _):
         self.assertIn(py27_path, {pi.binary for pi in cache.setup()})

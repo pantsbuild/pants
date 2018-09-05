@@ -5,11 +5,16 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from unittest import skipIf
 
 from pex.pex_bootstrapper import get_pex_info
 
 from pants.util.contextutil import temporary_dir
+from pants_test.backend.python.interpreter_selection_utils import (PY_3, PY_27,
+                                                                   python_interpreter_path,
+                                                                   skip_unless_python3,
+                                                                   skip_unless_python27,
+                                                                   skip_unless_python27_and_python3,
+                                                                   skip_unless_python36)
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
@@ -17,20 +22,15 @@ from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 class PythonRunIntegrationTest(PantsRunIntegrationTest):
   testproject = 'testprojects/src/python/interpreter_selection'
 
-  py27 = '2.7'
-  py3 = '3'
-
-  @skipIf(not PantsRunIntegrationTest.has_python_version(py3),
-          'No python {} found. Skipping.'.format(py3))
+  @skip_unless_python3
   @ensure_daemon
   def test_run_3(self):
-    self._run_version('3')
+    self._run_version(PY_3)
 
-  @skipIf(not PantsRunIntegrationTest.has_python_version(py27),
-          'No python {} found. Skipping.'.format(py27))
+  @skip_unless_python27
   @ensure_daemon
   def test_run_27(self):
-    self._run_version('2.7')
+    self._run_version(PY_27)
 
   def _run_version(self, version):
     echo = self._run_echo_version(version)
@@ -44,7 +44,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     binary_target = '{}:{}'.format(self.testproject, binary_name)
     # Build a pex.
     # Avoid some known-to-choke-on interpreters.
-    if version == self.py3:
+    if version == PY_3:
       constraint = '["CPython>=3.4,<3.7"]'
     else:
       constraint = '["CPython>=2.7,<3"]'
@@ -55,9 +55,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(command=command)
     return pants_run.stdout_data.splitlines()[0].strip()
 
-  @skipIf(not (PantsRunIntegrationTest.has_python_version(py27) and
-               PantsRunIntegrationTest.has_python_version(py3)),
-          'Could not find both python {} and python {} on system. Skipping.'.format(py27, py3))
+  @skip_unless_python27_and_python3
   def test_run_27_and_then_3(self):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
@@ -74,8 +72,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
       )
       self.assert_success(pants_run_3)
 
-  @skipIf(not PantsRunIntegrationTest.has_python_version(py3),
-          'No python {} found. Skipping.'.format(py3))
+  @skip_unless_python3
   def test_run_3_by_option(self):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {'python-setup': {'interpreter_constraints': ["CPython>=2.7,<3.7"],
@@ -87,8 +84,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
       )
       self.assert_success(pants_run_3)
 
-  @skipIf(not PantsRunIntegrationTest.has_python_version(py27),
-          'No python {} found. Skipping.'.format(py27))
+  @skip_unless_python27
   def test_run_2_by_option(self):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {'python-setup': {'interpreter_constraints': ["CPython>=2.7,<3.7"],
@@ -120,12 +116,9 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     self.assertEqual(var_val, pants_run.stdout_data.strip())
 
-  @skipIf(not (PantsRunIntegrationTest.has_python_version(py27) and
-               PantsRunIntegrationTest.has_python_version(py3)),
-          'Could not find both python {} and python {} on system. Skipping.'.format(py27, py3))
+  @skip_unless_python27_and_python3
   def test_pants_run_interpreter_selection_with_pexrc(self):
-    py27_path = self.python_interpreter_path(self.py27)
-    py3_path = self.python_interpreter_path(self.py3)
+    py27_path, py3_path = python_interpreter_path(PY_27), python_interpreter_path(PY_3)
     with setup_pexrc_with_pex_python_path([py27_path, py3_path]):
       with temporary_dir() as interpreters_cache:
         pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
@@ -144,12 +137,9 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
         self.assert_success(pants_run_3)
         self.assertIn(py3_path, pants_run_3.stdout_data)
 
-  @skipIf(not (PantsRunIntegrationTest.has_python_version(py27) and
-               PantsRunIntegrationTest.has_python_version(py3)),
-          'Could not find both python {} and python {} on system. Skipping.'.format(py27, py3))
+  @skip_unless_python27_and_python3
   def test_pants_binary_interpreter_selection_with_pexrc(self):
-    py27_path = self.python_interpreter_path(self.py27)
-    py3_path = self.python_interpreter_path(self.py3)
+    py27_path, py3_path = python_interpreter_path(PY_27), python_interpreter_path(PY_3)
     with setup_pexrc_with_pex_python_path([py27_path, py3_path]):
       with temporary_dir() as interpreters_cache:
         pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
@@ -178,8 +168,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     os.remove(py2_pex)
     os.remove(py3_pex)
 
-  @skipIf(not PantsRunIntegrationTest.has_python_version(py3),
-          'No python {} found. Skipping.'.format(py3))
+  @skip_unless_python3
   def test_target_constraints_with_no_sources(self):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {
@@ -212,10 +201,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     # Cleanup.
     os.remove(py2_pex)
 
-  py36 = '3.6'
-
-  @skipIf(not PantsRunIntegrationTest.has_python_version(py36),
-          'No python {} found. Skipping.'.format(py36))
+  @skip_unless_python36
   def test_pex_resolver_blacklist_integration(self):
     pex = os.path.join(os.getcwd(), 'dist', 'test_bin.pex')
     try:
