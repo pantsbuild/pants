@@ -53,12 +53,15 @@ class TestInterpreterCache(TestBase):
   @contextmanager
   def _setup_cache(self, constraints=None):
     with temporary_dir() as path:
-      setup_options = {'interpreter_cache_dir': path}
-      if constraints:
-        setup_options.update(interpreter_constraints=constraints)
-      python_setup, python_repos = self.create_python_subsystems(setup_options=setup_options)
-      cache = PythonInterpreterCache(python_setup=python_setup, python_repos=python_repos)
+      cache = self._setup_cache_at(path, constraints=constraints)
       yield cache, path
+
+  def _setup_cache_at(self, path, constraints=None):
+    setup_options = {'interpreter_cache_dir': path}
+    if constraints:
+      setup_options.update(interpreter_constraints=constraints)
+    python_setup, python_repos = self.create_python_subsystems(setup_options=setup_options)
+    return PythonInterpreterCache(python_setup=python_setup, python_repos=python_repos)
 
   def test_cache_setup_with_no_filters_uses_repo_default_excluded(self):
     bad_interpreter_requirement = self._make_bad_requirement(self._interpreter.identity.requirement)
@@ -168,17 +171,13 @@ class TestInterpreterCache(TestBase):
         self.assertIn(py36_path, {pi.binary for pi in cache.setup()})
 
   def test_setup_cached_warm(self):
-    with self._setup_test(mock_setup_cached=False) as (cache, path):
-      safe_mkdir(os.path.join(path, 'python'))
-      cache._interpreter_from_path = mock.Mock(return_value=self._interpreter)
-      interpreters = list(cache._setup_cached(filters=[]))
+    with self._setup_cache() as (cache, path):
+      interpreters = cache.setup()
+      self.assertGreater(len(interpreters), 0)
 
-      assert len(interpreters) == 1
-      assert interpreters[0] == self._interpreter
+      cache = self._setup_cache_at(path)
+      self.assertEqual(interpreters, list(cache._setup_cached()))
 
   def test_setup_cached_cold(self):
-    with self._setup_test(mock_setup_cached=False) as (cache, path):
-      cache._interpreter_from_path = mock.Mock(return_value=[self._interpreter])
-      interpreters = list(cache._setup_cached(filters=[]))
-
-      assert len(interpreters) == 0
+    with self._setup_cache() as (cache, _):
+      self.assertEqual([], list(cache._setup_cached()))
