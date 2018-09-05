@@ -34,7 +34,7 @@ def python_interpreter_path(version):
     command = ['python{}'.format(version), '-c', 'import sys; print(sys.executable)']
     py_path = subprocess.check_output(command).decode('utf-8').strip()
     return os.path.realpath(py_path)
-  except OSError:
+  except subprocess.CalledProcessError:
     return None
 
 
