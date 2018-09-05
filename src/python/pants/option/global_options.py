@@ -272,8 +272,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--remote-store-chunk-bytes', type=int, advanced=True,
              default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_bytes,
              help='Size in bytes of chunks transferred to/from the remote file store.')
-    register('--remote-store-chunk-upload-timeout-seconds', type=int, advanced=True,
-             default=0, help='Deprecated and ignored.')
 
     # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
     # lookups via CacheSetup in TaskBase.
