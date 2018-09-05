@@ -64,6 +64,9 @@ PKG_PANTS=(
   "pantsbuild.pants"
   "//src/python/pants:pants-packaged"
   "pkg_pants_install_test"
+
+  # Update the --python-tag in lockstep with other changes as described in
+  #   https://github.com/pantsbuild/pants/issues/6450
   "--python-tag cp27 --plat-name $(find_plat_name)"
 )
 function pkg_pants_install_test() {
@@ -211,6 +214,8 @@ function build_pants_packages() {
 
     start_travis_section "${NAME}" "Building package ${NAME}-${version} with target '${BUILD_TARGET}'"
     (
+      # Update the --python-tag default in lockstep with other changes as described in
+      #   https://github.com/pantsbuild/pants/issues/6450
       run_local_pants setup-py \
         --run="bdist_wheel ${BDIST_WHEEL_FLAGS:---python-tag py27}" \
           ${BUILD_TARGET} && \
