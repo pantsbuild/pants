@@ -35,6 +35,7 @@ extern crate boxfuture;
 extern crate byteorder;
 extern crate bytes;
 extern crate digest;
+extern crate dirs;
 extern crate futures;
 extern crate futures_cpupool;
 extern crate glob;

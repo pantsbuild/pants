@@ -3,6 +3,7 @@ use FileContent;
 use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
+use dirs;
 use futures::{future, Future};
 use hashing::Digest;
 use protobuf::Message;
@@ -90,6 +91,13 @@ impl Store {
         timeout,
       )),
     })
+  }
+
+  pub fn default_path() -> PathBuf {
+    match dirs::home_dir() {
+      Some(home_dir) => home_dir.join(".cache").join("pants").join("lmdb_store"),
+      None => panic!("Could not find home dir"),
+    }
   }
 
   ///

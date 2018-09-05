@@ -172,7 +172,7 @@ to this directory.",
         Arg::with_name("local-store-path")
           .takes_value(true)
           .long("local-store-path")
-          .required(true),
+          .required(false),
       )
         .arg(
           Arg::with_name("server-address")
@@ -199,7 +199,10 @@ to this directory.",
 }
 
 fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
-  let store_dir = top_match.value_of("local-store-path").unwrap();
+  let store_dir = top_match
+    .value_of("local-store-path")
+    .map(PathBuf::from)
+    .unwrap_or_else(Store::default_path);
   let pool = Arc::new(ResettablePool::new("fsutil-pool-".to_string()));
   let (store, store_has_remote) = {
     let (store_result, store_has_remote) = match top_match.value_of("server-address") {
@@ -208,7 +211,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           value_t!(top_match.value_of("chunk-bytes"), usize).expect("Bad chunk-bytes flag");
         (
           Store::with_remote(
-            store_dir,
+            &store_dir,
             pool.clone(),
             cas_address.to_owned(),
             1,
@@ -218,11 +221,11 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           true,
         )
       }
-      None => (Store::local_only(store_dir, pool.clone()), false),
+      None => (Store::local_only(&store_dir, pool.clone()), false),
     };
     let store = store_result.map_err(|e| {
       format!(
-        "Failed to open/create store for directory {}: {}",
+        "Failed to open/create store for directory {:?}: {}",
         store_dir, e
       )
     })?;

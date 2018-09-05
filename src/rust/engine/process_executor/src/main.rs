@@ -52,7 +52,6 @@ fn main() {
       Arg::with_name("local-store-path")
         .long("local-store-path")
         .takes_value(true)
-        .required(true)
         .help("Path to lmdb directory used for local file storage"),
     )
     .arg(
@@ -129,7 +128,10 @@ fn main() {
     .value_of("work-dir")
     .map(PathBuf::from)
     .unwrap_or_else(std::env::temp_dir);
-  let local_store_path = args.value_of("local-store-path").unwrap();
+  let local_store_path = args
+    .value_of("local-store-path")
+    .map(PathBuf::from)
+    .unwrap_or_else(fs::Store::default_path);
   let pool = Arc::new(fs::ResettablePool::new("process-executor-".to_owned()));
   let server_arg = args.value_of("server");
   let store = match (server_arg, args.value_of("cas-server")) {
