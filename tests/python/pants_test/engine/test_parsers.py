@@ -301,6 +301,9 @@ class JsonEncoderTest(unittest.TestCase):
     except AssertionError:
       def convert_to_stripped_set(json_str):
         no_brackets = json_str.replace('{', '').replace('}', '')
+        # TODO: #6275 appears to have broken this so that the `.strip()` is required now, but
+        # it's not clear why (why would there suddenly be extra whitespace on either side of each
+        # line, for multiple tests, where there wasn't before?).
         distinct_lines = set(l.strip() for l in no_brackets.split(','))
         return distinct_lines
 
