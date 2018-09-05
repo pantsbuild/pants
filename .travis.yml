@@ -89,29 +89,6 @@ matrix:
 
     - <<: *default_test_config
       env:
-        - SHARD="Self checks, lint, and JVM tests"
-      before_install:
-        - sudo apt-get install -y pkg-config fuse libfuse-dev
-        - sudo modprobe fuse
-        - sudo chmod 666 /dev/fuse
-        - sudo chown root:$USER /etc/fuse.conf
-      script:
-        - ./build-support/bin/ci.sh -fkmrjt "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Py2 - Unit tests for pants and pants-plugins"
-      script:
-        - ./build-support/bin/ci.sh -lp "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Py3 - Unit tests for pants and pants-plugins"
-      script:
-        - ./build-support/bin/ci.sh -3lp "${SHARD}"
-
-    - <<: *default_test_config
-      env:
         - SHARD="Python integration tests for pants - shard 2"
       script:
         - ./build-support/bin/ci.sh -c -i 1/7 "${SHARD}"
