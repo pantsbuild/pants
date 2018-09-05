@@ -227,7 +227,7 @@ class JsonParserTest(unittest.TestCase):
 
     # Strip trailing whitespace from the message since our expected literal below will have
     # trailing ws stripped via editors and code reviews calling for it.
-    actual_lines = [line.rstrip() for line in str(exc.exception).splitlines()]
+    actual_lines = [line.strip() for line in str(exc.exception).splitlines()]
 
     # This message from the json stdlib varies between python releases, so fuzz the match a bit.
     self.assertRegexpMatches(actual_lines[0],
