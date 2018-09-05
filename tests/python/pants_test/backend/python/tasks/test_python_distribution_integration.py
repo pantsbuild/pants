@@ -234,7 +234,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
 
   def test_pants_requirement_setup_requires_version(self):
     """Ensure that a pants_requirement() can be successfully used in setup_requires."""
-    pants_run = self.run_pants(['-q', 'run', '{}:bin'.format(self.pants_setup_requires)],
+    pants_run = self.run_pants(['-q', 'clean-all', 'run', '{}:bin'.format(self.pants_setup_requires)],
                                extra_env={'PEX_VERBOSE': '9'})
     self.assert_success(pants_run)
     # This testproject prints its own version string here, which is the current pants version plus
