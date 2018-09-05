@@ -16,6 +16,7 @@ from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInte
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_mkdir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.test_base import TestBase
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
@@ -35,14 +36,15 @@ class TestInterpreterCache(TestBase):
     self._interpreter = PythonInterpreter.get()
 
   @contextmanager
-  def _setup_test(self, constraints=None, mock_setup_paths_interpreters=None):
+  def _setup_test(self, constraints=None, mock_setup_paths_interpreters=None, mock_setup_cached=True):
     mock_setup = mock.MagicMock().return_value
     type(mock_setup).interpreter_constraints = mock.PropertyMock(return_value=constraints)
 
     with temporary_dir() as path:
       mock_setup.interpreter_cache_dir = path
       cache = PythonInterpreterCache(mock_setup, mock.MagicMock())
-      cache._setup_cached = mock.Mock(return_value=[self._interpreter])
+      if mock_setup_cached:
+        cache._setup_cached = mock.Mock(return_value=[self._interpreter])
       if mock_setup_paths_interpreters:
         cache._setup_paths = mock.Mock(return_value=[PythonInterpreter.from_binary(mock_setup_paths_interpreters[0]),
                                                      PythonInterpreter.from_binary(mock_setup_paths_interpreters[1])])
@@ -184,3 +186,19 @@ class TestInterpreterCache(TestBase):
     else:
       print('Could not find both python {} and python {} on system. Skipping.'.format(py27, py3))
       self.skipTest('Missing neccesary Python interpreters on system.')
+
+  def test_setup_cached_warm(self):
+    with self._setup_test(mock_setup_cached=False) as (cache, path):
+      safe_mkdir(os.path.join(path, 'python'))
+      cache._interpreter_from_path = mock.Mock(return_value=self._interpreter)
+      interpreters = list(cache._setup_cached(filters=[]))
+
+      assert len(interpreters) == 1
+      assert interpreters[0] == self._interpreter
+
+  def test_setup_cached_cold(self):
+    with self._setup_test(mock_setup_cached=False) as (cache, path):
+      cache._interpreter_from_path = mock.Mock(return_value=[self._interpreter])
+      interpreters = list(cache._setup_cached(filters=[]))
+
+      assert len(interpreters) == 0
