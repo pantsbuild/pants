@@ -64,6 +64,10 @@ type Nodes<N> = HashMap<EntryKey<N>, EntryId>;
 struct InnerGraph<N: Node> {
   nodes: Nodes<N>,
   pg: PGraph<N>,
+  /// A Graph that is marked `draining:True` will not allow the creation of new `Nodes`. But
+  /// while draining, any Nodes that exist in the Graph will continue to run until/unless they
+  /// attempt to get/create new Nodes.
+  draining: bool,
 }
 
 impl<N: Node> InnerGraph<N> {
@@ -474,6 +478,7 @@ pub struct Graph<N: Node> {
 impl<N: Node> Graph<N> {
   pub fn new() -> Graph<N> {
     let inner = InnerGraph {
+      draining: false,
       nodes: HashMap::default(),
       pg: DiGraph::new(),
     };
@@ -495,27 +500,34 @@ impl<N: Node> Graph<N> {
   where
     C: NodeContext<Node = N>,
   {
-    let (maybe_entry, entry_id) = {
+    let maybe_entry_and_id = {
       // Get or create the destination, and then insert the dep and return its state.
       let mut inner = self.inner.lock().unwrap();
-      let dst_id = {
-        // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
-        // without a much more complicated algorithm.
-        let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
-        if inner.detect_cycle(src_id, potential_dst_id) {
-          // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
-          inner.ensure_entry(EntryKey::Cyclic(dst_node))
-        } else {
-          // Valid dependency.
-          potential_dst_id
-        }
-      };
-      inner.pg.add_edge(src_id, dst_id, ());
-      (inner.entry_for_id(dst_id).cloned(), dst_id)
+      if inner.draining {
+        None
+      } else {
+        let dst_id = {
+          // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
+          // without a much more complicated algorithm.
+          let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
+          if inner.detect_cycle(src_id, potential_dst_id) {
+            // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
+            inner.ensure_entry(EntryKey::Cyclic(dst_node))
+          } else {
+            // Valid dependency.
+            potential_dst_id
+          }
+        };
+        inner.pg.add_edge(src_id, dst_id, ());
+        inner
+          .entry_for_id(dst_id)
+          .cloned()
+          .map(|entry| (entry, dst_id))
+      }
     };
 
     // Declare the dep, and return the state of the destination.
-    if let Some(mut entry) = maybe_entry {
+    if let Some((mut entry, entry_id)) = maybe_entry_and_id {
       entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
     } else {
       future::err(N::Error::invalidated()).to_boxed()
@@ -529,12 +541,16 @@ impl<N: Node> Graph<N> {
   where
     C: NodeContext<Node = N>,
   {
-    let (maybe_entry, entry_id) = {
+    let maybe_entry_and_id = {
       let mut inner = self.inner.lock().unwrap();
-      let id = inner.ensure_entry(EntryKey::Valid(node));
-      (inner.entry_for_id(id).cloned(), id)
+      if inner.draining {
+        None
+      } else {
+        let id = inner.ensure_entry(EntryKey::Valid(node));
+        inner.entry_for_id(id).cloned().map(|entry| (entry, id))
+      }
     };
-    if let Some(mut entry) = maybe_entry {
+    if let Some((mut entry, entry_id)) = maybe_entry_and_id {
       entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
     } else {
       future::err(N::Error::invalidated()).to_boxed()
@@ -694,12 +710,35 @@ impl<N: Node> Graph<N> {
     inner.all_digests()
   }
 
+  ///
+  /// Executes an operation while all access to the Graph is prevented (by acquiring the Graph's
+  /// lock).
+  ///
   pub fn with_exclusive<F, T>(&self, f: F) -> T
   where
     F: FnOnce() -> T,
   {
     let _inner = self.inner.lock().unwrap();
     f()
+  }
+
+  ///
+  /// Marks this Graph with the given draining status. If the Graph already has a matching
+  /// draining status, then the operation will return an Err.
+  ///
+  /// This is an independent operation from acquiring exclusive access to the Graph
+  /// (`with_exclusive`), because once exclusive access has been acquired, threads attempting to
+  /// access the Graph would wait to acquire the lock, rather than acquiring and then failing fast
+  /// as we'd like them to while `draining:True`.
+  ///
+  pub fn mark_draining(&self, draining: bool) -> Result<(), ()> {
+    let mut inner = self.inner.lock().unwrap();
+    if inner.draining == draining {
+      Err(())
+    } else {
+      inner.draining = draining;
+      Ok(())
+    }
   }
 }
 
