@@ -72,8 +72,7 @@ class CustomUrls(BinaryToolBase):
     return BinaryUtilFakeUname.Factory._create_for_cls(BinaryUtilFakeUname).select(binary_request)
 
 
-# TODO(cosmicexplorer): these should have integration tests which use BinaryTool subclasses
-# overriding archive_type
+# TODO: these should have integration tests which use BinaryTool subclasses overriding archive_type.
 class BinaryToolBaseTest(BaseTest):
 
   def setUp(self):

@@ -417,8 +417,8 @@ pub enum StrictGlobMatching {
 }
 
 impl StrictGlobMatching {
-  // TODO(cosmicexplorer): match this up with the allowed values for the GlobMatchErrorBehavior type
-  // in python somehow?
+  // TODO: match this up with the allowed values for the GlobMatchErrorBehavior type in python
+  // somehow?
   pub fn create(behavior: &str) -> Result<Self, String> {
     match behavior {
       "ignore" => Ok(StrictGlobMatching::Ignore),

@@ -315,9 +315,9 @@ class BinaryUtil(object):
     'linux': lambda release, machine: ('linux', machine),
   }
 
-  # TODO(cosmicexplorer): we create a HostPlatform in this class instead of in the constructor
-  # because we don't want to fail until a binary is requested. The HostPlatform should be a
-  # parameter that gets lazily resolved by the v2 engine.
+  # TODO: we create a HostPlatform in this class instead of in the constructor because we don't want
+  # to fail until a binary is requested. The HostPlatform should be a parameter that gets lazily
+  # resolved by the v2 engine.
   @memoized_method
   def _host_platform(self):
     uname_result = self._uname_func()

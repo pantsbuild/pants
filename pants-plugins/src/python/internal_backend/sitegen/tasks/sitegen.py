@@ -47,9 +47,8 @@ class SiteGen(Task):
     super(SiteGen, cls).register_options(register)
     register('--config-path', type=list, help='Path to .json file describing site structure.')
 
-  # TODO(cosmicexplorer): requiring these products ensures that the markdown
-  # and reference tasks run before this one, but we don't use those
-  # products.
+  # TODO: requiring these products ensures that the markdown and reference tasks run before this
+  # one, but we don't use those products.
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require(MarkdownToHtml.MARKDOWN_HTML_PRODUCT)

@@ -52,7 +52,7 @@ def known_os_names():
   return reduce(set.union, OS_ALIASES.values())
 
 
-# TODO(cosmicexplorer): use this as the default value for the global --binaries-path-by-id option!
+# TODO: use this as the default value for the global --binaries-path-by-id option!
 # panstd testing fails saying no run trackers were created when I tried to do this.
 SUPPORTED_PLATFORM_NORMALIZED_NAMES = {
   ('linux', 'x86_64'): ('linux', 'x86_64'),

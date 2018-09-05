@@ -1037,8 +1037,8 @@ impl Node for NodeKey {
     fn typstr(tc: &TypeConstraint) -> String {
       externs::key_to_str(&tc.0)
     }
-    // TODO(cosmicexplorer): these should all be converted to fmt::Debug implementations, and then
-    // this method can go away in favor of the auto-derived Debug for this type.
+    // TODO: these should all be converted to fmt::Debug implementations, and then this method can
+    // go away in favor of the auto-derived Debug for this type.
     match self {
       &NodeKey::DigestFile(ref s) => format!("DigestFile({:?})", s.0),
       &NodeKey::ExecuteProcess(ref s) => format!("ExecuteProcess({:?}", s.0),
