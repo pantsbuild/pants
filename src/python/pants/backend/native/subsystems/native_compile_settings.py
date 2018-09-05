@@ -19,7 +19,7 @@ class NativeCompileSettings(Subsystem):
     register('--fatal-warnings', type=bool, default=True, fingerprint=True, advanced=True,
              help='The default for the "fatal_warnings" argument for targets of this language.')
 
-  # FIXME: use some more formal method of mirroring options between a target and a subsystem -- see
+  # TODO: use some more formal method of mirroring options between a target and a subsystem -- see
   # pants.backend.jvm.subsystems.dependency_context.DependencyContext#defaulted_property()!
   def get_subsystem_target_mirrored_field_value(self, field_name, target):
     """Get the attribute `field_name` from `target` if set, else from this subsystem's options."""

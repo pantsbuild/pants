@@ -35,7 +35,7 @@ def build_file_aliases():
 
 
 def register_goals():
-  # FIXME(#5962): register these under the 'compile' goal when we eliminate the product transitive
+  # TODO(#5962): register these under the 'compile' goal when we eliminate the product transitive
   # dependency from export -> compile.
   task(name='native-third-party-fetch', action=NativeExternalLibraryFetch).install('native-compile')
   task(name='c-for-ctypes', action=CCompile).install('native-compile')

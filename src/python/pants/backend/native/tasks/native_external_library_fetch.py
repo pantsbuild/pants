@@ -33,7 +33,7 @@ class ConanRequirement(datatype(['pkg_spec'])):
   }
 
   def parse_conan_stdout_for_pkg_sha(self, stdout):
-    # FIXME: properly regex this method.
+    # TODO: properly regex this method.
     # https://github.com/pantsbuild/pants/issues/6168
     pkg_line = stdout.split('Packages')[1]
     collected_matches = [line for line in pkg_line.split() if self.pkg_spec in line]

@@ -9,7 +9,7 @@ from pants.task.task import Task
 
 class NativeTask(Task):
 
-  # FIXME(#5869): delete this when we can request Subsystems from options in tasks!
+  # TODO(#5869): delete this when we can request Subsystems from options in tasks!
   def _request_single(self, product, subject):
     # NB: This is not supposed to be exposed to Tasks yet -- see #4769 to track the status of
     # exposing v2 products in v1 tasks.

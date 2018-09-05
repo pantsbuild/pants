@@ -28,6 +28,6 @@ class NativeArtifact(datatype(['lib_name']), PayloadField):
     })
 
   def _compute_fingerprint(self):
-    # FIXME: can we just use the __hash__ method here somehow?
+    # TODO: can we just use the __hash__ method here somehow?
     hasher = sha1(self.lib_name.encode('utf-8'))
     return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')

@@ -47,7 +47,7 @@ class SiteGen(Task):
     super(SiteGen, cls).register_options(register)
     register('--config-path', type=list, help='Path to .json file describing site structure.')
 
-  # FIXME(cosmicexplorer): requiring these products ensures that the markdown
+  # TODO(cosmicexplorer): requiring these products ensures that the markdown
   # and reference tasks run before this one, but we don't use those
   # products.
   @classmethod

@@ -680,7 +680,7 @@ class Target(AbstractTarget):
     strict_deps = self._cached_strict_dependencies_map.get(dep_context, None)
     if strict_deps is None:
       default_predicate = self._closure_dep_predicate({self}, **dep_context.target_closure_kwargs)
-      # FIXME(#5977): this branch needs testing!
+      # TODO(#5977): this branch needs testing!
       if not default_predicate:
         def default_predicate(*args, **kwargs):
           return True
