@@ -176,7 +176,7 @@ class TestInterpreterCache(TestBase):
       self.assertGreater(len(interpreters), 0)
 
       cache = self._setup_cache_at(path)
-      self.assertEqual(interpreters, list(cache._setup_cached()))
+      self.assertEqual(sorted(interpreters), sorted(list(cache._setup_cached())))
 
   def test_setup_cached_cold(self):
     with self._setup_cache() as (cache, _):
