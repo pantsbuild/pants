@@ -146,7 +146,7 @@ matrix:
       env:
         - SHARD="Various pants self checks and lint"
       script:
-        - ./build-support/bin/ci.sh -x -cejlpn 'Various pants self checks and lint'
+        - ./build-support/bin/travis-ci.sh -x -cejlpn 'Various pants self checks and lint'
 
     - os: linux
       dist: trusty
@@ -173,7 +173,7 @@ matrix:
       env:
         - SHARD="Unit tests for pants and pants-plugins - shard 1"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcnt -u 0/2 "${SHARD}"
+        - ./build-support/bin/travis-ci.sh -x -efkmrcnt -u 0/2 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -200,7 +200,7 @@ matrix:
       env:
         - SHARD="Unit tests for pants and pants-plugins - shard 2"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcnt -u 1/2 "${SHARD}"
+        - ./build-support/bin/travis-ci.sh -x -efkmrcnt -u 1/2 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -227,7 +227,7 @@ matrix:
       env:
         - SHARD="Python contrib tests - shard 1"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 0/2 "${SHARD}"
+        - ./build-support/bin/travis-ci.sh -x -efkmrcjlpt -y 0/2 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -254,7 +254,7 @@ matrix:
       env:
         - SHARD="Python contrib tests - shard 2"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 1/2 "${SHARD}"
+        - ./build-support/bin/travis-ci.sh -x -efkmrcjlpt -y 1/2 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -281,7 +281,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 1"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 0/7 "${SHARD}"
+        - ./build-support/bin/travis-ci.sh -x -efkmrjlpnt -i 0/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -308,7 +308,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 2"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 1/7 "${SHARD}"
+        - ./build-support/bin/travis-ci.sh -x -efkmrjlpnt -i 1/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -335,7 +335,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 3"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 2/7 "${SHARD}"
+        - ./build-support/bin/travis-ci.sh -x -efkmrjlpnt -i 2/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -362,7 +362,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 4"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 3/7 "${SHARD}"
+        - ./build-support/bin/travis-ci.sh -x -efkmrjlpnt -i 3/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -389,7 +389,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 5"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 4/7 "${SHARD}"
+        - ./build-support/bin/travis-ci.sh -x -efkmrjlpnt -i 4/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -416,7 +416,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 6"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 5/7 "${SHARD}"
+        - ./build-support/bin/travis-ci.sh -x -efkmrjlpnt -i 5/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -443,7 +443,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 7"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 6/7 "${SHARD}"
+        - ./build-support/bin/travis-ci.sh -x -efkmrjlpnt -i 6/7 "${SHARD}"
 
     # Rust tests
     - os: linux
@@ -467,7 +467,7 @@ matrix:
         - ulimit -c unlimited
         - ulimit -n 8192
       script:
-        - ./build-support/bin/ci.sh -bcfjklmnprtx
+        - ./build-support/bin/travis-ci.sh -bcfjklmnprtx
 
     - os: osx
       # Fuse actually works on this image. It hangs on many others.
@@ -488,7 +488,7 @@ matrix:
         - ulimit -n 8192
       script:
         # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and set -z to run the platform-specific tests.
-        - ./build-support/bin/ci.sh -cfjklmnprtxz
+        - ./build-support/bin/travis-ci.sh -cfjklmnprtxz
 
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/s3/
