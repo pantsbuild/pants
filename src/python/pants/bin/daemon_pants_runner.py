@@ -30,6 +30,13 @@ from pants.util.socket import teardown_socket
 class DaemonExiter(Exiter):
   """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol."""
 
+  @classmethod
+  def create(cls, socket, options):
+    exiter_instance = cls(socket)
+    exiter_instance.apply_options(options)
+
+    return exiter_instance
+
   def __init__(self, socket):
     super(DaemonExiter, self).__init__()
     self._socket = socket
@@ -134,7 +141,7 @@ class DaemonPantsRunner(ProcessManager):
     self._options_bootstrapper = options_bootstrapper
     self._deferred_exception = deferred_exc
 
-    self._exiter = DaemonExiter(socket)
+    self._exiter = DaemonExiter.create(socket, self._options_bootstrapper.get_bootstrap_options())
 
   def _make_identity(self):
     """Generate a ProcessManager identity for a given pants run.
@@ -314,4 +321,8 @@ class DaemonPantsRunner(ProcessManager):
         else:
           self._exiter.exit(0)
     except Exception:
-      Exiter().handle_unhandled_exception(add_newline=True)
+      # self._exiter is a DaemonExiter and does some nailgun interaction, which is gone by this
+      # point, so we must make another.
+      tmp_exiter = Exiter()
+      tmp_exiter.apply_options(self._options_bootstrapper.get_bootstrap_options())
+      tmp_exiter.handle_unhandled_exception(add_newline=True)
