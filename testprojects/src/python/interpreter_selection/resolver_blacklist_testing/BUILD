@@ -1,7 +1,7 @@
 python_binary(
   name='test_bin',
   source='main.py',
-  compatibility=['CPython>3'],
+  compatibility=['CPython>=3.6'],
   dependencies=[
     ':reqlib'
   ]
