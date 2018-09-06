@@ -71,7 +71,9 @@ Some artifacts are rather large (on the scale of 100-200MB), so there’s a chan
 
 ### Visibility
 
-To better help with the migration, such as comparing the result with Ivy and sanity check, we needed Coursier to print out the resolve graph correctly. [[https://github.com/coursier/coursier/pull/671]]
+To better help with the migration, such as comparing the result with Ivy and sanity check, we needed Coursier to print out the resolve graph correctly.
+
+[[https://github.com/coursier/coursier/pull/671]]
 
 ## The Migration Process
 
