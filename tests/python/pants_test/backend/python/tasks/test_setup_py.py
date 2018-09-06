@@ -123,10 +123,15 @@ class TestSetupPyInterpreter(SetupPyTestBase):
     sdist_srcdir = os.path.join(self.distdir, 'foo-0.0.0', 'src')
     with environment_as(PYTHONPATH=sdist_srcdir):
       with self.run_execute(foo):
-        with open(os.path.join(sdist_srcdir, 'foo', 'commands', 'sys_path.txt')) as fp:
+        with open(os.path.join(sdist_srcdir, 'foo', 'commands', 'sys_path.txt'), 'r') as fp:
+          load_package = lambda: Package.from_href(fp.readline().strip())
+          # We don't care about the ordering of `wheel` and `setuptools` on the `sys.path`, just
+          # that they are 1st as a group.
+          extras = {p.name: p for p in (load_package(), load_package())}
+
           def assert_extra(name, expected_version):
-            package = Package.from_href(fp.readline().strip())
-            self.assertEqual(name, package.name)
+            package = extras.get(name)
+            self.assertIsNotNone(package)
             self.assertEqual(expected_version, package.raw_version)
 
           # The 1st two elements of the sys.path should be our custom SetupPyRunner Installer's
