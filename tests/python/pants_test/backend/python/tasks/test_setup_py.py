@@ -9,7 +9,6 @@ from builtins import open
 from collections import OrderedDict
 from contextlib import contextmanager
 from textwrap import dedent
-from unittest import skipIf
 
 from mock import Mock
 from pex.package import Package
@@ -28,7 +27,7 @@ from pants.build_graph.target import Target
 from pants.fs.archive import TGZ
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
-from pants.util.process_handler import subprocess
+from pants_test.backend.python.interpreter_selection_utils import skip_unless_python36
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 
@@ -644,15 +643,16 @@ class TestSetupPyFindPackages(SetupPyTestBase):
       chroot_mock.path.return_value = td
       yield chroot_mock
 
-  def assert_find_packages(self, py3):
+  def assert_find_packages(self, py36):
+    compatibility = 'CPython>=3.6,<3.7' if py36 else 'CPython>=2.7,<3'
     dummy_target = self.make_target(spec='src/python/foo',
                                     target_type=PythonLibrary,
                                     sources=[],
-                                    compatibility='CPython>=3.6,<4' if py3 else 'CPython>=2.7,<3')
+                                    compatibility=compatibility)
     setup_py = self.prepare_setup_py(dummy_target)
 
     def assert_single_chroot(packages, namespace_packages, resources):
-      with self.yield_chroot(packages, namespace_packages, resources, py3=py3) as chroot:
+      with self.yield_chroot(packages, namespace_packages, resources, py3=py36) as chroot:
         p, n_p, r = setup_py.find_packages(dummy_target, chroot)
         assert p == set(packages + namespace_packages)
         assert n_p == set(namespace_packages)
@@ -675,7 +675,7 @@ class TestSetupPyFindPackages(SetupPyTestBase):
     assert_single_chroot(['foo'], [], resources)
 
     # assert that nearest-submodule is honored
-    with self.yield_chroot(['foo', 'foo.bar'], [], resources, py3=py3) as chroot:
+    with self.yield_chroot(['foo', 'foo.bar'], [], resources, py3=py36) as chroot:
       _, _, r = setup_py.find_packages(dummy_target, chroot)
       assert r == {
         'foo': {'f0'},
@@ -683,17 +683,16 @@ class TestSetupPyFindPackages(SetupPyTestBase):
       }
 
     # assert that nearest submodule splits on module prefixes
-    with self.yield_chroot(['foo', 'foo.bar'], [], {'foo.bar1': ['f0']}, py3=py3) as chroot:
+    with self.yield_chroot(['foo', 'foo.bar'], [], {'foo.bar1': ['f0']}, py3=py36) as chroot:
       _, _, r = setup_py.find_packages(dummy_target, chroot)
       assert r == {'foo': {'bar1/f0'}}
 
   def test_find_packages(self):
-    self.assert_find_packages(py3=False)
+    self.assert_find_packages(py36=False)
 
-  @skipIf(subprocess.call(['which', 'python3.6']) != 0,
-          'This test requires python3.6 to run and no python3.6 interpreter could be found')
+  @skip_unless_python36
   def test_find_packages_py3(self):
-    self.assert_find_packages(py3=True)
+    self.assert_find_packages(py36=True)
 
 
 def test_nearest_subpackage():
