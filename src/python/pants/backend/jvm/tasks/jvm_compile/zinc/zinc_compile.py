@@ -12,7 +12,6 @@ import textwrap
 from builtins import open
 from collections import defaultdict
 from contextlib import closing
-from hashlib import sha1
 from xml.etree import ElementTree
 
 from future.utils import PY3, text_type
@@ -281,20 +280,6 @@ class BaseZincCompile(JvmCompile):
       for processor in processors:
         f.write('{}\n'.format(processor.strip()))
 
-  @memoized_property
-  def _zinc_cache_dir(self):
-    """A directory where zinc can store compiled copies of the `compiler-bridge`.
-
-    The compiler-bridge is specific to each scala version, and is lazily computed by zinc if the
-    appropriate version does not exist. Eventually it would be great to just fetch this rather
-    than compiling it.
-    """
-    hasher = sha1()
-    for cp_entry in [self._zinc.zinc, self._zinc.compiler_interface, self._zinc.compiler_bridge]:
-      hasher.update(os.path.relpath(cp_entry, self.get_options().pants_workdir))
-    key = hasher.hexdigest()[:12]
-    return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
-
   def compile(self, ctx, args, dependency_classpath, upstream_analysis,
               settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
@@ -340,9 +325,7 @@ class BaseZincCompile(JvmCompile):
 
     zinc_args.extend(['-compiler-interface', compiler_interface])
     zinc_args.extend(['-compiler-bridge', compiler_bridge])
-    # TODO: Kill zinc-cache-dir: https://github.com/pantsbuild/pants/issues/6155
-    # But for now, this will probably fail remotely because the homedir probably doesn't exist.
-    zinc_args.extend(['-zinc-cache-dir', self._zinc_cache_dir])
+    zinc_args.extend(["-compiled-interface-jar", self._zinc.compile_compiler_bridge(self.context)])
     zinc_args.extend(['-scala-path', ':'.join(scala_path)])
 
     zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
