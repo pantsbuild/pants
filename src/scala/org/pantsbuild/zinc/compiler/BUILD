@@ -16,10 +16,17 @@ scala_library(
     '3rdparty:guava',
     '3rdparty:jsr305',
     'src/scala/org/pantsbuild/zinc/analysis',
+    'src/scala/org/pantsbuild/zinc/scalautil',
     'src/scala/org/pantsbuild/zinc/cache',
     'src/scala/org/pantsbuild/zinc/options',
     'src/scala/org/pantsbuild/zinc/util',
   ],
   strict_deps=True,
   platform='java8',
+)
+
+jvm_binary(
+  name = "runner",
+  dependencies = [":compiler"],
+  main = "org.pantsbuild.zinc.compiler.Main",
 )

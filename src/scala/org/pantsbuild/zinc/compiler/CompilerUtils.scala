@@ -67,19 +67,6 @@ object CompilerUtils {
     Some(new ClassLoaderCache(new URLClassLoader(Array())))
 
   /**
-   * Get or create a zinc compiler based on compiler setup.
-   */
-  def getOrCreate(settings: Settings, log: Logger): Compilers = {
-    val setup = CompilerCacheKey(settings)
-    compilerCache.getOrElseUpdate(setup) {
-      val instance     = scalaInstance(setup)
-      val interfaceJar = compilerInterface(setup, instance, log)
-      val scalac       = newScalaCompiler(instance, interfaceJar)
-      ZincUtil.compilers(instance, ClasspathOptionsUtil.auto, setup.javaHome, scalac)
-    }
-  }
-
-  /**
    * Get the instance of the GlobalsCache.
    */
   def getGlobalsCache = residentCache
@@ -132,36 +119,6 @@ object CompilerUtils {
     Util.propertyFromResource("compiler.properties", "version.number", scalaLoader)
   }
 
-  /**
-   * Get the compiler interface for this compiler setup. Compile it if not already cached.
-   * NB: This usually occurs within the compilerCache entry lock, but in the presence of
-   * multiple zinc processes (ie, without nailgun) we need to be more careful not to clobber
-   * another compilation attempt.
-   */
-  def compilerInterface(setup: CompilerCacheKey, scalaInstance: XScalaInstance, log: Logger): File = {
-    def compile(targetJar: File): Unit =
-      AnalyzingCompiler.compileSources(
-        Seq(setup.compilerBridgeSrc),
-        targetJar,
-        Seq(setup.compilerInterface),
-        CompilerInterfaceId,
-        new RawCompiler(scalaInstance, ClasspathOptionsUtil.auto, log),
-        log
-      )
-    val dir = setup.cacheDir / interfaceId(scalaInstance.actualVersion)
-    val interfaceJar = dir / (CompilerInterfaceId + ".jar")
-    if (!interfaceJar.isFile) {
-      dir.mkdirs()
-      val tempJar = File.createTempFile("interface-", ".jar.tmp", dir)
-      try {
-        compile(tempJar)
-        tempJar.renameTo(interfaceJar)
-      } finally {
-        tempJar.delete()
-      }
-    }
-    interfaceJar
-  }
 
   def interfaceId(scalaVersion: String) = CompilerInterfaceId + "-" + scalaVersion + "-" + JavaClassVersion
 }

@@ -50,7 +50,8 @@ case class Settings(
   sbt: SbtJars                      = SbtJars(),
   _incOptions: IncOptions           = IncOptions(),
   analysis: AnalysisOptions         = AnalysisOptions(),
-  creationTime: Long                = 0
+  creationTime: Long                = 0,
+  compiledInterfaceJar: Option[File]= None
 ) {
   import Settings._
 
@@ -261,9 +262,11 @@ object Settings extends OptionSet[Settings] {
     prefix(    "-C", "<javac-option>",         "Pass option to javac",                       (s: Settings, o: String) => s.copy(javacOptions = s.javacOptions :+ o)),
 
     header("sbt options:"),
+    // TODO: Remove the next three options
     file(      CompilerBridgeOpt, "file",     "Specify compiler bridge sources jar",        (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerBridgeSrc = Some(f)))),
     file(      CompilerInterfaceOpt, "file",  "Specify compiler interface jar",             (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerInterface = Some(f)))),
     file(      ZincCacheDirOpt, "file",       "A cache directory for compiler interfaces",  (s: Settings, f: File) => s.copy(_zincCacheDir = Some(f))),
+    file("-compiled-interface-jar", "file", "Path to pre-compilede compiler interface", (s: Settings, f: File) => s.copy(compiledInterfaceJar = Some(f))),
 
     header("Incremental compiler options:"),
     int(       "-transitive-step", "n",        "Steps before transitive closure",            (s: Settings, i: Int) => s.copy(_incOptions = s._incOptions.copy(transitiveStep = i))),
