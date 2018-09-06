@@ -94,7 +94,7 @@ class NodeResolveTest(TaskTestBase):
     context = self.context(target_roots=[target], options={
       'npm-resolver': {'install_optional': False,
                        'force_option_override': False,
-                       'production_only': False,
+                       'install_production': False,
                        'force': False,
                        'frozen_lockfile': True}
     })
@@ -156,7 +156,7 @@ class NodeResolveTest(TaskTestBase):
     context = self.context(target_roots=[leaf], options={
       'npm-resolver': {'install_optional': False,
                        'force_option_override': False,
-                       'production_only': False,
+                       'install_production': False,
                        'force': False,
                        'frozen_lockfile': True}
     })
@@ -229,7 +229,7 @@ class NodeResolveTest(TaskTestBase):
     context = self.context(target_roots=[scripts_project], options={
       'npm-resolver': {'install_optional': False,
                        'force_option_override': False,
-                       'production_only': False,
+                       'install_production': False,
                        'force': False,
                        'frozen_lockfile': True}
     })
@@ -260,7 +260,7 @@ class NodeResolveTest(TaskTestBase):
       self.assertNotIn('optionalDependencies', package)
 
   def _test_resolve_options_helper(
-      self, install_optional, force_option_override, production_only, force, frozen_lockfile,
+      self, install_optional, force_option_override, install_production, force, frozen_lockfile,
       package_manager, product_types, has_lock_file, expected_params):
     self.create_file('src/node/util/package.json', contents=dedent("""
       {
@@ -287,7 +287,7 @@ class NodeResolveTest(TaskTestBase):
     context = self.context(target_roots=[target], options={
       'npm-resolver': {'install_optional': install_optional,
                        'force_option_override': force_option_override,
-                       'production_only': production_only,
+                       'install_production': install_production,
                        'force': force,
                        'frozen_lockfile': frozen_lockfile}
     })
@@ -306,7 +306,7 @@ class NodeResolveTest(TaskTestBase):
     self._test_resolve_options_helper(
       install_optional=False,
       force_option_override=False,
-      production_only=False,
+      install_production=False,
       force=False,
       frozen_lockfile=True,
       package_manager='npm',
@@ -318,7 +318,7 @@ class NodeResolveTest(TaskTestBase):
     self._test_resolve_options_helper(
       install_optional=True,
       force_option_override=True,
-      production_only=True,
+      install_production=True,
       force=True,
       frozen_lockfile=False,
       package_manager='npm',
@@ -330,7 +330,7 @@ class NodeResolveTest(TaskTestBase):
     self._test_resolve_options_helper(
       install_optional=False,
       force_option_override=False,
-      production_only=False,
+      install_production=False,
       force=False,
       frozen_lockfile=True,
       package_manager='yarnpkg',
@@ -342,7 +342,7 @@ class NodeResolveTest(TaskTestBase):
     self._test_resolve_options_helper(
       install_optional=True,
       force_option_override=True,
-      production_only=True,
+      install_production=True,
       force=True,
       frozen_lockfile=False,
       package_manager='yarnpkg',
@@ -354,19 +354,19 @@ class NodeResolveTest(TaskTestBase):
     self._test_resolve_options_helper(
       install_optional=False,
       force_option_override=False,
-      production_only=False,
+      install_production=False,
       force=False,
       frozen_lockfile=True,
       package_manager='yarnpkg',
       product_types=[NodePathsLocal],
       has_lock_file=True,
-      expected_params=['--non-interactive', '--force'])
+      expected_params=['--non-interactive'])
 
     def test_resolve_default_no_options_yarn_no_lock_local(self):
       self._test_resolve_options_helper(
         install_optional=False,
         force_option_override=False,
-        production_only=False,
+        install_production=False,
         force=False,
         frozen_lockfile=True,
         package_manager='yarnpkg',
@@ -378,7 +378,7 @@ class NodeResolveTest(TaskTestBase):
       self._test_resolve_options_helper(
         install_optional=True,
         force_option_override=False,
-        production_only=True,
+        install_production=True,
         force=True,
         frozen_lockfile=False,
         package_manager='yarnpkg',
@@ -390,7 +390,7 @@ class NodeResolveTest(TaskTestBase):
       self._test_resolve_options_helper(
         install_optional=False,
         force_option_override=True,
-        production_only=True,
+        install_production=True,
         force=False,
         frozen_lockfile=False,
         package_manager='yarnpkg',
@@ -404,7 +404,7 @@ class NodeResolveTest(TaskTestBase):
         self._test_resolve_options_helper(
           install_optional=False,
           force_option_override=False,
-          production_only=False,
+          install_production=False,
           force=False,
           frozen_lockfile=True,
           package_manager='npm',

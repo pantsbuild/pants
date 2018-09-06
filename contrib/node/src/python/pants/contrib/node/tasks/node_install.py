@@ -9,7 +9,7 @@ from pants.contrib.node.tasks.node_task import NodeTask
 
 
 class NodeInstall(NodeTask):
-  """Installs a node_module target into the source directory
+  """Installs a node_module target into the directory that the target is defined in.
 
   Note:
     Running the node install on an example_project will install into the local source dir
@@ -28,10 +28,6 @@ class NodeInstall(NodeTask):
   def prepare(cls, options, round_manager):
     super(NodeInstall, cls).prepare(options, round_manager)
     round_manager.require_data(NodePathsLocal)
-
-  @classmethod
-  def supports_passthru_args(cls):
-    return True
 
   def execute(self):
     for target in self.context.target_roots:

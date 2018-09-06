@@ -44,20 +44,13 @@ class NodePathsBase(AbstractClass):
 
 
 class NodePaths(NodePathsBase):
-  """Maps NpmPackage targets to their resolved NODE_PATH chroot.
-
-  NodePaths is exposed as a product type for resolve.node.
-  The paths are the resolved chroot after copying sources to the synthetic workspace.
-  """
+  """Maps Node package targets to their resolved chroot in the pants working dir"""
 
 
 class NodePathsLocal(NodePathsBase):
-  """Maps Node package targets to their local NODE_PATH chroot.
-
-  NodePathsLocal is exposed as a product type for node-resolve-local.
-  The paths are the real source chroot for the target.
+  """Maps Node package targets to the directory that the target is defined in.
 
   This product is intended to be used with the node-install goal which will
-  install local and 3rd party dependencies into the source directory rather
-  than the pants working directory.
+  "install" node targets in the directory they are defined rather than in the
+  pants working directory.
   """

@@ -31,11 +31,11 @@ class NpmResolver(Subsystem, NodeResolverBase):
       '--install-optional', type=bool, default=False, fingerprint=True,
       help='If enabled, install optional dependencies.')
     register(
-      '--production-only', type=bool, default=False, fingerprint=True,
-      help='If enabled, only install production dependencies')
+      '--install-production', type=bool, default=False, fingerprint=True,
+      help='If enabled, do not install devDependencies.')
     register(
       '--force', type=bool, default=False, fingerprint=True,
-      help='If enabled, rebuild dependencies even if they are already built.')
+      help='If enabled, refetch and resolve dependencies even if they are already built.')
     register(
       '--frozen-lockfile', type=bool, default=True, fingerprint=True,
       help='If enabled, disallow automatic update of lock files.')
@@ -45,7 +45,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
     # By turning on --force-option-override, the user accepts full responsibilities.
     register(
       '--force-option-override', type=bool, default=False, fingerprint=True, advanced=True,
-      help='If enabled, options will override hard-coded values.')
+      help='If enabled, options will override hard-coded values. Be aware of default values.')
 
     NodeResolve.register_resolver_for_type(NodeModule, cls)
 
@@ -65,12 +65,12 @@ class NpmResolver(Subsystem, NodeResolverBase):
     """
     if self.get_options().force_option_override:
       install_optional = self.get_options().install_optional
-      production_only = self.get_options().production_only
+      production_only = self.get_options().install_production
       force = self.get_options().force
       frozen_lockfile = self.get_options().frozen_lockfile
     else:
       install_optional = install_optional if install_optional is not None else self.get_options().install_optional
-      production_only = production_only if production_only is not None else self.get_options().production_only
+      production_only = production_only if production_only is not None else self.get_options().install_production
       force = force if force is not None else self.get_options().force
       frozen_lockfile = frozen_lockfile if frozen_lockfile is not None else self.get_options().frozen_lockfile
 

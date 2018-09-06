@@ -20,11 +20,11 @@ class NodeResolve(NodeTask):
   This task exposes two products NodePaths and NodePathsLocal. Both products are handled
   optionally allowing the consumer to choose.
 
-  NodePaths contain a mapping of targets and their resolved location in the virtualized
+  NodePaths contain a mapping of targets and their resolved path in the virtualized
   pants working directory.
 
-  NodePathsLocal is similar to NodePaths with the difference that the resolved location
-  is local to the target source root.
+  NodePathsLocal is similar to NodePaths with the difference that the resolved path
+  is within the same directory that the target is defined.
 
   A node path is considered resolved if the source files are present, installed all dependencies,
   and have executed their build scripts if defined.
@@ -112,7 +112,8 @@ class NodeResolve(NodeTask):
       # Always resolve targets if NodePathsLocal is required.
       # This is crucial for `node-install` goal which builds against source code and relies on
       # latest and nothing from the pants cache. The caching is done locally via the node_modules
-      # directory within source and managed by the underlying package manager.
+      # directory within source and managed by the underlying package manager. In the future,
+      # it can possible to be able to reuse work from the private pants copy.
       sorted_targets = self._topological_sort(targets)
       with self.context.new_workunit(name='node-install', labels=[WorkUnitLabel.MULTITOOL]):
         for target in sorted_targets:
@@ -120,7 +121,6 @@ class NodeResolve(NodeTask):
           results_dir = os.path.join(get_buildroot(), target.address.spec_path)
           resolver_for_target_type.resolve_target(self, target, results_dir, node_paths_local,
                                                   resolve_locally=True,
-                                                  force=True,
                                                   install_optional=True,
                                                   frozen_lockfile=False)
           node_paths_local.resolved(target, results_dir)

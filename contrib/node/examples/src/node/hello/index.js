@@ -2,7 +2,7 @@ if (!process.argv[2]) {
   console.log(`
 Hello!
 
-You can also run one of the following command to greet with name:
+You can also run the following command to greet with name:
 
     yarn start -- name
     ./pants run.node contrib/node/examples/src/node/hello:pantsbuild-hello-node -- name
