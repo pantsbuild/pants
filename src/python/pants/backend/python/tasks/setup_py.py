@@ -5,16 +5,17 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import inspect
+import io
 import itertools
 import os
-import pprint
 import shutil
 import textwrap
 from abc import abstractmethod
-from builtins import map, object, str, zip
+from builtins import bytes, map, object, str, zip
 from collections import OrderedDict, defaultdict
 
-from future.utils import PY2, PY3
+from future.moves import collections
+from future.utils import PY2
 from pex.installer import InstallerBase, Packager
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
@@ -40,7 +41,7 @@ from pants.util.dirutil import safe_concurrent_creation, safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.process_handler import subprocess
-from pants.util.strutil import safe_shlex_split
+from pants.util.strutil import ensure_binary, ensure_text, safe_shlex_split
 
 
 SETUP_BOILERPLATE = """
@@ -49,10 +50,63 @@ SETUP_BOILERPLATE = """
 
 from setuptools import setup
 
-setup(**
-{setup_dict}
-)
+setup(**{setup_dict})
 """
+
+
+# Distutils does not support unicode strings in setup.py, so we must explicitly convert to binary
+# strings as pants uses unicode_literals. A natural and prior technique was to use `pprint.pformat`,
+# but that embeds u's in the string itself during conversion. For that reason we roll out own
+# literal pretty-printer here.
+#
+# For more information, see http://bugs.python.org/issue13943
+def distutils_repr(obj):
+  output = io.StringIO()
+  linesep = os.linesep
+
+  def _write(data):
+    output.write(ensure_text(data))
+
+  def _write_repr(o, indent=False, level=0):
+    pad = ' ' * 4 * level
+    if indent:
+      _write(pad)
+    level += 1
+
+    if isinstance(o, (bytes, str)):
+      # The py2 repr of str (unicode) is `u'...'` and we don't want the `u` prefix; likewise,
+      # the py3 repr of bytes is `b'...'` and we don't want the `b` prefix so we hand-roll a
+      # repr here.
+      if linesep in o:
+        _write('"""{}"""'.format(ensure_text(o.replace('"""', r'\"\"\"'))))
+      else:
+        _write("'{}'".format(ensure_text(o.replace("'", r"\'"))))
+    elif isinstance(o, collections.Mapping):
+      _write('{' + linesep)
+      for k, v in o.items():
+        _write_repr(k, indent=True, level=level)
+        _write(': ')
+        _write_repr(v, indent=False, level=level)
+        _write(',' + linesep)
+      _write(pad + '}')
+    elif isinstance(o, collections.Iterable):
+      if isinstance(o, collections.MutableSequence):
+        open_collection, close_collection = '[]'
+      elif isinstance(o, collections.Set):
+        open_collection, close_collection = '{}'
+      else:
+        open_collection, close_collection = '()'
+
+      _write(open_collection + linesep)
+      for i in o:
+        _write_repr(i, indent=True, level=level)
+        _write(',' + linesep)
+      _write(pad + close_collection)
+    else:
+      _write(repr(o))  # Numbers and bools.
+
+  _write_repr(obj)
+  return output.getvalue()
 
 
 class SetupPyRunner(InstallerBase):
@@ -327,7 +381,7 @@ def declares_namespace_package(filename):
 class SetupPy(Task):
   """Generate setup.py-based Python projects."""
 
-  SOURCE_ROOT = 'src' if PY3 else b'src'
+  SOURCE_ROOT = 'src'
 
   PYTHON_DISTS_PRODUCT = 'python_dists'
 
@@ -411,9 +465,9 @@ class SetupPy(Task):
       pex_info = PexInfo.default(interpreter=interpreter)
       with safe_concurrent_creation(chroot) as scratch:
         builder = PEXBuilder(path=scratch, interpreter=interpreter, pex_info=pex_info, copy=True)
-        with temporary_file() as fp:
+        with temporary_file(binary_mode=False) as fp:
           declares_namespace_package_code = inspect.getsource(declares_namespace_package)
-          fp.write(textwrap.dedent('''
+          fp.write(textwrap.dedent("""
             import sys
 
 
@@ -424,7 +478,7 @@ class SetupPy(Task):
               for path in sys.argv[1:]:
                 if declares_namespace_package(path):
                   print(path)
-          ''').strip().format(declares_namespace_package_code=declares_namespace_package_code))
+          """).strip().format(declares_namespace_package_code=declares_namespace_package_code))
           fp.close()
           builder.set_executable(filename=fp.name, env_filename='main.py')
           builder.freeze()
@@ -447,7 +501,7 @@ class SetupPy(Task):
       # and then writing it out after the process has finished like we do here.
       def write(stream_name, data):
         stream = workunit.output(stream_name)
-        stream.write(data)
+        stream.write(ensure_binary(data) if PY2 else ensure_text(data))
         stream.flush()
 
       write('stdout', stdout)
@@ -460,7 +514,7 @@ class SetupPy(Task):
                         exit_code=exit_code,
                         failed_targets=[root_target])
 
-      return stdout.splitlines()
+      return ensure_text(stdout).splitlines()
 
   def find_packages(self, root_target, chroot):
     """Detect packages, namespace packages and resources from an existing chroot.
@@ -577,33 +631,20 @@ class SetupPy(Task):
 
     Must be run after writing the contents to the chroot.
     """
-    # NB: several explicit str conversions below force non-unicode strings in order to comply
-    # with setuptools expectations.
-    #
-    # Because we rely on pprint to generate the content, we must treat Py2 and Py3 differently.
-    # In Py2, unicode strings have the prefix 'u', and in Py3 byte strings have the prefix 'b'.
-    # The goal is to have no prefix displayed, so to do this we have to use bytes in Py2 and
-    # unicode in Py3.
-
     setup_keywords = root_target.provides.setup_py_keywords.copy()
 
-    package_dir = {'' if PY3 else b'': self.SOURCE_ROOT}
+    package_dir = {'': self.SOURCE_ROOT}
     packages, namespace_packages, resources = self.find_packages(root_target, chroot)
 
     if namespace_packages:
       setup_keywords['namespace_packages'] = list(sorted(namespace_packages))
 
     if packages:
-      normalized_package_data = (
-        resources.items()
-        if PY3 else
-        ((package.encode('utf-8'), [v.encode('utf-8') for v in rs])
-         for (package, rs) in resources.items())
-      )
       setup_keywords.update(
           package_dir=package_dir,
           packages=list(sorted(packages)),
-          package_data=dict(normalized_package_data))
+          package_data=dict((str(package), list(map(str, rs)))
+                            for (package, rs) in resources.items()))
 
     setup_keywords['install_requires'] = list(self.install_requires(reduced_dependencies))
 
@@ -615,44 +656,12 @@ class SetupPy(Task):
       setup_keywords['entry_points']['console_scripts'].append(
           '{} = {}'.format(binary_name, entry_point))
 
-    # From http://stackoverflow.com/a/13105359
-    def convert(input):
-      if isinstance(input, dict):
-        out = dict()
-        for key, value in input.items():
-          out[convert(key)] = convert(value)
-        return out
-      elif isinstance(input, list):
-        return [convert(element) for element in input]
-      elif PY2 and isinstance(input, str):
-        return input.encode('utf-8')
-      else:
-        return input
+    setup_py = self._setup_boilerplate().format(setup_dict=distutils_repr(setup_keywords),
+                                                setup_target=root_target.address.reference())
+    chroot.write(ensure_binary(setup_py), 'setup.py')
 
-    # Distutils does not support unicode strings in setup.py, so we must
-    # explicitly convert to binary strings as pants uses unicode_literals.
-    # Ideally we would write the output stream with an encoding, however,
-    # pprint.pformat embeds u's in the string itself during conversion.
-    # For that reason we convert each unicode string independently.
-    #
-    # jsirois@gill ~ $ python2
-    # Python 2.7.13 (default, Jul 21 2017, 03:24:34)
-    # [GCC 7.1.1 20170630] on linux2
-    # Type "help", "copyright", "credits" or "license" for more information.
-    # >>> import pprint
-    # >>> data = {u'entry_points': {u'console_scripts': [u'pants = pants.bin.pants_exe:main']}}
-    # >>> pprint.pformat(data, indent=4)
-    # "{   u'entry_points': {   u'console_scripts': [   u'pants = pants.bin.pants_exe:main']}}"
-    # >>>
-    #
-    # For more information, see http://bugs.python.org/issue13943
-    chroot.write(self._setup_boilerplate().format(
-      setup_dict=pprint.pformat(convert(setup_keywords), indent=4),
-      setup_target=repr(root_target)
-    ).encode('utf-8'), 'setup.py')
-
-    # make sure that setup.py is included
-    chroot.write('include *.py'.encode('utf8'), 'MANIFEST.in')
+    # Make sure that `setup.py` is included.
+    chroot.write('include *.py', 'MANIFEST.in', mode='w')
 
   def create_setup_py(self, target, dist_dir):
     chroot = Chroot(dist_dir, name=target.provides.name)
