@@ -93,9 +93,10 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
-    'tests/python/pants_test:int-test',
-    'tests/python/pants_test/backend/python:pants_requirement_integration_test_base',
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',
+    'tests/python/pants_test/backend/python:interpreter_selection_utils',
+    'tests/python/pants_test/backend/python:pants_requirement_integration_test_base',
+    'tests/python/pants_test:int-test',
   ],
   tags={'integration'},
   timeout=2400

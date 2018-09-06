@@ -5,10 +5,14 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-import sys
 import time
 
 from pants.util.contextutil import temporary_dir
+from pants_test.backend.python.interpreter_selection_utils import (PY_3, PY_27,
+                                                                   python_interpreter_path,
+                                                                   skip_unless_python3,
+                                                                   skip_unless_python27,
+                                                                   skip_unless_python27_and_python3)
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
@@ -96,7 +100,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     self.assertIn("FAILURE: Test was killed by signal", pants_run.stdout_data)
 
   def test_pytest_explicit_coverage(self):
-    with temporary_dir(cleanup=False) as coverage_dir:
+    with temporary_dir() as coverage_dir:
       pants_run = self.run_pants(['clean-all',
                                   'test.pytest',
                                   '--coverage=pants',
@@ -118,49 +122,41 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
       # current process started.
       self.assertTrue(os.path.exists('{}.0'.format(prof)))
 
+  @skip_unless_python27_and_python3
   def test_pants_test_interpreter_selection_with_pexrc(self):
     """Test the pants test goal with intepreters selected from a PEX_PYTHON_PATH
     defined in a pexrc file on disk.
-
     """
-    py27 = '2.7'
-    py3 = '3'
-    if self.has_python_version(py27) and self.has_python_version(py3):
-      print('Found both python {} and python {}. Running test.'.format(py27, py3))
-      py27_path, py3_path = self.python_interpreter_path(py27), self.python_interpreter_path(py3)
-      with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'),
-                                            [py27_path, py3_path]):
-        with temporary_dir() as interpreters_cache:
-          pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
-          pants_run_27 = self.run_pants(
-            command=['test', '{}:test_py2'.format(os.path.join(self.testproject,
-                                                               'python_3_selection_testing'))],
-            config=pants_ini_config
-          )
-          self.assert_success(pants_run_27)
-          pants_run_3 = self.run_pants(
-            command=['test', '{}:test_py3'.format(os.path.join(self.testproject,
-                                                               'python_3_selection_testing'))],
-            config=pants_ini_config
-          )
-          self.assert_success(pants_run_3)
-    else:
-      print('Could not find both python {} and python {} on system. Skipping.'.format(py27, py3))
-      self.skipTest('Missing neccesary Python interpreters on system.')
+    py27_path, py3_path = python_interpreter_path(PY_27), python_interpreter_path(PY_3)
+    with setup_pexrc_with_pex_python_path([py27_path, py3_path]):
+      with temporary_dir() as interpreters_cache:
+        pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
+        pants_run_27 = self.run_pants(
+          command=['test', '{}:test_py2'.format(os.path.join(self.testproject,
+                                                             'python_3_selection_testing'))],
+          config=pants_ini_config
+        )
+        self.assert_success(pants_run_27)
+        pants_run_3 = self.run_pants(
+          command=['test', '{}:test_py3'.format(os.path.join(self.testproject,
+                                                             'python_3_selection_testing'))],
+          config=pants_ini_config
+        )
+        self.assert_success(pants_run_3)
 
+  @skip_unless_python27
   def test_pants_test_interpreter_selection_with_option_2(self):
     """
     Test that the pants test goal properly constrains the SelectInterpreter task to Python 2
     using the '--python-setup-interpreter-constraints' option.
     """
-    if self.has_python_version('2.7'):
-      with temporary_dir() as interpreters_cache:
-        pants_ini_config = {
-          'python-setup': {
-            'interpreter_constraints': ['CPython>=2.7,<4'],
-            'interpreter_cache_dir': interpreters_cache,
-          }
+    with temporary_dir() as interpreters_cache:
+      pants_ini_config = {
+        'python-setup': {
+          'interpreter_constraints': ['CPython>=2.7,<4'],
+          'interpreter_cache_dir': interpreters_cache,
         }
+      }
       pants_run_2 = self.run_pants(
         command=[
           'test',
@@ -171,23 +167,23 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
       )
       self.assert_success(pants_run_2)
 
+  @skip_unless_python3
   def test_pants_test_interpreter_selection_with_option_3(self):
     """
     Test that the pants test goal properly constrains the SelectInterpreter task to Python 3
     using the '--python-setup-interpreter-constraints' option.
     """
-    if self.has_python_version('3'):
-      with temporary_dir() as interpreters_cache:
-        pants_ini_config = {
-          'python-setup': {
-            'interpreter_constraints': ['CPython>=2.7,<4'],
-            'interpreter_cache_dir': interpreters_cache,
-          }
+    with temporary_dir() as interpreters_cache:
+      pants_ini_config = {
+        'python-setup': {
+          'interpreter_constraints': ['CPython>=2.7,<4'],
+          'interpreter_cache_dir': interpreters_cache,
         }
+      }
       pants_run_3 = self.run_pants(
             command=[
               'test',
-              '{}:test_py3'.format(os.path.join(self.testproject,'python_3_selection_testing')),
+              '{}:test_py3'.format(os.path.join(self.testproject, 'python_3_selection_testing')),
               '--python-setup-interpreter-constraints=["CPython>=3"]',
             ],
             config=pants_ini_config

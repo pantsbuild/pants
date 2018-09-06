@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from pants_test.backend.python.interpreter_selection_utils import PY_3, has_python_version
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -15,7 +16,7 @@ class MypyIntegrationTest(PantsRunIntegrationTest):
       '--',
       '--follow-imports=silent'
     ]
-    if self.has_python_version('3'):
+    if has_python_version(PY_3):
       # Python 3.x is available. Test that we see an error in this integration test.
       with self.pants_results(cmd) as pants_run:
         self.assert_success(pants_run)
