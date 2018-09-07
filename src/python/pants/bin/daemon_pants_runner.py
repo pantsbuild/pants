@@ -10,7 +10,9 @@ import signal
 import sys
 import termios
 import time
-from builtins import open, str, zip
+from builtins import open
+from builtins import str as builtin_str
+from builtins import zip
 from contextlib import contextmanager
 
 from future.utils import raise_with_traceback
@@ -66,7 +68,10 @@ class DaemonExiter(Exiter):
         NailgunProtocol.send_stderr(self._socket, msg)
 
       # Send an Exit chunk with the result.
-      NailgunProtocol.send_exit(self._socket, str(result).encode('ascii'))
+      prev_encoded = str(result).encode('ascii')
+      cur_encoded = builtin_str(result).encode('ascii')
+      self._log_exception("@prev_encoded: {!r}, cur_encoded: {!r}".format(prev_encoded, cur_encoded))
+      NailgunProtocol.send_exit(self._socket, cur_encoded)
 
       # Shutdown the connected socket.
       teardown_socket(self._socket)

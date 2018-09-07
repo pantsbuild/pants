@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import socket
 import traceback
+from builtins import str as builtin_str
 
 from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer
 
@@ -83,7 +84,11 @@ class PailgunHandler(PailgunHandlerBase):
     """Error handler for failed calls to handle()."""
     if exc:
       NailgunProtocol.send_stderr(self.request, traceback.format_exc())
-    NailgunProtocol.send_exit(self.request, '1')
+    result = 1
+    prev_encoded = str(result).encode('ascii')
+    cur_encoded = builtin_str(result).encode('ascii')
+    self.logger.warn("prev_encoded: {!r}, cur_encoded: {!r}".format(prev_encoded, cur_encoded))
+    NailgunProtocol.send_exit(self.request, cur_encoded)
 
 
 class PailgunServer(TCPServer):
