@@ -10,7 +10,7 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 PYENV="$(pyenv which pyenv 2>/dev/null || true)"
-PYENV_ROOT="$(cd "$(pyenv root 2>/dev/null || true)" && pwd -P)"
+PYENV_ROOT="$(pyenv root 2>/dev/null || true)"
 
 function pyenv_path {
   "${PYENV}" versions --bare --skip-aliases | while read v; do
