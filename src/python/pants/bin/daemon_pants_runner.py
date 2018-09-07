@@ -72,7 +72,8 @@ class DaemonExiter(Exiter):
       cur_encoded = builtin_str(result).encode('ascii')
       self._log_exception("@prev_encoded: {!r} ({!r}), cur_encoded: {!r} ({!r})"
                           .format(prev_encoded, type(prev_encoded), cur_encoded, type(cur_encoded)))
-      NailgunProtocol.send_exit(self._socket, cur_encoded)
+      # NB: the CORRECT argument is cur_encoded!!!
+      NailgunProtocol.send_exit(self._socket, prev_encoded)
 
       # Shutdown the connected socket.
       teardown_socket(self._socket)

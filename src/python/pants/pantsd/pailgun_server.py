@@ -89,7 +89,8 @@ class PailgunHandler(PailgunHandlerBase):
     cur_encoded = builtin_str(result).encode('ascii')
     self.logger.warn("prev_encoded: {!r} ({!r}), cur_encoded: {!r} ({!r})"
                      .format(prev_encoded, type(prev_encoded), cur_encoded, type(cur_encoded)))
-    NailgunProtocol.send_exit(self.request, cur_encoded)
+    # NB: the CORRECT argument is cur_encoded!!!
+    NailgunProtocol.send_exit(self.request, prev_encoded)
 
 
 class PailgunServer(TCPServer):
