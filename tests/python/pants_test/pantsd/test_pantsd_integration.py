@@ -370,6 +370,25 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     finally:
       rm_rf(test_path)
 
+  def test_pantsd_parse_exception_success(self):
+    # This test covers the case described in #6426, where a run that is failing fast due to an
+    # exception can race other completing work. We expect all runs to fail due to the error
+    # that has been introduced, but none of them should hang.
+    test_path = 'testprojects/3rdparty/this_is_definitely_not_a_valid_directory'
+    test_build_file = os.path.join(test_path, 'BUILD')
+    invalid_symbol = 'this_is_definitely_not_a_valid_symbol'
+
+    try:
+      safe_mkdir(test_path, clean=True)
+      safe_file_dump(test_build_file, "{}()".format(invalid_symbol), binary_mode=False)
+      for _ in range(3):
+        with self.pantsd_run_context(success=False) as (pantsd_run, checker, _, _):
+          result = pantsd_run(['list', 'testprojects::'])
+          checker.assert_started()
+          self.assertIn(invalid_symbol, result.stderr_data)
+    finally:
+      rm_rf(test_path)
+
   def test_pantsd_multiple_parallel_runs(self):
     with self.pantsd_test_context() as (workdir, config, checker):
       file_to_make = os.path.join(workdir, 'some_magic_file')

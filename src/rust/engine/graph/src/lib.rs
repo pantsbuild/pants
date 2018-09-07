@@ -64,6 +64,10 @@ type Nodes<N> = HashMap<EntryKey<N>, EntryId>;
 struct InnerGraph<N: Node> {
   nodes: Nodes<N>,
   pg: PGraph<N>,
+  /// A Graph that is marked `draining:True` will not allow the creation of new `Nodes`. But
+  /// while draining, any Nodes that exist in the Graph will continue to run until/unless they
+  /// attempt to get/create new Nodes.
+  draining: bool,
 }
 
 impl<N: Node> InnerGraph<N> {
@@ -474,6 +478,7 @@ pub struct Graph<N: Node> {
 impl<N: Node> Graph<N> {
   pub fn new() -> Graph<N> {
     let inner = InnerGraph {
+      draining: false,
       nodes: HashMap::default(),
       pg: DiGraph::new(),
     };
@@ -495,27 +500,34 @@ impl<N: Node> Graph<N> {
   where
     C: NodeContext<Node = N>,
   {
-    let (maybe_entry, entry_id) = {
+    let maybe_entry_and_id = {
       // Get or create the destination, and then insert the dep and return its state.
       let mut inner = self.inner.lock().unwrap();
-      let dst_id = {
-        // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
-        // without a much more complicated algorithm.
-        let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
-        if inner.detect_cycle(src_id, potential_dst_id) {
-          // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
-          inner.ensure_entry(EntryKey::Cyclic(dst_node))
-        } else {
-          // Valid dependency.
-          potential_dst_id
-        }
-      };
-      inner.pg.add_edge(src_id, dst_id, ());
-      (inner.entry_for_id(dst_id).cloned(), dst_id)
+      if inner.draining {
+        None
+      } else {
+        let dst_id = {
+          // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
+          // without a much more complicated algorithm.
+          let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
+          if inner.detect_cycle(src_id, potential_dst_id) {
+            // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
+            inner.ensure_entry(EntryKey::Cyclic(dst_node))
+          } else {
+            // Valid dependency.
+            potential_dst_id
+          }
+        };
+        inner.pg.add_edge(src_id, dst_id, ());
+        inner
+          .entry_for_id(dst_id)
+          .cloned()
+          .map(|entry| (entry, dst_id))
+      }
     };
 
     // Declare the dep, and return the state of the destination.
-    if let Some(mut entry) = maybe_entry {
+    if let Some((mut entry, entry_id)) = maybe_entry_and_id {
       entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
     } else {
       future::err(N::Error::invalidated()).to_boxed()
@@ -529,12 +541,16 @@ impl<N: Node> Graph<N> {
   where
     C: NodeContext<Node = N>,
   {
-    let (maybe_entry, entry_id) = {
+    let maybe_entry_and_id = {
       let mut inner = self.inner.lock().unwrap();
-      let id = inner.ensure_entry(EntryKey::Valid(node));
-      (inner.entry_for_id(id).cloned(), id)
+      if inner.draining {
+        None
+      } else {
+        let id = inner.ensure_entry(EntryKey::Valid(node));
+        inner.entry_for_id(id).cloned().map(|entry| (entry, id))
+      }
     };
-    if let Some(mut entry) = maybe_entry {
+    if let Some((mut entry, entry_id)) = maybe_entry_and_id {
       entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
     } else {
       future::err(N::Error::invalidated()).to_boxed()
@@ -694,12 +710,35 @@ impl<N: Node> Graph<N> {
     inner.all_digests()
   }
 
+  ///
+  /// Executes an operation while all access to the Graph is prevented (by acquiring the Graph's
+  /// lock).
+  ///
   pub fn with_exclusive<F, T>(&self, f: F) -> T
   where
     F: FnOnce() -> T,
   {
     let _inner = self.inner.lock().unwrap();
     f()
+  }
+
+  ///
+  /// Marks this Graph with the given draining status. If the Graph already has a matching
+  /// draining status, then the operation will return an Err.
+  ///
+  /// This is an independent operation from acquiring exclusive access to the Graph
+  /// (`with_exclusive`), because once exclusive access has been acquired, threads attempting to
+  /// access the Graph would wait to acquire the lock, rather than acquiring and then failing fast
+  /// as we'd like them to while `draining:True`.
+  ///
+  pub fn mark_draining(&self, draining: bool) -> Result<(), ()> {
+    let mut inner = self.inner.lock().unwrap();
+    if inner.draining == draining {
+      Err(())
+    } else {
+      inner.draining = draining;
+      Ok(())
+    }
   }
 }
 
@@ -739,7 +778,7 @@ mod tests {
   extern crate rand;
 
   use std::cmp;
-  use std::collections::HashSet;
+  use std::collections::{HashMap, HashSet};
   use std::sync::{mpsc, Arc, Mutex};
   use std::thread;
   use std::time::Duration;
@@ -926,6 +965,50 @@ mod tests {
     );
   }
 
+  #[test]
+  fn drain_and_resume() {
+    // Confirms that after draining a Graph that has running work, we are able to resume the work
+    // and have it complete successfully.
+    let graph = Arc::new(Graph::new());
+
+    let delay_before_drain = Duration::from_millis(100);
+    let delay_in_task = delay_before_drain * 10;
+
+    // Create a context that will sleep long enough at TNode(1) to be interrupted before
+    // requesting TNode(0).
+    let context = {
+      let mut delays = HashMap::new();
+      delays.insert(TNode(1), delay_in_task);
+      TContext::new_with_delays(0, delays, graph.clone())
+    };
+
+    // Spawn a background thread that will mark the Graph draining after a short delay.
+    let graph2 = graph.clone();
+    let _join = thread::spawn(move || {
+      thread::sleep(delay_before_drain);
+      graph2
+        .mark_draining(true)
+        .expect("Should not already be draining.");
+    });
+
+    // Request a TNode(1) in the "delayed" context, and expect it to be interrupted by the
+    // drain.
+    assert_eq!(
+      graph.create(TNode(2), &context).wait(),
+      Err(TError::Invalidated),
+    );
+
+    // Unmark the Graph draining, and try again: we expect the `Invalidated` result we saw before
+    // due to the draining to not have been persisted.
+    graph
+      .mark_draining(false)
+      .expect("Should already be draining.");
+    assert_eq!(
+      graph.create(TNode(2), &context).wait(),
+      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+    );
+  }
+
   ///
   /// A token containing the id of a Node and the id of a Context, respectively. Has a short name
   /// to minimize the verbosity of tests.
@@ -949,6 +1032,7 @@ mod tests {
       let depth = self.0;
       let token = T(depth, context.id());
       if depth > 0 && !context.stop_at(&self) {
+        context.maybe_delay(&self);
         context
           .get(TNode(depth - 1))
           .map(move |mut v| {
@@ -1024,6 +1108,7 @@ mod tests {
   struct TContext {
     id: usize,
     stop_at: Option<TNode>,
+    delays: HashMap<TNode, Duration>,
     graph: Arc<Graph<TNode>>,
     runs: Arc<Mutex<Vec<TNode>>>,
     entry_id: Option<EntryId>,
@@ -1034,6 +1119,7 @@ mod tests {
       TContext {
         id: self.id,
         stop_at: self.stop_at.clone(),
+        delays: self.delays.clone(),
         graph: self.graph.clone(),
         runs: self.runs.clone(),
         entry_id: Some(entry_id),
@@ -1060,6 +1146,7 @@ mod tests {
       TContext {
         id,
         stop_at: None,
+        delays: HashMap::default(),
         graph,
         runs: Arc::new(Mutex::new(Vec::new())),
         entry_id: None,
@@ -1070,6 +1157,22 @@ mod tests {
       TContext {
         id,
         stop_at: Some(stop_at),
+        delays: HashMap::default(),
+        graph,
+        runs: Arc::new(Mutex::new(Vec::new())),
+        entry_id: None,
+      }
+    }
+
+    fn new_with_delays(
+      id: usize,
+      delays: HashMap<TNode, Duration>,
+      graph: Arc<Graph<TNode>>,
+    ) -> TContext {
+      TContext {
+        id,
+        stop_at: None,
+        delays,
         graph,
         runs: Arc::new(Mutex::new(Vec::new())),
         entry_id: None,
@@ -1087,6 +1190,12 @@ mod tests {
     fn ran(&self, node: TNode) {
       let mut runs = self.runs.lock().unwrap();
       runs.push(node);
+    }
+
+    fn maybe_delay(&self, node: &TNode) {
+      if let Some(delay) = self.delays.get(node) {
+        thread::sleep(*delay);
+      }
     }
 
     fn stop_at(&self, node: &TNode) -> bool {
