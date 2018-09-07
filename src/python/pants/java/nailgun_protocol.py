@@ -75,6 +75,9 @@ class NailgunProtocol(object):
   class TruncatedRead(ProtocolError):
     """Raised if there is a socket error while reading an expected number of bytes."""
 
+  class TruncatedZeroLengthRead(ProtocolError):
+    """???"""
+
   class TruncatedHeaderError(TruncatedRead):
     """Raised if there is a socket error while reading the header bytes."""
 
@@ -159,8 +162,13 @@ class NailgunProtocol(object):
     while len(buf) < desired_size:
       recv_bytes = sock.recv(desired_size - len(buf))
       if not recv_bytes:
-        raise cls.TruncatedRead('Expected {} bytes before socket shutdown, instead received {}'
-                                .format(desired_size, len(buf)))
+        num_bytes_recvd = len(buf)
+        if num_bytes_recvd == 0:
+          raise cls.TruncatedZeroLengthRead(
+            'Expected {} bytes before socket shutdown, instead received 0 (zero bytes!)')
+        else:
+          raise cls.TruncatedRead('Expected {} bytes before socket shutdown, instead received {}'
+                                  .format(desired_size, num_bytes_recvd))
       buf += recv_bytes
     return buf
 
@@ -204,7 +212,10 @@ class NailgunProtocol(object):
   def iter_chunks(cls, sock, return_bytes=False):
     """Generates chunks from a connected socket until an Exit chunk is sent."""
     while 1:
-      chunk_type, payload = cls.read_chunk(sock, return_bytes)
+      try:
+        chunk_type, payload = cls.read_chunk(sock, return_bytes)
+      except cls.TruncatedZeroLengthRead:
+        chunk_type, payload = (ChunkType.EXIT, '')
       yield chunk_type, payload
       if chunk_type == ChunkType.EXIT:
         break
