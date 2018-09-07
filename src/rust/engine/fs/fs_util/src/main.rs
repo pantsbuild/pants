@@ -216,7 +216,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             cas_address.to_owned(),
             1,
             chunk_size,
-            Duration::from_secs(30),
+            Duration::from_secs(30 * 60),
           ),
           true,
         )
