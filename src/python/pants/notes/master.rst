@@ -4,6 +4,79 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.10.0rc0 (09/07/2018)
+---------------------
+
+New features
+~~~~~~~~~~~~
+
+* Allow process_executor to make a JDK present (#6443)
+  `PR #6443 <https://github.com/pantsbuild/pants/pull/6443>`_
+
+* Zinc compiles can execute hermetically (#6351)
+  `PR #6351 <https://github.com/pantsbuild/pants/pull/6351>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fixup `JsonEncoderTest` encoding tests. (#6457)
+  `PR #6457 <https://github.com/pantsbuild/pants/pull/6457>`_
+
+* Switch back to forked grpc-rs (#6418)
+  `PR #6418 <https://github.com/pantsbuild/pants/pull/6418>`_
+
+* Fix pants_requirement environment markers. (#6451)
+  `PR #6451 <https://github.com/pantsbuild/pants/pull/6451>`_
+
+* Fix CI failures introduced by #6275 (#6454)
+  `PR #6454 <https://github.com/pantsbuild/pants/pull/6454>`_
+
+* Make sure directory digest is defined for cache hits (#6442)
+  `PR #6442 <https://github.com/pantsbuild/pants/pull/6442>`_
+
+* Cancel running work when entering the fork context (#6464)
+  `PR #6464 <https://github.com/pantsbuild/pants/pull/6464>`_
+
+* Fix setup.py rendering. (#6439)
+  `PR #6439 <https://github.com/pantsbuild/pants/pull/6439>`_
+
+* Detect ns packages using correct interpreter. (#6428)
+  `PR #6428 <https://github.com/pantsbuild/pants/pull/6428>`_
+
+* Fixup tests involving pexrc. (#6446)
+  `PR #6446 <https://github.com/pantsbuild/pants/pull/6446>`_
+
+* [fix] Pass full path to isdir rather than just basename. (#6453)
+  `PR #6453 <https://github.com/pantsbuild/pants/pull/6453>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* fs_util and process_executor: Use default --local-store-path (#6444)
+  `PR #6444 <https://github.com/pantsbuild/pants/pull/6444>`_
+
+* satisfy python_dist setup_requires with a pex to resolve transitive deps, and some other unrelated native toolchain changes (#6275)
+  `PR #6275 <https://github.com/pantsbuild/pants/pull/6275>`_
+
+* Work around production `coverage` float. (#6452)
+  `PR #6452 <https://github.com/pantsbuild/pants/pull/6452>`_
+
+* Get clippy from the beta channel. (#6441)
+  `PR #6441 <https://github.com/pantsbuild/pants/pull/6441>`_
+
+* Tighten travis matrix and python activation. (#6440)
+  `Issue #8315 <https://github.com/travis-ci/travis-ci/issues/8315>`_
+  `PR #6440 <https://github.com/pantsbuild/pants/pull/6440>`_
+
+* Ensure unstable pants dists can never conflict. (#6460)
+  `PR #6460 <https://github.com/pantsbuild/pants/pull/6460>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Minor tweak on blogpost (#6438)
+  `PR #6438 <https://github.com/pantsbuild/pants/pull/6438>`_
+
 
 1.10.0.dev5 (08/31/2018)
 ------------------------
