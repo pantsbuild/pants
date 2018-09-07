@@ -4,6 +4,7 @@
 use std;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::thread;
 use std::time::Duration;
 
 use tokio::runtime::Runtime;
@@ -124,9 +125,22 @@ impl Core {
   where
     F: Fn() -> T,
   {
-    self.fs_pool.with_shutdown(|| {
-      self.runtime.with_reset(|| {
-        self.graph.with_exclusive(|| {
+    // Only one fork may occur at a time, but draining the Runtime and Graph requires that the
+    // Graph lock is not actually held during draining (as that would not allow the Runtime's
+    // threads to observe the draining value). So we attempt to mark the Graph draining (similar
+    // to a CAS loop), and treat a successful attempt as indication that our thread has permission
+    // to execute the fork.
+    //
+    // An alternative would be to have two locks in the Graph: one outer lock for the draining
+    // bool, and one inner lock for Graph mutations. But forks should be rare enough that busy
+    // waiting is not too contentious.
+    while let Err(()) = self.graph.mark_draining(true) {
+      debug!("Waiting to enter fork_context...");
+      thread::sleep(Duration::from_millis(10));
+    }
+    let t = self.runtime.with_reset(|| {
+      self.graph.with_exclusive(|| {
+        self.fs_pool.with_shutdown(|| {
           // TODO: In order for `CommandRunner` to be "object safe" (which it must be in order to
           // be `Box`ed for use in the `Core` struct without generic parameters), it cannot have
           // a generic return type. Rather than giving it a return type like `void*`, we set a
@@ -138,7 +152,12 @@ impl Core {
           res.expect("with_shutdown method did not call its argument function.")
         })
       })
-    })
+    });
+    self
+      .graph
+      .mark_draining(false)
+      .expect("Multiple callers should not be in the fork context at once.");
+    t
   }
 }
 

@@ -401,7 +401,16 @@ impl<N: Node> Entry<N> {
         dirty,
         ..
       } => {
-        if dirty {
+        if result == Some(Err(N::Error::invalidated())) {
+          // Because it is always ephemeral, invalidation is the only type of Err that we do not
+          // persist in the Graph. Instead, swap the Node to NotStarted to drop all waiters,
+          // causing them to also experience invalidation (transitively).
+          EntryState::NotStarted {
+            run_token: run_token.next(),
+            generation,
+            previous_result,
+          }
+        } else if dirty {
           // The node was dirtied while it was running. The dep_generations and new result cannot
           // be trusted and were never published. We continue to use the previous result.
           Self::run(
