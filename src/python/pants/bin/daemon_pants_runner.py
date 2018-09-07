@@ -70,7 +70,8 @@ class DaemonExiter(Exiter):
       # Send an Exit chunk with the result.
       prev_encoded = str(result).encode('ascii')
       cur_encoded = builtin_str(result).encode('ascii')
-      self._log_exception("@prev_encoded: {!r}, cur_encoded: {!r}".format(prev_encoded, cur_encoded))
+      self._log_exception("@prev_encoded: {!r} ({!r}), cur_encoded: {!r} ({!r})"
+                          .format(prev_encoded, type(prev_encoded), cur_encoded, type(cur_encoded)))
       NailgunProtocol.send_exit(self._socket, cur_encoded)
 
       # Shutdown the connected socket.
