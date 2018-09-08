@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import re
 import unittest
 from builtins import str
 
@@ -217,13 +218,11 @@ class ExecuteProcessRequestTest(unittest.TestCase):
     with self.assertRaises(TypeCheckError):
       self._default_args_execute_process_request(argv=('1',), env=['foo', 'bar'])
 
-    # TODO(cosmicexplorer): we should probably check that the digest info in
-    # ExecuteProcessRequest is valid, beyond just checking if it's a string.
     with self.assertRaisesRegexp(TypeCheckError, "env"):
       ExecuteProcessRequest(
         argv=('1',),
-        env=(),
-        input_files='',
+        env=[],
+        input_files=EMPTY_DIRECTORY_DIGEST,
         output_files=(),
         output_directories=(),
         timeout_seconds=0.1,

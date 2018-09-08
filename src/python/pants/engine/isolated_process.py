@@ -11,6 +11,7 @@ from future.utils import binary_type, text_type
 from pants.engine.fs import DirectoryDigest
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
+from pants.util.objects import DatatypeFieldDecl as F
 from pants.util.objects import Exactly, TypeCheckError, datatype
 
 
@@ -23,28 +24,25 @@ class ExecuteProcessRequest(datatype([
   ('argv', tuple),
   ('input_files', DirectoryDigest),
   ('description', text_type),
-  ('env', tuple),
-  ('output_files', tuple),
-  ('output_directories', tuple),
+  # TODO: allow inferring a default value if a type is provided which has a 0-arg constructor.
+  F('env', Exactly(tuple, dict, type(None)), default_value=None),
+  F('output_files', tuple, default_value=()),
+  F('output_directories', tuple, default_value=()),
   # NB: timeout_seconds covers the whole remote operation including queuing and setup.
-  ('timeout_seconds', Exactly(float, int)),
-  ('jdk_home', Exactly(text_type, type(None))),
+  F('timeout_seconds', Exactly(float, int), default_value=_default_timeout_seconds),
+  F('jdk_home', Exactly(text_type, type(None)), default_value=None),
 ])):
   """Request for execution with args and snapshots to extract."""
 
-  def __new__(
-    cls,
-    argv,
-    input_files,
-    description,
-    env=None,
-    output_files=(),
-    output_directories=(),
-    timeout_seconds=_default_timeout_seconds,
-    jdk_home=None,
-  ):
+  def __new__(cls, *args, **kwargs):
+    this_object = super(ExecuteProcessRequest, cls).__new__(cls, *args, **kwargs)
+
+    env = this_object.env
+    # `env` is a tuple, a dict, or None.
     if env is None:
       env = ()
+    elif isinstance(env, tuple):
+      pass
     else:
       if not isinstance(env, dict):
         raise TypeCheckError(
@@ -56,17 +54,7 @@ class ExecuteProcessRequest(datatype([
         )
       env = tuple(item for pair in env.items() for item in pair)
 
-    return super(ExecuteProcessRequest, cls).__new__(
-      cls,
-      argv=argv,
-      env=env,
-      input_files=input_files,
-      description=description,
-      output_files=output_files,
-      output_directories=output_directories,
-      timeout_seconds=timeout_seconds,
-      jdk_home=jdk_home,
-    )
+    return this_object.copy(env=env)
 
 
 class ExecuteProcessResult(datatype([('stdout', binary_type),
