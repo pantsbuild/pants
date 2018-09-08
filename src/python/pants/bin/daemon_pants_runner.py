@@ -10,12 +10,10 @@ import signal
 import sys
 import termios
 import time
-from builtins import open
-from builtins import str as builtin_str
-from builtins import zip
+from builtins import open, str, zip
 from contextlib import contextmanager
 
-from future.utils import raise_with_traceback
+from future.utils import binary_type, raise_with_traceback
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
@@ -68,12 +66,7 @@ class DaemonExiter(Exiter):
         NailgunProtocol.send_stderr(self._socket, msg)
 
       # Send an Exit chunk with the result.
-      prev_encoded = str(result).encode('ascii')
-      cur_encoded = builtin_str(result).encode('ascii')
-      self._log_exception("@prev_encoded: {!r} ({!r}), cur_encoded: {!r} ({!r})"
-                          .format(prev_encoded, type(prev_encoded), cur_encoded, type(cur_encoded)))
-      # NB: the CORRECT argument is cur_encoded!!!
-      NailgunProtocol.send_exit(self._socket, prev_encoded)
+      NailgunProtocol.send_exit_with_code(self._socket, result)
 
       # Shutdown the connected socket.
       teardown_socket(self._socket)

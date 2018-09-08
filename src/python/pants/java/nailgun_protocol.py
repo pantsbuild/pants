@@ -235,6 +235,25 @@ class NailgunProtocol(object):
     cls.write_chunk(sock, ChunkType.PID, pid)
 
   @classmethod
+  def encode_process_exit_code(cls, code):
+    """???"""
+    if not isinstance(code, int):
+      raise Exception('???')
+    return str(code).encode('ascii')
+
+  @classmethod
+  def send_exit_with_code(cls, sock, code):
+    """???"""
+    encoded_exit_status = cls.encode_process_exit_code(code)
+    cls.send_exit(sock, payload=encoded_exit_status)
+
+  @classmethod
+  def encode_env_var_value(cls, obj):
+    """???"""
+    # return str(obj).encode('utf-8')
+    return binary_type(str(obj))
+
+  @classmethod
   def isatty_to_env(cls, stdin, stdout, stderr):
     """Generate nailgun tty capability environment variables based on checking a set of fds.
 
@@ -246,7 +265,7 @@ class NailgunProtocol(object):
     def gen_env_vars():
       for fd_id, fd in zip(STDIO_DESCRIPTORS, (stdin, stdout, stderr)):
         is_atty = fd.isatty()
-        yield (cls.TTY_ENV_TMPL.format(fd_id), str(int(is_atty)).encode('utf-8'))
+        yield (cls.TTY_ENV_TMPL.format(fd_id), cls.encode_env_var_value(int(is_atty)))
         if is_atty:
           yield (cls.TTY_PATH_ENV.format(fd_id), os.ttyname(fd.fileno()) or b'')
     return dict(gen_env_vars())
