@@ -11,7 +11,8 @@ from builtins import str
 import six
 
 from pants.util.meta import AbstractClass
-from pants.util.objects import Exactly, datatype
+from pants.util.objects import DatatypeFieldDecl as F
+from pants.util.objects import Exactly, SubclassesOf, datatype
 
 
 def type_or_constraint_repr(constraint):
@@ -96,15 +97,14 @@ class Selector(AbstractClass):
     """The product that this selector produces."""
 
 
-class Select(datatype(['product', 'optional']), Selector):
+class Select(datatype([
+    'product',
+    F('optional', bool, default_value=False),
+]), Selector):
   """Selects the given Product for the Subject provided to the constructor.
 
   If optional=True and no matching product can be produced, will return None.
   """
-
-  def __new__(cls, product, optional=False):
-    obj = super(Select, cls).__new__(cls, product, optional)
-    return obj
 
   def __repr__(self):
     return '{}({}{})'.format(type(self).__name__,
@@ -112,7 +112,10 @@ class Select(datatype(['product', 'optional']), Selector):
                              ', optional=True' if self.optional else '')
 
 
-class SelectVariant(datatype(['product', 'variant_key']), Selector):
+class SelectVariant(datatype([
+    'product',
+    ('variant_key', SubclassesOf(*six.string_types)),
+]), Selector):
   """Selects the matching Product and variant name for the Subject provided to the constructor.
 
   For example: a SelectVariant with a variant_key of "thrift" and a product of type ApacheThrift
@@ -120,11 +123,6 @@ class SelectVariant(datatype(['product', 'variant_key']), Selector):
   ApacheThrift value.
   """
   optional = False
-
-  def __new__(cls, product, variant_key):
-    if not isinstance(variant_key, six.string_types):
-      raise ValueError('Expected variant_key to be a string, but was {!r}'.format(variant_key))
-    return super(SelectVariant, cls).__new__(cls, product, variant_key)
 
   def __repr__(self):
     return '{}({}, {})'.format(type(self).__name__,
