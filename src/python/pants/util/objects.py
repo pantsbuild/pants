@@ -156,11 +156,53 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       '''Return a new OrderedDict which maps field names to their values'''
       return OrderedDict(zip(self._fields, self._super_iter()))
 
-    def _replace(_self, **kwds):
-      '''Return a new datatype object replacing specified fields with new values'''
-      field_dict = _self._asdict()
-      field_dict.update(**kwds)
-      return type(_self)(**field_dict)
+    @memoized_classproperty
+    def _supertype_keyword_only_cached_constructor(cls):
+      """This method is less of an optimization and more to avoid mistakes calling super()."""
+      def ctor(**kw):
+        return super(DataType, cls).__new__(cls, **kw)
+      return ctor
+
+    def _replace(self, **kwds):
+      '''Return a new datatype object replacing specified fields with new values.
+
+      This method upholds 2 contracts:
+      1. If no keyword arguments are provided, return the original object.
+      2. Do not call __new__() -- the parent class's __new__() is used instead (skipping e.g. type
+         checks, which are done in this method by hand).
+
+      These two contracts allow it to be used in __new__() overrides without worrying about
+      unbounded recursion.
+      '''
+      field_dict = self._asdict()
+
+      arg_check_error_messages = []
+      for cur_field_name, cur_field_value in kwds.items():
+        if cur_field_name not in parsed_field_dict:
+          arg_check_error_messages.append(
+            "Field '{}' was not recognized."
+            .format(cur_field_name))
+          continue
+
+        cur_field_decl = parsed_field_dict[cur_field_name]
+        maybe_type_constraint = cur_field_decl.type_constraint
+
+        if maybe_type_constraint:
+          try:
+            maybe_type_constraint.validate_satisfied_by(cur_field_value)
+          except TypeError as e:
+            arg_check_error_messages.append(
+              "Type error for field '{}': {}"
+              .format(cur_field_name, str(e)))
+
+        field_dict[cur_field_name] = cur_field_value
+
+      if arg_check_error_messages:
+        raise self.make_type_error(
+          "Replacing fields {kw!r} of object {obj!r} failed:\n{errs}"
+          .format(kw=kwds, obj=self, errs='\n'.join(arg_check_error_messages)))
+
+      return self._supertype_keyword_only_cached_constructor(**field_dict)
 
     def copy(self, **kwargs):
       """Return the result of `self._replace(**kwargs)`.
@@ -168,9 +210,9 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       This method stub makes error messages provide this method's name, instead of pointing to the
       private `_replace()`.
 
-      We intentionally accept only keyword arguments to make copy() calls in Python code consuming
-      the datatype remain valid if the datatype's definition is updated, unless a field is removed
-      (which fails loudly and quickly with an unknown keyword argument error).
+      NB: We intentionally accept only keyword arguments to make copy() calls in Python code
+      consuming the datatype remain valid if the datatype's definition is updated, unless a field is
+      removed (which fails loudly and quickly with an unknown keyword argument error).
       """
       return self._replace(**kwargs)
 

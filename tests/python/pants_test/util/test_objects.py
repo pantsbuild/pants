@@ -614,7 +614,8 @@ field 'some_value' was invalid: value 3 (with type 'int') must satisfy this type
 
     expected_rx_str = re.escape(
       """error: in constructor of type AnotherTypedDatatype: type check error:
-__new__() got an unexpected keyword argument 'nonexistent_field'""")
+Replacing fields {'nonexistent_field': 3} of object AnotherTypedDatatype(string=u'some string', elements=[1, 2, 3]) failed:
+Field 'nonexistent_field' was not recognized.""")
     with self.assertRaisesRegexp(TypeCheckError, expected_rx_str):
       obj.copy(nonexistent_field=3)
 
@@ -628,7 +629,8 @@ __new__() got an unexpected keyword argument 'nonexistent_field'""")
 
     expected_rx_str = re.escape(
       """error: in constructor of type AnotherTypedDatatype: type check error:
-field 'elements' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly(list).""")
+Replacing fields {'elements': 3} of object AnotherTypedDatatype(string=u'some string', elements=[1, 2, 3]) failed:
+Type error for field 'elements': value 3 (with type 'int') must satisfy this type constraint: Exactly(list).""")
     with self.assertRaisesRegexp(TypeCheckError, expected_rx_str):
       obj.copy(elements=3)
 
