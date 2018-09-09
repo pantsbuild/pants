@@ -155,7 +155,8 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       pex = os.path.join(tmp_dir, 'main.pex')
       pants_ini_config = {
         'python-setup': {
-          # TODO: explain why we need 'this-platform-does_not-exist' here.
+          # If no targets exist declaring the nonexistent platform, this should be reduced to just
+          # ['current'] in PythonNativeCode#check_build_for_current_platform_only().
           'platforms': ['current', 'this-platform-does_not-exist'],
         },
       }
