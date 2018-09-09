@@ -43,6 +43,7 @@ class ResolveRequirementsTaskBase(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super(ResolveRequirementsTaskBase, cls).prepare(options, round_manager)
     round_manager.require_data(PythonInterpreter)
     round_manager.optional_product(PythonRequirementLibrary)  # For local dists.
     # Codegen may inject extra resolvable deps, so make sure we have a product dependency
