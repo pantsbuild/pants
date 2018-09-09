@@ -9,7 +9,6 @@ import os
 import re
 from builtins import open
 
-from pants.backend.native.config.environment import Platform
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import is_executable
@@ -43,9 +42,10 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       # Check that the pex runs.
       output = subprocess.check_output(pex).decode('utf-8')
       self._assert_native_greeting(output)
-      # Check that we have exact one wheel output
+      # Check that we have exactly one wheel output.
       single_wheel_output = assert_single_element(glob.glob(os.path.join(tmp_dir, '*.whl')))
-      self.assertTrue(os.path.basename(single_wheel_output).startswith('fasthello-1.0.0+'))
+      self.assertRegexpMatches(os.path.basename(single_wheel_output),
+                               r'\A{}'.format(re.escape('fasthello-1.0.0+')))
 
   def test_pants_run(self):
     with temporary_dir() as tmp_dir:
@@ -68,7 +68,6 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
         command=['run', fasthello_run],
         workdir=os.path.join(buildroot.new_buildroot, '.pants.d'),
         build_root=buildroot.new_buildroot,
-        extra_env={'PEX_VERBOSE': '9'},
       )
 
       unmodified_pants_run = run_target()
@@ -176,13 +175,6 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       output = subprocess.check_output(pex).decode('utf-8')
       self._assert_native_greeting(output)
 
-  def _get_current_platform_string(self):
-    return Platform.create().resolve_platform_specific({
-      # TODO: this will fail on everyone's laptop if they're not at 10.12.
-      'darwin': lambda: 'macosx-10.12-x86_64',
-      'linux': lambda: 'linux-x86_64',
-    })
-
   def test_pants_tests_local_dists_for_simulated_current_platform_only(self):
     """
     The "simulated" current platform here is the platform that 'current' will resolve to on this
@@ -195,7 +187,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
         '{}:fasthello'.format(self.fasthello_tests)]
       pants_run = self.run_pants(command=command, config={
         'python-setup': {
-          'platforms': [self._get_current_platform_string()],
+          'platforms': ['current'],
         },
       })
       self.assert_success(pants_run)
@@ -227,8 +219,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
 
   def test_pants_requirement_setup_requires_version(self):
     """Ensure that a pants_requirement() can be successfully used in setup_requires."""
-    pants_run = self.run_pants(['-q', 'run', '{}:bin'.format(self.pants_setup_requires)],
-                               extra_env={'PEX_VERBOSE': '9'})
+    pants_run = self.run_pants(['-q', 'run', '{}:bin'.format(self.pants_setup_requires)])
     self.assert_success(pants_run)
     # This testproject prints its own version string here, which is the current pants version plus
     # the pants fingerprint (as defined in this project's setup.py).

@@ -122,8 +122,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
   def run_shard(self, shard):
     targets = self.targets_for_shard(shard)
     pants_run = self.pants_test(targets + ['--jvm-platform-default-platform=java7',
-                                           '--gen-protoc-import-from-root'],
-                                extra_env={'PEX_VERBOSE': '9'})
+                                           '--gen-protoc-import-from-root'])
     self.assert_success(pants_run)
 
   def test_self(self):
