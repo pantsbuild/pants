@@ -111,6 +111,7 @@ python_library(
   sources = ['hash_utils.py'],
   dependencies = [
     '3rdparty/python:future',
+    ':deprecated',
   ]
 )
 

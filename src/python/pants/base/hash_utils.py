@@ -6,10 +6,12 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import hashlib
 import json
-from builtins import object, open
+from builtins import bytes, object, open, str
 
+from future.moves import collections
 from future.utils import PY3
 
+from pants.base.deprecated import deprecated
 from pants.util.strutil import ensure_binary
 
 
@@ -39,6 +41,55 @@ def hash_file(path, digest=None):
   return digest.hexdigest() if PY3 else digest.hexdigest().decode('utf-8')
 
 
+class CoercingEncoder(json.JSONEncoder):
+  """An encoder which performs coercions in order to serialize many otherwise illegal objects.
+
+  The python documentation (https://docs.python.org/2/library/json.html#json.dumps) states that
+  dict keys are coerced to strings in json.dumps, but this appears to be incorrect -- it throws a
+  TypeError on things we might to throw at it, like a set, or a dict with tuple keys.
+  """
+
+  def _maybe_encode_dict_key(self, key_obj):
+    # If dict keys aren't strings, recursively encode them until they are. Checking for strings here
+    # means we don't touch keys that are already strings (instead of quoting them).
+    if isinstance(key_obj, bytes):
+      # Bytes often occur as dict keys in python 2 code, but in python 3, trying to encode bytes
+      # keys raises a TypeError. We explicitly check for that here and convert to str.
+      return self.default(key_obj.decode('utf-8'))
+    elif isinstance(key_obj, str):
+      return self.default(key_obj)
+    else:
+      return self.encode(key_obj)
+
+  def default(self, o):
+    if isinstance(o, collections.Mapping):
+      # Preserve order to avoid collisions for OrderedDict inputs to json.dumps(). We don't do this
+      # for general mappings because dicts have an arbitrary key ordering in some versions of python
+      # 3 (2.7 and 3.6-3.7 are known to have sorted keys, but with different definitions of sorted
+      # orders across versions, including insertion order). We want unordered dicts to collide if
+      # they have the same keys, in the same way we special-case sets below. Calling sorted() should
+      # be very fast if the keys happen to be pre-sorted.
+      if isinstance(o, collections.OrderedDict):
+        raise TypeError('{cls} does not support OrderedDict inputs: {val!r}.'
+                        .format(cls=type(self).__name__, val=o))
+      else:
+        ordered_kv_pairs = sorted(o.items(), key=lambda x: x[0])
+      return collections.OrderedDict(
+        (self._maybe_encode_dict_key(k), self.default(v))
+        for k, v in ordered_kv_pairs)
+    elif isinstance(o, collections.Set):
+      return sorted(self.default(i) for i in o)
+    elif isinstance(o, collections.Iterable) and not isinstance(o, (bytes, list, str)):
+      return list(self.default(i) for i in o)
+    return o
+
+  def encode(self, o):
+    return super(CoercingEncoder, self).encode(self.default(o))
+
+
+@deprecated(
+  '1.13.0.dev0',
+  'Please use pants.base.hash_utils.stable_json_sha1 instead.')
 def stable_json_hash(obj, digest=None, encoder=None):
   """Hashes `obj` stably; ie repeated calls with the same inputs will produce the same hash.
 
@@ -51,8 +102,37 @@ def stable_json_hash(obj, digest=None, encoder=None):
 
   :API: public
   """
+  return json_hash(obj, digest=digest, encoder=encoder)
+
+
+def json_hash(obj, digest=None, encoder=None):
+  """Hashes `obj` by dumping to JSON.
+
+  :param obj: An object that can be rendered to json using the given `encoder`.
+  :param digest: An optional `hashlib` compatible message digest. Defaults to `hashlib.sha1`.
+  :param encoder: An optional custom json encoder.
+  :type encoder: :class:`json.JSONEncoder`
+  :returns: A hash of the given `obj` according to the given `encoder`.
+  :rtype: str
+
+  :API: public
+  """
   json_str = json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True, cls=encoder)
   return hash_all(json_str, digest=digest)
+
+
+# TODO(#6513): something like python 3's @lru_cache decorator could be useful here!
+def stable_json_sha1(obj, digest=None):
+  """Hashes `obj` stably; ie repeated calls with the same inputs will produce the same hash.
+
+  :param obj: An object that can be rendered to json using a :class:`CoercingEncoder`.
+  :param digest: An optional `hashlib` compatible message digest. Defaults to `hashlib.sha1`.
+  :returns: A stable hash of the given `obj`.
+  :rtype: str
+
+  :API: public
+  """
+  return json_hash(obj, digest=digest, encoder=CoercingEncoder)
 
 
 class Sharder(object):

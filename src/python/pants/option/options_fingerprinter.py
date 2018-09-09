@@ -4,32 +4,26 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import functools
-import json
 import os
 from builtins import object, open, str
 from hashlib import sha1
 
 from pants.base.build_environment import get_buildroot
-from pants.base.hash_utils import stable_json_hash
+from pants.base.hash_utils import CoercingEncoder, json_hash
 from pants.option.custom_types import (UnsetBool, dict_with_files_option, dir_option, file_option,
                                        target_option)
 from pants.util.collections_abc_backport import Iterable, Mapping
 
 
-class Encoder(json.JSONEncoder):
+class CoercingOptionEncoder(CoercingEncoder):
   def default(self, o):
     if o is UnsetBool:
       return '_UNSET_BOOL_ENCODING'
-    elif isinstance(o, Iterable) and not isinstance(o, Mapping):
-      # For things like sets which JSONEncoder doesn't handle, and raises a TypeError on.
-      return list(o)
-    return super(Encoder, self).default(o)
+    return super(CoercingOptionEncoder, self).default(o)
 
 
-# TODO: this function could be wrapped in @memoized -- we would have to manage the cache size
-# somehow if this is done or it might blow up.
-stable_json_sha1 = functools.partial(stable_json_hash, encoder=Encoder)
+def stable_option_fingerprint(obj):
+  return json_hash(obj, encoder=CoercingOptionEncoder)
 
 
 class OptionsFingerprinter(object):
@@ -78,14 +72,11 @@ class OptionsFingerprinter(object):
     if option_val is None:
       return None
 
-    # The python documentation (https://docs.python.org/2/library/json.html#json.dumps) states that
-    # dict keys are coerced to strings in json.dumps, but this appears to be incorrect.
-    if isinstance(option_val, Mapping):
-      option_val = {stable_json_sha1(k):v for k, v in option_val.items()}
-
-    # For simplicity, we always fingerprint a list.  For non-list-valued options,
-    # this will be a singleton list.
-    if not isinstance(option_val, (list, tuple)):
+    # Wrapping all other values in a list here allows us to easily handle single-valued and
+    # list-valued options uniformly. For non-list-valued options, this will be a singleton list
+    # (with the exception of dict, which is not modified). This dict exception works because we do
+    # not currently have any "list of dict" type, so there is no ambiguity.
+    if not isinstance(option_val, (list, tuple, dict)):
       option_val = [option_val]
 
     if option_type == target_option:
@@ -165,7 +156,7 @@ class OptionsFingerprinter(object):
     return hasher.hexdigest()
 
   def _fingerprint_primitives(self, val):
-    return stable_json_sha1(val)
+    return stable_option_fingerprint(val)
 
   def _fingerprint_dict_with_files(self, option_val):
     """Returns a fingerprint of the given dictionary containing file paths.
@@ -176,12 +167,12 @@ class OptionsFingerprinter(object):
     This assumes the files are small enough to be read into memory.
 
     NB: The keys of the dict are assumed to be strings -- if they are not, the dict should be
-    converted to encode its keys with `stable_json_sha1()`, as is done in the `fingerprint()`
+    converted to encode its keys with `stable_option_fingerprint()`, as is done in the `fingerprint()`
     method.
     """
-    # Dicts are wrapped in singleton lists. See the "For simplicity..." comment in `fingerprint()`.
-    option_val = option_val[0]
-    return stable_json_sha1({k: self._expand_possible_file_value(v) for k, v in option_val.items()})
+    return stable_option_fingerprint({
+      k: self._expand_possible_file_value(v) for k, v in option_val.items()
+    })
 
   def _expand_possible_file_value(self, value):
     """If the value is a file, returns its contents. Otherwise return the original value."""
