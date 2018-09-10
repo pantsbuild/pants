@@ -1,15 +1,15 @@
 1.10.x Stable Releases
-=====================
+======================
 
 This document describes releases leading up to the ``1.10.x`` ``stable`` series.
 
 1.10.0 (09/10/2018)
-------------------
+-------------------
 
 The first stable release of the 1.10.x series.
 
 1.10.0rc0 (09/10/2018)
----------------------
+----------------------
 
 New features
 ~~~~~~~~~~~~
