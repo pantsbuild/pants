@@ -259,10 +259,10 @@ class MappedSpecs(datatype([
   def all_matching_addresses(self):
     """Return all addresses the given specs resolve to, within the given address families.
 
-    :raises: :class:`ResolveError` for errors matching address families, and for failure to match a
-             SingleAddress spec in an existing AddressFamily.
-    :raises: :class:`AddressLookupError` for failure to match any targets for non-SingleAddress
-             specs.
+    :raises: :class:`ResolveError` if:
+     - there were no matching AddressFamilies, or
+     - the Spec matches no addresses for SingleAddresses.
+    :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
     """
     matched_addresses = []
     for spec in self.specs.dependencies:
@@ -284,9 +284,10 @@ def map_specs(address_mapper, specs):
 def addresses_from_address_families(mapped_specs):
   """Given an AddressMapper and list of Specs, return matching BuildFileAddresses.
 
-  Raises a AddressLookupError if:
+  :raises: :class:`ResolveError` if:
      - there were no matching AddressFamilies, or
      - the Spec matches no addresses for SingleAddresses.
+  :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
   """
   deduplicated_addresses = frozenset(mapped_specs.all_matching_addresses())
   return BuildFileAddresses(tuple(deduplicated_addresses))
