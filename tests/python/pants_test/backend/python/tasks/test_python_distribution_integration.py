@@ -176,11 +176,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       output = subprocess.check_output(pex).decode('utf-8')
       self._assert_native_greeting(output)
 
-  def test_pants_tests_local_dists_for_simulated_current_platform_only(self):
-    """
-    The "simulated" current platform here is the platform that 'current' will resolve to on this
-    host -- we do support using those platform strings directly as well.
-    """
+  def test_pants_tests_local_dists_for_current_platform_only(self):
     with temporary_dir() as tmp_dir:
       command=[
         '--pants-distdir={}'.format(tmp_dir),
