@@ -80,7 +80,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     with self.assertRaisesRegexp(ResolveError, expected_rx_str):
       run_rule(addresses_from_address_families, mapped_specs)
 
-    # ???
+    # Ensure that we still catch nonexistent targets later on in the list of command-line specs.
     specs = Specs([SingleAddress('root', 'a'), SingleAddress('root', 'b')])
     mapped_specs = MappedSpecs([address_family], specs)
     with self.assertRaisesRegexp(ResolveError, expected_rx_str):
