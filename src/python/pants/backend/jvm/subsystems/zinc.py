@@ -267,13 +267,6 @@ class Zinc(object):
     """A utility function to create relative paths to the work dir"""
     return fast_relpath(path, get_buildroot())
 
-  @staticmethod
-  def execute_sucessfully_or_raise(context, request, label, workunits, fail_message=None):
-    res = context.execute_process_synchronously(request, label, workunits)
-    if res.exit_code:
-      raise Exception("{}".format(fail_message))
-    return res
-
   def compile_compiler_bridge(self, context):
     """Compile the compiler bridge to be used by zinc, using our scala bootstrapper.
     It will compile and cache the jar, and materialize it if not already there.
@@ -310,13 +303,7 @@ class Zinc(object):
       jdk_home=self.dist.home,
     )
 
-    res = Zinc.execute_sucessfully_or_raise(
-      context,
-      req,
-      'zinc-subsystem',
-      [WorkUnitLabel.COMPILER],
-      "Bootstrapping the compiler bridge failed:",
-    )
+    res = context.execute_process_synchronously_or_raise(req, 'zinc-subsystem', [WorkUnitLabel.COMPILER])
 
     if not context.options.for_global_scope().remote_execution_server:
       context._scheduler.materialize_directories((

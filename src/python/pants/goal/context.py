@@ -16,7 +16,8 @@ from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.target import Target
-from pants.engine.isolated_process import FallibleExecuteProcessResult
+from pants.engine.isolated_process import (FallibleExecuteProcessResult,
+                                           fallible_to_exec_result_or_raise)
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
 from pants.process.lock import OwnerPrintingInterProcessFileLock
@@ -399,3 +400,14 @@ class Context(object):
       workunit.output("stderr").write(result.stderr)
       workunit.set_outcome(WorkUnit.FAILURE if result.exit_code else WorkUnit.SUCCESS)
       return result
+
+  def execute_process_synchronously_or_raise(self, execute_process_request, name, labels=None):
+    """Execute process synchronously, and throw if the return code is not 0.
+
+    See execute_process_synchronously for the api docs.
+    """
+    fallible_result = self.execute_process_synchronously(execute_process_request, name, labels)
+    return fallible_to_exec_result_or_raise(
+      fallible_result,
+      execute_process_request
+    )
