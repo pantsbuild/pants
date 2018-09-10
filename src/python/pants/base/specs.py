@@ -33,6 +33,7 @@ class Spec(AbstractClass):
     """Given a dict of (namespace path) -> AddressFamily, return the values matching this spec.
 
     :raises: :class:`Spec.AddressFamilyResolutionError` if no address families matched this spec.
+    :return: list of AddressFamily.
     """
 
   @classmethod
@@ -50,9 +51,10 @@ class Spec(AbstractClass):
   def all_address_target_pairs(self, address_families):
     """Given a list of AddressFamily, return (address, target) pairs matching this spec.
 
-    :raises: :class:`SingleAddress.SingleAddressResolutionError` if no targets could be found for a
+    :raises: :class:`SingleAddress.SingleAddressResolutionError` for resolution errors with a
              :class:`SingleAddress` instance.
     :raises: :class:`Spec.AddressResolutionError` if no targets could be found otherwise.
+    :return: list of (Address, Target) pairs.
     """
     addr_tgt_pairs = []
     for af in address_families:
@@ -84,9 +86,11 @@ class SingleAddress(datatype(['directory', 'name']), Spec):
       self.name = name
 
   def all_address_target_pairs(self, address_families):
-    """Return the single target matching the single AddressFamily, or error.
+    """Return the pair for the single target matching the single AddressFamily, or error.
 
-    :raises: :class:`SingleAddress.SingleAddressResolutionError`
+    :raises: :class:`SingleAddress.SingleAddressResolutionError` if no targets could be found for a
+             :class:`SingleAddress` instance.
+    :return: list of (Address, Target) pairs with exactly one element.
     """
     single_af = assert_single_element(address_families)
     addr_tgt_pairs = [
