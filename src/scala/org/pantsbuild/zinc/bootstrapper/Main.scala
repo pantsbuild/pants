@@ -1,38 +1,98 @@
 /**
- * Copyright (C) 2017 Pants project contributors (see CONTRIBUTORS.md).
- * Licensed under the Apache License, Version 2.0 (see LICENSE).
- */
-
+  * Copyright (C) 2017 Pants project contributors (see CONTRIBUTORS.md).
+  * Licensed under the Apache License, Version 2.0 (see LICENSE).
+  */
 package org.pantsbuild.zinc.bootstrapper
 
 import org.pantsbuild.zinc.scalautil.ScalaUtils
 import java.io.File
 import sbt.internal.util.ConsoleLogger
 
+case class Configuration(
+    outputPath: File = new File("."),
+    compilerInterface: File = new File("."),
+    compilerBridgeSource: File = new File("."),
+    scalaCompiler: File = new File("."),
+    scalaLibrary: File = new File("."),
+    scalaReflect: File = new File(".")
+)
+object Cli {
+  val CliParser = new scopt.OptionParser[Configuration]("scopt") {
+    head("zinc-boostrapper", "0.0.1")
+
+    opt[File]('o', "out")
+      .required()
+      .valueName("<file>")
+      .action((x, c) => c.copy(outputPath = x))
+      .text("Output path for the compiler-bridge jar.")
+
+    opt[File]("compiler-interface")
+      .required()
+      .valueName("<file>")
+      .action((x, c) => c.copy(compilerInterface = x))
+      .validate { file =>
+        if (file.exists) success else failure(s"$file does not exist.")
+      }
+      .text("Compiler interface jar.")
+
+    opt[File]("compiler-bridge-src")
+      .required()
+      .valueName("<file>")
+      .action((x, c) => c.copy(compilerBridgeSource = x))
+      .validate { file =>
+        if (file.exists) success else failure(s"$file does not exist.")
+      }
+      .text("Compiler bridge source code.")
+
+    opt[File]("scala-compiler")
+      .required()
+      .valueName("<file>")
+      .action((x, c) => c.copy(scalaCompiler = x))
+      .validate { file =>
+        if (file.exists) success else failure(s"$file does not exist.")
+      }
+      .text("Path to the scala compiler.")
+
+    opt[File]("scala-library")
+      .required()
+      .valueName("<file>")
+      .action((x, c) => c.copy(scalaLibrary = x))
+      .validate { file =>
+        if (file.exists) success else failure(s"$file does not exist.")
+      }
+      .text("Path to the scala rumtime library.")
+
+    opt[File]("scala-reflect")
+      .required()
+      .valueName("<file>")
+      .action((x, c) => c.copy(scalaReflect = x))
+      .validate { file =>
+        if (file.exists) success else failure(s"$file does not exist.")
+      }
+      .text("Path to the scala reflection library.")
+  }
+}
+
 object Main {
-  /*
-   Assume:
-   - args(1): outputPath
-   - args(2) compilerInterface
-   - args(3): compilerBridgeSource
-   - args(4): scalaCompiler
-   - args(5): scalaLibrary
-   - args(6): scalaReflect (in scalaExtra)
-    */
+
   def main(args: Array[String]): Unit = {
-    val outputPath = new File(args(0))
-    val compilerInterface = new File(args(1))
-    val compilerBridgeSource = new File(args(2))
-    val scalaCompiler = new File(args(3))
-    val scalaLibrary = new File(args(4))
-    val scalaReflect = new File(args(5))
-    val scalaExtra = Seq(
-      scalaReflect
-    )
-    val scalaInstance = ScalaUtils.scalaInstance(scalaCompiler, scalaExtra, scalaLibrary)
+    Cli.CliParser.parse(args, Configuration()) match {
+      case Some(cliArgs) => {
+        val scalaInstance = ScalaUtils
+          .scalaInstance(cliArgs.scalaCompiler,
+                         Seq(cliArgs.scalaReflect),
+                         cliArgs.scalaLibrary)
 
-    val cl = ConsoleLogger.apply()
+        val cl = ConsoleLogger.apply()
 
-    BootstrapperUtils.compilerInterface(outputPath, compilerBridgeSource, compilerInterface, scalaInstance, cl)
+        BootstrapperUtils
+          .compilerInterface(cliArgs.outputPath,
+                             cliArgs.compilerBridgeSource,
+                             cliArgs.compilerInterface,
+                             scalaInstance,
+                             cl)
+      }
+      case None => System.exit(1)
+    }
   }
 }
