@@ -207,6 +207,7 @@ class MappedSpecs(datatype([
     ('address_families', tuple),
     ('specs', Specs),
 ])):
+  """Wraps up logic to resolve specs into individual target addresses, or error out."""
 
   def __new__(cls, address_families, specs):
     return super(MappedSpecs, cls).__new__(cls, tuple(address_families), specs)
@@ -256,6 +257,13 @@ class MappedSpecs(datatype([
     return all_matching_addresses
 
   def all_matching_addresses(self):
+    """Return all addresses the given specs resolve to, within the given address families.
+
+    :raises: :class:`ResolveError` for errors matching address families, and for failure to match a
+             SingleAddress spec in an existing AddressFamily.
+    :raises: :class:`AddressLookupError` for failure to match any targets for non-SingleAddress
+             specs.
+    """
     matched_addresses = []
     for spec in self.specs.dependencies:
       matched_addresses.extend(self._matching_addresses_for_spec(spec))

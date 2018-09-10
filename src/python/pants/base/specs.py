@@ -26,29 +26,40 @@ class Spec(AbstractClass):
   def to_spec_string(self):
     """Returns the normalized string representation of this spec."""
 
+  class AddressFamilyResolutionError(Exception): pass
+
   @abstractmethod
   def matching_address_families(self, address_families_dict):
-    """???"""
+    """Given a dict of (namespace path) -> AddressFamily, return the values matching this spec.
+
+    :raises: :class:`Spec.AddressFamilyResolutionError` if no address families matched this spec.
+    """
+
+  @classmethod
+  def address_families_for_dir(cls, address_families_dict, spec_dir_path):
+    """Implementation of `matching_address_families()` for specs matching at most one directory."""
+    maybe_af = address_families_dict.get(spec_dir_path, None)
+    if maybe_af is None:
+      raise cls.AddressFamilyResolutionError(
+        'Path "{}" does not contain any BUILD files.'
+        .format(spec_dir_path))
+    return [maybe_af]
 
   class AddressResolutionError(Exception): pass
 
   def all_address_target_pairs(self, address_families):
+    """Given a list of AddressFamily, return (address, target) pairs matching this spec.
+
+    :raises: :class:`SingleAddress.SingleAddressResolutionError` if no targets could be found for a
+             :class:`SingleAddress` instance.
+    :raises: :class:`Spec.AddressResolutionError` if no targets could be found otherwise.
+    """
     addr_tgt_pairs = []
     for af in address_families:
       addr_tgt_pairs.extend(af.addressables.items())
     if len(addr_tgt_pairs) == 0:
       raise self.AddressResolutionError('Spec {} does not match any targets.'.format(self))
     return addr_tgt_pairs
-
-  class AddressFamilyResolutionError(Exception): pass
-
-  def address_families_for_dir(self, address_families_dict, spec_dir_path):
-    maybe_af = address_families_dict.get(spec_dir_path, None)
-    if maybe_af is None:
-      raise self.AddressFamilyResolutionError(
-        'Path "{}" does not contain any BUILD files.'
-        .format(spec_dir_path))
-    return [maybe_af]
 
 
 class SingleAddress(datatype(['directory', 'name']), Spec):
@@ -73,6 +84,10 @@ class SingleAddress(datatype(['directory', 'name']), Spec):
       self.name = name
 
   def all_address_target_pairs(self, address_families):
+    """Return the single target matching the single AddressFamily, or error.
+
+    :raises: :class:`SingleAddress.SingleAddressResolutionError`
+    """
     single_af = assert_single_element(address_families)
     addr_tgt_pairs = [
       (addr, tgt) for addr, tgt in single_af.addressables.items()
