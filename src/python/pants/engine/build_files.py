@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import collections
 import functools
 import logging
+import re
 from builtins import next, str
 from os.path import dirname, join
 
@@ -14,7 +15,7 @@ import six
 
 from pants.base.project_tree import Dir
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
-                              SingleAddress, Specs)
+                              SingleAddress, Spec, Specs)
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import AddressableDescriptor, BuildFileAddresses
@@ -24,8 +25,9 @@ from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
-from pants.util.dirutil import fast_relpath_optional, recursive_dirname
+from pants.util.dirutil import recursive_dirname
 from pants.util.filtering import create_filters, wrap_filters
+from pants.util.memo import memoized_property
 from pants.util.objects import TypeConstraintError, datatype
 
 
@@ -201,90 +203,85 @@ def _hydrate(item_type, spec_path, **kwargs):
   return item
 
 
-@rule(BuildFileAddresses, [Select(AddressMapper), Select(Specs)])
-def addresses_from_address_families(address_mapper, specs):
+class MappedSpecs(datatype([
+    ('address_families', tuple),
+    ('specs', Specs),
+])):
+
+  def __new__(cls, address_families, specs):
+    return super(MappedSpecs, cls).__new__(cls, tuple(address_families), specs)
+
+  @memoized_property
+  def _exclude_compiled_regexps(self):
+    return [re.compile(pattern) for pattern in set(self.specs.exclude_patterns or [])]
+
+  def _excluded_by_pattern(self, address):
+    return any(p.search(address.spec) is not None for p in self._exclude_compiled_regexps)
+
+  @memoized_property
+  def _target_tag_matches(self):
+    def filter_for_tag(tag):
+      return lambda t: tag in [str(t_tag) for t_tag in t.kwargs().get("tags", [])]
+    return wrap_filters(create_filters(self.specs.tags, filter_for_tag))
+
+  def _matches_target_address_pair(self, address, target):
+    return self._target_tag_matches(target) and not self._excluded_by_pattern(address)
+
+  @memoized_property
+  def _address_family_by_directory(self):
+    return {af.namespace: af for af in self.address_families}
+
+  def _matching_addresses_for_spec(self, spec):
+    # NB: if a spec is provided which expands to some number of targets, but those targets match
+    # --exclude-target-regexp, we do NOT fail! This is why we wait to apply the tag and exclude
+    # patterns until we gather all the targets the spec would have matched without them.
+    # TODO: ensure we fail later (at some point) if we expand to zero targets after applying tags and
+    # --exclude-target-regexp!
+    try:
+      addr_families_for_spec = spec.matching_address_families(self._address_family_by_directory)
+    except Spec.AddressFamilyResolutionError as e:
+      raise ResolveError(e)
+
+    try:
+      all_addr_tgt_pairs = spec.all_address_target_pairs(addr_families_for_spec)
+    except Spec.AddressResolutionError as e:
+      raise AddressLookupError(e)
+    except SingleAddress.SingleAddressResolutionError as e:
+      _raise_did_you_mean(e.single_address_family, e.name)
+
+    all_matching_addresses = [
+      addr for (addr, tgt) in all_addr_tgt_pairs
+      if self._matches_target_address_pair(addr, tgt)
+    ]
+    return all_matching_addresses
+
+  def all_matching_addresses(self):
+    matched_addresses = []
+    for spec in self.specs.dependencies:
+      matched_addresses.extend(self._matching_addresses_for_spec(spec))
+    return matched_addresses
+
+
+@rule(MappedSpecs, [Select(AddressMapper), Select(Specs)])
+def map_specs(address_mapper, specs):
+  # Capture a Snapshot covering all paths for these Specs, then group by directory.
+  snapshot = yield Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
+  dirnames = {dirname(f.stat.path) for f in snapshot.files}
+  address_families = yield [Get(AddressFamily, Dir(d)) for d in dirnames]
+
+  yield MappedSpecs(address_families, specs)
+
+
+@rule(BuildFileAddresses, [Select(MappedSpecs)])
+def addresses_from_address_families(mapped_specs):
   """Given an AddressMapper and list of Specs, return matching BuildFileAddresses.
 
   Raises a AddressLookupError if:
      - there were no matching AddressFamilies, or
      - the Spec matches no addresses for SingleAddresses.
   """
-  # Capture a Snapshot covering all paths for these Specs, then group by directory.
-  snapshot = yield Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
-  dirnames = {dirname(f.stat.path) for f in snapshot.files}
-  address_families = yield [Get(AddressFamily, Dir(d)) for d in dirnames]
-
-  # NB: `@memoized` does not work on local functions.
-  def by_directory():
-    if by_directory.cached is None:
-      by_directory.cached = {af.namespace: af for af in address_families}
-    return by_directory.cached
-  by_directory.cached = None
-
-  def raise_empty_address_family(spec):
-    raise ResolveError('Path "{}" does not contain any BUILD files.'.format(spec.directory))
-
-  def exclude_address(spec):
-    if specs.exclude_patterns:
-      return any(p.search(spec) is not None for p in specs.exclude_patterns_memo())
-    return False
-
-  def filter_for_tag(tag):
-    return lambda t: tag in [str(t_tag) for t_tag in t.kwargs().get("tags", [])]
-
-  include_target = wrap_filters(create_filters(specs.tags if specs.tags else '', filter_for_tag))
-
-  addresses = []
-  addresses_to_exclude = []
-  included = set()
-  def include(address_families, predicate=None):
-    matched = False
-    for af in address_families:
-      for (a, t) in af.addressables.items():
-        if (predicate is None or predicate(a)):
-          should_exclude_address = exclude_address(a.spec)
-          if should_exclude_address:
-            addresses_to_exclude.append(a)
-          if include_target(t) and (not should_exclude_address):
-            matched = True
-            if a not in included:
-              addresses.append(a)
-              included.add(a)
-    return matched
-
-  for spec in specs.dependencies:
-    if type(spec) is DescendantAddresses:
-      matched = include(
-        af
-        for af in address_families
-        if fast_relpath_optional(af.namespace, spec.directory) is not None
-      )
-      if not matched:
-        raise AddressLookupError(
-          'Spec {} does not match any targets.'.format(spec))
-    elif type(spec) is SiblingAddresses:
-      address_family = by_directory().get(spec.directory)
-      if not address_family:
-        raise_empty_address_family(spec)
-      include([address_family])
-    elif type(spec) is SingleAddress:
-      address_family = by_directory().get(spec.directory)
-      if not address_family:
-        raise_empty_address_family(spec)
-      # spec.name here is generally the root node specified on commandline. equality here implies
-      # a root node i.e. node specified on commandline.
-      if not include([address_family], predicate=lambda a: a.target_name == spec.name):
-        if len(addresses) == 0 and len(addresses_to_exclude) == 0:
-          _raise_did_you_mean(address_family, spec.name)
-    elif type(spec) is AscendantAddresses:
-      include(
-        af
-        for af in address_families
-        if fast_relpath_optional(spec.directory, af.namespace) is not None
-      )
-    else:
-      raise ValueError('Unrecognized Spec type: {}'.format(spec))
-  yield BuildFileAddresses(addresses)
+  deduplicated_addresses = frozenset(mapped_specs.all_matching_addresses())
+  return BuildFileAddresses(tuple(deduplicated_addresses))
 
 
 def _spec_to_globs(address_mapper, specs):
@@ -333,6 +330,7 @@ def create_graph_rules(address_mapper, symbol_table):
     parse_address_family,
     # Spec handling: locate directories that contain build files, and request
     # AddressFamilies for each of them.
+    map_specs,
     addresses_from_address_families,
     # Root rules representing parameters that might be provided via root subjects.
     RootRule(Address),
