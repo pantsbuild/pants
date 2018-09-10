@@ -5,7 +5,7 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 1.10.0rc0 (09/10/2018)
----------------------
+----------------------
 
 New features
 ~~~~~~~~~~~~
