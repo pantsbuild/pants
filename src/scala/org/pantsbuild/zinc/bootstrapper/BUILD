@@ -18,9 +18,3 @@ scala_library(
   ],
   platform='java8',
 )
-
-jvm_binary(
-  name="runner",
-  main = "org.pantsbuild.zinc.bootstrapper.Main",
-  dependencies = [":bootstrapper"],
-)
