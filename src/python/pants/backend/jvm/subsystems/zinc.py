@@ -307,7 +307,7 @@ class Zinc(object):
       output_files=(self._make_relative(bridge_jar),),
       output_directories=(self._make_relative(self._compiler_bridge_cache_dir),),
       description="bootstrap compiler bridge.",
-      jdk_home=text_type(self.dist.home),
+      jdk_home=self.dist.home,
     )
 
     res = Zinc.execute_sucessfully_or_raise(
