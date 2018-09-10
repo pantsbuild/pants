@@ -78,14 +78,10 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       self.assertEqual('x=3, f(x)=17\n', binary_run_output)
 
   def test_ctypes_third_party_integration(self):
-    pants_binary = self.run_pants(
-      command=['clean-all', 'binary', self._binary_target_with_third_party]
-    )
+    pants_binary = self.run_pants(['binary', self._binary_target_with_third_party])
     self.assert_success(pants_binary)
 
-    pants_run = self.run_pants(
-      command=['clean-all', 'run', self._binary_target_with_third_party]
-    )
+    pants_run = self.run_pants(['run', self._binary_target_with_third_party])
     self.assert_success(pants_run)
     self.assertIn('Test worked!', pants_run.stdout_data)
 
@@ -105,7 +101,6 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     """
     # Clean all to rebuild requirements pex.
     command = [
-      'clean-all',
       'run',
       'testprojects/src/python/python_distribution/ctypes:bin'
     ]
