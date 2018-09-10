@@ -19,10 +19,7 @@ case class CompilerCacheKey(
   scalaCompiler: File,
   scalaLibrary: File,
   scalaExtra: Seq[File],
-  compilerBridgeSrc: File,
-  compilerInterface: File,
-  javaHome: Option[File],
-  cacheDir: File)
+  javaHome: Option[File])
 
 object CompilerCacheKey {
 
@@ -31,15 +28,11 @@ object CompilerCacheKey {
    */
   def apply(settings: Settings): CompilerCacheKey = {
     val scalaJars = InputUtils.selectScalaJars(settings.scala)
-    val (compilerBridgeSrc, compilerInterface) = settings.sbt.jars
     setup(
       scalaJars.compiler,
       scalaJars.library,
       scalaJars.extra,
-      compilerBridgeSrc,
-      compilerInterface,
-      settings.javaHome,
-      settings.zincCacheDir
+      settings.javaHome
     )
   }
 
@@ -50,18 +43,13 @@ object CompilerCacheKey {
     scalaCompiler: File,
     scalaLibrary: File,
     scalaExtra: Seq[File],
-    compilerBridgeSrc: File,
-    compilerInterface: File,
-    javaHomeDir: Option[File],
-    cacheDir: File
+    javaHomeDir: Option[File]
   ): CompilerCacheKey = {
     val normalise: File => File = { _.getAbsoluteFile }
     val compilerJar          = normalise(scalaCompiler)
     val libraryJar           = normalise(scalaLibrary)
     val extraJars            = scalaExtra map normalise
-    val compilerBridgeJar    = normalise(compilerBridgeSrc)
-    val compilerInterfaceJar = normalise(compilerInterface)
     val javaHome             = javaHomeDir map normalise
-    CompilerCacheKey(compilerJar, libraryJar, extraJars, compilerBridgeJar, compilerInterfaceJar, javaHome, cacheDir)
+    CompilerCacheKey(compilerJar, libraryJar, extraJars, javaHome)
   }
 }

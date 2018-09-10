@@ -19,8 +19,6 @@ import sbt.internal.inc.{
 }
 import sbt.util.Logger
 
-
-
 object BootstrapperUtils {
   val CompilerInterfaceId = "compiler-interface"
   val JavaClassVersion = System.getProperty("java.class.version")

@@ -38,7 +38,6 @@ import org.pantsbuild.zinc.cache.Cache.Implicits
 import org.pantsbuild.zinc.util.Util
 
 object CompilerUtils {
-  val CompilerInterfaceId = "compiler-interface"
   val JavaClassVersion = System.getProperty("java.class.version")
 
   private val compilerCacheLimit = Util.intProperty("zinc.compiler.cache.limit", 5)
@@ -74,10 +73,10 @@ object CompilerUtils {
   /**
    * Create a new scala compiler.
    */
-  def newScalaCompiler(instance: XScalaInstance, interfaceJar: File): AnalyzingCompiler =
+  def newScalaCompiler(instance: XScalaInstance, bridgeJar: File): AnalyzingCompiler =
     new AnalyzingCompiler(
       instance,
-      ZincCompilerUtil.constantBridgeProvider(instance, interfaceJar),
+      ZincCompilerUtil.constantBridgeProvider(instance, bridgeJar),
       ClasspathOptionsUtil.auto,
       _ => (),
       classLoaderCache
