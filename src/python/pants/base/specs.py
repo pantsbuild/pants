@@ -53,14 +53,13 @@ class Spec(AbstractClass):
 
     :raises: :class:`SingleAddress.SingleAddressResolutionError` for resolution errors with a
              :class:`SingleAddress` instance.
-    :raises: :class:`Spec.AddressResolutionError` if no targets could be found otherwise.
+    :raises: :class:`Spec.AddressResolutionError` if no targets could be found otherwise, if the
+             spec type requires a non-empty set of targets.
     :return: list of (Address, Target) pairs.
     """
     addr_tgt_pairs = []
     for af in address_families:
       addr_tgt_pairs.extend(af.addressables.items())
-    if len(addr_tgt_pairs) == 0:
-      raise self.AddressResolutionError('Spec {} does not match any targets.'.format(self))
     return addr_tgt_pairs
 
 
@@ -125,6 +124,12 @@ class DescendantAddresses(datatype(['directory']), Spec):
       af for ns, af in address_families_dict.items()
       if fast_relpath_optional(ns, self.directory) is not None
     ]
+
+  def all_address_target_pairs(self, address_families):
+    addr_tgt_pairs = super(DescendantAddresses, self).all_address_target_pairs(address_families)
+    if len(addr_tgt_pairs) == 0:
+      raise self.AddressResolutionError('Spec {} does not match any targets.'.format(self))
+    return addr_tgt_pairs
 
 
 class AscendantAddresses(datatype(['directory']), Spec):
