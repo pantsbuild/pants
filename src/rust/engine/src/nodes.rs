@@ -93,7 +93,7 @@ pub struct Select {
 
 impl Select {
   pub fn new(product: TypeConstraint, params: Params, edges: &rule_graph::RuleEdges) -> Select {
-    Self::new_with_selector(selectors::Select::without_variant(product), params, edges)
+    Self::new_with_selector(selectors::Select::new(product), params, edges)
   }
 
   pub fn new_with_entries(
@@ -101,7 +101,7 @@ impl Select {
     params: Params,
     entry: rule_graph::Entry,
   ) -> Select {
-    let selector = selectors::Select::without_variant(product);
+    let selector = selectors::Select::new(product);
     Select {
       selector,
       params,
@@ -685,8 +685,8 @@ impl Task {
       .into_iter()
       .map(|externs::Get(product, subject)| {
         // TODO: The subject of the get is a new parameter, but params from the context should be
-        // included as well.
-        // TODO: Parameters should be filtered to what is used by the Entry.
+        // included as well. Additionally, params should be filtered to what is used by the Entry.
+        //   see https://github.com/pantsbuild/pants/issues/6478
         let params = Params::new(vec![subject]);
         let select_key = rule_graph::SelectKey::JustGet(selectors::Get {
           product: product,

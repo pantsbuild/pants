@@ -24,7 +24,7 @@ impl UnreachableError {
     UnreachableError {
       task_rule: task_rule,
       diagnostic: Diagnostic {
-        params: Default::default(),
+        params: ParamTypes::default(),
         reason: "Unreachable".to_string(),
         details: vec![],
       },
@@ -81,7 +81,7 @@ impl EntryWithDeps {
       &EntryWithDeps::Inner(InnerEntry {
         rule: Rule::Intrinsic(Intrinsic { ref input, .. }),
         ..
-      }) => vec![SelectKey::JustSelect(Select::without_variant(*input))],
+      }) => vec![SelectKey::JustSelect(Select::new(*input))],
     }
   }
 
@@ -196,7 +196,7 @@ enum ConstructGraphResult {
   // The Entry was satisfiable without waiting for any additional nodes to be satisfied. The result
   // contains copies of the input Entry for each set subset of the parameters that satisfy it.
   Fulfilled(Vec<EntryWithDeps>),
-  // The Entry was not satifiable with installed rules.
+  // The Entry was not satisfiable with installed rules.
   Unfulfillable,
   // The dependencies of an Entry might be satisfiable, but is currently blocked waiting for the
   // results of the given entries.
@@ -386,6 +386,7 @@ impl<'t> GraphMaker<'t> {
       let (params, product) = match &select_key {
         &SelectKey::JustSelect(ref s) => (entry.params().clone(), s.product.clone()),
         &SelectKey::JustGet(ref g) => {
+          // Unlike Selects, Gets introduce new parameter values into a subgraph.
           let get_params = {
             let mut p = entry.params().clone();
             p.insert(g.subject.clone());
@@ -495,10 +496,7 @@ impl<'t> GraphMaker<'t> {
           return Ok(ConstructGraphResult::Unfulfillable);
         }
       };
-    let simplified_entries_only = simplified_entries
-      .iter()
-      .map(|(entry, _)| entry.clone())
-      .collect();
+    let simplified_entries_only = simplified_entries.keys().cloned().collect();
 
     if !cycled_on.is_empty() {
       // The set of cycled dependencies can only contain call stack "parents" of the dependency: we
@@ -664,8 +662,6 @@ impl<'t> GraphMaker<'t> {
       // the non-ambiguous rule with the smallest set of Params, as that minimizes Node identities
       // in the graph and biases toward receiving values from dependencies (which do not affect our
       // identity) rather than dependents.
-      //
-      // TODO: There has to be a more efficient way to group by Entry.
       let mut rules_by_kind: HashMap<EntryWithDeps, (usize, &Entry)> = HashMap::new();
       for satisfiable_entry in satisfiable_entries.iter() {
         match satisfiable_entry {
@@ -673,9 +669,6 @@ impl<'t> GraphMaker<'t> {
             rules_by_kind
               .entry(wd.simplified(BTreeSet::new()))
               .and_modify(|e| {
-                // TODO: Param set size isn't sufficient to fully differentiate alternatives: would
-                // prefer a larger param set to a smaller one.
-                // TODO2: This might be redundant now that we are matching subsets in monomorphize.
                 if e.0 > wd.params().len() {
                   *e = (wd.params().len(), satisfiable_entry);
                 }
@@ -752,10 +745,7 @@ impl<'t> GraphMaker<'t> {
     } else {
       Some(RootEntry {
         params: param_types.clone(),
-        clause: vec![Select {
-          product: *product_type,
-          variant_key: None,
-        }],
+        clause: vec![Select::new(*product_type)],
         gets: vec![],
       })
     }
@@ -923,14 +913,15 @@ fn task_display(task: &Task) -> String {
 }
 
 impl RuleGraph {
-  pub fn new(tasks: &Tasks, root_subject_types: Vec<TypeId>) -> RuleGraph {
-    GraphMaker::new(tasks, root_subject_types).full_graph()
+  pub fn new(tasks: &Tasks, root_param_types: Vec<TypeId>) -> RuleGraph {
+    GraphMaker::new(tasks, root_param_types).full_graph()
   }
 
-  pub fn find_root_edges(&self, subject_type: TypeId, select: Select) -> Option<RuleEdges> {
+  pub fn find_root_edges(&self, param_type: TypeId, select: Select) -> Option<RuleEdges> {
     // TODO: Support more than one root parameter... needs some API work.
+    //   see https://github.com/pantsbuild/pants/issues/6478
     let root = RootEntry {
-      params: vec![subject_type].into_iter().collect(),
+      params: vec![param_type].into_iter().collect(),
       clause: vec![select],
       gets: vec![],
     };

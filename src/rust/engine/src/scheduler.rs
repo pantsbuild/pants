@@ -107,7 +107,7 @@ impl Scheduler {
   ) -> Result<(), String> {
     let edges = self.find_root_edges_or_update_rule_graph(
       subject.type_id().clone(),
-      &selectors::Select::without_variant(product),
+      &selectors::Select::new(product),
     )?;
     request
       .roots

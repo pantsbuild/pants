@@ -151,16 +151,13 @@ impl Tasks {
       });
   }
 
-  pub fn add_select(&mut self, product: TypeConstraint, variant_key: Option<String>) {
+  pub fn add_select(&mut self, product: TypeConstraint) {
     self
       .preparing
       .as_mut()
       .expect("Must `begin()` a task creation before adding clauses!")
       .clause
-      .push(Select {
-        product: product,
-        variant_key: variant_key,
-      });
+      .push(Select::new(product));
   }
 
   pub fn task_end(&mut self) {

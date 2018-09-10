@@ -432,21 +432,7 @@ pub extern "C" fn tasks_add_get(tasks_ptr: *mut Tasks, product: TypeConstraint, 
 #[no_mangle]
 pub extern "C" fn tasks_add_select(tasks_ptr: *mut Tasks, product: TypeConstraint) {
   with_tasks(tasks_ptr, |tasks| {
-    tasks.add_select(product, None);
-  })
-}
-
-#[no_mangle]
-pub extern "C" fn tasks_add_select_variant(
-  tasks_ptr: *mut Tasks,
-  product: TypeConstraint,
-  variant_key_buf: Buffer,
-) {
-  let variant_key = variant_key_buf
-    .to_string()
-    .expect("Failed to decode key for select_variant");
-  with_tasks(tasks_ptr, |tasks| {
-    tasks.add_select(product, Some(variant_key));
+    tasks.add_select(product);
   })
 }
 
