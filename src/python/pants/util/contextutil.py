@@ -194,7 +194,7 @@ def temporary_file_path(root_dir=None, cleanup=True, suffix='', permissions=None
 
 
 @contextmanager
-def temporary_file(root_dir=None, cleanup=True, suffix='', permissions=None):
+def temporary_file(root_dir=None, cleanup=True, suffix='', permissions=None, binary_mode=True):
   """
     A with-context that creates a temporary file and returns a writeable file descriptor to it.
 
@@ -207,8 +207,10 @@ def temporary_file(root_dir=None, cleanup=True, suffix='', permissions=None):
                        if you need one, put it at the beginning of suffix.
                        See :py:class:`tempfile.NamedTemporaryFile`.
     :param int permissions: If provided, sets the file to use these permissions.
+    :param bool binary_mode: Whether file opens in binary or text mode.
   """
-  with tempfile.NamedTemporaryFile(suffix=suffix, dir=root_dir, delete=False) as fd:
+  mode = 'w+b' if binary_mode else 'w+'  # tempfile's default is 'w+b'
+  with tempfile.NamedTemporaryFile(suffix=suffix, dir=root_dir, delete=False, mode=mode) as fd:
     try:
       if permissions is not None:
         os.chmod(fd.name, permissions)

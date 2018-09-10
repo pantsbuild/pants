@@ -4,18 +4,23 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import ast
+import inspect
+import io
 import itertools
 import os
-import pprint
 import shutil
+import textwrap
 from abc import abstractmethod
-from builtins import map, object, str, zip
+from builtins import bytes, map, object, str, zip
 from collections import OrderedDict, defaultdict
 
-from pex.compatibility import string, to_bytes
+from future.moves import collections
+from future.utils import PY2
 from pex.installer import InstallerBase, Packager
 from pex.interpreter import PythonInterpreter
+from pex.pex import PEX
+from pex.pex_builder import PEXBuilder
+from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
@@ -26,14 +31,17 @@ from pants.backend.python.tasks.pex_build_util import is_local_python_dist
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.specs import SiblingAddresses
+from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
 from pants.task.task import Task
-from pants.util.dirutil import safe_rmtree, safe_walk
+from pants.util.contextutil import temporary_file
+from pants.util.dirutil import safe_concurrent_creation, safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
-from pants.util.strutil import safe_shlex_split
+from pants.util.process_handler import subprocess
+from pants.util.strutil import ensure_binary, ensure_text, safe_shlex_split
 
 
 SETUP_BOILERPLATE = """
@@ -42,10 +50,63 @@ SETUP_BOILERPLATE = """
 
 from setuptools import setup
 
-setup(**
-{setup_dict}
-)
+setup(**{setup_dict})
 """
+
+
+# Distutils does not support unicode strings in setup.py, so we must explicitly convert to binary
+# strings as pants uses unicode_literals. A natural and prior technique was to use `pprint.pformat`,
+# but that embeds u's in the string itself during conversion. For that reason we roll out own
+# literal pretty-printer here.
+#
+# For more information, see http://bugs.python.org/issue13943
+def distutils_repr(obj):
+  output = io.StringIO()
+  linesep = os.linesep
+
+  def _write(data):
+    output.write(ensure_text(data))
+
+  def _write_repr(o, indent=False, level=0):
+    pad = ' ' * 4 * level
+    if indent:
+      _write(pad)
+    level += 1
+
+    if isinstance(o, (bytes, str)):
+      # The py2 repr of str (unicode) is `u'...'` and we don't want the `u` prefix; likewise,
+      # the py3 repr of bytes is `b'...'` and we don't want the `b` prefix so we hand-roll a
+      # repr here.
+      if linesep in o:
+        _write('"""{}"""'.format(ensure_text(o.replace('"""', r'\"\"\"'))))
+      else:
+        _write("'{}'".format(ensure_text(o.replace("'", r"\'"))))
+    elif isinstance(o, collections.Mapping):
+      _write('{' + linesep)
+      for k, v in o.items():
+        _write_repr(k, indent=True, level=level)
+        _write(': ')
+        _write_repr(v, indent=False, level=level)
+        _write(',' + linesep)
+      _write(pad + '}')
+    elif isinstance(o, collections.Iterable):
+      if isinstance(o, collections.MutableSequence):
+        open_collection, close_collection = '[]'
+      elif isinstance(o, collections.Set):
+        open_collection, close_collection = '{}'
+      else:
+        open_collection, close_collection = '()'
+
+      _write(open_collection + linesep)
+      for i in o:
+        _write_repr(i, indent=True, level=level)
+        _write(',' + linesep)
+      _write(pad + close_collection)
+    else:
+      _write(repr(o))  # Numbers and bools.
+
+  _write_repr(obj)
+  return output.getvalue()
 
 
 class SetupPyRunner(InstallerBase):
@@ -297,10 +358,30 @@ class ExportedTargetDependencyCalculator(AbstractClass):
     return OrderedSet(d for d in reduced_dependencies if d.is_original)
 
 
+def declares_namespace_package(filename):
+  """Given a filename, walk its ast and determine if it declares a namespace package."""
+
+  import ast
+
+  with open(filename) as fp:
+    init_py = ast.parse(fp.read(), filename)
+  calls = [node for node in ast.walk(init_py) if isinstance(node, ast.Call)]
+  for call in calls:
+    if len(call.args) != 1:
+      continue
+    if isinstance(call.func, ast.Attribute) and call.func.attr != 'declare_namespace':
+      continue
+    if isinstance(call.func, ast.Name) and call.func.id != 'declare_namespace':
+      continue
+    if isinstance(call.args[0], ast.Name) and call.args[0].id == '__name__':
+      return True
+  return False
+
+
 class SetupPy(Task):
   """Generate setup.py-based Python projects."""
 
-  SOURCE_ROOT = b'src'
+  SOURCE_ROOT = 'src'
 
   PYTHON_DISTS_PRODUCT = 'python_dists'
 
@@ -367,26 +448,6 @@ class SetupPy(Task):
       yield name, concrete_target.entry_point
 
   @classmethod
-  def declares_namespace_package(cls, filename):
-    """Given a filename, walk its ast and determine if it is declaring a namespace package.
-
-    Intended only for __init__.py files though it will work for any .py.
-    """
-    with open(filename) as fp:
-      init_py = ast.parse(fp.read(), filename)
-    calls = [node for node in ast.walk(init_py) if isinstance(node, ast.Call)]
-    for call in calls:
-      if len(call.args) != 1:
-        continue
-      if isinstance(call.func, ast.Attribute) and call.func.attr != 'declare_namespace':
-        continue
-      if isinstance(call.func, ast.Name) and call.func.id != 'declare_namespace':
-        continue
-      if isinstance(call.args[0], ast.Name) and call.args[0].id == '__name__':
-        return True
-    return False
-
-  @classmethod
   def nearest_subpackage(cls, package, all_packages):
     """Given a package, find its nearest parent in all_packages."""
     def shared_prefix(candidate):
@@ -396,8 +457,66 @@ class SetupPy(Task):
     shared_packages = [_f for _f in map(shared_prefix, all_packages) if _f]
     return '.'.join(max(shared_packages, key=len)) if shared_packages else package
 
-  @classmethod
-  def find_packages(cls, chroot, log=None):
+  @memoized_property
+  def nsutil_pex(self):
+    interpreter = self.context.products.get_data(PythonInterpreter)
+    chroot = os.path.join(self.workdir, 'nsutil', interpreter.version_string)
+    if not os.path.exists(chroot):
+      pex_info = PexInfo.default(interpreter=interpreter)
+      with safe_concurrent_creation(chroot) as scratch:
+        builder = PEXBuilder(path=scratch, interpreter=interpreter, pex_info=pex_info, copy=True)
+        with temporary_file(binary_mode=False) as fp:
+          declares_namespace_package_code = inspect.getsource(declares_namespace_package)
+          fp.write(textwrap.dedent("""
+            import sys
+
+
+            {declares_namespace_package_code}
+
+
+            if __name__ == '__main__':
+              for path in sys.argv[1:]:
+                if declares_namespace_package(path):
+                  print(path)
+          """).strip().format(declares_namespace_package_code=declares_namespace_package_code))
+          fp.close()
+          builder.set_executable(filename=fp.name, env_filename='main.py')
+          builder.freeze()
+    return PEX(pex=chroot, interpreter=interpreter)
+
+  def filter_namespace_packages(self, root_target, inits):
+    args = list(inits)
+    with self.context.new_workunit(name='find-namespace-packages',
+                                   cmd=' '.join(self.nsutil_pex.cmdline(args=args)),
+                                   labels=[WorkUnitLabel.TOOL]) as workunit:
+
+      process = self.nsutil_pex.run(args=args,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE,
+                                    blocking=False)
+
+      stdout, stderr = process.communicate()
+
+      # TODO(John Sirois): Find a way to tee a workunit output instead of buffering up all output
+      # and then writing it out after the process has finished like we do here.
+      def write(stream_name, data):
+        stream = workunit.output(stream_name)
+        stream.write(ensure_binary(data) if PY2 else ensure_text(data))
+        stream.flush()
+
+      write('stdout', stdout)
+      write('stderr', stderr)
+
+      exit_code = process.returncode
+      if exit_code != 0:
+        raise TaskError('Failure trying to detect namespace packages when constructing setup.py '
+                        'project for {}:\n{}'.format(root_target.address.reference(), stderr),
+                        exit_code=exit_code,
+                        failed_targets=[root_target])
+
+      return ensure_text(stdout).splitlines()
+
+  def find_packages(self, root_target, chroot):
     """Detect packages, namespace packages and resources from an existing chroot.
 
     :returns: a tuple of:
@@ -405,7 +524,7 @@ class SetupPy(Task):
                 set(namespace_packages)
                 map(package => set(files))
     """
-    base = os.path.join(chroot.path(), cls.SOURCE_ROOT)
+    base = os.path.join(chroot.path(), self.SOURCE_ROOT)
     packages, namespace_packages = set(), set()
     resources = defaultdict(set)
 
@@ -416,12 +535,15 @@ class SetupPy(Task):
           yield module, filename, os.path.join(root, filename)
 
     # establish packages, namespace packages in first pass
+    inits_to_check = {}
     for module, filename, real_filename in iter_files():
       if filename != '__init__.py':
         continue
       packages.add(module)
-      if cls.declares_namespace_package(real_filename):
-        namespace_packages.add(module)
+      inits_to_check[real_filename] = module
+    namespace_packages = {inits_to_check[init]
+                          for init in self.filter_namespace_packages(root_target,
+                                                                     inits_to_check.keys())}
 
     # second pass establishes non-source content (resources)
     for module, filename, real_filename in iter_files():
@@ -431,11 +553,11 @@ class SetupPy(Task):
           # hygiene.
           # raise cls.UndefinedSource('{} is source but does not belong to a package!'
           #                           .format(filename))
-          if log:
-            log.warn('{} is source but does not belong to a package.'.format(real_filename))
+          self.context.log.warn('{} is source but does not belong to a package.'
+                                .format(real_filename))
         else:
           continue
-      submodule = cls.nearest_subpackage(module, packages)
+      submodule = self.nearest_subpackage(module, packages)
       if submodule == module:
         resources[submodule].add(filename)
       else:
@@ -509,13 +631,10 @@ class SetupPy(Task):
 
     Must be run after writing the contents to the chroot.
     """
-    # NB: several explicit str conversions below force non-unicode strings in order to comply
-    # with setuptools expectations.
-
     setup_keywords = root_target.provides.setup_py_keywords.copy()
 
-    package_dir = {b'': self.SOURCE_ROOT}
-    packages, namespace_packages, resources = self.find_packages(chroot, self.context.log)
+    package_dir = {'': self.SOURCE_ROOT}
+    packages, namespace_packages, resources = self.find_packages(root_target, chroot)
 
     if namespace_packages:
       setup_keywords['namespace_packages'] = list(sorted(namespace_packages))
@@ -537,44 +656,12 @@ class SetupPy(Task):
       setup_keywords['entry_points']['console_scripts'].append(
           '{} = {}'.format(binary_name, entry_point))
 
-    # From http://stackoverflow.com/a/13105359
-    def convert(input):
-      if isinstance(input, dict):
-        out = dict()
-        for key, value in input.items():
-          out[convert(key)] = convert(value)
-        return out
-      elif isinstance(input, list):
-        return [convert(element) for element in input]
-      elif isinstance(input, string):
-        return to_bytes(input)
-      else:
-        return input
+    setup_py = self._setup_boilerplate().format(setup_dict=distutils_repr(setup_keywords),
+                                                setup_target=root_target.address.reference())
+    chroot.write(ensure_binary(setup_py), 'setup.py')
 
-    # Distutils does not support unicode strings in setup.py, so we must
-    # explicitly convert to binary strings as pants uses unicode_literals.
-    # Ideally we would write the output stream with an encoding, however,
-    # pprint.pformat embeds u's in the string itself during conversion.
-    # For that reason we convert each unicode string independently.
-    #
-    # jsirois@gill ~ $ python2
-    # Python 2.7.13 (default, Jul 21 2017, 03:24:34)
-    # [GCC 7.1.1 20170630] on linux2
-    # Type "help", "copyright", "credits" or "license" for more information.
-    # >>> import pprint
-    # >>> data = {u'entry_points': {u'console_scripts': [u'pants = pants.bin.pants_exe:main']}}
-    # >>> pprint.pformat(data, indent=4)
-    # "{   u'entry_points': {   u'console_scripts': [   u'pants = pants.bin.pants_exe:main']}}"
-    # >>>
-    #
-    # For more information, see http://bugs.python.org/issue13943
-    chroot.write(self._setup_boilerplate().format(
-      setup_dict=pprint.pformat(convert(setup_keywords), indent=4),
-      setup_target=repr(root_target)
-    ), 'setup.py')
-
-    # make sure that setup.py is included
-    chroot.write('include *.py'.encode('utf8'), 'MANIFEST.in')
+    # Make sure that `setup.py` is included.
+    chroot.write('include *.py', 'MANIFEST.in', mode='w')
 
   def create_setup_py(self, target, dist_dir):
     chroot = Chroot(dist_dir, name=target.provides.name)
