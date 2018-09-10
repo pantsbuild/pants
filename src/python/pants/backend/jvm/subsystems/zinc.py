@@ -70,7 +70,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
         'bootstrap',
         classpath=[
-          JarDependency('org.pantsbuild', 'zinc-bootstrapper_2.11', 'snap-1'),
+          JarDependency('org.pantsbuild', 'zinc-bootstrapper_2.11', 'snap_2'),
         ],
         main=Zinc.ZINC_BOOTSTRAPER_MAIN,
         custom_rules=shader_rules,
@@ -79,7 +79,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
         Zinc.ZINC_COMPILER_TOOL_NAME,
         classpath=[
-          JarDependency('org.pantsbuild', 'zinc-compiler_2.11', 'snap-1'),
+          JarDependency('org.pantsbuild', 'zinc-compiler_2.11', 'snap_2'),
         ],
         main=Zinc.ZINC_COMPILE_MAIN,
         custom_rules=shader_rules)
@@ -283,15 +283,15 @@ class Zinc(object):
     bootstrapper = self._zinc_factory._compiler_bootstrapper(self._products)
 
     bootstrapper_args = [
-      bridge_jar,
-      self.compiler_interface,
-      self.compiler_bridge,
-      self.scala_compiler,
-      self.scala_library,
-      self.scala_reflect,
+      "--out", bridge_jar,
+      "--compiler-interface", self.compiler_interface,
+      "--compiler-bridge-src", self.compiler_bridge,
+      "--scala-compiler", self.scala_compiler,
+      "--scala-library", self.scala_library,
+      "--scala-reflect", self.scala_reflect,
     ]
     input_jar_snapshots = context._scheduler.capture_snapshots((PathGlobsAndRoot(
-      PathGlobs(tuple([self._make_relative(jar) for jar in bootstrapper_args])),
+      PathGlobs(tuple([self._make_relative(jar) for jar in bootstrapper_args[1::2]])),
       text_type(self.workdir)
     ),))
     input_jars_digest = context._scheduler.merge_directories(
@@ -310,6 +310,9 @@ class Zinc(object):
       jdk_home=text_type(self.dist.home),
     )
     res = context.execute_process_synchronously(req, 'zinc-subsystem', [WorkUnitLabel.COMPILER])
+
+    if res.exit_code:
+      raise Exception("Bootstrapping the compiler bridge failed: {}".format(res.stderr))
 
     #TODO(borja) We should only materialize if we are running locally
     context._scheduler.materialize_directories((
