@@ -37,6 +37,7 @@ class Zinc(object):
   DEFAULT_CONFS = ['default']
 
   ZINC_COMPILER_TOOL_NAME = 'zinc'
+  ZINC_BOOTSTRAPPER_TOOL_NAME = 'zinc-bootstrapper'
   ZINC_EXTRACTOR_TOOL_NAME = 'zinc-extractor'
 
   class Factory(Subsystem, JvmToolMixin):
@@ -68,7 +69,7 @@ class Zinc(object):
       ]
 
       cls.register_jvm_tool(register,
-        'bootstrap',
+        Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME,
         classpath=[
           JarDependency('org.pantsbuild', 'zinc-bootstrapper_2.11', 'snap_2'),
         ],
@@ -120,7 +121,7 @@ class Zinc(object):
       #               intransitive=True)
       scala_compiler_dependency = ScalaPlatform._create_compiler_jardep('2.11')
       cls.register_jvm_tool(register,
-        'scala-compiler-nonsense',
+        'scala-compiler',
         classpath=[
           JarDependency(
             org=scala_compiler_dependency.org,
@@ -161,11 +162,11 @@ class Zinc(object):
 
     @classmethod
     def _compiler_bootstrapper(cls, products):
-      return cls.tool_jar_from_products(products, 'bootstrap', cls.options_scope)
+      return cls.tool_jar_from_products(products, Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME, cls.options_scope)
 
     @classmethod
     def _scala_compiler(cls, products):
-      return cls.tool_jar_from_products(products, 'scala-compiler-nonsense', cls.options_scope)
+      return cls.tool_jar_from_products(products, 'scala-compiler', cls.options_scope)
 
     @classmethod
     def _scala_library(cls, products):
@@ -257,19 +258,21 @@ class Zinc(object):
     """
     hasher = sha1()
     for cp_entry in [self.zinc, self.compiler_interface, self.compiler_bridge]:
-      hasher.update(os.path.relpath(cp_entry, self.workdir))
+      hasher.update(os.path.relpath(cp_entry, get_buildroot()))
     key = hasher.hexdigest()[:12]
 
-    return os.path.join(self.workdir, 'zinc', key)
+    return os.path.join(self._zinc_factory.get_options().pants_workdir, 'zinc', 'compiler-bridge', key)
 
   def _make_relative(self, path):
     """A utility function to create relative paths to the work dir"""
-    return fast_relpath(path, self.workdir)
+    return fast_relpath(path, get_buildroot())
 
-  @memoized_property
-  def workdir(self):
-    """A utility method to access the current workdir"""
-    return self._zinc_factory.get_options().pants_workdir
+  @staticmethod
+  def execute_sucessfully_or_raise(context, request, label, workunits, fail_message=None):
+    res = context.execute_process_synchronously(request, label, workunits)
+    if res.exit_code:
+      raise Exception("{}".format(fail_message))
+    return res
 
   def compile_compiler_bridge(self, context):
     """Compile the compiler bridge to be used by zinc, using our scala bootstrapper.
@@ -292,32 +295,33 @@ class Zinc(object):
     ]
     input_jar_snapshots = context._scheduler.capture_snapshots((PathGlobsAndRoot(
       PathGlobs(tuple([self._make_relative(jar) for jar in bootstrapper_args[1::2]])),
-      text_type(self.workdir)
+      text_type(get_buildroot())
     ),))
-    input_jars_digest = context._scheduler.merge_directories(
-      tuple(s.directory_digest for s in (input_jar_snapshots))
-    )
     argv = tuple(['.jdk/bin/java'] +
                  ['-cp', bootstrapper, Zinc.ZINC_BOOTSTRAPER_MAIN] +
                  bootstrapper_args
     )
     req = ExecuteProcessRequest(
       argv=argv,
-      input_files=input_jars_digest,
+      input_files=input_jar_snapshots[0].directory_digest,
       output_files=(self._make_relative(bridge_jar),),
       output_directories=(self._make_relative(self._compiler_bridge_cache_dir),),
       description="bootstrap compiler bridge.",
       jdk_home=text_type(self.dist.home),
     )
-    res = context.execute_process_synchronously(req, 'zinc-subsystem', [WorkUnitLabel.COMPILER])
 
-    if res.exit_code:
-      raise Exception("Bootstrapping the compiler bridge failed: {}".format(res.stderr))
+    res = Zinc.execute_sucessfully_or_raise(
+      context,
+      req,
+      'zinc-subsystem',
+      [WorkUnitLabel.COMPILER],
+      "Bootstrapping the compiler bridge failed:",
+    )
 
-    #TODO(borja) We should only materialize if we are running locally
-    context._scheduler.materialize_directories((
-      DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
-    ))
+    if not context.options.for_global_scope().remote_execution_server:
+      context._scheduler.materialize_directories((
+        DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
+      ))
     return bridge_jar
 
   @memoized_method
