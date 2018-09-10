@@ -119,6 +119,4 @@ object CompilerUtils {
     Util.propertyFromResource("compiler.properties", "version.number", scalaLoader)
   }
 
-
-  def interfaceId(scalaVersion: String) = CompilerInterfaceId + "-" + scalaVersion + "-" + JavaClassVersion
 }

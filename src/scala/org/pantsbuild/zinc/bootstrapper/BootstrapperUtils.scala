@@ -46,6 +46,4 @@ object BootstrapperUtils {
       tempJar.delete()
     }
   }
-
-  def interfaceId(scalaVersion: String) = CompilerInterfaceId + "-" + scalaVersion + "-" + JavaClassVersion
 }
