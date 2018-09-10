@@ -4,7 +4,7 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
-1.10.0rc0 (09/07/2018)
+1.10.0rc0 (09/10/2018)
 ---------------------
 
 New features
@@ -15,6 +15,9 @@ New features
 
 * Zinc compiles can execute hermetically (#6351)
   `PR #6351 <https://github.com/pantsbuild/pants/pull/6351>`_
+
+* Add a node-install goal to Pants for installing node_modules (#6367)
+  `PR #6367 <https://github.com/pantsbuild/pants/pull/6367>`_
 
 Bugfixes
 ~~~~~~~~
@@ -49,6 +52,12 @@ Bugfixes
 * [fix] Pass full path to isdir rather than just basename. (#6453)
   `PR #6453 <https://github.com/pantsbuild/pants/pull/6453>`_
 
+* Add missing call to super. (#6477)
+  `PR #6477 <https://github.com/pantsbuild/pants/pull/6477>`_
+
+* Remove broken pyenv shims from the PATH. (#6469)
+  `PR #6469 <https://github.com/pantsbuild/pants/pull/6469>`_
+
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -70,6 +79,16 @@ Refactoring, Improvements, and Tooling
 
 * Ensure unstable pants dists can never conflict. (#6460)
   `PR #6460 <https://github.com/pantsbuild/pants/pull/6460>`_
+
+* Extend fs_util deadline to 30 minutes (#6471)
+  `PR #6471 <https://github.com/pantsbuild/pants/pull/6471>`_
+  `PR #6433 <https://github.com/pantsbuild/pants/pull/6433>`_
+
+* remove clean-all from pants invocations in python_dist() integration testing + some other refactoring (#6474)
+  `PR #6474 <https://github.com/pantsbuild/pants/pull/6474>`_
+
+* Re-enable pants_setup_requires:bin IT. (#6466)
+  `PR #6466 <https://github.com/pantsbuild/pants/pull/6466>`_
 
 Documentation
 ~~~~~~~~~~~~~
