@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import re
 import unittest
 
 from pants.base.project_tree import Dir, File
@@ -76,6 +77,33 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
 
     self.assertEqual(len(targets.dependencies), 1)
     self.assertEqual(targets.dependencies[0].spec, 'root:b')
+
+  def test_fails_on_nonexistent_specs(self):
+    """Test that specs referring to nonexistent targets raise a ResolveError."""
+    address_mapper = AddressMapper(JsonParser(TestTable()))
+    snapshot = Snapshot(DirectoryDigest('xx', 2),
+                        (Path('root/BUILD', File('root/BUILD')),))
+    address_family = AddressFamily('root', {'a': ('root/BUILD', TargetAdaptor())})
+
+    specs = Specs([SingleAddress('root', 'b'), SingleAddress('root', 'a')])
+    expected_rx_str = re.escape(
+      """"b" was not found in namespace "root". Did you mean one of:
+  :a""")
+    with self.assertRaisesRegexp(ResolveError, expected_rx_str):
+      run_rule(
+        addresses_from_address_families, address_mapper, specs, {
+          (Snapshot, PathGlobs): lambda _: snapshot,
+          (AddressFamily, Dir): lambda _: address_family,
+        })
+
+    # ???
+    specs = Specs([SingleAddress('root', 'a'), SingleAddress('root', 'b')])
+    with self.assertRaisesRegexp(ResolveError, expected_rx_str):
+      run_rule(
+        addresses_from_address_families, address_mapper, specs, {
+          (Snapshot, PathGlobs): lambda _: snapshot,
+          (AddressFamily, Dir): lambda _: address_family,
+        })
 
   def test_exclude_pattern(self):
     """Test that targets are filtered based on exclude patterns."""
