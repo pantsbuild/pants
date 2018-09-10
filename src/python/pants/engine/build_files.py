@@ -236,8 +236,6 @@ class MappedSpecs(datatype([
     # NB: if a spec is provided which expands to some number of targets, but those targets match
     # --exclude-target-regexp, we do NOT fail! This is why we wait to apply the tag and exclude
     # patterns until we gather all the targets the spec would have matched without them.
-    # TODO: ensure we fail later (at some point) if we expand to zero targets after applying tags and
-    # --exclude-target-regexp!
     try:
       addr_families_for_spec = spec.matching_address_families(self._address_family_by_directory)
     except Spec.AddressFamilyResolutionError as e:
@@ -254,6 +252,7 @@ class MappedSpecs(datatype([
       addr for (addr, tgt) in all_addr_tgt_pairs
       if self._matches_target_address_pair(addr, tgt)
     ]
+    # NB: This may be empty, as the result of filtering by tag and exclude patterns!
     return all_matching_addresses
 
   def all_matching_addresses(self):
