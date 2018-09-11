@@ -242,7 +242,7 @@ class MappedSpecs(datatype([
       raise ResolveError(e)
 
     try:
-      all_addr_tgt_pairs = spec.all_address_target_pairs(addr_families_for_spec)
+      all_addr_tgt_pairs = spec.address_target_pairs_from_address_families(addr_families_for_spec)
     except Spec.AddressResolutionError as e:
       raise AddressLookupError(e)
     except SingleAddress.SingleAddressResolutionError as e:

@@ -48,7 +48,8 @@ class Spec(AbstractClass):
 
   class AddressResolutionError(Exception): pass
 
-  def all_address_target_pairs(self, address_families):
+  @abstractmethod
+  def address_target_pairs_from_address_families(self, address_families):
     """Given a list of AddressFamily, return (address, target) pairs matching this spec.
 
     :raises: :class:`SingleAddress.SingleAddressResolutionError` for resolution errors with a
@@ -57,6 +58,10 @@ class Spec(AbstractClass):
              spec type requires a non-empty set of targets.
     :return: list of (Address, Target) pairs.
     """
+
+  @classmethod
+  def all_address_target_pairs(cls, address_families):
+    """Implementation of `address_target_pairs_from_address_families()` which does no filtering."""
     addr_tgt_pairs = []
     for af in address_families:
       addr_tgt_pairs.extend(af.addressables.items())
@@ -84,7 +89,7 @@ class SingleAddress(datatype(['directory', 'name']), Spec):
       self.single_address_family = single_address_family
       self.name = name
 
-  def all_address_target_pairs(self, address_families):
+  def address_target_pairs_from_address_families(self, address_families):
     """Return the pair for the single target matching the single AddressFamily, or error.
 
     :raises: :class:`SingleAddress.SingleAddressResolutionError` if no targets could be found for a
@@ -112,6 +117,9 @@ class SiblingAddresses(datatype(['directory']), Spec):
   def matching_address_families(self, address_families_dict):
     return self.address_families_for_dir(address_families_dict, self.directory)
 
+  def address_target_pairs_from_address_families(self, address_families):
+    return self.all_address_target_pairs(address_families)
+
 
 class DescendantAddresses(datatype(['directory']), Spec):
   """A Spec representing all addresses located recursively under the given directory."""
@@ -125,8 +133,8 @@ class DescendantAddresses(datatype(['directory']), Spec):
       if fast_relpath_optional(ns, self.directory) is not None
     ]
 
-  def all_address_target_pairs(self, address_families):
-    addr_tgt_pairs = super(DescendantAddresses, self).all_address_target_pairs(address_families)
+  def address_target_pairs_from_address_families(self, address_families):
+    addr_tgt_pairs = self.all_address_target_pairs(address_families)
     if len(addr_tgt_pairs) == 0:
       raise self.AddressResolutionError('Spec {} does not match any targets.'.format(self))
     return addr_tgt_pairs
@@ -143,6 +151,9 @@ class AscendantAddresses(datatype(['directory']), Spec):
       af for ns, af in address_families_dict.items()
       if fast_relpath_optional(self.directory, ns) is not None
     ]
+
+  def address_target_pairs_from_address_families(self, address_families):
+    return self.all_address_target_pairs(address_families)
 
 
 class Specs(datatype([('dependencies', tuple), ('tags', tuple), ('exclude_patterns', tuple)])):
