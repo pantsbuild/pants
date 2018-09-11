@@ -5,4 +5,6 @@ int mangled_function(int);
 
 extern "C" int multiply_by_three(int);
 
+extern "C" const char *get_node_name_xml(const char *);
+
 #endif

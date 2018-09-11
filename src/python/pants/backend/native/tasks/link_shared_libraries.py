@@ -29,8 +29,26 @@ class LinkSharedLibraryRequest(datatype([
     'output_dir',
     ('external_lib_dirs', tuple),
     ('external_lib_names', tuple),
+    ('external_static_archive_paths', tuple),
 ])):
-  pass
+
+  @classmethod
+  def with_external_libs_product(cls, external_libs_product=None, *args, **kwargs):
+    if external_libs_product is None:
+      lib_dirs = ()
+      lib_names = ()
+      static_archive_paths = ()
+    else:
+      lib_dirs = (external_libs_product.lib_dir,)
+      lib_names = external_libs_product.lib_names
+      static_archive_paths = external_libs_product.static_archive_paths
+
+    return cls(
+      *args,
+      external_lib_dirs=lib_dirs,
+      external_lib_names=lib_names,
+      external_static_archive_paths=static_archive_paths,
+      **kwargs)
 
 
 class LinkSharedLibraries(NativeTask):
@@ -169,12 +187,14 @@ class LinkSharedLibraries(NativeTask):
     self.context.log.debug("resulting_shared_lib_path: {}".format(resulting_shared_lib_path))
     # We are executing in the results_dir, so get absolute paths for everything.
     cmd = ([linker.exe_filename] +
-           self.platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS) +
            linker.extra_args +
-           ['-o', os.path.abspath(resulting_shared_lib_path)] +
-           ['-L{}'.format(lib_dir) for lib_dir in link_request.external_lib_dirs] +
-           ['-l{}'.format(lib_name) for lib_name in link_request.external_lib_names] +
-           [os.path.abspath(obj) for obj in object_files])
+           [os.path.abspath(obj) for obj in object_files] +
+           # TODO: consider -rpath=dir whenever we support depending on dynamic libs?
+           list(link_request.external_static_archive_paths) +
+           ['-L{}'.format(d) for d in link_request.external_lib_dirs] +
+           ['-l{}'.format(l) for l in link_request.external_lib_names] +
+           self.platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS) +
+           ['-o', os.path.abspath(resulting_shared_lib_path)])
     self.context.log.debug("linker command: {}".format(cmd))
 
     env = linker.as_invocation_environment_dict

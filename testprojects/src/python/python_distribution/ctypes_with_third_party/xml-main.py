@@ -5,13 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from setuptools import setup, find_packages
+from ctypes_python_pkg.ctypes_wrapper import get_node_name
 
 
-setup(
-  name='ctypes_third_party_test',
-  version='0.0.1',
-  packages=find_packages(),
-  # Declare one shared lib at the top-level directory (denoted by '').
-  data_files=[('', ['libasdf-cpp-tp.so', 'test.xml'])],
-)
+if __name__ == '__main__':
+  print('node_name={}'.format(get_node_name()))

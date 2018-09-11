@@ -10,18 +10,20 @@ from distutils.dir_util import copy_tree
 
 from pex.interpreter import PythonInterpreter
 
-from pants.backend.native.config.environment import Platform
+from pants.backend.native.config.environment import LLVMCppToolchain, Platform
 from pants.backend.native.subsystems.conan import Conan
+from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
+from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.exceptions import TaskError
 from pants.goal.products import UnionProducts
 from pants.invalidation.cache_manager import VersionedTargetSet
-from pants.task.task import Task
 from pants.util.contextutil import environment_as
 from pants.util.memo import memoized_property
 from pants.util.objects import Exactly, datatype
 from pants.util.process_handler import subprocess
+from pants.util.strutil import create_path_env_var
 
 
 class ConanRequirement(datatype(['pkg_spec'])):
@@ -59,7 +61,12 @@ class ConanRequirement(datatype(['pkg_spec'])):
   def fetch_cmdline_args(self):
     platform = Platform.create()
     conan_os_name = platform.resolve_platform_specific(self.CONAN_OS_NAME)
-    args = ['install', self.pkg_spec, '-s', 'os={}'.format(conan_os_name)]
+    # TODO: document these!
+    args = [
+      'install', self.pkg_spec,
+      '-s', 'os={}'.format(conan_os_name),
+      '--build', 'missing',
+    ]
     return args
 
 
@@ -68,25 +75,21 @@ class NativeExternalLibraryFiles(datatype([
     # TODO: we shouldn't have any `lib_names` if `lib_dir` is not set!
     'lib_dir',
     ('lib_names', tuple),
+    ('static_archive_paths', tuple),
 ])): pass
 
 
-class NativeExternalLibraryFetch(Task):
-  options_scope = 'native-external-library-fetch'
+class NativeExternalLibraryFetch(NativeTask):
   native_library_constraint = Exactly(ExternalNativeLibrary)
-
   conan_pex_subdir = 'conan-support'
   conan_pex_filename = 'conan.pex'
 
-  class NativeExternalLibraryFetchError(TaskError):
-    pass
-
   @classmethod
-  def _parse_lib_name_from_library_filename(cls, filename):
-    match_group = re.match(r"^lib(.*)\.(a|so|dylib)$", filename)
-    if match_group:
-      return match_group.group(1)
-    return None
+  def subsystem_dependencies(cls):
+    return super(NativeExternalLibraryFetch, cls).subsystem_dependencies() + (
+      Conan.scoped(cls),
+      NativeToolchain.scoped(cls),
+    )
 
   @classmethod
   def register_options(cls, register):
@@ -97,10 +100,6 @@ class NativeExternalLibraryFetch(Task):
   @classmethod
   def implementation_version(cls):
     return super(NativeExternalLibraryFetch, cls).implementation_version() + [('NativeExternalLibraryFetch', 0)]
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(NativeExternalLibraryFetch, cls).subsystem_dependencies() + (Conan.scoped(cls),)
 
   @classmethod
   def product_types(cls):
@@ -114,10 +113,37 @@ class NativeExternalLibraryFetch(Task):
     return True
 
   @memoized_property
-  def _conan_python_interpreter(self):
-    return PythonInterpreter.get()
+  def _native_toolchain(self):
+    return NativeToolchain.scoped_instance(self)
 
   @memoized_property
+  def _cpp_toolchain(self):
+    return self._request_single(LLVMCppToolchain, self._native_toolchain).cpp_toolchain
+
+  @memoized_property
+  def _build_environment(self):
+    cpp_compiler = self._cpp_toolchain.cpp_compiler
+    cpp_linker = self._cpp_toolchain.cpp_linker
+    # Compose the invocation environments.
+    invocation_env_dict = cpp_compiler.as_invocation_environment_dict.copy()
+    invocation_env_dict.update(cpp_linker.as_invocation_environment_dict)
+    invocation_env_dict.update({
+      'PATH': create_path_env_var((cpp_compiler.path_entries + cpp_linker.path_entries),
+                                  os.environ.copy(),
+                                  prepend=True),
+    })
+    return invocation_env_dict
+
+  class NativeExternalLibraryFetchError(TaskError):
+    pass
+
+  @classmethod
+  def _parse_lib_name_from_library_filename(cls, filename):
+    match_group = re.match(r"^lib(.*)\.(a|so|dylib)$", filename)
+    if match_group:
+      return match_group.group(1)
+    return None
+
   def _conan_pex_path(self):
     return os.path.join(get_pants_cachedir(),
                         self.conan_pex_subdir,
@@ -126,8 +152,8 @@ class NativeExternalLibraryFetch(Task):
   @memoized_property
   def _conan_binary(self):
     return Conan.scoped_instance(self).bootstrap(
-      self._conan_python_interpreter,
-      self._conan_pex_path)
+      PythonInterpreter.get(),
+      self._conan_pex_path())
 
   def execute(self):
     native_lib_tgts = self.context.targets(self.native_library_constraint.satisfied_by)
@@ -155,13 +181,18 @@ class NativeExternalLibraryFetch(Task):
       lib_names = []
       if os.path.isdir(lib_dir):
         for filename in os.listdir(lib_dir):
-          lib_name = self._parse_lib_name_from_library_filename(filename)
-          if lib_name:
-            lib_names.append(lib_name)
+          if filename.endswith('.a'):
+            archive_path = os.path.join(lib_dir, filename)
+            static_archive_paths.append(archive_path)
+          else:
+            shared_lib_name = self._parse_lib_name_from_library_filename(filename)
+            if shared_lib_name:
+              lib_names.append(shared_lib_name)
 
       nelf = NativeExternalLibraryFiles(include_dir=include_dir,
                                         lib_dir=lib_dir,
-                                        lib_names=tuple(lib_names))
+                                        lib_names=tuple(lib_names),
+                                        static_archive_paths=tuple(static_archive_paths))
       product.add_for_target(vt.target, [nelf])
     return product
 
@@ -253,7 +284,7 @@ class NativeExternalLibraryFetch(Task):
     # iteration of this system (a 'clean-all' will nuke the conan dir). In the future,
     # it would be good to migrate this under ~/.cache/pants/conan for persistence.
     # Fix this per: https://github.com/pantsbuild/pants/issues/6169
-    with environment_as(CONAN_USER_HOME=self.workdir):
+    with environment_as(CONAN_USER_HOME=self.workdir, **self._build_environment):
       for pkg_spec in vt.target.packages:
 
         conan_requirement = ConanRequirement(pkg_spec=pkg_spec)

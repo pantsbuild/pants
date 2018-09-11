@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<config>
+  <!-- This is a config file for the mesh viewer -->
+  <model file="dwarf.dea"/>
+  <messageText caption="Irrlicht Engine Mesh Viewer">
+    Welcome to the Mesh Viewer of the "Irrlicht Engine".
+  </messageText>
+</config>
