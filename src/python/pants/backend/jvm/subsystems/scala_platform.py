@@ -41,18 +41,18 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
   options_scope = 'scala'
 
   @classmethod
-  def _create_jardep(cls, name, version):
+  def create_jardep(cls, name, version):
     return JarDependency(org='org.scala-lang',
                          name=name,
                          rev=scala_build_info[version].full_version)
 
   @classmethod
   def _create_runtime_jardep(cls, version):
-    return cls._create_jardep('scala-library', version)
+    return cls.create_jardep('scala-library', version)
 
   @classmethod
   def _create_compiler_jardep(cls, version):
-    return cls._create_jardep('scala-compiler', version)
+    return cls.create_jardep('scala-compiler', version)
 
   @classmethod
   def versioned_tool_name(cls, tool, version):

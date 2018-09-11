@@ -124,7 +124,7 @@ class Zinc(object):
                                   ScalaPlatform.versioned_tool_name(tool_name, scala_version),
                                   classpath=[
                                     ScalaPlatform
-                                      ._create_jardep(tool_name, scala_version)
+                                      .create_jardep(tool_name, scala_version)
                                       .copy(intransitive=True)
                                   ])
 
