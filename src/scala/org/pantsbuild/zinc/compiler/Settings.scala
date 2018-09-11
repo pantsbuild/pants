@@ -234,7 +234,7 @@ object Settings extends OptionSet[Settings] {
     prefix(    "-C", "<javac-option>",         "Pass option to javac",                       (s: Settings, o: String) => s.copy(javacOptions = s.javacOptions :+ o)),
 
     header("sbt options:"),
-    file("-compiled-bridge-jar", "file", "Path to pre-compilede compiler interface", (s: Settings, f: File) => s.copy(compiledBridgeJar = Some(f))),
+    file("-compiled-bridge-jar", "file", "Path to pre-compiled compiler interface", (s: Settings, f: File) => s.copy(compiledBridgeJar = Some(f))),
 
     header("Incremental compiler options:"),
     int(       "-transitive-step", "n",        "Steps before transitive closure",            (s: Settings, i: Int) => s.copy(_incOptions = s._incOptions.copy(transitiveStep = i))),

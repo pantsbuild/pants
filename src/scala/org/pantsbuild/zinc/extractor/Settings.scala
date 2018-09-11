@@ -23,6 +23,7 @@ case class Settings(
 object Settings extends OptionSet[Settings] {
   override def empty = Settings()
 
+  // TODO Subsitute with scopt, similar to `src/scala/org/pantsbuild/zinc/bootstrapper/Cli.scala
   override val options = Seq(
     header("Output options:"),
     boolean(  ("-help", "-h"),                 "Print this usage message",

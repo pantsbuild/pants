@@ -6,7 +6,7 @@ scala_library(
     org='org.pantsbuild',
     name='zinc-scalautil',
     repo=public,
-    publication_metadata=pants_library('Bootstrapper for The SBT incremental compiler for nailgun')
+    publication_metadata=pants_library('Common utilities to create objects required by the zinc wrappers.')
   ),
   dependencies = [
     'src/scala/org/pantsbuild/zinc/util',
