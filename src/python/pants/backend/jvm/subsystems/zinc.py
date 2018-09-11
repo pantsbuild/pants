@@ -70,7 +70,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-bootstrapper_2.11', 'snap_2'),
+                              ScalaJarDependency('org.pantsbuild', 'zinc-bootstrapper', 'snap_2'),
                             ],
                             main=Zinc.ZINC_BOOTSTRAPER_MAIN,
                             custom_rules=shader_rules,
@@ -79,7 +79,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_COMPILER_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', 'snap_2'),
+                              ScalaJarDependency('org.pantsbuild', 'zinc-compiler', 'snap_2'),
                             ],
                             main=Zinc.ZINC_COMPILE_MAIN,
                             custom_rules=shader_rules)
@@ -110,7 +110,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_EXTRACTOR_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.4')
+                              ScalaJarDependency('org.pantsbuild', 'zinc-extractor', '0.0.4')
                             ])
 
       # TODO(borja) is this the right way to do it? Alternative is fully specifying the version by hand:
