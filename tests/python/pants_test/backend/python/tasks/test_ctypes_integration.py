@@ -29,9 +29,10 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
   _binary_interop_target_dir = 'testprojects/src/python/python_distribution/ctypes_interop'
   _binary_target_with_interop = '{}:bin'.format(_binary_interop_target_dir)
   _wrapped_math_build_file = os.path.join(_binary_interop_target_dir, 'wrapped-math', 'BUILD')
-  _binary_target_with_third_party = (
-    'testprojects/src/python/python_distribution/ctypes_with_third_party:bin_with_third_party'
-  )
+  _third_party_dir = 'testprojects/src/python/python_distribution/ctypes_with_third_party'
+  _binary_target_with_third_party = '{}:{}'.format(
+    _third_party_dir, 'bin_with_third_party')
+  _binary_target_xml = '{}:{}'.format(_third_party_dir, 'get-xml-node-names')
 
   def test_ctypes_run(self):
     pants_run = self.run_pants(command=['-q', 'run', self._binary_target])
@@ -125,6 +126,31 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     )
     self.assert_success(pants_run)
     self.assertIn('Test worked!\n', pants_run.stdout_data)
+
+  _test_xml_node_names_output = """\
+node_name=,,config,
+  , This is a config file for the mesh viewer ,
+  ,model,
+  ,messageText,
+    Welcome to the Mesh Viewer of the "Irrlicht Engine".
+  ,messageText,config,config
+"""
+
+  def test_ctypes_third_party_with_built_sources(self):
+    pants_run = self.run_pants(['run', self._binary_target_xml])
+    self.assert_success(pants_run)
+    self.assertIn(self._test_xml_node_names_output, pants_run.stdout_data)
+
+    with temporary_dir() as tmp_dir:
+      pants_binary = self.run_pants(['binary', self._binary_target_xml], config={
+        GLOBAL_SCOPE_CONFIG_SECTION: {
+          'pants_distdir': tmp_dir,
+        }
+      })
+      self.assert_success(pants_binary)
+      pex = os.path.join(tmp_dir, 'get-xml-node-names.pex')
+      pex_output = invoke_pex_for_output(pex)
+      self.assertEqual(self._test_xml_node_names_output, pex_output)
 
   def test_pants_native_source_detection_for_local_ctypes_dists_for_current_platform_only(self):
     """Test that `./pants run` respects platforms when the closure contains native sources.
