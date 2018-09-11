@@ -46,8 +46,8 @@ class Zinc(object):
     @classmethod
     def subsystem_dependencies(cls):
       return super(Zinc.Factory, cls).subsystem_dependencies() + (DependencyContext,
-      Java,
-      ScalaPlatform)
+                                                                  Java,
+                                                                  ScalaPlatform)
 
     @classmethod
     def register_options(cls, register):
@@ -55,63 +55,63 @@ class Zinc(object):
 
       zinc_rev = '1.0.3'
 
-
       shader_rules = [
-        # The compiler-interface and compiler-bridge tool jars carry xsbt and
-        # xsbti interfaces that are used across the shaded tool jar boundary so
-        # we preserve these root packages wholesale along with the core scala
-        # APIs.
-        Shader.exclude_package('scala', recursive=True),
-        Shader.exclude_package('xsbt', recursive=True),
-        Shader.exclude_package('xsbti', recursive=True),
-        # Unfortunately, is loaded reflectively by the compiler.
-        Shader.exclude_package('org.apache.logging.log4j', recursive=True),
-      ]
+          # The compiler-interface and compiler-bridge tool jars carry xsbt and
+          # xsbti interfaces that are used across the shaded tool jar boundary so
+          # we preserve these root packages wholesale along with the core scala
+          # APIs.
+          Shader.exclude_package('scala', recursive=True),
+          Shader.exclude_package('xsbt', recursive=True),
+          Shader.exclude_package('xsbti', recursive=True),
+          # Unfortunately, is loaded reflectively by the compiler.
+          Shader.exclude_package('org.apache.logging.log4j', recursive=True),
+        ]
 
       cls.register_jvm_tool(register,
-        Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME,
-        classpath=[
-          JarDependency('org.pantsbuild', 'zinc-bootstrapper_2.11', 'snap_2'),
-        ],
-        main=Zinc.ZINC_BOOTSTRAPER_MAIN,
-        custom_rules=shader_rules,
-      )
+                            Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME,
+                            classpath=[
+                              JarDependency('org.pantsbuild', 'zinc-bootstrapper_2.11', 'snap_2'),
+                            ],
+                            main=Zinc.ZINC_BOOTSTRAPER_MAIN,
+                            custom_rules=shader_rules,
+                          )
 
       cls.register_jvm_tool(register,
-        Zinc.ZINC_COMPILER_TOOL_NAME,
-        classpath=[
-          JarDependency('org.pantsbuild', 'zinc-compiler_2.11', 'snap_2'),
-        ],
-        main=Zinc.ZINC_COMPILE_MAIN,
-        custom_rules=shader_rules)
+                            Zinc.ZINC_COMPILER_TOOL_NAME,
+                            classpath=[
+                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', 'snap_2'),
+                            ],
+                            main=Zinc.ZINC_COMPILE_MAIN,
+                            custom_rules=shader_rules)
 
       cls.register_jvm_tool(register,
-        'compiler-bridge',
-        classpath=[
-          ScalaJarDependency(org='org.scala-sbt',
-            name='compiler-bridge',
-            rev=zinc_rev,
-            classifier='sources',
-            intransitive=True),
-        ])
-      cls.register_jvm_tool(register,
-        'compiler-interface',
-        classpath=[
-          JarDependency(org='org.scala-sbt',
-            name='compiler-interface',
-            rev=zinc_rev),
-        ],
-        # NB: We force a noop-jarjar'ing of the interface, since it is now
-        # broken up into multiple jars, but zinc does not yet support a sequence
-        # of jars for the interface.
-        main='no.such.main.Main',
-        custom_rules=shader_rules)
+                            'compiler-bridge',
+                            classpath=[
+                              ScalaJarDependency(org='org.scala-sbt',
+                                                name='compiler-bridge',
+                                                rev=zinc_rev,
+                                                classifier='sources',
+                                                intransitive=True),
+                            ])
 
       cls.register_jvm_tool(register,
-        Zinc.ZINC_EXTRACTOR_TOOL_NAME,
-        classpath=[
-          JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.4')
-        ])
+                            'compiler-interface',
+                            classpath=[
+                              JarDependency(org='org.scala-sbt',
+                                            name='compiler-interface',
+                                            rev=zinc_rev),
+                            ],
+                            # NB: We force a noop-jarjar'ing of the interface, since it is now
+                            # broken up into multiple jars, but zinc does not yet support a sequence
+                            # of jars for the interface.
+                            main='no.such.main.Main',
+                            custom_rules=shader_rules)
+
+      cls.register_jvm_tool(register,
+                            Zinc.ZINC_EXTRACTOR_TOOL_NAME,
+                            classpath=[
+                              JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.4')
+                            ])
 
       # TODO(borja) is this the right way to do it? Alternative is fully specifying the version by hand:
       # The main issue is that this dependency has to be intransitive.
@@ -121,32 +121,32 @@ class Zinc(object):
       #               intransitive=True)
       scala_compiler_dependency = ScalaPlatform._create_compiler_jardep('2.11')
       cls.register_jvm_tool(register,
-        'scala-compiler',
-        classpath=[
-          JarDependency(
-            org=scala_compiler_dependency.org,
-            name=scala_compiler_dependency.name,
-            rev=scala_compiler_dependency.rev,
-            intransitive=True
-          )
-        ])
+                            'scala-compiler',
+                            classpath=[
+                              JarDependency(
+                                org=scala_compiler_dependency.org,
+                                name=scala_compiler_dependency.name,
+                                rev=scala_compiler_dependency.rev,
+                                intransitive=True
+                              )
+                            ])
 
       cls.register_jvm_tool(register,
-        'scala-library',
-        classpath=[
-          ScalaPlatform._create_runtime_jardep('2.11')
-        ])
+                            'scala-library',
+                            classpath=[
+                              ScalaPlatform._create_runtime_jardep('2.11')
+                            ])
 
       cls.register_jvm_tool(register,
-        'scala-reflect',
-        classpath=[
-          JarDependency(
-            org='org.scala-lang',
-            name='scala-reflect',
-            rev='2.11.12',
-            intransitive=True,
-          )
-        ])
+                            'scala-reflect',
+                            classpath=[
+                              JarDependency(
+                                org='org.scala-lang',
+                                name='scala-reflect',
+                                rev='2.11.12',
+                                intransitive=True,
+                              )
+                            ])
 
     @classmethod
     def _zinc(cls, products):
@@ -377,14 +377,6 @@ class Zinc(object):
     # iterator, `excludes` are not applied
     # in ClasspathProducts.get_product_target_mappings_for_targets.
     return ClasspathUtil.compute_classpath_entries(iter(dependencies),
-      classpath_product,
-      all_extra_cp_entries,
-      self.DEFAULT_CONFS,
-    )
-
-  def compile_classpath(self, classpath_product_key, target, extra_cp_entries=None):
-    """Compute the compile classpath for the given target."""
-    return list(
-      entry.path
-      for entry in self.compile_classpath_entries(classpath_product_key, target, extra_cp_entries)
-    )
+                                           classpath_product,
+                                           all_extra_cp_entries,
+                                           self.DEFAULT_CONFS)

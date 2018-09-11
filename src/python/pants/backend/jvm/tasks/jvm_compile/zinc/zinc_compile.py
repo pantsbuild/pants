@@ -323,8 +323,6 @@ class BaseZincCompile(JvmCompile):
     if not self.get_options().colors:
       zinc_args.append('-no-color')
 
-    #zinc_args.extend(['-compiler-interface', compiler_interface])
-    #zinc_args.extend(['-compiler-bridge', compiler_bridge])
     zinc_args.extend(["-compiled-bridge-jar", self._zinc.compile_compiler_bridge(self.context)])
     zinc_args.extend(['-scala-path', ':'.join(scala_path)])
 
