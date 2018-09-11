@@ -23,6 +23,8 @@ class GoImportMetaTagReader(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(GoImportMetaTagReader, cls).register_options(register)
+    # GoCompileIntegrationTest will flake out pretty often in Travis, and increasing the retries may
+    # make it less flaky -- see #6476.
     register('--retries', type=int, default=5, advanced=True,
              help='How many times to retry when fetching meta tags.')
 
