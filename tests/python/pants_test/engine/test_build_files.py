@@ -13,7 +13,7 @@ from pants.base.specs import SiblingAddresses, SingleAddress, Specs
 from pants.build_graph.address import Address
 from pants.engine.addressable import addressable, addressable_dict
 from pants.engine.build_files import (MappedSpecs, ResolvedTypeMismatchError,
-                                      addresses_from_mapped_specs, create_graph_rules,
+                                      addresses_from_address_families, create_graph_rules,
                                       parse_address_family)
 from pants.engine.fs import (DirectoryDigest, FileContent, FilesContent, PathGlobs, Snapshot,
                              create_fs_rules)
@@ -47,7 +47,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     address_family = AddressFamily('a', {'a': ('a/BUILD', 'this is an object!')})
     mapped_specs = MappedSpecs([address_family], Specs([address, address]))
 
-    bfas = run_rule(addresses_from_mapped_specs, mapped_specs)
+    bfas = run_rule(addresses_from_address_families, mapped_specs)
 
     self.assertEqual(len(bfas.dependencies), 1)
     self.assertEqual(bfas.dependencies[0].spec, 'a:a')
@@ -63,7 +63,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     )
     mapped_specs = MappedSpecs([address_family], Specs([spec], tags=['+integration']))
 
-    targets = run_rule(addresses_from_mapped_specs, mapped_specs)
+    targets = run_rule(addresses_from_address_families, mapped_specs)
 
     self.assertEqual(len(targets.dependencies), 1)
     self.assertEqual(targets.dependencies[0].spec, 'root:b')
@@ -78,13 +78,13 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
       """"b" was not found in namespace "root". Did you mean one of:
   :a""")
     with self.assertRaisesRegexp(ResolveError, expected_rx_str):
-      run_rule(addresses_from_mapped_specs, mapped_specs)
+      run_rule(addresses_from_address_families, mapped_specs)
 
     # Ensure that we still catch nonexistent targets later on in the list of command-line specs.
     specs = Specs([SingleAddress('root', 'a'), SingleAddress('root', 'b')])
     mapped_specs = MappedSpecs([address_family], specs)
     with self.assertRaisesRegexp(ResolveError, expected_rx_str):
-      run_rule(addresses_from_mapped_specs, mapped_specs)
+      run_rule(addresses_from_address_families, mapped_specs)
 
   def test_exclude_pattern(self):
     """Test that targets are filtered based on exclude patterns."""
@@ -95,7 +95,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
       }
     )
     mapped_specs = MappedSpecs([address_family], Specs([spec], exclude_patterns=tuple(['.exclude*'])))
-    targets = run_rule(addresses_from_mapped_specs, mapped_specs)
+    targets = run_rule(addresses_from_address_families, mapped_specs)
     self.assertEqual(len(targets.dependencies), 1)
     self.assertEqual(targets.dependencies[0].spec, 'root:not_me')
 
@@ -108,7 +108,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
       }
     )
     mapped_specs = MappedSpecs([address_family], Specs([spec], exclude_patterns=tuple(['root.*'])))
-    targets = run_rule(addresses_from_mapped_specs, mapped_specs)
+    targets = run_rule(addresses_from_address_families, mapped_specs)
     self.assertEqual(len(targets.dependencies), 0)
 
 

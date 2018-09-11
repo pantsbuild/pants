@@ -280,7 +280,7 @@ def map_specs(address_mapper, specs):
 
 
 @rule(BuildFileAddresses, [Select(MappedSpecs)])
-def addresses_from_mapped_specs(mapped_specs):
+def addresses_from_address_families(mapped_specs):
   """Given an AddressMapper and list of Specs, return matching BuildFileAddresses.
 
   :raises: :class:`ResolveError` if:
@@ -339,7 +339,7 @@ def create_graph_rules(address_mapper, symbol_table):
     # Spec handling: locate directories that contain build files, and request
     # AddressFamilies for each of them.
     map_specs,
-    addresses_from_mapped_specs,
+    addresses_from_address_families,
     # Root rules representing parameters that might be provided via root subjects.
     RootRule(Address),
     RootRule(BuildFileAddress),
