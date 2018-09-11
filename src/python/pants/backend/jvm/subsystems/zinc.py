@@ -113,40 +113,25 @@ class Zinc(object):
                               ScalaJarDependency('org.pantsbuild', 'zinc-extractor', '0.0.4')
                             ])
 
-      # TODO(borja) is this the right way to do it? Alternative is fully specifying the version by hand:
-      # The main issue is that this dependency has to be intransitive.
-      # JarDependency(org='org.scala-lang',
-      #               name='scala-compiler',
-      #               rev="2.11.12",
-      #               intransitive=True)
-      scala_compiler_dependency = ScalaPlatform._create_compiler_jardep('2.11')
-      cls.register_jvm_tool(register,
-                            'scala-compiler',
-                            classpath=[
-                              JarDependency(
-                                org=scala_compiler_dependency.org,
-                                name=scala_compiler_dependency.name,
-                                rev=scala_compiler_dependency.rev,
-                                intransitive=True
-                              )
-                            ])
+      # Register tools for fixed versions of Scala, 2.10, 2.11 and 2.12.
+      # Relies on ScalaPlatform to get the revision version from the major.minor version.
+      # The tool with the correct scala version will be retrieved later,
+      # taking the user-passed option into account.
+      def register_scala_tools_for_versions(tools, scala_versions):
+        for tool_name in tools:
+          for scala_version in scala_versions:
+            cls.register_jvm_tool(register,
+                                  ScalaPlatform._key_for_tool_version(tool_name, scala_version),
+                                  classpath=[
+                                    ScalaPlatform
+                                      ._create_jardep(tool_name, scala_version)
+                                      .copy(intransitive=True)
+                                  ])
 
-      cls.register_jvm_tool(register,
-                            'scala-library',
-                            classpath=[
-                              ScalaPlatform._create_runtime_jardep('2.11')
-                            ])
-
-      cls.register_jvm_tool(register,
-                            'scala-reflect',
-                            classpath=[
-                              JarDependency(
-                                org='org.scala-lang',
-                                name='scala-reflect',
-                                rev='2.11.12',
-                                intransitive=True,
-                              )
-                            ])
+      register_scala_tools_for_versions(
+        tools=["scala-compiler", "scala-library", "scala-reflect"],
+        scala_versions=["2.10", "2.11", "2.12"]
+      )
 
     @classmethod
     def _zinc(cls, products):
@@ -164,17 +149,24 @@ class Zinc(object):
     def _compiler_bootstrapper(cls, products):
       return cls.tool_jar_from_products(products, Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME, cls.options_scope)
 
-    @classmethod
-    def _scala_compiler(cls, products):
-      return cls.tool_jar_from_products(products, 'scala-compiler', cls.options_scope)
+    # Retrieves the path of a tool's jar
+    # by looking at the classpath of the registered tool with the user-specified scala version.
+    def _fetch_tool_jar_from_classpath(self, products, tool_name):
+      scala_version = ScalaPlatform.global_instance().version
+      classpath = self.tool_classpath_from_products(products,
+                                                    ScalaPlatform._key_for_tool_version(tool_name, scala_version),
+                                                    scope=self.options_scope)
+      assert(len(classpath) == 1)
+      return classpath[0]
 
-    @classmethod
-    def _scala_library(cls, products):
-      return cls.tool_jar_from_products(products, 'scala-library', cls.options_scope)
+    def _scala_compiler(self, products):
+      return self._fetch_tool_jar_from_classpath(products, 'scala-compiler')
 
-    @classmethod
-    def _scala_reflect(cls, products):
-      return cls.tool_jar_from_products(products, 'scala-reflect', cls.options_scope)
+    def _scala_library(self, products):
+      return self._fetch_tool_jar_from_classpath(products, 'scala-library')
+
+    def _scala_reflect(self, products):
+      return self._fetch_tool_jar_from_classpath(products, 'scala-reflect')
 
     def create(self, products):
       """Create a Zinc instance from products active in the current Pants run.
