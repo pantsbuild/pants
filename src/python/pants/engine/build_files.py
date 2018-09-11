@@ -14,8 +14,7 @@ from os.path import dirname, join
 import six
 
 from pants.base.project_tree import Dir
-from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
-                              SingleAddress, Spec, Specs)
+from pants.base.specs import SingleAddress, Spec, Specs
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import AddressableDescriptor, BuildFileAddresses
@@ -25,7 +24,6 @@ from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
-from pants.util.dirutil import recursive_dirname
 from pants.util.filtering import create_filters, wrap_filters
 from pants.util.memo import memoized_property
 from pants.util.objects import TypeConstraintError, datatype
@@ -295,18 +293,7 @@ def _spec_to_globs(address_mapper, specs):
   """Given a Specs object, return a PathGlobs object for the build files that it matches."""
   patterns = set()
   for spec in specs.dependencies:
-    if type(spec) is DescendantAddresses:
-      patterns.update(join(spec.directory, '**', pattern)
-                      for pattern in address_mapper.build_patterns)
-    elif type(spec) in (SiblingAddresses, SingleAddress):
-      patterns.update(join(spec.directory, pattern)
-                      for pattern in address_mapper.build_patterns)
-    elif type(spec) is AscendantAddresses:
-      patterns.update(join(f, pattern)
-                      for pattern in address_mapper.build_patterns
-                      for f in recursive_dirname(spec.directory))
-    else:
-      raise ValueError('Unrecognized Spec type: {}'.format(spec))
+    patterns.update(spec.make_glob_patterns(address_mapper))
   return PathGlobs(include=patterns, exclude=address_mapper.build_ignore_patterns)
 
 

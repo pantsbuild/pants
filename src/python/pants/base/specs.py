@@ -4,10 +4,11 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
 from abc import abstractmethod
 
 from pants.util.collections import assert_single_element
-from pants.util.dirutil import fast_relpath_optional
+from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -67,6 +68,15 @@ class Spec(AbstractClass):
       addr_tgt_pairs.extend(af.addressables.items())
     return addr_tgt_pairs
 
+  @abstractmethod
+  def make_glob_patterns(self, address_mapper):
+    """Generate glob patterns matching exactly all the BUILD files this spec covers."""
+
+  @classmethod
+  def globs_in_single_dir(cls, spec_dir_path, address_mapper):
+    """Implementation of `make_glob_patterns()` which only allows a single base directory."""
+    return [os.path.join(spec_dir_path, pat) for pat in address_mapper.build_patterns]
+
 
 class SingleAddress(datatype(['directory', 'name']), Spec):
   """A Spec for a single address."""
@@ -107,6 +117,9 @@ class SingleAddress(datatype(['directory', 'name']), Spec):
     assert(len(addr_tgt_pairs) == 1)
     return addr_tgt_pairs
 
+  def make_glob_patterns(self, address_mapper):
+    return self.globs_in_single_dir(self.directory, address_mapper)
+
 
 class SiblingAddresses(datatype(['directory']), Spec):
   """A Spec representing all addresses located directly within the given directory."""
@@ -119,6 +132,9 @@ class SiblingAddresses(datatype(['directory']), Spec):
 
   def address_target_pairs_from_address_families(self, address_families):
     return self.all_address_target_pairs(address_families)
+
+  def make_glob_patterns(self, address_mapper):
+    return self.globs_in_single_dir(self.directory, address_mapper)
 
 
 class DescendantAddresses(datatype(['directory']), Spec):
@@ -139,6 +155,9 @@ class DescendantAddresses(datatype(['directory']), Spec):
       raise self.AddressResolutionError('Spec {} does not match any targets.'.format(self))
     return addr_tgt_pairs
 
+  def make_glob_patterns(self, address_mapper):
+    return [os.path.join(self.directory, '**', pat) for pat in address_mapper.build_patterns]
+
 
 class AscendantAddresses(datatype(['directory']), Spec):
   """A Spec representing all addresses located recursively _above_ the given directory."""
@@ -154,6 +173,13 @@ class AscendantAddresses(datatype(['directory']), Spec):
 
   def address_target_pairs_from_address_families(self, address_families):
     return self.all_address_target_pairs(address_families)
+
+  def make_glob_patterns(self, address_mapper):
+    return [
+      os.path.join(f, pattern)
+      for pattern in address_mapper.build_patterns
+      for f in recursive_dirname(self.directory)
+    ]
 
 
 class Specs(datatype([('dependencies', tuple), ('tags', tuple), ('exclude_patterns', tuple)])):
