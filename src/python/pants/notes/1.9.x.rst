@@ -3,6 +3,22 @@
 
 This document describes releases leading up to the ``1.9.x`` ``stable`` series.
 
+1.9.0rc3 (09/10/2018)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Cherry-pick setup_py fixes (#6472)
+  `Issue #8315 <https://github.com/travis-ci/travis-ci/issues/8315>`_
+  `PR #6472 <https://github.com/pantsbuild/pants/pull/6472>`_
+
+* Work around production `coverage` float. (#6452)
+  `PR #6452 <https://github.com/pantsbuild/pants/pull/6452>`_
+
+* Cancel running work when entering the fork context (#6464)
+  `PR #6464 <https://github.com/pantsbuild/pants/pull/6464>`_
+
 1.9.0rc2 (08/30/2018)
 ---------------------
 
