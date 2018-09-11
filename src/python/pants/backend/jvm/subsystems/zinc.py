@@ -121,7 +121,7 @@ class Zinc(object):
         for tool_name in tools:
           for scala_version in scala_versions:
             cls.register_jvm_tool(register,
-                                  ScalaPlatform._key_for_tool_version(tool_name, scala_version),
+                                  ScalaPlatform.versioned_tool_name(tool_name, scala_version),
                                   classpath=[
                                     ScalaPlatform
                                       ._create_jardep(tool_name, scala_version)
@@ -154,7 +154,7 @@ class Zinc(object):
     def _fetch_tool_jar_from_classpath(self, products, tool_name):
       scala_version = ScalaPlatform.global_instance().version
       classpath = self.tool_classpath_from_products(products,
-                                                    ScalaPlatform._key_for_tool_version(tool_name, scala_version),
+                                                    ScalaPlatform.versioned_tool_name(tool_name, scala_version),
                                                     scope=self.options_scope)
       assert(len(classpath) == 1)
       return classpath[0]
