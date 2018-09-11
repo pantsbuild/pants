@@ -7,6 +7,10 @@ package org.pantsbuild.zinc.options
 
 import java.io.File
 
+///
+/// TODO Remove uses of this in favor of scopt
+/// A reference way to do this is described in #6487
+///
 trait OptionSet[T] {
   /** An empty set of options. */
   def empty: T

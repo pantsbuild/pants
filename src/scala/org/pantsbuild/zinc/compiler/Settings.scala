@@ -43,20 +43,15 @@ case class Settings(
   scala: ScalaLocation              = ScalaLocation(),
   scalacOptions: Seq[String]        = Seq.empty,
   javaHome: Option[File]            = None,
-  _zincCacheDir: Option[File]       = None,
   javaOnly: Boolean                 = false,
   javacOptions: Seq[String]         = Seq.empty,
   compileOrder: CompileOrder        = CompileOrder.Mixed,
-  sbt: SbtJars                      = SbtJars(),
   _incOptions: IncOptions           = IncOptions(),
   analysis: AnalysisOptions         = AnalysisOptions(),
-  creationTime: Long                = 0
+  creationTime: Long                = 0,
+  compiledBridgeJar: Option[File]= None
 ) {
   import Settings._
-
-  lazy val zincCacheDir: File = _zincCacheDir.getOrElse {
-    throw new RuntimeException(s"The ${Settings.ZincCacheDirOpt} option is required.")
-  }
 
   lazy val sources: Seq[File] = _sources map normalise
 
@@ -161,25 +156,6 @@ object ScalaLocation {
 }
 
 /**
- * Locating the sbt jars needed for zinc compile.
- */
-case class SbtJars(
-  compilerBridgeSrc: Option[File] = None,
-  compilerInterface: Option[File] = None
-) {
-  lazy val jars: (File, File) = (compilerBridgeSrc, compilerInterface) match {
-    case (Some(x), Some(y)) if x.exists && y.exists => (x, y)
-    case (Some(x), Some(y)) =>
-      throw new RuntimeException(s"One or both of $x and $y do not exist.")
-    case _ =>
-      throw new RuntimeException(
-        s"Both the ${Settings.CompilerBridgeOpt} and " +
-        s"${Settings.CompilerInterfaceOpt} options are required."
-      )
-  }
-}
-
-/**
  * Wrapper around incremental compiler options.
  */
 case class IncOptions(
@@ -214,9 +190,6 @@ case class IncOptions(
 object Settings extends OptionSet[Settings] {
   val DestinationOpt = "-d"
   val JarDestinationOpt = "-jar"
-  val ZincCacheDirOpt = "-zinc-cache-dir"
-  val CompilerBridgeOpt = "-compiler-bridge"
-  val CompilerInterfaceOpt = "-compiler-interface"
 
   override def empty = Settings()
 
@@ -261,9 +234,7 @@ object Settings extends OptionSet[Settings] {
     prefix(    "-C", "<javac-option>",         "Pass option to javac",                       (s: Settings, o: String) => s.copy(javacOptions = s.javacOptions :+ o)),
 
     header("sbt options:"),
-    file(      CompilerBridgeOpt, "file",     "Specify compiler bridge sources jar",        (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerBridgeSrc = Some(f)))),
-    file(      CompilerInterfaceOpt, "file",  "Specify compiler interface jar",             (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerInterface = Some(f)))),
-    file(      ZincCacheDirOpt, "file",       "A cache directory for compiler interfaces",  (s: Settings, f: File) => s.copy(_zincCacheDir = Some(f))),
+    file("-compiled-bridge-jar", "file", "Path to pre-compiled compiler interface", (s: Settings, f: File) => s.copy(compiledBridgeJar = Some(f))),
 
     header("Incremental compiler options:"),
     int(       "-transitive-step", "n",        "Steps before transitive closure",            (s: Settings, i: Int) => s.copy(_incOptions = s._incOptions.copy(transitiveStep = i))),

@@ -18,6 +18,7 @@ scala_library(
     'src/scala/org/pantsbuild/zinc/analysis',
     'src/scala/org/pantsbuild/zinc/cache',
     'src/scala/org/pantsbuild/zinc/options',
+    'src/scala/org/pantsbuild/zinc/scalautil',
     'src/scala/org/pantsbuild/zinc/util',
   ],
   strict_deps=True,

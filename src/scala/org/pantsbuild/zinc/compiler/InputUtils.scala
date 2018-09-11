@@ -9,11 +9,13 @@ import java.util.function.{ Function => JFunction }
 
 import scala.compat.java8.OptionConverters._
 
+import sbt.internal.inc.ZincUtil
 import sbt.io.IO
 import sbt.util.Logger
 import xsbti.{Position, Problem, Severity, ReporterConfig, ReporterUtil}
 import xsbti.compile.{
   AnalysisStore,
+  ClasspathOptionsUtil,
   CompileOptions,
   CompileOrder,
   Compilers,
@@ -21,8 +23,9 @@ import xsbti.compile.{
   PreviousResult,
   Setup
 }
-
 import org.pantsbuild.zinc.analysis.AnalysisMap
+import org.pantsbuild.zinc.scalautil.ScalaUtils
+import org.pantsbuild.zinc.compiler.CompilerUtils.{compilerCache, newScalaCompiler, scalaInstance}
 
 object InputUtils {
   /**
@@ -36,7 +39,10 @@ object InputUtils {
   ): Inputs = {
     import settings._
 
-    val compilers = CompilerUtils.getOrCreate(settings, log)
+    val scalaJars = InputUtils.selectScalaJars(settings.scala)
+
+    val instance = ScalaUtils.scalaInstance(scalaJars.compiler, scalaJars.extra, scalaJars.library)
+    val compilers = ZincUtil.compilers(instance, ClasspathOptionsUtil.auto, settings.javaHome, newScalaCompiler(instance, settings.compiledBridgeJar.get))
 
     // TODO: Remove duplication once on Scala 2.12.x.
     val positionMapper =
@@ -164,8 +170,6 @@ object InputUtils {
   val ScalaCompiler            = JarFile("scala-compiler")
   val ScalaLibrary             = JarFile("scala-library")
   val ScalaReflect             = JarFile("scala-reflect")
-  val CompilerBridgeSources    = JarFile("compiler-bridge", "sources")
-  val CompilerInterface        = JarFile("compiler-interface")
 
   // TODO: The default jar locations here are definitely not helpful, but the existence
   // of "some" value for each of these is assumed in a few places. Should remove and make
