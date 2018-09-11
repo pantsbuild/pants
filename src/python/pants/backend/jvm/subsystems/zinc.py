@@ -70,7 +70,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME,
                             classpath=[
-                              ScalaJarDependency('org.pantsbuild', 'zinc-bootstrapper', 'snap_2'),
+                              ScalaJarDependency('org.pantsbuild', 'zinc-bootstrapper', '0.0.2'),
                             ],
                             main=Zinc.ZINC_BOOTSTRAPER_MAIN,
                             custom_rules=shader_rules,
@@ -79,7 +79,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_COMPILER_TOOL_NAME,
                             classpath=[
-                              ScalaJarDependency('org.pantsbuild', 'zinc-compiler', 'snap_2'),
+                              ScalaJarDependency('org.pantsbuild', 'zinc-compiler', '0.0.8'),
                             ],
                             main=Zinc.ZINC_COMPILE_MAIN,
                             custom_rules=shader_rules)
@@ -110,7 +110,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_EXTRACTOR_TOOL_NAME,
                             classpath=[
-                              ScalaJarDependency('org.pantsbuild', 'zinc-extractor', '0.0.4')
+                              ScalaJarDependency('org.pantsbuild', 'zinc-extractor', '0.0.6')
                             ])
 
       # Register tools for fixed versions of Scala, 2.10, 2.11 and 2.12.
