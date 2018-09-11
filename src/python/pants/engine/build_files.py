@@ -269,18 +269,8 @@ class MappedSpecs(datatype([
     return matched_addresses
 
 
-@rule(MappedSpecs, [Select(AddressMapper), Select(Specs)])
-def map_specs(address_mapper, specs):
-  # Capture a Snapshot covering all paths for these Specs, then group by directory.
-  snapshot = yield Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
-  dirnames = {dirname(f.stat.path) for f in snapshot.files}
-  address_families = yield [Get(AddressFamily, Dir(d)) for d in dirnames]
-
-  yield MappedSpecs(address_families, specs)
-
-
-@rule(BuildFileAddresses, [Select(MappedSpecs)])
-def addresses_from_address_families(mapped_specs):
+@rule(BuildFileAddresses, [Select(AddressMapper), Select(Specs)])
+def addresses_from_address_families(address_mapper, specs):
   """Given an AddressMapper and list of Specs, return matching BuildFileAddresses.
 
   :raises: :class:`ResolveError` if:
@@ -288,8 +278,13 @@ def addresses_from_address_families(mapped_specs):
      - the Spec matches no addresses for SingleAddresses.
   :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
   """
+  # Capture a Snapshot covering all paths for these Specs, then group by directory.
+  snapshot = yield Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
+  dirnames = {dirname(f.stat.path) for f in snapshot.files}
+  address_families = yield [Get(AddressFamily, Dir(d)) for d in dirnames]
+  mapped_specs = MappedSpecs(address_families, specs)
   deduplicated_addresses = frozenset(mapped_specs.all_matching_addresses())
-  return BuildFileAddresses(tuple(deduplicated_addresses))
+  yield BuildFileAddresses(tuple(deduplicated_addresses))
 
 
 def _spec_to_globs(address_mapper, specs):
@@ -338,7 +333,6 @@ def create_graph_rules(address_mapper, symbol_table):
     parse_address_family,
     # Spec handling: locate directories that contain build files, and request
     # AddressFamilies for each of them.
-    map_specs,
     addresses_from_address_families,
     # Root rules representing parameters that might be provided via root subjects.
     RootRule(Address),

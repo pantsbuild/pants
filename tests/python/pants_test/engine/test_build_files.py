@@ -12,10 +12,9 @@ from pants.base.project_tree import Dir, File
 from pants.base.specs import SiblingAddresses, SingleAddress, Specs
 from pants.build_graph.address import Address
 from pants.engine.addressable import addressable, addressable_dict
-from pants.engine.build_files import (MappedSpecs, ResolvedTypeMismatchError,
-                                      addresses_from_address_families, create_graph_rules,
-                                      parse_address_family)
-from pants.engine.fs import (DirectoryDigest, FileContent, FilesContent, PathGlobs, Snapshot,
+from pants.engine.build_files import (ResolvedTypeMismatchError, addresses_from_address_families,
+                                      create_graph_rules, parse_address_family)
+from pants.engine.fs import (DirectoryDigest, FileContent, FilesContent, Path, PathGlobs, Snapshot,
                              create_fs_rules)
 from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.mapper import AddressFamily, AddressMapper, ResolveError
@@ -44,10 +43,15 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
   def test_duplicated(self):
     """Test that matching the same Spec twice succeeds."""
     address = SingleAddress('a', 'a')
+    address_mapper = AddressMapper(JsonParser(TestTable()))
+    snapshot = Snapshot(DirectoryDigest('xx', 2),
+                        (Path('a/BUILD', File('a/BUILD')),))
     address_family = AddressFamily('a', {'a': ('a/BUILD', 'this is an object!')})
-    mapped_specs = MappedSpecs([address_family], Specs([address, address]))
 
-    bfas = run_rule(addresses_from_address_families, mapped_specs)
+    bfas = run_rule(addresses_from_address_families, address_mapper, Specs([address, address]), {
+        (Snapshot, PathGlobs): lambda _: snapshot,
+        (AddressFamily, Dir): lambda _: address_family,
+      })
 
     self.assertEqual(len(bfas.dependencies), 1)
     self.assertEqual(bfas.dependencies[0].spec, 'a:a')
@@ -55,15 +59,21 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
   def test_tag_filter(self):
     """Test that targets are filtered based on `tags`."""
     spec = SiblingAddresses('root')
+    address_mapper = AddressMapper(JsonParser(TestTable()))
+    snapshot = Snapshot(DirectoryDigest('xx', 2),
+                        (Path('root/BUILD', File('root/BUILD')),))
     address_family = AddressFamily('root',
       {'a': ('root/BUILD', TargetAdaptor()),
        'b': ('root/BUILD', TargetAdaptor(tags={'integration'})),
        'c': ('root/BUILD', TargetAdaptor(tags={'not_integration'}))
       }
     )
-    mapped_specs = MappedSpecs([address_family], Specs([spec], tags=['+integration']))
 
-    targets = run_rule(addresses_from_address_families, mapped_specs)
+    targets = run_rule(
+      addresses_from_address_families, address_mapper, Specs([spec], tags=['+integration']), {
+      (Snapshot, PathGlobs): lambda _: snapshot,
+      (AddressFamily, Dir): lambda _: address_family,
+    })
 
     self.assertEqual(len(targets.dependencies), 1)
     self.assertEqual(targets.dependencies[0].spec, 'root:b')
@@ -71,44 +81,63 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
   def test_fails_on_nonexistent_specs(self):
     """Test that specs referring to nonexistent targets raise a ResolveError."""
     address_family = AddressFamily('root', {'a': ('root/BUILD', TargetAdaptor())})
+    address_mapper = AddressMapper(JsonParser(TestTable()))
+    snapshot = Snapshot(DirectoryDigest('xx', 2),
+                        (Path('root/BUILD', File('root/BUILD')),))
     specs = Specs([SingleAddress('root', 'b'), SingleAddress('root', 'a')])
-    mapped_specs = MappedSpecs([address_family], specs)
 
     expected_rx_str = re.escape(
       """"b" was not found in namespace "root". Did you mean one of:
   :a""")
     with self.assertRaisesRegexp(ResolveError, expected_rx_str):
-      run_rule(addresses_from_address_families, mapped_specs)
+      run_rule(addresses_from_address_families, address_mapper, specs, {
+        (Snapshot, PathGlobs): lambda _: snapshot,
+        (AddressFamily, Dir): lambda _: address_family,
+      })
 
     # Ensure that we still catch nonexistent targets later on in the list of command-line specs.
     specs = Specs([SingleAddress('root', 'a'), SingleAddress('root', 'b')])
-    mapped_specs = MappedSpecs([address_family], specs)
     with self.assertRaisesRegexp(ResolveError, expected_rx_str):
-      run_rule(addresses_from_address_families, mapped_specs)
+      run_rule(addresses_from_address_families, address_mapper, specs, {
+        (Snapshot, PathGlobs): lambda _: snapshot,
+        (AddressFamily, Dir): lambda _: address_family,
+      })
 
   def test_exclude_pattern(self):
     """Test that targets are filtered based on exclude patterns."""
     spec = SiblingAddresses('root')
+    address_mapper = AddressMapper(JsonParser(TestTable()))
+    snapshot = Snapshot(DirectoryDigest('xx', 2),
+                        (Path('root/BUILD', File('root/BUILD')),))
     address_family = AddressFamily('root',
-      {'exclude_me': ('root/BUILD', TargetAdaptor()),
-       'not_me': ('root/BUILD', TargetAdaptor()),
-      }
+                                   {'exclude_me': ('root/BUILD', TargetAdaptor()),
+                                    'not_me': ('root/BUILD', TargetAdaptor()),
+                                   }
     )
-    mapped_specs = MappedSpecs([address_family], Specs([spec], exclude_patterns=tuple(['.exclude*'])))
-    targets = run_rule(addresses_from_address_families, mapped_specs)
+    targets = run_rule(
+      addresses_from_address_families, address_mapper, Specs([spec], exclude_patterns=tuple(['.exclude*'])),{
+        (Snapshot, PathGlobs): lambda _: snapshot,
+        (AddressFamily, Dir): lambda _: address_family,
+      })
     self.assertEqual(len(targets.dependencies), 1)
     self.assertEqual(targets.dependencies[0].spec, 'root:not_me')
 
   def test_exclude_pattern_with_single_address(self):
     """Test that single address targets are filtered based on exclude patterns."""
     spec = SingleAddress('root', 'not_me')
+    address_mapper = AddressMapper(JsonParser(TestTable()))
+    snapshot = Snapshot(DirectoryDigest('xx', 2),
+                        (Path('root/BUILD', File('root/BUILD')),))
     address_family = AddressFamily('root',
-      {
-       'not_me': ('root/BUILD', TargetAdaptor()),
-      }
+                                   {
+                                     'not_me': ('root/BUILD', TargetAdaptor()),
+                                   }
     )
-    mapped_specs = MappedSpecs([address_family], Specs([spec], exclude_patterns=tuple(['root.*'])))
-    targets = run_rule(addresses_from_address_families, mapped_specs)
+    targets = run_rule(
+      addresses_from_address_families, address_mapper, Specs([spec], exclude_patterns=tuple(['root.*'])),{
+        (Snapshot, PathGlobs): lambda _: snapshot,
+        (AddressFamily, Dir): lambda _: address_family,
+      })
     self.assertEqual(len(targets.dependencies), 0)
 
 
