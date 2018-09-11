@@ -282,8 +282,12 @@ def addresses_from_address_families(address_mapper, specs):
   snapshot = yield Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
   dirnames = {dirname(f.stat.path) for f in snapshot.files}
   address_families = yield [Get(AddressFamily, Dir(d)) for d in dirnames]
+
+  # all_matching_addresses() could be a free function as well -- it just seemed to make it easier to
+  # follow to package it up into a datatype here.
   mapped_specs = MappedSpecs(address_families, specs)
   deduplicated_addresses = frozenset(mapped_specs.all_matching_addresses())
+
   yield BuildFileAddresses(tuple(deduplicated_addresses))
 
 
