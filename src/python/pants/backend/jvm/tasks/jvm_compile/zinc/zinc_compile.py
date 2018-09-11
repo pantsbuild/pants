@@ -441,7 +441,7 @@ class BaseZincCompile(JvmCompile):
         # TODO: These should always be unicodes
         jdk_home=text_type(self._zinc.dist.home),
       )
-      res = self.context.execute_process_synchronously(req, self.name(), [WorkUnitLabel.COMPILER])
+      res = self.context.execute_process_synchronously_without_raising(req, self.name(), [WorkUnitLabel.COMPILER])
       # TODO: Materialize as a batch in do_compile or somewhere
       self.context._scheduler.materialize_directories((
         DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),

@@ -380,7 +380,7 @@ class Context(object):
       build_graph.inject_address_closure(address)
     return build_graph
 
-  def execute_process_synchronously(self, execute_process_request, name, labels=None):
+  def execute_process_synchronously_without_raising(self, execute_process_request, name, labels=None):
     """Executes a process (possibly remotely), and returns information about its output.
 
     :param execute_process_request: The ExecuteProcessRequest to run.
@@ -406,7 +406,7 @@ class Context(object):
 
     See execute_process_synchronously for the api docs.
     """
-    fallible_result = self.execute_process_synchronously(execute_process_request, name, labels)
+    fallible_result = self.execute_process_synchronously_without_raising(execute_process_request, name, labels)
     return fallible_to_exec_result_or_raise(
       fallible_result,
       execute_process_request
