@@ -436,10 +436,9 @@ class BaseZincCompile(JvmCompile):
               "execution".format(dep)
             )
 
-      if scalac_classpath_entries:
-        snapshots.extend(
-          classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries
-        )
+      snapshots.extend(
+        classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries
+      )
 
       merged_input_digest = self.context._scheduler.merge_directories(
         tuple(s.directory_digest for s in (snapshots)) + directory_digests

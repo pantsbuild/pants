@@ -48,7 +48,8 @@ class ScaladocGen(JvmdocGen):
       return None
 
     scala_platform = ScalaPlatform.global_instance()
-    tool_classpath = scala_platform.compiler_classpath(self.context.products)
+    tool_classpath = scala_platform.compiler_classpath_entries(
+      self.context.products, self.context._scheduler)
 
     args = ['-usejavacp',
             '-classpath', ':'.join(classpath),
