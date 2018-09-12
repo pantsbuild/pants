@@ -261,12 +261,12 @@ class Zinc(object):
   def _run_bootstrapper(self, bridge_jar, context):
     bootstrapper = self._zinc_factory._compiler_bootstrapper(self._products)
     bootstrapper_args = [
-      "--out", bridge_jar,
-      "--compiler-interface", self.compiler_interface,
-      "--compiler-bridge-src", self.compiler_bridge,
-      "--scala-compiler", self.scala_compiler,
-      "--scala-library", self.scala_library,
-      "--scala-reflect", self.scala_reflect,
+      '--out', bridge_jar,
+      '--compiler-interface', self.compiler_interface,
+      '--compiler-bridge-src', self.compiler_bridge,
+      '--scala-compiler', self.scala_compiler,
+      '--scala-library', self.scala_library,
+      '--scala-reflect', self.scala_reflect,
     ]
     input_jar_snapshots = context._scheduler.capture_snapshots((PathGlobsAndRoot(
       PathGlobs(tuple([self._make_relative(jar) for jar in bootstrapper_args[1::2]])),
@@ -281,11 +281,12 @@ class Zinc(object):
       input_files=input_jar_snapshots[0].directory_digest,
       output_files=(self._make_relative(bridge_jar),),
       output_directories=(self._make_relative(self._compiler_bridge_cache_dir),),
-      description="bootstrap compiler bridge.",
+      description='bootstrap compiler bridge.',
       jdk_home=self.dist.home,
     )
     return context.execute_process_synchronously_or_raise(req, 'zinc-subsystem', [WorkUnitLabel.COMPILER])
 
+  @memoized_method
   def compile_compiler_bridge(self, context):
     """Compile the compiler bridge to be used by zinc, using our scala bootstrapper.
     It will compile and cache the jar, and materialize it if not already there.
@@ -295,25 +296,20 @@ class Zinc(object):
     :return: The absolute path to the compiled scala-compiler-bridge jar.
     """
     bridge_jar = os.path.join(self._compiler_bridge_cache_dir, 'scala-compiler-bridge.jar')
-    is_executing_remotely = context.options.for_global_scope().remote_execution_server
 
-    if is_executing_remotely:
+    if not os.path.exists(bridge_jar):
       res = self._run_bootstrapper(bridge_jar, context)
+      context._scheduler.materialize_directories((
+        DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
+      ))
       return ClasspathEntry(bridge_jar, res.output_directory_digest)
     else:
-      if not os.path.exists(bridge_jar):
-        res = self._run_bootstrapper(bridge_jar, context)
-        context._scheduler.materialize_directories((
-          DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
-        ))
-        return ClasspathEntry(bridge_jar, res.output_directory_digest)
-      else:
-        bridge_jar_snapshot = context._scheduler.capture_snapshots((PathGlobsAndRoot(
-          PathGlobs((self._make_relative(bridge_jar),)),
-          text_type(get_buildroot())
-        ),))[0]
-        bridge_jar_digest = bridge_jar_snapshot.directory_digest
-        return ClasspathEntry(bridge_jar, bridge_jar_digest)
+      bridge_jar_snapshot = context._scheduler.capture_snapshots((PathGlobsAndRoot(
+        PathGlobs((self._make_relative(bridge_jar),)),
+        text_type(get_buildroot())
+      ),))[0]
+      bridge_jar_digest = bridge_jar_snapshot.directory_digest
+      return ClasspathEntry(bridge_jar, bridge_jar_digest)
 
   @memoized_method
   def snapshot(self, scheduler):
