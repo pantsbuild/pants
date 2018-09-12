@@ -70,7 +70,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME,
                             classpath=[
-                              ScalaJarDependency('org.pantsbuild', 'zinc-bootstrapper', '0.0.2'),
+                              JarDependency('org.pantsbuild', 'zinc-bootstrapper_2.11', '0.0.2'),
                             ],
                             main=Zinc.ZINC_BOOTSTRAPER_MAIN,
                             custom_rules=shader_rules,
@@ -79,7 +79,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_COMPILER_TOOL_NAME,
                             classpath=[
-                              ScalaJarDependency('org.pantsbuild', 'zinc-compiler', '0.0.8'),
+                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.8'),
                             ],
                             main=Zinc.ZINC_COMPILE_MAIN,
                             custom_rules=shader_rules)
@@ -110,7 +110,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_EXTRACTOR_TOOL_NAME,
                             classpath=[
-                              ScalaJarDependency('org.pantsbuild', 'zinc-extractor', '0.0.6')
+                              JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.6')
                             ])
 
       # Register tools for fixed versions of Scala, 2.10, 2.11 and 2.12.
@@ -268,39 +268,39 @@ class Zinc(object):
     :return: The absolute path to the compiled scala-compiler-bridge jar.
     """
     bridge_jar = os.path.join(self._compiler_bridge_cache_dir, 'scala-compiler-bridge.jar')
-    bootstrapper = self._zinc_factory._compiler_bootstrapper(self._products)
+    is_executing_remotely = context.options.for_global_scope().remote_execution_server
 
-    bootstrapper_args = [
-      "--out", bridge_jar,
-      "--compiler-interface", self.compiler_interface,
-      "--compiler-bridge-src", self.compiler_bridge,
-      "--scala-compiler", self.scala_compiler,
-      "--scala-library", self.scala_library,
-      "--scala-reflect", self.scala_reflect,
-    ]
-    input_jar_snapshots = context._scheduler.capture_snapshots((PathGlobsAndRoot(
-      PathGlobs(tuple([self._make_relative(jar) for jar in bootstrapper_args[1::2]])),
-      text_type(get_buildroot())
-    ),))
-    argv = tuple(['.jdk/bin/java'] +
-                 ['-cp', bootstrapper, Zinc.ZINC_BOOTSTRAPER_MAIN] +
-                 bootstrapper_args
-    )
-    req = ExecuteProcessRequest(
-      argv=argv,
-      input_files=input_jar_snapshots[0].directory_digest,
-      output_files=(self._make_relative(bridge_jar),),
-      output_directories=(self._make_relative(self._compiler_bridge_cache_dir),),
-      description="bootstrap compiler bridge.",
-      jdk_home=self.dist.home,
-    )
-
-    res = context.execute_process_synchronously_or_raise(req, 'zinc-subsystem', [WorkUnitLabel.COMPILER])
-
-    if not context.options.for_global_scope().remote_execution_server:
-      context._scheduler.materialize_directories((
-        DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
-      ))
+    if is_executing_remotely or not os.path.exists(bridge_jar):
+      bootstrapper = self._zinc_factory._compiler_bootstrapper(self._products)
+      bootstrapper_args = [
+        "--out", bridge_jar,
+        "--compiler-interface", self.compiler_interface,
+        "--compiler-bridge-src", self.compiler_bridge,
+        "--scala-compiler", self.scala_compiler,
+        "--scala-library", self.scala_library,
+        "--scala-reflect", self.scala_reflect,
+      ]
+      input_jar_snapshots = context._scheduler.capture_snapshots((PathGlobsAndRoot(
+        PathGlobs(tuple([self._make_relative(jar) for jar in bootstrapper_args[1::2]])),
+        text_type(get_buildroot())
+      ),))
+      argv = tuple(['.jdk/bin/java'] +
+                   ['-cp', bootstrapper, Zinc.ZINC_BOOTSTRAPER_MAIN] +
+                   bootstrapper_args
+      )
+      req = ExecuteProcessRequest(
+        argv=argv,
+        input_files=input_jar_snapshots[0].directory_digest,
+        output_files=(self._make_relative(bridge_jar),),
+        output_directories=(self._make_relative(self._compiler_bridge_cache_dir),),
+        description="bootstrap compiler bridge.",
+        jdk_home=self.dist.home,
+      )
+      res = context.execute_process_synchronously_or_raise(req, 'zinc-subsystem', [WorkUnitLabel.COMPILER])
+      if not is_executing_remotely:
+        context._scheduler.materialize_directories((
+          DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
+        ))
     return bridge_jar
 
   @memoized_method
@@ -369,6 +369,14 @@ class Zinc(object):
     # iterator, `excludes` are not applied
     # in ClasspathProducts.get_product_target_mappings_for_targets.
     return ClasspathUtil.compute_classpath_entries(iter(dependencies),
-                                           classpath_product,
-                                           all_extra_cp_entries,
-                                           self.DEFAULT_CONFS)
+      classpath_product,
+      all_extra_cp_entries,
+      self.DEFAULT_CONFS,
+    )
+
+  def compile_classpath(self, classpath_product_key, target, extra_cp_entries=None):
+    """Compute the compile classpath for the given target."""
+    return list(
+      entry.path
+        for entry in self.compile_classpath_entries(classpath_product_key, target, extra_cp_entries)
+    )
