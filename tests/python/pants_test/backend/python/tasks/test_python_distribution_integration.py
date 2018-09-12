@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import glob
 import os
 import re
-import unittest
 from builtins import open
 
 from pants.util.collections import assert_single_element
