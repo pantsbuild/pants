@@ -52,7 +52,8 @@ class BasicAuth(Subsystem):
     url = provider_config.get('url')
     if not url:
       raise BasicAuthException('No url found in config for provider {}.'.format(provider_config))
-    # TODO: Require url to be https, except when testing.
+    # TODO: Require url to be https, except when testing. See
+    # https://github.com/pantsbuild/pants/issues/6496.
 
     if creds:
       auth = requests.auth.HTTPBasicAuth(creds.username, creds.password)
