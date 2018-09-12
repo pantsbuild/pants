@@ -12,6 +12,7 @@ from builtins import next, str
 from os.path import dirname, join
 
 import six
+from twitter.common.collections import OrderedSet
 
 from pants.base.project_tree import Dir
 from pants.base.specs import SingleAddress, Spec, Specs
@@ -284,7 +285,7 @@ def addresses_from_address_families(address_mapper, specs):
   # all_matching_addresses() could be a free function as well -- it just seemed to make it easier to
   # follow to package it up into a datatype here.
   mapped_specs = _MappedSpecs(address_families, specs)
-  deduplicated_addresses = frozenset(mapped_specs.all_matching_addresses())
+  deduplicated_addresses = OrderedSet(mapped_specs.all_matching_addresses())
 
   yield BuildFileAddresses(tuple(deduplicated_addresses))
 
