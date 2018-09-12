@@ -31,7 +31,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
-from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
+from pants.engine.fs import DirectoryToMaterialize
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import open_zip
@@ -262,8 +262,10 @@ class BaseZincCompile(JvmCompile):
     # the JDK it was invoked with.
     return Java.global_javac_classpath(self.context.products)
 
-  def scalac_classpath(self):
-    return ScalaPlatform.global_instance().compiler_classpath(self.context.products)
+  def scalac_classpath_entries(self):
+    """Returns classpath entries for the scalac classpath."""
+    return ScalaPlatform.global_instance().compiler_classpath_entries(
+      self.context.products, self.context._scheduler)
 
   def write_extra_resources(self, compile_context):
     """Override write_extra_resources to produce plugin and annotation processor files."""
@@ -314,19 +316,21 @@ class BaseZincCompile(JvmCompile):
       # TODO: Support workdirs not nested under buildroot by path-rewriting.
       return fast_relpath(path, get_buildroot())
 
-    scala_path = self.scalac_classpath()
     compiler_interface = self._zinc.compiler_interface
     compiler_bridge = self._zinc.compiler_bridge
     classes_dir = ctx.classes_dir
     analysis_cache = ctx.analysis_file
 
-    scala_path = tuple(relative_to_exec_root(c) for c in scala_path)
     compiler_interface = relative_to_exec_root(compiler_interface)
     compiler_bridge = relative_to_exec_root(compiler_bridge)
     analysis_cache = relative_to_exec_root(analysis_cache)
     classes_dir = relative_to_exec_root(classes_dir)
     # TODO: Have these produced correctly, rather than having to relativize them here
     relative_classpath = tuple(relative_to_exec_root(c) for c in absolute_classpath)
+
+    # list of classpath entries
+    scalac_classpath_entries = self.scalac_classpath_entries()
+    scala_path = [classpath_entry.path for classpath_entry in scalac_classpath_entries]
 
     zinc_args = []
     zinc_args.extend([
@@ -432,14 +436,9 @@ class BaseZincCompile(JvmCompile):
               "execution".format(dep)
             )
 
-      if scala_path:
-        # TODO: ScalaPlatform._tool_classpath should capture this and memoize it.
-        # See https://github.com/pantsbuild/pants/issues/6435
-        snapshots.append(
-          self.context._scheduler.capture_snapshots((PathGlobsAndRoot(
-            PathGlobs(scala_path),
-            get_buildroot(),
-          ),))[0]
+      if scalac_classpath_entries:
+        snapshots.extend(
+          classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries
         )
 
       merged_input_digest = self.context._scheduler.merge_directories(
