@@ -201,14 +201,14 @@ def _hydrate(item_type, spec_path, **kwargs):
   return item
 
 
-class MappedSpecs(datatype([
+class _MappedSpecs(datatype([
     ('address_families', tuple),
     ('specs', Specs),
 ])):
   """Wraps up logic to resolve specs into individual target addresses, or error out."""
 
   def __new__(cls, address_families, specs):
-    return super(MappedSpecs, cls).__new__(cls, tuple(address_families), specs)
+    return super(_MappedSpecs, cls).__new__(cls, tuple(address_families), specs)
 
   @memoized_property
   def _exclude_compiled_regexps(self):
@@ -283,7 +283,7 @@ def addresses_from_address_families(address_mapper, specs):
 
   # all_matching_addresses() could be a free function as well -- it just seemed to make it easier to
   # follow to package it up into a datatype here.
-  mapped_specs = MappedSpecs(address_families, specs)
+  mapped_specs = _MappedSpecs(address_families, specs)
   deduplicated_addresses = frozenset(mapped_specs.all_matching_addresses())
 
   yield BuildFileAddresses(tuple(deduplicated_addresses))
