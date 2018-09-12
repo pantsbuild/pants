@@ -113,25 +113,23 @@ class Zinc(object):
                               JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.6')
                             ])
 
-      # Register tools for fixed versions of Scala, 2.10, 2.11 and 2.12.
+      # Register scalac for fixed versions of Scala, 2.10, 2.11 and 2.12.
       # Relies on ScalaPlatform to get the revision version from the major.minor version.
       # The tool with the correct scala version will be retrieved later,
       # taking the user-passed option into account.
-      def register_scala_tools_for_versions(tools, scala_versions):
-        for tool_name in tools:
-          for scala_version in scala_versions:
-            cls.register_jvm_tool(register,
-                                  ScalaPlatform.versioned_tool_name(tool_name, scala_version),
-                                  classpath=[
-                                    ScalaPlatform
-                                      .create_jardep(tool_name, scala_version)
-                                      .copy(intransitive=True)
-                                  ])
+      supported_scala_versions=['2.10', '2.11', '2.12']
+      wanted_jars = ['scala-compiler', 'scala-library', 'scala-reflect']
+      for scala_version in supported_scala_versions:
+        cls.register_jvm_tool(register,
+                              ScalaPlatform.versioned_tool_name('scalac', scala_version),
+                              classpath=[
+                                ScalaPlatform.create_jardep(jar, scala_version) for jar in wanted_jars
+                              ])
 
-      register_scala_tools_for_versions(
-        tools=["scala-compiler", "scala-library", "scala-reflect"],
-        scala_versions=["2.10", "2.11", "2.12"]
-      )
+      # Register custom scalac tool.
+      cls.register_jvm_tool(register,
+                            ScalaPlatform.versioned_tool_name('scalac', 'custom'),
+                            classpath=[JarDependency('missing spec', ' //:scalac')])
 
     @classmethod
     def _zinc(cls, products):
@@ -151,22 +149,23 @@ class Zinc(object):
 
     # Retrieves the path of a tool's jar
     # by looking at the classpath of the registered tool with the user-specified scala version.
-    def _fetch_tool_jar_from_classpath(self, products, tool_name):
+    def _fetch_tool_jar_from_scalac_classpath(self, products, jar_name):
       scala_version = ScalaPlatform.global_instance().version
       classpath = self.tool_classpath_from_products(products,
-                                                    ScalaPlatform.versioned_tool_name(tool_name, scala_version),
+                                                    ScalaPlatform.versioned_tool_name('scalac', scala_version),
                                                     scope=self.options_scope)
-      assert(len(classpath) == 1)
-      return classpath[0]
+      candidates = [jar for jar in classpath if jar_name in jar]
+      assert(len(candidates) == 1)
+      return candidates[0]
 
     def _scala_compiler(self, products):
-      return self._fetch_tool_jar_from_classpath(products, 'scala-compiler')
+      return self._fetch_tool_jar_from_scalac_classpath(products, 'scala-compiler')
 
     def _scala_library(self, products):
-      return self._fetch_tool_jar_from_classpath(products, 'scala-library')
+      return self._fetch_tool_jar_from_scalac_classpath(products, 'scala-library')
 
     def _scala_reflect(self, products):
-      return self._fetch_tool_jar_from_classpath(products, 'scala-reflect')
+      return self._fetch_tool_jar_from_scalac_classpath(products, 'scala-reflect')
 
     def create(self, products):
       """Create a Zinc instance from products active in the current Pants run.
