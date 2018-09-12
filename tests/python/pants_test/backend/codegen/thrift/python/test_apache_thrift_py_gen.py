@@ -169,3 +169,26 @@ class ApacheThriftPyGenTest(TaskTestBase):
                                stderr=subprocess.PIPE)
     _, stderr = process.communicate()
     self.assertEqual(0, process.returncode, stderr)
+
+  def test_compatibility_passthrough(self):
+    py2_thrift_library = self.make_target(spec='src/thrift/com/foo:py2',
+                                          target_type=PythonThriftLibrary,
+                                          sources=[],
+                                          compatibility=['CPython>=2.7,<3'])
+    _, py2_synthetic_target = self.generate_single_thrift_target(py2_thrift_library)
+
+    python_repos = global_subsystem_instance(PythonRepos)
+    python_setup = global_subsystem_instance(PythonSetup)
+    interpreter_cache = PythonInterpreterCache(python_setup, python_repos)
+
+    interpreter = interpreter_cache.select_interpreter_for_targets([py2_synthetic_target])
+    self.assertTrue(interpreter.identity.matches('CPython>=2.7,<3'))
+
+    py3_thrift_library = self.make_target(spec='src/thrift/com/foo:py3',
+                                          target_type=PythonThriftLibrary,
+                                          sources=[],
+                                          compatibility=['CPython>=3,<3.7'])
+    _, py3_synthetic_target = self.generate_single_thrift_target(py3_thrift_library)
+
+    interpreter = interpreter_cache.select_interpreter_for_targets([py3_synthetic_target])
+    self.assertTrue(interpreter.identity.matches('CPython>=3,<3.7'))
