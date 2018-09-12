@@ -17,6 +17,10 @@ object Main {
                          Seq(cliArgs.scalaReflect),
                          cliArgs.scalaLibrary)
 
+        // As per https://github.com/pantsbuild/pants/issues/6160, this is a workaround
+        // so we can run zinc without $PATH (as needed in remoting).
+        System.setProperty("sbt.log.format", "true")
+
         val cl = ConsoleLogger.apply()
 
         BootstrapperUtils
