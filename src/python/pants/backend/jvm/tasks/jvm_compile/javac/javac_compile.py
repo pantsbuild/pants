@@ -60,7 +60,7 @@ class JavacCompile(JvmCompile):
 
   @classmethod
   def get_fatal_warnings_enabled_args_default(cls):
-    return ('-Werror')
+    return ('-Werror',)
 
   @classmethod
   def get_fatal_warnings_disabled_args_default(cls):
