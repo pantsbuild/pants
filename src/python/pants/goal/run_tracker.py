@@ -18,6 +18,7 @@ from contextlib import contextmanager
 import requests
 from future.utils import PY2, PY3
 
+from pants.auth.cookies import Cookies
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool, WorkerPool
@@ -61,7 +62,7 @@ class RunTracker(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return (StatsDBFactory,)
+    return (StatsDBFactory, Cookies)
 
   @classmethod
   def register_options(cls, register):
@@ -319,8 +320,9 @@ class RunTracker(Subsystem):
     # But this will first require changing the upload receiver at every shop that uses this
     # (probably only Foursquare at present).
     params = {k: json.dumps(v) for (k, v) in stats.items()}
+    cookies = Cookies.global_instance()
     try:
-      r = requests.post(url, data=params, timeout=timeout)
+      r = requests.post(url, data=params, timeout=timeout, cookies=cookies.get_cookie_jar())
       if r.status_code != requests.codes.ok:
         return error("HTTP error code: {}".format(r.status_code))
     except Exception as e:  # Broad catch - we don't want to fail the build over upload errors.
