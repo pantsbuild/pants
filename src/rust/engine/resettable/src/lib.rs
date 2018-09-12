@@ -39,32 +39,38 @@ where
   T: Clone + Send + Sync,
 {
   pub fn new<F: Fn() -> T + 'static>(make: F) -> Resettable<T> {
+    let val = (make)();
     Resettable {
-      val: Arc::new(RwLock::new(None)),
+      val: Arc::new(RwLock::new(Some(val))),
       make: Arc::new(make),
     }
   }
 
+  ///
+  /// TODO: This probably needs to switch to a "with"/context-manager style pattern.
+  /// Having an externalized `get` and using Clone like this is problematic: if there
+  /// might be references/Clones of the field outside of the lock on the resource, then we can't
+  /// be sure that dropping it will actually deallocate the resource.  
+  ///
   pub fn get(&self) -> T {
-    {
-      if let Some(ref val) = *self.val.read().unwrap() {
-        return val.clone();
-      }
-    }
-    {
-      let mut maybe_val = self.val.write().unwrap();
-      {
-        if let Some(ref val) = *maybe_val {
-          return val.clone();
-        }
-      }
-      let val = (self.make)();
-      *maybe_val = Some(val.clone());
-      val
-    }
+    let val_opt = self.val.read().unwrap();
+    let val = val_opt
+      .as_ref()
+      .unwrap_or_else(|| panic!("A Resettable value cannot be used while it is shutdown."));
+    val.clone()
   }
 
-  pub fn reset(&self) {
-    *self.val.write().unwrap() = None
+  ///
+  /// Run a function while the Resettable resource is cleared, and then recreate it afterward.
+  ///
+  pub fn with_reset<F, O>(&self, f: F) -> O
+  where
+    F: FnOnce() -> O,
+  {
+    let mut val = self.val.write().unwrap();
+    *val = None;
+    let t = f();
+    *val = Some((self.make)());
+    t
   }
 }

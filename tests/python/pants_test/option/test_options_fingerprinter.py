@@ -5,15 +5,41 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import unittest
 from builtins import range, zip
+
+from future.utils import PY2
 
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.option.custom_types import (UnsetBool, dict_option, dir_option, file_option, list_option,
                                        target_option)
-from pants.option.options_fingerprinter import OptionsFingerprinter
+from pants.option.options_fingerprinter import OptionsFingerprinter, stable_json_sha1
 from pants.util.contextutil import temporary_dir
 from pants_test.test_base import TestBase
+
+
+class JsonEncodingTest(unittest.TestCase):
+  def test_known_checksums(self):
+    """Check a laundry list of supported inputs to stable_json_sha1().
+
+    This checks both that the method can successfully handle the type of input object, but also that
+    the hash of specific objects remains stable.
+    """
+    self.assertEqual(stable_json_sha1({}), 'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f')
+    self.assertEqual(stable_json_sha1(()), '97d170e1550eee4afc0af065b78cda302a97674c')
+    self.assertEqual(stable_json_sha1([]), '97d170e1550eee4afc0af065b78cda302a97674c')
+    self.assertEqual(stable_json_sha1(set([])), '97d170e1550eee4afc0af065b78cda302a97674c')
+    self.assertEqual(stable_json_sha1([{}]), '4e9950a1f2305f56d358cad23f28203fb3aacbef')
+    self.assertEqual(stable_json_sha1([('a', 3)]), 'd6abed2e53c1595fb3075ecbe020365a47af1f6f')
+    self.assertEqual(stable_json_sha1({'a': 3}), '9e0e6d8a99c72daf40337183358cbef91bba7311')
+    self.assertEqual(stable_json_sha1([{'a': 3}]), '8f4e36849a0b8fbe9c4a822c80fbee047c65458a')
+    self.assertEqual(stable_json_sha1(set([1])), 'f629ae44b7b3dcfed444d363e626edf411ec69a8')
+
+  def test_non_string_dict_key(self):
+    error_regex_str = r'key \(\) is not a string' if PY2 else r'keys must be a string'
+    with self.assertRaisesRegexp(TypeError, error_regex_str):
+      stable_json_sha1({():()})
 
 
 class OptionsFingerprinterTest(TestBase):
@@ -30,6 +56,11 @@ class OptionsFingerprinterTest(TestBase):
                      for d in (d1, d2, d3))
     self.assertEqual(fp1, fp2)
     self.assertNotEqual(fp1, fp3)
+
+  def test_fingerprint_dict_with_non_string_keys(self):
+    d = {('a', 2): (3, 4)}
+    fp = self.options_fingerprinter.fingerprint(dict_option, d)
+    self.assertEqual(fp, 'ba3b9319e9477f14dcea56ae1836ae5e73a73a2c')
 
   def test_fingerprint_list(self):
     l1 = [1, 2, 3]

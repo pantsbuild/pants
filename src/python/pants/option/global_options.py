@@ -16,47 +16,17 @@ from pants.option.errors import OptionsError
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
-from pants.util.memo import memoized_classproperty
-from pants.util.objects import datatype
+from pants.util.objects import datatype, enum
 
 
-class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
+class GlobMatchErrorBehavior(enum('failure_behavior', ['ignore', 'warn', 'error'])):
   """Describe the action to perform when matching globs in BUILD files to source files.
 
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
   be aware of any changes to this object's definition.
   """
 
-  IGNORE = 'ignore'
-  WARN = 'warn'
-  ERROR = 'error'
-
-  allowed_values = [IGNORE, WARN, ERROR]
-
-  default_value = IGNORE
-
-  default_option_value = WARN
-
-  @memoized_classproperty
-  def _singletons(cls):
-    return { behavior: cls(behavior) for behavior in cls.allowed_values }
-
-  @classmethod
-  def create(cls, value=None):
-    if isinstance(value, cls):
-      return value
-    if not value:
-      value = cls.default_value
-    return cls._singletons[value]
-
-  def __new__(cls, *args, **kwargs):
-    this_object = super(GlobMatchErrorBehavior, cls).__new__(cls, *args, **kwargs)
-
-    if this_object.failure_behavior not in cls.allowed_values:
-      raise cls.make_type_error("Value {!r} for failure_behavior must be one of: {!r}."
-                                .format(this_object.failure_behavior, cls.allowed_values))
-
-    return this_object
+  default_option_value = 'warn'
 
 
 class ExecutionOptions(datatype([

@@ -11,7 +11,6 @@ use futures::Future;
 
 use boxfuture::{BoxFuture, Boxable};
 use core::{Failure, TypeId};
-use dirs;
 use fs::{safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
 use graph::{EntryId, Graph, NodeContext};
 use handles::maybe_drop_handles;
@@ -64,10 +63,7 @@ impl Core {
       Arc::new(Runtime::new().unwrap_or_else(|e| panic!("Could not initialize Runtime: {:?}", e)))
     });
 
-    let store_path = match dirs::home_dir() {
-      Some(home_dir) => home_dir.join(".cache").join("pants").join("lmdb_store"),
-      None => panic!("Could not find home dir"),
-    };
+    let store_path = Store::default_path();
 
     let store = safe_create_dir_all_ioerror(&store_path)
       .map_err(|e| format!("Error making directory {:?}: {:?}", store_path, e))
@@ -121,11 +117,25 @@ impl Core {
     }
   }
 
-  pub fn pre_fork(&self) {
-    self.fs_pool.reset();
-    self.store.reset_prefork();
-    self.runtime.reset();
-    self.command_runner.reset_prefork();
+  pub fn fork_context<F, T>(&self, f: F) -> T
+  where
+    F: Fn() -> T,
+  {
+    self.fs_pool.with_shutdown(|| {
+      self.runtime.with_reset(|| {
+        self.graph.with_exclusive(|| {
+          // TODO: In order for `CommandRunner` to be "object safe" (which it must be in order to
+          // be `Box`ed for use in the `Core` struct without generic parameters), it cannot have
+          // a generic return type. Rather than giving it a return type like `void*`, we set a
+          // mutable field here.
+          let mut res: Option<T> = None;
+          self.command_runner.with_shutdown(&mut || {
+            res = Some(f());
+          });
+          res.expect("with_shutdown method did not call its argument function.")
+        })
+      })
+    })
   }
 }
 

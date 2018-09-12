@@ -482,7 +482,7 @@ impl<N: Node> Entry<N> {
   ///
   /// If the Node has started and has not yet completed, returns its runtime.
   ///
-  pub(crate) fn current_running_duration(&self, now: &Instant) -> Option<Duration> {
+  pub(crate) fn current_running_duration(&self, now: Instant) -> Option<Duration> {
     match *self.state.lock().unwrap() {
       EntryState::Running { start_time, .. } => Some(now.duration_since(start_time)),
       _ => None,

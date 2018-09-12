@@ -212,7 +212,7 @@ Scheduler* scheduler_create(Tasks*,
                             uint64_t,
                             uint64_t,
                             _Bool);
-void scheduler_pre_fork(Scheduler*);
+PyResult scheduler_fork_context(Scheduler*, Function);
 Handle scheduler_metrics(Scheduler*, Session*);
 RawNodes* scheduler_execute(Scheduler*, Session*, ExecutionRequest*);
 void scheduler_destroy(Scheduler*);

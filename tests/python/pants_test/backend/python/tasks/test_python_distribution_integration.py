@@ -10,9 +10,10 @@ import re
 from builtins import open
 
 from pants.backend.native.config.environment import Platform
-from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.dirutil import is_executable
 from pants.util.process_handler import subprocess
+from pants.version import VERSION as pants_version
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -23,6 +24,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
   fasthello_tests = 'examples/tests/python/example/python_distribution/hello/test_fasthello'
   fasthello_install_requires_dir = 'testprojects/src/python/python_distribution/fasthello_with_install_requires'
   hello_setup_requires = 'examples/src/python/example/python_distribution/hello/setup_requires'
+  pants_setup_requires = 'examples/src/python/example/python_distribution/hello/pants_setup_requires'
 
   def _assert_native_greeting(self, output):
     self.assertIn('Hello from C!', output)
@@ -188,6 +190,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     # attempting to translate the coverage sdist for incompatible platforms.
     pants_ini_config = {'python-setup': {'platforms': [platform_string]}}
     # Clean all to rebuild requirements pex.
+    # TODO: why do we need to clean-all here?
     with temporary_dir() as tmp_dir:
       command=[
         '--pants-distdir={}'.format(tmp_dir),
@@ -203,35 +206,38 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     with environment_as(PANTS_TEST_SETUP_REQUIRES='1'):
       command=['run', '{}:main'.format(self.hello_setup_requires)]
       pants_run = self.run_pants(command=command)
-      self.assertRaises(Exception)
-      # Indicates the pycountry package is available to setup.py script.
-      self.assertIn('current/setup_requires_site/pycountry/__init__.py', pants_run.stderr_data)
-      # Indicates that the pycountry wheel has been installed on PYTHONPATH correctly.
-      self.assertIn('pycountry-18.5.20.dist-info', pants_run.stderr_data)
 
     # Valdiate the run task. Use clean-all to invalidate cached python_dist wheels from
     # previous test run. Use -ldebug to get debug info on setup_requires functionality.
     command=['-ldebug', 'clean-all', 'run', '{}:main'.format(self.hello_setup_requires)]
     pants_run = self.run_pants(command=command)
-    self.assertIn("Installing setup requirements: ['pycountry']", pants_run.stdout_data)
-    self.assertIn("Setting PYTHONPATH with setup_requires site directory", pants_run.stdout_data)
 
     # Validate that the binary can build and run properly. Use clean-all to invalidate cached
     # python_dist wheels from previous test run. Use -ldebug to get debug info on setup_requires
     # functionality.
-    pex = os.path.join(get_buildroot(), 'dist', 'main.pex')
-    try:
-      command=['-ldebug', 'clean-all', 'binary', '{}:main'.format(self.hello_setup_requires)]
+    with temporary_dir() as tmp_dir:
+      pex = os.path.join(tmp_dir, 'main.pex')
+      command=[
+        '--pants-distdir={}'.format(tmp_dir),
+        '-ldebug',
+        'clean-all',
+        'binary',
+        '{}:main'.format(self.hello_setup_requires),
+      ]
       pants_run = self.run_pants(command=command)
       self.assert_success(pants_run)
-      self.assertIn("Installing setup requirements: ['pycountry']", pants_run.stdout_data)
-      self.assertIn("Setting PYTHONPATH with setup_requires site directory", pants_run.stdout_data)
       # Check that the pex was built.
-      self.assertTrue(os.path.isfile(pex))
+      self.assertTrue(is_executable(pex))
       # Check that the pex runs.
       output = subprocess.check_output(pex).decode('utf-8')
-      self.assertIn('Hello, world!', output)
-    finally:
-      if os.path.exists(pex):
-        # Cleanup.
-        os.remove(pex)
+      self.assertEqual('Hello, world!\n', output)
+
+  def test_pants_requirement_setup_requires_version(self):
+    """Ensure that a pants_requirement() can be successfully used in setup_requires."""
+    pants_run = self.run_pants(['-q', 'run', '{}:bin'.format(self.pants_setup_requires)],
+                               extra_env={'PEX_VERBOSE': '9'})
+    self.assert_success(pants_run)
+    # This testproject prints its own version string here, which is the current pants version plus
+    # the pants fingerprint (as defined in this project's setup.py).
+    self.assertRegexpMatches(pants_run.stdout_data,
+                             r'\A{}\+([a-z0-9\.])+\n\Z'.format(re.escape(pants_version)))

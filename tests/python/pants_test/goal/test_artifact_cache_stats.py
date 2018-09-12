@@ -79,7 +79,8 @@ class ArtifactCacheStatsTest(TestBase):
     with temporary_dir() as tmp_dir:
       artifact_cache_stats = ArtifactCacheStats(tmp_dir)
       yield artifact_cache_stats
-      self.assertEqual(expected_stats, artifact_cache_stats.get_all())
+      self.assertEqual(sorted(expected_stats, key=lambda s: s['cache_name']),
+                       sorted(artifact_cache_stats.get_all(), key=lambda s: s['cache_name']))
 
       self.assertEqual(sorted(list(expected_hit_or_miss_files.keys())),
                         sorted(os.listdir(tmp_dir)))

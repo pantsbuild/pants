@@ -52,7 +52,6 @@ fn main() {
       Arg::with_name("local-store-path")
         .long("local-store-path")
         .takes_value(true)
-        .required(true)
         .help("Path to lmdb directory used for local file storage"),
     )
     .arg(
@@ -99,6 +98,13 @@ fn main() {
         .multiple(true)
         .help("Environment variables with which the process should be run."),
     )
+      .arg(
+        Arg::with_name("jdk")
+            .long("jdk")
+            .takes_value(true)
+            .required(false)
+            .help("Symlink a JDK from .jdk in the working directory. For local execution, symlinks to the value of this flag. For remote execution, just requests that some JDK is symlinked if this flag has any value. https://github.com/pantsbuild/pants/issues/6416 will make this less weird in the future.")
+      )
     .setting(AppSettings::TrailingVarArg)
     .arg(
       Arg::with_name("argv")
@@ -129,7 +135,10 @@ fn main() {
     .value_of("work-dir")
     .map(PathBuf::from)
     .unwrap_or_else(std::env::temp_dir);
-  let local_store_path = args.value_of("local-store-path").unwrap();
+  let local_store_path = args
+    .value_of("local-store-path")
+    .map(PathBuf::from)
+    .unwrap_or_else(fs::Store::default_path);
   let pool = Arc::new(fs::ResettablePool::new("process-executor-".to_owned()));
   let server_arg = args.value_of("server");
   let store = match (server_arg, args.value_of("cas-server")) {
@@ -169,7 +178,7 @@ fn main() {
     output_directories: BTreeSet::new(),
     timeout: Duration::new(15 * 60, 0),
     description: "process_executor".to_string(),
-    jdk_home: None,
+    jdk_home: args.value_of("jdk").map(PathBuf::from),
   };
 
   let runner: Box<process_execution::CommandRunner> = match server_arg {

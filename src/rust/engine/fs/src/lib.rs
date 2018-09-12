@@ -25,7 +25,7 @@ pub use snapshot::{
   OneOffStoreFileByDigest, Snapshot, StoreFileByDigest, EMPTY_DIGEST, EMPTY_FINGERPRINT,
 };
 mod store;
-pub use store::Store;
+pub use store::{Store, UploadSummary};
 mod pool;
 pub use pool::ResettablePool;
 
@@ -35,6 +35,7 @@ extern crate boxfuture;
 extern crate byteorder;
 extern crate bytes;
 extern crate digest;
+extern crate dirs;
 extern crate futures;
 extern crate futures_cpupool;
 extern crate glob;
@@ -52,11 +53,14 @@ extern crate log;
 extern crate mock;
 extern crate protobuf;
 extern crate resettable;
+extern crate serde;
 extern crate sha2;
 #[cfg(test)]
 extern crate tempfile;
 #[cfg(test)]
 extern crate testutil;
+#[macro_use]
+extern crate serde_derive;
 
 use std::cmp::min;
 use std::io::{self, Read};
@@ -443,10 +447,27 @@ impl StrictGlobMatching {
 }
 
 #[derive(Debug)]
+pub enum GlobExpansionConjunction {
+  AllMatch,
+  AnyMatch,
+}
+
+impl GlobExpansionConjunction {
+  pub fn create(spec: &str) -> Result<Self, String> {
+    match spec {
+      "all_match" => Ok(GlobExpansionConjunction::AllMatch),
+      "any_match" => Ok(GlobExpansionConjunction::AnyMatch),
+      _ => Err(format!("Unrecognized conjunction: {}.", spec)),
+    }
+  }
+}
+
+#[derive(Debug)]
 pub struct PathGlobs {
   include: Vec<PathGlobIncludeEntry>,
   exclude: Arc<GitignoreStyleExcludes>,
   strict_match_behavior: StrictGlobMatching,
+  conjunction: GlobExpansionConjunction,
 }
 
 impl PathGlobs {
@@ -454,21 +475,24 @@ impl PathGlobs {
     include: &[String],
     exclude: &[String],
     strict_match_behavior: StrictGlobMatching,
+    conjunction: GlobExpansionConjunction,
   ) -> Result<PathGlobs, String> {
     let include = PathGlob::spread_filespecs(include)?;
-    Self::create_with_globs_and_match_behavior(include, exclude, strict_match_behavior)
+    Self::create_with_globs_and_match_behavior(include, exclude, strict_match_behavior, conjunction)
   }
 
   fn create_with_globs_and_match_behavior(
     include: Vec<PathGlobIncludeEntry>,
     exclude: &[String],
     strict_match_behavior: StrictGlobMatching,
+    conjunction: GlobExpansionConjunction,
   ) -> Result<PathGlobs, String> {
     let gitignore_excludes = GitignoreStyleExcludes::create(exclude)?;
     Ok(PathGlobs {
       include,
       exclude: gitignore_excludes,
       strict_match_behavior,
+      conjunction,
     })
   }
 
@@ -481,7 +505,12 @@ impl PathGlobs {
       })
       .collect();
     // An empty exclude becomes EMPTY_IGNORE.
-    PathGlobs::create_with_globs_and_match_behavior(include, &[], StrictGlobMatching::Ignore)
+    PathGlobs::create_with_globs_and_match_behavior(
+      include,
+      &[],
+      StrictGlobMatching::Ignore,
+      GlobExpansionConjunction::AllMatch,
+    )
   }
 }
 

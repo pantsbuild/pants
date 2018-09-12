@@ -374,7 +374,7 @@ def hydrate_sources(sources_field, glob_match_error_behavior):
   """
   # TODO(#5864): merge the target's selection of --glob-expansion-failure (which doesn't exist yet)
   # with the global default!
-  path_globs = sources_field.path_globs.with_match_error_behavior(glob_match_error_behavior)
+  path_globs = sources_field.path_globs.copy(glob_match_error_behavior=glob_match_error_behavior)
   snapshot = yield Get(Snapshot, PathGlobs, path_globs)
   fileset_with_spec = _eager_fileset_with_spec(
     sources_field.address.spec_path,
@@ -388,7 +388,7 @@ def hydrate_sources(sources_field, glob_match_error_behavior):
 def hydrate_bundles(bundles_field, glob_match_error_behavior):
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
   path_globs_with_match_errors = [
-    pg.with_match_error_behavior(glob_match_error_behavior)
+    pg.copy(glob_match_error_behavior=glob_match_error_behavior)
     for pg in bundles_field.path_globs_list
   ]
   snapshot_list = yield [Get(Snapshot, PathGlobs, pg) for pg in path_globs_with_match_errors]

@@ -18,6 +18,7 @@ from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Get
 from pants.engine.struct import HasProducts, Struct
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
+from pants.util.memo import memoized
 from pants.util.objects import SubclassesOf
 from pants_test.option.util.fakes import create_options_for_optionables
 from pants_test.subsystem.subsystem_util import init_subsystem
@@ -83,6 +84,7 @@ def run_rule(rule, *args):
       return res
 
 
+@memoized
 def init_native():
   """Initialize and return a `Native` instance."""
   init_subsystem(BinaryUtil.Factory)
@@ -90,9 +92,9 @@ def init_native():
   return Native.create(opts.for_global_scope())
 
 
-def create_scheduler(rules, validate=True):
+def create_scheduler(rules, validate=True, native=None):
   """Create a Scheduler."""
-  native = init_native()
+  native = native or init_native()
   return Scheduler(
     native,
     FileSystemProjectTree(os.getcwd()),

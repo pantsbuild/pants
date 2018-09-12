@@ -122,7 +122,6 @@ python_tests(
   dependencies = [
     '3rdparty/python:future',
     '3rdparty/python:mock',
-    '3rdparty/python:requirements_files',
     'src/python/pants/bin',
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',

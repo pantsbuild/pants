@@ -57,7 +57,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
     build_content = '''python_library(name='exclude_strings_disallowed',
                                       sources=rglobs('*.py', exclude='aa.py'))'''
 
-    with self.temporary_file_content(build_path, build_content):
+    with self.temporary_file_content(build_path, build_content, binary_mode=False):
       pants_run = self.do_command('filemap',
                                   self._mk_target('exclude_strings_disallowed'),
                                   success=False)

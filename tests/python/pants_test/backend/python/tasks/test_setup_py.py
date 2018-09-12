@@ -16,8 +16,9 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
 from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
-from pants.backend.python.tasks.setup_py import SetupPy
+from pants.backend.python.tasks.setup_py import SetupPy, declares_namespace_package
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.prep_command import PrepCommand
@@ -26,6 +27,7 @@ from pants.build_graph.target import Target
 from pants.fs.archive import TGZ
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
+from pants_test.backend.python.interpreter_selection_utils import skip_unless_python36
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 
@@ -41,15 +43,18 @@ class SetupPyTestBase(PythonTaskTestBase):
     self.set_options(pants_distdir=self.distdir)
     init_subsystem(Target.Arguments)
 
-  @contextmanager
-  def run_execute(self, target, recursive=False):
+  def prepare_setup_py(self, target, recursive=False):
     self.set_options(recursive=recursive)
     si_task_type = self.synthesize_task_subtype(SelectInterpreter, 'si_scope')
     context = self.context(for_task_types=[si_task_type], target_roots=[target])
     si_task_type(context, os.path.join(self.pants_workdir, 'si')).execute()
-    setup_py = self.create_task(context)
+    return self.create_task(context)
+
+  @contextmanager
+  def run_execute(self, target, recursive=False):
+    setup_py = self.prepare_setup_py(target, recursive=recursive)
     setup_py.execute()
-    yield context.products.get_data(SetupPy.PYTHON_DISTS_PRODUCT)
+    yield setup_py.context.products.get_data(SetupPy.PYTHON_DISTS_PRODUCT)
 
 
 class TestSetupPyInterpreter(SetupPyTestBase):
@@ -604,7 +609,7 @@ def test_detect_namespace_packages():
     with temporary_file(binary_mode=False) as fp:
       fp.write(stmt)
       fp.flush()
-      return SetupPy.declares_namespace_package(fp.name)
+      return declares_namespace_package(fp.name)
 
   assert not has_ns('')
   assert not has_ns('add(1, 2); foo(__name__); self.shoot(__name__)')
@@ -614,70 +619,80 @@ def test_detect_namespace_packages():
   assert has_ns('from pkg_resources import declare_namespace; declare_namespace(__name__)')
 
 
-@contextmanager
-def yield_chroot(packages, namespace_packages, resources):
-  def to_path(package):
-    return package.replace('.', os.path.sep)
+class TestSetupPyFindPackages(SetupPyTestBase):
+  @contextmanager
+  def yield_chroot(self, packages, namespace_packages, resources, py3=False):
+    def to_path(package):
+      return package.replace('.', os.path.sep)
 
-  with temporary_dir() as td:
-    def write(package, name, content):
-      package_path = os.path.join(td, SetupPy.SOURCE_ROOT, to_path(package))
-      safe_mkdir(os.path.dirname(os.path.join(package_path, name)))
-      with open(os.path.join(package_path, name), 'w') as fp:
-        fp.write(content)
-    for package in packages:
-      write(package, '__init__.py', '')
-    for package in namespace_packages:
-      write(package, '__init__.py', '__import__("pkg_resources").declare_namespace(__name__)')
-    for package, resource_list in resources.items():
-      for resource in resource_list:
-        write(package, resource, 'asdfasdf')
+    with temporary_dir() as td:
+      def write(package, name, content):
+        package_path = os.path.join(td, SetupPy.SOURCE_ROOT, to_path(package))
+        safe_mkdir(os.path.dirname(os.path.join(package_path, name)))
+        with open(os.path.join(package_path, name), 'w') as fp:
+          fp.write(content)
+      for package in packages:
+        write(package, '__init__.py', 'a = "b"; b = f"{a}"' if py3 else '')
+      for package in namespace_packages:
+        write(package, '__init__.py', '__import__("pkg_resources").declare_namespace(__name__)')
+      for package, resource_list in resources.items():
+        for resource in resource_list:
+          write(package, resource, 'asdfasdf')
 
-    chroot_mock = Mock(spec=Chroot)
-    chroot_mock.path.return_value = td
-    yield chroot_mock
+      chroot_mock = Mock(spec=Chroot)
+      chroot_mock.path.return_value = td
+      yield chroot_mock
 
+  def assert_find_packages(self, py36):
+    compatibility = 'CPython>=3.6,<3.7' if py36 else 'CPython>=2.7,<3'
+    dummy_target = self.make_target(spec='src/python/foo',
+                                    target_type=PythonLibrary,
+                                    sources=[],
+                                    compatibility=compatibility)
+    setup_py = self.prepare_setup_py(dummy_target)
 
-def test_find_packages():
-  def assert_single_chroot(packages, namespace_packages, resources):
-    with yield_chroot(packages, namespace_packages, resources) as chroot:
-      p, n_p, r = SetupPy.find_packages(chroot)
-      assert p == set(packages + namespace_packages)
-      assert n_p == set(namespace_packages)
-      assert r == dict((k, set(v)) for (k, v) in resources.items())
+    def assert_single_chroot(packages, namespace_packages, resources):
+      with self.yield_chroot(packages, namespace_packages, resources, py3=py36) as chroot:
+        p, n_p, r = setup_py.find_packages(dummy_target, chroot)
+        assert p == set(packages + namespace_packages)
+        assert n_p == set(namespace_packages)
+        assert r == dict((k, set(v)) for (k, v) in resources.items())
 
-  # assert both packages and namespace packages work
-  assert_single_chroot(['foo'], [], {})
-  assert_single_chroot(['foo'], ['foo'], {})
+    # assert both packages and namespace packages work
+    assert_single_chroot(['foo'], [], {})
+    assert_single_chroot(['foo'], ['foo'], {})
 
-  # assert resources work
-  assert_single_chroot(['foo'], [], {'foo': ['blork.dat']})
+    # assert resources work
+    assert_single_chroot(['foo'], [], {'foo': ['blork.dat']})
 
-  resources = {
-    'foo': [
-      'f0',
-      os.path.join('bar', 'baz', 'f1'),
-      os.path.join('bar', 'baz', 'f2'),
-    ]
-  }
-  assert_single_chroot(['foo'], [], resources)
-
-  # assert that nearest-submodule is honored
-  with yield_chroot(['foo', 'foo.bar'], [], resources) as chroot:
-    _, _, r = SetupPy.find_packages(chroot)
-    assert r == {
-      'foo': {'f0'},
-      'foo.bar': {os.path.join('baz', 'f1'), os.path.join('baz', 'f2')}
+    resources = {
+      'foo': [
+        'f0',
+        os.path.join('bar', 'baz', 'f1'),
+        os.path.join('bar', 'baz', 'f2'),
+      ]
     }
+    assert_single_chroot(['foo'], [], resources)
 
-  # assert that nearest submodule splits on module prefixes
-  with yield_chroot(
-      ['foo', 'foo.bar'],
-      [],
-      {'foo.bar1': ['f0']}) as chroot:
+    # assert that nearest-submodule is honored
+    with self.yield_chroot(['foo', 'foo.bar'], [], resources, py3=py36) as chroot:
+      _, _, r = setup_py.find_packages(dummy_target, chroot)
+      assert r == {
+        'foo': {'f0'},
+        'foo.bar': {os.path.join('baz', 'f1'), os.path.join('baz', 'f2')}
+      }
 
-    _, _, r = SetupPy.find_packages(chroot)
-    assert r == {'foo': {'bar1/f0'}}
+    # assert that nearest submodule splits on module prefixes
+    with self.yield_chroot(['foo', 'foo.bar'], [], {'foo.bar1': ['f0']}, py3=py36) as chroot:
+      _, _, r = setup_py.find_packages(dummy_target, chroot)
+      assert r == {'foo': {'bar1/f0'}}
+
+  def test_find_packages(self):
+    self.assert_find_packages(py36=False)
+
+  @skip_unless_python36
+  def test_find_packages_py3(self):
+    self.assert_find_packages(py36=True)
 
 
 def test_nearest_subpackage():

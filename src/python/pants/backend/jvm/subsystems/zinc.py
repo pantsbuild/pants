@@ -15,8 +15,10 @@ from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.base.build_environment import get_buildroot
+from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
+from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -60,7 +62,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_COMPILER_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.5'),
+                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.7'),
                             ],
                             main=Zinc.ZINC_COMPILE_MAIN,
                             custom_rules=shader_rules)
@@ -151,6 +153,23 @@ class Zinc(object):
     """
     return self._zinc_factory._compiler_interface(self._products)
 
+  @memoized_method
+  def snapshot(self, scheduler):
+    buildroot = get_buildroot()
+    return scheduler.capture_snapshots((
+      PathGlobsAndRoot(
+        PathGlobs(
+          tuple(
+            fast_relpath(a, buildroot)
+            for a in (self.zinc, self.compiler_bridge, self.compiler_interface)
+          )
+        ),
+        buildroot,
+      ),
+    ))[0]
+
+  # TODO: Make rebase map work without needing to pass in absolute paths:
+  # https://github.com/pantsbuild/pants/issues/6434
   @memoized_property
   def rebase_map_args(self):
     """We rebase known stable paths in zinc analysis to make it portable across machines."""

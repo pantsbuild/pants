@@ -25,11 +25,15 @@ extern crate fs;
 extern crate futures;
 extern crate hashing;
 extern crate protobuf;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{App, Arg, SubCommand};
-use fs::{GlobMatching, ResettablePool, Snapshot, Store, StoreFileByDigest};
+use fs::{GlobMatching, ResettablePool, Snapshot, Store, StoreFileByDigest, UploadSummary};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use protobuf::Message;
@@ -52,6 +56,12 @@ impl From<String> for ExitError {
   fn from(s: String) -> Self {
     ExitError(s, ExitCode::UnknownError)
   }
+}
+
+#[derive(Serialize)]
+struct SummaryWithDigest {
+  digest: Digest,
+  summary: Option<UploadSummary>,
 }
 
 fn main() {
@@ -77,7 +87,10 @@ fn main() {
                 "Ingest a file by path, which allows it to be used in Directories/Snapshots. \
 Outputs a fingerprint of its contents and its size in bytes, separated by a space.",
               )
-              .arg(Arg::with_name("path").required(true).takes_value(true)),
+              .arg(Arg::with_name("path").required(true).takes_value(true))
+              .arg(Arg::with_name("output-mode").long("output-mode").possible_values(&["json", "simple"]).default_value("simple").multiple(false).takes_value(true).help(
+                "Set to manipulate the way a report is displayed."
+              )),
           ),
       )
       .subcommand(
@@ -118,6 +131,9 @@ directory, relative to the root.",
                 .arg(Arg::with_name("root").long("root").required(true).takes_value(true).help(
                   "Root under which the globs live. The Directory proto produced will be relative \
 to this directory.",
+            ))
+                .arg(Arg::with_name("output-mode").long("output-mode").possible_values(&["json", "simple"]).default_value("simple").multiple(false).takes_value(true).help(
+                  "Set to manipulate the way a report is displayed."
                 )),
           )
           .subcommand(
@@ -156,7 +172,7 @@ to this directory.",
         Arg::with_name("local-store-path")
           .takes_value(true)
           .long("local-store-path")
-          .required(true),
+          .required(false),
       )
         .arg(
           Arg::with_name("server-address")
@@ -183,7 +199,10 @@ to this directory.",
 }
 
 fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
-  let store_dir = top_match.value_of("local-store-path").unwrap();
+  let store_dir = top_match
+    .value_of("local-store-path")
+    .map(PathBuf::from)
+    .unwrap_or_else(Store::default_path);
   let pool = Arc::new(ResettablePool::new("fsutil-pool-".to_string()));
   let (store, store_has_remote) = {
     let (store_result, store_has_remote) = match top_match.value_of("server-address") {
@@ -192,7 +211,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           value_t!(top_match.value_of("chunk-bytes"), usize).expect("Bad chunk-bytes flag");
         (
           Store::with_remote(
-            store_dir,
+            &store_dir,
             pool.clone(),
             cas_address.to_owned(),
             1,
@@ -202,11 +221,11 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           true,
         )
       }
-      None => (Store::local_only(store_dir, pool.clone()), false),
+      None => (Store::local_only(&store_dir, pool.clone()), false),
     };
     let store = store_result.map_err(|e| {
       format!(
-        "Failed to open/create store for directory {}: {}",
+        "Failed to open/create store for directory {:?}: {}",
         store_dir, e
       )
     })?;
@@ -254,10 +273,10 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                 .store_by_digest(f)
                 .wait()
                 .unwrap();
-              if store_has_remote {
-                store.ensure_remote_has_recursive(vec![digest]).wait()?;
-              }
-              println!("{} {}", digest.0, digest.1);
+
+              let report = ensure_uploaded_to_remote(&store, store_has_remote, digest);
+              print_upload_summary(args.value_of("output-mode"), &report);
+
               Ok(())
             }
             o => Err(
@@ -306,6 +325,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             // By using `Ignore`, we assume all elements of the globs will definitely expand to
             // something here, or we don't care. Is that a valid assumption?
             fs::StrictGlobMatching::Ignore,
+            fs::GlobExpansionConjunction::AllMatch,
           )?)
           .map_err(|e| format!("Error expanding globs: {:?}", e))
           .and_then(move |paths| {
@@ -317,10 +337,10 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           })
           .map(|snapshot| snapshot.digest)
           .wait()?;
-        if store_has_remote {
-          store.ensure_remote_has_recursive(vec![digest]).wait()?;
-        }
-        println!("{} {}", digest.0, digest.1);
+
+        let report = ensure_uploaded_to_remote(&store, store_has_remote, digest);
+        print_upload_summary(args.value_of("output-mode"), &report);
+
         Ok(())
       }
       ("cat-proto", Some(args)) => {
@@ -460,4 +480,31 @@ fn expand_files_helper(
 
 fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::PosixFS {
   fs::PosixFS::new(&root, pool, &[]).unwrap()
+}
+
+fn ensure_uploaded_to_remote(
+  store: &Store,
+  store_has_remote: bool,
+  digest: Digest,
+) -> SummaryWithDigest {
+  let summary = if store_has_remote {
+    Some(
+      store
+        .ensure_remote_has_recursive(vec![digest])
+        .wait()
+        .unwrap(),
+    )
+  } else {
+    None
+  };
+  SummaryWithDigest { digest, summary }
+}
+
+fn print_upload_summary(mode: Option<&str>, report: &SummaryWithDigest) {
+  match mode {
+    Some("json") => println!("{}", serde_json::to_string_pretty(&report).unwrap()),
+    Some("simple") => println!("{} {}", report.digest.0, report.digest.1),
+    // This should never be reached, as clap should error with unknown formats.
+    _ => eprintln!("Unknown summary format."),
+  };
 }

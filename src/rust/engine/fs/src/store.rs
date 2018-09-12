@@ -3,6 +3,7 @@ use FileContent;
 use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
+use dirs;
 use futures::{future, Future};
 use hashing::Digest;
 use protobuf::Message;
@@ -24,6 +25,17 @@ const MAX_LOCAL_STORE_SIZE_BYTES: usize = 1024 * 1024 * 1024 * 1024 / 10;
 // This is the target number of bytes which should be present in all combined LMDB store files
 // after garbage collection. We almost certainly want to make this configurable.
 const LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * 1024 * 1024 * 1024;
+
+// Summary of the files and directories uploaded with an operation
+// ingested_file_{count, bytes}: Number and combined size of processed files
+// uploaded_file_{count, bytes}: Number and combined size of files uploaded to the remote
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize)]
+pub struct UploadSummary {
+  ingested_file_count: usize,
+  ingested_file_bytes: usize,
+  uploaded_file_count: usize,
+  uploaded_file_bytes: usize,
+}
 
 ///
 /// A content-addressed store of file contents, and Directories.
@@ -81,6 +93,13 @@ impl Store {
     })
   }
 
+  pub fn default_path() -> PathBuf {
+    match dirs::home_dir() {
+      Some(home_dir) => home_dir.join(".cache").join("pants").join("lmdb_store"),
+      None => panic!("Could not find home dir"),
+    }
+  }
+
   ///
   /// LMDB Environments aren't safe to be re-used after forking, so we need to drop them before
   /// forking and re-create them afterwards.
@@ -89,11 +108,17 @@ impl Store {
   /// processes run using the same daemon, one takes out some kind of lock which the other cannot
   /// ever acquire, so lmdb returns EAGAIN whenever a transaction is created in the second process.
   ///
-  pub fn reset_prefork(&self) {
-    self.local.reset_prefork();
-    if let Some(ref remote) = self.remote {
-      remote.reset_threadpool();
-    }
+  pub fn with_reset<F>(&self, f: F)
+  where
+    F: FnOnce() -> (),
+  {
+    self.local.with_reset(|| {
+      if let Some(ref remote) = self.remote {
+        remote.with_reset(f)
+      } else {
+        f()
+      }
+    })
   }
 
   ///
@@ -255,7 +280,12 @@ impl Store {
   /// Ensures that the remote ByteStore has a copy of each passed Fingerprint, including any files
   /// contained in any Directories in the list.
   ///
-  pub fn ensure_remote_has_recursive(&self, digests: Vec<Digest>) -> BoxFuture<(), String> {
+  /// Returns a structure with the summary of operations.
+  ///
+  pub fn ensure_remote_has_recursive(
+    &self,
+    digests: Vec<Digest>,
+  ) -> BoxFuture<UploadSummary, String> {
     let remote = match self.remote {
       Some(ref remote) => remote,
       None => {
@@ -295,20 +325,20 @@ impl Store {
         }
         expanded_digests
       })
-      .and_then(move |digests| {
-        if Store::upload_is_faster_than_checking_whether_to_upload(&digests) {
-          return Ok((digests.keys().cloned().collect(), digests));
+      .and_then(move |ingested_digests| {
+        if Store::upload_is_faster_than_checking_whether_to_upload(&ingested_digests) {
+          return Ok((ingested_digests.keys().cloned().collect(), ingested_digests));
         }
         remote
-          .list_missing_digests(digests.keys())
-          .map(|filtered_digests| (filtered_digests, digests))
+          .list_missing_digests(ingested_digests.keys())
+          .map(|digests_to_upload| (digests_to_upload, ingested_digests))
       })
-      .and_then(move |(filtered_digests, digest_entry_types)| {
+      .and_then(move |(digests_to_upload, ingested_digests)| {
         future::join_all(
-          filtered_digests
+          digests_to_upload
             .into_iter()
-            .map(move |digest| {
-              let entry_type = digest_entry_types[&digest];
+            .map(|digest| {
+              let entry_type = ingested_digests[&digest];
               let remote = remote2.clone();
               local
                 .load_bytes_with(entry_type, digest.0, move |bytes| remote.store_bytes(bytes))
@@ -318,10 +348,20 @@ impl Store {
                 })
             })
             .collect::<Vec<_>>(),
-        )
+        ).and_then(future::join_all)
+          .map(|uploaded_digests| (uploaded_digests, ingested_digests))
       })
-      .and_then(future::join_all)
-      .map(|_| ())
+      .map(|(uploaded_digests, ingested_digests)| {
+        let ingested_file_sizes = ingested_digests.iter().map(|(digest, _)| digest.1);
+        let uploaded_file_sizes = uploaded_digests.iter().map(|digest| digest.1);
+
+        UploadSummary {
+          ingested_file_count: ingested_file_sizes.len(),
+          ingested_file_bytes: ingested_file_sizes.sum(),
+          uploaded_file_count: uploaded_file_sizes.len(),
+          uploaded_file_bytes: uploaded_file_sizes.sum(),
+        }
+      })
       .to_boxed()
   }
 
@@ -658,9 +698,14 @@ mod local {
       })
     }
 
-    pub fn reset_prefork(&self) {
-      self.inner.file_dbs.reset();
-      self.inner.directory_dbs.reset();
+    pub fn with_reset<F>(&self, f: F)
+    where
+      F: FnOnce() -> (),
+    {
+      self
+        .inner
+        .file_dbs
+        .with_reset(|| self.inner.directory_dbs.with_reset(f))
     }
 
     // Note: This performs IO on the calling thread. Hopefully the IO is small enough not to matter.
@@ -1622,11 +1667,15 @@ mod remote {
       }
     }
 
-    pub fn reset_threadpool(&self) {
-      self.channel.reset();
-      self.env.reset();
-      self.cas_client.reset();
-      self.byte_stream_client.reset();
+    pub fn with_reset<F>(&self, f: F)
+    where
+      F: FnOnce() -> (),
+    {
+      self.cas_client.with_reset(|| {
+        self
+          .byte_stream_client
+          .with_reset(|| self.channel.with_reset(|| self.env.with_reset(f)))
+      })
     }
 
     pub fn store_bytes(&self, bytes: Bytes) -> BoxFuture<Digest, String> {
@@ -1750,6 +1799,10 @@ mod remote {
       }
     }
 
+    ///
+    /// Given a collection of Digests (digests),
+    /// returns the set of digests from that collection not present in the CAS.
+    ///
     pub fn list_missing_digests<'a, Digests: Iterator<Item = &'a Digest>>(
       &self,
       digests: Digests,
@@ -2079,7 +2132,7 @@ mod remote {
 
 #[cfg(test)]
 mod tests {
-  use super::{local, EntryType, FileContent, Store};
+  use super::{local, EntryType, FileContent, Store, UploadSummary};
 
   use bazel_protos;
   use bytes::Bytes;
@@ -2141,6 +2194,9 @@ mod tests {
     store.load_file_bytes_with(digest, |bytes| bytes).wait()
   }
 
+  ///
+  /// Create a StubCas with a file and a directory inside.
+  ///
   pub fn new_cas(chunk_size_bytes: usize) -> StubCAS {
     StubCAS::with_content(
       chunk_size_bytes as i64,
@@ -2149,11 +2205,17 @@ mod tests {
     )
   }
 
+  ///
+  /// Create a new local store with whatever was already serialized in dir.
+  ///
   fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
     Store::local_only(dir, Arc::new(ResettablePool::new("test-pool-".to_string())))
       .expect("Error creating local store")
   }
 
+  ///
+  /// Create a new store with a remote CAS.
+  ///
   fn new_store<P: AsRef<Path>>(dir: P, cas_address: String) -> Store {
     Store::with_remote(
       dir,
@@ -2973,7 +3035,7 @@ mod tests {
   }
 
   #[test]
-  fn works_after_reset_prefork() {
+  fn works_after_reset() {
     let dir = TempDir::new().unwrap();
     let cas = new_cas(1024);
 
@@ -2988,7 +3050,7 @@ mod tests {
       Ok(Some(testdata.bytes()))
     );
 
-    store.reset_prefork();
+    store.with_reset(|| {});
 
     // Already exists in local store:
     assert_eq!(
@@ -3123,5 +3185,109 @@ mod tests {
       .expect("Getting metadata")
       .permissions()
       .mode() & 0o100 == 0o100
+  }
+
+  #[test]
+  fn returns_upload_summary_on_empty_cas() {
+    let dir = TempDir::new().unwrap();
+    let cas = StubCAS::empty();
+
+    let testroland = TestData::roland();
+    let testcatnip = TestData::catnip();
+    let testdir = TestDirectory::containing_roland_and_treats();
+
+    let local_store = new_local_store(dir.path());
+    local_store
+      .record_directory(&testdir.directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+    local_store
+      .store_file_bytes(testroland.bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
+    local_store
+      .store_file_bytes(testcatnip.bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
+    let summary = new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![testdir.digest()])
+      .wait()
+      .expect("Error uploading file");
+
+    // We store all 3 files, and so we must sum their digests
+    let test_data = vec![
+      testdir.digest().1,
+      testroland.digest().1,
+      testcatnip.digest().1,
+    ];
+    let test_bytes = test_data.iter().sum();
+    assert_eq!(
+      summary,
+      UploadSummary {
+        ingested_file_count: test_data.len(),
+        ingested_file_bytes: test_bytes,
+        uploaded_file_count: test_data.len(),
+        uploaded_file_bytes: test_bytes
+      }
+    );
+  }
+
+  #[test]
+  fn summary_does_not_count_things_in_cas() {
+    let dir = TempDir::new().unwrap();
+    let cas = StubCAS::empty();
+
+    let testroland = TestData::roland();
+    let testcatnip = TestData::catnip();
+    let testdir = TestDirectory::containing_roland_and_treats();
+
+    // Store everything locally
+    let local_store = new_local_store(dir.path());
+    local_store
+      .record_directory(&testdir.directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+    local_store
+      .store_file_bytes(testroland.bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
+    local_store
+      .store_file_bytes(testcatnip.bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
+
+    // Store testroland first, which should return a summary of one file
+    let data_summary = new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![testroland.digest()])
+      .wait()
+      .expect("Error uploading file");
+
+    assert_eq!(
+      data_summary,
+      UploadSummary {
+        ingested_file_count: 1,
+        ingested_file_bytes: testroland.digest().1,
+        uploaded_file_count: 1,
+        uploaded_file_bytes: testroland.digest().1
+      }
+    );
+
+    // Store the directory and catnip.
+    // It should see the digest of testroland already in cas,
+    // and not report it in uploads.
+    let dir_summary = new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![testdir.digest()])
+      .wait()
+      .expect("Error uploading directory");
+
+    assert_eq!(
+      dir_summary,
+      UploadSummary {
+        ingested_file_count: 3,
+        ingested_file_bytes: testdir.digest().1 + testroland.digest().1 + testcatnip.digest().1,
+        uploaded_file_count: 2,
+        uploaded_file_bytes: testdir.digest().1 + testcatnip.digest().1
+      }
+    );
   }
 }

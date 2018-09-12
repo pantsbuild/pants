@@ -9,9 +9,9 @@ from setuptools import setup, find_packages
 
 
 setup(
-  name='ctypes_test',
+  name='ctypes_third_party_test',
   version='0.0.1',
   packages=find_packages(),
-  # Declare two files at the top-level directory (denoted by '').
+  # Declare one shared lib at the top-level directory (denoted by '').
   data_files=[('', ['libasdf-cpp-tp.so'])],
 )

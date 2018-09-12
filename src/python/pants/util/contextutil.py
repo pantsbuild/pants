@@ -74,7 +74,9 @@ def _purge_env():
   # invokes or other things that may access the environment at the C level may not see the
   # correct env vars (i.e. we can't just replace os.environ with an empty dict).
   # See https://docs.python.org/2/library/os.html#os.unsetenv for more info.
-  for k in os.environ.keys():
+  #
+  # Wraps iterable in list() to make a copy and avoid issues with deleting while iterating.
+  for k in list(os.environ.keys()):
     del os.environ[k]
 
 

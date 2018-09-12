@@ -263,6 +263,7 @@ class JsonParserTest(unittest.TestCase):
 
 
 class JsonEncoderTest(unittest.TestCase):
+
   def setUp(self):
     bill = Bob(name='bill')
 
@@ -290,8 +291,8 @@ class JsonEncoderTest(unittest.TestCase):
       "relative": "::an opaque address::"
     }
     """).strip()
-    self.assertEqual(json.dumps(json.loads(expected_json)),
-                     parsers.encode_json(self.bob, inline=False))
+    self.assertEqual(json.dumps(json.loads(expected_json), sort_keys=True),
+                     parsers.encode_json(self.bob, inline=False, sort_keys=True))
 
   def test_inlined_encoding(self):
     expected_json = dedent("""
@@ -308,8 +309,8 @@ class JsonEncoderTest(unittest.TestCase):
       }
     }
     """).strip()
-    self.assertEqual(json.dumps(json.loads(expected_json)),
-                     parsers.encode_json(self.bob, inline=True))
+    self.assertEqual(json.dumps(json.loads(expected_json), sort_keys=True),
+                     parsers.encode_json(self.bob, inline=True, sort_keys=True))
 
 
 class PythonAssignmentsParserTest(unittest.TestCase):

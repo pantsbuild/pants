@@ -20,9 +20,11 @@
 
 extern crate digest;
 extern crate hex;
+extern crate serde;
 extern crate sha2;
 
 use digest::{Digest as DigestTrait, FixedOutput};
+use serde::ser::{Serialize, SerializeStruct, Serializer};
 use sha2::Sha256;
 
 use std::fmt;
@@ -84,6 +86,15 @@ impl AsRef<[u8]> for Fingerprint {
   }
 }
 
+impl Serialize for Fingerprint {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer,
+  {
+    serializer.serialize_str(self.to_hex().as_str())
+  }
+}
+
 ///
 /// A Digest is a fingerprint, as well as the size in bytes of the plaintext for which that is the
 /// fingerprint.
@@ -93,6 +104,18 @@ impl AsRef<[u8]> for Fingerprint {
 ///
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Digest(pub Fingerprint, pub usize);
+
+impl Serialize for Digest {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer,
+  {
+    let mut obj = serializer.serialize_struct("digest", 2)?;
+    obj.serialize_field("fingerprint", &self.0)?;
+    obj.serialize_field("size_bytes", &self.1)?;
+    obj.end()
+  }
+}
 
 ///
 /// A Write instance that fingerprints all data that passes through it.
@@ -134,6 +157,8 @@ impl<W: Write> Write for WriterHasher<W> {
 #[cfg(test)]
 mod fingerprint_tests {
   use super::Fingerprint;
+  extern crate serde_test;
+  use self::serde_test::{assert_ser_tokens, Token};
 
   #[test]
   fn from_bytes_unsafe() {
@@ -201,4 +226,53 @@ mod fingerprint_tests {
       hex.to_lowercase()
     )
   }
+
+  #[test]
+  fn serialize_to_str() {
+    let fingerprint = Fingerprint([
+      0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32,
+      0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+      0xff, 0xff,
+    ]);
+    assert_ser_tokens(
+      &fingerprint,
+      &[Token::Str(
+        "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
+      )],
+    );
+  }
+
+}
+
+#[cfg(test)]
+mod digest_tests {
+  use super::Digest;
+  use super::Fingerprint;
+  extern crate serde_test;
+  use self::serde_test::{assert_ser_tokens, Token};
+
+  #[test]
+  fn serialize_to_str() {
+    let digest = Digest(
+      Fingerprint::from_hex_string(
+        "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
+      ).unwrap(),
+      1,
+    );
+    assert_ser_tokens(
+      &digest,
+      &[
+        Token::Struct {
+          name: "digest",
+          len: 2,
+        },
+        Token::Str("fingerprint"),
+        Token::Str("0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff"),
+        Token::Str("size_bytes"),
+        Token::U64(1),
+        Token::StructEnd,
+      ],
+    );
+  }
+
 }

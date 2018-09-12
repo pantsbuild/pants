@@ -136,7 +136,7 @@ def reify_scala_sources(sources):
   packages = set()
   import_re = re.compile(r'^import ([^;]*);?$')
   for filecontent in source_files_content.dependencies:
-    for line in filecontent.content.splitlines():
+    for line in filecontent.content.decode('utf-8').splitlines():
       match = import_re.search(line)
       if match:
         packages.add(match.group(1).rsplit('.', 1)[0])

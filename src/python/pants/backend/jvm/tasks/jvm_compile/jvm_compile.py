@@ -394,6 +394,8 @@ class JvmCompile(NailgunTaskBase):
         classpath_product,
       )
 
+      # TODO: Pass around DirectoryDigests in these ClasspathEntries
+      # See https://github.com/pantsbuild/pants/issues/6429
       if not self.get_options().use_classpath_jars:
         # Once compilation has completed, replace the classpath entry for each target with
         # its jar'd representation.
@@ -425,6 +427,9 @@ class JvmCompile(NailgunTaskBase):
     valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
 
     # Register classpaths and products for valid targets.
+    # TODO: Store the DirectoryDigest for successful compiles in the target workdir as text,
+    # and hydrate them into the ClasspathEntries here when we get cache hits.
+    # See https://github.com/pantsbuild/pants/issues/6429
     for valid_target in valid_targets:
       cc = self.select_runtime_context(compile_contexts[valid_target])
       classpath_product.add_for_target(
@@ -503,7 +508,7 @@ class JvmCompile(NailgunTaskBase):
         ').')
       with self.context.new_workunit('compile', labels=[WorkUnitLabel.COMPILER]) as compile_workunit:
         try:
-          self.compile(
+          directory_digest = self.compile(
             ctx,
             self._args,
             dependency_classpath,
@@ -515,6 +520,7 @@ class JvmCompile(NailgunTaskBase):
             self._get_plugin_map('scalac', ScalaPlatform.global_instance(), ctx.target),
           )
           self._capture_logs(compile_workunit, ctx.log_dir)
+          return directory_digest
         except TaskError:
           if self.get_options().suggest_missing_deps:
             logs = [path
@@ -815,10 +821,13 @@ class JvmCompile(NailgunTaskBase):
     # Double check the cache before beginning compilation
     hit_cache = self.check_cache(vts, counter)
 
+    # TODO: Load from store when https://github.com/pantsbuild/pants/issues/6429 is complete.
+    directory_digest = None
+
     if not hit_cache:
       # Compute the compile classpath for this target.
       dependency_cp_entries = self._zinc.compile_classpath_entries(
-        classpath_product_key,
+        'runtime_classpath',
         ctx.target,
         extra_cp_entries=self._extra_compile_time_classpath,
       )
@@ -837,7 +846,7 @@ class JvmCompile(NailgunTaskBase):
       compiler_option_sets = dep_context.defaulted_property(tgt, lambda x: x.compiler_option_sets)
       zinc_file_manager = dep_context.defaulted_property(tgt, lambda x: x.zinc_file_manager)
       with Timer() as timer:
-        self._compile_vts(vts,
+        directory_digest = self._compile_vts(vts,
                           ctx,
                           upstream_analysis,
                           dependency_cp_entries,
@@ -862,6 +871,6 @@ class JvmCompile(NailgunTaskBase):
     # Update the products with the latest classes.
     classpath_product.add_for_target(
       ctx.target,
-      [(conf, self._classpath_for_context(ctx)) for conf in self._confs],
+      [(conf, self._classpath_for_context(ctx), directory_digest) for conf in self._confs],
     )
     self.register_extra_products_from_contexts([ctx.target], all_compile_contexts)

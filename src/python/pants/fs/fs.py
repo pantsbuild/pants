@@ -41,7 +41,7 @@ def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LE
     return filename
   else:
     digest = digest or hashlib.sha1()
-    digest.update(filename)
+    digest.update(filename.encode('utf-8'))
     hexdigest = digest.hexdigest()[:16]
 
     # Prefix and suffix length: max length less 2 periods, the extension length, and the digest length.

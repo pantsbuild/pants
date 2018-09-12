@@ -6,13 +6,14 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import copy
 import pickle
+import re
 from abc import abstractmethod
 from builtins import object, str
 
 from future.utils import PY2, PY3, text_type
 
 from pants.util.objects import (Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
-                                TypedDatatypeInstanceConstructionError, datatype)
+                                TypedDatatypeInstanceConstructionError, datatype, enum)
 from pants_test.base_test import BaseTest
 
 
@@ -193,6 +194,9 @@ class CamelCaseWrapper(datatype([('nonneg_int', NonNegativeInt)])): pass
 class ReturnsNotImplemented(object):
   def __eq__(self, other):
     return NotImplemented
+
+
+class SomeEnum(enum('x', [1, 2])): pass
 
 
 class DatatypeTest(BaseTest):
@@ -589,3 +593,32 @@ __new__() got an unexpected keyword argument 'nonexistent_field'""")
       """error: in constructor of type AnotherTypedDatatype: type check error:
 field 'elements' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly(list).""")
     self.assertEqual(str(cm.exception), expected_msg)
+
+  def test_enum_class_creation_errors(self):
+    expected_rx = re.escape(
+      "When converting all_values ([1, 2, 3, 1]) to a set, at least one duplicate "
+      "was detected. The unique elements of all_values were: OrderedSet([1, 2, 3]).")
+    with self.assertRaisesRegexp(ValueError, expected_rx):
+      class DuplicateAllowedValues(enum('x', [1, 2, 3, 1])): pass
+
+  def test_enum_instance_creation(self):
+    self.assertEqual(1, SomeEnum.create().x)
+    self.assertEqual(2, SomeEnum.create(2).x)
+    self.assertEqual(1, SomeEnum(1).x)
+    self.assertEqual(2, SomeEnum(x=2).x)
+
+  def test_enum_instance_creation_errors(self):
+    expected_rx = re.escape(
+      "Value 3 for 'x' must be one of: OrderedSet([1, 2]).")
+    with self.assertRaisesRegexp(TypeCheckError, expected_rx):
+      SomeEnum.create(3)
+    with self.assertRaisesRegexp(TypeCheckError, expected_rx):
+      SomeEnum(3)
+    with self.assertRaisesRegexp(TypeCheckError, expected_rx):
+      SomeEnum(x=3)
+
+    expected_rx_falsy_value = re.escape(
+      "Value {}'' for 'x' must be one of: OrderedSet([1, 2])."
+      .format('u' if PY2 else ''))
+    with self.assertRaisesRegexp(TypeCheckError, expected_rx_falsy_value):
+      SomeEnum(x='')

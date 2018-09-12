@@ -36,7 +36,7 @@ class GoalExecutor(object):
     goal_workdir = os.path.join(self._context.options.for_global_scope().pants_workdir,
                                 self._goal.name)
     with self._context.new_workunit(name=self._goal.name, labels=[WorkUnitLabel.GOAL]):
-      for name, task_type in reversed(self._tasktypes_by_name.items()):
+      for name, task_type in reversed(list(self._tasktypes_by_name.items())):
         task_workdir = os.path.join(goal_workdir, name)
         task = task_type(self._context, task_workdir)
         log_config = WorkUnit.LogConfig(level=task.get_options().level, colors=task.get_options().colors)
@@ -49,7 +49,7 @@ class GoalExecutor(object):
             task.execute()
 
       if explain:
-        reversed_tasktypes_by_name = reversed(self._tasktypes_by_name.items())
+        reversed_tasktypes_by_name = reversed(list(self._tasktypes_by_name.items()))
         goal_to_task = ', '.join(
             '{}->{}'.format(name, task_type.__name__) for name, task_type in reversed_tasktypes_by_name)
         print('{goal} [{goal_to_task}]'.format(goal=self._goal.name, goal_to_task=goal_to_task))

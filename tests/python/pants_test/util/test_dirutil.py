@@ -112,7 +112,7 @@ class DirutilTest(unittest.TestCase):
     atexit_register.assert_called_once_with(faux_cleaner)
     self.assertTrue(os_getpid.called)
     self.assertEqual([mock.call(dir='1'), mock.call(dir='2')], tempfile_mkdtemp.mock_calls)
-    self.assertEqual([mock.call(DIR1), mock.call(DIR2)], dirutil_safe_rmtree.mock_calls)
+    self.assertEqual(sorted([mock.call(DIR1), mock.call(DIR2)]), sorted(dirutil_safe_rmtree.mock_calls))
 
   def test_safe_walk(self):
     """Test that directory names are correctly represented as unicode strings"""
@@ -485,7 +485,7 @@ class DirutilTest(unittest.TestCase):
       os.symlink(real, link)
       self.assertTrue(os.path.exists(real))
       self.assertTrue(os.path.exists(link))
-      safe_rmtree(link);
+      safe_rmtree(link)
       self.assertTrue(os.path.exists(real))
       self.assertFalse(os.path.exists(link))
 

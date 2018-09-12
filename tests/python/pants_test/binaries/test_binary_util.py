@@ -9,7 +9,7 @@ import os
 from builtins import object, open, str
 
 import mock
-from future.utils import PY2, PY3
+from future.utils import PY2
 
 from pants.binaries.binary_util import (BinaryRequest, BinaryToolFetcher, BinaryToolUrlGenerator,
                                         BinaryUtil)
@@ -228,14 +228,11 @@ class BinaryUtilTest(TestBase):
     the_raised_exception_message = str(cm.exception)
 
     self.assertIn(BinaryUtil.MissingMachineInfo.__name__, the_raised_exception_message)
-    expected_msg_prefix = (
+    expected_msg = (
       "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
       "name=name, platform_dependent=True, external_url_generator=None, archiver=None): "
       "Pants could not resolve binaries for the current host: platform 'vms' was not recognized. "
-      "Recognized platforms are: ")
-    expected_msg = expected_msg_prefix + ("dict_keys([\\'linux\', \\'darwin\'])."
-                                          if PY3 else
-                                          "[u'darwin', u'linux'].")
+      "Recognized platforms are: [darwin, linux].")
     self.assertIn(expected_msg, the_raised_exception_message)
 
   def test_select_binary_base_path_missing_version(self):

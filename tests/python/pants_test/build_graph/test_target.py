@@ -9,6 +9,7 @@ from builtins import range, str
 from hashlib import sha1
 
 import mock
+from future.utils import PY3
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -156,13 +157,15 @@ class TargetTest(TestBase):
     # No key_arg.
     with self.assertRaises(TargetDefinitionException) as cm:
       target.create_sources_field(sources='a-string', sources_rel_path='')
-    self.assertIn("Expected a glob, an address or a list, but was <type \'unicode\'>",
+    self.assertIn("Expected a glob, an address or a list, but was {}"
+                  .format('<class \'str\'>' if PY3 else '<type \'unicode\'>'),
                   str(cm.exception))
 
     # With key_arg.
     with self.assertRaises(TargetDefinitionException) as cm:
       target.create_sources_field(sources='a-string', sources_rel_path='', key_arg='my_cool_field')
-    self.assertIn("Expected 'my_cool_field' to be a glob, an address or a list, but was <type \'unicode\'>",
+    self.assertIn("Expected 'my_cool_field' to be a glob, an address or a list, but was {}"
+                  .format('<class \'str\'>' if PY3 else '<type \'unicode\'>'),
                   str(cm.exception))
     #could also test address case, but looks like nothing really uses it.
 
@@ -186,14 +189,14 @@ class TargetTest(TestBase):
     self.assertEqual(hash_value, target_a.transitive_invalidation_hash())
 
     hasher = sha1()
-    hasher.update(hash_value)
+    hasher.update(hash_value.encode('utf-8'))
     dep_hash = hasher.hexdigest()[:12]
     target_hash = target_b.invalidation_hash()
     hash_value = '{}.{}'.format(target_hash, dep_hash)
     self.assertEqual(hash_value, target_b.transitive_invalidation_hash())
 
     hasher = sha1()
-    hasher.update(hash_value)
+    hasher.update(hash_value.encode('utf-8'))
     dep_hash = hasher.hexdigest()[:12]
     target_hash = target_c.invalidation_hash()
     hash_value = '{}.{}'.format(target_hash, dep_hash)
@@ -206,7 +209,7 @@ class TargetTest(TestBase):
 
     fingerprint_strategy = TestFingerprintStrategy()
     hasher = sha1()
-    hasher.update(target_b.invalidation_hash(fingerprint_strategy=fingerprint_strategy))
+    hasher.update(target_b.invalidation_hash(fingerprint_strategy=fingerprint_strategy).encode('utf-8'))
     dep_hash = hasher.hexdigest()[:12]
     target_hash = target_c.invalidation_hash(fingerprint_strategy=fingerprint_strategy)
     hash_value = '{}.{}'.format(target_hash, dep_hash)

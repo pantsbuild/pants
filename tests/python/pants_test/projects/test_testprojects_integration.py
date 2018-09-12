@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import math
+from builtins import range
 
 from pants.util.memo import memoized_property
 from pants_test.pants_run_integration_test import ensure_resolver
@@ -33,6 +34,11 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/thriftdeptest',
       # TODO(Eric Ayers): I don't understand why this fails
       'testprojects/src/java/org/pantsbuild/testproject/jvmprepcommand:compile-prep-command',
+      # TODO(#6455): this produces a resolution error in (currently) the test_shard_6() method with
+      # "Could not satisfy all requirements for hello_again==...", but the missing requirement is
+      # the one we're trying to satisfy, from the setup.py for the python_dist() target in the same
+      # directory!
+      'examples/src/python/example/python_distribution/hello/pants_setup_requires:bin',
     ]
 
     # Targets that are intended to fail
@@ -102,8 +108,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
 
     targets_to_exclude = (known_failing_targets + negative_test_targets + need_java_8 +
                           timeout_targets + deliberately_conflicting_targets + simply_skip)
-    exclude_opts = map(lambda target: '--exclude-target-regexp={}'.format(target),
-                       targets_to_exclude)
+    exclude_opts = ['--exclude-target-regexp={}'.format(target) for target in targets_to_exclude]
 
     # Run list with exclude options, then parse and sort output.
     pants_run = self.run_pants(['list', 'testprojects::', 'examples::'] + exclude_opts)
@@ -122,7 +127,8 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
   def run_shard(self, shard):
     targets = self.targets_for_shard(shard)
     pants_run = self.pants_test(targets + ['--jvm-platform-default-platform=java7',
-                                           '--gen-protoc-import-from-root'])
+                                           '--gen-protoc-import-from-root'],
+                                extra_env={'PEX_VERBOSE': '9'})
     self.assert_success(pants_run)
 
   def test_self(self):

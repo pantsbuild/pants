@@ -76,7 +76,7 @@ testprojects/
 def harness():
   try:
     for name, content in BUILD_FILES.items():
-      safe_file_dump(name, dedent(content))
+      safe_file_dump(name, dedent(content), binary_mode=False)
     yield
   finally:
     safe_rmtree(SUBPROJ_SPEC)

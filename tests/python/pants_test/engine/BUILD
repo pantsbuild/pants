@@ -231,7 +231,7 @@ python_tests(
   tags={'integration'},
 )
 
-python_tests(
+python_library(
   name='scheduler_test_base',
   sources=['scheduler_test_base.py'],
   dependencies=[

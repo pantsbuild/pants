@@ -2,7 +2,10 @@ extern crate log;
 extern crate tempfile;
 
 use boxfuture::{BoxFuture, Boxable};
-use fs::{self, GlobMatching, PathGlobs, PathStatGetter, Snapshot, StrictGlobMatching};
+use fs::{
+  self, GlobExpansionConjunction, GlobMatching, PathGlobs, PathStatGetter, Snapshot,
+  StrictGlobMatching,
+};
 use futures::{future, Future, Stream};
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
@@ -62,6 +65,7 @@ impl CommandRunner {
         &try_future!(output_dirs_glob_strings),
         &[],
         StrictGlobMatching::Ignore,
+        GlobExpansionConjunction::AllMatch,
       )))
       .map_err(|e| format!("Error stating output dirs: {}", e));
 
@@ -310,9 +314,12 @@ impl super::CommandRunner for CommandRunner {
       .to_boxed()
   }
 
-  fn reset_prefork(&self) {
-    self.store.reset_prefork();
-    self.fs_pool.reset();
+  fn with_shutdown(&self, f: &mut FnMut() -> ()) {
+    // TODO: Although we have a Resettable<CpuPool>, we do not shut it down, because our caller
+    // will (and attempting to shut things down twice guarantees a deadlock because Resettable is
+    // not reentrant). This is fragile, and it would be nice to have type safety to prevent that
+    // case.
+    self.store.with_reset(f)
   }
 }
 

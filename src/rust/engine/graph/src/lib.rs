@@ -389,7 +389,7 @@ impl<N: Node> InnerGraph<N> {
     let queue_entry = |id| {
       self
         .entry_for_id(id)
-        .and_then(|entry| entry.current_running_duration(&now))
+        .and_then(|entry| entry.current_running_duration(now))
         .map(|d| (d, id))
     };
 
@@ -692,6 +692,14 @@ impl<N: Node> Graph<N> {
   pub fn all_digests(&self) -> Vec<hashing::Digest> {
     let inner = self.inner.lock().unwrap();
     inner.all_digests()
+  }
+
+  pub fn with_exclusive<F, T>(&self, f: F) -> T
+  where
+    F: FnOnce() -> T,
+  {
+    let _inner = self.inner.lock().unwrap();
+    f()
   }
 }
 

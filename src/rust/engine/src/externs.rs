@@ -209,6 +209,17 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
 }
 
 ///
+/// Calls the given function with exclusive access to all locks managed by this module.
+/// Used to ensure that the main thread forks with all locks acquired.
+///
+pub fn exclusive_call(func: &Key) -> Result<Value, Failure> {
+  // NB: Acquiring the interns exclusively as well.
+  let interns = INTERNS.write().unwrap();
+  let func_val = interns.get(func);
+  with_externs_exclusive(|e| (e.call)(e.context, func_val as &Handle, &[].as_ptr(), 0)).into()
+}
+
+///
 /// NB: Panics on failure. Only recommended for use with built-in functions, such as
 /// those configured in types::Types.
 ///
@@ -225,6 +236,8 @@ pub fn unsafe_call(func: &Function, args: &[Value]) -> Value {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 lazy_static! {
+  // NB: Unfortunately, it's not currently possible to merge these locks, because mutating
+  // the `Interns` requires calls to extern functions, which would be re-entrant.
   static ref EXTERNS: RwLock<Option<Externs>> = RwLock::new(None);
   static ref INTERNS: RwLock<Interns> = RwLock::new(Interns::new());
 }
@@ -258,6 +271,17 @@ where
   F: FnOnce(&Externs) -> T,
 {
   let externs_opt = EXTERNS.read().unwrap();
+  let externs = externs_opt
+    .as_ref()
+    .unwrap_or_else(|| panic!("externs used before static initialization."));
+  f(externs)
+}
+
+fn with_externs_exclusive<F, T>(f: F) -> T
+where
+  F: FnOnce(&Externs) -> T,
+{
+  let externs_opt = EXTERNS.write().unwrap();
   let externs = externs_opt
     .as_ref()
     .unwrap_or_else(|| panic!("externs used before static initialization."));

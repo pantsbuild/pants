@@ -5,29 +5,23 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
-import os
-
-from pex.interpreter import PythonInterpreter
-from pex.pex import PEX
-from pex.pex_builder import PEXBuilder
-from pex.pex_info import PexInfo
 
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems.python_repos import PythonRepos
-from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.backend.python.tasks.pex_build_util import dump_requirements
-from pants.base.build_environment import get_pants_cachedir
-from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import safe_concurrent_creation
-from pants.util.objects import datatype
+from pants.binaries.executable_pex_tool import ExecutablePexTool
+from pants.util.memo import memoized_property
 
 
 logger = logging.getLogger(__name__)
 
 
-class Conan(Subsystem):
+class Conan(ExecutablePexTool):
   """Pex binary for the conan package manager."""
   options_scope = 'conan'
+
+  entry_point = 'conans.conan'
+
+  # TODO: It would be great if these requirements could be drawn from a BUILD file (potentially with
+  # a special target specified in BUILD.tools)?
   default_conan_requirements = (
     'conan==1.4.4',
     'PyJWT>=1.4.0, <2.0.0',
@@ -47,33 +41,15 @@ class Conan(Subsystem):
   )
 
   @classmethod
-  def implementation_version(cls):
-    return super(Conan, cls).implementation_version() + [('Conan', 0)]
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(Conan, cls).subsystem_dependencies() + (PythonRepos, PythonSetup)
-
-  @classmethod
   def register_options(cls, register):
     super(Conan, cls).register_options(register)
     register('--conan-requirements', type=list, default=cls.default_conan_requirements,
              advanced=True, help='The requirements used to build the conan client pex.')
 
-  class ConanBinary(datatype(['pex'])):
-    """A `conan` PEX binary."""
+  @classmethod
+  def implementation_version(cls):
+    return super(Conan, cls).implementation_version() + [('Conan', 0)]
 
-  def bootstrap_conan(self):
-    pex_info = PexInfo.default()
-    pex_info.entry_point = 'conans.conan'
-    conan_bootstrap_dir = os.path.join(get_pants_cachedir(), 'conan_support')
-    conan_pex_path = os.path.join(conan_bootstrap_dir, 'conan_binary')
-    interpreter = PythonInterpreter.get()
-    if not os.path.exists(conan_pex_path):
-      with safe_concurrent_creation(conan_pex_path) as safe_path:
-        builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
-        reqs = [PythonRequirement(req) for req in self.get_options().conan_requirements]
-        dump_requirements(builder, interpreter, reqs, logger)
-        builder.freeze()
-    conan_binary = PEX(conan_pex_path, interpreter)
-    return self.ConanBinary(pex=conan_binary)
+  @memoized_property
+  def base_requirements(self):
+    return [PythonRequirement(req) for req in self.get_options().conan_requirements]
