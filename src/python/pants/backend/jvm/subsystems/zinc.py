@@ -301,7 +301,7 @@ class Zinc(object):
         context._scheduler.materialize_directories((
           DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
         ))
-    return bridge_jar
+    return ClasspathEntry(path=bridge_jar, directory_digest=res.output_directory_digest)
 
   @memoized_method
   def snapshot(self, scheduler):

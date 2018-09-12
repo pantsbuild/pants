@@ -300,14 +300,10 @@ class BaseZincCompile(JvmCompile):
       return fast_relpath(path, get_buildroot())
 
     scala_path = self.scalac_classpath()
-    compiler_interface = self._zinc.compiler_interface
-    compiler_bridge = self._zinc.compiler_bridge
     classes_dir = ctx.classes_dir
     analysis_cache = ctx.analysis_file
 
     scala_path = tuple(relative_to_exec_root(c) for c in scala_path)
-    compiler_interface = relative_to_exec_root(compiler_interface)
-    compiler_bridge = relative_to_exec_root(compiler_bridge)
     analysis_cache = relative_to_exec_root(analysis_cache)
     classes_dir = relative_to_exec_root(classes_dir)
     # TODO: Have these produced correctly, rather than having to relativize them here
@@ -323,7 +319,8 @@ class BaseZincCompile(JvmCompile):
     if not self.get_options().colors:
       zinc_args.append('-no-color')
 
-    zinc_args.extend(["-compiled-bridge-jar", self._zinc.compile_compiler_bridge(self.context)])
+    compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)
+    zinc_args.extend(["-compiled-bridge-jar", compiler_bridge_classpath_entry.path])
     zinc_args.extend(['-scala-path', ':'.join(scala_path)])
 
     zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
@@ -402,11 +399,12 @@ class BaseZincCompile(JvmCompile):
         ctx.target.sources_snapshot(self.context._scheduler),
       ]
 
+      relevant_classpath_entries = dependency_classpath + [compiler_bridge_classpath_entry]
       directory_digests = tuple(
-        entry.directory_digest for entry in dependency_classpath if entry.directory_digest
+        entry.directory_digest for entry in relevant_classpath_entries if entry.directory_digest
       )
-      if len(directory_digests) != len(dependency_classpath):
-        for dep in dependency_classpath:
+      if len(directory_digests) != len(relevant_classpath_entries):
+        for dep in relevant_classpath_entries:
           if dep.directory_digest is None:
             logger.warning(
               "ClasspathEntry {} didn't have a DirectoryDigest, so won't be present for hermetic "
