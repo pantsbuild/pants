@@ -41,16 +41,15 @@ class ParseAddressFamilyTest(unittest.TestCase):
 
 class AddressesFromAddressFamiliesTest(unittest.TestCase):
 
-  def setUp(self):
-    self._default_address_mapper = AddressMapper(JsonParser(TestTable()))
-    self._default_snapshot = Snapshot(DirectoryDigest('xx', 2),
-                                     (Path('root/BUILD', File('root/BUILD')),))
+  def _address_mapper():
+    return AddressMapper(JsonParser(TestTable()))
 
-  def _resolve_build_file_addresses(self, specs, address_family, snapshot=None,
-                                    address_mapper=None):
-    address_mapper = address_mapper or self._default_address_mapper
-    snapshot = snapshot or self._default_snapshot
+  def _snapshot():
+    return Snapshot(
+      DirectoryDigest('xx', 2),
+      (Path('root/BUILD', File('root/BUILD')),))
 
+  def _resolve_build_file_addresses(self, specs, address_family, snapshot, address_mapper):
     return run_rule(addresses_from_address_families, address_mapper, specs, {
       (Snapshot, PathGlobs): lambda _: snapshot,
       (AddressFamily, Dir): lambda _: address_family,
@@ -64,7 +63,8 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     address_family = AddressFamily('a', {'a': ('a/BUILD', 'this is an object!')})
     specs = Specs([address, address])
 
-    bfas = self._resolve_build_file_addresses(specs, address_family, snapshot=snapshot)
+    bfas = self._resolve_build_file_addresses(
+      specs, address_family, snapshot, self._address_mapper())
 
     self.assertEqual(len(bfas.dependencies), 1)
     self.assertEqual(bfas.dependencies[0].spec, 'a:a')
@@ -79,7 +79,8 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
       }
     )
 
-    targets = self._resolve_build_file_addresses(specs, address_family)
+    targets = self._resolve_build_file_addresses(
+      specs, address_family, self._snapshot(), self._address_mapper())
 
     self.assertEqual(len(targets.dependencies), 1)
     self.assertEqual(targets.dependencies[0].spec, 'root:b')
@@ -93,12 +94,14 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
       """"b" was not found in namespace "root". Did you mean one of:
   :a""")
     with self.assertRaisesRegexp(ResolveError, expected_rx_str):
-      self._resolve_build_file_addresses(specs, address_family)
+      self._resolve_build_file_addresses(
+        specs, address_family, self._snapshot(), self._address_mapper())
 
     # Ensure that we still catch nonexistent targets later on in the list of command-line specs.
     specs = Specs([SingleAddress('root', 'a'), SingleAddress('root', 'b')])
     with self.assertRaisesRegexp(ResolveError, expected_rx_str):
-      self._resolve_build_file_addresses(specs, address_family)
+      self._resolve_build_file_addresses(
+        specs, address_family, self._snapshot(), self._address_mapper())
 
   def test_exclude_pattern(self):
     """Test that targets are filtered based on exclude patterns."""
@@ -109,7 +112,8 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
                                    }
     )
 
-    targets = self._resolve_build_file_addresses(specs, address_family)
+    targets = self._resolve_build_file_addresses(
+      specs, address_family, self._snapshot(), self._address_mapper())
 
     self.assertEqual(len(targets.dependencies), 1)
     self.assertEqual(targets.dependencies[0].spec, 'root:not_me')
@@ -123,7 +127,8 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
                                    }
     )
 
-    targets = self._resolve_build_file_addresses(specs, address_family)
+    targets = self._resolve_build_file_addresses(
+      specs, address_family, self._snapshot(), self._address_mapper())
 
     self.assertEqual(len(targets.dependencies), 0)
 
