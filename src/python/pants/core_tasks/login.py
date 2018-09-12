@@ -35,4 +35,5 @@ class Login(Task):
     requested_providers = list(filter(None, [self.get_options().to] + self.get_passthru_args()))
     if len(requested_providers) != 1:
       raise TaskError('Must specify exactly one provider.')
+    # TODO: An interactive mode where we prompt for creds. Currently we assume they are in netrc.
     BasicAuth.global_instance().authenticate(requested_providers[0])
