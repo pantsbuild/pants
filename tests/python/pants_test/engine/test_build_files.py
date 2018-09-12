@@ -41,10 +41,10 @@ class ParseAddressFamilyTest(unittest.TestCase):
 
 class AddressesFromAddressFamiliesTest(unittest.TestCase):
 
-  def _address_mapper():
+  def _address_mapper(self):
     return AddressMapper(JsonParser(TestTable()))
 
-  def _snapshot():
+  def _snapshot(self):
     return Snapshot(
       DirectoryDigest('xx', 2),
       (Path('root/BUILD', File('root/BUILD')),))
