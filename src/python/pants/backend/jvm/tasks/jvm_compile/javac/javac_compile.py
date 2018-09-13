@@ -103,9 +103,9 @@ class JavacCompile(JvmCompile):
     """Override write_extra_resources to produce plugin and annotation processor files."""
     target = compile_context.target
     if isinstance(target, JavacPlugin):
-      self._write_javac_plugin_info(compile_context.classes_dir, target)
+      self._write_javac_plugin_info(compile_context.classes_dir.path, target)
     elif isinstance(target, AnnotationProcessor) and target.processors:
-      processor_info_file = os.path.join(compile_context.classes_dir, _PROCESSOR_INFO_FILE)
+      processor_info_file = os.path.join(compile_context.classes_dir.path, _PROCESSOR_INFO_FILE)
       self._write_processor_info(processor_info_file, target.processors)
 
   def _write_processor_info(self, processor_info_file, processors):
@@ -120,10 +120,10 @@ class JavacCompile(JvmCompile):
   def compile(self, ctx, args, dependency_classpath, upstream_analysis,
               settings, fatal_warnings, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
-    classpath = (ctx.classes_dir,) + tuple(ce.path for ce in dependency_classpath)
+    classpath = (ctx.classes_dir.path,) + tuple(ce.path for ce in dependency_classpath)
 
     if self.get_options().capture_classpath:
-      self._record_compile_classpath(classpath, ctx.target, ctx.classes_dir)
+      self._record_compile_classpath(classpath, ctx.target, ctx.classes_dir.path)
 
     try:
       distribution = JvmPlatform.preferred_jvm_distribution([settings], strict=True)
@@ -163,7 +163,7 @@ class JavacCompile(JvmCompile):
       ])
     else:
       javac_cmd.extend([
-        '-d', ctx.classes_dir,
+        '-d', ctx.classes_dir.path,
       ])
 
     javac_cmd.extend(self._javac_plugin_args(javac_plugin_map))
@@ -229,7 +229,7 @@ class JavacCompile(JvmCompile):
     )
 
     # Dump the output to the .pants.d directory where it's expected by downstream tasks.
-    classes_directory = ctx.classes_dir
+    classes_directory = ctx.classes_dir.path
     self.context._scheduler.materialize_directories((
       DirectoryToMaterialize(text_type(classes_directory), exec_result.output_directory_digest),
     ))

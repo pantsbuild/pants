@@ -240,8 +240,8 @@ class BaseZincCompile(JvmCompile):
 
     if zinc_analysis is not None:
       for compile_context in compile_contexts:
-        zinc_analysis[compile_context.target] = (compile_context.classes_dir,
-        compile_context.jar_file,
+        zinc_analysis[compile_context.target] = (compile_context.classes_dir.path,
+        compile_context.jar_file.path,
         compile_context.analysis_file)
 
     if zinc_args is not None:
@@ -298,10 +298,10 @@ class BaseZincCompile(JvmCompile):
   def compile(self, ctx, args, dependency_classpath, upstream_analysis,
               settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
-    absolute_classpath = (ctx.classes_dir,) + tuple(ce.path for ce in dependency_classpath)
+    absolute_classpath = (ctx.classes_dir.path,) + tuple(ce.path for ce in dependency_classpath)
 
     if self.get_options().capture_classpath:
-      self._record_compile_classpath(absolute_classpath, ctx.target, ctx.classes_dir)
+      self._record_compile_classpath(absolute_classpath, ctx.target, ctx.classes_dir.path)
 
     # TODO: Allow use of absolute classpath entries with hermetic execution,
     # specifically by using .jdk dir for Distributions:
@@ -317,7 +317,7 @@ class BaseZincCompile(JvmCompile):
     scala_path = self.scalac_classpath()
     compiler_interface = self._zinc.compiler_interface
     compiler_bridge = self._zinc.compiler_bridge
-    classes_dir = ctx.classes_dir
+    classes_dir = ctx.classes_dir.path
     analysis_cache = ctx.analysis_file
 
     scala_path = tuple(relative_to_exec_root(c) for c in scala_path)
@@ -357,7 +357,7 @@ class BaseZincCompile(JvmCompile):
     #   triggering the plugin search mechanism, which does the memoizing).
     scalac_plugin_search_classpath = (
       (set(absolute_classpath) | set(self.scalac_plugin_classpath_elements())) -
-      {ctx.classes_dir, ctx.jar_file}
+      {ctx.classes_dir.path, ctx.jar_file.path}
     )
     zinc_args.extend(self._scalac_plugin_args(scalac_plugin_map, scalac_plugin_search_classpath))
     if upstream_analysis:
