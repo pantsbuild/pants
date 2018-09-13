@@ -45,3 +45,6 @@ class CompileContext(object):
 
   def __hash__(self):
     return hash(self._id)
+
+  def set_classes_dir(self, classes_dir):
+    self.classes_dir = classes_dir

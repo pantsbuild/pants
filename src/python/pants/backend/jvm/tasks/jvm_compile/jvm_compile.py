@@ -429,7 +429,10 @@ class JvmCompile(NailgunTaskBase):
       cc = self.select_runtime_context(compile_contexts[valid_target])
 
       if self.execution_strategy == self.HERMETIC:
-        cc.classes_dir.set_directory_digest(self._snapshot_dependencies(cc))
+        classes_directory_cp_entry = cc.classes_dir
+        classes_directory_cp_entry.set_directory_digest(self._snapshot_dependencies(cc))
+        cc.classes_dir = classes_directory_cp_entry
+        print("@@@@@", cc)
 
       classpath_product.add_for_target(
         valid_target,
@@ -477,12 +480,15 @@ class JvmCompile(NailgunTaskBase):
       f.write(text)
 
   def _snapshot_dependencies(self, compile_context):
+    print("$$$$", self.get_options().pants_workdir, compile_context.classes_dir)
     relative_classes_dir = fast_relpath(compile_context.classes_dir.path, self.get_options().pants_workdir)
     relative_analysis_file = fast_relpath(compile_context.analysis_file, self.get_options().pants_workdir)
-    return self.context._scheduler.capture_snapshots((PathGlobsAndRoot(
+    snapshot = self.context._scheduler.capture_snapshots((PathGlobsAndRoot(
         PathGlobs(tuple([relative_classes_dir, relative_analysis_file])),
         get_buildroot(),
       ),))[0]
+    print("&&&&&", snapshot)
+    return snapshot
 
   def _compile_vts(self, vts, ctx, upstream_analysis, dependency_classpath, progress_message, settings,
                    compiler_option_sets, zinc_file_manager, counter):
@@ -697,7 +703,8 @@ class JvmCompile(NailgunTaskBase):
       hit_cache = self.check_cache(vts, counter)
 
       # TODO: Load from store when https://github.com/pantsbuild/pants/issues/6429 is complete.
-      directory_digest = None
+      directory_digest = ctx.classes_dir.directory_digest
+      print("%%%%%%%%", ctx.target, directory_digest)
 
       if not hit_cache:
         # Compute the compile classpath for this target.
