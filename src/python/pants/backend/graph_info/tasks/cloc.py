@@ -58,11 +58,13 @@ class CountLinesOfCode(ConsoleTask):
 
     cloc_path, cloc_snapshot = ClocBinary.global_instance().hackily_snapshot(self.context)
 
-    directory_digest = self.context._scheduler.merge_directories(tuple(s.directory_digest for s in
-      input_snapshots + (
+    all_the_snapshots = input_snapshots + (
       cloc_snapshot,
       list_file_snapshot,
-    )))
+    )
+    # raise Exception('all_the_snapshots: {}'.format(all_the_snapshots))
+    directory_digest = self.context._scheduler.merge_directories(
+      tuple(s.directory_digest for s in all_the_snapshots))
 
     cmd = (
       '/usr/bin/perl',
@@ -88,10 +90,16 @@ class CountLinesOfCode(ConsoleTask):
     )[0].dependencies
 
     files_content = {fc.path: fc.content.decode('utf-8') for fc in files_content_tuple}
-    for line in files_content['report'].split('\n'):
-      yield line
+
+    # TODO: this key can be empty if no files were matched. Should that be an error?
+    files_report = files_content.get('report', None)
+    if files_report is not None:
+      for line in files_report.split('\n'):
+        yield line
 
     if self.get_options().ignored:
       yield 'Ignored the following files:'
-      for line in files_content['ignored'].split('\n'):
-        yield line
+      files_ignored = files_content.get('ignored', None)
+      if files_ignored is not None:
+        for line in files_ignored.split('\n'):
+          yield line
