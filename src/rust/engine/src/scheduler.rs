@@ -111,7 +111,7 @@ impl Scheduler {
     )?;
     request
       .roots
-      .push(Select::new(product, Params::new(vec![subject]), &edges));
+      .push(Select::new(product, Params::new_single(subject), &edges));
     Ok(())
   }
 

@@ -18,21 +18,21 @@ pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 /// For efficiency and hashability, they're stored as sorted Keys (with distinct TypeIds), and
 /// wrapped in an `Arc` that allows us to copy-on-write for param contents.
 ///
+/// TODO: Consider replacing the Arc<Vec<_>> with a [smallvec](https://crates.io/crates/smallvec).
+///
 #[repr(C)]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Params(Arc<Vec<Key>>);
 
 impl Params {
-  pub fn new(mut params: Vec<Key>) -> Params {
-    params.sort_by(|l, r| l.type_id().cmp(r.type_id()));
-    params.dedup_by(|l, r| l.type_id() == r.type_id());
-    Params(Arc::new(params))
+  pub fn new_single(param: Key) -> Params {
+    Params(Arc::new(vec![param]))
   }
 
   ///
   /// TODO: This is a compatibility API to assist in the transition from "every Node has exactly
   /// one Subject" to "every Node has zero or more Params". See:
-  ///   https://github.com/pantsbuild/pants/issues/5788
+  ///   https://github.com/pantsbuild/pants/issues/6478
   ///
   pub fn expect_single(&self) -> &Key {
     if self.0.len() != 1 {

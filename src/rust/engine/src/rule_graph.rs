@@ -219,17 +219,17 @@ pub struct GraphMaker<'t> {
 }
 
 impl<'t> GraphMaker<'t> {
-  pub fn new(tasks: &'t Tasks, root_subject_types: Vec<TypeId>) -> GraphMaker<'t> {
-    let root_param_types = root_subject_types.into_iter().collect();
+  pub fn new(tasks: &'t Tasks, root_param_types: Vec<TypeId>) -> GraphMaker<'t> {
+    let root_param_types = root_param_types.into_iter().collect();
     GraphMaker {
       tasks,
       root_param_types,
     }
   }
 
-  pub fn sub_graph(&self, subject_type: &TypeId, product_type: &TypeConstraint) -> RuleGraph {
+  pub fn sub_graph(&self, param_type: &TypeId, product_type: &TypeConstraint) -> RuleGraph {
     // TODO: Update to support rendering a subgraph given a set of ParamTypes.
-    let param_types = vec![*subject_type].into_iter().collect();
+    let param_types = vec![*param_type].into_iter().collect();
 
     if let Some(beginning_root) = self.gen_root_entry(&param_types, product_type) {
       self.construct_graph(vec![beginning_root])
@@ -625,7 +625,7 @@ impl<'t> GraphMaker<'t> {
           return Ok(None);
         }
         1 => {
-          combination.push((key, *chosen_entries.last().unwrap()));
+          combination.push((key, chosen_entries[0]));
         }
         _ => {
           return Err(Diagnostic::ambiguous(available_params, key, chosen_entries));

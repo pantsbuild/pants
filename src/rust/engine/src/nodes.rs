@@ -687,7 +687,7 @@ impl Task {
         // TODO: The subject of the get is a new parameter, but params from the context should be
         // included as well. Additionally, params should be filtered to what is used by the Entry.
         //   see https://github.com/pantsbuild/pants/issues/6478
-        let params = Params::new(vec![subject]);
+        let params = Params::new_single(subject);
         let select_key = rule_graph::SelectKey::JustGet(selectors::Get {
           product: product,
           subject: *subject.type_id(),
