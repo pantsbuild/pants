@@ -70,7 +70,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-bootstrapper_2.11', '0.0.2'),
+                              JarDependency('org.pantsbuild', 'zinc-bootstrapper_2.11', '0.0.3'),
                             ],
                             main=Zinc.ZINC_BOOTSTRAPER_MAIN,
                             custom_rules=shader_rules,
