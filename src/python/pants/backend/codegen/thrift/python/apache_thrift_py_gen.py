@@ -51,6 +51,10 @@ class ApacheThriftPyGen(ApacheThriftGenBase):
         # leave as-is.
         pass
 
+  @property
+  def _copy_target_attributes(self):
+    return super(ApacheThriftPyGen, self)._copy_target_attributes + ['compatibility']
+
   def ignore_dup(self, tgt1, tgt2, rel_src):
     # Thrift generates all the intermediate __init__.py files, and they shouldn't
     # count as dups.
