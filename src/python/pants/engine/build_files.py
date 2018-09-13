@@ -203,7 +203,7 @@ def _hydrate(item_type, spec_path, **kwargs):
 
 
 class _MappedSpecs(datatype([
-    ('address_families', tuple),
+    ('address_families', tuple), # List[AddressFamily]
     ('specs', Specs),
 ])):
   """Wraps up logic to resolve specs into individual target addresses, or error out."""
