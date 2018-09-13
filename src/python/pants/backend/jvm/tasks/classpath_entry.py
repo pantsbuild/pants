@@ -37,6 +37,13 @@ class ClasspathEntry(object):
     """
     return self._directory_digest
 
+  def set_directory_digest(self, directory_digest):
+    """Sets this instance's directory_digest with the passed in directory_digest.
+
+    :param pants.engine.fs.DirectoryDigest
+    """
+    self._directory_digest = directory_digest
+
   def is_excluded_by(self, excludes):
     """Returns `True` if this classpath entry should be excluded given the `excludes` in play.
 

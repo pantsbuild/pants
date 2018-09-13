@@ -429,7 +429,7 @@ class JvmCompile(NailgunTaskBase):
       cc = self.select_runtime_context(compile_contexts[valid_target])
 
       if self.execution_strategy == self.HERMETIC:
-        cc.classes_dir.directory_digest = self._snapshot_compile_context_element(cc.classes_dir.path)
+        cc.classes_dir.set_directory_digest(self._snapshot_dependencies(cc))
 
       classpath_product.add_for_target(
         valid_target,
