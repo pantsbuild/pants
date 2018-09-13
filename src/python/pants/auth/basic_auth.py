@@ -30,6 +30,10 @@ class BasicAuth(Subsystem):
              help='Map from provider name to config dict. This dict contains the following items: '
                   '{url: <url of endpoint that accepts basic auth and sets a session cookie>}')
 
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(BasicAuth, cls).subsystem_dependencies() + (Cookies,)
+
   def authenticate(self, provider, creds=None, cookies=None):
     """Authenticate against the specified provider.
 
@@ -38,7 +42,8 @@ class BasicAuth(Subsystem):
       If unspecified, assumes that creds are set in the netrc file.
     :param pants.auth.cookies.Cookies cookies: Store the auth cookies in this instance.
       If unspecified, uses the global instance.
-
+    :raises pants.auth.basic_auth.BasicAuthException: If auth fails due to misconfiguration or
+      rejection by the server.
     """
     cookies = cookies or Cookies.global_instance()
 

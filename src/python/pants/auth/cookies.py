@@ -6,14 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
-from six.moves.http_cookiejar import LWPCookieJar
+from future.moves.http.cookiejar import LWPCookieJar
 
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir_for
-
-
-class BasicAuthException(Exception):
-  pass
 
 
 class Cookies(Subsystem):
@@ -22,7 +18,7 @@ class Cookies(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(Cookies, cls).register_options(register)
-    register('--path', advanced=True, default='~/.pants.cookies',
+    register('--path', advanced=True, fingerprint=True, default='~/.pants.cookies',
              help='Path to file that stores persistent cookies.')
 
   def update(self, cookies):

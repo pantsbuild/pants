@@ -8,7 +8,7 @@ import base64
 import os
 import threading
 
-from six.moves import BaseHTTPServer
+from future.moves.http.server import BaseHTTPServer
 
 from pants.auth.basic_auth import BasicAuth, BasicAuthCreds
 from pants.auth.cookies import Cookies
@@ -29,18 +29,20 @@ class RequestHandlerForTest(BaseHTTPServer.BaseHTTPRequestHandler):
     self.send_header('Set-Cookie', 'test_auth_key=test_auth_value; Max-Age=3600')
     self.end_headers()
 
+
 def _run_test_server():
   httpd = BaseHTTPServer.HTTPServer(('localhost', 0), RequestHandlerForTest)
   thread = threading.Thread(target=httpd.serve_forever)
   thread.daemon = True
   thread.start()
-  return httpd.server_port
+  return httpd.server_port, httpd.shutdown
 
 
 class TestBasicAuth(TestBase):
   def setUp(self):
     super(TestBasicAuth, self).setUp()
-    self.port = _run_test_server()
+    self.port, shutdown_func = _run_test_server()
+    self.addCleanup(shutdown_func)
 
   def _do_test_basic_auth(self, creds):
     with temporary_dir() as tmpcookiedir:
