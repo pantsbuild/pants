@@ -12,6 +12,7 @@ from builtins import next, str
 from os.path import dirname, join
 
 import six
+from future.utils import raise_from
 from twitter.common.collections import OrderedSet
 
 from pants.base.project_tree import Dir
@@ -77,12 +78,18 @@ class UnhydratedStruct(datatype(['address', 'struct', 'dependencies'])):
     return hash(self.struct)
 
 
-def _raise_did_you_mean(address_family, name):
+def _raise_did_you_mean(address_family, name, source=None):
   names = [a.target_name for a in address_family.addressables]
   possibilities = '\n  '.join(':{}'.format(target_name) for target_name in sorted(names))
-  raise ResolveError('"{}" was not found in namespace "{}". '
-                     'Did you mean one of:\n  {}'
-                     .format(name, address_family.namespace, possibilities))
+
+  resolve_error = ResolveError('"{}" was not found in namespace "{}". '
+                               'Did you mean one of:\n  {}'
+                               .format(name, address_family.namespace, possibilities))
+
+  if source:
+    raise_from(resolve_error, source)
+  else:
+    raise resolve_error
 
 
 @rule(UnhydratedStruct, [Select(AddressMapper), Select(Address)])
@@ -238,14 +245,14 @@ class _MappedSpecs(datatype([
     try:
       addr_families_for_spec = spec.matching_address_families(self._address_family_by_directory)
     except Spec.AddressFamilyResolutionError as e:
-      raise ResolveError(e)
+      raise raise_from(ResolveError(e), e)
 
     try:
       all_addr_tgt_pairs = spec.address_target_pairs_from_address_families(addr_families_for_spec)
     except Spec.AddressResolutionError as e:
-      raise AddressLookupError(e)
+      raise raise_from(AddressLookupError(e), e)
     except SingleAddress.SingleAddressResolutionError as e:
-      _raise_did_you_mean(e.single_address_family, e.name)
+      _raise_did_you_mean(e.single_address_family, e.name, source=e)
 
     all_matching_addresses = [
       addr for (addr, tgt) in all_addr_tgt_pairs
