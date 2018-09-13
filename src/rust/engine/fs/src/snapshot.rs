@@ -6,9 +6,10 @@ use boxfuture::{BoxFuture, Boxable};
 use futures::future::{self, join_all};
 use futures::Future;
 use hashing::{Digest, Fingerprint};
-use indexmap::{self, IndexMap};
+use indexmap::{self, IndexMap, IndexSet};
 use itertools::Itertools;
 use protobuf;
+use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::fmt;
 use std::path::PathBuf;
@@ -25,6 +26,7 @@ pub const EMPTY_DIGEST: Digest = Digest(EMPTY_FINGERPRINT, 0);
 pub struct Snapshot {
   pub digest: Digest,
   pub path_stats: Vec<PathStat>,
+  pub base_dir: Option<PathStat>,
 }
 
 impl Snapshot {
@@ -32,6 +34,7 @@ impl Snapshot {
     Snapshot {
       digest: EMPTY_DIGEST,
       path_stats: vec![],
+      base_dir: None,
     }
   }
 
@@ -42,11 +45,16 @@ impl Snapshot {
     store: Store,
     file_digester: &S,
     path_stats: Vec<PathStat>,
+    base_dir: Option<PathStat>,
   ) -> BoxFuture<Snapshot, String> {
     let mut sorted_path_stats = path_stats.clone();
     sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
     Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &sorted_path_stats)
-      .map(|digest| Snapshot { digest, path_stats })
+      .map(|digest| Snapshot {
+        digest,
+        path_stats,
+        base_dir,
+      })
       .to_boxed()
   }
 
@@ -57,10 +65,16 @@ impl Snapshot {
     store: Store,
     file_digester: &S,
     path_stats: &[PathStat],
+    base_dir: Option<PathStat>,
   ) -> BoxFuture<Digest, String> {
     let mut sorted_path_stats = path_stats.to_owned();
     sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &sorted_path_stats)
+    Snapshot::ingest_directory_from_sorted_path_stats(
+      store,
+      file_digester,
+      &sorted_path_stats,
+      base_dir,
+    )
   }
 
   fn ingest_directory_from_sorted_path_stats<
@@ -70,6 +84,7 @@ impl Snapshot {
     store: Store,
     file_digester: &S,
     path_stats: &[PathStat],
+    base_dir: Option<PathStat>,
   ) -> BoxFuture<Digest, String> {
     let mut file_futures: Vec<BoxFuture<bazel_protos::remote_execution::FileNode, String>> =
       Vec::new();
@@ -129,6 +144,7 @@ impl Snapshot {
             store.clone(),
             file_digester,
             &paths_of_child_dir(path_group),
+            base_dir,
           ).and_then(move |digest| {
             let mut dir_node = bazel_protos::remote_execution::DirectoryNode::new();
             dir_node.set_name(osstring_as_utf8(first_component)?);
@@ -162,30 +178,50 @@ impl Snapshot {
     // We dedupe PathStats by their symbolic names, as those will be their names within the
     // `Directory` structure. Only `Dir+Dir` collisions are legal.
     let path_stats = {
-      let mut uniq_paths: IndexMap<PathBuf, PathStat> = IndexMap::new();
-      for path_stat in Itertools::flatten(snapshots.iter().map(|s| s.path_stats.iter().cloned())) {
-        match uniq_paths.entry(path_stat.path().to_owned()) {
-          indexmap::map::Entry::Occupied(e) => match (&path_stat, e.get()) {
-            (&PathStat::Dir { .. }, &PathStat::Dir { .. }) => (),
-            (x, y) => {
-              return future::err(format!(
-                "Snapshots contained duplicate path: {:?} vs {:?}",
-                x, y
-              )).to_boxed()
+      let mut no_base_dir_paths: Vec<PathStat> = Vec::new();
+      let mut paths_by_dir: IndexMap<PathStat, IndexSet<PathStat>> = IndexMap::new();
+      for snapshot in snapshots {
+        match snapshot.base_dir.clone() {
+          None => {
+            no_base_dir_paths.extend(snapshot.path_stats.iter().cloned());
+          }
+          Some(stat) => match paths_by_dir.entry(stat) {
+            indexmap::map::Entry::Occupied(e) => {
+              let all_stats = e.get().union(snapshot.path_stats.iter().cloned().collect());
+              e.insert(all_stats);
+            }
+            indexmap::map::Entry::Vacant(v) => {
+              v.insert(snapshot.path_stats.iter().cloned().collect());
             }
           },
-          indexmap::map::Entry::Vacant(v) => {
-            v.insert(path_stat);
-          }
         }
       }
-      uniq_paths.into_iter().map(|(_, v)| v).collect()
+
+      let mut all_paths = no_base_dir_paths.clone();
+      all_paths.extend(Itertools::flatten(
+        paths_by_dir.into_iter().map(|(_, stats)| stats).cloned(),
+      ));
+
+      let mut seen_paths: IndexSet<PathStat> = IndexSet::new();
+      for path_stat in all_paths.into_iter() {
+        if seen_paths.contains(path_stat.clone()) {
+          return future::err(format!(
+            "Snapshots contained duplicate path: {:?}",
+            path_stat.clone(),
+          )).to_boxed();
+        } else {
+          seen_paths.insert(path_stat);
+        }
+      }
+
+      seen_paths.into_iter().collect()
     };
     // Recursively merge the Digests in the Snapshots.
     Self::merge_directories(store, snapshots.iter().map(|s| s.digest).collect())
       .map(move |root_digest| Snapshot {
         digest: root_digest,
         path_stats: path_stats,
+        base_dir: None,
       })
       .to_boxed()
   }

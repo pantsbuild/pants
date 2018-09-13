@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import logging
 from hashlib import sha1
 
 from future.utils import PY3
@@ -14,6 +15,9 @@ from pants.source.filespec import matches_filespec
 from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetWithSpec
 from pants.util.memo import memoized_property
+
+
+logger = logging.getLogger(__name__)
 
 
 class SourcesField(PayloadField):
@@ -66,7 +70,7 @@ class SourcesField(PayloadField):
     """Returns the address this sources field refers to (used by some derived classes)"""
     return self._ref_address
 
-  def snapshot(self, scheduler=None):
+  def snapshot(self, scheduler=None, throw=False):
     """
     Returns a Snapshot containing the sources, relative to the build root.
 
@@ -77,6 +81,9 @@ class SourcesField(PayloadField):
       if snapshot is not None:
         return snapshot
     input_pathglobs = PathGlobs(tuple(self.relative_to_buildroot()))
+    if throw:
+      raise Exception('input_pathglobs: {}'.format(input_pathglobs))
+    logger.debug('input_pathglobs: {}'.format(input_pathglobs))
     return scheduler.product_request(Snapshot, [input_pathglobs])[0]
 
   def relative_to_buildroot(self):
