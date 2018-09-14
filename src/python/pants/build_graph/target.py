@@ -903,7 +903,7 @@ class Target(AbstractTarget):
     elif not isinstance(sources, EagerFilesetWithSpec):
       deprecated_conditional(
         lambda: True,
-        '1.11.0.dev0',
+        '1.12.0.dev0',
         ('FilesetWithSpec sources values are deprecated except for EagerFilesetWithSpec values. '
          'Saw value of type {}').format(type(sources))
       )
