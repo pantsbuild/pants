@@ -8,6 +8,8 @@ import os
 import struct
 from builtins import bytes, object, str, zip
 
+from future.utils import binary_type
+
 
 STDIO_DESCRIPTORS = (0, 1, 2)
 

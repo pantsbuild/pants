@@ -13,7 +13,7 @@ import time
 from builtins import open, str, zip
 from contextlib import contextmanager
 
-from future.utils import binary_type, raise_with_traceback
+from future.utils import raise_with_traceback
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
