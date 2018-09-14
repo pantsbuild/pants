@@ -199,7 +199,7 @@ class BaseZincCompile(JvmCompile):
 
   @memoized_property
   def _zinc(self):
-    return Zinc.Factory.global_instance().create(self.context.products)
+    return Zinc.Factory.global_instance().create(self.context.products, self.execution_strategy)
 
   def __init__(self, *args, **kwargs):
     super(BaseZincCompile, self).__init__(*args, **kwargs)
@@ -303,9 +303,6 @@ class BaseZincCompile(JvmCompile):
     if self.get_options().capture_classpath:
       self._record_compile_classpath(absolute_classpath, ctx.target, ctx.classes_dir)
 
-    # TODO: Allow use of absolute classpath entries with hermetic execution,
-    # specifically by using .jdk dir for Distributions:
-    # https://github.com/pantsbuild/pants/issues/6430
     self._verify_zinc_classpath(absolute_classpath, allow_dist=(self.execution_strategy != self.HERMETIC))
     # TODO: Investigate upstream_analysis for hermetic compiles
     self._verify_zinc_classpath(upstream_analysis.keys())

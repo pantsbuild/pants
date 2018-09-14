@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
 from builtins import object
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
@@ -14,8 +15,10 @@ from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
+from pants.java.distribution.distribution import Distribution
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath
@@ -107,7 +110,7 @@ class Zinc(object):
     def _compiler_interface(cls, products):
       return cls.tool_jar_from_products(products, 'compiler-interface', cls.options_scope)
 
-    def create(self, products):
+    def create(self, products, execution_strategy):
       """Create a Zinc instance from products active in the current Pants run.
 
       :param products: The active Pants run products to pluck classpaths from.
@@ -115,11 +118,12 @@ class Zinc(object):
       :returns: A Zinc instance with access to relevant Zinc compiler wrapper jars and classpaths.
       :rtype: :class:`Zinc`
       """
-      return Zinc(self, products)
+      return Zinc(self, products, execution_strategy)
 
-  def __init__(self, zinc_factory, products):
+  def __init__(self, zinc_factory, products, execution_strategy):
     self._zinc_factory = zinc_factory
     self._products = products
+    self._execution_strategy = execution_strategy
 
   @memoized_property
   def zinc(self):
@@ -131,9 +135,28 @@ class Zinc(object):
 
   @property
   def dist(self):
-    """Return the distribution selected for Zinc.
+    """Return the `Distribution` selected for Zinc based on execution strategy.
 
-    :rtype: list of str
+    :rtype: pants.java.distribution.distribution.Distribution
+    """
+    underlying_dist = self.underlying_dist
+    if self._execution_strategy != NailgunTaskBase.HERMETIC:
+      # symlink .pants.d/.jdk -> /some/java/home/
+      jdk_home_symlink = os.path.relpath(
+        os.path.join(self._zinc_factory.get_options().pants_workdir, '.jdk'),
+        get_buildroot())
+
+      if os.path.exists(jdk_home_symlink):
+        os.remove(jdk_home_symlink)
+      os.symlink(underlying_dist.home, jdk_home_symlink)
+      return Distribution(home_path=jdk_home_symlink)
+    else:
+      return underlying_dist
+
+  @property
+  def underlying_dist(self):
+    """
+    :rtype: pants.java.distribution.distribution.Distribution
     """
     return self._zinc_factory.dist
 
