@@ -234,25 +234,26 @@ class NailgunProtocol(object):
   @classmethod
   def send_pid(cls, sock, pid):
     """Send the PID chunk over the specified socket."""
-    cls.write_chunk(sock, ChunkType.PID, pid)
+    encoded_pid = cls.encode_int(pid)
+    cls.write_chunk(sock, ChunkType.PID, encoded_pid)
 
   @classmethod
-  def encode_process_exit_code(cls, code):
-    """Verify the object is a valid return code, and encode it to the right type of string.
+  def encode_int(cls, obj):
+    """Verify the object is an int, and encode it to the right type of string for nailgun.
 
-    :param int code: The return code of a completed subprocess execution.
-    :raises: :class:`TypeError` if `code` is not an integer.
-    :return: A representation suitable to pass as the `payload` to send_exit().
+    :param int obj: An integer to be encoded.
+    :raises: :class:`TypeError` if `obj` is not an integer.
+    :return: A representation of the int `obj` suitable to pass as the `payload` to send_exit().
     """
-    if not isinstance(code, int):
-      raise TypeError("cannot encode non-integer exit code: {} (type '{}')."
-                      .format(code, type(code)))
-    return str(code).encode('ascii')
+    if not isinstance(obj, int):
+      raise TypeError("cannot encode non-integer object in encode_int(): object was {} (type '{}')."
+                      .format(obj, type(obj)))
+    return str(obj).encode('ascii')
 
   @classmethod
   def send_exit_with_code(cls, sock, code):
     """Send the Exit chunk over the specified socket, containing an integer return code."""
-    encoded_exit_status = cls.encode_process_exit_code(code)
+    encoded_exit_status = cls.encode_int(code)
     cls.send_exit(sock, payload=encoded_exit_status)
 
   @classmethod

@@ -175,6 +175,24 @@ class TestNailgunProtocol(unittest.TestCase):
       (ChunkType.EXIT, self.TEST_OUTPUT)
     )
 
+  def test_send_pid(self):
+    test_pid = -1
+    NailgunProtocol.send_pid(self.server_sock, test_pid)
+    chunk_type, payload = NailgunProtocol.read_chunk(self.client_sock)
+    self.assertEqual(
+      (chunk_type, payload),
+      (ChunkType.PID, NailgunProtocol.encode_int(test_pid))
+    )
+
+  def test_send_exit_with_code(self):
+    return_code = 1
+    NailgunProtocol.send_exit_with_code(self.server_sock, return_code)
+    chunk_type, payload = NailgunProtocol.read_chunk(self.client_sock)
+    self.assertEqual(
+      (chunk_type, payload),
+      (ChunkType.EXIT, NailgunProtocol.encode_int(return_code))
+    )
+
   def test_send_unicode_chunk(self):
     NailgunProtocol.send_stdout(self.server_sock, self.TEST_UNICODE_PAYLOAD)
     chunk_type, payload = NailgunProtocol.read_chunk(self.client_sock, return_bytes=True)

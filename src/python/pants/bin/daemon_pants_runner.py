@@ -10,7 +10,7 @@ import signal
 import sys
 import termios
 import time
-from builtins import open, str, zip
+from builtins import open, zip
 from contextlib import contextmanager
 
 from future.utils import raise_with_traceback
@@ -31,9 +31,12 @@ class DaemonExiter(Exiter):
   """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol."""
 
   @classmethod
-  def create(cls, socket, options):
+  def create(cls, socket, options=None):
     exiter_instance = cls(socket)
-    exiter_instance.apply_options(options)
+    # We want to be able to log error to an exceptions.log, and we need to get the location of the
+    # log dir from the (bootstrap) options, or the Exiter won't log anything at all.
+    if options is not None:
+      exiter_instance.apply_options(options)
 
     return exiter_instance
 
@@ -141,7 +144,11 @@ class DaemonPantsRunner(ProcessManager):
     self._options_bootstrapper = options_bootstrapper
     self._deferred_exception = deferred_exc
 
-    self._exiter = DaemonExiter.create(socket, self._options_bootstrapper.get_bootstrap_options())
+    self._maybe_bootstrap_options = (
+      self._options_bootstrapper.get_bootstrap_options()
+      if self._options_bootstrapper
+      else None)
+    self._exiter = DaemonExiter.create(socket, options=self._maybe_bootstrap_options)
 
   def _make_identity(self):
     """Generate a ProcessManager identity for a given pants run.
@@ -286,8 +293,7 @@ class DaemonPantsRunner(ProcessManager):
 
     # Broadcast our process group ID (in PID form - i.e. negated) to the remote client so
     # they can send signals (e.g. SIGINT) to all processes in the runners process group.
-    pid = str(os.getpgrp() * -1).encode('ascii')
-    NailgunProtocol.send_pid(self._socket, pid)
+    NailgunProtocol.send_pid(self._socket, os.getpgrp() * -1)
 
     try:
       # Invoke a Pants run with stdio redirected and a proxied environment.
@@ -324,5 +330,8 @@ class DaemonPantsRunner(ProcessManager):
       # self._exiter is a DaemonExiter and does some nailgun interaction, which is gone by this
       # point, so we must make another.
       tmp_exiter = Exiter()
-      tmp_exiter.apply_options(self._options_bootstrapper.get_bootstrap_options())
+      # We want to be able to log error to an exceptions.log, and we need to get the location of the
+      # log dir from the (bootstrap) options, or the Exiter won't log anything at all.
+      if self._maybe_bootstrap_options is not None:
+        tmp_exiter.apply_options(self._maybe_bootstrap_options)
       tmp_exiter.handle_unhandled_exception(add_newline=True)
