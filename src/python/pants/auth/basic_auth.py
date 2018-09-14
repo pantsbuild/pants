@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from collections import namedtuple
 
 import requests
-from requests.auth import HTTPBasicAuth
 
 from pants.auth.cookies import Cookies
 from pants.subsystem.subsystem import Subsystem

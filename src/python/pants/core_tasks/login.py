@@ -29,7 +29,6 @@ class Login(Task):
     register('--to', fingerprint=True,
              help='Log in to this provider.  Can also be specified as a passthru arg.')
 
-
   def execute(self):
     # TODO: When we have other auth methods (e.g., OAuth2), select one by provider name.
     requested_providers = list(filter(None, [self.get_options().to] + self.get_passthru_args()))
