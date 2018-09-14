@@ -9,7 +9,7 @@ from collections import namedtuple
 
 import six
 from colors import cyan, green, red, yellow
-from future.utils import PY2
+from future.utils import binary_type
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.reporting.plaintext_reporter_base import PlainTextReporterBase
@@ -94,6 +94,10 @@ class PlainTextReporter(PlainTextReporterBase):
 
   def __init__(self, run_tracker, settings):
     super(PlainTextReporter, self).__init__(run_tracker, settings)
+
+    # We eagerly validate that our output accepts raw bytes.
+    settings.outfile.write(b'')
+
     for key, value in settings.label_format.items():
       if key not in WorkUnitLabel.keys():
         self.emit('*** Got invalid key {} for --reporting-console-label-format. Expected one of {}\n'
@@ -183,15 +187,7 @@ class PlainTextReporter(PlainTextReporterBase):
     self.flush()
 
   def emit(self, s, dest=ReporterDestination.OUT):
-    # In Py2, sys.stdout tries to coerce into ASCII, and will fail in coercing Unicode. So,
-    # we encode prematurely to handle unicode.
-    # In Py3, sys.stdout takes unicode, so will work normally.
-    #
-    # `self.settings.outfile` can also be `io.StringIO` instead of an std stream, in which case it only
-    # accepts unicode, so `s` does not need to be modified.
-    # TODO(python3port): Figure out if there's a better way to do this, like opening `sys.stderr` in different mode.
-    # Part of https://github.com/pantsbuild/pants/issues/6071.
-    if PY2 and 'std' in str(self.settings.outfile):
+    if not isinstance(s, binary_type):
       s = s.encode('utf-8')
     if dest == ReporterDestination.OUT:
       self.settings.outfile.write(s)
