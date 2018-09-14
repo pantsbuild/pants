@@ -14,7 +14,7 @@ from builtins import object, open, str
 from collections import namedtuple
 from contextlib import contextmanager
 
-from future.utils import PY3
+from future.utils import PY3, text_type
 from six import string_types
 
 from pants.base.revision import Revision
@@ -154,7 +154,7 @@ class Distribution(object):
         if self._is_executable(os.path.join(jdk_dir, 'bin', 'javac')):
           home = jdk_dir
       self._home = home
-    return self._home
+    return text_type(self._home)
 
   @property
   def real_home(self):

@@ -41,21 +41,21 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
   options_scope = 'scala'
 
   @classmethod
-  def _create_jardep(cls, name, version):
+  def create_jardep(cls, name, version):
     return JarDependency(org='org.scala-lang',
                          name=name,
                          rev=scala_build_info[version].full_version)
 
   @classmethod
   def _create_runtime_jardep(cls, version):
-    return cls._create_jardep('scala-library', version)
+    return cls.create_jardep('scala-library', version)
 
   @classmethod
   def _create_compiler_jardep(cls, version):
-    return cls._create_jardep('scala-compiler', version)
+    return cls.create_jardep('scala-compiler', version)
 
   @classmethod
-  def _key_for_tool_version(cls, tool, version):
+  def versioned_tool_name(cls, tool, version):
     if version == 'custom':
       return tool
     else:
@@ -65,7 +65,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
   def register_options(cls, register):
     def register_scala_compiler_tool(version):
       cls.register_jvm_tool(register,
-                            cls._key_for_tool_version('scalac', version),
+                            cls.versioned_tool_name('scalac', version),
                             classpath=[cls._create_compiler_jardep(version)])
 
     def register_scala_repl_tool(version, with_jline=False):
@@ -78,12 +78,12 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
         )
         classpath.append(jline_dep)
       cls.register_jvm_tool(register,
-                            cls._key_for_tool_version('scala-repl', version),
+                            cls.versioned_tool_name('scala-repl', version),
                             classpath=classpath)
 
     def register_style_tool(version):
       cls.register_jvm_tool(register,
-                            cls._key_for_tool_version('scalastyle', version),
+                            cls.versioned_tool_name('scalastyle', version),
                             classpath=[scala_style_jar])
 
     super(ScalaPlatform, cls).register_options(register)
@@ -126,7 +126,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
     # fail with a useful error, hence the dummy jardep with rev=None.
     def register_custom_tool(key):
       dummy_jardep = JarDependency('missing spec', ' //:{}'.format(key))
-      cls.register_jvm_tool(register, cls._key_for_tool_version(key, 'custom'),
+      cls.register_jvm_tool(register, cls.versioned_tool_name(key, 'custom'),
                             classpath=[dummy_jardep])
     register_custom_tool('scalac')
     register_custom_tool('scala-repl')
@@ -135,7 +135,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
   def _tool_classpath(self, tool, products):
     """Return the proper classpath based on products and scala version."""
     return self.tool_classpath_from_products(products,
-                                             self._key_for_tool_version(tool, self.version),
+                                             self.versioned_tool_name(tool, self.version),
                                              scope=self.options_scope)
 
   def compiler_classpath(self, products):
@@ -172,7 +172,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
   @property
   def repl(self):
     """Return the repl tool key."""
-    return self._key_for_tool_version('scala-repl', self.version)
+    return self.versioned_tool_name('scala-repl', self.version)
 
   def injectables(self, build_graph):
     if self.version == 'custom':
