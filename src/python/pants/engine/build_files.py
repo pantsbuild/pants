@@ -251,7 +251,7 @@ class _MappedSpecs(datatype([
       all_addr_tgt_pairs = spec.address_target_pairs_from_address_families(addr_families_for_spec)
     except Spec.AddressResolutionError as e:
       raise raise_from(AddressLookupError(e), e)
-    except SingleAddress.SingleAddressResolutionError as e:
+    except SingleAddress._SingleAddressResolutionError as e:
       _raise_did_you_mean(e.single_address_family, e.name, source=e)
 
     all_matching_addresses = [

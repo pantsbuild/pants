@@ -53,7 +53,7 @@ class Spec(AbstractClass):
   def address_target_pairs_from_address_families(self, address_families):
     """Given a list of AddressFamily, return (address, target) pairs matching this spec.
 
-    :raises: :class:`SingleAddress.SingleAddressResolutionError` for resolution errors with a
+    :raises: :class:`SingleAddress._SingleAddressResolutionError` for resolution errors with a
              :class:`SingleAddress` instance.
     :raises: :class:`Spec.AddressResolutionError` if no targets could be found otherwise, if the
              spec type requires a non-empty set of targets.
@@ -93,16 +93,16 @@ class SingleAddress(datatype(['directory', 'name']), Spec):
   def matching_address_families(self, address_families_dict):
     return self.address_families_for_dir(address_families_dict, self.directory)
 
-  class SingleAddressResolutionError(Exception):
+  class _SingleAddressResolutionError(Exception):
     def __init__(self, single_address_family, name):
-      super(SingleAddress.SingleAddressResolutionError, self).__init__()
+      super(SingleAddress._SingleAddressResolutionError, self).__init__()
       self.single_address_family = single_address_family
       self.name = name
 
   def address_target_pairs_from_address_families(self, address_families):
     """Return the pair for the single target matching the single AddressFamily, or error.
 
-    :raises: :class:`SingleAddress.SingleAddressResolutionError` if no targets could be found for a
+    :raises: :class:`SingleAddress._SingleAddressResolutionError` if no targets could be found for a
              :class:`SingleAddress` instance.
     :return: list of (Address, Target) pairs with exactly one element.
     """
@@ -112,7 +112,7 @@ class SingleAddress(datatype(['directory', 'name']), Spec):
       if addr.target_name == self.name
     ]
     if len(addr_tgt_pairs) == 0:
-      raise self.SingleAddressResolutionError(single_af, self.name)
+      raise self._SingleAddressResolutionError(single_af, self.name)
     # There will be at most one target with a given name in a single AddressFamily.
     assert(len(addr_tgt_pairs) == 1)
     return addr_tgt_pairs
