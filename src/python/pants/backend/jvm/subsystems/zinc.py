@@ -24,7 +24,8 @@ from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import fast_relpath
+from pants.util.dirutil import fast_relpath, safe_mkdir
+from pants.util.fileutil import safe_hardlink_or_copy
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -237,6 +238,9 @@ class Zinc(object):
     """
     return self._zinc_factory._scala_reflect(self._products)
 
+  def _workdir(self):
+    return self._zinc_factory.get_options().pants_workdir
+
   @memoized_property
   def _compiler_bridge_cache_dir(self):
     """A directory where we can store compiled copies of the `compiler-bridge`.
@@ -249,12 +253,12 @@ class Zinc(object):
     """
     hasher = sha1()
     for cp_entry in [self.zinc, self.compiler_interface, self.compiler_bridge]:
-      hasher.update(os.path.relpath(cp_entry, get_buildroot()))
+      hasher.update(os.path.relpath(cp_entry, self._workdir()))
     key = hasher.hexdigest()[:12]
 
-    return os.path.join(self._zinc_factory.get_options().pants_workdir, 'zinc', 'compiler-bridge', key)
+    return os.path.join(self._workdir(), 'zinc', 'compiler-bridge', key)
 
-  def _make_relative(self, path):
+  def _relative_to_buildroot(self, path):
     """A utility function to create relative paths to the work dir"""
     return fast_relpath(path, get_buildroot())
 
@@ -269,7 +273,7 @@ class Zinc(object):
       '--scala-reflect', self.scala_reflect,
     ]
     input_jar_snapshots = context._scheduler.capture_snapshots((PathGlobsAndRoot(
-      PathGlobs(tuple([self._make_relative(jar) for jar in bootstrapper_args[1::2]])),
+      PathGlobs(tuple([self._relative_to_buildroot(jar) for jar in bootstrapper_args[1::2]])),
       text_type(get_buildroot())
     ),))
     argv = tuple(['.jdk/bin/java'] +
@@ -279,8 +283,8 @@ class Zinc(object):
     req = ExecuteProcessRequest(
       argv=argv,
       input_files=input_jar_snapshots[0].directory_digest,
-      output_files=(self._make_relative(bridge_jar),),
-      output_directories=(self._make_relative(self._compiler_bridge_cache_dir),),
+      output_files=(self._relative_to_buildroot(bridge_jar),),
+      output_directories=(self._relative_to_buildroot(self._compiler_bridge_cache_dir),),
       description='bootstrap compiler bridge.',
       jdk_home=self.dist.home,
     )
@@ -295,17 +299,35 @@ class Zinc(object):
                     This is mostly needed to use its scheduler to create digests of the relevant jars.
     :return: The absolute path to the compiled scala-compiler-bridge jar.
     """
-    bridge_jar = os.path.join(self._compiler_bridge_cache_dir, 'scala-compiler-bridge.jar')
+    bridge_jar_name = 'scala-compiler-bridge.jar'
+    bridge_jar = os.path.join(self._compiler_bridge_cache_dir, bridge_jar_name)
+    global_bridge_cache_dir = os.path.join(self._zinc_factory.get_options().pants_bootstrapdir, fast_relpath(self._compiler_bridge_cache_dir,  self._workdir()))
+    globally_cached_bridge_jar = os.path.join(global_bridge_cache_dir, bridge_jar_name)
+
+    # Workaround to avoid recompiling the bridge for every integration test
+    # We check the bootstrapdir (.cache) for the bridge.
+    # If it exists, we make a copy to the buildroot.
+    #
+    # TODO Remove when action caches are implemented.
+    if os.path.exists(globally_cached_bridge_jar):
+      # Cache the bridge jar under buildroot, to allow snapshotting
+      safe_mkdir(self._relative_to_buildroot(self._compiler_bridge_cache_dir))
+      safe_hardlink_or_copy(globally_cached_bridge_jar, bridge_jar)
 
     if not os.path.exists(bridge_jar):
       res = self._run_bootstrapper(bridge_jar, context)
       context._scheduler.materialize_directories((
         DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
       ))
+      # For the workaround above to work, we need to store a copy of the bridge in
+      # the bootstrapdir cache (.cache).
+      safe_mkdir(global_bridge_cache_dir)
+      safe_hardlink_or_copy(bridge_jar, globally_cached_bridge_jar)
+
       return ClasspathEntry(bridge_jar, res.output_directory_digest)
     else:
       bridge_jar_snapshot = context._scheduler.capture_snapshots((PathGlobsAndRoot(
-        PathGlobs((self._make_relative(bridge_jar),)),
+        PathGlobs((self._relative_to_buildroot(bridge_jar),)),
         text_type(get_buildroot())
       ),))[0]
       bridge_jar_digest = bridge_jar_snapshot.directory_digest
