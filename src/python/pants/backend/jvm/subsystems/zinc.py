@@ -23,7 +23,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.java.distribution.distribution import Distribution
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
