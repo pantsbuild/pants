@@ -98,7 +98,6 @@ class ScroogeGenTest(NailgunTaskTestBase):
         language='{language}',
         compiler_args={compiler_args},
         strict_deps=True,
-        fatal_warnings=False,
       )
     '''.format(language=language, compiler_args=compiler_args_str))
 

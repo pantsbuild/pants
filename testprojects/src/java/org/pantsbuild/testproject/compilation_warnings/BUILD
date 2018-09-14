@@ -1,16 +1,11 @@
 java_library(
   name='fatal',
-  fatal_warnings=True,
+  compiler_option_sets={'fatal_warnings'},
   sources=['Warning.java'],
 )
 
 java_library(
   name='nonfatal',
-  fatal_warnings=False,
-  sources=['Warning.java'],
-)
-
-java_library(
-  name='defaultfatal',
+  compiler_option_sets={},
   sources=['Warning.java'],
 )
