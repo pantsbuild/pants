@@ -53,7 +53,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       'GLOBAL': {
         # Muddies the logs with warnings: once all of the warnings in the repository
         # are fixed, this can be removed.
-        # Note: some testprojects are made to intentionally create these warnings -- these could
+        # TODO: some testprojects are made to intentionally create these warnings -- these could
         # potentially be tagged as such so we don't have to have this setting on.
         'glob_expansion_failure': 'ignore',
       }
