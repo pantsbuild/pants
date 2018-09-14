@@ -4,7 +4,11 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
 from builtins import object
+from hashlib import sha1
+
+from future.utils import text_type
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.java import Java
@@ -15,10 +19,13 @@ from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.base.build_environment import get_buildroot
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot
+from pants.base.workunit import WorkUnitLabel
+from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
+from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import fast_relpath
+from pants.util.dirutil import fast_relpath, safe_mkdir
+from pants.util.fileutil import safe_hardlink_or_copy
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -26,10 +33,12 @@ class Zinc(object):
   """Configuration for Pants' zinc wrapper tool."""
 
   ZINC_COMPILE_MAIN = 'org.pantsbuild.zinc.compiler.Main'
+  ZINC_BOOTSTRAPER_MAIN = 'org.pantsbuild.zinc.bootstrapper.Main'
   ZINC_EXTRACT_MAIN = 'org.pantsbuild.zinc.extractor.Main'
   DEFAULT_CONFS = ['default']
 
   ZINC_COMPILER_TOOL_NAME = 'zinc'
+  ZINC_BOOTSTRAPPER_TOOL_NAME = 'zinc-bootstrapper'
   ZINC_EXTRACTOR_TOOL_NAME = 'zinc-extractor'
 
   class Factory(Subsystem, JvmToolMixin):
@@ -60,9 +69,18 @@ class Zinc(object):
         ]
 
       cls.register_jvm_tool(register,
+                            Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME,
+                            classpath=[
+                              JarDependency('org.pantsbuild', 'zinc-bootstrapper_2.11', '0.0.3'),
+                            ],
+                            main=Zinc.ZINC_BOOTSTRAPER_MAIN,
+                            custom_rules=shader_rules,
+                          )
+
+      cls.register_jvm_tool(register,
                             Zinc.ZINC_COMPILER_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.7'),
+                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.8'),
                             ],
                             main=Zinc.ZINC_COMPILE_MAIN,
                             custom_rules=shader_rules)
@@ -76,6 +94,7 @@ class Zinc(object):
                                                 classifier='sources',
                                                 intransitive=True),
                             ])
+
       cls.register_jvm_tool(register,
                             'compiler-interface',
                             classpath=[
@@ -92,8 +111,26 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_EXTRACTOR_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.4')
+                              JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.6')
                             ])
+
+      # Register scalac for fixed versions of Scala, 2.10, 2.11 and 2.12.
+      # Relies on ScalaPlatform to get the revision version from the major.minor version.
+      # The tool with the correct scala version will be retrieved later,
+      # taking the user-passed option into account.
+      supported_scala_versions=['2.10', '2.11', '2.12']
+      wanted_jars = ['scala-compiler', 'scala-library', 'scala-reflect']
+      for scala_version in supported_scala_versions:
+        cls.register_jvm_tool(register,
+                              ScalaPlatform.versioned_tool_name('scalac', scala_version),
+                              classpath=[
+                                ScalaPlatform.create_jardep(jar, scala_version) for jar in wanted_jars
+                              ])
+
+      # Register custom scalac tool.
+      cls.register_jvm_tool(register,
+                            ScalaPlatform.versioned_tool_name('scalac', 'custom'),
+                            classpath=[JarDependency('missing spec', ' //:scalac')])
 
     @classmethod
     def _zinc(cls, products):
@@ -106,6 +143,30 @@ class Zinc(object):
     @classmethod
     def _compiler_interface(cls, products):
       return cls.tool_jar_from_products(products, 'compiler-interface', cls.options_scope)
+
+    @classmethod
+    def _compiler_bootstrapper(cls, products):
+      return cls.tool_jar_from_products(products, Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME, cls.options_scope)
+
+    # Retrieves the path of a tool's jar
+    # by looking at the classpath of the registered tool with the user-specified scala version.
+    def _fetch_tool_jar_from_scalac_classpath(self, products, jar_name):
+      scala_version = ScalaPlatform.global_instance().version
+      classpath = self.tool_classpath_from_products(products,
+                                                    ScalaPlatform.versioned_tool_name('scalac', scala_version),
+                                                    scope=self.options_scope)
+      candidates = [jar for jar in classpath if jar_name in jar]
+      assert(len(candidates) == 1)
+      return candidates[0]
+
+    def _scala_compiler(self, products):
+      return self._fetch_tool_jar_from_scalac_classpath(products, 'scala-compiler')
+
+    def _scala_library(self, products):
+      return self._fetch_tool_jar_from_scalac_classpath(products, 'scala-library')
+
+    def _scala_reflect(self, products):
+      return self._fetch_tool_jar_from_scalac_classpath(products, 'scala-reflect')
 
     def create(self, products):
       """Create a Zinc instance from products active in the current Pants run.
@@ -153,6 +214,125 @@ class Zinc(object):
     """
     return self._zinc_factory._compiler_interface(self._products)
 
+  @memoized_property
+  def scala_compiler(self):
+    """Return the path to the scala compiler jar.
+
+    :rtype: str
+    """
+    return self._zinc_factory._scala_compiler(self._products)
+
+  @memoized_property
+  def scala_library(self):
+    """Return the path to the scala library jar (runtime).
+
+    :rtype: str
+    """
+    return self._zinc_factory._scala_library(self._products)
+
+  @memoized_property
+  def scala_reflect(self):
+    """Return the path to the scala library jar (runtime).
+
+    :rtype: str
+    """
+    return self._zinc_factory._scala_reflect(self._products)
+
+  def _workdir(self):
+    return self._zinc_factory.get_options().pants_workdir
+
+  @memoized_property
+  def _compiler_bridge_cache_dir(self):
+    """A directory where we can store compiled copies of the `compiler-bridge`.
+
+    The compiler-bridge is specific to each scala version.
+    Currently we compile the `compiler-bridge` only once, while bootstrapping.
+    Then, we store it in the working directory under .pants.d/zinc/<cachekey>, where
+    <cachekey> is calculated using the locations of zinc, the compiler interface,
+    and the compiler bridge.
+    """
+    hasher = sha1()
+    for cp_entry in [self.zinc, self.compiler_interface, self.compiler_bridge]:
+      hasher.update(os.path.relpath(cp_entry, self._workdir()))
+    key = hasher.hexdigest()[:12]
+
+    return os.path.join(self._workdir(), 'zinc', 'compiler-bridge', key)
+
+  def _relative_to_buildroot(self, path):
+    """A utility function to create relative paths to the work dir"""
+    return fast_relpath(path, get_buildroot())
+
+  def _run_bootstrapper(self, bridge_jar, context):
+    bootstrapper = self._zinc_factory._compiler_bootstrapper(self._products)
+    bootstrapper_args = [
+      '--out', bridge_jar,
+      '--compiler-interface', self.compiler_interface,
+      '--compiler-bridge-src', self.compiler_bridge,
+      '--scala-compiler', self.scala_compiler,
+      '--scala-library', self.scala_library,
+      '--scala-reflect', self.scala_reflect,
+    ]
+    input_jar_snapshots = context._scheduler.capture_snapshots((PathGlobsAndRoot(
+      PathGlobs(tuple([self._relative_to_buildroot(jar) for jar in bootstrapper_args[1::2]])),
+      text_type(get_buildroot())
+    ),))
+    argv = tuple(['.jdk/bin/java'] +
+                 ['-cp', bootstrapper, Zinc.ZINC_BOOTSTRAPER_MAIN] +
+                 bootstrapper_args
+    )
+    req = ExecuteProcessRequest(
+      argv=argv,
+      input_files=input_jar_snapshots[0].directory_digest,
+      output_files=(self._relative_to_buildroot(bridge_jar),),
+      output_directories=(self._relative_to_buildroot(self._compiler_bridge_cache_dir),),
+      description='bootstrap compiler bridge.',
+      jdk_home=self.dist.home,
+    )
+    return context.execute_process_synchronously_or_raise(req, 'zinc-subsystem', [WorkUnitLabel.COMPILER])
+
+  @memoized_method
+  def compile_compiler_bridge(self, context):
+    """Compile the compiler bridge to be used by zinc, using our scala bootstrapper.
+    It will compile and cache the jar, and materialize it if not already there.
+
+    :param context: The context of the task trying to compile the bridge.
+                    This is mostly needed to use its scheduler to create digests of the relevant jars.
+    :return: The absolute path to the compiled scala-compiler-bridge jar.
+    """
+    bridge_jar_name = 'scala-compiler-bridge.jar'
+    bridge_jar = os.path.join(self._compiler_bridge_cache_dir, bridge_jar_name)
+    global_bridge_cache_dir = os.path.join(self._zinc_factory.get_options().pants_bootstrapdir, fast_relpath(self._compiler_bridge_cache_dir,  self._workdir()))
+    globally_cached_bridge_jar = os.path.join(global_bridge_cache_dir, bridge_jar_name)
+
+    # Workaround to avoid recompiling the bridge for every integration test
+    # We check the bootstrapdir (.cache) for the bridge.
+    # If it exists, we make a copy to the buildroot.
+    #
+    # TODO Remove when action caches are implemented.
+    if os.path.exists(globally_cached_bridge_jar):
+      # Cache the bridge jar under buildroot, to allow snapshotting
+      safe_mkdir(self._relative_to_buildroot(self._compiler_bridge_cache_dir))
+      safe_hardlink_or_copy(globally_cached_bridge_jar, bridge_jar)
+
+    if not os.path.exists(bridge_jar):
+      res = self._run_bootstrapper(bridge_jar, context)
+      context._scheduler.materialize_directories((
+        DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
+      ))
+      # For the workaround above to work, we need to store a copy of the bridge in
+      # the bootstrapdir cache (.cache).
+      safe_mkdir(global_bridge_cache_dir)
+      safe_hardlink_or_copy(bridge_jar, globally_cached_bridge_jar)
+
+      return ClasspathEntry(bridge_jar, res.output_directory_digest)
+    else:
+      bridge_jar_snapshot = context._scheduler.capture_snapshots((PathGlobsAndRoot(
+        PathGlobs((self._relative_to_buildroot(bridge_jar),)),
+        text_type(get_buildroot())
+      ),))[0]
+      bridge_jar_digest = bridge_jar_snapshot.directory_digest
+      return ClasspathEntry(bridge_jar, bridge_jar_digest)
+
   @memoized_method
   def snapshot(self, scheduler):
     buildroot = get_buildroot()
@@ -161,7 +341,7 @@ class Zinc(object):
         PathGlobs(
           tuple(
             fast_relpath(a, buildroot)
-            for a in (self.zinc, self.compiler_bridge, self.compiler_interface)
+              for a in (self.zinc, self.compiler_bridge, self.compiler_interface)
           )
         ),
         buildroot,
@@ -228,5 +408,5 @@ class Zinc(object):
     """Compute the compile classpath for the given target."""
     return list(
       entry.path
-      for entry in self.compile_classpath_entries(classpath_product_key, target, extra_cp_entries)
+        for entry in self.compile_classpath_entries(classpath_product_key, target, extra_cp_entries)
     )
