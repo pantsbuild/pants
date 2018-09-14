@@ -687,7 +687,14 @@ class JvmCompile(NailgunTaskBase):
     compile_context = self.select_runtime_context(context_for_target)
 
     job = Job(self.exec_graph_key_for_target(compile_target),
-              functools.partial(self._default_work_for_vts, ivts, compile_context, counter, all_compile_contexts),
+              functools.partial(
+                self._default_work_for_vts,
+                ivts,
+                compile_context,
+                'runtime_classpath',
+                counter,
+                all_compile_contexts,
+                classpath_product),
               [self.exec_graph_key_for_target(target) for target in invalid_dependencies],
               self._size_estimator(compile_context.sources),
               # If compilation and analysis work succeeds, validate the vts.
@@ -815,7 +822,7 @@ class JvmCompile(NailgunTaskBase):
     plugin_tgts = self.context.targets(predicate=lambda t: isinstance(t, plugin_cls))
     return {t.plugin: t.closure() for t in plugin_tgts}
 
-  def _default_work_for_vts(self, vts, ctx, classpath_product_key, counter, all_compile_contexts, classpath_product):
+  def _default_work_for_vts(self, vts, ctx, input_classpath_product_key, counter, all_compile_contexts, output_classpath_product):
     progress_message = ctx.target.address.spec
 
     # Double check the cache before beginning compilation
@@ -827,7 +834,7 @@ class JvmCompile(NailgunTaskBase):
     if not hit_cache:
       # Compute the compile classpath for this target.
       dependency_cp_entries = self._zinc.compile_classpath_entries(
-        'runtime_classpath',
+        input_classpath_product_key,
         ctx.target,
         extra_cp_entries=self._extra_compile_time_classpath,
       )
@@ -869,7 +876,7 @@ class JvmCompile(NailgunTaskBase):
       self._create_context_jar(ctx)
 
     # Update the products with the latest classes.
-    classpath_product.add_for_target(
+    output_classpath_product.add_for_target(
       ctx.target,
       [(conf, self._classpath_for_context(ctx), directory_digest) for conf in self._confs],
     )

@@ -51,18 +51,18 @@ class RscCompileIntegration(BaseCompileIT):
           'outline/META-INF/semanticdb/out.semanticdb')
         self.assertTrue(os.path.exists(path))
 
-  def test_executing_multi_target_binary_built_hermeticly(self):
+  def test_executing_multi_target_binary(self):
     with temporary_dir() as cache_dir:
       config = {
         'cache.compile.rsc': {'write_to': [cache_dir]},
         'jvm-platform': {'compiler': 'rsc'},
-        'compile.rsc': {'execution_strategy': 'hermetic'}
+        'compile.rsc': {'execution_strategy': 'subprocess'}
       }
-
-      pants_run = self.run_pants(
-        ['run',
-         'examples/src/scala/org/pantsbuild/example/hello/exe',
-         ],
-        config)
-      self.assert_success(pants_run)
-      self.assertIn('Hello, Resource World!', pants_run.stdout_data)
+      with self.temporary_workdir() as workdir:
+        pants_run = self.run_pants_with_workdir(
+          ['run',
+           'examples/src/scala/org/pantsbuild/example/hello/exe',
+           ],
+          workdir, config)
+        self.assert_success(pants_run)
+        self.assertIn('Hello, Resource World!', pants_run.stdout_data)

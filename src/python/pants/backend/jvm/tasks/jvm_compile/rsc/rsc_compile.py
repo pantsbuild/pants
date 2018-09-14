@@ -178,9 +178,7 @@ class RscCompile(ZincCompile):
           compile_cc.target,
           [(conf, compile_cc.jar_file) for conf in self._confs])
       elif target.has_sources('.scala'):
-        self.context.products.get_data('rsc_classpath').add_for_target(
-          rsc_cc.target,
-          [(conf, rsc_cc.rsc_mjar_file) for conf in self._confs])
+        pass
       else:
         pass
 
@@ -372,6 +370,10 @@ class RscCompile(ZincCompile):
             ],
             output_dir=os.path.dirname(rsc_mjar_file)
             )
+          self.context.products.get_data('rsc_classpath').add_for_target(
+            ctx.target,
+            [(conf, ctx.rsc_mjar_file) for conf in self._confs],
+          )
 
         self._record_target_stats(tgt,
                                   len(cp_entries),
@@ -438,6 +440,16 @@ class RscCompile(ZincCompile):
         )
       )
     elif compile_target.has_sources('.java'):
+      # write to both rsc classpath and runtime classpath
+      class CompositeProductAdder(object):
+        def __init__(self, runtime_classpath_product, rsc_classpath_product):
+          self.rsc_classpath_product = rsc_classpath_product
+          self.runtime_classpath_product = runtime_classpath_product
+
+        def add_for_target(self, *args, **kwargs):
+          self.runtime_classpath_product.add_for_target(*args, **kwargs)
+          self.rsc_classpath.add_for_target(*args, **kwargs)
+
       full_key = self._compile_against_rsc_key_for_target(compile_target)
       zinc_jobs.append(
         Job(
@@ -449,7 +461,9 @@ class RscCompile(ZincCompile):
             'runtime_classpath',
             counter,
             compile_contexts,
-            runtime_classpath_product),
+            CompositeProductAdder(
+              runtime_classpath_product,
+              self.context.products.get_data('rsc_classpath'))),
           [self._compile_against_rsc_key_for_target(target) for target in invalid_dependencies],
           self._size_estimator(compile_context_pair[1].sources),
           # NB: right now, only the last job will write to the cache, because we don't
