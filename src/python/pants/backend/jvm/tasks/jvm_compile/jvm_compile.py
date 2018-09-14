@@ -429,10 +429,12 @@ class JvmCompile(NailgunTaskBase):
       cc = self.select_runtime_context(compile_contexts[valid_target])
 
       if self.execution_strategy == self.HERMETIC:
-        classes_directory_cp_entry = cc.classes_dir
-        classes_directory_cp_entry.set_directory_digest(self._snapshot_dependencies(cc))
-        cc.classes_dir = classes_directory_cp_entry
-        print("@@@@@", cc)
+        print("#######", cc.classes_dir)
+        new_classpath_entry = ClasspathEntry(cc.classes_dir.path, self._snapshot_dependencies(cc))
+        # classes_directory_cp_entry = cc.classes_dir
+        # classes_directory_cp_entry.set_directory_digest(self._snapshot_dependencies(cc))
+        cc.classes_dir = new_classpath_entry
+        print("@@@@@", cc.classes_dir)
 
       classpath_product.add_for_target(
         valid_target,
