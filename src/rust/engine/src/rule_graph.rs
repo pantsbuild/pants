@@ -227,9 +227,9 @@ impl<'t> GraphMaker<'t> {
     }
   }
 
-  pub fn sub_graph(&self, param_type: &TypeId, product_type: &TypeConstraint) -> RuleGraph {
+  pub fn sub_graph(&self, param_type: TypeId, product_type: &TypeConstraint) -> RuleGraph {
     // TODO: Update to support rendering a subgraph given a set of ParamTypes.
-    let param_types = vec![*param_type].into_iter().collect();
+    let param_types = vec![param_type].into_iter().collect();
 
     if let Some(beginning_root) = self.gen_root_entry(&param_types, product_type) {
       self.construct_graph(vec![beginning_root])
@@ -314,7 +314,7 @@ impl<'t> GraphMaker<'t> {
     if let Some(simplified) = all_simplified_entries.get(&entry) {
       // A simplified equivalent entry has already been computed, return it.
       return ConstructGraphResult::Fulfilled(simplified.clone());
-    } else if let Some(_) = unfulfillable_rules.get(&entry) {
+    } else if unfulfillable_rules.get(&entry).is_some() {
       // The rule is unfulfillable.
       return ConstructGraphResult::Unfulfillable;
     }
@@ -336,10 +336,11 @@ impl<'t> GraphMaker<'t> {
         // been computed (or we would have returned it above). The cyclic parent(s) will complete
         // before recursing to compute this node again.
         let mut cyclic_deps = HashSet::new();
-        cyclic_deps.insert(entry.clone());
+        let simplified = entry.simplified(BTreeSet::new());
+        cyclic_deps.insert(entry);
         return ConstructGraphResult::CycledOn {
           cyclic_deps,
-          partial_simplified_entries: vec![entry.simplified(BTreeSet::new())],
+          partial_simplified_entries: vec![simplified],
         };
       }
     };
@@ -384,15 +385,15 @@ impl<'t> GraphMaker<'t> {
 
     for select_key in dependency_keys {
       let (params, product) = match &select_key {
-        &SelectKey::JustSelect(ref s) => (entry.params().clone(), s.product.clone()),
+        &SelectKey::JustSelect(ref s) => (entry.params().clone(), s.product),
         &SelectKey::JustGet(ref g) => {
           // Unlike Selects, Gets introduce new parameter values into a subgraph.
           let get_params = {
             let mut p = entry.params().clone();
-            p.insert(g.subject.clone());
+            p.insert(g.subject);
             p
           };
-          (get_params, g.product.clone())
+          (get_params, g.product)
         }
       };
 
@@ -407,7 +408,7 @@ impl<'t> GraphMaker<'t> {
             rule_dependency_edges,
             all_simplified_entries,
             unfulfillable_rules,
-            c.clone(),
+            c,
           ) {
             ConstructGraphResult::Unfulfillable => {}
             ConstructGraphResult::Fulfilled(simplified_entries) => {
@@ -445,13 +446,15 @@ impl<'t> GraphMaker<'t> {
         // If any candidate triggered a cycle on a rule that has not yet completed, then we are not
         // yet fulfillable, and should finish gathering any other cyclic rule dependencies.
         continue;
-      } else if fulfillable_candidates.is_empty() {
+      }
+
+      if fulfillable_candidates.is_empty() {
         // If no candidates were fulfillable, this rule is not fulfillable.
         unfulfillable_diagnostics.push(Diagnostic {
           params: params.clone(),
           reason: format!(
             "no rule was available to compute {} with parameter type{} {}",
-            type_constraint_str(product.clone()),
+            type_constraint_str(product),
             if params.len() > 1 { "s" } else { "" },
             params_str(&params),
           ),
@@ -480,11 +483,11 @@ impl<'t> GraphMaker<'t> {
     let flattened_fulfillable_candidates_by_key = fulfillable_candidates_by_key
       .into_iter()
       .map(|(k, candidate_group)| (k, Itertools::flatten(candidate_group.into_iter()).collect()))
-      .collect();
+      .collect::<Vec<_>>();
 
     // Generate one Entry per legal combination of parameters.
     let simplified_entries =
-      match Self::monomorphize(&entry, flattened_fulfillable_candidates_by_key) {
+      match Self::monomorphize(&entry, &flattened_fulfillable_candidates_by_key) {
         Ok(se) => se,
         Err(ambiguous_diagnostics) => {
           // At least one combination of the dependencies was ambiguous.
@@ -496,9 +499,17 @@ impl<'t> GraphMaker<'t> {
           return Ok(ConstructGraphResult::Unfulfillable);
         }
       };
-    let simplified_entries_only = simplified_entries.keys().cloned().collect();
+    let simplified_entries_only: Vec<_> = simplified_entries.keys().cloned().collect();
 
-    if !cycled_on.is_empty() {
+    if cycled_on.is_empty() {
+      // All dependencies were fulfillable and none were blocked on cycles. Remove the
+      // placeholder and store the simplified entries.
+      rule_dependency_edges.remove(&entry);
+      rule_dependency_edges.extend(simplified_entries);
+
+      all_simplified_entries.insert(entry, simplified_entries_only.clone());
+      Ok(ConstructGraphResult::Fulfilled(simplified_entries_only))
+    } else {
       // The set of cycled dependencies can only contain call stack "parents" of the dependency: we
       // remove this entry from the set (if we're in it), until the top-most cyclic parent
       // (represented by an empty set) is the one that re-starts recursion.
@@ -510,25 +521,17 @@ impl<'t> GraphMaker<'t> {
         //
         // Store our simplified equivalence and then re-execute our dependency discovery. In this
         // second attempt our cyclic dependencies will use the simplified representation(s) to succeed.
-        all_simplified_entries.insert(entry.clone(), simplified_entries_only);
-        return Err(());
+        all_simplified_entries.insert(entry, simplified_entries_only);
+        Err(())
       } else {
         // This rule may be fulfillable, but we can't compute its complete set of dependencies until
         // parent rule entries complete. Remove our placeholder edges before returning.
         rule_dependency_edges.remove(&entry);
-        return Ok(ConstructGraphResult::CycledOn {
+        Ok(ConstructGraphResult::CycledOn {
           cyclic_deps: cycled_on,
           partial_simplified_entries: simplified_entries_only,
-        });
+        })
       }
-    } else {
-      // All dependencies were fulfillable and none were blocked on cycles. Remove the
-      // placeholder and store the simplified entries.
-      rule_dependency_edges.remove(&entry);
-      rule_dependency_edges.extend(simplified_entries);
-
-      all_simplified_entries.insert(entry.clone(), simplified_entries_only.clone());
-      return Ok(ConstructGraphResult::Fulfilled(simplified_entries_only));
     }
   }
 
@@ -542,12 +545,12 @@ impl<'t> GraphMaker<'t> {
   ///
   fn monomorphize(
     entry: &EntryWithDeps,
-    deps: Vec<(SelectKey, Vec<Entry>)>,
+    deps: &[(SelectKey, Vec<Entry>)],
   ) -> Result<HashMap<EntryWithDeps, RuleEdges>, Vec<Diagnostic>> {
     // Collect the powerset of the union of used parameters, ordered by set size.
     let params_powerset: Vec<Vec<TypeId>> = {
       let mut all_used_params = BTreeSet::new();
-      for (key, inputs) in &deps {
+      for (key, inputs) in deps {
         for input in inputs {
           all_used_params.extend(Self::used_params(key, input));
         }
@@ -575,7 +578,7 @@ impl<'t> GraphMaker<'t> {
         continue;
       }
 
-      match Self::choose_dependencies(&available_params, &deps) {
+      match Self::choose_dependencies(&available_params, deps) {
         Ok(Some(inputs)) => {
           let mut rule_edges = RuleEdges::default();
           for (key, input) in inputs {
@@ -589,10 +592,10 @@ impl<'t> GraphMaker<'t> {
     }
 
     // If none of the combinations was satisfiable, return the generated diagnostics.
-    if !combinations.is_empty() {
-      Ok(combinations)
-    } else {
+    if combinations.is_empty() {
       Err(diagnostics)
+    } else {
+      Ok(combinations)
     }
   }
 
@@ -606,7 +609,7 @@ impl<'t> GraphMaker<'t> {
   ///
   fn choose_dependencies<'a>(
     available_params: &ParamTypes,
-    deps: &'a Vec<(SelectKey, Vec<Entry>)>,
+    deps: &'a [(SelectKey, Vec<Entry>)],
   ) -> Result<Option<Vec<(&'a SelectKey, &'a Entry)>>, Diagnostic> {
     let mut combination = Vec::new();
     for (key, input_entries) in deps {
@@ -664,18 +667,15 @@ impl<'t> GraphMaker<'t> {
       // identity) rather than dependents.
       let mut rules_by_kind: HashMap<EntryWithDeps, (usize, &Entry)> = HashMap::new();
       for satisfiable_entry in satisfiable_entries.iter() {
-        match satisfiable_entry {
-          &Entry::WithDeps(ref wd) => {
-            rules_by_kind
-              .entry(wd.simplified(BTreeSet::new()))
-              .and_modify(|e| {
-                if e.0 > wd.params().len() {
-                  *e = (wd.params().len(), satisfiable_entry);
-                }
-              })
-              .or_insert((wd.params().len(), satisfiable_entry));
-          }
-          _ => {}
+        if let &Entry::WithDeps(ref wd) = satisfiable_entry {
+          rules_by_kind
+            .entry(wd.simplified(BTreeSet::new()))
+            .and_modify(|e| {
+              if e.0 > wd.params().len() {
+                *e = (wd.params().len(), satisfiable_entry);
+              }
+            })
+            .or_insert((wd.params().len(), satisfiable_entry));
         }
       }
 
@@ -710,7 +710,7 @@ impl<'t> GraphMaker<'t> {
   }
 
   fn powerset<'a, T: Clone>(slice: &'a [T]) -> impl Iterator<Item = Vec<T>> + 'a {
-    (0..(1 << slice.len())).into_iter().map(move |mask| {
+    (0..(1 << slice.len())).map(move |mask| {
       let mut ss = Vec::new();
       let mut bitset = mask;
       while bitset > 0 {
@@ -806,7 +806,7 @@ pub fn type_str(type_id: TypeId) -> String {
 pub fn params_str(params: &ParamTypes) -> String {
   params
     .iter()
-    .map(|type_id| type_str(type_id.clone()))
+    .map(|type_id| type_str(*type_id))
     .collect::<Vec<_>>()
     .join("+")
 }
@@ -1002,7 +1002,7 @@ impl RuleGraph {
           .into_iter()
           .map(|d| {
             if d.details.is_empty() {
-              format!("{}", d.reason)
+              d.reason.clone()
             } else {
               format!("{}:\n      {}", d.reason, d.details.join("\n      "))
             }
