@@ -11,7 +11,6 @@ from pants.backend.jvm.subsystems.zinc_language_mixin import ZincLanguageMixin
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 from pants.build_graph.address import Address
 from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
@@ -152,14 +151,6 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
     if scala_path:
       snapshots = scheduler.capture_snapshots(tuple(PathGlobsAndRoot(PathGlobs([path]), get_buildroot()) for path in scala_path))
       return [ClasspathEntry(path, snapshot) for path, snapshot in list(zip(scala_path, snapshots))]
-    else:
-      return [ClasspathEntry(p, None) for p in scala_path]
-
-  @deprecated('1.12.0.dev0', 'Use compiler_classpath_entries instead.')
-  def compiler_classpath(self, products):
-    """Returns classpath as paths."""
-    compiler_classpath_entries = self._tool_classpath('scalac', products)
-    return [classpath_entry.path for classpath_entry in compiler_classpath_entries]
 
   def compiler_classpath_entries(self, products, scheduler):
     """Returns classpath entries for the scalac tool."""
