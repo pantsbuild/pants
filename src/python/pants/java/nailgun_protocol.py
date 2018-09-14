@@ -238,21 +238,26 @@ class NailgunProtocol(object):
 
   @classmethod
   def encode_process_exit_code(cls, code):
-    """???"""
+    """Verify the object is a valid return code, and encode it to the right type of string.
+
+    :param int code: The return code of a completed subprocess execution.
+    :raises: :class:`TypeError` if `code` is not an integer.
+    :return: A representation suitable to pass as the `payload` to send_exit().
+    """
     if not isinstance(code, int):
-      raise Exception('???')
+      raise TypeError("cannot encode non-integer exit code: {} (type '{}')."
+                      .format(code, type(code)))
     return str(code).encode('ascii')
 
   @classmethod
   def send_exit_with_code(cls, sock, code):
-    """???"""
+    """Send the Exit chunk over the specified socket, containing an integer return code."""
     encoded_exit_status = cls.encode_process_exit_code(code)
     cls.send_exit(sock, payload=encoded_exit_status)
 
   @classmethod
   def encode_env_var_value(cls, obj):
-    """???"""
-    # return str(obj).encode('utf-8')
+    """Encode the input so that it can be used as the value of an environment variable."""
     return binary_type(str(obj))
 
   @classmethod
