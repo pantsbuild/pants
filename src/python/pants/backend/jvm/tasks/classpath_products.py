@@ -184,7 +184,11 @@ class ClasspathProducts(object):
       self.add_for_target(target, classpath_elements)
 
   def add_for_target(self, target, classpath_elements):
-    """Adds classpath path elements to the products of the provided target."""
+    """Adds classpath path elements to the products of the provided target.
+
+    :param target: The target for which to add the classpath elements.
+    :param classpath_elements: List of strings or pants.backend.jvm.tasks.ClasspathEntry
+    """
     self._add_elements_for_target(target, self._wrap_path_elements(classpath_elements))
 
   def add_jars_for_targets(self, targets, conf, resolved_jars):
@@ -329,7 +333,13 @@ class ClasspathProducts(object):
       self._excludes.add_for_target(target, target.excludes)
 
   def _wrap_path_elements(self, classpath_elements):
-    return [(element[0], ClasspathEntry(*element[1:])) for element in classpath_elements]
+    wrapped_path_elements = []
+    for element in classpath_elements:
+      if isinstance(element[1], ClasspathEntry):
+        wrapped_path_elements.append(element)
+      else:
+        wrapped_path_elements.append((element[0], ClasspathEntry(*element[1:])))
+    return wrapped_path_elements
 
   def _add_elements_for_target(self, target, elements):
     self._validate_classpath_tuples(elements, target)

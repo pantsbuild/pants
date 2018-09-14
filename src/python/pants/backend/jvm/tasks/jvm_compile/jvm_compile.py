@@ -401,8 +401,8 @@ class JvmCompile(NailgunTaskBase):
 
   def _classpath_for_context(self, context):
     if self.get_options().use_classpath_jars:
-      return context.jar_file.path
-    return context.classes_dir.path
+      return context.jar_file
+    return context.classes_dir
 
   def create_runtime_classpath(self):
     compile_classpath = self.context.products.get_data('compile_classpath')
@@ -420,21 +420,13 @@ class JvmCompile(NailgunTaskBase):
     invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
     valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
 
-    # Register classpaths and products for valid targets.
-    # TODO: Store the DirectoryDigest for successful compiles in the target workdir as text,
-    # and hydrate them into the ClasspathEntries here when we get cache hits.
-    # See https://github.com/pantsbuild/pants/issues/6429
     for valid_target in valid_targets:
-      # capture snapshot here and add to classpathentry
       cc = self.select_runtime_context(compile_contexts[valid_target])
 
       if self.execution_strategy == self.HERMETIC:
-        print("#######", cc.classes_dir)
-        new_classpath_entry = ClasspathEntry(cc.classes_dir.path, self._snapshot_dependencies(cc))
-        # classes_directory_cp_entry = cc.classes_dir
-        # classes_directory_cp_entry.set_directory_digest(self._snapshot_dependencies(cc))
+        new_classpath_entry = ClasspathEntry(cc.classes_dir.path,
+          self._get_directory_digest_of_dependencies(cc))
         cc.classes_dir = new_classpath_entry
-        print("@@@@@", cc.classes_dir)
 
       classpath_product.add_for_target(
         valid_target,
@@ -481,16 +473,14 @@ class JvmCompile(NailgunTaskBase):
     with open(path, 'w') as f:
       f.write(text)
 
-  def _snapshot_dependencies(self, compile_context):
-    print("$$$$", self.get_options().pants_workdir, compile_context.classes_dir)
-    relative_classes_dir = fast_relpath(compile_context.classes_dir.path, self.get_options().pants_workdir)
-    relative_analysis_file = fast_relpath(compile_context.analysis_file, self.get_options().pants_workdir)
+  def _get_directory_digest_of_dependencies(self, compile_context):
+    relative_classes_dir = fast_relpath(compile_context.classes_dir.path, get_buildroot())
+    relative_analysis_file = fast_relpath(compile_context.analysis_file, get_buildroot())
     snapshot = self.context._scheduler.capture_snapshots((PathGlobsAndRoot(
-        PathGlobs(tuple([relative_classes_dir, relative_analysis_file])),
+        PathGlobs(tuple([relative_classes_dir + '/**', relative_analysis_file])),
         get_buildroot(),
       ),))[0]
-    print("&&&&&", snapshot)
-    return snapshot
+    return snapshot.directory_digest
 
   def _compile_vts(self, vts, ctx, upstream_analysis, dependency_classpath, progress_message, settings,
                    compiler_option_sets, zinc_file_manager, counter):
@@ -704,10 +694,6 @@ class JvmCompile(NailgunTaskBase):
       # Double check the cache before beginning compilation
       hit_cache = self.check_cache(vts, counter)
 
-      # TODO: Load from store when https://github.com/pantsbuild/pants/issues/6429 is complete.
-      directory_digest = ctx.classes_dir.directory_digest
-      print("%%%%%%%%", ctx.target, directory_digest)
-
       if not hit_cache:
         # Compute the compile classpath for this target.
         dependency_cp_entries = self._zinc.compile_classpath_entries(
@@ -739,6 +725,10 @@ class JvmCompile(NailgunTaskBase):
                             compiler_option_sets,
                             zinc_file_manager,
                             counter)
+
+        # This might be missing the analysis file?
+        ctx.classes_dir = ClasspathEntry(ctx.classes_dir.path, directory_digest)
+
         self._record_target_stats(tgt,
                                   len(dependency_cp_entries),
                                   len(ctx.sources),
@@ -755,7 +745,7 @@ class JvmCompile(NailgunTaskBase):
       # Update the products with the latest classes.
       classpath_product.add_for_target(
         ctx.target,
-        [(conf, self._classpath_for_context(ctx), directory_digest) for conf in self._confs],
+        [(conf, self._classpath_for_context(ctx)) for conf in self._confs],
       )
       self.register_extra_products_from_contexts([ctx.target], all_compile_contexts)
 
