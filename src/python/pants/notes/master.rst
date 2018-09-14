@@ -4,6 +4,40 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.11.0.dev0 (09/14/2018)
+------------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add extra_jvm_options to jvm_binary targets (#6310)
+  `PR #6310 <https://github.com/pantsbuild/pants/pull/6310>`_
+
+Bugfixes
+~~~~~~~~
+
+* make fatal_warnings_enabled_args a tuple instead of just parens (#6497)
+  `PR #6497 <https://github.com/pantsbuild/pants/pull/6497>`_
+
+* pass through `compatibility` to synthetic python thrift targets (#6499)
+  `PR #6499 <https://github.com/pantsbuild/pants/pull/6499>`_
+
+* Apply  workaround similer to #6409 to bootstrapper (#6498)
+  `PR #6498 <https://github.com/pantsbuild/pants/pull/6498>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* delete unnecessary testproject and broken test (#6494)
+  `PR #6494 <https://github.com/pantsbuild/pants/pull/6494>`_
+
+* skip integration test with pants_requirement() (#6493)
+  `PR #6493 <https://github.com/pantsbuild/pants/pull/6493>`_
+
+* Add bootstrapper jar to compile the compile-bridge. (#6462)
+  `PR #6462 <https://github.com/pantsbuild/pants/pull/6462>`_
+
+
 1.10.0rc0 (09/10/2018)
 ----------------------
 
